@@ -1,0 +1,7 @@
+plugins {
+  id 'com.diffplug.blowdryer'
+}
+repositories {
+  mavenCentral()
+}
+apply from: rootProject.file('gradle/spotless.gradle')
