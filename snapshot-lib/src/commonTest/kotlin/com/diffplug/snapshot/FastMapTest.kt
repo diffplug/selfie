@@ -27,6 +27,8 @@ class FastMapTest {
     map.values shouldBe emptyList()
     map.entries shouldBe emptySet()
     map["key"] shouldBe null
+    map shouldBe mapOf()
+    map shouldBe FastMap.empty()
   }
 
   private fun assertSingle(map: FastMap<String, String>, key: String, value: String) {
@@ -36,6 +38,8 @@ class FastMapTest {
     map.entries shouldBe setOf(entry(key, value))
     map[key] shouldBe value
     map[key + "blah"] shouldBe null
+    map shouldBe mapOf(key to value)
+    map shouldBe FastMap.empty<String, String>().plus(key, value)
   }
 
   private fun assertDouble(
@@ -52,6 +56,10 @@ class FastMapTest {
     map[key1] shouldBe value1
     map[key2] shouldBe value2
     map[key1 + "blah"] shouldBe null
+    map shouldBe mapOf(key1 to value1, key2 to value2)
+    map shouldBe mapOf(key2 to value2, key1 to value1)
+    map shouldBe FastMap.empty<String, String>().plus(key1, value1).plus(key2, value2)
+    map shouldBe FastMap.empty<String, String>().plus(key2, value2).plus(key1, value1)
   }
 
   @Test

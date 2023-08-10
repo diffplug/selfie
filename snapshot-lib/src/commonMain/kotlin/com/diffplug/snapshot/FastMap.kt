@@ -21,8 +21,8 @@ internal expect abstract class ListBackedSet<T>() : Set<T>, AbstractList<T> {}
 
 internal expect fun <K, V> entry(key: K, value: V): Map.Entry<K, V>
 
-/** An immutable sorted map. */
-data class FastMap<K : Comparable<K>, V : Any>(private val data: Array<Any>) : Map<K, V> {
+/** An immutable sorted map. Wish it could be package-private! UGH!! */
+class FastMap<K : Comparable<K>, V : Any>(private val data: Array<Any>) : Map<K, V> {
   /**
    * Returns a new FastMap which has added the given key. Throws an exception if the key already
    * exists.
@@ -90,15 +90,17 @@ data class FastMap<K : Comparable<K>, V : Any>(private val data: Array<Any>) : M
   override fun isEmpty(): Boolean = data.isEmpty()
 
   override fun equals(other: Any?): Boolean {
-    if (this === other) return true
-    if (other == null || this::class != other::class) return false
-    other as FastMap<*, *>
-    return data.contentEquals(other.data)
+    if (other === this) return true
+    if (other !is Map<*, *>) return false
+    if (size != other.size) return false
+    if (other is FastMap<*, *>) {
+      return data == other.data
+    } else {
+      return other.entries.all { (key, value) -> this[key] == value }
+    }
   }
 
-  override fun hashCode(): Int {
-    return data.contentHashCode()
-  }
+  override fun hashCode(): Int = entries.hashCode()
 
   companion object {
     private val EMPTY = FastMap<String, Any>(arrayOf())
