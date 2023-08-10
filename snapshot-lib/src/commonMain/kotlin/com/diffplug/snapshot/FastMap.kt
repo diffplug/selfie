@@ -17,27 +17,29 @@ package com.diffplug.snapshot
 
 import kotlin.collections.binarySearch
 
-expect abstract class ListBackedSet<T>() : Set<T>, AbstractList<T> {}
+internal expect abstract class ListBackedSet<T>() : Set<T>, AbstractList<T> {}
 
-expect fun <K, V> entry(key: K, value: V): Map.Entry<K, V>
+internal expect fun <K, V> entry(key: K, value: V): Map.Entry<K, V>
 
 /** An immutable sorted map. */
-interface FastMap<K : Comparable<K>, V : Any> : Map<K, V> {
+data class FastMap<K : Comparable<K>, V : Any>(private val data: Array<Any>) : Map<K, V> {
   /**
    * Returns a new FastMap which has added the given key. Throws an exception if the key already
    * exists.
    */
-  fun plus(key: K, value: V): FastMap<K, V>
-
-  companion object {
-    private val EMPTY = ArrayMap<String, Any>(arrayOf())
-
-    fun <K : Comparable<K>, V : Any> empty() = EMPTY as FastMap<K, V>
+  fun plus(key: K, value: V): FastMap<K, V> {
+    return when (size) {
+      0 -> FastMap(arrayOf(key, value))
+      1 ->
+          key.compareTo(data[0] as K).let {
+            if (it < 0) FastMap(arrayOf(key, value, data[0], data[1]))
+            else if (it > 0) FastMap(arrayOf(data[0], data[1], key, value))
+            else throw IllegalArgumentException("Key already exists: $key")
+          }
+      else -> TODO("Binary search like get()")
+    }
   }
-}
 
-internal data class ArrayMap<K : Comparable<K>, V : Any>(private val data: Array<Any>) :
-    FastMap<K, V> {
   private val dataAsKeys =
       object : ListBackedSet<K>() {
         override val size: Int
@@ -47,19 +49,6 @@ internal data class ArrayMap<K : Comparable<K>, V : Any>(private val data: Array
           return data[index * 2] as K
         }
       }
-
-  override fun plus(key: K, value: V): FastMap<K, V> {
-    return when (size) {
-      0 -> ArrayMap(arrayOf(key, value))
-      1 ->
-          key.compareTo(data[0] as K).let {
-            if (it < 0) ArrayMap(arrayOf(key, value, data[0], data[1]))
-            else if (it > 0) ArrayMap(arrayOf(data[0], data[1], key, value))
-            else throw IllegalArgumentException("Key already exists: $key")
-          }
-      else -> TODO("Binary search like get()")
-    }
-  }
 
   override fun get(key: K): V? {
     val idx = dataAsKeys.binarySearch(key)
@@ -103,11 +92,17 @@ internal data class ArrayMap<K : Comparable<K>, V : Any>(private val data: Array
   override fun equals(other: Any?): Boolean {
     if (this === other) return true
     if (other == null || this::class != other::class) return false
-    other as ArrayMap<*, *>
+    other as FastMap<*, *>
     return data.contentEquals(other.data)
   }
 
   override fun hashCode(): Int {
     return data.contentHashCode()
+  }
+
+  companion object {
+    private val EMPTY = FastMap<String, Any>(arrayOf())
+
+    fun <K : Comparable<K>, V : Any> empty() = EMPTY as FastMap<K, V>
   }
 }
