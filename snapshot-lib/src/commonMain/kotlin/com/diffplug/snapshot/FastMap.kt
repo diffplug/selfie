@@ -17,6 +17,8 @@ package com.diffplug.snapshot
 
 import kotlin.collections.binarySearch
 
+expect abstract class ListBackedSet<T>() : Set<T>, AbstractList<T> {}
+
 /** An immutable sorted map. */
 interface FastMap<K : Comparable<K>, V : Any> : Map<K, V> {
   /**
@@ -38,7 +40,7 @@ internal data class E<K, V>(override val key: K, override val value: V) : Map.En
 internal data class ArrayMap<K : Comparable<K>, V : Any>(private val data: Array<Any>) :
     FastMap<K, V> {
   private val dataAsKeys =
-      object : Set<K>, AbstractList<K>() {
+      object : ListBackedSet<K>() {
         override val size: Int
           get() = data.size / 2
 
@@ -71,7 +73,7 @@ internal data class ArrayMap<K : Comparable<K>, V : Any>(private val data: Array
 
   override val entries: Set<Map.Entry<K, V>>
     get() =
-        object : Set<Map.Entry<K, V>>, AbstractList<Map.Entry<K, V>>() {
+        object : ListBackedSet<Map.Entry<K, V>>() {
           override val size: Int
             get() = data.size / 2
 
