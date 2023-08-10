@@ -15,4 +15,18 @@
  */
 package com.diffplug.snapshot
 
-actual abstract class ListBackedSet<T> actual constructor() : Set<T>, AbstractList<T>() {}
+actual abstract class ListBackedSet<T> actual constructor() : Set<T>, AbstractList<T>()
+
+actual fun <K, V> entry(key: K, value: V): Map.Entry<K, V> = E(key, value)
+
+class E<K, V>(override val key: K, override val value: V) : Map.Entry<K, V> {
+  override fun equals(other: Any?): Boolean {
+    if (other is Map.Entry<*, *>) {
+      return key == other.key && value == other.value
+    } else {
+      return false
+    }
+  }
+
+  override fun hashCode(): Int = key.hashCode() xor value.hashCode()
+}

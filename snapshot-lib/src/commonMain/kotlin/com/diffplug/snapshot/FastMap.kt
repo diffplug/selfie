@@ -19,6 +19,8 @@ import kotlin.collections.binarySearch
 
 expect abstract class ListBackedSet<T>() : Set<T>, AbstractList<T> {}
 
+expect fun <K, V> entry(key: K, value: V): Map.Entry<K, V>
+
 /** An immutable sorted map. */
 interface FastMap<K : Comparable<K>, V : Any> : Map<K, V> {
   /**
@@ -33,9 +35,6 @@ interface FastMap<K : Comparable<K>, V : Any> : Map<K, V> {
     fun <K : Comparable<K>, V : Any> empty() = EMPTY as FastMap<K, V>
   }
 }
-
-/** Only because there is no Map.entry in Kotlin. */
-internal data class E<K, V>(override val key: K, override val value: V) : Map.Entry<K, V>
 
 internal data class ArrayMap<K : Comparable<K>, V : Any>(private val data: Array<Any>) :
     FastMap<K, V> {
@@ -80,7 +79,7 @@ internal data class ArrayMap<K : Comparable<K>, V : Any>(private val data: Array
           override fun get(index: Int): Map.Entry<K, V> {
             val key = data[index * 2] as K
             val value = data[index * 2 + 1] as V
-            return E(key, value)
+            return entry(key, value)
           }
         }
 
