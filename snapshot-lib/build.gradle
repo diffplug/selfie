@@ -8,10 +8,6 @@ repositories {
 apply from: rootProject.file('gradle/spotless.gradle')
 kotlin {
   jvm {
-    compilations.all {
-      kotlinOptions.jvmTarget = '17'
-    }
-    withJava()
     testRuns["test"].executionTask.configure {
       useJUnitPlatform()
     }
