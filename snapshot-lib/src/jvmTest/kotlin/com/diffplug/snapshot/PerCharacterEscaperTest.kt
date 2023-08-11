@@ -27,18 +27,18 @@ class PerCharacterEscaperTest {
     val escaper = selfEscape("`123")
     // if nothing gets changed, it should return the exact same value
     val abc = "abc"
-    Assertions.assertSame(abc, escaper.doForward(abc))
-    Assertions.assertSame(abc, escaper.doBackward(abc))
+    Assertions.assertSame(abc, escaper.escape(abc))
+    Assertions.assertSame(abc, escaper.unescape(abc))
 
     // otherwise it should have the normal behavior
-    Assertions.assertEquals("`1", escaper.doForward("1"))
-    Assertions.assertEquals("``", escaper.doForward("`"))
-    Assertions.assertEquals("abc`1`2`3``def", escaper.doForward("abc123`def"))
+    Assertions.assertEquals("`1", escaper.escape("1"))
+    Assertions.assertEquals("``", escaper.escape("`"))
+    Assertions.assertEquals("abc`1`2`3``def", escaper.escape("abc123`def"))
 
     // in both directions
-    Assertions.assertEquals("1", escaper.doBackward("`1"))
-    Assertions.assertEquals("`", escaper.doBackward("``"))
-    Assertions.assertEquals("abc123`def", escaper.doBackward("abc`1`2`3``def"))
+    Assertions.assertEquals("1", escaper.unescape("`1"))
+    Assertions.assertEquals("`", escaper.unescape("``"))
+    Assertions.assertEquals("abc123`def", escaper.unescape("abc`1`2`3``def"))
   }
 
   @Test
@@ -46,18 +46,18 @@ class PerCharacterEscaperTest {
     val escaper = specifiedEscape("`a1b2c3d")
     // if nothing gets changed, it should return the exact same value
     val abc = "abc"
-    Assertions.assertSame(abc, escaper.doForward(abc))
-    Assertions.assertSame(abc, escaper.doBackward(abc))
+    Assertions.assertSame(abc, escaper.escape(abc))
+    Assertions.assertSame(abc, escaper.unescape(abc))
 
     // otherwise it should have the normal behavior
-    Assertions.assertEquals("`b", escaper.doForward("1"))
-    Assertions.assertEquals("`a", escaper.doForward("`"))
-    Assertions.assertEquals("abc`b`c`d`adef", escaper.doForward("abc123`def"))
+    Assertions.assertEquals("`b", escaper.escape("1"))
+    Assertions.assertEquals("`a", escaper.escape("`"))
+    Assertions.assertEquals("abc`b`c`d`adef", escaper.escape("abc123`def"))
 
     // in both directions
-    Assertions.assertEquals("1", escaper.doBackward("`b"))
-    Assertions.assertEquals("`", escaper.doBackward("`a"))
-    Assertions.assertEquals("abc123`def", escaper.doBackward("abc`1`2`3``def"))
+    Assertions.assertEquals("1", escaper.unescape("`b"))
+    Assertions.assertEquals("`", escaper.unescape("`a"))
+    Assertions.assertEquals("abc123`def", escaper.unescape("abc`1`2`3``def"))
   }
 
   @Test
@@ -66,12 +66,12 @@ class PerCharacterEscaperTest {
     // cornercase - escape character without follow-on will throw an error
     val exception =
         Assertions.assertThrows(java.lang.IllegalArgumentException::class.java) {
-          escaper.doBackward("`")
+          escaper.unescape("`")
         }
     Assertions.assertEquals(
         "Escape character '`' can't be the last character in a string.", exception.message)
     // escape character followed by non-escape character is fine
-    Assertions.assertEquals("a", escaper.doBackward("`a"))
+    Assertions.assertEquals("a", escaper.unescape("`a"))
   }
 
   @Test
@@ -80,19 +80,19 @@ class PerCharacterEscaperTest {
     // cornercase - escape character without follow-on will throw an error
     val exception =
         Assertions.assertThrows(java.lang.IllegalArgumentException::class.java) {
-          escaper.doBackward("`")
+          escaper.unescape("`")
         }
     Assertions.assertEquals(
         "Escape character '`' can't be the last character in a string.", exception.message)
     // escape character followed by non-escape character is fine
-    Assertions.assertEquals("e", escaper.doBackward("`e"))
+    Assertions.assertEquals("e", escaper.unescape("`e"))
   }
 
   @Test
   fun roundtrip() {
     val escaper = selfEscape("`<>")
     val roundtrip = Consumer { str: String? ->
-      Assertions.assertEquals(str, escaper.doBackward(escaper.doForward(str!!)))
+      Assertions.assertEquals(str, escaper.unescape(escaper.escape(str!!)))
     }
     roundtrip.accept("")
     roundtrip.accept("<local>~`/")

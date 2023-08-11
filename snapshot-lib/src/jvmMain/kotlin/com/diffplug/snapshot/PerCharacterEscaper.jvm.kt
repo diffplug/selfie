@@ -23,7 +23,7 @@ package com.diffplug.snapshot
  * I won't->I won''t
  * ```
  */
-class PerCharacterEscaper
+actual class PerCharacterEscaper
 /**
  * The first character in the string will be uses as the escape character, and all characters will
  * be escaped.
@@ -33,9 +33,6 @@ private constructor(
     private val escapedCodePoints: IntArray,
     private val escapedByCodePoints: IntArray
 ) {
-  fun needsEscaping(input: String): Boolean {
-    return firstOffsetNeedingEscape(input) != -1
-  }
   private fun firstOffsetNeedingEscape(input: String): Int {
     val length = input.length
     var firstOffsetNeedingEscape = -1
@@ -52,10 +49,7 @@ private constructor(
     }
     return firstOffsetNeedingEscape
   }
-  fun escapeCodePoint(): Int {
-    return escapeCodePoint
-  }
-  fun doForward(input: String): String {
+  actual fun escape(input: String): String {
     val noEscapes = firstOffsetNeedingEscape(input)
     return if (noEscapes == -1) {
       input
@@ -93,7 +87,7 @@ private constructor(
     }
     return firstOffsetNeedingEscape
   }
-  fun doBackward(input: String): String {
+  actual fun unescape(input: String): String {
     val noEscapes = firstOffsetNeedingUnescape(input)
     return if (noEscapes == -1) {
       input
@@ -129,8 +123,8 @@ private constructor(
     }
   }
 
-  companion object {
-    fun indexOf(arr: IntArray, target: Int): Int {
+  actual companion object {
+    private fun indexOf(arr: IntArray, target: Int): Int {
       for ((index, value) in arr.withIndex()) {
         if (value == target) {
           return index
@@ -147,7 +141,7 @@ private constructor(
      * I won't->I won''t
      * ```
      */
-    fun selfEscape(escapePolicy: String): PerCharacterEscaper {
+    actual fun selfEscape(escapePolicy: String): PerCharacterEscaper {
       val escapedCodePoints = escapePolicy.codePoints().toArray()
       val escapeCodePoint = escapedCodePoints[0]
       return PerCharacterEscaper(escapeCodePoint, escapedCodePoints, escapedCodePoints)
@@ -161,7 +155,7 @@ private constructor(
      * I won't->I won'at
      * ```
      */
-    fun specifiedEscape(escapePolicy: String): PerCharacterEscaper {
+    actual fun specifiedEscape(escapePolicy: String): PerCharacterEscaper {
       val codePoints = escapePolicy.codePoints().toArray()
       require(codePoints.size % 2 == 0)
       val escapeCodePoint = codePoints[0]
