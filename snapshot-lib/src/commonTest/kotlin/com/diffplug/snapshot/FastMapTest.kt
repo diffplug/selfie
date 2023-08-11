@@ -20,69 +20,6 @@ import io.kotest.matchers.shouldBe
 import kotlin.test.Test
 
 class FastMapTest {
-  private fun assertEmpty(map: FastMap<String, String>) {
-    map.size shouldBe 0
-    map.keys shouldBe emptySet()
-    map.values shouldBe emptyList()
-    map.entries shouldBe emptySet()
-    map["key"] shouldBe null
-    map shouldBe mapOf()
-    map shouldBe FastMap.empty()
-  }
-  private fun assertSingle(map: FastMap<String, String>, key: String, value: String) {
-    map.size shouldBe 1
-    map.keys shouldBe setOf(key)
-    map.values shouldBe listOf(value)
-    map.entries shouldBe setOf(entry(key, value))
-    map[key] shouldBe value
-    map[key + "blah"] shouldBe null
-    map shouldBe mapOf(key to value)
-    map shouldBe FastMap.empty<String, String>().plus(key, value)
-  }
-  private fun assertDouble(
-      map: FastMap<String, String>,
-      key1: String,
-      value1: String,
-      key2: String,
-      value2: String
-  ) {
-    map.size shouldBe 2
-    map.keys shouldBe setOf(key1, key2)
-    map.values shouldBe listOf(value1, value2)
-    map.entries shouldBe setOf(entry(key1, value1), entry(key2, value2))
-    map[key1] shouldBe value1
-    map[key2] shouldBe value2
-    map[key1 + "blah"] shouldBe null
-    map shouldBe mapOf(key1 to value1, key2 to value2)
-    map shouldBe mapOf(key2 to value2, key1 to value1)
-    map shouldBe FastMap.empty<String, String>().plus(key1, value1).plus(key2, value2)
-    map shouldBe FastMap.empty<String, String>().plus(key2, value2).plus(key1, value1)
-  }
-  private fun assertTriple(
-      map: FastMap<String, String>,
-      key1: String,
-      value1: String,
-      key2: String,
-      value2: String,
-      key3: String,
-      value3: String
-  ) {
-    map.size shouldBe 3
-    map.keys shouldBe setOf(key1, key2, key3)
-    map.values shouldBe listOf(value1, value2, value3)
-    map.entries shouldBe setOf(entry(key1, value1), entry(key2, value2), entry(key3, value3))
-    map[key1] shouldBe value1
-    map[key2] shouldBe value2
-    map[key3] shouldBe value3
-    map[key1 + "blah"] shouldBe null
-    map shouldBe mapOf(key1 to value1, key2 to value2, key3 to value3)
-    map shouldBe mapOf(key2 to value2, key1 to value1, key3 to value3)
-    map shouldBe
-        FastMap.empty<String, String>().plus(key1, value1).plus(key2, value2).plus(key3, value3)
-    map shouldBe
-        FastMap.empty<String, String>().plus(key2, value2).plus(key1, value1).plus(key3, value3)
-  }
-
   @Test
   fun empty() {
     val empty = FastMap.empty<String, String>()
@@ -146,5 +83,67 @@ class FastMapTest {
         "two",
         "3",
         "three")
+  }
+  private fun assertEmpty(map: FastMap<String, String>) {
+    map.size shouldBe 0
+    map.keys shouldBe emptySet()
+    map.values shouldBe emptyList()
+    map.entries shouldBe emptySet()
+    map["key"] shouldBe null
+    map shouldBe mapOf()
+    map shouldBe FastMap.empty()
+  }
+  private fun assertSingle(map: FastMap<String, String>, key: String, value: String) {
+    map.size shouldBe 1
+    map.keys shouldBe setOf(key)
+    map.values shouldBe listOf(value)
+    map.entries shouldBe setOf(entry(key, value))
+    map[key] shouldBe value
+    map[key + "blah"] shouldBe null
+    map shouldBe mapOf(key to value)
+    map shouldBe FastMap.empty<String, String>().plus(key, value)
+  }
+  private fun assertDouble(
+      map: FastMap<String, String>,
+      key1: String,
+      value1: String,
+      key2: String,
+      value2: String
+  ) {
+    map.size shouldBe 2
+    map.keys shouldBe setOf(key1, key2)
+    map.values shouldBe listOf(value1, value2)
+    map.entries shouldBe setOf(entry(key1, value1), entry(key2, value2))
+    map[key1] shouldBe value1
+    map[key2] shouldBe value2
+    map[key1 + "blah"] shouldBe null
+    map shouldBe mapOf(key1 to value1, key2 to value2)
+    map shouldBe mapOf(key2 to value2, key1 to value1)
+    map shouldBe FastMap.empty<String, String>().plus(key1, value1).plus(key2, value2)
+    map shouldBe FastMap.empty<String, String>().plus(key2, value2).plus(key1, value1)
+  }
+  private fun assertTriple(
+      map: FastMap<String, String>,
+      key1: String,
+      value1: String,
+      key2: String,
+      value2: String,
+      key3: String,
+      value3: String
+  ) {
+    map.size shouldBe 3
+    map.keys shouldBe setOf(key1, key2, key3)
+    map.values shouldBe listOf(value1, value2, value3)
+    map.entries shouldBe setOf(entry(key1, value1), entry(key2, value2), entry(key3, value3))
+    map[key1] shouldBe value1
+    map[key2] shouldBe value2
+    map[key3] shouldBe value3
+    map[key1 + "blah"] shouldBe null
+    map shouldBe mapOf(key1 to value1, key2 to value2, key3 to value3)
+    map shouldBe mapOf(key2 to value2, key1 to value1, key3 to value3)
+    map shouldBe
+        FastMap.empty<String, String>().plus(key1, value1).plus(key2, value2).plus(key3, value3)
+    map shouldBe
+        FastMap.empty<String, String>().plus(key2, value2).plus(key1, value1).plus(key3, value3)
   }
 }
