@@ -26,3 +26,8 @@ kotlin {
     }
   }
 }
+
+// the normal `test` task doesn't work for multiplatform projects
+tasks.create('test') {
+  dependsOn('jvmTest')
+}
