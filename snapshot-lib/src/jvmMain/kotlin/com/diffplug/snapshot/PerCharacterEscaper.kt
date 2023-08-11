@@ -36,7 +36,6 @@ private constructor(
   fun needsEscaping(input: String): Boolean {
     return firstOffsetNeedingEscape(input) != -1
   }
-
   private fun firstOffsetNeedingEscape(input: String): Int {
     val length = input.length
     var firstOffsetNeedingEscape = -1
@@ -53,11 +52,9 @@ private constructor(
     }
     return firstOffsetNeedingEscape
   }
-
   fun escapeCodePoint(): Int {
     return escapeCodePoint
   }
-
   fun doForward(input: String): String {
     val noEscapes = firstOffsetNeedingEscape(input)
     return if (noEscapes == -1) {
@@ -82,7 +79,6 @@ private constructor(
       builder.toString()
     }
   }
-
   private fun firstOffsetNeedingUnescape(input: String): Int {
     val length = input.length
     var firstOffsetNeedingEscape = -1
@@ -97,7 +93,6 @@ private constructor(
     }
     return firstOffsetNeedingEscape
   }
-
   fun doBackward(input: String): String {
     val noEscapes = firstOffsetNeedingUnescape(input)
     return if (noEscapes == -1) {

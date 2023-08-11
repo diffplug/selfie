@@ -27,6 +27,5 @@ class E<K, V>(override val key: K, override val value: V) : Map.Entry<K, V> {
       return false
     }
   }
-
   override fun hashCode(): Int = key.hashCode() xor value.hashCode()
 }

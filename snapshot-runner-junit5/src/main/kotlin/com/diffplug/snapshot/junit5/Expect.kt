@@ -31,32 +31,22 @@ interface ExpectSnapshot {
    * this method will prevent a snapshot from being removed.
    */
   fun preserveScenarios(vararg names: String)
-
   fun toMatchSnapshotBinary(content: ByteArray): String
-
   fun toMatchSnapshot(content: Any): String
-
   fun <T> toMatchSnapshot(content: T, snapshotter: Snapshotter<T>): String
 }
 
 interface ExpectLiteral {
   fun toMatchLiteral(content: Int, actual: Int): Int
-
   fun toMatchLiteral(content: Long, actual: Long): Long
-
   fun toMatchLiteral(content: Boolean, actual: Boolean): Boolean
-
   fun toMatchLiteral(content: Any, actual: String): String
 }
 
 class Expect : ExpectSnapshot { // TODO: ExpectLiteral
   override fun scenario(name: String) = TODO()
-
   override fun preserveScenarios(vararg names: String) = TODO()
-
   override fun toMatchSnapshotBinary(content: ByteArray) = TODO()
-
   override fun toMatchSnapshot(content: Any) = TODO()
-
   override fun <T> toMatchSnapshot(content: T, snapshotter: Snapshotter<T>) = TODO()
 }

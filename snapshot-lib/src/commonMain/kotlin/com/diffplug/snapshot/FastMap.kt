@@ -47,56 +47,46 @@ class FastMap<K : Comparable<K>, V : Any>(private val data: Array<Any>) : Map<K,
               })
     }
   }
-
+  /** list-backed set of guaranteed-sorted keys at even indices. */
   private val dataAsKeys =
       object : ListBackedSet<K>() {
         override val size: Int
           get() = data.size / 2
-
         override fun get(index: Int): K {
           return data[index * 2] as K
         }
       }
-
+  override val keys: Set<K>
+    get() = dataAsKeys
   override fun get(key: K): V? {
     val idx = dataAsKeys.binarySearch(key)
     return if (idx < 0) null else data[idx * 2 + 1] as V
   }
-
   override fun containsKey(key: K): Boolean = get(key) == null
-
+  /** list-backed collection of values at odd indices. */
+  override val values: List<V>
+    get() =
+        object : AbstractList<V>() {
+          override val size: Int
+            get() = data.size / 2
+          override fun get(index: Int): V = data[index * 2 + 1] as V
+        }
   override fun containsValue(value: V): Boolean = values.contains(value)
-
+  /** list-backed set of entries. */
   override val entries: Set<Map.Entry<K, V>>
     get() =
         object : ListBackedSet<Map.Entry<K, V>>() {
           override val size: Int
             get() = data.size / 2
-
           override fun get(index: Int): Map.Entry<K, V> {
             val key = data[index * 2] as K
             val value = data[index * 2 + 1] as V
             return entry(key, value)
           }
         }
-
-  override val keys: Set<K>
-    get() = dataAsKeys
-
-  override val values: Collection<V>
-    get() =
-        object : AbstractList<V>() {
-          override val size: Int
-            get() = data.size / 2
-
-          override fun get(index: Int): V = data[index * 2 + 1] as V
-        }
-
   override val size: Int
     get() = data.size / 2
-
   override fun isEmpty(): Boolean = data.isEmpty()
-
   override fun equals(other: Any?): Boolean {
     if (other === this) return true
     if (other !is Map<*, *>) return false
@@ -107,14 +97,11 @@ class FastMap<K : Comparable<K>, V : Any>(private val data: Array<Any>) : Map<K,
       return other.entries.all { (key, value) -> this[key] == value }
     }
   }
-
   override fun hashCode(): Int = entries.hashCode()
 
   companion object {
     private val EMPTY = FastMap<String, Any>(arrayOf())
-
     fun <K : Comparable<K>, V : Any> empty() = EMPTY as FastMap<K, V>
-
     fun <K : Comparable<K>, V : Any> of(pairs: MutableList<Pair<K, V>>): FastMap<K, V> {
       val array = arrayOfNulls<Any>(pairs.size * 2)
       pairs.sortBy { it.first }

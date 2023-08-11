@@ -29,7 +29,6 @@ class FastMapTest {
     map shouldBe mapOf()
     map shouldBe FastMap.empty()
   }
-
   private fun assertSingle(map: FastMap<String, String>, key: String, value: String) {
     map.size shouldBe 1
     map.keys shouldBe setOf(key)
@@ -40,7 +39,6 @@ class FastMapTest {
     map shouldBe mapOf(key to value)
     map shouldBe FastMap.empty<String, String>().plus(key, value)
   }
-
   private fun assertDouble(
       map: FastMap<String, String>,
       key1: String,
@@ -60,7 +58,6 @@ class FastMapTest {
     map shouldBe FastMap.empty<String, String>().plus(key1, value1).plus(key2, value2)
     map shouldBe FastMap.empty<String, String>().plus(key2, value2).plus(key1, value1)
   }
-
   private fun assertTriple(
       map: FastMap<String, String>,
       key1: String,
