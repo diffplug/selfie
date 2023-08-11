@@ -1,7 +1,7 @@
-╔═ 00_empty ═╗ inline
+╔═ 00_empty ═╗ Any text here, after the first '═╗', is a comment which is discarded by the parser.
 ╔═ 01_singleLineString ═╗
 this is one line
-╔═ 02_multiLineStringTrimmed ═╗Any text here, after the ═╗, is stored but not validated
+╔═ 02_multiLineStringTrimmed ═╗
 Line 1
 Line 2
 ╔═ 03_multiLineStringTrailingNewline ═╗

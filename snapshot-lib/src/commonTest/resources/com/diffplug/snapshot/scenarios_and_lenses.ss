@@ -1,3 +1,8 @@
+╔═name ═╗ error: Expected '╔═ '
+╔═ name═╗ error: Expected ' ═╗'
+╔═  name ═╗ error: Leading spaces are disallowed: ' name'
+╔═ name  ═╗ error: Trailing spaces are disallowed: 'name '
+
 ╔═ test ═╗
 ╔═ test/scenario ═╗
 ╔═ test/scenario/subscenario ═╗
@@ -22,3 +27,4 @@ We escape the following:
 ╔═ test with \nnewline\n in name ═╗
 ╔═ test with \ttab\t in name ═╗
 ╔═ test with \┌\─ ascii art \┐\─ in name ═╗
+
