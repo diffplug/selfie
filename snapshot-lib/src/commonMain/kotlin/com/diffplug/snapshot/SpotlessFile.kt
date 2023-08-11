@@ -58,6 +58,15 @@ class SnapshotValueReader(val lineReader: LineReader) {
   companion object {
     fun of(content: String) = SnapshotValueReader(LineReader.forString(content))
     fun of(content: ByteArray) = SnapshotValueReader(LineReader.forBinary(content))
+    private val headerFirstChar = '╔'
+    private val headerStart = "╔═ "
+    private val headerEnd = "═╗"
+    /**
+     * https://github.com/diffplug/spotless-snapshot/blob/f63192a84390901a3d3543066d095ea23bf81d21/snapshot-lib/src/commonTest/resources/com/diffplug/snapshot/scenarios_and_lenses.ss#L11-L29
+     */
+    private val nameEsc = PerCharacterEscaper.specifiedEscape("\\\\/∕[(])\nn\tt╔┌╗┐═─")
+    /** https://github.com/diffplug/spotless-snapshot/issues/2 */
+    private val bodyEsc = PerCharacterEscaper.selfEscape("\uD801\uDF43\uD801\uDF41")
   }
 }
 
