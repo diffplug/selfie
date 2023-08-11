@@ -17,7 +17,6 @@ package com.diffplug.snapshot
 
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
-import kotlin.test.Ignore
 import kotlin.test.Test
 
 class FastMapTest {
@@ -62,6 +61,31 @@ class FastMapTest {
     map shouldBe FastMap.empty<String, String>().plus(key2, value2).plus(key1, value1)
   }
 
+  private fun assertTriple(
+      map: FastMap<String, String>,
+      key1: String,
+      value1: String,
+      key2: String,
+      value2: String,
+      key3: String,
+      value3: String
+  ) {
+    map.size shouldBe 3
+    map.keys shouldBe setOf(key1, key2, key3)
+    map.values shouldBe listOf(value1, value2, value3)
+    map.entries shouldBe setOf(entry(key1, value1), entry(key2, value2), entry(key3, value3))
+    map[key1] shouldBe value1
+    map[key2] shouldBe value2
+    map[key3] shouldBe value3
+    map[key1 + "blah"] shouldBe null
+    map shouldBe mapOf(key1 to value1, key2 to value2, key3 to value3)
+    map shouldBe mapOf(key2 to value2, key1 to value1, key3 to value3)
+    map shouldBe
+        FastMap.empty<String, String>().plus(key1, value1).plus(key2, value2).plus(key3, value3)
+    map shouldBe
+        FastMap.empty<String, String>().plus(key2, value2).plus(key1, value1).plus(key3, value3)
+  }
+
   @Test
   fun empty() {
     val empty = FastMap.empty<String, String>()
@@ -92,9 +116,38 @@ class FastMapTest {
   }
 
   @Test
-  @Ignore // TODO: implement
+  fun of() {
+    assertEmpty(FastMap.of(mutableListOf<Pair<String, String>>()))
+    assertSingle(FastMap.of(mutableListOf("one" to "1")), "one", "1")
+    assertDouble(FastMap.of(mutableListOf("one" to "1", "two" to "2")), "one", "1", "two", "2")
+    assertDouble(FastMap.of(mutableListOf("two" to "2", "one" to "1")), "one", "1", "two", "2")
+  }
+
+  @Test
   fun multi() {
-    val three = FastMap.empty<String, String>().plus("1", "one").plus("2", "two").plus("3", "three")
-    three.size shouldBe 3
+    assertTriple(
+        FastMap.empty<String, String>().plus("1", "one").plus("2", "two").plus("3", "three"),
+        "1",
+        "one",
+        "2",
+        "two",
+        "3",
+        "three")
+    assertTriple(
+        FastMap.empty<String, String>().plus("2", "two").plus("3", "three").plus("1", "one"),
+        "1",
+        "one",
+        "2",
+        "two",
+        "3",
+        "three")
+    assertTriple(
+        FastMap.empty<String, String>().plus("3", "three").plus("1", "one").plus("2", "two"),
+        "1",
+        "one",
+        "2",
+        "two",
+        "3",
+        "three")
   }
 }

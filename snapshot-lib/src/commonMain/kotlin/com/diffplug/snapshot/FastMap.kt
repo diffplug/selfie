@@ -21,22 +21,30 @@ internal expect abstract class ListBackedSet<T>() : Set<T>, AbstractList<T> {}
 
 internal expect fun <K, V> entry(key: K, value: V): Map.Entry<K, V>
 
-/** An immutable sorted map. Wish it could be package-private! UGH!! */
+/** An immutable, sorted, array-backed map. Wish it could be package-private! UGH!! */
 class FastMap<K : Comparable<K>, V : Any>(private val data: Array<Any>) : Map<K, V> {
   /**
    * Returns a new FastMap which has added the given key. Throws an exception if the key already
    * exists.
    */
   fun plus(key: K, value: V): FastMap<K, V> {
-    return when (size) {
+    val idxExisting = dataAsKeys.binarySearch(key)
+    if (idxExisting >= 0) {
+      throw IllegalArgumentException("Key already exists: $key")
+    }
+    val idxInsert = -(idxExisting + 1)
+    return when (data.size) {
       0 -> FastMap(arrayOf(key, value))
-      1 ->
-          key.compareTo(data[0] as K).let {
-            if (it < 0) FastMap(arrayOf(key, value, data[0], data[1]))
-            else if (it > 0) FastMap(arrayOf(data[0], data[1], key, value))
-            else throw IllegalArgumentException("Key already exists: $key")
-          }
-      else -> TODO("Binary search like get()")
+      1 -> {
+        if (idxInsert == 0) FastMap(arrayOf(key, value, data[0], data[1]))
+        else FastMap(arrayOf(data[0], data[1], key, value))
+      }
+      else ->
+          // TODO: use idxInsert and arrayCopy to do this faster
+          of(
+              MutableList(size + 1) {
+                if (it < size) Pair(data[it * 2] as K, data[it * 2 + 1] as V) else Pair(key, value)
+              })
     }
   }
 
@@ -94,7 +102,7 @@ class FastMap<K : Comparable<K>, V : Any>(private val data: Array<Any>) : Map<K,
     if (other !is Map<*, *>) return false
     if (size != other.size) return false
     if (other is FastMap<*, *>) {
-      return data == other.data
+      return data.contentEquals(other.data)
     } else {
       return other.entries.all { (key, value) -> this[key] == value }
     }
@@ -106,5 +114,15 @@ class FastMap<K : Comparable<K>, V : Any>(private val data: Array<Any>) : Map<K,
     private val EMPTY = FastMap<String, Any>(arrayOf())
 
     fun <K : Comparable<K>, V : Any> empty() = EMPTY as FastMap<K, V>
+
+    fun <K : Comparable<K>, V : Any> of(pairs: MutableList<Pair<K, V>>): FastMap<K, V> {
+      val array = arrayOfNulls<Any>(pairs.size * 2)
+      pairs.sortBy { it.first }
+      for (i in 0 until pairs.size) {
+        array[i * 2] = pairs[i].first
+        array[i * 2 + 1] = pairs[i].second
+      }
+      return FastMap(array as Array<Any>)
+    }
   }
 }
