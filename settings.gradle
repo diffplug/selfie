@@ -41,4 +41,5 @@ blowdryerSetup {
 }
 
 include 'snapshot-lib'
+include 'snapshot-runner-junit5'
 rootProject.name = 'snapshot'

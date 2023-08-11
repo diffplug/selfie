@@ -50,12 +50,8 @@ data class Snapshot(
   }
 }
 
-interface Snapshotter<T> {
-  fun snapshot(value: T): Snapshot
-}
-
-interface SnapshotValueFile {
-  fun get(prefix: String): Snapshot? = TODO()
+class SnapshotValueFile {
+  fun get(key: String): SnapshotValue? = TODO()
 
   fun putString(prefix: String, content: String): Unit = TODO()
 
@@ -66,26 +62,8 @@ interface SnapshotValueReader {
   fun nextKey(): String?
 
   fun nextValue(): SnapshotValue
+
+  companion object {
+    fun of(file: String): SnapshotValueReader = TODO()
+  }
 }
-
-interface ExpectSnapshot {
-  fun toMatchSnapshotBinary(content: ByteArray)
-
-  fun toMatchSnapshot(content: Any)
-
-  fun <T> toMatchSnapshot(content: T, snapshotter: Snapshotter<T>)
-
-  fun scenario(name: String): ExpectSnapshot
-}
-
-interface ExpectInplace {
-  fun toMatch(content: Int, actual: Int)
-
-  fun toMatch(content: Long, actual: Long)
-
-  fun toMatch(content: Boolean, actual: Boolean)
-
-  fun toMatch(content: Any, actual: String)
-}
-
-interface Expect : ExpectSnapshot, ExpectInplace
