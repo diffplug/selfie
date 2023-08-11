@@ -50,20 +50,38 @@ data class Snapshot(
   }
 }
 
-class SnapshotValueFile {
-  fun get(key: String): SnapshotValue? = TODO()
+fun parseSS(valueReader: SnapshotValueReader): FastMap<String, Snapshot> = TODO()
 
-  fun putString(prefix: String, content: String): Unit = TODO()
+fun serializeSS(valueWriter: StringWriter, snapshots: FastMap<String, Snapshot>): Unit = TODO()
 
-  fun putBinary(prefix: String, content: ByteArray): Unit = TODO()
-}
-
-interface SnapshotValueReader {
-  fun nextKey(): String?
-
-  fun nextValue(): SnapshotValue
+/** Provides the ability to parse a snapshot file incrementally. */
+class SnapshotValueReader(val lineReader: LineReader) {
+  /** The key of the next value, does not increment anything about the reader's state. */
+  fun peekKey(): String? = TODO()
+  /** Reads the next value. */
+  fun nextValue(): SnapshotValue = TODO()
+  /** Same as nextValue, but faster. */
+  fun skipValue(): Unit = TODO()
 
   companion object {
-    fun of(file: String): SnapshotValueReader = TODO()
+    fun of(content: String) = SnapshotValueReader(LineReader.forString(content))
+
+    fun of(content: ByteArray) = SnapshotValueReader(LineReader.forBinary(content))
   }
+}
+
+expect class LineReader {
+  fun getLineNumber(): Int
+
+  fun readLine(): String
+
+  companion object {
+    fun forString(content: String): LineReader
+
+    fun forBinary(content: ByteArray): LineReader
+  }
+}
+
+interface StringWriter {
+  fun write(string: String)
 }
