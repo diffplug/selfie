@@ -17,8 +17,9 @@ package com.diffplug.snapshot
 
 actual class LineReader {
   actual companion object {
-    actual fun forString(content: String): LineReader {
-      TODO("Not yet implemented")
-    }
+    actual fun forString(content: String): LineReader = TODO()
+    actual fun forBinary(content: ByteArray): LineReader = TODO()
   }
+  actual fun getLineNumber(): Int = TODO()
+  actual fun readLine(): String = TODO()
 }
