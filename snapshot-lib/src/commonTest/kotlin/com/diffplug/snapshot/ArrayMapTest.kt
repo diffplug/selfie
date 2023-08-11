@@ -19,16 +19,16 @@ import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import kotlin.test.Test
 
-class FastMapTest {
+class ArrayMapTest {
   @Test
   fun empty() {
-    val empty = FastMap.empty<String, String>()
+    val empty = ArrayMap.empty<String, String>()
     assertEmpty(empty)
   }
 
   @Test
   fun single() {
-    val empty = FastMap.empty<String, String>()
+    val empty = ArrayMap.empty<String, String>()
     val single = empty.plus("one", "1")
     assertEmpty(empty)
     assertSingle(single, "one", "1")
@@ -36,7 +36,7 @@ class FastMapTest {
 
   @Test
   fun double() {
-    val empty = FastMap.empty<String, String>()
+    val empty = ArrayMap.empty<String, String>()
     val single = empty.plus("one", "1")
     val double = single.plus("two", "2")
     assertEmpty(empty)
@@ -51,16 +51,16 @@ class FastMapTest {
 
   @Test
   fun of() {
-    assertEmpty(FastMap.of(mutableListOf<Pair<String, String>>()))
-    assertSingle(FastMap.of(mutableListOf("one" to "1")), "one", "1")
-    assertDouble(FastMap.of(mutableListOf("one" to "1", "two" to "2")), "one", "1", "two", "2")
-    assertDouble(FastMap.of(mutableListOf("two" to "2", "one" to "1")), "one", "1", "two", "2")
+    assertEmpty(ArrayMap.of(mutableListOf<Pair<String, String>>()))
+    assertSingle(ArrayMap.of(mutableListOf("one" to "1")), "one", "1")
+    assertDouble(ArrayMap.of(mutableListOf("one" to "1", "two" to "2")), "one", "1", "two", "2")
+    assertDouble(ArrayMap.of(mutableListOf("two" to "2", "one" to "1")), "one", "1", "two", "2")
   }
 
   @Test
   fun multi() {
     assertTriple(
-        FastMap.empty<String, String>().plus("1", "one").plus("2", "two").plus("3", "three"),
+        ArrayMap.empty<String, String>().plus("1", "one").plus("2", "two").plus("3", "three"),
         "1",
         "one",
         "2",
@@ -68,7 +68,7 @@ class FastMapTest {
         "3",
         "three")
     assertTriple(
-        FastMap.empty<String, String>().plus("2", "two").plus("3", "three").plus("1", "one"),
+        ArrayMap.empty<String, String>().plus("2", "two").plus("3", "three").plus("1", "one"),
         "1",
         "one",
         "2",
@@ -76,7 +76,7 @@ class FastMapTest {
         "3",
         "three")
     assertTriple(
-        FastMap.empty<String, String>().plus("3", "three").plus("1", "one").plus("2", "two"),
+        ArrayMap.empty<String, String>().plus("3", "three").plus("1", "one").plus("2", "two"),
         "1",
         "one",
         "2",
@@ -84,16 +84,16 @@ class FastMapTest {
         "3",
         "three")
   }
-  private fun assertEmpty(map: FastMap<String, String>) {
+  private fun assertEmpty(map: ArrayMap<String, String>) {
     map.size shouldBe 0
     map.keys shouldBe emptySet()
     map.values shouldBe emptyList()
     map.entries shouldBe emptySet()
     map["key"] shouldBe null
     map shouldBe mapOf()
-    map shouldBe FastMap.empty()
+    map shouldBe ArrayMap.empty()
   }
-  private fun assertSingle(map: FastMap<String, String>, key: String, value: String) {
+  private fun assertSingle(map: ArrayMap<String, String>, key: String, value: String) {
     map.size shouldBe 1
     map.keys shouldBe setOf(key)
     map.values shouldBe listOf(value)
@@ -101,10 +101,10 @@ class FastMapTest {
     map[key] shouldBe value
     map[key + "blah"] shouldBe null
     map shouldBe mapOf(key to value)
-    map shouldBe FastMap.empty<String, String>().plus(key, value)
+    map shouldBe ArrayMap.empty<String, String>().plus(key, value)
   }
   private fun assertDouble(
-      map: FastMap<String, String>,
+      map: ArrayMap<String, String>,
       key1: String,
       value1: String,
       key2: String,
@@ -119,11 +119,11 @@ class FastMapTest {
     map[key1 + "blah"] shouldBe null
     map shouldBe mapOf(key1 to value1, key2 to value2)
     map shouldBe mapOf(key2 to value2, key1 to value1)
-    map shouldBe FastMap.empty<String, String>().plus(key1, value1).plus(key2, value2)
-    map shouldBe FastMap.empty<String, String>().plus(key2, value2).plus(key1, value1)
+    map shouldBe ArrayMap.empty<String, String>().plus(key1, value1).plus(key2, value2)
+    map shouldBe ArrayMap.empty<String, String>().plus(key2, value2).plus(key1, value1)
   }
   private fun assertTriple(
-      map: FastMap<String, String>,
+      map: ArrayMap<String, String>,
       key1: String,
       value1: String,
       key2: String,
@@ -142,8 +142,8 @@ class FastMapTest {
     map shouldBe mapOf(key1 to value1, key2 to value2, key3 to value3)
     map shouldBe mapOf(key2 to value2, key1 to value1, key3 to value3)
     map shouldBe
-        FastMap.empty<String, String>().plus(key1, value1).plus(key2, value2).plus(key3, value3)
+        ArrayMap.empty<String, String>().plus(key1, value1).plus(key2, value2).plus(key3, value3)
     map shouldBe
-        FastMap.empty<String, String>().plus(key2, value2).plus(key1, value1).plus(key3, value3)
+        ArrayMap.empty<String, String>().plus(key2, value2).plus(key1, value1).plus(key3, value3)
   }
 }

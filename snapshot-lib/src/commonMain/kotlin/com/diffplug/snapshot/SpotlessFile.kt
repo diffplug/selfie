@@ -28,7 +28,7 @@ interface SnapshotValue {
 
 data class Snapshot(
     val value: SnapshotValue,
-    private val lensData: FastMap<String, SnapshotValue>
+    private val lensData: ArrayMap<String, SnapshotValue>
 ) {
   /** A sorted immutable map of extra values. */
   val lenses: Map<String, SnapshotValue>
@@ -39,12 +39,12 @@ data class Snapshot(
       Snapshot(this.value, lensData.plus(key, SnapshotValue.of(value)))
 
   companion object {
-    fun of(binary: ByteArray) = Snapshot(SnapshotValue.of(binary), FastMap.empty())
-    fun of(string: String) = Snapshot(SnapshotValue.of(string), FastMap.empty())
+    fun of(binary: ByteArray) = Snapshot(SnapshotValue.of(binary), ArrayMap.empty())
+    fun of(string: String) = Snapshot(SnapshotValue.of(string), ArrayMap.empty())
   }
 }
-fun parseSS(valueReader: SnapshotValueReader): FastMap<String, Snapshot> = TODO()
-fun serializeSS(valueWriter: StringWriter, snapshots: FastMap<String, Snapshot>): Unit = TODO()
+fun parseSS(valueReader: SnapshotValueReader): ArrayMap<String, Snapshot> = TODO()
+fun serializeSS(valueWriter: StringWriter, snapshots: ArrayMap<String, Snapshot>): Unit = TODO()
 
 /** Provides the ability to parse a snapshot file incrementally. */
 class SnapshotValueReader(val lineReader: LineReader) {
