@@ -20,11 +20,11 @@ import kotlin.test.Test
 
 class SnapshotValueReaderTest {
   @Test
-  fun simple() {
+  fun noEscapingNeeded() {
     val reader =
         SnapshotValueReader.of(
             """
-            ╔═ 00_empty ═╗ Any text here, after the first '═╗', is a comment which is discarded by the parser.
+            ╔═ 00_empty ═╗
             ╔═ 01_singleLineString ═╗
             this is one line
             ╔═ 02_multiLineStringTrimmed ═╗
@@ -38,7 +38,8 @@ class SnapshotValueReaderTest {
 
             Line 1
             Line 2
-        """
+            ╔═ 05_notSureHowKotlinMultilineWorks ═╗
+            """
                 .trimIndent())
     reader.peekKey() shouldBe "00_empty"
     reader.peekKey() shouldBe "00_empty"
@@ -47,5 +48,42 @@ class SnapshotValueReaderTest {
     reader.peekKey() shouldBe "01_singleLineString"
     reader.nextValue().valueString() shouldBe "this is one line"
     // etc
+  }
+
+  @Test
+  fun invalidNames() {
+    /* TODO
+    ╔═name ═╗ error: Expected '╔═ '
+    ╔═ name═╗ error: Expected ' ═╗'
+    ╔═  name ═╗ error: Leading spaces are disallowed: ' name'
+    ╔═ name  ═╗ error: Trailing spaces are disallowed: 'name '
+    ╔═ name ═╗ comment okay
+    ╔═ name ═╗okay here too
+    ╔═ name ═╗ okay  ╔═ ═╗ (it's the first ' ═╗' that counts)
+             */
+  }
+
+  @Test
+  fun escapeCharactersInName() {
+    /* TODO
+    ╔═ test with \∕slash\∕ in name ═╗
+    ╔═ test with \(square brackets\) in name ═╗
+    ╔═ test with \\backslash\\ in name ═╗
+    ╔═ test with \nnewline\n in name ═╗
+    ╔═ test with \ttab\t in name ═╗
+    ╔═ test with \┌\─ ascii art \┐\─ in name ═╗
+     */
+  }
+
+  @Test
+  fun escapeCharactersInBody() {
+    /* TODO
+    ╔═ ascii art okay ═╗
+     ╔══╗
+    ╔═ escaped iff on first line ═╗
+    𐝁══╗
+    ╔═ body escape characters ═╗
+    𐝃𐝁𐝃𐝃 linear a is dead
+     */
   }
 }
