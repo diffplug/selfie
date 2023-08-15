@@ -12,13 +12,13 @@ The example below uses the JUnit 5 runner, but we also support TODO.
 Here is a very simple test which snapshots the HTML served at various URLs.
 
 ```java
-@Test public void gzipFavicon() {
-  expect(get("localhost:8080/favicon.ico", ContentEncoding.GZIP).bytes).toMatchSnapshot();
+@Test public void gzipFavicon(Expect expect) {
+  expect.toMatchBinarySnapshot(get("localhost:8080/favicon.ico", ContentEncoding.GZIP));
 }
-@Test public void orderFlow() {
-  expect(get("localhost:8080/orders")).toMatchSnapshot("initial");
+@Test public void orderFlow(Expect expect) {
+  expect.scenario("initial").toMatchSnapshot(get("localhost:8080/orders"));
   postOrder();
-  expect(get("localhost:8080/orders")).toMatchSnapshot("ordered");
+  expect.scenario("ordered").toMatchSnapshot(get("localhost:8080/orders"));
 }
 ```
 
@@ -46,9 +46,9 @@ H4sIAAAAAAAA/8pIzcnJVyjPL8pJUQQAlQYXAAAA
 A great thing about snapshots is that they are fast to write and update. A downside is that the asserted value is opaque. But it doesn't have to be! Just swap `toMatchSnapshot` for `toMatchLiteral`.
 
 ```java
-@Test public void preventCssBloat() {
+@Test public void preventCssBloat(Expect expect) {
   // spotless-snapshot can update this literal value for you ▼
-  int size = expect(get("/index.css").length).toMatchLiteral(5_236);
+  int size = expect.toMatchLiteral(get("/index.css").length, 5_236);
   if (size > 100_000) {
     Assert.fail("CSS has gotten too big!");
   }
