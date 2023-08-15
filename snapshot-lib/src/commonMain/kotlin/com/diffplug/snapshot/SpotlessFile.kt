@@ -15,15 +15,30 @@
  */
 package com.diffplug.snapshot
 
-interface SnapshotValue {
+sealed interface SnapshotValue {
   val isBinary: Boolean
+    get() = this is SnapshotValueBinary
   fun valueBinary(): ByteArray
   fun valueString(): String
 
   companion object {
-    fun of(binary: ByteArray): SnapshotValue = TODO()
-    fun of(string: String): SnapshotValue = TODO()
+    fun of(binary: ByteArray): SnapshotValue = SnapshotValueBinary(binary)
+    fun of(string: String): SnapshotValue = SnapshotValueString(string)
   }
+}
+
+internal data class SnapshotValueBinary(val value: ByteArray) : SnapshotValue {
+  override fun valueBinary(): ByteArray = value
+  override fun valueString() = throw UnsupportedOperationException("This is a binary value.")
+  override fun hashCode(): Int = value.contentHashCode()
+  override fun equals(other: Any?): Boolean =
+      if (this === other) true
+      else (other is SnapshotValueBinary && value.contentEquals(other.value))
+}
+
+internal data class SnapshotValueString(val value: String) : SnapshotValue {
+  override fun valueBinary() = throw UnsupportedOperationException("This is a string value.")
+  override fun valueString(): String = value
 }
 
 data class Snapshot(
