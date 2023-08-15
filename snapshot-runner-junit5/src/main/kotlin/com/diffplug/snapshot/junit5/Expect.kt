@@ -16,14 +16,11 @@
 package com.diffplug.snapshot.junit5
 
 import com.diffplug.snapshot.Snapshot
-
-interface Snapshotter<T> {
-  fun snapshot(value: T): Snapshot
-}
+import com.diffplug.snapshot.Snapshotter
 
 interface ExpectSnapshot {
   /** Creates a sub-snapshot, which can be used to group related snapshots together. */
-  fun scenario(name: String): Expect
+  fun scenario(name: String): ExpectSnapshot
 
   /**
    * Spotless prunes snapshots which are no longer used. If there are some that you want to
@@ -31,9 +28,9 @@ interface ExpectSnapshot {
    * this method will prevent a snapshot from being removed.
    */
   fun preserveScenarios(vararg names: String)
-  fun toMatchSnapshotBinary(content: ByteArray): String
+  fun toMatchSnapshotBinary(content: ByteArray): ByteArray
   fun toMatchSnapshot(content: Any): String
-  fun <T> toMatchSnapshot(content: T, snapshotter: Snapshotter<T>): String
+  fun <T> toMatchSnapshot(content: T, snapshotter: Snapshotter<T>): Snapshot
 }
 
 interface ExpectLiteral {
@@ -41,12 +38,4 @@ interface ExpectLiteral {
   fun toMatchLiteral(content: Long, actual: Long): Long
   fun toMatchLiteral(content: Boolean, actual: Boolean): Boolean
   fun toMatchLiteral(content: Any, actual: String): String
-}
-
-class Expect : ExpectSnapshot { // TODO: ExpectLiteral
-  override fun scenario(name: String) = TODO()
-  override fun preserveScenarios(vararg names: String) = TODO()
-  override fun toMatchSnapshotBinary(content: ByteArray) = TODO()
-  override fun toMatchSnapshot(content: Any) = TODO()
-  override fun <T> toMatchSnapshot(content: T, snapshotter: Snapshotter<T>) = TODO()
 }

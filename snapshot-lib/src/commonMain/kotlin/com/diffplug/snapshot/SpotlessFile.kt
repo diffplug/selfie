@@ -58,6 +58,10 @@ data class Snapshot(
     fun of(string: String) = Snapshot(SnapshotValue.of(string), ArrayMap.empty())
   }
 }
+
+interface Snapshotter<T> {
+  fun snapshot(value: T): Snapshot
+}
 fun parseSS(valueReader: SnapshotValueReader): ArrayMap<String, Snapshot> = TODO()
 fun serializeSS(valueWriter: StringWriter, snapshots: ArrayMap<String, Snapshot>): Unit = TODO()
 
