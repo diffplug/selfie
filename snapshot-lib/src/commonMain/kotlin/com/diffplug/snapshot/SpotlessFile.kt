@@ -65,6 +65,12 @@ interface Snapshotter<T> {
 fun parseSS(valueReader: SnapshotValueReader): ArrayMap<String, Snapshot> = TODO()
 fun serializeSS(valueWriter: StringWriter, snapshots: ArrayMap<String, Snapshot>): Unit = TODO()
 
+class SnapshotReader(val valueReader: SnapshotValueReader) {
+  fun peekKey(): String? = TODO()
+  fun nextSnapshot(): Snapshot = TODO()
+  fun skipSnapshot(): Unit = TODO()
+}
+
 /** Provides the ability to parse a snapshot file incrementally. */
 class SnapshotValueReader(val lineReader: LineReader) {
   /** The key of the next value, does not increment anything about the reader's state. */
