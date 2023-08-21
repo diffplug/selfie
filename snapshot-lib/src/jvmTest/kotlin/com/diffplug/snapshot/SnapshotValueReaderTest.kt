@@ -15,7 +15,10 @@
  */
 package com.diffplug.snapshot
 
+import io.kotest.assertions.throwables.shouldThrow
+import io.kotest.matchers.should
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.startWith
 import kotlin.test.Test
 
 class SnapshotValueReaderTest {
@@ -47,43 +50,78 @@ class SnapshotValueReaderTest {
     reader.peekKey() shouldBe "01_singleLineString"
     reader.peekKey() shouldBe "01_singleLineString"
     reader.nextValue().valueString() shouldBe "this is one line"
-    // etc
+    reader.peekKey() shouldBe "02_multiLineStringTrimmed"
+    reader.nextValue().valueString() shouldBe "Line 1\nLine 2"
+    reader.peekKey() shouldBe "03_multiLineStringTrailingNewline"
+    reader.nextValue().valueString() shouldBe "Line 1\nLine 2"
+    reader.peekKey() shouldBe "04_multiLineStringLeadingNewline"
+    reader.nextValue().valueString() shouldBe "Line 1\nLine 2"
+    reader.peekKey() shouldBe "05_notSureHowKotlinMultilineWorks"
+    reader.nextValue().valueString() shouldBe ""
   }
 
   @Test
   fun invalidNames() {
-    /* TODO
-    ╔═name ═╗ error: Expected '╔═ '
-    ╔═ name═╗ error: Expected ' ═╗'
-    ╔═  name ═╗ error: Leading spaces are disallowed: ' name'
-    ╔═ name  ═╗ error: Trailing spaces are disallowed: 'name '
-    ╔═ name ═╗ comment okay
-    ╔═ name ═╗okay here too
-    ╔═ name ═╗ okay  ╔═ ═╗ (it's the first ' ═╗' that counts)
-             */
+    shouldThrow<IllegalStateException> { SnapshotValueReader.of("╔═name ═╗").peekKey() }
+        .let { it.message should startWith("Expected '╔═ ' at line:1") }
+    shouldThrow<IllegalStateException> { SnapshotValueReader.of("╔═ name═╗").peekKey() }
+        .let { it.message should startWith("Expected ' ═╗' at line:1") }
+    shouldThrow<IllegalStateException> { SnapshotValueReader.of("╔═  name ═╗").peekKey() }
+        .let { it.message should startWith("Leading spaces are disallowed: ' name' at line:1") }
+    shouldThrow<IllegalStateException> { SnapshotValueReader.of("╔═ name  ═╗").peekKey() }
+        .let { it.message should startWith("Trailing spaces are disallowed: 'name ' at line:1") }
+    SnapshotValueReader.of("╔═ name ═╗ comment okay").peekKey()
+    SnapshotValueReader.of("╔═ name ═╗okay here too").peekKey()
+    SnapshotValueReader.of("╔═ name ═╗ okay  ╔═ ═╗ (it's the first ' ═╗' that counts)")
+        .peekKey() shouldBe "name"
   }
 
   @Test
   fun escapeCharactersInName() {
-    /* TODO
-    ╔═ test with \∕slash\∕ in name ═╗
-    ╔═ test with \(square brackets\) in name ═╗
-    ╔═ test with \\backslash\\ in name ═╗
-    ╔═ test with \nnewline\n in name ═╗
-    ╔═ test with \ttab\t in name ═╗
-    ╔═ test with \┌\─ ascii art \┐\─ in name ═╗
-     */
+    val reader =
+        SnapshotValueReader.of(
+            """
+            ╔═ test with \∕slash\∕ in name ═╗
+            ╔═ test with \(square brackets\) in name ═╗
+            ╔═ test with \\backslash\\ in name ═╗
+            ╔═ test with \nnewline\n in name ═╗
+            ╔═ test with \ttab\t in name ═╗
+            ╔═ test with \┌\─ ascii art \┐\─ in name ═╗
+            """
+                .trimIndent())
+    reader.peekKey() shouldBe "test with \\\\∕slash\\\\∕ in name"
+    reader.nextValue().valueString() shouldBe ""
+    reader.peekKey() shouldBe "test with \\\\(square brackets\\\\) in name"
+    reader.nextValue().valueString() shouldBe ""
+    reader.peekKey() shouldBe "test with \\\\\\\\backslash\\\\\\\\ in name"
+    reader.nextValue().valueString() shouldBe ""
+    reader.peekKey() shouldBe "test with \\\\nnewline\\\\n in name"
+    reader.nextValue().valueString() shouldBe ""
+    reader.peekKey() shouldBe "test with \\\\ttab\\\\t in name"
+    reader.nextValue().valueString() shouldBe ""
+    reader.peekKey() shouldBe "test with \\\\┌\\\\─ ascii art \\\\┐\\\\─ in name"
+    reader.nextValue().valueString() shouldBe ""
   }
 
   @Test
   fun escapeCharactersInBody() {
-    /* TODO
-    ╔═ ascii art okay ═╗
-     ╔══╗
-    ╔═ escaped iff on first line ═╗
-    𐝁══╗
-    ╔═ body escape characters ═╗
-    𐝃𐝁𐝃𐝃 linear a is dead
-     */
+    val reader =
+        SnapshotValueReader.of(
+            """
+          ╔═ ascii art okay ═╗
+            ╔══╗
+          ╔═ escaped iff on first line ═╗
+            𐝁══╗
+          ╔═ body escape characters ═╗
+            𐝃𐝁𐝃𐝃 linear a is dead
+        """
+                .trimIndent())
+    reader.peekKey() shouldBe "ascii art okay"
+    reader.nextValue().valueString() shouldBe "╔══╗"
+    reader.peekKey() shouldBe "escaped iff on first line"
+    reader.nextValue().valueString() shouldBe "\uD801\uDF43\uD801\uDF41══╗"
+    reader.peekKey() shouldBe "body escape characters"
+    reader.nextValue().valueString() shouldBe
+        "\uD801\uDF43\uD801\uDF43\uD801\uDF43\uD801\uDF41\uD801\uDF43\uD801\uDF43\uD801\uDF43\uD801\uDF43 linear a is dead"
   }
 }

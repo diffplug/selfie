@@ -22,6 +22,7 @@ sealed interface SnapshotValue {
   fun valueString(): String
 
   companion object {
+    val EMPTY: SnapshotValue = SnapshotValueEmptyString("")
     fun of(binary: ByteArray): SnapshotValue = SnapshotValueBinary(binary)
     fun of(string: String): SnapshotValue = SnapshotValueString(string)
   }
@@ -39,6 +40,11 @@ internal data class SnapshotValueBinary(val value: ByteArray) : SnapshotValue {
 internal data class SnapshotValueString(val value: String) : SnapshotValue {
   override fun valueBinary() = throw UnsupportedOperationException("This is a string value.")
   override fun valueString(): String = value
+}
+
+internal data class SnapshotValueEmptyString(val value: String) : SnapshotValue {
+  override fun valueBinary() = throw UnsupportedOperationException("This is an empty string value.")
+  override fun valueString() = value
 }
 
 data class Snapshot(
@@ -73,23 +79,88 @@ class SnapshotReader(val valueReader: SnapshotValueReader) {
 
 /** Provides the ability to parse a snapshot file incrementally. */
 class SnapshotValueReader(val lineReader: LineReader) {
+  var line: String? = null
+
   /** The key of the next value, does not increment anything about the reader's state. */
-  fun peekKey(): String? = TODO()
+  fun peekKey(): String? {
+    return nextKey()
+  }
+
   /** Reads the next value. */
-  fun nextValue(): SnapshotValue = TODO()
+  fun nextValue(): SnapshotValue {
+    // validate key
+    nextKey()
+    resetLine()
+    // read value
+    var nextLine = nextLine()
+    val buffer = StringBuilder()
+    while (nextLine != null) {
+      if (nextLine.isNotBlank() && nextLine[0] == headerFirstChar) {
+        break
+      }
+      resetLine()
+      buffer.append(nextLine).append('\n')
+      // read next
+      nextLine = nextLine()
+    }
+    if (buffer.isEmpty()) {
+      return SnapshotValue.EMPTY
+    }
+    return SnapshotValue.of(bodyEsc.escape(buffer.toString().trim()))
+  }
+
   /** Same as nextValue, but faster. */
   fun skipValue(): Unit = TODO()
+  private fun nextKey(): String? {
+    val line =
+        nextLine()
+            ?:
+            // TODO: do we really want null?
+            return null
+
+    // TODO: confirm exception type
+    val startIndex = line.indexOf(headerStart)
+    val endIndex = line.indexOf(headerEnd)
+    if (startIndex == -1) {
+      throw IllegalStateException("Expected '$headerStart' at line:${lineReader.getLineNumber()}")
+    }
+    if (endIndex == -1) {
+      throw IllegalStateException("Expected '$headerEnd' at line:${lineReader.getLineNumber()}")
+    }
+    // valid key
+    val key = line.substring(startIndex + headerStart.length, endIndex)
+    if (key.startsWith(" ")) {
+      throw IllegalStateException(
+          "Leading spaces are disallowed: '$key' at line:${lineReader.getLineNumber()}")
+    }
+    if (key.endsWith(" ")) {
+      throw IllegalStateException(
+          "Trailing spaces are disallowed: '$key' at line:${lineReader.getLineNumber()}")
+    }
+    return nameEsc.escape(key)
+  }
+  private fun nextLine(): String? {
+    if (line == null) {
+      line = lineReader.readLine()
+    }
+    return line
+  }
+  private fun resetLine() {
+    line = null
+  }
 
   companion object {
     fun of(content: String) = SnapshotValueReader(LineReader.forString(content))
     fun of(content: ByteArray) = SnapshotValueReader(LineReader.forBinary(content))
     private val headerFirstChar = '╔'
     private val headerStart = "╔═ "
-    private val headerEnd = "═╗"
+    private val headerEnd = " ═╗"
+
     /**
      * https://github.com/diffplug/spotless-snapshot/blob/f63192a84390901a3d3543066d095ea23bf81d21/snapshot-lib/src/commonTest/resources/com/diffplug/snapshot/scenarios_and_lenses.ss#L11-L29
      */
     private val nameEsc = PerCharacterEscaper.specifiedEscape("\\\\/∕[(])\nn\tt╔┌╗┐═─")
+
     /** https://github.com/diffplug/spotless-snapshot/issues/2 */
     private val bodyEsc = PerCharacterEscaper.selfEscape("\uD801\uDF43\uD801\uDF41")
   }
@@ -97,7 +168,7 @@ class SnapshotValueReader(val lineReader: LineReader) {
 
 expect class LineReader {
   fun getLineNumber(): Int
-  fun readLine(): String
+  fun readLine(): String?
 
   companion object {
     fun forString(content: String): LineReader
