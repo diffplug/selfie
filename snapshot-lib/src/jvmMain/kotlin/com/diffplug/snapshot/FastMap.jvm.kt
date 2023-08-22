@@ -16,11 +16,6 @@
 package com.diffplug.snapshot
 
 import java.util.*
-import kotlin.collections.AbstractList
-
-internal actual abstract class ListBackedSet<T> actual constructor() : Set<T>, AbstractList<T>() {
-  override fun spliterator(): Spliterator<T> = (this as AbstractList<T>).spliterator()
-}
 
 internal actual fun <K, V> entry(key: K, value: V): Map.Entry<K, V> =
     java.util.Map.entry(key, value)
