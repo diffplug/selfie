@@ -28,7 +28,6 @@ sealed interface SnapshotValue {
   fun valueString(): String
 
   companion object {
-    val EMPTY: SnapshotValue = SnapshotValueEmptyString("")
     fun of(binary: ByteArray): SnapshotValue = SnapshotValueBinary(binary)
     fun of(string: String): SnapshotValue = SnapshotValueString(string)
   }
@@ -89,8 +88,6 @@ class SnapshotValueReader(val lineReader: LineReader) {
 
   /** The key of the next value, does not increment anything about the reader's state. */
   fun peekKey(): String? {
-    // I think this will need to maintain its own state separate
-    // from `nextKey()` to make signficant leading and trailing newlines work
     return nextKey()
   }
 
@@ -111,11 +108,12 @@ class SnapshotValueReader(val lineReader: LineReader) {
       }
       buffer.append('\n')
     }
-    if (buffer.isEmpty()) {
-      return SnapshotValue.EMPTY
-    }
-    buffer.setLength(buffer.length - 1)
-    return SnapshotValue.of(bodyEsc.unescape(buffer.toString()))
+    return SnapshotValue.of(
+        if (buffer.isEmpty()) ""
+        else {
+          buffer.setLength(buffer.length - 1)
+          bodyEsc.unescape(buffer.toString())
+        })
   }
 
   /** Same as nextValue, but faster. */
@@ -128,7 +126,7 @@ class SnapshotValueReader(val lineReader: LineReader) {
       // ignore it
     }
   }
-  private fun scanValue(consumer: (String) -> Unit) {
+  private inline fun scanValue(consumer: (String) -> Unit) {
     // read next
     var nextLine = nextLine()
     while (nextLine != null && nextLine.indexOf(headerFirstChar) != 0) {

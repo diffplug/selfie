@@ -17,7 +17,7 @@ spotless {
             licenseHeaderFile 干.file("spotless/license-${license}.java")
             ktfmt()
             for (modifier in ['', 'override ', 'public ', 'protected ', 'private ', 'internal ', 'expected ', 'actual ']) {
-                for (key in ['fun', 'val', 'override']) {
+                for (key in ['inline', 'fun', 'val', 'override']) {
                     String toCheck = "$modifier$key"
                     replaceRegex("dense $toCheck", "\n\n(\\s*)$toCheck ", "\n\$1$toCheck ")
                 }
