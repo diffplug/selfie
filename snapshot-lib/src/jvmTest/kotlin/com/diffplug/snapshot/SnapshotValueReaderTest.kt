@@ -139,7 +139,7 @@ class SnapshotValueReaderTest {
   }
 
   @Test
-  fun testSkip() {
+  fun skipValues() {
     val testContent =
         """
             ╔═ 00_empty ═╗
