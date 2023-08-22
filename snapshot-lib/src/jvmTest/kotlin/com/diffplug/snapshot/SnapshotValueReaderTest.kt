@@ -28,6 +28,10 @@ class SnapshotValueReaderTest {
             ╔═ 00_empty ═╗
             ╔═ 01_singleLineString ═╗
             this is one line
+            ╔═ 01a_singleLineLeadingSpace ═╗
+             the leading space is significant
+            ╔═ 01b_singleLineTrailingSpace ═╗
+            the trailing space is significant 
             ╔═ 02_multiLineStringTrimmed ═╗
             Line 1
             Line 2
@@ -48,6 +52,10 @@ class SnapshotValueReaderTest {
     reader.peekKey() shouldBe "01_singleLineString"
     reader.peekKey() shouldBe "01_singleLineString"
     reader.nextValue().valueString() shouldBe "this is one line"
+    reader.peekKey() shouldBe "01a_singleLineLeadingSpace"
+    reader.nextValue().valueString() shouldBe " the leading space is significant"
+    reader.peekKey() shouldBe "01b_singleLineTrailingSpace"
+    reader.nextValue().valueString() shouldBe "the trailing space is significant "
     reader.peekKey() shouldBe "02_multiLineStringTrimmed"
     reader.nextValue().valueString() shouldBe "Line 1\nLine 2"
     // note that leading and trailing newlines in the snapshots are significant
