@@ -16,9 +16,7 @@
 package com.diffplug.snapshot
 
 import io.kotest.assertions.throwables.shouldThrow
-import io.kotest.matchers.should
 import io.kotest.matchers.shouldBe
-import io.kotest.matchers.string.startWith
 import kotlin.test.Test
 
 class SnapshotValueReaderTest {
@@ -62,16 +60,16 @@ class SnapshotValueReaderTest {
 
   @Test
   fun invalidNames() {
-    shouldThrow<IllegalStateException> { SnapshotValueReader.of("╔═name ═╗").peekKey() }
-        .let { it.message should startWith("Expected '╔═ ' at line:1") }
-    shouldThrow<IllegalStateException> { SnapshotValueReader.of("╔═ name═╗").peekKey() }
-        .let { it.message should startWith("Expected ' ═╗' at line:1") }
-    shouldThrow<IllegalStateException> { SnapshotValueReader.of("╔═  name ═╗").peekKey() }
-        .let { it.message should startWith("Leading spaces are disallowed: ' name' at line:1") }
-    shouldThrow<IllegalStateException> { SnapshotValueReader.of("╔═ name  ═╗").peekKey() }
-        .let { it.message should startWith("Trailing spaces are disallowed: 'name ' at line:1") }
-    SnapshotValueReader.of("╔═ name ═╗ comment okay").peekKey()
-    SnapshotValueReader.of("╔═ name ═╗okay here too").peekKey()
+    shouldThrow<ParseException> { SnapshotValueReader.of("╔═name ═╗").peekKey() }
+        .let { it.message shouldBe "L1:Expected to start with '╔═ '" }
+    shouldThrow<ParseException> { SnapshotValueReader.of("╔═ name═╗").peekKey() }
+        .let { it.message shouldBe "L1:Expected to contain ' ═╗'" }
+    shouldThrow<ParseException> { SnapshotValueReader.of("╔═  name ═╗").peekKey() }
+        .let { it.message shouldBe "L1:Leading spaces are disallowed: ' name'" }
+    shouldThrow<ParseException> { SnapshotValueReader.of("╔═ name  ═╗").peekKey() }
+        .let { it.message shouldBe "L1:Trailing spaces are disallowed: 'name '" }
+    SnapshotValueReader.of("╔═ name ═╗ comment okay").peekKey() shouldBe "name"
+    SnapshotValueReader.of("╔═ name ═╗okay here too").peekKey() shouldBe "name"
     SnapshotValueReader.of("╔═ name ═╗ okay  ╔═ ═╗ (it's the first ' ═╗' that counts)")
         .peekKey() shouldBe "name"
   }

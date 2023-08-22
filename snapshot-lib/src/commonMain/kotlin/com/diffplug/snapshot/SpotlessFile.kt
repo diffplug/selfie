@@ -15,6 +15,12 @@
  */
 package com.diffplug.snapshot
 
+class ParseException(val line: Int, message: String) : IllegalArgumentException(message) {
+  constructor(lineReader: LineReader, message: String) : this(lineReader.getLineNumber(), message)
+  override val message: String
+    get() = "L${line}:${super.message}"
+}
+
 sealed interface SnapshotValue {
   val isBinary: Boolean
     get() = this is SnapshotValueBinary
@@ -112,32 +118,24 @@ class SnapshotValueReader(val lineReader: LineReader) {
   /** Same as nextValue, but faster. */
   fun skipValue(): Unit = TODO()
   private fun nextKey(): String? {
-    val line =
-        nextLine()
-            ?:
-            // TODO: do we really want null?
-            return null
-
-    // TODO: confirm exception type
+    val line = nextLine() ?: return null
     val startIndex = line.indexOf(headerStart)
     val endIndex = line.indexOf(headerEnd)
     if (startIndex == -1) {
-      throw IllegalStateException("Expected '$headerStart' at line:${lineReader.getLineNumber()}")
+      throw ParseException(lineReader, "Expected to start with '$headerStart'")
     }
     if (endIndex == -1) {
-      throw IllegalStateException("Expected '$headerEnd' at line:${lineReader.getLineNumber()}")
+      throw ParseException(lineReader, "Expected to contain '$headerEnd'")
     }
     // valid key
     val key = line.substring(startIndex + headerStart.length, endIndex)
-    if (key.startsWith(" ")) {
-      throw IllegalStateException(
-          "Leading spaces are disallowed: '$key' at line:${lineReader.getLineNumber()}")
+    return if (key.startsWith(" ")) {
+      throw ParseException(lineReader, "Leading spaces are disallowed: '$key'")
+    } else if (key.endsWith(" ")) {
+      throw ParseException(lineReader, "Trailing spaces are disallowed: '$key'")
+    } else {
+      nameEsc.escape(key)
     }
-    if (key.endsWith(" ")) {
-      throw IllegalStateException(
-          "Trailing spaces are disallowed: '$key' at line:${lineReader.getLineNumber()}")
-    }
-    return nameEsc.escape(key)
   }
   private fun nextLine(): String? {
     if (line == null) {
