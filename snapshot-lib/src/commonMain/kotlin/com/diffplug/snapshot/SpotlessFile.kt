@@ -103,7 +103,13 @@ class SnapshotValueReader(val lineReader: LineReader) {
     // read value
     val buffer = StringBuilder()
     scanValue { line ->
-      buffer.append(line).append("\n")
+      if (line.length >= 2 && line[0] == '\uD801' && line[1] == '\uDF41') { // "\uD801\uDF41" = "𐝁"
+        buffer.append('╔')
+        buffer.append(line, 2, line.length)
+      } else {
+        buffer.append(line)
+      }
+      buffer.append('\n')
     }
     if (buffer.isEmpty()) {
       return SnapshotValue.EMPTY

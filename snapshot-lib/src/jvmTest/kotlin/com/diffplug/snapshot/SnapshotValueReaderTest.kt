@@ -133,7 +133,6 @@ class SnapshotValueReaderTest {
     reader.peekKey() shouldBe "ascii art okay"
     reader.nextValue().valueString() shouldBe """ ╔══╗"""
     reader.peekKey() shouldBe "escaped iff on first line"
-    // TODO: bit confused about escape/unescape what do we need here?
     reader.nextValue().valueString() shouldBe """╔══╗"""
     reader.peekKey() shouldBe "body escape characters"
     reader.nextValue().valueString() shouldBe """𐝁𐝃 linear a is dead"""
