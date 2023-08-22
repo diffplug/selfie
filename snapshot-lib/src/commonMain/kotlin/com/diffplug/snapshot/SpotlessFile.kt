@@ -99,26 +99,41 @@ class SnapshotValueReader(val lineReader: LineReader) {
     // validate key
     nextKey()
     resetLine()
+
     // read value
-    var nextLine = nextLine()
     val buffer = StringBuilder()
-    while (nextLine != null) {
-      if (nextLine.isNotBlank() && nextLine[0] == headerFirstChar) {
-        break
-      }
-      resetLine()
-      buffer.append(nextLine).append('\n')
-      // read next
-      nextLine = nextLine()
+    scanValue { line ->
+      buffer.append(line).append("\n")
     }
     if (buffer.isEmpty()) {
       return SnapshotValue.EMPTY
     }
-    return SnapshotValue.of(bodyEsc.unescape(buffer.toString().trim()))
+    buffer.setLength(buffer.length - 1)
+    return SnapshotValue.of(bodyEsc.unescape(buffer.toString()))
   }
 
   /** Same as nextValue, but faster. */
-  fun skipValue(): Unit = TODO()
+  fun skipValue() {
+    // Ignore key
+    nextKey()
+    resetLine()
+
+    scanValue {
+      // ignore it
+    }
+  }
+  private fun scanValue(consumer: (String) -> Unit) {
+    // read next
+    var nextLine = nextLine()
+    while (nextLine != null && nextLine.indexOf(headerFirstChar) != 0) {
+      resetLine()
+
+      consumer(nextLine)
+
+      // read next
+      nextLine = nextLine()
+    }
+  }
   private fun nextKey(): String? {
     val line = nextLine() ?: return null
     val startIndex = line.indexOf(headerStart)
