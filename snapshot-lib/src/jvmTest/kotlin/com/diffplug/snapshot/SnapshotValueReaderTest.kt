@@ -50,10 +50,12 @@ class SnapshotValueReaderTest {
     reader.nextValue().valueString() shouldBe "this is one line"
     reader.peekKey() shouldBe "02_multiLineStringTrimmed"
     reader.nextValue().valueString() shouldBe "Line 1\nLine 2"
+    // note that leading and trailing newlines in the snapshots are significant
+    // this is critical so that snapshots can accurately capture the exact number of newlines
     reader.peekKey() shouldBe "03_multiLineStringTrailingNewline"
-    reader.nextValue().valueString() shouldBe "Line 1\nLine 2"
+    reader.nextValue().valueString() shouldBe "Line 1\nLine 2\n"
     reader.peekKey() shouldBe "04_multiLineStringLeadingNewline"
-    reader.nextValue().valueString() shouldBe "Line 1\nLine 2"
+    reader.nextValue().valueString() shouldBe "\nLine 1\nLine 2"
     reader.peekKey() shouldBe "05_notSureHowKotlinMultilineWorks"
     reader.nextValue().valueString() shouldBe ""
   }
@@ -113,17 +115,17 @@ class SnapshotValueReaderTest {
         SnapshotValueReader.of(
             """
           ╔═ ascii art okay ═╗
-            ╔══╗
+           ╔══╗
           ╔═ escaped iff on first line ═╗
-            𐝁══╗
+          𐝁══╗
           ╔═ body escape characters ═╗
-            𐝃𐝁𐝃𐝃 linear a is dead
+          𐝃𐝁𐝃𐝃 linear a is dead
         """
                 .trimIndent())
     reader.peekKey() shouldBe "ascii art okay"
-    reader.nextValue().valueString() shouldBe "╔══╗"
+    reader.nextValue().valueString() shouldBe """ ╔══╗"""
     reader.peekKey() shouldBe "escaped iff on first line"
-    reader.nextValue().valueString() shouldBe """𐝁══╗"""
+    reader.nextValue().valueString() shouldBe """╔══╗"""
     reader.peekKey() shouldBe "body escape characters"
     reader.nextValue().valueString() shouldBe """𐝁𐝃 linear a is dead"""
   }

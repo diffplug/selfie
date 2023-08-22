@@ -89,6 +89,8 @@ class SnapshotValueReader(val lineReader: LineReader) {
 
   /** The key of the next value, does not increment anything about the reader's state. */
   fun peekKey(): String? {
+    // I think this will need to maintain its own state separate
+    // from `nextKey()` to make signficant leading and trailing newlines work
     return nextKey()
   }
 
