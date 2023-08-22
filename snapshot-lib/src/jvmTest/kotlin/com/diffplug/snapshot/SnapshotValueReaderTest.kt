@@ -129,4 +129,33 @@ class SnapshotValueReaderTest {
     reader.peekKey() shouldBe "body escape characters"
     reader.nextValue().valueString() shouldBe """𐝁𐝃 linear a is dead"""
   }
+
+  @Test
+  fun testSkip() {
+    val testContent =
+        """
+            ╔═ 00_empty ═╗
+            ╔═ 01_singleLineString ═╗
+            this is one line
+            ╔═ 02_multiLineStringTrimmed ═╗
+            Line 1
+            Line 2
+            ╔═ 05_notSureHowKotlinMultilineWorks ═╗
+            """
+            .trimIndent()
+    assertKeyValueWithSkip(testContent, "00_empty", "")
+    assertKeyValueWithSkip(testContent, "01_singleLineString", "this is one line")
+    assertKeyValueWithSkip(testContent, "02_multiLineStringTrimmed", "Line 1\nLine 2")
+  }
+  private fun assertKeyValueWithSkip(input: String, key: String, value: String) {
+    val reader = SnapshotValueReader.of(input)
+    while (reader.peekKey() != key) {
+      reader.skipValue()
+    }
+    reader.peekKey() shouldBe key
+    reader.nextValue().valueString() shouldBe value
+    while (reader.peekKey() != null) {
+      reader.skipValue()
+    }
+  }
 }
