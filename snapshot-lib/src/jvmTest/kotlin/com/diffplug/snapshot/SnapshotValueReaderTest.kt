@@ -82,22 +82,28 @@ class SnapshotValueReaderTest {
             ╔═ test with \∕slash\∕ in name ═╗
             ╔═ test with \(square brackets\) in name ═╗
             ╔═ test with \\backslash\\ in name ═╗
-            ╔═ test with \nnewline\n in name ═╗
+            ╔═ test with\nnewline\nin name ═╗
             ╔═ test with \ttab\t in name ═╗
-            ╔═ test with \┌\─ ascii art \┐\─ in name ═╗
+            ╔═ test with \┌\─ ascii art \─\┐ in name ═╗
             """
                 .trimIndent())
-    reader.peekKey() shouldBe "test with \\\\∕slash\\\\∕ in name"
+    reader.peekKey() shouldBe "test with /slash/ in name"
     reader.nextValue().valueString() shouldBe ""
-    reader.peekKey() shouldBe "test with \\\\(square brackets\\\\) in name"
+    reader.peekKey() shouldBe "test with [square brackets] in name"
     reader.nextValue().valueString() shouldBe ""
-    reader.peekKey() shouldBe "test with \\\\\\\\backslash\\\\\\\\ in name"
+    reader.peekKey() shouldBe """test with \backslash\ in name"""
     reader.nextValue().valueString() shouldBe ""
-    reader.peekKey() shouldBe "test with \\\\nnewline\\\\n in name"
+    reader.peekKey() shouldBe
+        """
+        test with
+        newline
+        in name
+         """
+            .trimIndent()
     reader.nextValue().valueString() shouldBe ""
-    reader.peekKey() shouldBe "test with \\\\ttab\\\\t in name"
+    reader.peekKey() shouldBe "test with \ttab\t in name"
     reader.nextValue().valueString() shouldBe ""
-    reader.peekKey() shouldBe "test with \\\\┌\\\\─ ascii art \\\\┐\\\\─ in name"
+    reader.peekKey() shouldBe "test with ╔═ ascii art ═╗ in name"
     reader.nextValue().valueString() shouldBe ""
   }
 
@@ -117,9 +123,8 @@ class SnapshotValueReaderTest {
     reader.peekKey() shouldBe "ascii art okay"
     reader.nextValue().valueString() shouldBe "╔══╗"
     reader.peekKey() shouldBe "escaped iff on first line"
-    reader.nextValue().valueString() shouldBe "\uD801\uDF43\uD801\uDF41══╗"
+    reader.nextValue().valueString() shouldBe """𐝁══╗"""
     reader.peekKey() shouldBe "body escape characters"
-    reader.nextValue().valueString() shouldBe
-        "\uD801\uDF43\uD801\uDF43\uD801\uDF43\uD801\uDF41\uD801\uDF43\uD801\uDF43\uD801\uDF43\uD801\uDF43 linear a is dead"
+    reader.nextValue().valueString() shouldBe """𐝁𐝃 linear a is dead"""
   }
 }

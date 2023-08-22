@@ -112,7 +112,7 @@ class SnapshotValueReader(val lineReader: LineReader) {
     if (buffer.isEmpty()) {
       return SnapshotValue.EMPTY
     }
-    return SnapshotValue.of(bodyEsc.escape(buffer.toString().trim()))
+    return SnapshotValue.of(bodyEsc.unescape(buffer.toString().trim()))
   }
 
   /** Same as nextValue, but faster. */
@@ -134,7 +134,7 @@ class SnapshotValueReader(val lineReader: LineReader) {
     } else if (key.endsWith(" ")) {
       throw ParseException(lineReader, "Trailing spaces are disallowed: '$key'")
     } else {
-      nameEsc.escape(key)
+      nameEsc.unescape(key)
     }
   }
   private fun nextLine(): String? {
