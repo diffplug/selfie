@@ -15,7 +15,5 @@
  */
 package com.diffplug.snapshot
 
-import java.util.*
-
 internal actual fun <K, V> entry(key: K, value: V): Map.Entry<K, V> =
     java.util.Map.entry(key, value)
