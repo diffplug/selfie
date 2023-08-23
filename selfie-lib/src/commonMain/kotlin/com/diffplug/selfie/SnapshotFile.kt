@@ -123,7 +123,7 @@ class SnapshotFile {
   }
 
   companion object {
-    private val HEADER_PREFIX = """📷 """
+    private const val HEADER_PREFIX = """📷 """
     fun parse(valueReader: SnapshotValueReader): SnapshotFile {
       try {
         val result = SnapshotFile()
@@ -158,7 +158,7 @@ class SnapshotReader(val valueReader: SnapshotValueReader) {
     var snapshot = Snapshot(valueReader.nextValue(), ArrayMap.empty())
     while (true) {
       val nextKey = valueReader.peekKey() ?: return snapshot
-      val lensIdx = nextKey.indexOf('[') ?: -1
+      val lensIdx = nextKey.indexOf('[')
       if (lensIdx == -1) {
         return snapshot
       }
@@ -172,7 +172,7 @@ class SnapshotReader(val valueReader: SnapshotValueReader) {
       snapshot = snapshot.lens(lensName, valueReader.nextValue().valueString())
     }
   }
-  fun skipSnapshot(): Unit {
+  fun skipSnapshot() {
     val rootName = peekKey()!!
     valueReader.skipValue()
     while (peekKey()?.startsWith("$rootName[") == true) {
@@ -200,7 +200,7 @@ class SnapshotValueReader(val lineReader: LineReader) {
     val buffer = StringBuilder()
     scanValue { line ->
       if (line.length >= 2 && line[0] == '\uD801' && line[1] == '\uDF41') { // "\uD801\uDF41" = "𐝁"
-        buffer.append('╔')
+        buffer.append(KEY_FIRST_CHAR)
         buffer.append(line, 2, line.length)
       } else {
         buffer.append(line)
@@ -228,7 +228,7 @@ class SnapshotValueReader(val lineReader: LineReader) {
   private inline fun scanValue(consumer: (String) -> Unit) {
     // read next
     var nextLine = nextLine()
-    while (nextLine != null && nextLine.indexOf(headerFirstChar) != 0) {
+    while (nextLine != null && nextLine.indexOf(KEY_FIRST_CHAR) != 0) {
       resetLine()
 
       consumer(nextLine)
@@ -239,16 +239,16 @@ class SnapshotValueReader(val lineReader: LineReader) {
   }
   private fun nextKey(): String? {
     val line = nextLine() ?: return null
-    val startIndex = line.indexOf(headerStart)
-    val endIndex = line.indexOf(headerEnd)
+    val startIndex = line.indexOf(KEY_START)
+    val endIndex = line.indexOf(KEY_END)
     if (startIndex == -1) {
-      throw ParseException(lineReader, "Expected to start with '$headerStart'")
+      throw ParseException(lineReader, "Expected to start with '$KEY_START'")
     }
     if (endIndex == -1) {
-      throw ParseException(lineReader, "Expected to contain '$headerEnd'")
+      throw ParseException(lineReader, "Expected to contain '$KEY_END'")
     }
     // valid key
-    val key = line.substring(startIndex + headerStart.length, endIndex)
+    val key = line.substring(startIndex + KEY_START.length, endIndex)
     return if (key.startsWith(" ")) {
       throw ParseException(lineReader, "Leading spaces are disallowed: '$key'")
     } else if (key.endsWith(" ")) {
@@ -270,9 +270,10 @@ class SnapshotValueReader(val lineReader: LineReader) {
   companion object {
     fun of(content: String) = SnapshotValueReader(LineReader.forString(content))
     fun of(content: ByteArray) = SnapshotValueReader(LineReader.forBinary(content))
-    private val headerFirstChar = '╔'
-    private val headerStart = "╔═ "
-    private val headerEnd = " ═╗"
+
+    private const val KEY_FIRST_CHAR = '╔'
+    private const val KEY_START = "╔═ "
+    private const val KEY_END = " ═╗"
 
     /**
      * https://github.com/diffplug/selfie/blob/f63192a84390901a3d3543066d095ea23bf81d21/snapshot-lib/src/commonTest/resources/com/diffplug/snapshot/scenarios_and_lenses.ss#L11-L29
@@ -294,5 +295,5 @@ expect class LineReader {
   }
 }
 fun interface StringWriter {
-  fun write(string: String): Unit
+  fun write(string: String)
 }
