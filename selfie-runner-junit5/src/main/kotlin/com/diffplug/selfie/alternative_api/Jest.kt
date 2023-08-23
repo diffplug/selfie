@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.diffplug.selfie.jest
+package com.diffplug.selfie.alternative_api
 
 import com.diffplug.selfie.Snapshot
 import com.diffplug.selfie.Snapshotter
