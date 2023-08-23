@@ -54,10 +54,9 @@ data class Snapshot(
   /** A sorted immutable map of extra values. */
   val lenses: Map<String, SnapshotValue>
     get() = lensData
-  fun lens(key: String, value: ByteArray) =
-      Snapshot(this.value, lensData.plus(key, SnapshotValue.of(value)))
-  fun lens(key: String, value: String) =
-      Snapshot(this.value, lensData.plus(key, SnapshotValue.of(value)))
+  fun lens(key: String, value: ByteArray) = lens(key, SnapshotValue.of(value))
+  fun lens(key: String, value: String) = lens(key, SnapshotValue.of(value))
+  fun lens(key: String, value: SnapshotValue) = Snapshot(this.value, lensData.plus(key, value))
 
   companion object {
     fun of(binary: ByteArray) = Snapshot(SnapshotValue.of(binary), ArrayMap.empty())
@@ -134,44 +133,39 @@ class SnapshotFile {
 }
 
 class SnapshotReader(val valueReader: SnapshotValueReader) {
-  var key: String? = null
-  var lens: String? = null
   fun peekKey(): String? {
-    val next = valueReader.peekKey() ?: return resetKeyState()
-    val lensIdx = next.indexOf('[')
-    if (lensIdx > 0) {
-      lens = next.substring(lensIdx + 1, next.indexOf(']'))
-      key = next.substring(0, lensIdx)
-    } else {
-      key = next
-      lens = null
+    val next = valueReader.peekKey() ?: return null
+    require(next.indexOf('[') == -1) {
+      "Missing root snapshot, square brackets not allowed: '$next'"
     }
-    return key
-  }
-  private fun resetKeyState(): String? {
-    key = null
-    lens = null
-    return null
+    return next
   }
   fun nextSnapshot(): Snapshot {
-    var key = peekKey()
-    var prevKey = key
-    var result: Snapshot? = null
-    while (key != null && prevKey == key) {
-      prevKey = key
-      val nextValue = valueReader.nextValue()
-      if (result == null) {
-        result = Snapshot(nextValue, ArrayMap.empty())
+    val rootName = peekKey()
+    var snapshot = Snapshot(valueReader.nextValue(), ArrayMap.empty())
+    while (true) {
+      val nextKey = valueReader.peekKey() ?: return snapshot
+      val lensIdx = nextKey.indexOf('[') ?: -1
+      if (lensIdx == -1) {
+        return snapshot
       }
-      if (lens != null) {
-        result = result.lens(lens!!, nextValue.valueString())
+      val lensRoot = nextKey.substring(0, lensIdx)
+      require(lensRoot == rootName) {
+        "Expected '$nextKey' to come after '$lensRoot', not '$rootName'"
       }
-
-      key = peekKey()
+      val lensEndIdx = nextKey.indexOf(']', lensIdx + 1)
+      require(lensEndIdx != -1) { "Missing ] in $nextKey" }
+      val lensName = nextKey.substring(lensIdx + 1, lensEndIdx)
+      snapshot = snapshot.lens(lensName, valueReader.nextValue().valueString())
     }
-    return result!!
   }
-  fun skipSnapshot(): Unit = valueReader.skipValue()
+  fun skipSnapshot(): Unit {
+    val rootName = peekKey()!!
+    valueReader.skipValue()
+    while (peekKey()?.startsWith("$rootName[") == true) {
+      valueReader.skipValue()
+    }
+  }
 }
 
 /** Provides the ability to parse a snapshot file incrementally. */
