@@ -15,6 +15,8 @@
  */
 package com.diffplug.selfie.junit5
 
+import com.diffplug.selfie.SelfieRouting
+import com.diffplug.selfie.SnapshotFile
 import org.junit.jupiter.api.extension.AfterAllCallback
 import org.junit.jupiter.api.extension.BeforeAllCallback
 import org.junit.jupiter.api.extension.BeforeEachCallback
@@ -22,12 +24,16 @@ import org.junit.jupiter.api.extension.ExtensionContext
 
 class SelfieExtension : BeforeAllCallback, AfterAllCallback, BeforeEachCallback {
   override fun beforeAll(context: ExtensionContext) {
-    println("beforeAll ${context.displayName}")
+    // TOOD: load the selfie file if it exists
+    // TODO: create the selfie metadata if necessary
+    SelfieRouting.currentFile = SnapshotFile()
   }
   override fun beforeEach(context: ExtensionContext) {
-    println("beforeEach ${context.displayName}")
+    SelfieRouting.currentDiskPrefix = context.testMethod.get().name
   }
   override fun afterAll(context: ExtensionContext) {
-    println("afterAll ${context.displayName}")
+    // TODO: test/prune orphan snapshots
+    SelfieRouting.currentDiskPrefix = null
+    SelfieRouting.currentFile = null
   }
 }

@@ -15,8 +15,35 @@
  */
 package com.diffplug.selfie
 
+object SelfieRouting {
+  var isWriting: Boolean = true
+  var currentFile: SnapshotFile? = null
+  var currentDiskPrefix: String? = null
+  private fun assertInitializedProperly() {
+    if (currentFile == null || currentDiskPrefix == null) {
+      throw AssertionError("You called `toMatchDisk` without setting up snapshots.")
+    }
+  }
+  fun onDiskRightNow(scenario: String?): Snapshot? {
+    assertInitializedProperly()
+    val snapshotSuffix = scenario?.let { "/$scenario" } ?: ""
+    val snapshotName = "${currentDiskPrefix!!}${snapshotSuffix}"
+    return currentFile!!.snapshots.get(snapshotName)
+  }
+}
+
 open class DiskSelfie internal constructor(private val actual: Snapshot) {
-  fun toMatchDisk(scenario: String = ""): Snapshot = TODO()
+  fun toMatchDisk(scenario: String? = null): Snapshot {
+    val snapshot = SelfieRouting.onDiskRightNow(scenario)
+    if (actual != snapshot) {
+      if (SelfieRouting.isWriting) {
+        TODO("write snapshot")
+      } else {
+        throw AssertionError()
+      }
+    }
+    return actual
+  }
 }
 fun <T> expectSelfie(actual: T, snapshotter: Snapshotter<T>) =
     DiskSelfie(snapshotter.snapshot(actual))
