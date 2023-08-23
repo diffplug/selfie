@@ -90,27 +90,24 @@ class SnapshotFile {
       valueWriter.write(
           buildString {
             val snapshot = entry.value
-            if (snapshot.lenses.isEmpty()) {
+            append("""╔═ """)
+            append(entry.key)
+            append(""" ═╗""")
+            append("\n")
+            append(snapshot.value.valueString())
+            if (index < snapshots.size - 1) {
+              append("\n")
+            }
+            for (lens in snapshot.lenses.entries) {
               append("""╔═ """)
               append(entry.key)
-              append(""" ═╗""")
+              append("[")
+              append(lens.key)
+              append("""] ═╗""")
               append("\n")
-              append(snapshot.value.valueString())
+              append(lens.value.valueString())
               if (index < snapshots.size - 1) {
                 append("\n")
-              }
-            } else {
-              for (lens in snapshot.lenses.entries) {
-                append("""╔═ """)
-                append(snapshot.value.valueString())
-                append("[")
-                append(lens.key)
-                append("""] ═╗""")
-                append("\n")
-                append(lens.value.valueString())
-                if (index < snapshots.size - 1) {
-                  append("\n")
-                }
               }
             }
           })

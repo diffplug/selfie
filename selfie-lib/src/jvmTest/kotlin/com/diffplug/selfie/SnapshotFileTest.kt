@@ -27,6 +27,8 @@ class SnapshotFileTest {
                 """
             ╔═ 📷 com.acme.AcmeTest ═╗
             {"header":"data"}
+            ╔═ Apple ═╗
+            Granny Smith
             ╔═ Apple[color] ═╗
             green
             ╔═ Apple[crisp] ═╗
@@ -45,6 +47,8 @@ class SnapshotFileTest {
         SnapshotFile.parse(
             SnapshotValueReader.of(
                 """
+            ╔═ Apple ═╗
+            Apple
             ╔═ Apple[color] ═╗
             green
             ╔═ Apple[crisp] ═╗
@@ -63,15 +67,16 @@ class SnapshotFileTest {
     underTest.metadata = entry("com.acme.AcmeTest", """{"header":"data"}""")
     underTest.snapshots =
         underTest.snapshots.plus(
-            "Apple", Snapshot.of("Apple").lens("color", "green").lens("crisp", "yes"))
+            "Apple", Snapshot.of("Granny Smith").lens("color", "green").lens("crisp", "yes"))
     underTest.snapshots = underTest.snapshots.plus("Orange", Snapshot.of("Orange"))
-    // etc
     val buffer = StringBuffer()
     underTest.serialize { line -> buffer.append(line) }
     buffer.toString() shouldBe
         """
             ╔═ 📷 com.acme.AcmeTest ═╗
             {"header":"data"}
+            ╔═ Apple ═╗
+            Granny Smith
             ╔═ Apple[color] ═╗
             green
             ╔═ Apple[crisp] ═╗
