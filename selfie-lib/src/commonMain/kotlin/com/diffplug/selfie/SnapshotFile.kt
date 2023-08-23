@@ -171,11 +171,11 @@ class SnapshotValueReader(val lineReader: LineReader) {
     private val headerEnd = " ═╗"
 
     /**
-     * https://github.com/diffplug/spotless-snapshot/blob/f63192a84390901a3d3543066d095ea23bf81d21/snapshot-lib/src/commonTest/resources/com/diffplug/snapshot/scenarios_and_lenses.ss#L11-L29
+     * https://github.com/diffplug/selfie/blob/f63192a84390901a3d3543066d095ea23bf81d21/snapshot-lib/src/commonTest/resources/com/diffplug/snapshot/scenarios_and_lenses.ss#L11-L29
      */
     private val nameEsc = PerCharacterEscaper.specifiedEscape("\\\\/∕[(])\nn\tt╔┌╗┐═─")
 
-    /** https://github.com/diffplug/spotless-snapshot/issues/2 */
+    /** https://github.com/diffplug/selfie/issues/2 */
     private val bodyEsc = PerCharacterEscaper.selfEscape("\uD801\uDF43\uD801\uDF41")
   }
 }

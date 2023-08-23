@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 package com.diffplug.selfie
-fun preserveScenarios(vararg names: String): Unit = TODO()
 
 open class DiskSelfie internal constructor(private val actual: Snapshot) {
   fun toMatchDisk(scenario: String = ""): Snapshot = TODO()
