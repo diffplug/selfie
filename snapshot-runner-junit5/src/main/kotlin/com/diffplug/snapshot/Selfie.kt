@@ -17,31 +17,37 @@ package com.diffplug.snapshot
 fun preserveScenarios(vararg names: String): Unit = TODO()
 
 open class DiskSelfie internal constructor(private val actual: Snapshot) {
-  fun shouldMatchDisk(scenario: String = ""): Snapshot = TODO()
+  fun toMatchDisk(scenario: String = ""): Snapshot = TODO()
 }
-fun <T> selfie(actual: T, snapshotter: Snapshotter<T>) = DiskSelfie(snapshotter.snapshot(actual))
+fun <T> expectSelfie(actual: T, snapshotter: Snapshotter<T>) =
+    DiskSelfie(snapshotter.snapshot(actual))
 
 class StringSelfie(private val actual: String) : DiskSelfie(Snapshot.of(actual)) {
-  fun shouldBe(expected: String): String = TODO()
+  fun toBe(expected: String): String = TODO()
+  fun toBe_TODO(): String = TODO()
 }
-fun selfie(actual: String) = StringSelfie(actual)
+fun expectSelfie(actual: String) = StringSelfie(actual)
 
 class BinarySelfie(private val actual: ByteArray) : DiskSelfie(Snapshot.of(actual)) {
-  fun shouldBeBase64(expected: String): String = TODO()
+  fun toBeBase64(expected: String): ByteArray = TODO()
+  fun toBeBase64_TODO(): ByteArray = TODO()
 }
-fun selfie(actual: ByteArray) = BinarySelfie(actual)
+fun expectSelfie(actual: ByteArray) = BinarySelfie(actual)
 
 class IntSelfie(private val actual: Int) {
-  fun shouldBe(expected: Int): Int = TODO()
+  fun toBe(expected: Int): Int = TODO()
+  fun toBe_TODO(): Int = TODO()
 }
-fun selfie(actual: Int) = IntSelfie(actual)
+fun expectSelfie(actual: Int) = IntSelfie(actual)
 
 class LongSelfie(private val actual: Long) {
-  fun shouldBe(expected: Long): Long = TODO()
+  fun toBe(expected: Long): Long = TODO()
+  fun toBe_TODO(): Long = TODO()
 }
-fun selfie(actual: Long) = LongSelfie(actual)
+fun expectSelfie(actual: Long) = LongSelfie(actual)
 
 class BooleanSelfie(private val actual: Boolean) {
-  fun shouldBe(expected: Boolean): Boolean = TODO()
+  fun toBe(expected: Boolean): Boolean = TODO()
+  fun toBe_TODO(): Boolean = TODO()
 }
-fun selfie(actual: Boolean) = BooleanSelfie(actual)
+fun expectSelfie(actual: Boolean) = BooleanSelfie(actual)

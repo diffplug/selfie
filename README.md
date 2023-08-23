@@ -1,24 +1,22 @@
 # Selfie
 
-- Precise snapshot testing for the JVM and Javascript (Native TODO)
+- Precise snapshot testing for the JVM and Javascript (others TBD)
 - Supports text and binary data.
 - Friendly to humans and version control.
 - In-place [literal snapshots](#literal-snapshots).
 - Allows [lenses](#lenses) to verify multiple aspects of an object under test.
   - e.g. pretty-printed JSON, or only the rendered plaintext of an HTML document, etc.
 
-The example below uses the JUnit 5 runner, but we also support TODO.
-
-Here is a very simple test which snapshots the HTML served at various URLs.
+ere is a very simple test which snapshots the HTML served at various URLs.
 
 ```java
 @Test public void gzipFavicon() {
-    selfie(get("/favicon.ico", ContentEncoding.GZIP)).shouldMatch();
+    expectSelfie(get("/favicon.ico", ContentEncoding.GZIP)).toMatchDisk();
 }
 @Test public void orderFlow() {
-  selfie(get("/orders")).shouldMatch("initial");
+  expectSelfie(get("/orders")).toMatchDisk("initial");
   postOrder();
-  selfie(get("/orders")).shouldMatch("ordered");
+  expectSelfie(get("/orders")).toMatchDisk("ordered");
 }
 ```
 
@@ -43,12 +41,12 @@ H4sIAAAAAAAA/8pIzcnJVyjPL8pJUQQAlQYXAAAA
 
 ### Literal snapshots
 
-A great thing about snapshots is that they are fast to write and update. A downside is that the asserted value is opaque. But it doesn't have to be! Just swap `toMatchSnapshot` for `toMatchLiteral`.
+A great thing about snapshots is that they are fast to write and update. A downside is that the asserted value is opaque. But it doesn't have to be! Just swap `toMatchDisk` for `toBe`.
 
 ```java
 @Test public void preventCssBloat() {
-  //      selfie can update this literal value for you ▼
-  int size = selfie(get("/index.css").length).shouldBe(5_236);
+  //        selfie can update this literal value for you ▼
+  int size = expectSelfie(get("/index.css").length).toBe(5_236);
   if (size > 100_000) {
     Assert.fail("CSS has gotten too big!");
   }
@@ -92,9 +90,9 @@ Order information
 Tracking #ABC123
 ```
 
-Lenses can make PRs easier to review, by putting the focus on various aspects of the snapshot that are relevant to the change.
+Lenses can make PRs easier to review, by putting the focus on whichever aspect of the snapshot is relevant to the change.
 
 ### Acknowledgements
 
-- JUnit test runner heavily inspired by [origin-energy's java-snapshot-testing](https://github.com/origin-energy/java-snapshot-testing).
+- Heavily inspired by [origin-energy's java-snapshot-testing](https://github.com/origin-energy/java-snapshot-testing).
 - Which in turn is heavily inspired by [Facebook's jest-snapshot](https://jestjs.io/docs/snapshot-testing).
