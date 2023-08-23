@@ -15,8 +15,17 @@
  */
 package com.diffplug.selfie
 
-class ParseException(val line: Int, message: String) : IllegalArgumentException(message) {
-  constructor(lineReader: LineReader, message: String) : this(lineReader.getLineNumber(), message)
+class ParseException private constructor(val line: Int, message: String?, cause: Throwable?) :
+    IllegalArgumentException(message, cause) {
+  constructor(
+      lineReader: LineReader,
+      message: String
+  ) : this(lineReader.getLineNumber(), message, null)
+
+  constructor(
+      lineReader: LineReader,
+      cause: Exception
+  ) : this(lineReader.getLineNumber(), null, cause)
   override val message: String
     get() = "L${line}:${super.message}"
 }
@@ -116,18 +125,22 @@ class SnapshotFile {
   companion object {
     private val HEADER_PREFIX = """📷 """
     fun parse(valueReader: SnapshotValueReader): SnapshotFile {
-      val result = SnapshotFile()
-      val reader = SnapshotReader(valueReader)
-      // only if the first value starts with 📷
-      if (reader.peekKey()?.startsWith(HEADER_PREFIX) == true) {
-        val metadataName = reader.peekKey()!!.substring(HEADER_PREFIX.length)
-        val metadataValue = reader.valueReader.nextValue().valueString()
-        result.metadata = entry(metadataName, metadataValue)
+      try {
+        val result = SnapshotFile()
+        val reader = SnapshotReader(valueReader)
+        // only if the first value starts with 📷
+        if (reader.peekKey()?.startsWith(HEADER_PREFIX) == true) {
+          val metadataName = reader.peekKey()!!.substring(HEADER_PREFIX.length)
+          val metadataValue = reader.valueReader.nextValue().valueString()
+          result.metadata = entry(metadataName, metadataValue)
+        }
+        while (reader.peekKey() != null) {
+          result.snapshots = result.snapshots.plus(reader.peekKey()!!, reader.nextSnapshot())
+        }
+        return result
+      } catch (e: IllegalArgumentException) {
+        throw if (e is ParseException) e else ParseException(valueReader.lineReader, e)
       }
-      while (reader.peekKey() != null) {
-        result.snapshots = result.snapshots.plus(reader.peekKey()!!, reader.nextSnapshot())
-      }
-      return result
     }
   }
 }
