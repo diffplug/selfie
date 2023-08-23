@@ -15,8 +15,17 @@
  */
 package com.diffplug.selfie
 
-class ParseException(val line: Int, message: String) : IllegalArgumentException(message) {
-  constructor(lineReader: LineReader, message: String) : this(lineReader.getLineNumber(), message)
+class ParseException private constructor(val line: Int, message: String?, cause: Throwable?) :
+    IllegalArgumentException(message, cause) {
+  constructor(
+      lineReader: LineReader,
+      message: String
+  ) : this(lineReader.getLineNumber(), message, null)
+
+  constructor(
+      lineReader: LineReader,
+      cause: Exception
+  ) : this(lineReader.getLineNumber(), null, cause)
   override val message: String
     get() = "L${line}:${super.message}"
 }
@@ -54,10 +63,9 @@ data class Snapshot(
   /** A sorted immutable map of extra values. */
   val lenses: Map<String, SnapshotValue>
     get() = lensData
-  fun lens(key: String, value: ByteArray) =
-      Snapshot(this.value, lensData.plus(key, SnapshotValue.of(value)))
-  fun lens(key: String, value: String) =
-      Snapshot(this.value, lensData.plus(key, SnapshotValue.of(value)))
+  fun lens(key: String, value: ByteArray) = lens(key, SnapshotValue.of(value))
+  fun lens(key: String, value: String) = lens(key, SnapshotValue.of(value))
+  fun lens(key: String, value: SnapshotValue) = Snapshot(this.value, lensData.plus(key, value))
 
   companion object {
     fun of(binary: ByteArray) = Snapshot(SnapshotValue.of(binary), ArrayMap.empty())
@@ -68,36 +76,109 @@ data class Snapshot(
 interface Snapshotter<T> {
   fun snapshot(value: T): Snapshot
 }
+private fun String.efficientReplace(find: String, replaceWith: String): String {
+  val idx = this.indexOf(find)
+  return if (idx == -1) this else this.replace(find, replaceWith)
+}
 
 class SnapshotFile {
   // this will probably become `<String, JsonObject>` we'll cross that bridge when we get to it
   var metadata: Map.Entry<String, String>? = null
   var snapshots = ArrayMap.empty<String, Snapshot>()
-  fun serialize(valueWriter: StringWriter): Unit = TODO()
+  fun serialize(valueWriter: StringWriter) {
+    metadata?.let {
+      writeKey(valueWriter, "📷 ${it.key}", null, true)
+      writeValue(valueWriter, SnapshotValue.of(it.value))
+    }
+    for ((index, entry) in snapshots.entries.withIndex()) {
+      val isFirst = metadata == null && index == 0
+      writeKey(valueWriter, entry.key, null, isFirst)
+      writeValue(valueWriter, entry.value.value)
+      for (lens in entry.value.lenses.entries) {
+        writeKey(valueWriter, entry.key, lens.key, false)
+        writeValue(valueWriter, lens.value)
+      }
+    }
+  }
+  private fun writeKey(valueWriter: StringWriter, key: String, lens: String?, first: Boolean) {
+    valueWriter.write(if (first) "╔═ " else "\n╔═ ")
+    valueWriter.write(SnapshotValueReader.nameEsc.escape(key))
+    if (lens != null) {
+      valueWriter.write("[")
+      valueWriter.write(SnapshotValueReader.nameEsc.escape(lens))
+      valueWriter.write("]")
+    }
+    valueWriter.write(" ═╗\n")
+  }
+  private fun writeValue(valueWriter: StringWriter, value: SnapshotValue) {
+    if (value.isBinary) {
+      TODO("BASE64")
+    } else {
+      val escaped =
+          SnapshotValueReader.bodyEsc
+              .escape(value.valueString())
+              .efficientReplace("\n╔", "\n\uD801\uDF41")
+      valueWriter.write(escaped)
+    }
+  }
 
   companion object {
-    private val HEADER_PREFIX = """📷 """
+    private const val HEADER_PREFIX = """📷 """
     fun parse(valueReader: SnapshotValueReader): SnapshotFile {
-      val result = SnapshotFile()
-      val reader = SnapshotReader(valueReader)
-      // only if the first value starts with 📷
-      if (reader.peekKey()?.startsWith(HEADER_PREFIX) == true) {
-        val metadataName = reader.peekKey()!!.substring(HEADER_PREFIX.length)
-        val metadataValue = reader.valueReader.nextValue().valueString()
-        result.metadata = entry(metadataName, metadataValue)
+      try {
+        val result = SnapshotFile()
+        val reader = SnapshotReader(valueReader)
+        // only if the first value starts with 📷
+        if (reader.peekKey()?.startsWith(HEADER_PREFIX) == true) {
+          val metadataName = reader.peekKey()!!.substring(HEADER_PREFIX.length)
+          val metadataValue = reader.valueReader.nextValue().valueString()
+          result.metadata = entry(metadataName, metadataValue)
+        }
+        while (reader.peekKey() != null) {
+          result.snapshots = result.snapshots.plus(reader.peekKey()!!, reader.nextSnapshot())
+        }
+        return result
+      } catch (e: IllegalArgumentException) {
+        throw if (e is ParseException) e else ParseException(valueReader.lineReader, e)
       }
-      while (reader.peekKey() != null) {
-        result.snapshots = result.snapshots.plus(reader.peekKey()!!, reader.nextSnapshot())
-      }
-      return result
     }
   }
 }
 
 class SnapshotReader(val valueReader: SnapshotValueReader) {
-  fun peekKey(): String? = TODO()
-  fun nextSnapshot(): Snapshot = TODO()
-  fun skipSnapshot(): Unit = TODO()
+  fun peekKey(): String? {
+    val next = valueReader.peekKey() ?: return null
+    require(next.indexOf('[') == -1) {
+      "Missing root snapshot, square brackets not allowed: '$next'"
+    }
+    return next
+  }
+  fun nextSnapshot(): Snapshot {
+    val rootName = peekKey()
+    var snapshot = Snapshot(valueReader.nextValue(), ArrayMap.empty())
+    while (true) {
+      val nextKey = valueReader.peekKey() ?: return snapshot
+      val lensIdx = nextKey.indexOf('[')
+      if (lensIdx == -1) {
+        return snapshot
+      }
+      val lensRoot = nextKey.substring(0, lensIdx)
+      require(lensRoot == rootName) {
+        "Expected '$nextKey' to come after '$lensRoot', not '$rootName'"
+      }
+      val lensEndIdx = nextKey.indexOf(']', lensIdx + 1)
+      require(lensEndIdx != -1) { "Missing ] in $nextKey" }
+      val lensName = nextKey.substring(lensIdx + 1, lensEndIdx)
+      snapshot = snapshot.lens(lensName, valueReader.nextValue().valueString())
+    }
+  }
+  fun skipSnapshot() {
+    val rootName = peekKey()!!
+    valueReader.skipValue()
+    while (peekKey()?.startsWith("$rootName[") == true) {
+      valueReader.skipValue()
+    }
+  }
 }
 
 /** Provides the ability to parse a snapshot file incrementally. */
@@ -119,7 +200,7 @@ class SnapshotValueReader(val lineReader: LineReader) {
     val buffer = StringBuilder()
     scanValue { line ->
       if (line.length >= 2 && line[0] == '\uD801' && line[1] == '\uDF41') { // "\uD801\uDF41" = "𐝁"
-        buffer.append('╔')
+        buffer.append(KEY_FIRST_CHAR)
         buffer.append(line, 2, line.length)
       } else {
         buffer.append(line)
@@ -147,7 +228,7 @@ class SnapshotValueReader(val lineReader: LineReader) {
   private inline fun scanValue(consumer: (String) -> Unit) {
     // read next
     var nextLine = nextLine()
-    while (nextLine != null && nextLine.indexOf(headerFirstChar) != 0) {
+    while (nextLine != null && nextLine.indexOf(KEY_FIRST_CHAR) != 0) {
       resetLine()
 
       consumer(nextLine)
@@ -158,16 +239,16 @@ class SnapshotValueReader(val lineReader: LineReader) {
   }
   private fun nextKey(): String? {
     val line = nextLine() ?: return null
-    val startIndex = line.indexOf(headerStart)
-    val endIndex = line.indexOf(headerEnd)
+    val startIndex = line.indexOf(KEY_START)
+    val endIndex = line.indexOf(KEY_END)
     if (startIndex == -1) {
-      throw ParseException(lineReader, "Expected to start with '$headerStart'")
+      throw ParseException(lineReader, "Expected to start with '$KEY_START'")
     }
     if (endIndex == -1) {
-      throw ParseException(lineReader, "Expected to contain '$headerEnd'")
+      throw ParseException(lineReader, "Expected to contain '$KEY_END'")
     }
     // valid key
-    val key = line.substring(startIndex + headerStart.length, endIndex)
+    val key = line.substring(startIndex + KEY_START.length, endIndex)
     return if (key.startsWith(" ")) {
       throw ParseException(lineReader, "Leading spaces are disallowed: '$key'")
     } else if (key.endsWith(" ")) {
@@ -189,17 +270,18 @@ class SnapshotValueReader(val lineReader: LineReader) {
   companion object {
     fun of(content: String) = SnapshotValueReader(LineReader.forString(content))
     fun of(content: ByteArray) = SnapshotValueReader(LineReader.forBinary(content))
-    private val headerFirstChar = '╔'
-    private val headerStart = "╔═ "
-    private val headerEnd = " ═╗"
+
+    private const val KEY_FIRST_CHAR = '╔'
+    private const val KEY_START = "╔═ "
+    private const val KEY_END = " ═╗"
 
     /**
      * https://github.com/diffplug/selfie/blob/f63192a84390901a3d3543066d095ea23bf81d21/snapshot-lib/src/commonTest/resources/com/diffplug/snapshot/scenarios_and_lenses.ss#L11-L29
      */
-    private val nameEsc = PerCharacterEscaper.specifiedEscape("\\\\/∕[(])\nn\tt╔┌╗┐═─")
+    internal val nameEsc = PerCharacterEscaper.specifiedEscape("\\\\/∕[(])\nn\tt╔┌╗┐═─")
 
     /** https://github.com/diffplug/selfie/issues/2 */
-    private val bodyEsc = PerCharacterEscaper.selfEscape("\uD801\uDF43\uD801\uDF41")
+    internal val bodyEsc = PerCharacterEscaper.selfEscape("\uD801\uDF43\uD801\uDF41")
   }
 }
 
@@ -212,7 +294,6 @@ expect class LineReader {
     fun forBinary(content: ByteArray): LineReader
   }
 }
-
-interface StringWriter {
+fun interface StringWriter {
   fun write(string: String)
 }
