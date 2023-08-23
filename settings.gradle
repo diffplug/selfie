@@ -42,4 +42,4 @@ blowdryerSetup {
 
 include 'selfie-lib'
 include 'selfie-runner-junit5'
-rootProject.name = 'snapshot'
+rootProject.name = 'selfie'
