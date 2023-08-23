@@ -15,12 +15,19 @@
  */
 package com.diffplug.selfie.junit5
 
-import kotlin.test.Test
-import kotlin.test.assertFails
+import org.junit.jupiter.api.extension.AfterAllCallback
+import org.junit.jupiter.api.extension.BeforeAllCallback
+import org.junit.jupiter.api.extension.BeforeEachCallback
+import org.junit.jupiter.api.extension.ExtensionContext
 
-class CreateSnapshots {
-  @Test
-  fun test() {
-    assertFails { TODO() }
+class SelfieExtension : BeforeAllCallback, AfterAllCallback, BeforeEachCallback {
+  override fun beforeAll(context: ExtensionContext) {
+    println("beforeAll ${context.displayName}")
+  }
+  override fun beforeEach(context: ExtensionContext) {
+    println("beforeEach ${context.displayName}")
+  }
+  override fun afterAll(context: ExtensionContext) {
+    println("afterAll ${context.displayName}")
   }
 }
