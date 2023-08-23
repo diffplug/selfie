@@ -68,8 +68,31 @@ data class Snapshot(
 interface Snapshotter<T> {
   fun snapshot(value: T): Snapshot
 }
-fun parseSS(valueReader: SnapshotValueReader): ArrayMap<String, Snapshot> = TODO()
-fun serializeSS(valueWriter: StringWriter, snapshots: ArrayMap<String, Snapshot>): Unit = TODO()
+
+class SnapshotFile {
+  // this will probably become `<String, JsonObject>` we'll cross that bridge when we get to it
+  var metadata: Map.Entry<String, String>? = null
+  var snapshots = ArrayMap.empty<String, Snapshot>()
+  fun serialize(valueWriter: StringWriter): Unit = TODO()
+
+  companion object {
+    private val HEADER_PREFIX = """📷 """
+    fun parse(valueReader: SnapshotValueReader): SnapshotFile {
+      val result = SnapshotFile()
+      val reader = SnapshotReader(valueReader)
+      // only if the first value starts with 📷
+      if (reader.peekKey()?.startsWith(HEADER_PREFIX) == true) {
+        val metadataName = reader.peekKey()!!.substring(HEADER_PREFIX.length)
+        val metadataValue = reader.valueReader.nextValue().valueString()
+        result.metadata = entry(metadataName, metadataValue)
+      }
+      while (reader.peekKey() != null) {
+        result.snapshots = result.snapshots.plus(reader.peekKey()!!, reader.nextSnapshot())
+      }
+      return result
+    }
+  }
+}
 
 class SnapshotReader(val valueReader: SnapshotValueReader) {
   fun peekKey(): String? = TODO()
