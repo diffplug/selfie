@@ -13,10 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.diffplug.snapshot.junit5
+package com.diffplug.selfie.junit5
 
-import com.diffplug.snapshot.Snapshot
-import com.diffplug.snapshot.Snapshotter
+import com.diffplug.selfie.Snapshot
+import com.diffplug.selfie.Snapshotter
 
 interface ExpectSnapshot {
   /** Creates a sub-snapshot, which can be used to group related snapshots together. */

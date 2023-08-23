@@ -13,10 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.diffplug.snapshot.jest
+package com.diffplug.selfie.jest
 
-import com.diffplug.snapshot.Snapshot
-import com.diffplug.snapshot.Snapshotter
+import com.diffplug.selfie.Snapshot
+import com.diffplug.selfie.Snapshotter
 fun preserveScenarios(vararg names: String): Unit = TODO()
 
 class Expect(private val actual: Snapshot) {

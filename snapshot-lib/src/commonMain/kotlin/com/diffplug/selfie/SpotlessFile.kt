@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.diffplug.snapshot
+package com.diffplug.selfie
 
 class ParseException(val line: Int, message: String) : IllegalArgumentException(message) {
   constructor(lineReader: LineReader, message: String) : this(lineReader.getLineNumber(), message)

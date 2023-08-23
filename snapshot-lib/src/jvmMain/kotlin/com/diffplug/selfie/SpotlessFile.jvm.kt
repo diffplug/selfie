@@ -13,14 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.diffplug.snapshot.junit5
+package com.diffplug.selfie
 
-import kotlin.test.Test
-import kotlin.test.assertFails
+import java.io.InputStreamReader
+import java.io.LineNumberReader
+import java.io.Reader
+import java.io.StringReader
+import java.nio.charset.StandardCharsets
 
-class CreateSnapshots {
-  @Test
-  fun test() {
-    assertFails { TODO() }
+actual class LineReader(reader: Reader) : LineNumberReader(reader) {
+  actual companion object {
+    actual fun forString(content: String) = LineReader(StringReader(content))
+    actual fun forBinary(content: ByteArray) =
+        LineReader(InputStreamReader(content.inputStream(), StandardCharsets.UTF_8))
   }
 }

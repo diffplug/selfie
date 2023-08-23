@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.diffplug.snapshot
+package com.diffplug.selfie
 fun preserveScenarios(vararg names: String): Unit = TODO()
 
 open class DiskSelfie internal constructor(private val actual: Snapshot) {

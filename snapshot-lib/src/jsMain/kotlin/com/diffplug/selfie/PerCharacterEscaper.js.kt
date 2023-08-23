@@ -13,31 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.diffplug.snapshot
+package com.diffplug.selfie
 
-expect class PerCharacterEscaper {
-  fun escape(input: String): String
-  fun unescape(input: String): String
+actual class PerCharacterEscaper {
+  actual fun escape(input: String): String = TODO()
+  actual fun unescape(input: String): String = TODO()
 
-  companion object {
-    /**
-     * If your escape policy is "'123", it means this:
-     * ```
-     * abc->abc
-     * 123->'1'2'3
-     * I won't->I won''t
-     * ```
-     */
-    fun selfEscape(escapePolicy: String): PerCharacterEscaper
-
-    /**
-     * If your escape policy is "'a1b2c3d", it means this:
-     * ```
-     * abc->abc
-     * 123->'b'c'd
-     * I won't->I won'at
-     * ```
-     */
-    fun specifiedEscape(escapePolicy: String): PerCharacterEscaper
+  actual companion object {
+    actual fun selfEscape(escapePolicy: String): PerCharacterEscaper = TODO()
+    actual fun specifiedEscape(escapePolicy: String): PerCharacterEscaper = TODO()
   }
 }

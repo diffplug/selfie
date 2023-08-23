@@ -13,19 +13,31 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.diffplug.snapshot
+package com.diffplug.selfie
 
-import java.io.InputStreamReader
-import java.io.LineNumberReader
-import java.io.Reader
-import java.io.StringReader
-import java.nio.charset.StandardCharsets
+expect class PerCharacterEscaper {
+  fun escape(input: String): String
+  fun unescape(input: String): String
 
-actual class LineReader(reader: Reader) : LineNumberReader(reader) {
-  actual companion object {
-    actual fun forString(content: String) = LineReader(StringReader(content))
+  companion object {
+    /**
+     * If your escape policy is "'123", it means this:
+     * ```
+     * abc->abc
+     * 123->'1'2'3
+     * I won't->I won''t
+     * ```
+     */
+    fun selfEscape(escapePolicy: String): PerCharacterEscaper
 
-    actual fun forBinary(content: ByteArray) =
-        LineReader(InputStreamReader(content.inputStream(), StandardCharsets.UTF_8))
+    /**
+     * If your escape policy is "'a1b2c3d", it means this:
+     * ```
+     * abc->abc
+     * 123->'b'c'd
+     * I won't->I won'at
+     * ```
+     */
+    fun specifiedEscape(escapePolicy: String): PerCharacterEscaper
   }
 }

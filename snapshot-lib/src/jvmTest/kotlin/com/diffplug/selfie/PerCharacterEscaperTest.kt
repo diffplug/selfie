@@ -13,10 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.diffplug.snapshot
+package com.diffplug.selfie
 
-import com.diffplug.snapshot.PerCharacterEscaper.Companion.selfEscape
-import com.diffplug.snapshot.PerCharacterEscaper.Companion.specifiedEscape
+import com.diffplug.selfie.PerCharacterEscaper.Companion.selfEscape
+import com.diffplug.selfie.PerCharacterEscaper.Companion.specifiedEscape
 import java.util.function.Consumer
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test

@@ -13,13 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.diffplug.snapshot
+package com.diffplug.selfie
 
-actual class LineReader {
-  actual companion object {
-    actual fun forString(content: String): LineReader = TODO()
-    actual fun forBinary(content: ByteArray): LineReader = TODO()
-  }
-  actual fun getLineNumber(): Int = TODO()
-  actual fun readLine(): String? = TODO()
-}
+internal actual fun <K, V> entry(key: K, value: V): Map.Entry<K, V> =
+    java.util.Map.entry(key, value)
