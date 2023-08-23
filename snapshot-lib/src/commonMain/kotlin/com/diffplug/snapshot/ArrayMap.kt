@@ -17,7 +17,27 @@ package com.diffplug.snapshot
 
 import kotlin.collections.binarySearch
 
-internal expect abstract class ListBackedSet<T>() : Set<T>, AbstractList<T> {}
+internal abstract class ListBackedSet<T>() : AbstractSet<T>() {
+  abstract fun get(index: Int): T
+  override fun iterator(): Iterator<T> =
+      object : Iterator<T> {
+        private var index = 0
+        override fun hasNext(): Boolean = index < size
+        override fun next(): T {
+          if (!hasNext()) throw NoSuchElementException()
+          return get(index++)
+        }
+      }
+}
+internal fun <T : Comparable<T>> ListBackedSet<T>.binarySearch(element: T): Int {
+  val list =
+      object : AbstractList<T>() {
+        override val size: Int
+          get() = this@binarySearch.size
+        override fun get(index: Int): T = this@binarySearch.get(index)
+      }
+  return list.binarySearch(element)
+}
 
 internal expect fun <K, V> entry(key: K, value: V): Map.Entry<K, V>
 

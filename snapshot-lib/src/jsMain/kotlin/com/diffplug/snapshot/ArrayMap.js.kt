@@ -15,12 +15,15 @@
  */
 package com.diffplug.snapshot
 
-import java.util.*
-import kotlin.collections.AbstractList
+internal actual fun <K, V> entry(key: K, value: V): Map.Entry<K, V> = E(key, value)
 
-internal actual abstract class ListBackedSet<T> actual constructor() : Set<T>, AbstractList<T>() {
-  override fun spliterator(): Spliterator<T> = (this as AbstractList<T>).spliterator()
+class E<K, V>(override val key: K, override val value: V) : Map.Entry<K, V> {
+  override fun equals(other: Any?): Boolean {
+    if (other is Map.Entry<*, *>) {
+      return key == other.key && value == other.value
+    } else {
+      return false
+    }
+  }
+  override fun hashCode(): Int = key.hashCode() xor value.hashCode()
 }
-
-internal actual fun <K, V> entry(key: K, value: V): Map.Entry<K, V> =
-    java.util.Map.entry(key, value)

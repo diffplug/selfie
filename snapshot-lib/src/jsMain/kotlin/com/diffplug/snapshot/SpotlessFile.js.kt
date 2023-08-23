@@ -21,5 +21,5 @@ actual class LineReader {
     actual fun forBinary(content: ByteArray): LineReader = TODO()
   }
   actual fun getLineNumber(): Int = TODO()
-  actual fun readLine(): String = TODO()
+  actual fun readLine(): String? = TODO()
 }
