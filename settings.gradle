@@ -40,6 +40,6 @@ blowdryerSetup {
   }
 }
 
-include 'snapshot-lib'
-include 'snapshot-runner-junit5'
+include 'selfie-lib'
+include 'selfie-runner-junit5'
 rootProject.name = 'snapshot'
