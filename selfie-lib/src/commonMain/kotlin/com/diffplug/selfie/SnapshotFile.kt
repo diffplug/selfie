@@ -68,49 +68,49 @@ data class Snapshot(
 interface Snapshotter<T> {
   fun snapshot(value: T): Snapshot
 }
+private fun String.efficientReplace(find: String, replaceWith: String): String {
+  val idx = this.indexOf(find)
+  return if (idx == -1) this else this.replace(find, replaceWith)
+}
 
 class SnapshotFile {
   // this will probably become `<String, JsonObject>` we'll cross that bridge when we get to it
   var metadata: Map.Entry<String, String>? = null
   var snapshots = ArrayMap.empty<String, Snapshot>()
   fun serialize(valueWriter: StringWriter) {
-    if (metadata != null) {
-      valueWriter.write(
-          buildString {
-            append("""╔═ 📷 """)
-            append(metadata!!.key)
-            append(""" ═╗""")
-            append("\n")
-          })
-      valueWriter.write(metadata!!.value)
-      valueWriter.write("\n")
+    metadata?.let {
+      writeKey(valueWriter, "📷 ${it.key}", null, true)
+      writeValue(valueWriter, SnapshotValue.of(it.value))
     }
-
     for ((index, entry) in snapshots.entries.withIndex()) {
-      valueWriter.write(
-          buildString {
-            val snapshot = entry.value
-            append("""╔═ """)
-            append(entry.key)
-            append(""" ═╗""")
-            append("\n")
-            append(snapshot.value.valueString())
-            if (index < snapshots.size - 1) {
-              append("\n")
-            }
-            for (lens in snapshot.lenses.entries) {
-              append("""╔═ """)
-              append(entry.key)
-              append("[")
-              append(lens.key)
-              append("""] ═╗""")
-              append("\n")
-              append(lens.value.valueString())
-              if (index < snapshots.size - 1) {
-                append("\n")
-              }
-            }
-          })
+      val isFirst = metadata == null && index == 0
+      writeKey(valueWriter, entry.key, null, isFirst)
+      writeValue(valueWriter, entry.value.value)
+      for (lens in entry.value.lenses.entries) {
+        writeKey(valueWriter, entry.key, lens.key, false)
+        writeValue(valueWriter, lens.value)
+      }
+    }
+  }
+  private fun writeKey(valueWriter: StringWriter, key: String, lens: String?, first: Boolean) {
+    valueWriter.write(if (first) "╔═ " else "\n╔═ ")
+    valueWriter.write(SnapshotValueReader.nameEsc.escape(key))
+    if (lens != null) {
+      valueWriter.write("[")
+      valueWriter.write(SnapshotValueReader.nameEsc.escape(lens))
+      valueWriter.write("]")
+    }
+    valueWriter.write(" ═╗\n")
+  }
+  private fun writeValue(valueWriter: StringWriter, value: SnapshotValue) {
+    if (value.isBinary) {
+      TODO("BASE64")
+    } else {
+      val escaped =
+          SnapshotValueReader.bodyEsc
+              .escape(value.valueString())
+              .efficientReplace("\n╔", "\n\uD801\uDF41")
+      valueWriter.write(escaped)
     }
   }
 
@@ -270,10 +270,10 @@ class SnapshotValueReader(val lineReader: LineReader) {
     /**
      * https://github.com/diffplug/selfie/blob/f63192a84390901a3d3543066d095ea23bf81d21/snapshot-lib/src/commonTest/resources/com/diffplug/snapshot/scenarios_and_lenses.ss#L11-L29
      */
-    private val nameEsc = PerCharacterEscaper.specifiedEscape("\\\\/∕[(])\nn\tt╔┌╗┐═─")
+    internal val nameEsc = PerCharacterEscaper.specifiedEscape("\\\\/∕[(])\nn\tt╔┌╗┐═─")
 
     /** https://github.com/diffplug/selfie/issues/2 */
-    private val bodyEsc = PerCharacterEscaper.selfEscape("\uD801\uDF43\uD801\uDF41")
+    internal val bodyEsc = PerCharacterEscaper.selfEscape("\uD801\uDF43\uD801\uDF41")
   }
 }
 
