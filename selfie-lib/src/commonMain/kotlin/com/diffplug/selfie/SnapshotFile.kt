@@ -212,7 +212,6 @@ expect class LineReader {
     fun forBinary(content: ByteArray): LineReader
   }
 }
-
-interface StringWriter {
-  fun write(string: String)
+fun interface StringWriter {
+  fun write(string: String): Unit
 }
