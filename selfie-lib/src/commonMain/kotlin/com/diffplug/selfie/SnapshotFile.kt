@@ -73,7 +73,49 @@ class SnapshotFile {
   // this will probably become `<String, JsonObject>` we'll cross that bridge when we get to it
   var metadata: Map.Entry<String, String>? = null
   var snapshots = ArrayMap.empty<String, Snapshot>()
-  fun serialize(valueWriter: StringWriter): Unit = TODO()
+  fun serialize(valueWriter: StringWriter) {
+    if (metadata != null) {
+      valueWriter.write(
+          buildString {
+            append("""╔═ 📷 """)
+            append(metadata!!.key)
+            append(""" ═╗""")
+            append("\n")
+          })
+      valueWriter.write(metadata!!.value)
+      valueWriter.write("\n")
+    }
+
+    for ((index, entry) in snapshots.entries.withIndex()) {
+      valueWriter.write(
+          buildString {
+            val snapshot = entry.value
+            if (snapshot.lenses.isEmpty()) {
+              append("""╔═ """)
+              append(entry.key)
+              append(""" ═╗""")
+              append("\n")
+              append(snapshot.value.valueString())
+              if (index < snapshots.size - 1) {
+                append("\n")
+              }
+            } else {
+              for (lens in snapshot.lenses.entries) {
+                append("""╔═ """)
+                append(snapshot.value.valueString())
+                append("[")
+                append(lens.key)
+                append("""] ═╗""")
+                append("\n")
+                append(lens.value.valueString())
+                if (index < snapshots.size - 1) {
+                  append("\n")
+                }
+              }
+            }
+          })
+    }
+  }
 
   companion object {
     private val HEADER_PREFIX = """📷 """
@@ -95,9 +137,44 @@ class SnapshotFile {
 }
 
 class SnapshotReader(val valueReader: SnapshotValueReader) {
-  fun peekKey(): String? = TODO()
-  fun nextSnapshot(): Snapshot = TODO()
-  fun skipSnapshot(): Unit = TODO()
+  var key: String? = null
+  var lens: String? = null
+  fun peekKey(): String? {
+    val next = valueReader.peekKey() ?: return resetKeyState()
+    val lensIdx = next.indexOf('[')
+    if (lensIdx > 0) {
+      lens = next.substring(lensIdx + 1, next.indexOf(']'))
+      key = next.substring(0, lensIdx)
+    } else {
+      key = next
+      lens = null
+    }
+    return key
+  }
+  private fun resetKeyState(): String? {
+    key = null
+    lens = null
+    return null
+  }
+  fun nextSnapshot(): Snapshot {
+    var key = peekKey()
+    var prevKey = key
+    var result: Snapshot? = null
+    while (key != null && prevKey == key) {
+      prevKey = key
+      val nextValue = valueReader.nextValue()
+      if (result == null) {
+        result = Snapshot(nextValue, ArrayMap.empty())
+      }
+      if (lens != null) {
+        result = result.lens(lens!!, nextValue.valueString())
+      }
+
+      key = peekKey()
+    }
+    return result!!
+  }
+  fun skipSnapshot(): Unit = valueReader.skipValue()
 }
 
 /** Provides the ability to parse a snapshot file incrementally. */
