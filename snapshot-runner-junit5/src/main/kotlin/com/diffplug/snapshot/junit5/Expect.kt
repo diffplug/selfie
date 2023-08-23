@@ -23,9 +23,9 @@ interface ExpectSnapshot {
   fun scenario(name: String): ExpectSnapshot
 
   /**
-   * Spotless prunes snapshots which are no longer used. If there are some that you want to
-   * preserve, perhaps because a single test has different behavior in different environments, then
-   * this method will prevent a snapshot from being removed.
+   * Selfie prunes snapshots which are no longer used. If there are some that you want to preserve,
+   * perhaps because a single test has different behavior in different environments, then this
+   * method will prevent a snapshot from being removed.
    */
   fun preserveScenarios(vararg names: String)
   fun toMatchSnapshotBinary(content: ByteArray): ByteArray

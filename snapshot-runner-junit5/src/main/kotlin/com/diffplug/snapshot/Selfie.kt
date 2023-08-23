@@ -52,9 +52,13 @@ class BooleanSelfie(private val actual: Boolean) {
 }
 fun expectSelfie(actual: Boolean) = BooleanSelfie(actual)
 
+/** Sometimes a selfie doesn't get used. */
+fun preserveDiskSelfies(vararg names: String): Unit = TODO()
+
 // infix versions for the inline methods, consistent with Kotest's API
-infix fun String.shouldBeSelfie(expected: String): String = TODO()
-infix fun ByteArray.shouldBeSelfieBase64(expected: String): ByteArray = TODO()
-infix fun Int.shouldBeSelfie(expected: Int): Int = TODO()
-infix fun Long.shouldBeSelfie(expected: Long): Long = TODO()
-infix fun Boolean.shouldBeSelfie(expected: Boolean): Boolean = TODO()
+infix fun String.shouldBeSelfie(expected: String): String = expectSelfie(this).toBe(expected)
+infix fun ByteArray.shouldBeSelfieBase64(expected: String): ByteArray =
+    expectSelfie(this).toBeBase64(expected)
+infix fun Int.shouldBeSelfie(expected: Int): Int = expectSelfie(this).toBe(expected)
+infix fun Long.shouldBeSelfie(expected: Long): Long = expectSelfie(this).toBe(expected)
+infix fun Boolean.shouldBeSelfie(expected: Boolean): Boolean = expectSelfie(this).toBe(expected)
