@@ -47,11 +47,6 @@ internal data class SnapshotValueString(val value: String) : SnapshotValue {
   override fun valueString(): String = value
 }
 
-internal data class SnapshotValueEmptyString(val value: String) : SnapshotValue {
-  override fun valueBinary() = throw UnsupportedOperationException("This is an empty string value.")
-  override fun valueString() = value
-}
-
 data class Snapshot(
     val value: SnapshotValue,
     private val lensData: ArrayMap<String, SnapshotValue>
