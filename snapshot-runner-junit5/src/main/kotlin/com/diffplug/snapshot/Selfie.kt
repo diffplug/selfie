@@ -51,3 +51,10 @@ class BooleanSelfie(private val actual: Boolean) {
   fun toBe_TODO(): Boolean = TODO()
 }
 fun expectSelfie(actual: Boolean) = BooleanSelfie(actual)
+
+// infix versions for the inline methods, consistent with Kotest's API
+infix fun String.shouldBeSelfie(expected: String): String = TODO()
+infix fun ByteArray.shouldBeSelfieBase64(expected: String): ByteArray = TODO()
+infix fun Int.shouldBeSelfie(expected: Int): Int = TODO()
+infix fun Long.shouldBeSelfie(expected: Long): Long = TODO()
+infix fun Boolean.shouldBeSelfie(expected: Boolean): Boolean = TODO()
