@@ -10,9 +10,12 @@ dependencies {
   api project(':selfie-lib')
   compileOnly "org.junit.jupiter:junit-jupiter-api:$ver_JUNIT_API"
 
+  testImplementation "com.squareup.okio:okio:$ver_OKIO"
+
   testImplementation "org.jetbrains.kotlin:kotlin-test-junit5:$ver_KOTLIN_TEST"
   testImplementation "io.kotest:kotest-assertions-core:$ver_KOTEST"
   testImplementation "org.junit.jupiter:junit-jupiter:$ver_JUNIT_USE"
+  testImplementation gradleTestKit()
 }
 test {
   useJUnitPlatform()
