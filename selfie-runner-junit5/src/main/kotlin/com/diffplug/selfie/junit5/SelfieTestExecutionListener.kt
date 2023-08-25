@@ -15,32 +15,91 @@
  */
 package com.diffplug.selfie.junit5
 
+import com.diffplug.selfie.ArrayMap
 import org.junit.platform.engine.TestExecutionResult
-import org.junit.platform.engine.support.descriptor.ClassSource
-import org.junit.platform.engine.support.descriptor.MethodSource
 import org.junit.platform.launcher.TestExecutionListener
 import org.junit.platform.launcher.TestIdentifier
 
-class SelfieTestExecutionListener : TestExecutionListener {
-  override fun executionStarted(testIdentifier: TestIdentifier) {
-    val source = testIdentifier.source.orElse(null)
-    when (source) {
-      is ClassSource -> {
-        println("start class ${source.className}")
-      }
-      is MethodSource -> {
-        println("start method ${source.className}#${source.methodName}")
-      }
-      else -> throw IllegalArgumentException("Unknown source type ${testIdentifier.source.get()}")
+internal enum class Usage {
+  STARTED,
+  SUCCEEDED,
+  SKIPPED,
+}
+
+internal class SnapshotUsage {
+  private var snapshots = ArrayMap.empty<String, Usage>()
+  fun set(method: String, usage: Usage): Unit {
+    snapshots = snapshots.plusOrReplace(method) { usage }
+  }
+  fun finish(classLevelResult: Usage): Unit {}
+}
+
+internal class Progress {
+  var layout: SelfieLayout? = null
+  var usageByClass = ArrayMap.empty<String, SnapshotUsage>()
+
+  @Synchronized
+  fun start(className: String, method: String?) {
+    if (method == null) {
+      usageByClass = usageByClass.plus(className, SnapshotUsage())
+    } else {
+      usageByClass[className]!!.let { it.set(method, Usage.STARTED) }
     }
   }
+
+  @Synchronized
+  fun skip(className: String, method: String?) {
+    if (method != null) {
+      usageByClass[className]?.let { it.set(method, Usage.SKIPPED) }
+    }
+  }
+
+  @Synchronized
+  fun finish(className: String, method: String?, result: Usage) {
+    usageByClass[className]?.let {
+      if (method == null) {
+        it.finish(result)
+      } else {
+        it.set(method, result)
+      }
+    }
+  }
+}
+
+class SelfieTestExecutionListener : TestExecutionListener {
+  private val progress = Progress()
+  override fun executionStarted(testIdentifier: TestIdentifier) {
+    if (isRoot(testIdentifier)) return
+    val (clazz, method) = parseClassMethod(testIdentifier)
+    progress.start(clazz, method)
+  }
   override fun executionSkipped(testIdentifier: TestIdentifier, reason: String) {
-    println("skipped=${testIdentifier.displayName}")
+    val (clazz, method) = parseClassMethod(testIdentifier)
+    progress.skip(clazz, method)
   }
   override fun executionFinished(
       testIdentifier: TestIdentifier,
       testExecutionResult: TestExecutionResult
   ) {
-    println("finished=${testIdentifier.displayName}")
+    val (clazz, method) = parseClassMethod(testIdentifier)
+    val result =
+        testExecutionResult.status.let {
+          when (it) {
+            TestExecutionResult.Status.SUCCESSFUL -> Usage.SUCCEEDED
+            TestExecutionResult.Status.FAILED,
+            TestExecutionResult.Status.ABORTED -> Usage.SKIPPED
+            else -> throw IllegalArgumentException("Unknown status $it")
+          }
+        }
+    progress.finish(clazz, method, result)
+  }
+  private fun isRoot(testIdentifier: TestIdentifier) = testIdentifier.parentId.isEmpty
+  private fun parseClassMethod(testIdentifier: TestIdentifier): Pair<String, String?> {
+    val display = testIdentifier.displayName
+    val pieces = display.split('#')
+    assert(pieces.size == 1 || pieces.size == 2) {
+      "Expected 1 or 2 pieces, but got ${pieces.size} for $display"
+    }
+    return if (pieces.size == 1) Pair(pieces[0], null) else Pair(pieces[0], pieces[1])
   }
 }

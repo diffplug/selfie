@@ -53,6 +53,29 @@ class ArrayMap<K : Comparable<K>, V : Any>(private val data: Array<Any>) : Map<K
       throw IllegalArgumentException("Key already exists: $key")
     }
     val idxInsert = -(idxExisting + 1)
+    return insert(idxInsert, key, value)
+  }
+  /**
+   * Returns a new FastMap which has added the given key. Throws an exception if the key already
+   * exists.
+   */
+  fun plusOrReplace(key: K, replacer: (V?) -> V): ArrayMap<K, V> {
+    val idxExisting = dataAsKeys.binarySearch(key)
+    if (idxExisting >= 0) {
+      val existingValue = data[idxExisting * 2 + 1] as V
+      val value = replacer(existingValue)
+      return if (value == existingValue) this
+      else {
+        val copy = data.copyOf()
+        copy[idxExisting * 2 + 1] = value
+        return ArrayMap(copy)
+      }
+    } else {
+      val idxInsert = -(idxExisting + 1)
+      return insert(idxInsert, key, replacer(null))
+    }
+  }
+  private fun insert(idxInsert: Int, key: K, value: V): ArrayMap<K, V> {
     return when (data.size) {
       0 -> ArrayMap(arrayOf(key, value))
       1 -> {
@@ -111,10 +134,10 @@ class ArrayMap<K : Comparable<K>, V : Any>(private val data: Array<Any>) : Map<K
     if (other === this) return true
     if (other !is Map<*, *>) return false
     if (size != other.size) return false
-    if (other is ArrayMap<*, *>) {
-      return data.contentEquals(other.data)
+    return if (other is ArrayMap<*, *>) {
+      data.contentEquals(other.data)
     } else {
-      return other.entries.all { (key, value) -> this[key] == value }
+      other.entries.all { (key, value) -> this[key] == value }
     }
   }
   override fun hashCode(): Int = entries.hashCode()
