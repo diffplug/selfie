@@ -37,4 +37,4 @@ jobs:
         if: always() # always run even if the previous step fails
         with:
           check_name: JUnit ${{ matrix.jre }} ${{ matrix.os }}
-          report_paths: '**/test-results/*/TEST-*.xml'
+          report_paths: '*/build/test-results/*/TEST-*.xml'
