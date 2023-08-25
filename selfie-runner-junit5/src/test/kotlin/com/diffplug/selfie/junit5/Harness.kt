@@ -32,7 +32,9 @@ open class Harness(rootFolderStr: String) {
       FileHarness(nameOrSubpath)
     } else {
       val matches =
-          FileSystem.SYSTEM.listRecursively(rootFolder).filter { it.name == nameOrSubpath }.toList()
+          FileSystem.SYSTEM.listRecursively(rootFolder)
+              .filter { it.name == nameOrSubpath && !it.toString().contains("build") }
+              .toList()
       assert(matches.size <= 1) {
         val allMatches = matches.map { it.relativeTo(rootFolder) }.joinToString("\n  ")
         "Expected to find exactly one file named $nameOrSubpath, but found ${matches.size}:\n  $allMatches"
@@ -107,7 +109,6 @@ open class Harness(rootFolderStr: String) {
         assert(startInclusive >= 0)
         assert(endInclusive >= startInclusive)
         assert(lines.size >= endInclusive)
-        println("range: $startInclusive..$endInclusive")
       }
       fun shrinkByOne() = LineRange(lines, startInclusive + 1, endInclusive - 1)
       /** Prepend `//` to every line in this range and save it to disk. */
