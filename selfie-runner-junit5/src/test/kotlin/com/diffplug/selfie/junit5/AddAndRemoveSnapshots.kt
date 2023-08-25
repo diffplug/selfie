@@ -26,20 +26,20 @@ class AddAndRemoveSnapshots : Harness("undertest-junit5") {
   @Test @Order(1)
   fun noSelfiesNoFile() {
     // the body of the class should be totally commented out at the start of the test
-    file("AddAndRemoveSnapshots.kt")
-        .linesFrom("class AddAndRemoveSnapshots")
+    ut_mirror()
+        .linesFrom("UT_AddAndRemoveSnapshots")
         .toLast("}")
         .shrinkByOne()
         .assertCommented(true)
-    gradlew("underTest", "--updateSnapshots").build()
-    file("AddAndRemoveSnapshots.ss").assertDoesNotExist()
+    gradlewWriteSnapshots()
+    ut_snapshot().assertDoesNotExist()
   }
 
   @Test @Order(2)
   fun firstSelfieCreatesFile() {
-    file("AddAndRemoveSnapshots.kt").linesFrom("fun one").toFirst("}").uncomment()
-    gradlew("test", "--updateSnapshots")
-    file("AddAndRemoveSnapshots.ss")
+    ut_mirror().linesFrom("fun one").toFirst("}").uncomment()
+    gradlewWriteSnapshots()
+    ut_snapshot()
         .assertContent(
             """
       ╔═ one ═╗
@@ -51,9 +51,9 @@ class AddAndRemoveSnapshots : Harness("undertest-junit5") {
 
   @Test @Order(3)
   fun secondSelfieAppendsFile() {
-    file("AddAndRemoveSnapshots.kt").linesFrom("fun two").toFirst("}").uncomment()
-    gradlew("test", "--updateSnapshots")
-    file("AddAndRemoveSnapshots.ss")
+    ut_mirror().linesFrom("fun two").toFirst("}").uncomment()
+    gradlewWriteSnapshots()
+    ut_snapshot()
         .assertContent(
             """
       ╔═ one ═╗
@@ -67,9 +67,9 @@ class AddAndRemoveSnapshots : Harness("undertest-junit5") {
 
   @Test @Order(4)
   fun removingSelfieShrinksFile() {
-    file("AddAndRemoveSnapshots.kt").linesFrom("fun one").toFirst("}").commentOut()
-    gradlew("test", "--updateSnapshots")
-    file("AddAndRemoveSnapshots.ss")
+    ut_mirror().linesFrom("fun one").toFirst("}").commentOut()
+    gradlewWriteSnapshots()
+    ut_snapshot()
         .assertContent(
             """
       ╔═ two ═╗
@@ -81,8 +81,8 @@ class AddAndRemoveSnapshots : Harness("undertest-junit5") {
 
   @Test @Order(5)
   fun removingAllSelfiesDeletesFile() {
-    file("AddAndRemoveSnapshots.kt").linesFrom("fun two").toFirst("}").commentOut()
-    gradlew("test", "--updateSnapshots")
-    file("AddAndRemoveSnapshots.ss").assertDoesNotExist()
+    ut_mirror().linesFrom("fun two").toFirst("}").commentOut()
+    gradlewWriteSnapshots()
+    ut_snapshot().assertDoesNotExist()
   }
 }
