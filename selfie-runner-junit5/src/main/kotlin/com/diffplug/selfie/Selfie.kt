@@ -15,33 +15,31 @@
  */
 package com.diffplug.selfie
 
-object SelfieRouting {
-  var currentFile: SnapshotFile? = null
-  var currentDiskPrefix: String? = null
-  private fun assertInitializedProperly() {
-    if (currentFile == null || currentDiskPrefix == null) {
-      throw AssertionError("You called `toMatchDisk` without setting up snapshots.")
-    }
-  }
-  fun onDiskRightNow(scenario: String?): Snapshot? {
-    assertInitializedProperly()
-    val snapshotSuffix = scenario?.let { "/$scenario" } ?: ""
-    val snapshotName = "${currentDiskPrefix!!}${snapshotSuffix}"
-    return currentFile!!.snapshots.get(snapshotName)
-  }
-}
+import com.diffplug.selfie.junit5.Router
+import org.opentest4j.AssertionFailedError
 
 open class DiskSelfie internal constructor(private val actual: Snapshot) {
   fun toMatchDisk(scenario: String? = null): Snapshot {
-    val snapshot = SelfieRouting.onDiskRightNow(scenario)
-    if (actual != snapshot) {
-      if (RW.isWrite) {
-        TODO("write snapshot")
-      } else {
-        throw AssertionError()
+    val onDisk = Router.readOrWrite(actual, scenario)
+    return if (RW.isWrite) actual
+    else {
+      if (actual.value != onDisk.value) {
+        throw AssertionFailedError("Snapshot failure", onDisk.value, actual.value)
       }
+      if (actual.lenses.keys != onDisk.lenses.keys) {
+        throw AssertionFailedError(
+            "Snapshot failure: mismatched lenses", onDisk.lenses.keys, actual.lenses.keys)
+      }
+      for (key in actual.lenses.keys) {
+        val actualValue = actual.lenses[key]!!
+        val onDiskValue = onDisk.lenses[key]!!
+        if (actualValue != onDiskValue) {
+          throw AssertionFailedError("Snapshot failure within lens $key", onDiskValue, actualValue)
+        }
+      }
+      // if we're in read mode and the equality checks passed, stick with the disk value
+      onDisk
     }
-    return actual
   }
 }
 fun <T> expectSelfie(actual: T, snapshotter: Snapshotter<T>) =

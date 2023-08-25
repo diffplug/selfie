@@ -16,9 +16,31 @@
 package com.diffplug.selfie.junit5
 
 import com.diffplug.selfie.ArrayMap
+import com.diffplug.selfie.RW
+import com.diffplug.selfie.Snapshot
+import com.diffplug.selfie.SnapshotFile
 import org.junit.platform.engine.TestExecutionResult
 import org.junit.platform.launcher.TestExecutionListener
 import org.junit.platform.launcher.TestIdentifier
+
+internal class ClassMethod(val progress: Progress, val clazz: String, val method: String)
+
+/** Really wish this could be package-private! */
+internal object Router {
+  fun readOrWrite(snapshot: Snapshot, scenario: String?): Snapshot {
+    val classMethod =
+        threadCtx.get()
+            ?: throw AssertionError(
+                "Selfie `toMatchDisk` must be called only on the original thread.")
+    if (RW.isWrite) {
+      classMethod.progress.write(classMethod.clazz, classMethod.method, scenario, snapshot)
+      return snapshot
+    } else {
+      return classMethod.progress.read(classMethod.clazz, classMethod.method, scenario)
+    }
+  }
+  val threadCtx = ThreadLocal<ClassMethod?>()
+}
 
 internal enum class Usage {
   STARTED,
@@ -28,6 +50,8 @@ internal enum class Usage {
 
 internal class SnapshotUsage {
   private var snapshots = ArrayMap.empty<String, Usage>()
+  private var file: SnapshotFile? = null
+  fun read() {}
   fun set(method: String, usage: Usage): Unit {
     snapshots = snapshots.plusOrReplace(method) { usage }
   }
@@ -37,6 +61,14 @@ internal class SnapshotUsage {
 internal class Progress {
   var layout: SelfieLayout? = null
   var usageByClass = ArrayMap.empty<String, SnapshotUsage>()
+  fun write(clazz: Any, method: Any, scenario: String?, snapshot: Snapshot) {
+    val usage = synchronized(this) { usageByClass[clazz]!! }
+    synchronized(usage) { TODO() }
+  }
+  fun read(clazz: String, method: String, scenario: String?): Snapshot {
+    val usage = synchronized(this) { usageByClass[clazz]!! }
+    return synchronized(usage) { TODO() }
+  }
 
   @Synchronized
   fun start(className: String, method: String?) {
@@ -44,6 +76,7 @@ internal class Progress {
       usageByClass = usageByClass.plus(className, SnapshotUsage())
     } else {
       usageByClass[className]!!.let { it.set(method, Usage.STARTED) }
+      Router.threadCtx.set(ClassMethod(this, className, method))
     }
   }
 
@@ -60,6 +93,7 @@ internal class Progress {
       if (method == null) {
         it.finish(result)
       } else {
+        Router.threadCtx.set(null)
         it.set(method, result)
       }
     }
