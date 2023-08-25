@@ -89,7 +89,6 @@ class SnapshotValueReaderTest {
     val reader =
         SnapshotValueReader.of(
             """
-            ╔═ test with \∕slash\∕ in name ═╗
             ╔═ test with \(square brackets\) in name ═╗
             ╔═ test with \\backslash\\ in name ═╗
             ╔═ test with\nnewline\nin name ═╗
@@ -97,8 +96,6 @@ class SnapshotValueReaderTest {
             ╔═ test with \┌\─ ascii art \─\┐ in name ═╗
             """
                 .trimIndent())
-    reader.peekKey() shouldBe "test with /slash/ in name"
-    reader.nextValue().valueString() shouldBe ""
     reader.peekKey() shouldBe "test with [square brackets] in name"
     reader.nextValue().valueString() shouldBe ""
     reader.peekKey() shouldBe """test with \backslash\ in name"""

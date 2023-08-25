@@ -13,7 +13,6 @@ No limit to how deep scenario nesting can go.
 Tests, scenarios, and lenses have no length or character restrictions.
 We escape the following:
  - \ -> \\
- - / -> \∕  (mathematical division slash)
  - [ -> \(
  - ] -> \)
  - newline -> \n

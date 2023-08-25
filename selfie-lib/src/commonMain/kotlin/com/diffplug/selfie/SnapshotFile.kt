@@ -276,9 +276,9 @@ class SnapshotValueReader(val lineReader: LineReader) {
     private const val KEY_END = " ═╗"
 
     /**
-     * https://github.com/diffplug/selfie/blob/f63192a84390901a3d3543066d095ea23bf81d21/snapshot-lib/src/commonTest/resources/com/diffplug/snapshot/scenarios_and_lenses.ss#L11-L29
+     * https://github.com/diffplug/selfie/blob/main/selfie-lib/src/commonTest/resources/com/diffplug/selfie/scenarios_and_lenses.ss
      */
-    internal val nameEsc = PerCharacterEscaper.specifiedEscape("\\\\/∕[(])\nn\tt╔┌╗┐═─")
+    internal val nameEsc = PerCharacterEscaper.specifiedEscape("\\\\[(])\nn\tt╔┌╗┐═─")
 
     /** https://github.com/diffplug/selfie/issues/2 */
     internal val bodyEsc = PerCharacterEscaper.selfEscape("\uD801\uDF43\uD801\uDF41")
