@@ -22,6 +22,7 @@ spotless {
                     replaceRegex("dense $toCheck", "\n\n(\\s*)$toCheck ", "\n\$1$toCheck ")
                 }
             }
+            replaceRegex("dense test order", "@Test(\\s*)@Order\\((\\d+)\\)", "@Test @Order(\$2)")
         }
     }
 }
