@@ -1,6 +1,9 @@
 package com.diffplug.selfie.junit5
 
+// spotless:off
 import org.junit.jupiter.api.extension.ExtendWith
+import kotlin.test.Test
+// spotless:on
 
 @ExtendWith(SelfieExtension::class)
 class AddAndRemoveSnapshots {
