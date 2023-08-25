@@ -16,7 +16,6 @@
 package com.diffplug.selfie
 
 object SelfieRouting {
-  var isWriting: Boolean = true
   var currentFile: SnapshotFile? = null
   var currentDiskPrefix: String? = null
   private fun assertInitializedProperly() {
@@ -36,7 +35,7 @@ open class DiskSelfie internal constructor(private val actual: Snapshot) {
   fun toMatchDisk(scenario: String? = null): Snapshot {
     val snapshot = SelfieRouting.onDiskRightNow(scenario)
     if (actual != snapshot) {
-      if (SelfieRouting.isWriting) {
+      if (RW.isWrite) {
         TODO("write snapshot")
       } else {
         throw AssertionError()
