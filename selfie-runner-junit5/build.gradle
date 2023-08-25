@@ -7,18 +7,12 @@ repositories {
 apply from: rootProject.file('gradle/spotless.gradle')
 apply plugin: 'java-library'
 dependencies {
-  implementation project(':selfie-lib')
-  // User supplied Junit5 version
-  String JUNIT_API = '5.0.0'
-  compileOnly "org.junit.jupiter:junit-jupiter-api:$JUNIT_API"
-  compileOnly "org.junit.jupiter:junit-jupiter-engine:$JUNIT_API"
+  api project(':selfie-lib')
+  compileOnly "org.junit.jupiter:junit-jupiter-api:$ver_JUNIT_API"
 
-  testImplementation 'org.jetbrains.kotlin:kotlin-test-junit5:1.9.0'
-  testImplementation 'io.kotest:kotest-assertions-core:5.6.2'
-
-  String JUNIT_IMPL = '5.10.0'
-  testImplementation "org.junit.jupiter:junit-jupiter-api:$JUNIT_IMPL"
-  testImplementation "org.junit.jupiter:junit-jupiter-engine:$JUNIT_IMPL"
+  testImplementation "org.jetbrains.kotlin:kotlin-test-junit5:$ver_KOTLIN_TEST"
+  testImplementation "io.kotest:kotest-assertions-core:$ver_KOTEST"
+  testImplementation "org.junit.jupiter:junit-jupiter:$ver_JUNIT_USE"
 }
 test {
   useJUnitPlatform()
