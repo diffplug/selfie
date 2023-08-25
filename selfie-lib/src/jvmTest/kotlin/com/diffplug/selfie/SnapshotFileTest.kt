@@ -35,6 +35,7 @@ class SnapshotFileTest {
             yes
             ╔═ Orange ═╗
             Orange
+            ╔═ [end of file] ═╗
         """
                     .trimIndent()))
     file.metadata shouldBe entry("com.acme.AcmeTest", """{"header":"data"}""")
@@ -55,6 +56,7 @@ class SnapshotFileTest {
             yes
             ╔═ Orange ═╗
             Orange
+            ╔═ [end of file] ═╗
         """
                     .trimIndent()))
     file.metadata shouldBe null
@@ -83,6 +85,8 @@ class SnapshotFileTest {
             yes
             ╔═ Orange ═╗
             Orange
+            ╔═ [end of file] ═╗
+            
       """
             .trimIndent()
   }
