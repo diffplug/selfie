@@ -26,4 +26,4 @@ We escape the following:
 ╔═ test with \nnewline\n in name ═╗
 ╔═ test with \ttab\t in name ═╗
 ╔═ test with \┌\─ ascii art \┐\─ in name ═╗
-
+╔═ [end of file] ═╗

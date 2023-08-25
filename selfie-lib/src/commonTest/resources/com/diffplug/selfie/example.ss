@@ -16,3 +16,4 @@ Line 2
 lkajdgjsa  TODO: place newlines strategically based on 32-bit long zeros which are 32-bit aligned
 aslkdgjgg
 asdgasdgs
+╔═ [end of file] ═╗

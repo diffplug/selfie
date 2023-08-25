@@ -87,21 +87,21 @@ class SnapshotFile {
   var snapshots = ArrayMap.empty<String, Snapshot>()
   fun serialize(valueWriter: StringWriter) {
     metadata?.let {
-      writeKey(valueWriter, "📷 ${it.key}", null, true)
+      writeKey(valueWriter, "📷 ${it.key}", null)
       writeValue(valueWriter, SnapshotValue.of(it.value))
     }
     for ((index, entry) in snapshots.entries.withIndex()) {
-      val isFirst = metadata == null && index == 0
-      writeKey(valueWriter, entry.key, null, isFirst)
+      writeKey(valueWriter, entry.key, null)
       writeValue(valueWriter, entry.value.value)
       for (lens in entry.value.lenses.entries) {
-        writeKey(valueWriter, entry.key, lens.key, false)
+        writeKey(valueWriter, entry.key, lens.key)
         writeValue(valueWriter, lens.value)
       }
     }
+    writeKey(valueWriter, "", "end of file")
   }
-  private fun writeKey(valueWriter: StringWriter, key: String, lens: String?, first: Boolean) {
-    valueWriter.write(if (first) "╔═ " else "\n╔═ ")
+  private fun writeKey(valueWriter: StringWriter, key: String, lens: String?) {
+    valueWriter.write("╔═ ")
     valueWriter.write(SnapshotValueReader.nameEsc.escape(key))
     if (lens != null) {
       valueWriter.write("[")
@@ -119,11 +119,13 @@ class SnapshotFile {
               .escape(value.valueString())
               .efficientReplace("\n╔", "\n\uD801\uDF41")
       valueWriter.write(escaped)
+      valueWriter.write("\n")
     }
   }
 
   companion object {
     private const val HEADER_PREFIX = """📷 """
+    internal const val END_OF_FILE = "[end of file]"
     fun parse(valueReader: SnapshotValueReader): SnapshotFile {
       try {
         val result = SnapshotFile()
@@ -148,6 +150,9 @@ class SnapshotFile {
 class SnapshotReader(val valueReader: SnapshotValueReader) {
   fun peekKey(): String? {
     val next = valueReader.peekKey() ?: return null
+    if (next == SnapshotFile.END_OF_FILE) {
+      return null
+    }
     require(next.indexOf('[') == -1) {
       "Missing root snapshot, square brackets not allowed: '$next'"
     }
@@ -159,7 +164,7 @@ class SnapshotReader(val valueReader: SnapshotValueReader) {
     while (true) {
       val nextKey = valueReader.peekKey() ?: return snapshot
       val lensIdx = nextKey.indexOf('[')
-      if (lensIdx == -1) {
+      if (lensIdx == -1 || (lensIdx == 0 && nextKey == SnapshotFile.END_OF_FILE)) {
         return snapshot
       }
       val lensRoot = nextKey.substring(0, lensIdx)
