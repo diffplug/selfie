@@ -39,6 +39,8 @@ open class Harness(subproject: String) {
       "The subproject folder $subproject must exist"
     }
   }
+  protected fun ut_mirror() = file("UT_${javaClass.simpleName}.kt")
+  protected fun ut_snapshot() = file("UT_${javaClass.simpleName}.ss")
   fun file(nameOrSubpath: String): FileHarness {
     return if (nameOrSubpath.contains('/')) {
       FileHarness(nameOrSubpath)
@@ -47,11 +49,15 @@ open class Harness(subproject: String) {
           FileSystem.SYSTEM.listRecursively(subprojectFolder)
               .filter { it.name == nameOrSubpath && !it.toString().contains("build") }
               .toList()
-      assert(matches.size <= 1) {
-        val allMatches = matches.map { it.relativeTo(subprojectFolder) }.joinToString("\n  ")
-        "Expected to find exactly one file named $nameOrSubpath, but found ${matches.size}:\n  $allMatches"
+      when (matches.size) {
+        0 -> FileHarness(nameOrSubpath)
+        1 -> FileHarness(matches[0].relativeTo(subprojectFolder).toString())
+        else -> {
+          val allMatches = matches.map { it.relativeTo(subprojectFolder) }.joinToString("\n  ")
+          throw AssertionError(
+              "Expected to find exactly one file named $nameOrSubpath, but found ${matches.size}:\n  $allMatches")
+        }
       }
-      FileHarness(matches[0].relativeTo(subprojectFolder).toString())
     }
   }
 
@@ -125,12 +131,14 @@ open class Harness(subproject: String) {
       fun shrinkByOne() = LineRange(lines, startInclusive + 1, endInclusive - 1)
       /** Prepend `//` to every line in this range and save it to disk. */
       fun commentOut() = mutateLinesAndWriteToDisk { lineNumber, line ->
-        assert(!line.startsWith("//")) { "Expected L$lineNumber to not start with //, was $line" }
-        "//$line"
+        if (line.trim().startsWith("//")) {
+          line
+        } else "//$line"
       }
       fun uncomment() = mutateLinesAndWriteToDisk { lineNumber, line ->
-        assert(line.startsWith("//")) { "Expected L$lineNumber to start with //, was $line" }
-        line.substring(2)
+        if (line.trim().startsWith("//")) {
+          line.trim().substring(2)
+        } else line
       }
       fun assertCommented(isCommented: Boolean) = mutateLinesAndWriteToDisk { lineNumber, line ->
         assert(line.trim().isEmpty() || line.startsWith("//") == isCommented) {
@@ -158,6 +166,10 @@ open class Harness(subproject: String) {
             buildList {
               add(":${subprojectFolder.name}:$task")
               addAll(args)
+              add("--stacktrace")
             })
   }
+  fun gradlewWriteSnapshots() = gradlew("underTest", "-Pselfie=write").build()
+  fun gradlewTestSucceed() = gradlew("underTest", "-Pselfie=read").build()
+  fun gradlewTestFail() = gradlew("underTest", "-Pselfie=read").buildAndFail()
 }
