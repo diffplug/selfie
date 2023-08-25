@@ -19,47 +19,59 @@ import io.kotest.matchers.shouldBe
 import okio.FileSystem
 import okio.Path
 import okio.Path.Companion.toPath
+import org.gradle.testkit.runner.GradleRunner
 
-open class Harness(rootFolderStr: String) {
-  val rootFolder: Path
+open class Harness(subproject: String) {
+  val subprojectFolder: Path
 
   init {
-    rootFolder = FileSystem.SYSTEM.canonicalize(rootFolderStr.toPath())
-    check(FileSystem.SYSTEM.exists(rootFolder)) { "The root folder $rootFolder must exist" }
+    var rootFolder = FileSystem.SYSTEM.canonicalize("".toPath())
+    if (!FileSystem.SYSTEM.exists(rootFolder.resolve("settings.gradle"))) {
+      check(FileSystem.SYSTEM.exists(rootFolder.parent!!.resolve("settings.gradle"))) {
+        "The root folder must contain settings.gradle, was not present in\n" +
+            "  $rootFolder\n" +
+            "  ${rootFolder.parent}"
+      }
+      rootFolder = rootFolder.parent!!
+    }
+    subprojectFolder = rootFolder.resolve(subproject)
+    check(FileSystem.SYSTEM.exists(subprojectFolder)) {
+      "The subproject folder $subproject must exist"
+    }
   }
   fun file(nameOrSubpath: String): FileHarness {
     return if (nameOrSubpath.contains('/')) {
       FileHarness(nameOrSubpath)
     } else {
       val matches =
-          FileSystem.SYSTEM.listRecursively(rootFolder)
+          FileSystem.SYSTEM.listRecursively(subprojectFolder)
               .filter { it.name == nameOrSubpath && !it.toString().contains("build") }
               .toList()
       assert(matches.size <= 1) {
-        val allMatches = matches.map { it.relativeTo(rootFolder) }.joinToString("\n  ")
+        val allMatches = matches.map { it.relativeTo(subprojectFolder) }.joinToString("\n  ")
         "Expected to find exactly one file named $nameOrSubpath, but found ${matches.size}:\n  $allMatches"
       }
-      FileHarness(matches[0].relativeTo(rootFolder).toString())
+      FileHarness(matches[0].relativeTo(subprojectFolder).toString())
     }
   }
 
   inner class FileHarness(val subpath: String) {
     fun assertDoesNotExist() {
-      if (FileSystem.SYSTEM.exists(rootFolder.resolve(subpath))) {
+      if (FileSystem.SYSTEM.exists(subprojectFolder.resolve(subpath))) {
         throw AssertionError("Expected $subpath to not exist, but it does")
       }
     }
     fun assertContent(expected: String) {
-      FileSystem.SYSTEM.read(rootFolder.resolve(subpath)) {
+      FileSystem.SYSTEM.read(subprojectFolder.resolve(subpath)) {
         val actual = readUtf8()
         actual shouldBe expected
       }
     }
     fun setContent(content: String) {
-      FileSystem.SYSTEM.write(rootFolder.resolve(subpath)) { writeUtf8(content) }
+      FileSystem.SYSTEM.write(subprojectFolder.resolve(subpath)) { writeUtf8(content) }
     }
     fun linesFrom(start: String): LineRangeSelector {
-      FileSystem.SYSTEM.read(rootFolder.resolve(subpath)) {
+      FileSystem.SYSTEM.read(subprojectFolder.resolve(subpath)) {
         val allLines = mutableListOf<String>()
         while (!exhausted()) {
           readUtf8Line()?.let { allLines.add(it) }
@@ -130,7 +142,7 @@ open class Harness(rootFolderStr: String) {
         for (i in startInclusive..endInclusive) {
           lines[i] = mutator(i + 1, lines[i])
         }
-        FileSystem.SYSTEM.write(rootFolder.resolve(subpath)) {
+        FileSystem.SYSTEM.write(subprojectFolder.resolve(subpath)) {
           for (line in lines) {
             writeUtf8(line)
             writeUtf8("\n")
@@ -139,7 +151,13 @@ open class Harness(rootFolderStr: String) {
       }
     }
   }
-  fun gradlew(vararg args: String) {
-    TODO()
+  fun gradlew(task: String, vararg args: String): GradleRunner {
+    return GradleRunner.create()
+        .withProjectDir(subprojectFolder.parent!!.toFile())
+        .withArguments(
+            buildList {
+              add(":${subprojectFolder.name}:$task")
+              addAll(args)
+            })
   }
 }

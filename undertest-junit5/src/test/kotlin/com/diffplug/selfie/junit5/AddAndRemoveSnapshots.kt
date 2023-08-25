@@ -1,8 +1,9 @@
 package com.diffplug.selfie.junit5
 
 // spotless:off
-import org.junit.jupiter.api.extension.ExtendWith
+import com.diffplug.selfie.expectSelfie
 import kotlin.test.Test
+import org.junit.jupiter.api.extension.ExtendWith
 // spotless:on
 
 @ExtendWith(SelfieExtension::class)

@@ -20,8 +20,9 @@ import org.junit.jupiter.api.MethodOrderer
 import org.junit.jupiter.api.Order
 import org.junit.jupiter.api.TestMethodOrder
 
+// @Ignore
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
-class AddAndRemoveSnapshots : Harness("../undertest-junit5") {
+class AddAndRemoveSnapshots : Harness("undertest-junit5") {
   @Test @Order(1)
   fun noSelfiesNoFile() {
     // the body of the class should be totally commented out at the start of the test
@@ -30,7 +31,7 @@ class AddAndRemoveSnapshots : Harness("../undertest-junit5") {
         .toLast("}")
         .shrinkByOne()
         .assertCommented(true)
-    gradlew("test", "--updateSnapshots")
+    gradlew("underTest", "--updateSnapshots").build()
     file("AddAndRemoveSnapshots.ss").assertDoesNotExist()
   }
 
