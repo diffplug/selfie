@@ -90,7 +90,7 @@ class SnapshotFile {
       writeKey(valueWriter, "📷 ${it.key}", null)
       writeValue(valueWriter, SnapshotValue.of(it.value))
     }
-    for ((index, entry) in snapshots.entries.withIndex()) {
+    snapshots.entries.forEach { entry ->
       writeKey(valueWriter, entry.key, null)
       writeValue(valueWriter, entry.value.value)
       for (lens in entry.value.lenses.entries) {
