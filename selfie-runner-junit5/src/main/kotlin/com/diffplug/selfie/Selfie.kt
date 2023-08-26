@@ -21,25 +21,22 @@ import org.opentest4j.AssertionFailedError
 open class DiskSelfie internal constructor(private val actual: Snapshot) {
   fun toMatchDisk(scenario: String? = null): Snapshot {
     val onDisk = Router.readOrWrite(actual, scenario)
-    return if (RW.isWrite) actual
-    else {
-      if (actual.value != onDisk.value) {
+    if (RW.isWrite) return actual
+    else if (onDisk == null) throw AssertionFailedError("No such snapshot")
+    else if (actual.value != onDisk.value)
         throw AssertionFailedError("Snapshot failure", onDisk.value, actual.value)
-      }
-      if (actual.lenses.keys != onDisk.lenses.keys) {
+    else if (actual.lenses.keys != onDisk.lenses.keys)
         throw AssertionFailedError(
             "Snapshot failure: mismatched lenses", onDisk.lenses.keys, actual.lenses.keys)
+    for (key in actual.lenses.keys) {
+      val actualValue = actual.lenses[key]!!
+      val onDiskValue = onDisk.lenses[key]!!
+      if (actualValue != onDiskValue) {
+        throw AssertionFailedError("Snapshot failure within lens $key", onDiskValue, actualValue)
       }
-      for (key in actual.lenses.keys) {
-        val actualValue = actual.lenses[key]!!
-        val onDiskValue = onDisk.lenses[key]!!
-        if (actualValue != onDiskValue) {
-          throw AssertionFailedError("Snapshot failure within lens $key", onDiskValue, actualValue)
-        }
-      }
-      // if we're in read mode and the equality checks passed, stick with the disk value
-      onDisk
     }
+    // if we're in read mode and the equality checks passed, stick with the disk value
+    return onDisk
   }
 }
 fun <T> expectSelfie(actual: T, snapshotter: Snapshotter<T>) =

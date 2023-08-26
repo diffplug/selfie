@@ -15,10 +15,7 @@
  */
 package com.diffplug.selfie.junit5
 
-import com.diffplug.selfie.ArrayMap
-import com.diffplug.selfie.RW
-import com.diffplug.selfie.Snapshot
-import com.diffplug.selfie.SnapshotFile
+import com.diffplug.selfie.*
 import org.junit.platform.engine.TestExecutionResult
 import org.junit.platform.launcher.TestExecutionListener
 import org.junit.platform.launcher.TestIdentifier
@@ -27,7 +24,7 @@ internal class ClassMethod(val progress: Progress, val clazz: String, val method
 
 /** Really wish this could be package-private! */
 internal object Router {
-  fun readOrWrite(snapshot: Snapshot, scenario: String?): Snapshot {
+  fun readOrWrite(snapshot: Snapshot, scenario: String?): Snapshot? {
     val classMethod =
         threadCtx.get()
             ?: throw AssertionError(
@@ -51,7 +48,9 @@ internal enum class Usage {
 internal class SnapshotUsage {
   private var snapshots = ArrayMap.empty<String, Usage>()
   private var file: SnapshotFile? = null
-  fun read() {}
+  fun read(): SnapshotFile {
+    TODO()
+  }
   fun set(method: String, usage: Usage): Unit {
     snapshots = snapshots.plusOrReplace(method) { usage }
   }
@@ -60,36 +59,38 @@ internal class SnapshotUsage {
 
 internal class Progress {
   var layout: SelfieLayout? = null
-  var usageByClass = ArrayMap.empty<String, SnapshotUsage>()
-  fun write(clazz: Any, method: Any, scenario: String?, snapshot: Snapshot) {
-    val usage = synchronized(this) { usageByClass[clazz]!! }
-    synchronized(usage) { TODO() }
+  fun write(clazz: String, method: String, scenario: String?, snapshot: Snapshot) {
+    mutate(clazz) {
+      val key = if (scenario == null) method else "$method/$scenario"
+      it.set(key, Usage.SUCCEEDED)
+      it.read().set(key, snapshot)
+    }
   }
-  fun read(clazz: String, method: String, scenario: String?): Snapshot {
-    val usage = synchronized(this) { usageByClass[clazz]!! }
-    return synchronized(usage) { TODO() }
+  fun read(clazz: String, method: String, scenario: String?): Snapshot? {
+    return getFrom(clazz) {
+      val key = if (scenario == null) method else "$method/$scenario"
+      val snapshot = it.read().snapshots.get(key)
+      it.set(key, if (snapshot == null) Usage.SKIPPED else Usage.SUCCEEDED)
+      return snapshot
+    }
   }
-
-  @Synchronized
   fun start(className: String, method: String?) {
     if (method == null) {
-      usageByClass = usageByClass.plus(className, SnapshotUsage())
+      synchronized(this) { usageByClass = usageByClass.plus(className, SnapshotUsage()) }
     } else {
-      usageByClass[className]!!.let { it.set(method, Usage.STARTED) }
-      Router.threadCtx.set(ClassMethod(this, className, method))
+      mutate(className) {
+        it.set(method, Usage.STARTED)
+        Router.threadCtx.set(ClassMethod(this, className, method))
+      }
     }
   }
-
-  @Synchronized
   fun skip(className: String, method: String?) {
     if (method != null) {
-      usageByClass[className]?.let { it.set(method, Usage.SKIPPED) }
+      mutate(className) { it.set(method, Usage.SKIPPED) }
     }
   }
-
-  @Synchronized
   fun finish(className: String, method: String?, result: Usage) {
-    usageByClass[className]?.let {
+    mutate(className) {
       if (method == null) {
         it.finish(result)
       } else {
@@ -97,6 +98,16 @@ internal class Progress {
         it.set(method, result)
       }
     }
+  }
+
+  var usageByClass = ArrayMap.empty<String, SnapshotUsage>()
+  private inline fun mutate(clazz: String, mutator: (SnapshotUsage) -> Unit) {
+    val usage = synchronized(this) { usageByClass[clazz]!! }
+    synchronized(usage) { mutator(usage) }
+  }
+  private inline fun <T> getFrom(clazz: String, mutator: (SnapshotUsage) -> T): T {
+    val usage = synchronized(this) { usageByClass[clazz]!! }
+    return synchronized(usage) { mutator(usage) }
   }
 }
 

@@ -123,6 +123,16 @@ class SnapshotFile {
     }
   }
 
+  private var isDirty: Boolean = false
+  fun set(key: String, snapshot: Snapshot) {
+    val existing = snapshots.get(key)
+    if (existing != null && existing == snapshot) {
+      return
+    }
+    snapshots = snapshots.plusOrReplace(key) { snapshot }
+    isDirty = true
+  }
+
   companion object {
     private const val HEADER_PREFIX = """📷 """
     internal const val END_OF_FILE = "[end of file]"
