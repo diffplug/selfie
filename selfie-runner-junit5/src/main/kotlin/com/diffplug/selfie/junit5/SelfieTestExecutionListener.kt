@@ -111,8 +111,10 @@ internal class ClassProgress(val className: String) {
   @Synchronized fun finishedClassWithSuccess(success: Boolean) {
     assertNotTerminated()
     if (file != null) {
-      SnapshotMethodPruner.prune(className, file!!.snapshots, methods, success)
-      if (file!!.wasSetAtTestTime) {
+      val staleSnapshots =
+          SnapshotMethodPruner.findStale(className, file!!.snapshots, methods, success)
+      if (staleSnapshots.isNotEmpty() || file!!.wasSetAtTestTime) {
+        // TODO: remove the staleSnapshots from the file
         val snapshotFile = Router.fileLocationFor(className)
         Files.createDirectories(snapshotFile.parent)
         Files.newBufferedWriter(snapshotFile, StandardCharsets.UTF_8).use { writer ->

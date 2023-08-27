@@ -10,6 +10,7 @@ dependencies {
   api project(':selfie-lib')
   // see if we can drop this down to 1.0.0
   implementation 'org.junit.platform:junit-platform-launcher:1.10.0'
+  compileOnly "org.junit.jupiter:junit-jupiter-api:$ver_JUNIT_API"
 
   testImplementation "com.squareup.okio:okio:$ver_OKIO"
   testImplementation "org.jetbrains.kotlin:kotlin-test-junit5:$ver_KOTLIN_TEST"

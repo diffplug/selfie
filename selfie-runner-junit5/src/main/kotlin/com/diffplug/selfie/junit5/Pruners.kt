@@ -46,24 +46,38 @@ internal class SnapshotMethodPruner {
   fun keep(key: String) {
     toKeep.add(key)
   }
+
+  var keepAll = false
   fun keepAll() {
     keepAll = true
   }
 
-  var keepAll = false
-  var isExhaustive = false
+  var succeeded = false
   fun succeeded() {
-    isExhaustive = true
+    succeeded = true
   }
 
   companion object {
-    fun prune(
+    fun findStale(
         className: String,
         snapshots: ArrayMap<String, Snapshot>,
         methods: ArrayMap<String, SnapshotMethodPruner>,
         classLevelSuccess: Boolean
-    ) {
+    ): List<String> {
+      val clazz = Class.forName(className)
+      val testMethods =
+          clazz.declaredMethods
+              .filter { it.isAnnotationPresent(org.junit.jupiter.api.Test::class.java) }
+              .map { it.name }
       // TODO: implement
+      // - Every snapshot is named `testMethod` or `testMethod/subpath`
+      // - It is possible to have `testMethod/subpath` without `testMethod`
+      // - If a snapshot does not have a corresponding testMethod, it is stale
+      // - If a method ran successfully, then we should keep exclusively the snapshots in
+      // SnapshotMethodPruner#toKeep
+      // - Unless that method has `keepAll`, in which case the user asked to exclude that method
+      // from pruning
+      return listOf()
     }
     fun ifSnapshotFileExistsItIsStale(
         className: String,
