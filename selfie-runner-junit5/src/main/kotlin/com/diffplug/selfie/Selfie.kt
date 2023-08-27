@@ -24,7 +24,7 @@ import org.opentest4j.AssertionFailedError
  */
 fun preserveSelfiesOnDisk(vararg subsToKeep: String): Unit {
   if (subsToKeep.isEmpty()) {
-    TODO("preserve all selfies from this method")
+    Router.readOrWriteOrKeep(null, null)
   } else {
     for (sub in subsToKeep) {
       Router.readOrWriteOrKeep(null, sub)

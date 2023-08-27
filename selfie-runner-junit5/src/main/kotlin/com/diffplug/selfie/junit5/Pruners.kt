@@ -50,7 +50,11 @@ internal class SnapshotMethodPruner {
   fun keep(key: String) {
     toKeep.add(key)
   }
+  fun keepAll() {
+    keepAll = true
+  }
 
+  var keepAll = false
   var isExhaustive = false
   fun succeeded() {
     isExhaustive = true

@@ -28,21 +28,27 @@ import org.junit.platform.launcher.TestPlan
 internal object Router {
   private class ClassMethod(val clazz: ClassProgress, val method: String)
   private val threadCtx = ThreadLocal<ClassMethod?>()
-  fun readOrWriteOrKeep(snapshot: Snapshot?, sub: String): Snapshot? {
-    val suffix = if (sub == "") "" else "/$sub"
+  fun readOrWriteOrKeep(snapshot: Snapshot?, subOrKeepAll: String?): Snapshot? {
     val classMethod =
         threadCtx.get()
             ?: throw AssertionError(
                 "Selfie `toMatchDisk` must be called only on the original thread.")
-    if (snapshot == null) {
-      classMethod.clazz.keep(classMethod.method, suffix)
-      return null
+    return if (subOrKeepAll == null) {
+      assert(snapshot == null)
+      classMethod.clazz.keep(classMethod.method, null)
+      null
     } else {
-      return if (RW.isWrite) {
-        classMethod.clazz.write(classMethod.method, suffix, snapshot)
-        snapshot
+      val suffix = if (subOrKeepAll == "") "" else "/$subOrKeepAll"
+      if (snapshot == null) {
+        classMethod.clazz.keep(classMethod.method, suffix)
+        null
       } else {
-        classMethod.clazz.read(classMethod.method, suffix)
+        if (RW.isWrite) {
+          classMethod.clazz.write(classMethod.method, suffix, snapshot)
+          snapshot
+        } else {
+          classMethod.clazz.read(classMethod.method, suffix)
+        }
       }
     }
   }
@@ -131,9 +137,13 @@ internal class ClassProgress(val className: String) {
     file = null
   }
   // the methods below are called from the test thread for I/O on snapshots
-  @Synchronized fun keep(method: String, suffix: String) {
+  @Synchronized fun keep(method: String, suffixOrAll: String?) {
     assertNotTerminated()
-    methods[method]!!.keep(suffix)
+    if (suffixOrAll == null) {
+      methods[method]!!.keepAll()
+    } else {
+      methods[method]!!.keep(suffixOrAll)
+    }
   }
   @Synchronized fun write(method: String, suffix: String, snapshot: Snapshot) {
     assertNotTerminated()
