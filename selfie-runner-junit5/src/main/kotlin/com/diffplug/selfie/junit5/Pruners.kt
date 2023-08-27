@@ -61,7 +61,17 @@ internal class SnapshotMethodPruner {
         className: String,
         snapshots: ArrayMap<String, Snapshot>,
         methods: ArrayMap<String, SnapshotMethodPruner>,
-        total: Boolean
-    ) {}
+        classLevelSuccess: Boolean
+    ) {
+      // TODO: implement
+    }
+    fun ifSnapshotFileExistsItIsStale(
+        className: String,
+        methods: ArrayMap<String, SnapshotMethodPruner>,
+        classLevelSuccess: Boolean
+    ): Boolean {
+      // TODO: implement
+      return false
+    }
   }
 }

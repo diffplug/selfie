@@ -15,10 +15,10 @@
  */
 package com.diffplug.selfie.junit5
 
-import com.diffplug.selfie.ArrayMap
-import com.diffplug.selfie.RW
-import com.diffplug.selfie.Snapshot
-import com.diffplug.selfie.SnapshotFile
+import com.diffplug.selfie.*
+import java.nio.charset.StandardCharsets
+import java.nio.file.Files
+import java.nio.file.Path
 import org.junit.platform.engine.TestExecutionResult
 import org.junit.platform.launcher.TestExecutionListener
 import org.junit.platform.launcher.TestIdentifier
@@ -58,6 +58,14 @@ internal object Router {
     }
     threadCtx.set(null)
   }
+  fun fileLocationFor(className: String): Path {
+    if (layout == null) {
+      layout = SnapshotFileLayout.initialize(className)
+    }
+    return layout!!.resolve(className)
+  }
+
+  var layout: SnapshotFileLayout? = null
 }
 
 /** Tracks the progress of test runs within a single class, so that snapshots can be pruned. */
@@ -89,9 +97,28 @@ internal class ClassProgress(val className: String) {
   }
   @Synchronized fun finishedClassWithSuccess(success: Boolean) {
     assertNotTerminated()
-    SnapshotMethodPruner.prune(className, read().snapshots, methods, success)
-    // write the file to disk
-    TODO("write the file to disk if necessary")
+    if (file != null) {
+      SnapshotMethodPruner.prune(className, file!!.snapshots, methods, success)
+      val snapshotFile = Router.fileLocationFor(className)
+      Files.createDirectories(snapshotFile.parent)
+      Files.newBufferedWriter(snapshotFile, StandardCharsets.UTF_8).use { writer ->
+        file!!.serialize(writer::write)
+      }
+    } else {
+      // we never read or wrote to the file
+      val isStale = SnapshotMethodPruner.ifSnapshotFileExistsItIsStale(className, methods, success)
+      if (isStale) {
+        val snapshotFile = Router.fileLocationFor(className)
+        if (Files.isRegularFile(snapshotFile)) {
+          Files.delete(snapshotFile)
+          // if the parent folder is now empty, delete it
+          val parent = snapshotFile.parent!!
+          if (Files.list(parent).use { !it.findAny().isPresent }) {
+            Files.delete(parent)
+          }
+        }
+      }
+    }
     // now that we are done, allow our contents to be GC'ed
     methods = TERMINATED
     file = null
@@ -116,7 +143,14 @@ internal class ClassProgress(val className: String) {
   }
   private fun read(): SnapshotFile {
     if (file == null) {
-      file = TODO()
+      val snapshotPath = Router.fileLocationFor(className)
+      file =
+          if (Files.exists(snapshotPath) && Files.isRegularFile(snapshotPath)) {
+            val content = Files.readAllBytes(snapshotPath)
+            SnapshotFile.parse(SnapshotValueReader.of(content))
+          } else {
+            SnapshotFile()
+          }
     }
     return file!!
   }
@@ -127,14 +161,15 @@ internal class ClassProgress(val className: String) {
  * - pruning unused snapshot files
  */
 internal class Progress {
-  var layout: SelfieLayout? = null
-  var usageByClass = ArrayMap.empty<String, ClassProgress>()
-  private fun forClass(className: String) = synchronized(this) { usageByClass[className]!! }
+  private var progressPerClass = ArrayMap.empty<String, ClassProgress>()
+  private fun forClass(className: String) = synchronized(this) { progressPerClass[className]!! }
 
   // TestExecutionListener
   fun start(className: String, method: String?) {
     if (method == null) {
-      synchronized(this) { usageByClass = usageByClass.plus(className, ClassProgress(className)) }
+      synchronized(this) {
+        progressPerClass = progressPerClass.plus(className, ClassProgress(className))
+      }
     } else {
       forClass(className).startMethod(method)
     }

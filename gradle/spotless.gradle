@@ -17,11 +17,13 @@ spotless {
             licenseHeaderFile 干.file("spotless/license-${license}.java")
             ktfmt()
             for (modifier in ['', 'override ', 'public ', 'protected ', 'private ', 'internal ', 'infix ', 'expected ', 'actual ']) {
-                for (key in ['inline', 'fun', 'val', 'override']) {
+                for (key in ['inline', 'fun', 'abstract fun', 'val', 'override']) {
                     String toCheck = "$modifier$key"
                     replaceRegex("dense $toCheck", "\n\n(\\s*)$toCheck ", "\n\$1$toCheck ")
                 }
             }
+            replaceRegex("dense synchronized", "@Synchronized(\\s*)fun ", "@Synchronized fun ")
+            replaceRegex("dense synchronized newline", "}\n\n(\\s*)@Synchronized fun ", "}\n\$1@Synchronized fun ")
             replaceRegex("dense test order", "@Test(\\s*)@Order\\((\\d+)\\)", "@Test @Order(\$2)")
         }
     }
