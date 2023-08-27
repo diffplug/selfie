@@ -15,7 +15,6 @@
  */
 package com.diffplug.selfie.junit5
 
-import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
@@ -49,11 +48,7 @@ internal class SnapshotFileLayout(val rootFolder: Path, val snapshotFolderName: 
     fun initialize(className: String): SnapshotFileLayout {
       val selfieDotProp = SnapshotFileLayout.javaClass.getResource("/selfie.properties")
       val properties = java.util.Properties()
-      try {
-        selfieDotProp.openStream().use { properties.load(selfieDotProp.openStream()) }
-      } catch (e: IOException) {
-        // not a problem if the resource doesn't exist
-      }
+      selfieDotProp?.openStream()?.use { properties.load(selfieDotProp.openStream()) }
       val snapshotFolderName = snapshotFolderName(properties.getProperty("snapshot-dir"))
       val snapshotRootFolder = rootFolder(properties.getProperty("output-dir"))
       return SnapshotFileLayout(snapshotRootFolder, snapshotFolderName)

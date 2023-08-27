@@ -20,6 +20,8 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import org.junit.platform.engine.TestExecutionResult
+import org.junit.platform.engine.support.descriptor.ClassSource
+import org.junit.platform.engine.support.descriptor.MethodSource
 import org.junit.platform.launcher.TestExecutionListener
 import org.junit.platform.launcher.TestIdentifier
 import org.junit.platform.launcher.TestPlan
@@ -228,6 +230,7 @@ class SelfieTestExecutionListener : TestExecutionListener {
       testIdentifier: TestIdentifier,
       testExecutionResult: TestExecutionResult
   ) {
+    if (isRoot(testIdentifier)) return
     val (clazz, method) = parseClassMethod(testIdentifier)
     progress.finishWithSuccess(
         clazz, method, testExecutionResult.status == TestExecutionResult.Status.SUCCESSFUL)
@@ -237,11 +240,10 @@ class SelfieTestExecutionListener : TestExecutionListener {
   }
   private fun isRoot(testIdentifier: TestIdentifier) = testIdentifier.parentId.isEmpty
   private fun parseClassMethod(testIdentifier: TestIdentifier): Pair<String, String?> {
-    val display = testIdentifier.displayName
-    val pieces = display.split('#')
-    assert(pieces.size == 1 || pieces.size == 2) {
-      "Expected 1 or 2 pieces, but got ${pieces.size} for $display"
+    return when (val source = testIdentifier.source.get()) {
+      is ClassSource -> Pair(source.className, null)
+      is MethodSource -> Pair(source.className, source.methodName)
+      else -> throw AssertionError("Unexpected source $source")
     }
-    return if (pieces.size == 1) Pair(pieces[0], null) else Pair(pieces[0], pieces[1])
   }
 }

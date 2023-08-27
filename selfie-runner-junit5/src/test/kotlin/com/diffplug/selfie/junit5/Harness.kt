@@ -67,6 +67,11 @@ open class Harness(subproject: String) {
         throw AssertionError("Expected $subpath to not exist, but it does")
       }
     }
+    fun deleteIfExists() {
+      if (FileSystem.SYSTEM.exists(subprojectFolder.resolve(subpath))) {
+        FileSystem.SYSTEM.delete(subprojectFolder.resolve(subpath))
+      }
+    }
     fun assertContent(expected: String) {
       FileSystem.SYSTEM.read(subprojectFolder.resolve(subpath)) {
         val actual = readUtf8()
@@ -166,6 +171,7 @@ open class Harness(subproject: String) {
             buildList {
               add(":${subprojectFolder.name}:$task")
               addAll(args)
+              add("--configuration-cache")
               add("--stacktrace")
             })
   }

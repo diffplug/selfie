@@ -23,14 +23,58 @@ import org.junit.jupiter.api.TestMethodOrder
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
 class ControlRW : Harness("undertest-junit5") {
   @Test @Order(1)
-  fun noSelfiesNoFile() {
+  fun noSelfie() {
+    ut_snapshot().deleteIfExists()
+    ut_snapshot().assertDoesNotExist()
+  }
+
+  @Test @Order(2)
+  fun writeApple() {
     ut_mirror().lineWith("apple").uncomment()
     ut_mirror().lineWith("orange").commentOut()
     gradlew("underTest").build()
     ut_snapshot()
         .assertContent(
             """
-            blah            
+            ╔═ selfie ═╗
+            apple
+            ╔═ [end of file] ═╗
+            
+        """
+                .trimIndent())
+  }
+
+  @Test @Order(3)
+  fun assertApplePasses() {
+    gradlew("underTest").build()
+  }
+
+  @Test @Order(4)
+  fun assertOrangeFails() {
+    ut_mirror().lineWith("apple").commentOut()
+    ut_mirror().lineWith("orange").uncomment()
+    gradlew("underTest", "-Pselfie=read").buildAndFail()
+    ut_snapshot()
+        .assertContent(
+            """
+            ╔═ selfie ═╗
+            apple
+            ╔═ [end of file] ═╗
+            
+        """
+                .trimIndent())
+  }
+
+  @Test @Order(4)
+  fun writeOrange() {
+    gradlew("underTest").build()
+    ut_snapshot()
+        .assertContent(
+            """
+            ╔═ selfie ═╗
+            orange
+            ╔═ [end of file] ═╗
+            
         """
                 .trimIndent())
   }

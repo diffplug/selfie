@@ -27,5 +27,5 @@ test {
 }
 tasks.register('underTest', Test) {
   useJUnitPlatform()
-  systemProperty 'selfie', System.getProperty('selfie')
+  systemProperty 'selfie', findProperty('selfie')
 }
