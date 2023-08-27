@@ -19,8 +19,10 @@ import kotlin.test.Test
 import org.junit.jupiter.api.MethodOrderer
 import org.junit.jupiter.api.Order
 import org.junit.jupiter.api.TestMethodOrder
+import org.junitpioneer.jupiter.DisableIfTestFails
 
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
+@DisableIfTestFails
 class ControlRW : Harness("undertest-junit5") {
   @Test @Order(1)
   fun noSelfie() {
@@ -32,7 +34,7 @@ class ControlRW : Harness("undertest-junit5") {
   fun writeApple() {
     ut_mirror().lineWith("apple").uncomment()
     ut_mirror().lineWith("orange").commentOut()
-    gradlew("underTest").build()
+    gradleWriteSS()
     ut_snapshot()
         .assertContent(
             """
@@ -46,14 +48,14 @@ class ControlRW : Harness("undertest-junit5") {
 
   @Test @Order(3)
   fun assertApplePasses() {
-    gradlew("underTest").build()
+    gradleReadSS()
   }
 
   @Test @Order(4)
   fun assertOrangeFails() {
     ut_mirror().lineWith("apple").commentOut()
     ut_mirror().lineWith("orange").uncomment()
-    gradlew("underTest", "-Pselfie=read").buildAndFail()
+    gradleReadSSFail()
     ut_snapshot()
         .assertContent(
             """
@@ -67,7 +69,7 @@ class ControlRW : Harness("undertest-junit5") {
 
   @Test @Order(4)
   fun writeOrange() {
-    gradlew("underTest").build()
+    gradleWriteSS()
     ut_snapshot()
         .assertContent(
             """
