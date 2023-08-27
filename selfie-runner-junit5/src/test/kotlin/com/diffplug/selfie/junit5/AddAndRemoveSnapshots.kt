@@ -31,14 +31,14 @@ class AddAndRemoveSnapshots : Harness("undertest-junit5") {
         .toLast("}")
         .shrinkByOne()
         .assertCommented(true)
-    gradlewWriteSnapshots()
+    gradleWriteSS()
     ut_snapshot().assertDoesNotExist()
   }
 
   @Test @Order(2)
   fun firstSelfieCreatesFile() {
     ut_mirror().linesFrom("fun one").toFirst("}").uncomment()
-    gradlewWriteSnapshots()
+    gradleWriteSS()
     ut_snapshot()
         .assertContent(
             """
@@ -52,7 +52,7 @@ class AddAndRemoveSnapshots : Harness("undertest-junit5") {
   @Test @Order(3)
   fun secondSelfieAppendsFile() {
     ut_mirror().linesFrom("fun two").toFirst("}").uncomment()
-    gradlewWriteSnapshots()
+    gradleWriteSS()
     ut_snapshot()
         .assertContent(
             """
@@ -68,7 +68,7 @@ class AddAndRemoveSnapshots : Harness("undertest-junit5") {
   @Test @Order(4)
   fun removingSelfieShrinksFile() {
     ut_mirror().linesFrom("fun one").toFirst("}").commentOut()
-    gradlewWriteSnapshots()
+    gradleWriteSS()
     ut_snapshot()
         .assertContent(
             """
@@ -82,7 +82,7 @@ class AddAndRemoveSnapshots : Harness("undertest-junit5") {
   @Test @Order(5)
   fun removingAllSelfiesDeletesFile() {
     ut_mirror().linesFrom("fun two").toFirst("}").commentOut()
-    gradlewWriteSnapshots()
+    gradleWriteSS()
     ut_snapshot().assertDoesNotExist()
   }
 }

@@ -12,7 +12,7 @@ spotless {
     licenseHeader ''
     ktfmt()
     replaceRegex("test one-liner", "@Test\n(\\s*)fun ", "@Test fun ")
-    replace("test harness comments", "\n  //", "\n//")
+    replace("test harness comments", "\n(\\s)*//", "\n//")
   }
 }
 
@@ -27,5 +27,10 @@ test {
 }
 tasks.register('underTest', Test) {
   useJUnitPlatform()
+  // defaults to 'write'
   systemProperty 'selfie', findProperty('selfie')
+}
+tasks.register('underTestRead', Test) {
+  useJUnitPlatform()
+  systemProperty 'selfie', 'read'
 }

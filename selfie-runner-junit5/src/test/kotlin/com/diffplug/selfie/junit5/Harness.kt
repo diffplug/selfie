@@ -19,7 +19,8 @@ import io.kotest.matchers.shouldBe
 import okio.FileSystem
 import okio.Path
 import okio.Path.Companion.toPath
-import org.gradle.testkit.runner.GradleRunner
+import org.gradle.tooling.BuildException
+import org.gradle.tooling.GradleConnector
 
 open class Harness(subproject: String) {
   val subprojectFolder: Path
@@ -164,18 +165,45 @@ open class Harness(subproject: String) {
       }
     }
   }
-  fun gradlew(task: String, vararg args: String): GradleRunner {
-    return GradleRunner.create()
-        .withProjectDir(subprojectFolder.parent!!.toFile())
-        .withArguments(
-            buildList {
-              add(":${subprojectFolder.name}:$task")
-              addAll(args)
-              add("--configuration-cache")
-              add("--stacktrace")
-            })
+  fun gradlew(task: String, vararg args: String): BuildException? {
+    val runner =
+        GradleConnector.newConnector()
+            .forProjectDirectory(subprojectFolder.parent!!.toFile())
+            .connect()
+
+    try {
+      val buildLauncher =
+          runner
+              .newBuild()
+              .forTasks(":${subprojectFolder.name}:$task")
+              .withArguments(
+                  buildList<String> {
+                    addAll(args)
+                    add("--configuration-cache") // ControlWR enabled vs disables is 11s vs 24s
+                    add("--stacktrace")
+                  })
+      buildLauncher.run()
+      return null
+    } catch (e: BuildException) {
+      return e
+    }
   }
-  fun gradlewWriteSnapshots() = gradlew("underTest", "-Pselfie=write").build()
-  fun gradlewTestSucceed() = gradlew("underTest", "-Pselfie=read").build()
-  fun gradlewTestFail() = gradlew("underTest", "-Pselfie=read").buildAndFail()
+  fun gradleWriteSS() {
+    gradlew("underTest", "-Pselfie=write")?.let {
+      throw AssertionError("Expected write snapshots to succeed, but it failed", it)
+    }
+  }
+  fun gradleReadSS() {
+    gradlew("underTest", "-Pselfie=read")?.let {
+      throw AssertionError("Expected read snapshots to succeed, but it failed", it)
+    }
+  }
+  fun gradleReadSSFail(): BuildException {
+    val failure = gradlew("underTest", "-Pselfie=read")
+    if (failure == null) {
+      throw AssertionError("Expected read snapshots to fail, but it succeeded.")
+    } else {
+      return failure
+    }
+  }
 }
