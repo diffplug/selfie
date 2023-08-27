@@ -25,7 +25,15 @@ package com.diffplug.selfie
  */
 object RW {
   private fun lowercaseFromEnvOrSys(key: String): String? {
-    return System.getenv(key)?.lowercase() ?: System.getProperty(key)?.lowercase()
+    val env = System.getenv(key)?.lowercase()
+    if (!env.isNullOrEmpty()) {
+      return env
+    }
+    val system = System.getProperty(key)?.lowercase()
+    if (!system.isNullOrEmpty()) {
+      return system
+    }
+    return null
   }
   private fun calcIsWrite(): Boolean {
     val override = lowercaseFromEnvOrSys("selfie") ?: lowercaseFromEnvOrSys("SELFIE")
