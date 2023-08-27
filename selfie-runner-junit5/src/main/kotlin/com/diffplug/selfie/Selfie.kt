@@ -19,8 +19,8 @@ import com.diffplug.selfie.junit5.Router
 import org.opentest4j.AssertionFailedError
 
 open class DiskSelfie internal constructor(private val actual: Snapshot) {
-  fun toMatchDisk(scenario: String? = null): Snapshot {
-    val onDisk = Router.readOrWrite(actual, scenario)
+  fun toMatchDisk(sub: String? = null): Snapshot {
+    val onDisk = Router.readOrWrite(actual, sub)
     if (RW.isWrite) return actual
     else if (onDisk == null) throw AssertionFailedError("No such snapshot")
     else if (actual.value != onDisk.value)

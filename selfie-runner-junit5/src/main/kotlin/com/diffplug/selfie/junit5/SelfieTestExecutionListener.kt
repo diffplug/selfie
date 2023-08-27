@@ -15,102 +15,152 @@
  */
 package com.diffplug.selfie.junit5
 
-import com.diffplug.selfie.*
+import com.diffplug.selfie.ArrayMap
+import com.diffplug.selfie.RW
+import com.diffplug.selfie.Snapshot
+import com.diffplug.selfie.SnapshotFile
 import org.junit.platform.engine.TestExecutionResult
 import org.junit.platform.launcher.TestExecutionListener
 import org.junit.platform.launcher.TestIdentifier
+import org.junit.platform.launcher.TestPlan
 
-internal class ClassMethod(val progress: Progress, val clazz: String, val method: String)
-
-/** Really wish this could be package-private! */
+/** Routes between `toMatchDisk()` calls and the snapshot file / pruning machinery. */
 internal object Router {
-  fun readOrWrite(snapshot: Snapshot, scenario: String?): Snapshot? {
+  private class ClassMethod(val clazz: ClassProgress, val method: String)
+  private val threadCtx = ThreadLocal<ClassMethod?>()
+  fun readOrWrite(snapshot: Snapshot, sub: String?): Snapshot? {
+    val suffix = if (sub == null) "" else "/$sub"
     val classMethod =
         threadCtx.get()
             ?: throw AssertionError(
                 "Selfie `toMatchDisk` must be called only on the original thread.")
-    if (RW.isWrite) {
-      classMethod.progress.write(classMethod.clazz, classMethod.method, scenario, snapshot)
-      return snapshot
+    return if (RW.isWrite) {
+      classMethod.clazz.write(classMethod.method, suffix, snapshot)
+      snapshot
     } else {
-      return classMethod.progress.read(classMethod.clazz, classMethod.method, scenario)
+      classMethod.clazz.read(classMethod.method, suffix)
     }
   }
-  val threadCtx = ThreadLocal<ClassMethod?>()
+  internal fun start(clazz: ClassProgress, method: String) {
+    val current = threadCtx.get()
+    check(current == null) {
+      "THREAD ERROR: ${current!!.clazz.className}#${current.method} is in progress, cannot start $clazz#$method"
+    }
+    threadCtx.set(ClassMethod(clazz, method))
+  }
+  internal fun finish(clazz: ClassProgress, method: String) {
+    val current = threadCtx.get()
+    check(current != null) {
+      "THREAD ERROR: no method is in progress, cannot finish $clazz#$method"
+    }
+    check(current.clazz == clazz && current.method == method) {
+      "THREAD ERROR: ${current.clazz.className}#${current.method} is in progress, cannot finish ${clazz.className}#$method"
+    }
+    threadCtx.set(null)
+  }
 }
 
-internal enum class Usage {
-  STARTED,
-  SUCCEEDED,
-  SKIPPED,
-}
+/** Tracks the progress of test runs within a single class, so that snapshots can be pruned. */
+internal class ClassProgress(val className: String) {
+  companion object {
+    val TERMINATED =
+        ArrayMap.empty<String, SnapshotMethodPruner>()
+            .plus(" ~ f!n1shed ~ ", SnapshotMethodPruner())
+  }
+  private fun assertNotTerminated() {
+    assert(methods !== TERMINATED) { "Cannot call methods on a terminated ClassProgress" }
+  }
 
-internal class SnapshotUsage {
-  private var snapshots = ArrayMap.empty<String, Usage>()
   private var file: SnapshotFile? = null
-  fun read(): SnapshotFile {
-    TODO()
+  private var methods = ArrayMap.empty<String, SnapshotMethodPruner>()
+  // the methods below called by the TestExecutionListener on its runtime thread
+  @Synchronized fun startMethod(method: String) {
+    assertNotTerminated()
+    Router.start(this, method)
+    assert(method.indexOf('/') == -1) { "Method name cannot contain '/', was $method" }
+    methods = methods.plus(method, SnapshotMethodPruner())
   }
-  fun set(method: String, usage: Usage): Unit {
-    snapshots = snapshots.plusOrReplace(method) { usage }
+  @Synchronized fun finishedMethodWithSuccess(method: String, success: Boolean) {
+    assertNotTerminated()
+    Router.finish(this, method)
+    if (success) {
+      methods[method]!!.succeeded()
+    }
   }
-  fun finish(classLevelResult: Usage): Unit {}
+  @Synchronized fun finishedClassWithSuccess(success: Boolean) {
+    assertNotTerminated()
+    SnapshotMethodPruner.prune(className, read().snapshots, methods, success)
+    // write the file to disk
+    TODO("write the file to disk if necessary")
+    // now that we are done, allow our contents to be GC'ed
+    methods = TERMINATED
+    file = null
+  }
+  // the methods below are called from the test thread for I/O on snapshots
+  @Synchronized fun keep(method: String, scenario: String) {
+    assertNotTerminated()
+    methods[method]!!.keep(scenario)
+  }
+  @Synchronized fun write(method: String, suffix: String, snapshot: Snapshot) {
+    assertNotTerminated()
+    methods[method]!!.keep(suffix)
+    read().set("$method$suffix", snapshot)
+  }
+  @Synchronized fun read(
+      method: String,
+      suffix: String,
+  ): Snapshot? {
+    assertNotTerminated()
+    methods[method]!!.keep(suffix)
+    return read().snapshots[suffix]
+  }
+  private fun read(): SnapshotFile {
+    if (file == null) {
+      file = TODO()
+    }
+    return file!!
+  }
 }
-
+/**
+ * Responsible for
+ * - lazily determining the snapshot file layout
+ * - pruning unused snapshot files
+ */
 internal class Progress {
   var layout: SelfieLayout? = null
-  fun write(clazz: String, method: String, scenario: String?, snapshot: Snapshot) {
-    mutate(clazz) {
-      val key = if (scenario == null) method else "$method/$scenario"
-      it.set(key, Usage.SUCCEEDED)
-      it.read().set(key, snapshot)
-    }
-  }
-  fun read(clazz: String, method: String, scenario: String?): Snapshot? {
-    return getFrom(clazz) {
-      val key = if (scenario == null) method else "$method/$scenario"
-      val snapshot = it.read().snapshots.get(key)
-      it.set(key, if (snapshot == null) Usage.SKIPPED else Usage.SUCCEEDED)
-      return snapshot
-    }
-  }
+  var usageByClass = ArrayMap.empty<String, ClassProgress>()
+  private fun forClass(className: String) = synchronized(this) { usageByClass[className]!! }
+
+  // TestExecutionListener
   fun start(className: String, method: String?) {
     if (method == null) {
-      synchronized(this) { usageByClass = usageByClass.plus(className, SnapshotUsage()) }
+      synchronized(this) { usageByClass = usageByClass.plus(className, ClassProgress(className)) }
     } else {
-      mutate(className) {
-        it.set(method, Usage.STARTED)
-        Router.threadCtx.set(ClassMethod(this, className, method))
-      }
+      forClass(className).startMethod(method)
     }
   }
   fun skip(className: String, method: String?) {
-    if (method != null) {
-      mutate(className) { it.set(method, Usage.SKIPPED) }
+    if (method == null) {
+      start(className, null)
+      finishWithSuccess(className, null, false)
+    } else {
+      // thanks to reflection, we don't have to rely on method skip events
     }
   }
-  fun finish(className: String, method: String?, result: Usage) {
-    mutate(className) {
-      if (method == null) {
-        it.finish(result)
+  fun finishWithSuccess(className: String, method: String?, isSuccess: Boolean) {
+    forClass(className)?.let {
+      if (method != null) {
+        it.finishedMethodWithSuccess(method, isSuccess)
       } else {
-        Router.threadCtx.set(null)
-        it.set(method, result)
+        it.finishedClassWithSuccess(isSuccess)
       }
     }
   }
-
-  var usageByClass = ArrayMap.empty<String, SnapshotUsage>()
-  private inline fun mutate(clazz: String, mutator: (SnapshotUsage) -> Unit) {
-    val usage = synchronized(this) { usageByClass[clazz]!! }
-    synchronized(usage) { mutator(usage) }
-  }
-  private inline fun <T> getFrom(clazz: String, mutator: (SnapshotUsage) -> T): T {
-    val usage = synchronized(this) { usageByClass[clazz]!! }
-    return synchronized(usage) { mutator(usage) }
+  fun pruneSnapshotFiles() {
+    // TODO: use SnapshotFilePruner
   }
 }
-
+/** This is automatically registered at runtime thanks to `META-INF/services`. */
 class SelfieTestExecutionListener : TestExecutionListener {
   private val progress = Progress()
   override fun executionStarted(testIdentifier: TestIdentifier) {
@@ -127,16 +177,11 @@ class SelfieTestExecutionListener : TestExecutionListener {
       testExecutionResult: TestExecutionResult
   ) {
     val (clazz, method) = parseClassMethod(testIdentifier)
-    val result =
-        testExecutionResult.status.let {
-          when (it) {
-            TestExecutionResult.Status.SUCCESSFUL -> Usage.SUCCEEDED
-            TestExecutionResult.Status.FAILED,
-            TestExecutionResult.Status.ABORTED -> Usage.SKIPPED
-            else -> throw IllegalArgumentException("Unknown status $it")
-          }
-        }
-    progress.finish(clazz, method, result)
+    progress.finishWithSuccess(
+        clazz, method, testExecutionResult.status == TestExecutionResult.Status.SUCCESSFUL)
+  }
+  override fun testPlanExecutionFinished(testPlan: TestPlan?) {
+    progress.pruneSnapshotFiles()
   }
   private fun isRoot(testIdentifier: TestIdentifier) = testIdentifier.parentId.isEmpty
   private fun parseClassMethod(testIdentifier: TestIdentifier): Pair<String, String?> {
