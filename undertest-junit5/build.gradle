@@ -12,7 +12,7 @@ spotless {
     licenseHeader ''
     ktfmt()
     replaceRegex("test one-liner", "@Test\n(\\s*)fun ", "@Test fun ")
-    replace("test harness comments", "\n(\\s)*//", "\n//")
+    replaceRegex("test harness comments", "\n(\\s)*//", "\n//")
   }
 }
 

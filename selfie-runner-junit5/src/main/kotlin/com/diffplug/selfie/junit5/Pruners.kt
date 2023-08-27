@@ -23,18 +23,14 @@ import kotlin.io.path.name
 
 internal object SnapshotFilePruner {
   fun needsPruning(root: Path, subpathToClassname: (String) -> String): List<String> {
-    return findAllSnapshotFiles(root, subpathToClassname).filter { !classExists(it) }
+    return Files.walk(root).use { paths ->
+      paths
+          .filter { it.name.endsWith(".ss") && Files.isRegularFile(it) }
+          .map { subpathToClassname(root.relativize(it).toString()) }
+          .filter(::classExists)
+          .toList()
+    }
   }
-  private fun findAllSnapshotFiles(
-      root: Path,
-      subpathToClassname: (String) -> String
-  ): List<String> =
-      Files.walk(root).use { paths ->
-        paths
-            .filter { it.name.endsWith(".ss") && Files.isRegularFile(it) }
-            .map { subpathToClassname(root.relativize(it).toString()) }
-            .toList()
-      }
   private fun classExists(key: String): Boolean {
     try {
       Class.forName(key)

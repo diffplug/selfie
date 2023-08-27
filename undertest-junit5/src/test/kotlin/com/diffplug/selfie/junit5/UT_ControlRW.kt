@@ -5,7 +5,7 @@ import kotlin.test.Test
 
 class UT_ControlRW {
   @Test fun selfie() {
-    //    expectSelfie("apple").toMatchDisk()
+//    expectSelfie("apple").toMatchDisk()
     expectSelfie("orange").toMatchDisk()
   }
 }
