@@ -158,7 +158,7 @@ internal class ClassProgress(val className: String) {
   ): Snapshot? {
     assertNotTerminated()
     methods[method]!!.keep(suffix)
-    return read().snapshots[suffix]
+    return read().snapshots["$method$suffix"]
   }
   private fun read(): SnapshotFile {
     if (file == null) {
