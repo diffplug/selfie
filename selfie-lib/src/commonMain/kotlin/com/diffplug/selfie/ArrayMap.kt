@@ -17,8 +17,16 @@ package com.diffplug.selfie
 
 import kotlin.collections.binarySearch
 
-internal abstract class ListBackedSet<T>() : AbstractSet<T>() {
-  abstract fun get(index: Int): T
+abstract class ListBackedSet<T>() : AbstractSet<T>() {
+  abstract operator fun get(index: Int): T
+  fun sublist(startIdx: Int, endIdx: Int): List<T> {
+    check(endIdx >= startIdx)
+    return object : AbstractList<T>() {
+      override val size: Int
+        get() = endIdx - startIdx
+      override fun get(index: Int): T = this@ListBackedSet[startIdx + index]
+    }
+  }
   override fun iterator(): Iterator<T> =
       object : Iterator<T> {
         private var index = 0
@@ -29,12 +37,12 @@ internal abstract class ListBackedSet<T>() : AbstractSet<T>() {
         }
       }
 }
-internal fun <T : Comparable<T>> ListBackedSet<T>.binarySearch(element: T): Int {
+fun <T : Comparable<T>> ListBackedSet<T>.binarySearch(element: T): Int {
   val list =
       object : AbstractList<T>() {
         override val size: Int
           get() = this@binarySearch.size
-        override fun get(index: Int): T = this@binarySearch.get(index)
+        override fun get(index: Int): T = this@binarySearch[index]
       }
   return list.binarySearch(element)
 }
@@ -99,7 +107,7 @@ class ArrayMap<K : Comparable<K>, V : Any>(private val data: Array<Any>) : Map<K
           return data[index * 2] as K
         }
       }
-  override val keys: Set<K>
+  override val keys: ListBackedSet<K>
     get() = dataAsKeys
   override fun get(key: K): V? {
     val idx = dataAsKeys.binarySearch(key)
