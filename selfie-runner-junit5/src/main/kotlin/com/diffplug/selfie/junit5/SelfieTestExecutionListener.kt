@@ -112,7 +112,8 @@ internal class ClassProgress(val className: String) {
     assertNotTerminated()
     if (file != null) {
       val staleSnapshots =
-          SnapshotMethodPruner.findStale(className, file!!.snapshots, methods, success)
+          SnapshotMethodPruner.findStaleSnapshotsWithin(
+              className, file!!.snapshots, methods, success)
       if (staleSnapshots.isNotEmpty() || file!!.wasSetAtTestTime) {
         // TODO: remove the staleSnapshots from the file
         val snapshotFile = Router.fileLocationFor(className)
@@ -123,7 +124,7 @@ internal class ClassProgress(val className: String) {
       }
     } else {
       // we never read or wrote to the file
-      val isStale = SnapshotMethodPruner.ifSnapshotFileExistsItIsStale(className, methods, success)
+      val isStale = SnapshotMethodPruner.isUnusedSnapshotFileStale(className, methods, success)
       if (isStale) {
         val snapshotFile = Router.fileLocationFor(className)
         if (Files.isRegularFile(snapshotFile)) {

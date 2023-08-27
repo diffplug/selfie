@@ -58,17 +58,12 @@ internal class SnapshotMethodPruner {
   }
 
   companion object {
-    fun findStale(
+    fun findStaleSnapshotsWithin(
         className: String,
         snapshots: ArrayMap<String, Snapshot>,
         methods: ArrayMap<String, SnapshotMethodPruner>,
         classLevelSuccess: Boolean
     ): List<String> {
-      val clazz = Class.forName(className)
-      val testMethods =
-          clazz.declaredMethods
-              .filter { it.isAnnotationPresent(org.junit.jupiter.api.Test::class.java) }
-              .map { it.name }
       // TODO: implement
       // - Every snapshot is named `testMethod` or `testMethod/subpath`
       // - It is possible to have `testMethod/subpath` without `testMethod`
@@ -77,15 +72,38 @@ internal class SnapshotMethodPruner {
       // SnapshotMethodPruner#toKeep
       // - Unless that method has `keepAll`, in which case the user asked to exclude that method
       // from pruning
+      val testMethods = findTestMethodsSorted(className)
       return listOf()
     }
-    fun ifSnapshotFileExistsItIsStale(
+
+    /**
+     * This method is called only when a class has completed without ever touching a snapshot file.
+     */
+    fun isUnusedSnapshotFileStale(
         className: String,
         methods: ArrayMap<String, SnapshotMethodPruner>,
         classLevelSuccess: Boolean
     ): Boolean {
-      // TODO: implement
-      return false
+      if (!classLevelSuccess) {
+        // if the class failed, then we can't know that it wouldn't have used snapshots if it
+        // succeeded
+        return false
+      }
+      val testMethods = findTestMethodsSorted(className)
+      if (!methods.keys.isEqualToPresortedList(testMethods)) {
+        // if some methods didn't run, then we can't know for sure that we don't need their
+        // snapshots
+        return false
+      }
+      // if all methods ran successfully, then we can delete the snapshot file since it wasn't used
+      return methods.values.all { it.succeeded }
+    }
+    private fun findTestMethodsSorted(className: String): List<String> {
+      val clazz = Class.forName(className)
+      return clazz.declaredMethods
+          .filter { it.isAnnotationPresent(org.junit.jupiter.api.Test::class.java) }
+          .map { it.name }
+          .sorted()
     }
   }
 }
