@@ -19,14 +19,6 @@ import kotlin.collections.binarySearch
 
 abstract class ListBackedSet<T>() : AbstractSet<T>() {
   abstract operator fun get(index: Int): T
-  fun sublist(startIdx: Int, endIdx: Int): List<T> {
-    check(endIdx >= startIdx)
-    return object : AbstractList<T>() {
-      override val size: Int
-        get() = endIdx - startIdx
-      override fun get(index: Int): T = this@ListBackedSet[startIdx + index]
-    }
-  }
   override fun iterator(): Iterator<T> =
       object : Iterator<T> {
         private var index = 0
@@ -37,7 +29,7 @@ abstract class ListBackedSet<T>() : AbstractSet<T>() {
         }
       }
 }
-fun <T : Comparable<T>> ListBackedSet<T>.binarySearch(element: T): Int {
+private fun <T : Comparable<T>> ListBackedSet<T>.binarySearch(element: T): Int {
   val list =
       object : AbstractList<T>() {
         override val size: Int
@@ -52,7 +44,7 @@ internal expect fun <K, V> entry(key: K, value: V): Map.Entry<K, V>
 /** An immutable, sorted, array-backed map. Wish it could be package-private! UGH!! */
 class ArrayMap<K : Comparable<K>, V : Any>(private val data: Array<Any>) : Map<K, V> {
   /**
-   * Returns a new FastMap which has added the given key. Throws an exception if the key already
+   * Returns a new ArrayMap which has added the given key. Throws an exception if the key already
    * exists.
    */
   fun plus(key: K, value: V): ArrayMap<K, V> {
@@ -64,23 +56,22 @@ class ArrayMap<K : Comparable<K>, V : Any>(private val data: Array<Any>) : Map<K
     return insert(idxInsert, key, value)
   }
   /**
-   * Returns a new FastMap which has added the given key. Throws an exception if the key already
-   * exists.
+   * Returns an ArrayMap which has added or overwritten the given key/value. If the map already
+   * contained that mapping (equal keys and values) then it returns the same map.
    */
-  fun plusOrReplace(key: K, replacer: (V?) -> V): ArrayMap<K, V> {
+  fun plusOrReplace(key: K, newValue: V): ArrayMap<K, V> {
     val idxExisting = dataAsKeys.binarySearch(key)
     if (idxExisting >= 0) {
       val existingValue = data[idxExisting * 2 + 1] as V
-      val value = replacer(existingValue)
-      return if (value == existingValue) this
+      return if (newValue == existingValue) this
       else {
         val copy = data.copyOf()
-        copy[idxExisting * 2 + 1] = value
+        copy[idxExisting * 2 + 1] = newValue
         return ArrayMap(copy)
       }
     } else {
       val idxInsert = -(idxExisting + 1)
-      return insert(idxInsert, key, replacer(null))
+      return insert(idxInsert, key, newValue)
     }
   }
   private fun insert(idxInsert: Int, key: K, value: V): ArrayMap<K, V> {

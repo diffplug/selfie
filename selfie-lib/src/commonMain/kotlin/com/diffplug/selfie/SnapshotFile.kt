@@ -125,12 +125,14 @@ class SnapshotFile {
 
   private var isDirty: Boolean = false
   fun set(key: String, snapshot: Snapshot) {
-    val existing = snapshots.get(key)
-    if (existing != null && existing == snapshot) {
-      return
+    // TODO: track whenever a snapshot is set, so that we can:
+    //  - warn about duplicate snapshots when they are equal
+    //  - give good errors when they are not
+    val newSnapshots = snapshots.plusOrReplace(key, snapshot)
+    if (newSnapshots !== snapshots) {
+      snapshots = newSnapshots
+      isDirty = true
     }
-    snapshots = snapshots.plusOrReplace(key) { snapshot }
-    isDirty = true
   }
 
   companion object {
