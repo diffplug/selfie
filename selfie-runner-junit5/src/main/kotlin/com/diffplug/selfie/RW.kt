@@ -18,10 +18,11 @@ package com.diffplug.selfie
 /**
  * Determines whether Selfie is overwriting snapshots or erroring-out on mismatch.
  * - by default, Selfie will overwrite snapshots (both `.ss` files and inline literals)
- * - if there is an environment variable or system property named `ci` or `CI`, then Selfie is
- *   read-only and errors out on a snapshot mismatch
- * - if there is an environment variable or system property named `selfie` or `SELFIE`, its value
- *   should be either `read` or `write`, and that will override all previous behaviors
+ * - if environment variable or system property named `ci` or `CI` with value `true` or `TRUE`
+ *     - then Selfie is read-only and errors out on a snapshot mismatch
+ * - if environment variable or system property named `selfie` or `SELFIE`
+ *     - its value should be either `read` or `write` (case-insensitive)
+ *     - that will override the presence of `CI`
  */
 object RW {
   private fun lowercaseFromEnvOrSys(key: String): String? {
@@ -47,7 +48,7 @@ object RW {
       }
     }
     val ci = lowercaseFromEnvOrSys("ci") ?: lowercaseFromEnvOrSys("CI")
-    return ci == null
+    return ci == "true"
   }
   val isWrite = calcIsWrite()
 }
