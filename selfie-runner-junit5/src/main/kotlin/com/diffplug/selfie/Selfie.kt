@@ -18,9 +18,23 @@ package com.diffplug.selfie
 import com.diffplug.selfie.junit5.Router
 import org.opentest4j.AssertionFailedError
 
+/**
+ * Sometimes a selfie is environment-specific, but should not be deleted when run in a different
+ * environment.
+ */
+fun preserveSelfiesOnDisk(vararg subsToKeep: String): Unit {
+  if (subsToKeep.isEmpty()) {
+    TODO("preserve all selfies from this method")
+  } else {
+    for (sub in subsToKeep) {
+      Router.readOrWriteOrKeep(null, sub)
+    }
+  }
+}
+
 open class DiskSelfie internal constructor(private val actual: Snapshot) {
-  fun toMatchDisk(sub: String? = null): Snapshot {
-    val onDisk = Router.readOrWrite(actual, sub)
+  fun toMatchDisk(sub: String = ""): Snapshot {
+    val onDisk = Router.readOrWriteOrKeep(actual, sub)
     if (RW.isWrite) return actual
     else if (onDisk == null) throw AssertionFailedError("No such snapshot")
     else if (actual.value != onDisk.value)
@@ -71,9 +85,6 @@ class BooleanSelfie(private val actual: Boolean) {
   fun toBe_TODO(): Boolean = TODO()
 }
 fun expectSelfie(actual: Boolean) = BooleanSelfie(actual)
-
-/** Sometimes a selfie doesn't get used. */
-fun preserveDiskSelfies(vararg names: String): Unit = TODO()
 
 // infix versions for the inline methods, consistent with Kotest's API
 infix fun String.shouldBeSelfie(expected: String): String = expectSelfie(this).toBe(expected)

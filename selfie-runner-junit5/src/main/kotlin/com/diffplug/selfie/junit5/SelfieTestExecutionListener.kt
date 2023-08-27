@@ -28,17 +28,22 @@ import org.junit.platform.launcher.TestPlan
 internal object Router {
   private class ClassMethod(val clazz: ClassProgress, val method: String)
   private val threadCtx = ThreadLocal<ClassMethod?>()
-  fun readOrWrite(snapshot: Snapshot, sub: String?): Snapshot? {
-    val suffix = if (sub == null) "" else "/$sub"
+  fun readOrWriteOrKeep(snapshot: Snapshot?, sub: String): Snapshot? {
+    val suffix = if (sub == "") "" else "/$sub"
     val classMethod =
         threadCtx.get()
             ?: throw AssertionError(
                 "Selfie `toMatchDisk` must be called only on the original thread.")
-    return if (RW.isWrite) {
-      classMethod.clazz.write(classMethod.method, suffix, snapshot)
-      snapshot
+    if (snapshot == null) {
+      classMethod.clazz.keep(classMethod.method, suffix)
+      return null
     } else {
-      classMethod.clazz.read(classMethod.method, suffix)
+      return if (RW.isWrite) {
+        classMethod.clazz.write(classMethod.method, suffix, snapshot)
+        snapshot
+      } else {
+        classMethod.clazz.read(classMethod.method, suffix)
+      }
     }
   }
   internal fun start(clazz: ClassProgress, method: String) {
@@ -126,9 +131,9 @@ internal class ClassProgress(val className: String) {
     file = null
   }
   // the methods below are called from the test thread for I/O on snapshots
-  @Synchronized fun keep(method: String, scenario: String) {
+  @Synchronized fun keep(method: String, suffix: String) {
     assertNotTerminated()
-    methods[method]!!.keep(scenario)
+    methods[method]!!.keep(suffix)
   }
   @Synchronized fun write(method: String, suffix: String, snapshot: Snapshot) {
     assertNotTerminated()
