@@ -123,15 +123,15 @@ class SnapshotFile {
     }
   }
 
-  private var isDirty: Boolean = false
-  fun set(key: String, snapshot: Snapshot) {
+  var wasSetAtTestTime: Boolean = false
+  fun setAtTestTime(key: String, snapshot: Snapshot) {
     // TODO: track whenever a snapshot is set, so that we can:
     //  - warn about duplicate snapshots when they are equal
     //  - give good errors when they are not
     val newSnapshots = snapshots.plusOrReplace(key, snapshot)
     if (newSnapshots !== snapshots) {
       snapshots = newSnapshots
-      isDirty = true
+      wasSetAtTestTime = true
     }
   }
 

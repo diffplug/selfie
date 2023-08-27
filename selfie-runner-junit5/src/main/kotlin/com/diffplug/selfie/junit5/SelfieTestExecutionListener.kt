@@ -99,10 +99,12 @@ internal class ClassProgress(val className: String) {
     assertNotTerminated()
     if (file != null) {
       SnapshotMethodPruner.prune(className, file!!.snapshots, methods, success)
-      val snapshotFile = Router.fileLocationFor(className)
-      Files.createDirectories(snapshotFile.parent)
-      Files.newBufferedWriter(snapshotFile, StandardCharsets.UTF_8).use { writer ->
-        file!!.serialize(writer::write)
+      if (file!!.wasSetAtTestTime) {
+        val snapshotFile = Router.fileLocationFor(className)
+        Files.createDirectories(snapshotFile.parent)
+        Files.newBufferedWriter(snapshotFile, StandardCharsets.UTF_8).use { writer ->
+          file!!.serialize(writer::write)
+        }
       }
     } else {
       // we never read or wrote to the file
@@ -131,7 +133,7 @@ internal class ClassProgress(val className: String) {
   @Synchronized fun write(method: String, suffix: String, snapshot: Snapshot) {
     assertNotTerminated()
     methods[method]!!.keep(suffix)
-    read().set("$method$suffix", snapshot)
+    read().setAtTestTime("$method$suffix", snapshot)
   }
   @Synchronized fun read(
       method: String,
