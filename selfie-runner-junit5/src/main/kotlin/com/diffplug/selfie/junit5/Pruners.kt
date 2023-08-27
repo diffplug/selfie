@@ -23,13 +23,15 @@ import kotlin.io.path.name
 
 internal object SnapshotFilePruner {
   fun needsPruning(root: Path, subpathToClassname: (String) -> String): List<String> {
-    return Files.walk(root).use { paths ->
+    val needsPruning = mutableListOf<String>()
+    Files.walk(root).use { paths ->
       paths
           .filter { it.name.endsWith(".ss") && Files.isRegularFile(it) }
           .map { subpathToClassname(root.relativize(it).toString()) }
           .filter(::classExists)
-          .toList()
+          .forEach(needsPruning::add)
     }
+    return needsPruning
   }
   private fun classExists(key: String): Boolean {
     try {
