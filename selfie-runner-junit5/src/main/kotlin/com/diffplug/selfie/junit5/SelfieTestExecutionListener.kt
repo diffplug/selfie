@@ -85,21 +85,20 @@ internal object Router {
 internal class ClassProgress(val className: String) {
   companion object {
     val TERMINATED =
-        ArrayMap.empty<String, SnapshotMethodPruner>()
-            .plus(" ~ f!n1shed ~ ", SnapshotMethodPruner())
+        ArrayMap.empty<String, MethodSnapshotUsage>().plus(" ~ f!n1shed ~ ", MethodSnapshotUsage())
   }
   private fun assertNotTerminated() {
     assert(methods !== TERMINATED) { "Cannot call methods on a terminated ClassProgress" }
   }
 
   private var file: SnapshotFile? = null
-  private var methods = ArrayMap.empty<String, SnapshotMethodPruner>()
+  private var methods = ArrayMap.empty<String, MethodSnapshotUsage>()
   // the methods below called by the TestExecutionListener on its runtime thread
   @Synchronized fun startMethod(method: String) {
     assertNotTerminated()
     Router.start(this, method)
     assert(method.indexOf('/') == -1) { "Method name cannot contain '/', was $method" }
-    methods = methods.plus(method, SnapshotMethodPruner())
+    methods = methods.plus(method, MethodSnapshotUsage())
   }
   @Synchronized fun finishedMethodWithSuccess(method: String, success: Boolean) {
     assertNotTerminated()
@@ -112,7 +111,7 @@ internal class ClassProgress(val className: String) {
     assertNotTerminated()
     if (file != null) {
       val staleSnapshots =
-          SnapshotMethodPruner.findStaleSnapshotsWithin(
+          MethodSnapshotUsage.findStaleSnapshotsWithin(
               className, file!!.snapshots, methods, success)
       if (staleSnapshots.isNotEmpty() || file!!.wasSetAtTestTime) {
         // TODO: remove the staleSnapshots from the file
@@ -124,7 +123,7 @@ internal class ClassProgress(val className: String) {
       }
     } else {
       // we never read or wrote to the file
-      val isStale = SnapshotMethodPruner.isUnusedSnapshotFileStale(className, methods, success)
+      val isStale = MethodSnapshotUsage.isUnusedSnapshotFileStale(className, methods, success)
       if (isStale) {
         val snapshotFile = Router.fileLocationFor(className)
         deleteFileAndParentDirIfEmpty(snapshotFile)
@@ -206,12 +205,9 @@ internal class Progress {
       }
     }
   }
-  fun deleteStaleSnapshotFiles() {
+  fun finishedAllTests() {
     Router.layout?.let { layout ->
-      SnapshotFilePruner.findStaleSnapshotFiles(layout.rootFolder, layout::subpathToClassname)
-      for (stale in
-          SnapshotFilePruner.findStaleSnapshotFiles(
-              layout.rootFolder, layout::subpathToClassname)) {
+      for (stale in findStaleSnapshotFiles(layout.rootFolder, layout::subpathToClassname)) {
         deleteFileAndParentDirIfEmpty(layout.rootFolder.resolve(stale))
       }
     }
@@ -239,7 +235,7 @@ class SelfieTestExecutionListener : TestExecutionListener {
         clazz, method, testExecutionResult.status == TestExecutionResult.Status.SUCCESSFUL)
   }
   override fun testPlanExecutionFinished(testPlan: TestPlan?) {
-    progress.deleteStaleSnapshotFiles()
+    progress.finishedAllTests()
   }
   private fun isRoot(testIdentifier: TestIdentifier) = testIdentifier.parentId.isEmpty
   private fun parseClassMethod(testIdentifier: TestIdentifier): Pair<String, String?> {

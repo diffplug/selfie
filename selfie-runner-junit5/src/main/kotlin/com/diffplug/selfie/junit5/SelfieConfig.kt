@@ -20,7 +20,7 @@ import java.nio.file.Path
 import java.nio.file.Paths
 
 internal class SnapshotFileLayout(val rootFolder: Path, val snapshotFolderName: String?) {
-  private val extension: String = ".ss"
+  val extension: String = ".ss"
   fun resolve(className: String): Path {
     val lastDot = className.lastIndexOf('.')
     val classFolder: Path

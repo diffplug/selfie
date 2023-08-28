@@ -18,35 +18,33 @@ package com.diffplug.selfie.junit5
 import com.diffplug.selfie.ArrayMap
 import com.diffplug.selfie.Snapshot
 import java.nio.file.Files
-import java.nio.file.Path
 import kotlin.io.path.name
 import org.junit.jupiter.api.Test
 
-internal object SnapshotFilePruner {
-  fun findStaleSnapshotFiles(
-      snapshotFileRoot: Path,
-      subpathToClassname: (String) -> String
-  ): List<String> {
-    val needsPruning = mutableListOf<String>()
-    Files.walk(snapshotFileRoot).use { paths ->
-      paths
-          .filter { it.name.endsWith(".ss") && Files.isRegularFile(it) }
-          .map { subpathToClassname(snapshotFileRoot.relativize(it).toString()) }
-          .filter(::classExistsAndHasTests)
-          .forEach(needsPruning::add)
-    }
-    return needsPruning
+/**
+ * Searches the whole snapshot directory, finds all the `.ss` files, and prunes any which don't have
+ * matching test files anymore.
+ */
+internal fun findStaleSnapshotFiles(layout: SnapshotFileLayout): List<String> {
+  val needsPruning = mutableListOf<String>()
+  Files.walk(layout.rootFolder).use { paths ->
+    paths
+        .filter { it.name.endsWith(layout.extension) && Files.isRegularFile(it) }
+        .map { layout.subpathToClassname(layout.rootFolder.relativize(it).toString()) }
+        .filter(::classExistsAndHasTests)
+        .forEach(needsPruning::add)
   }
-  private fun classExistsAndHasTests(key: String): Boolean {
-    try {
-      return Class.forName(key).declaredMethods.any { it.isAnnotationPresent(Test::class.java) }
-    } catch (e: ClassNotFoundException) {
-      return false
-    }
+  return needsPruning
+}
+private fun classExistsAndHasTests(key: String): Boolean {
+  try {
+    return Class.forName(key).declaredMethods.any { it.isAnnotationPresent(Test::class.java) }
+  } catch (e: ClassNotFoundException) {
+    return false
   }
 }
 
-internal class SnapshotMethodPruner {
+internal class MethodSnapshotUsage {
   private val toKeep = mutableSetOf<String>()
   fun keep(key: String) {
     toKeep.add(key)
@@ -66,7 +64,7 @@ internal class SnapshotMethodPruner {
     fun findStaleSnapshotsWithin(
         className: String,
         snapshots: ArrayMap<String, Snapshot>,
-        methods: ArrayMap<String, SnapshotMethodPruner>,
+        methods: ArrayMap<String, MethodSnapshotUsage>,
         classLevelSuccess: Boolean
     ): List<String> {
       // TODO: implement
@@ -86,7 +84,7 @@ internal class SnapshotMethodPruner {
      */
     fun isUnusedSnapshotFileStale(
         className: String,
-        methods: ArrayMap<String, SnapshotMethodPruner>,
+        methods: ArrayMap<String, MethodSnapshotUsage>,
         classLevelSuccess: Boolean
     ): Boolean {
       if (!classLevelSuccess) {
