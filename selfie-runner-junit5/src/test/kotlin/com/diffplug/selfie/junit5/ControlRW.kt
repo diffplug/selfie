@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Order
 import org.junit.jupiter.api.TestMethodOrder
 import org.junitpioneer.jupiter.DisableIfTestFails
 
+/** Simplest test for verifying read/write of a snapshot. */
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
 @DisableIfTestFails
 class ControlRW : Harness("undertest-junit5") {

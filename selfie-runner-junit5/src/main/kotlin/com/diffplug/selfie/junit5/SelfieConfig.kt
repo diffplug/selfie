@@ -21,7 +21,7 @@ import java.nio.file.Paths
 
 internal class SnapshotFileLayout(val rootFolder: Path, val snapshotFolderName: String?) {
   val extension: String = ".ss"
-  fun resolve(className: String): Path {
+  fun snapshotPathForClass(className: String): Path {
     val lastDot = className.lastIndexOf('.')
     val classFolder: Path
     val filename: String
@@ -49,7 +49,7 @@ internal class SnapshotFileLayout(val rootFolder: Path, val snapshotFolderName: 
           }
           val simpleName = subpath.substring(lastSlash + 1, subpath.length - extension.length)
           if (secondToLastSlash == -1) simpleName
-          else subpath.substring(0, secondToLastSlash) + simpleName
+          else subpath.substring(0, secondToLastSlash + 1) + simpleName
         }
     return classnameWithSlashes.replace('/', '.')
   }

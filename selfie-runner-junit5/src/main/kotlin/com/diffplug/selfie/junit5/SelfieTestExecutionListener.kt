@@ -75,7 +75,7 @@ internal object Router {
     if (layout == null) {
       layout = SnapshotFileLayout.initialize(className)
     }
-    return layout!!.resolve(className)
+    return layout!!.snapshotPathForClass(className)
   }
 
   var layout: SnapshotFileLayout? = null
@@ -212,7 +212,7 @@ internal class Progress {
   fun finishedAllTests() {
     Router.layout?.let { layout ->
       for (stale in findStaleSnapshotFiles(layout)) {
-        deleteFileAndParentDirIfEmpty(layout.rootFolder.resolve(stale))
+        deleteFileAndParentDirIfEmpty(layout.snapshotPathForClass(stale))
       }
     }
   }

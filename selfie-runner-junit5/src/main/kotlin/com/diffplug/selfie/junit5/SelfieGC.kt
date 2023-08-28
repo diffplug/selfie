@@ -32,7 +32,7 @@ internal fun findStaleSnapshotFiles(layout: SnapshotFileLayout): List<String> {
     paths
         .filter { it.name.endsWith(layout.extension) && Files.isRegularFile(it) }
         .map { layout.subpathToClassname(layout.rootFolder.relativize(it).toString()) }
-        .filter(::classExistsAndHasTests)
+        .filter { !classExistsAndHasTests(it) }
         .forEach(needsPruning::add)
   }
   return needsPruning
