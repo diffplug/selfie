@@ -28,13 +28,6 @@ abstract class ListBackedSet<T>() : AbstractSet<T>() {
           return get(index++)
         }
       }
-  fun isEqualToPresortedList(other: List<T>): Boolean {
-    if (size != other.size) return false
-    for (i in 0 until size) {
-      if (get(i) != other[i]) return false
-    }
-    return true
-  }
 }
 private fun <T : Comparable<T>> ListBackedSet<T>.binarySearch(element: T): Int {
   val list =

@@ -73,7 +73,7 @@ internal class MethodSnapshotGC {
       // MethodSnapshotUsage#suffixesToKeep
       // - Unless that method has `keepAll`, in which case the user asked to exclude that method
       // from pruning
-      val testMethods = findTestMethodsSorted(className)
+      val testMethods = findTestMethods(className)
       return listOf()
     }
 
@@ -90,8 +90,7 @@ internal class MethodSnapshotGC {
         // succeeded
         return false
       }
-      val testMethods = findTestMethodsSorted(className)
-      if (!methods.keys.isEqualToPresortedList(testMethods)) {
+      if (!methods.keys.containsExactSameElementsAs(findTestMethods(className))) {
         // if some methods didn't run, then we can't know for sure that we don't need their
         // snapshots
         return false
@@ -99,15 +98,24 @@ internal class MethodSnapshotGC {
       // if all methods ran successfully, then we can delete the snapshot file since it wasn't used
       return methods.values.all { it.succeededAndUsedNoSnapshots() }
     }
-    private fun findTestMethodsSorted(className: String): List<String> {
+    private fun findTestMethods(className: String): List<String> {
       val clazz = Class.forName(className)
       return clazz.declaredMethods
           .filter { it.isAnnotationPresent(Test::class.java) }
           .map { it.name }
-          .sorted()
     }
     private val EMPTY_SET = ArraySet<String>(arrayOf())
   }
+}
+private fun <T : Comparable<T>> ListBackedSet<T>.containsExactSameElementsAs(
+    other: List<T>
+): Boolean {
+  if (size != other.size) return false
+  val sorted = other.sorted()
+  for (i in 0 until size) {
+    if (this[i] != sorted[i]) return false
+  }
+  return true
 }
 
 /** An immutable, sorted, array-backed set. Wish it could be package-private! UGH!! */
