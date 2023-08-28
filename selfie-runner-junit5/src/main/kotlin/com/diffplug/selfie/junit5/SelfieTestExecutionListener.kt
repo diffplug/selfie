@@ -127,14 +127,7 @@ internal class ClassProgress(val className: String) {
       val isStale = SnapshotMethodPruner.isUnusedSnapshotFileStale(className, methods, success)
       if (isStale) {
         val snapshotFile = Router.fileLocationFor(className)
-        if (Files.isRegularFile(snapshotFile)) {
-          Files.delete(snapshotFile)
-          // if the parent folder is now empty, delete it
-          val parent = snapshotFile.parent!!
-          if (Files.list(parent).use { !it.findAny().isPresent }) {
-            Files.delete(parent)
-          }
-        }
+        deleteFileAndParentDirIfEmpty(snapshotFile)
       }
     }
     // now that we are done, allow our contents to be GC'ed
@@ -205,7 +198,7 @@ internal class Progress {
     }
   }
   fun finishWithSuccess(className: String, method: String?, isSuccess: Boolean) {
-    forClass(className)?.let {
+    forClass(className).let {
       if (method != null) {
         it.finishedMethodWithSuccess(method, isSuccess)
       } else {
@@ -213,8 +206,15 @@ internal class Progress {
       }
     }
   }
-  fun pruneSnapshotFiles() {
-    // TODO: use SnapshotFilePruner
+  fun deleteStaleSnapshotFiles() {
+    Router.layout?.let { layout ->
+      SnapshotFilePruner.findStaleSnapshotFiles(layout.rootFolder, layout::subpathToClassname)
+      for (stale in
+          SnapshotFilePruner.findStaleSnapshotFiles(
+              layout.rootFolder, layout::subpathToClassname)) {
+        deleteFileAndParentDirIfEmpty(layout.rootFolder.resolve(stale))
+      }
+    }
   }
 }
 /** This is automatically registered at runtime thanks to `META-INF/services`. */
@@ -239,7 +239,7 @@ class SelfieTestExecutionListener : TestExecutionListener {
         clazz, method, testExecutionResult.status == TestExecutionResult.Status.SUCCESSFUL)
   }
   override fun testPlanExecutionFinished(testPlan: TestPlan?) {
-    progress.pruneSnapshotFiles()
+    progress.deleteStaleSnapshotFiles()
   }
   private fun isRoot(testIdentifier: TestIdentifier) = testIdentifier.parentId.isEmpty
   private fun parseClassMethod(testIdentifier: TestIdentifier): Pair<String, String?> {
@@ -247,6 +247,16 @@ class SelfieTestExecutionListener : TestExecutionListener {
       is ClassSource -> Pair(source.className, null)
       is MethodSource -> Pair(source.className, source.methodName)
       else -> throw AssertionError("Unexpected source $source")
+    }
+  }
+}
+private fun deleteFileAndParentDirIfEmpty(snapshotFile: Path) {
+  if (Files.isRegularFile(snapshotFile)) {
+    Files.delete(snapshotFile)
+    // if the parent folder is now empty, delete it
+    val parent = snapshotFile.parent!!
+    if (Files.list(parent).use { !it.findAny().isPresent }) {
+      Files.delete(parent)
     }
   }
 }

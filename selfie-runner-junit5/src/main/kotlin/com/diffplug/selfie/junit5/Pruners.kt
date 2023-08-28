@@ -20,23 +20,26 @@ import com.diffplug.selfie.Snapshot
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.name
+import org.junit.jupiter.api.Test
 
 internal object SnapshotFilePruner {
-  fun needsPruning(root: Path, subpathToClassname: (String) -> String): List<String> {
+  fun findStaleSnapshotFiles(
+      snapshotFileRoot: Path,
+      subpathToClassname: (String) -> String
+  ): List<String> {
     val needsPruning = mutableListOf<String>()
-    Files.walk(root).use { paths ->
+    Files.walk(snapshotFileRoot).use { paths ->
       paths
           .filter { it.name.endsWith(".ss") && Files.isRegularFile(it) }
-          .map { subpathToClassname(root.relativize(it).toString()) }
-          .filter(::classExists)
+          .map { subpathToClassname(snapshotFileRoot.relativize(it).toString()) }
+          .filter(::classExistsAndHasTests)
           .forEach(needsPruning::add)
     }
     return needsPruning
   }
-  private fun classExists(key: String): Boolean {
+  private fun classExistsAndHasTests(key: String): Boolean {
     try {
-      Class.forName(key)
-      return true
+      return Class.forName(key).declaredMethods.any { it.isAnnotationPresent(Test::class.java) }
     } catch (e: ClassNotFoundException) {
       return false
     }
@@ -103,7 +106,7 @@ internal class SnapshotMethodPruner {
     private fun findTestMethodsSorted(className: String): List<String> {
       val clazz = Class.forName(className)
       return clazz.declaredMethods
-          .filter { it.isAnnotationPresent(org.junit.jupiter.api.Test::class.java) }
+          .filter { it.isAnnotationPresent(Test::class.java) }
           .map { it.name }
           .sorted()
     }

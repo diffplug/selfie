@@ -35,6 +35,24 @@ internal class SnapshotFileLayout(val rootFolder: Path, val snapshotFolderName: 
     val parentFolder = snapshotFolderName?.let { classFolder.resolve(it) } ?: classFolder
     return parentFolder.resolve(filename)
   }
+  fun subpathToClassname(subpath: String): String {
+    check(subpath.indexOf('\\') == -1)
+    val classnameWithSlashes =
+        if (snapshotFolderName == null) {
+          subpath.substring(0, subpath.length - extension.length)
+        } else {
+          val lastSlash = subpath.lastIndexOf('/')
+          val secondToLastSlash = subpath.lastIndexOf('/', lastSlash - 1)
+          check(secondToLastSlash != -1) { "Expected at least two slashes in $subpath" }
+          check(secondToLastSlash - lastSlash == snapshotFolderName.length) {
+            "Expected '$subpath' to be in a folder named '$snapshotFolderName'"
+          }
+          val simpleName = subpath.substring(lastSlash + 1, subpath.length - extension.length)
+          if (secondToLastSlash == -1) simpleName
+          else subpath.substring(0, secondToLastSlash) + simpleName
+        }
+    return classnameWithSlashes.replace('/', '.')
+  }
 
   companion object {
     private const val DEFAULT_SNAPSHOT_DIR = "__snapshots__"
