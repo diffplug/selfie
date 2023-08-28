@@ -67,7 +67,7 @@ class ControlRW : Harness("undertest-junit5") {
                 .trimIndent())
   }
 
-  @Test @Order(4)
+  @Test @Order(5)
   fun writeOrange() {
     gradleWriteSS()
     ut_snapshot()
