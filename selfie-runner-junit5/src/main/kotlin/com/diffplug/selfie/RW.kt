@@ -24,7 +24,7 @@ package com.diffplug.selfie
  *     - its value should be either `read` or `write` (case-insensitive)
  *     - that will override the presence of `CI`
  */
-object RW {
+internal object RW {
   private fun lowercaseFromEnvOrSys(key: String): String? {
     val env = System.getenv(key)?.lowercase()
     if (!env.isNullOrEmpty()) {
