@@ -115,7 +115,7 @@ class ArrayMap<K : Comparable<K>, V : Any>(private val data: Array<Any>) : Map<K
         }
   override fun containsValue(value: V): Boolean = values.contains(value)
   /** list-backed set of entries. */
-  override val entries: Set<Map.Entry<K, V>>
+  override val entries: ListBackedSet<Map.Entry<K, V>>
     get() =
         object : ListBackedSet<Map.Entry<K, V>>() {
           override val size: Int

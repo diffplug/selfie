@@ -38,25 +38,27 @@ internal fun findStaleSnapshotFiles(layout: SnapshotFileLayout): List<String> {
   return needsPruning
 }
 private fun classExistsAndHasTests(key: String): Boolean {
-  try {
-    return Class.forName(key).declaredMethods.any { it.isAnnotationPresent(Test::class.java) }
+  return try {
+    Class.forName(key).declaredMethods.any { it.isAnnotationPresent(Test::class.java) }
   } catch (e: ClassNotFoundException) {
-    return false
+    false
   }
 }
 
 internal class MethodSnapshotGC {
   private var suffixesToKeep: ArraySet<String>? = EMPTY_SET
   fun keepSuffix(suffix: String) {
-    suffixesToKeep?.let { it.plusOrThis(suffix) }
+    suffixesToKeep = suffixesToKeep?.plusOrThis(suffix)
   }
-  fun keepAll() {
+  fun keepAll(): MethodSnapshotGC {
     suffixesToKeep = null
+    return this
   }
   fun succeeded(success: Boolean) {
     if (!success) keepAll() // if a method fails we have to keep all its snapshots just in case
   }
   private fun succeededAndUsedNoSnapshots() = suffixesToKeep == EMPTY_SET
+  private fun keeps(s: String): Boolean = suffixesToKeep?.contains(s) ?: true
 
   companion object {
     fun findStaleSnapshotsWithin(
@@ -65,7 +67,8 @@ internal class MethodSnapshotGC {
         methods: ArrayMap<String, MethodSnapshotGC>,
         classLevelSuccess: Boolean
     ): List<String> {
-      // TODO: implement
+      val stale = mutableListOf<String>()
+
       // - Every snapshot is named `testMethod` or `testMethod/subpath`
       // - It is possible to have `testMethod/subpath` without `testMethod`
       // - If a snapshot does not have a corresponding testMethod, it is stale
@@ -73,8 +76,54 @@ internal class MethodSnapshotGC {
       // MethodSnapshotUsage#suffixesToKeep
       // - Unless that method has `keepAll`, in which case the user asked to exclude that method
       // from pruning
-      val testMethods = findTestMethods(className)
-      return listOf()
+
+      // combine what we know about methods that did run with what we know about the tests that
+      // didn't
+      var totalGc = methods
+      for (method in findTestMethodsThatDidntRun(className, methods)) {
+        totalGc = totalGc.plus(method, MethodSnapshotGC().keepAll())
+      }
+      val gcRoots = totalGc.entries
+      val keys = snapshots.keys
+      // we'll start with the lowest gc, and the lowest key
+      var gcIdx = 0
+      var keyIdx = 0
+      while (keyIdx < keys.size && gcIdx < gcRoots.size) {
+        val key = keys[keyIdx]
+        val gc = gcRoots[gcIdx]
+        if (key.startsWith(gc.key)) {
+          if (key.length == gc.key.length) {
+            // startWith + same length = exact match, no suffix
+            if (!gc.value.keeps("")) {
+              stale.add(key)
+            }
+            ++keyIdx
+            continue
+          } else if (key.elementAt(gc.key.length) == '/') {
+            // startWith + not same length = can safely query the `/`
+            val suffix = key.substring(gc.key.length + 1)
+            if (!gc.value.keeps(suffix)) {
+              stale.add(key)
+            }
+            ++keyIdx
+            continue
+          } else {
+            // key is longer than gc.key, but doesn't start with gc.key, so we must increment gc
+            ++gcIdx
+            continue
+          }
+        } else {
+          // we don't start with the key, so we must increment
+          if (gc.key < key) {
+            ++gcIdx
+          } else {
+            // we never found a gc that started with this key, so it's stale
+            stale.add(key)
+            ++keyIdx
+          }
+        }
+      }
+      return stale
     }
 
     /**
@@ -85,38 +134,34 @@ internal class MethodSnapshotGC {
         methods: ArrayMap<String, MethodSnapshotGC>,
         classLevelSuccess: Boolean
     ): Boolean {
-      if (!classLevelSuccess) {
-        // if the class failed, then we can't know that it wouldn't have used snapshots if it
-        // succeeded
-        return false
-      }
-      if (!methods.keys.containsExactSameElementsAs(findTestMethods(className))) {
-        // if some methods didn't run, then we can't know for sure that we don't need their
-        // snapshots
-        return false
-      }
-      // if all methods ran successfully, then we can delete the snapshot file since it wasn't used
-      return methods.values.all { it.succeededAndUsedNoSnapshots() }
+      // we need the entire class to succeed in order to be sure
+      return classLevelSuccess &&
+          // we need every method to succeed and not use any snapshots
+          methods.values.all { it.succeededAndUsedNoSnapshots() } &&
+          // we need every method to run
+          findTestMethodsThatDidntRun(className, methods).isEmpty()
     }
-    private fun findTestMethods(className: String): List<String> {
-      val clazz = Class.forName(className)
-      return clazz.declaredMethods
-          .filter { it.isAnnotationPresent(Test::class.java) }
-          .map { it.name }
+    private fun findTestMethodsThatDidntRun(
+        className: String,
+        methodsThatRan: ArrayMap<String, MethodSnapshotGC>,
+    ): List<String> {
+      return Class.forName(className).declaredMethods.mapNotNull {
+        if (methodsThatRan.containsKey(it.name) || !it.isAnnotationPresent(Test::class.java)) {
+          null
+        } else {
+          it.name
+        }
+      }
     }
     private val EMPTY_SET = ArraySet<String>(arrayOf())
   }
 }
-private fun <T : Comparable<T>> ListBackedSet<T>.containsExactSameElementsAs(
-    other: List<T>
-): Boolean {
-  if (size != other.size) return false
-  val sorted = other.sorted()
-  for (i in 0 until size) {
-    if (this[i] != sorted[i]) return false
-  }
-  return true
-}
+private fun <T> ListBackedSet<T>.subList(start: Int, end: Int): List<T> =
+    object : AbstractList<T>() {
+      override val size: Int
+        get() = end - start
+      override fun get(index: Int): T = this@subList[start + index]
+    }
 
 /** An immutable, sorted, array-backed set. Wish it could be package-private! UGH!! */
 internal class ArraySet<K : Comparable<K>>(private val data: Array<Any>) : ListBackedSet<K>() {
