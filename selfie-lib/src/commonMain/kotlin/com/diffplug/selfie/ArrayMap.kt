@@ -43,6 +43,29 @@ internal expect fun <K, V> entry(key: K, value: V): Map.Entry<K, V>
 
 /** An immutable, sorted, array-backed map. Wish it could be package-private! UGH!! */
 class ArrayMap<K : Comparable<K>, V : Any>(private val data: Array<Any>) : Map<K, V> {
+  fun minusSortedIndices(indicesToRemove: List<Int>): ArrayMap<K, V> {
+    if (indicesToRemove.isEmpty()) {
+      return this
+    }
+    val newData = arrayOfNulls<Any>(data.size - indicesToRemove.size * 2)
+    var newDataIdx = 0
+    var currentDataIdx = 0
+    var toRemoveIdx = 0
+    while (newDataIdx < newData.size) {
+      if (toRemoveIdx < indicesToRemove.size && currentDataIdx == indicesToRemove[toRemoveIdx]) {
+        ++toRemoveIdx
+        ++currentDataIdx
+      } else {
+        newData[newDataIdx++] = data[2 * currentDataIdx]
+        newData[newDataIdx++] = data[2 * currentDataIdx + 1]
+        ++currentDataIdx
+      }
+    }
+    check(toRemoveIdx == indicesToRemove.size) {
+      "The indices weren't sorted or were too big: $indicesToRemove"
+    }
+    return ArrayMap<K, V>(newData as Array<Any>)
+  }
   /**
    * Returns a new ArrayMap which has added the given key. Throws an exception if the key already
    * exists.

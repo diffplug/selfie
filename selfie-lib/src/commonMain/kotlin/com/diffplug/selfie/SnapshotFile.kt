@@ -54,6 +54,7 @@ internal data class SnapshotValueBinary(val value: ByteArray) : SnapshotValue {
 internal data class SnapshotValueString(val value: String) : SnapshotValue {
   override fun valueBinary() = throw UnsupportedOperationException("This is a string value.")
   override fun valueString(): String = value
+  override fun toString(): String = value
 }
 
 data class Snapshot(
@@ -66,6 +67,7 @@ data class Snapshot(
   fun lens(key: String, value: ByteArray) = lens(key, SnapshotValue.of(value))
   fun lens(key: String, value: String) = lens(key, SnapshotValue.of(value))
   fun lens(key: String, value: SnapshotValue) = Snapshot(this.value, lensData.plus(key, value))
+  override fun toString(): String = "[${value} ${lenses}]"
 
   companion object {
     fun of(binary: ByteArray) = Snapshot(SnapshotValue.of(binary), ArrayMap.empty())
@@ -133,6 +135,13 @@ class SnapshotFile {
       snapshots = newSnapshots
       wasSetAtTestTime = true
     }
+  }
+  fun removeAllIndices(indices: List<Int>) {
+    if (indices.isEmpty()) {
+      return
+    }
+    wasSetAtTestTime = true
+    snapshots = snapshots.minusSortedIndices(indices)
   }
 
   companion object {

@@ -108,14 +108,18 @@ internal class ClassProgress(val className: String) {
   @Synchronized fun finishedClassWithSuccess(success: Boolean) {
     assertNotTerminated()
     if (file != null) {
-      val staleSnapshots =
-          MethodSnapshotGC.findStaleSnapshotsWithin(className, file!!.snapshots, methods, success)
-      if (staleSnapshots.isNotEmpty() || file!!.wasSetAtTestTime) {
-        // TODO: remove the staleSnapshots from the file
-        val snapshotFile = Router.fileLocationFor(className)
-        Files.createDirectories(snapshotFile.parent)
-        Files.newBufferedWriter(snapshotFile, StandardCharsets.UTF_8).use { writer ->
-          file!!.serialize(writer::write)
+      val staleSnapshotIndices =
+          MethodSnapshotGC.findStaleSnapshotsWithin(className, file!!.snapshots, methods)
+      if (staleSnapshotIndices.isNotEmpty() || file!!.wasSetAtTestTime) {
+        file!!.removeAllIndices(staleSnapshotIndices)
+        val snapshotPath = Router.fileLocationFor(className)
+        if (file!!.snapshots.isEmpty()) {
+          deleteFileAndParentDirIfEmpty(snapshotPath)
+        } else {
+          Files.createDirectories(snapshotPath.parent)
+          Files.newBufferedWriter(snapshotPath, StandardCharsets.UTF_8).use { writer ->
+            file!!.serialize(writer::write)
+          }
         }
       }
     } else {

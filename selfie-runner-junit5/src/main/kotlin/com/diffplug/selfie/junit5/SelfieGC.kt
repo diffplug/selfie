@@ -57,6 +57,7 @@ internal class MethodSnapshotGC {
   fun succeeded(success: Boolean) {
     if (!success) keepAll() // if a method fails we have to keep all its snapshots just in case
   }
+  override fun toString() = java.util.Objects.toString(suffixesToKeep)
   private fun succeededAndUsedNoSnapshots() = suffixesToKeep == EMPTY_SET
   private fun keeps(s: String): Boolean = suffixesToKeep?.contains(s) ?: true
 
@@ -65,9 +66,8 @@ internal class MethodSnapshotGC {
         className: String,
         snapshots: ArrayMap<String, Snapshot>,
         methods: ArrayMap<String, MethodSnapshotGC>,
-        classLevelSuccess: Boolean
-    ): List<String> {
-      val stale = mutableListOf<String>()
+    ): List<Int> {
+      val staleIndices = mutableListOf<Int>()
 
       // - Every snapshot is named `testMethod` or `testMethod/subpath`
       // - It is possible to have `testMethod/subpath` without `testMethod`
@@ -95,7 +95,7 @@ internal class MethodSnapshotGC {
           if (key.length == gc.key.length) {
             // startWith + same length = exact match, no suffix
             if (!gc.value.keeps("")) {
-              stale.add(key)
+              staleIndices.add(keyIdx)
             }
             ++keyIdx
             continue
@@ -103,7 +103,7 @@ internal class MethodSnapshotGC {
             // startWith + not same length = can safely query the `/`
             val suffix = key.substring(gc.key.length + 1)
             if (!gc.value.keeps(suffix)) {
-              stale.add(key)
+              staleIndices.add(keyIdx)
             }
             ++keyIdx
             continue
@@ -118,12 +118,16 @@ internal class MethodSnapshotGC {
             ++gcIdx
           } else {
             // we never found a gc that started with this key, so it's stale
-            stale.add(key)
+            staleIndices.add(keyIdx)
             ++keyIdx
           }
         }
       }
-      return stale
+      while (keyIdx < keys.size) {
+        staleIndices.add(keyIdx)
+        ++keyIdx
+      }
+      return staleIndices
     }
 
     /**
@@ -156,14 +160,7 @@ internal class MethodSnapshotGC {
     private val EMPTY_SET = ArraySet<String>(arrayOf())
   }
 }
-private fun <T> ListBackedSet<T>.subList(start: Int, end: Int): List<T> =
-    object : AbstractList<T>() {
-      override val size: Int
-        get() = end - start
-      override fun get(index: Int): T = this@subList[start + index]
-    }
-
-/** An immutable, sorted, array-backed set. Wish it could be package-private! UGH!! */
+/** An immutable, sorted, array-backed set. */
 internal class ArraySet<K : Comparable<K>>(private val data: Array<Any>) : ListBackedSet<K>() {
   override val size: Int
     get() = data.size
