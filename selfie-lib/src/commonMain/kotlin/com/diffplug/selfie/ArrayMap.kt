@@ -104,7 +104,7 @@ class ArrayMap<K : Comparable<K>, V : Any>(private val data: Array<Any>) : Map<K
     val idx = dataAsKeys.binarySearch(key)
     return if (idx < 0) null else data[idx * 2 + 1] as V
   }
-  override fun containsKey(key: K): Boolean = get(key) == null
+  override fun containsKey(key: K): Boolean = dataAsKeys.binarySearch(key) >= 0
   /** list-backed collection of values at odd indices. */
   override val values: List<V>
     get() =
