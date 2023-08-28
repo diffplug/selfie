@@ -89,7 +89,7 @@ class ArrayMap<K : Comparable<K>, V : Any>(private val data: Array<Any>) : Map<K
         else ArrayMap(arrayOf(data[0], data[1], key, value))
       }
       else ->
-          // TODO: use idxInsert and arrayCopy to do this faster
+          // TODO: use idxInsert and arrayCopy to do this faster, see ArraySet#plusOrThis
           of(
               MutableList(size + 1) {
                 if (it < size) Pair(data[it * 2] as K, data[it * 2 + 1] as V) else Pair(key, value)

@@ -16,6 +16,7 @@
 package com.diffplug.selfie.junit5
 
 import com.diffplug.selfie.ArrayMap
+import com.diffplug.selfie.ListBackedSet
 import com.diffplug.selfie.Snapshot
 import java.nio.file.Files
 import kotlin.io.path.name
@@ -44,27 +45,24 @@ private fun classExistsAndHasTests(key: String): Boolean {
   }
 }
 
-internal class MethodSnapshotUsage {
-  private val toKeep = mutableSetOf<String>()
-  fun keep(key: String) {
-    toKeep.add(key)
+internal class MethodSnapshotGC {
+  private var suffixesToKeep: ArraySet<String>? = EMPTY_SET
+  fun keepSuffix(suffix: String) {
+    suffixesToKeep?.let { it.plusOrThis(suffix) }
   }
-
-  var keepAll = false
   fun keepAll() {
-    keepAll = true
+    suffixesToKeep = null
   }
-
-  var succeeded = false
-  fun succeeded() {
-    succeeded = true
+  fun succeeded(success: Boolean) {
+    if (!success) keepAll() // if a method fails we have to keep all its snapshots just in case
   }
+  private fun succeededAndUsedNoSnapshots() = suffixesToKeep == EMPTY_SET
 
   companion object {
     fun findStaleSnapshotsWithin(
         className: String,
         snapshots: ArrayMap<String, Snapshot>,
-        methods: ArrayMap<String, MethodSnapshotUsage>,
+        methods: ArrayMap<String, MethodSnapshotGC>,
         classLevelSuccess: Boolean
     ): List<String> {
       // TODO: implement
@@ -72,7 +70,7 @@ internal class MethodSnapshotUsage {
       // - It is possible to have `testMethod/subpath` without `testMethod`
       // - If a snapshot does not have a corresponding testMethod, it is stale
       // - If a method ran successfully, then we should keep exclusively the snapshots in
-      // SnapshotMethodPruner#toKeep
+      // MethodSnapshotUsage#suffixesToKeep
       // - Unless that method has `keepAll`, in which case the user asked to exclude that method
       // from pruning
       val testMethods = findTestMethodsSorted(className)
@@ -84,7 +82,7 @@ internal class MethodSnapshotUsage {
      */
     fun isUnusedSnapshotFileStale(
         className: String,
-        methods: ArrayMap<String, MethodSnapshotUsage>,
+        methods: ArrayMap<String, MethodSnapshotGC>,
         classLevelSuccess: Boolean
     ): Boolean {
       if (!classLevelSuccess) {
@@ -99,7 +97,7 @@ internal class MethodSnapshotUsage {
         return false
       }
       // if all methods ran successfully, then we can delete the snapshot file since it wasn't used
-      return methods.values.all { it.succeeded }
+      return methods.values.all { it.succeededAndUsedNoSnapshots() }
     }
     private fun findTestMethodsSorted(className: String): List<String> {
       val clazz = Class.forName(className)
@@ -107,6 +105,39 @@ internal class MethodSnapshotUsage {
           .filter { it.isAnnotationPresent(Test::class.java) }
           .map { it.name }
           .sorted()
+    }
+    private val EMPTY_SET = ArraySet<String>(arrayOf())
+  }
+}
+
+/** An immutable, sorted, array-backed set. Wish it could be package-private! UGH!! */
+internal class ArraySet<K : Comparable<K>>(private val data: Array<Any>) : ListBackedSet<K>() {
+  override val size: Int
+    get() = data.size
+  override fun get(index: Int): K = data[index] as K
+  fun plusOrThis(key: K): ArraySet<K> {
+    val idxExisting = data.binarySearch(key)
+    if (idxExisting >= 0) {
+      return this
+    }
+    val idxInsert = -(idxExisting + 1)
+    return when (data.size) {
+      0 -> ArraySet(arrayOf(key))
+      1 -> {
+        if (idxInsert == 0)
+            ArraySet(
+                arrayOf(
+                    key,
+                    data[0],
+                ))
+        else ArraySet(arrayOf(data[0], key))
+      }
+      else -> {
+        // TODO: use idxInsert and arrayCopy to do this faster, see ArrayMap#insert
+        val array = Array(size + 1) { if (it < size) data[it] else key }
+        array.sort()
+        ArraySet(array)
+      }
     }
   }
 }
