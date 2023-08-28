@@ -20,11 +20,11 @@ plugins {
   // https://plugins.gradle.org/plugin/org.jetbrains.dokka
   id 'org.jetbrains.dokka'                       version '1.8.20' apply false
   // https://plugins.gradle.org/plugin/org.jetbrains.kotlin.jvm
-  id 'org.jetbrains.kotlin.jvm'                  version '1.9.0' apply false
+  id 'org.jetbrains.kotlin.jvm'                  version '1.9.10' apply false
   // https://plugins.gradle.org/plugin/org.jetbrains.kotlin.plugin.serialization
-  id 'org.jetbrains.kotlin.plugin.serialization' version '1.9.0' apply false
+  id 'org.jetbrains.kotlin.plugin.serialization' version '1.9.10' apply false
   // https://plugins.gradle.org/plugin/org.jetbrains.kotlin.multiplatform
-  id 'org.jetbrains.kotlin.multiplatform' version '1.9.0' apply false
+  id 'org.jetbrains.kotlin.multiplatform' version '1.9.10' apply false
 }
 
 blowdryerSetup {
@@ -33,13 +33,14 @@ blowdryerSetup {
   setPluginsBlockTo {
     it.file 'plugin.versions'
     it.file 'plugin-kotlin.versions'
-    it.replace '1.8.22', '1.9.0'
     it.add "\t// https://plugins.gradle.org/plugin/org.jetbrains.kotlin.multiplatform"
-    it.add "\tid 'org.jetbrains.kotlin.multiplatform' version '1.9.0' apply false"
+    it.add "\tid 'org.jetbrains.kotlin.multiplatform' version '1.8.22' apply false"
+    it.replace '1.8.22', '1.9.10'
     it.replace '\t', '  '
   }
 }
 
 include 'selfie-lib'
 include 'selfie-runner-junit5'
+include 'undertest-junit5'
 rootProject.name = 'selfie'

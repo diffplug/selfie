@@ -54,6 +54,7 @@ internal data class SnapshotValueBinary(val value: ByteArray) : SnapshotValue {
 internal data class SnapshotValueString(val value: String) : SnapshotValue {
   override fun valueBinary() = throw UnsupportedOperationException("This is a string value.")
   override fun valueString(): String = value
+  override fun toString(): String = value
 }
 
 data class Snapshot(
@@ -66,6 +67,7 @@ data class Snapshot(
   fun lens(key: String, value: ByteArray) = lens(key, SnapshotValue.of(value))
   fun lens(key: String, value: String) = lens(key, SnapshotValue.of(value))
   fun lens(key: String, value: SnapshotValue) = Snapshot(this.value, lensData.plus(key, value))
+  override fun toString(): String = "[${value} ${lenses}]"
 
   companion object {
     fun of(binary: ByteArray) = Snapshot(SnapshotValue.of(binary), ArrayMap.empty())
@@ -90,7 +92,7 @@ class SnapshotFile {
       writeKey(valueWriter, "📷 ${it.key}", null)
       writeValue(valueWriter, SnapshotValue.of(it.value))
     }
-    for ((index, entry) in snapshots.entries.withIndex()) {
+    snapshots.entries.forEach { entry ->
       writeKey(valueWriter, entry.key, null)
       writeValue(valueWriter, entry.value.value)
       for (lens in entry.value.lenses.entries) {
@@ -121,6 +123,25 @@ class SnapshotFile {
       valueWriter.write(escaped)
       valueWriter.write("\n")
     }
+  }
+
+  var wasSetAtTestTime: Boolean = false
+  fun setAtTestTime(key: String, snapshot: Snapshot) {
+    // TODO: track whenever a snapshot is set, so that we can:
+    //  - warn about duplicate snapshots when they are equal
+    //  - give good errors when they are not
+    val newSnapshots = snapshots.plusOrReplace(key, snapshot)
+    if (newSnapshots !== snapshots) {
+      snapshots = newSnapshots
+      wasSetAtTestTime = true
+    }
+  }
+  fun removeAllIndices(indices: List<Int>) {
+    if (indices.isEmpty()) {
+      return
+    }
+    wasSetAtTestTime = true
+    snapshots = snapshots.minusSortedIndices(indices)
   }
 
   companion object {
