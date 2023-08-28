@@ -31,7 +31,9 @@ internal fun findStaleSnapshotFiles(layout: SnapshotFileLayout): List<String> {
   Files.walk(layout.rootFolder).use { paths ->
     paths
         .filter { it.name.endsWith(layout.extension) && Files.isRegularFile(it) }
-        .map { layout.subpathToClassname(layout.rootFolder.relativize(it).toString()) }
+        .map {
+          layout.subpathToClassname(layout.rootFolder.relativize(it).toString().replace('\\', '/'))
+        }
         .filter { !classExistsAndHasTests(it) }
         .forEach(needsPruning::add)
   }
