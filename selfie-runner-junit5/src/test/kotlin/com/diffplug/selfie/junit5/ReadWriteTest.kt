@@ -21,68 +21,64 @@ import org.junit.jupiter.api.Order
 import org.junit.jupiter.api.TestMethodOrder
 import org.junitpioneer.jupiter.DisableIfTestFails
 
-/** Write-only test which asserts adding and removing snapshots results in same-class GC. */
+/** Simplest test for verifying read/write of a snapshot. */
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
 @DisableIfTestFails
-class MethodLevelGC : Harness("undertest-junit5") {
+class ReadWriteTest : Harness("undertest-junit5") {
   @Test @Order(1)
-  fun noSelfiesNoFile() {
+  fun noSelfie() {
     ut_snapshot().deleteIfExists()
     ut_snapshot().assertDoesNotExist()
-    ut_mirror().linesFrom("UT_MethodLevelGC").toLast("}").shrinkByOne().commentOut()
   }
 
   @Test @Order(2)
-  fun firstSelfieCreatesFile() {
-    ut_mirror().linesFrom("fun one").toFirst("}").uncomment()
+  fun writeApple() {
+    ut_mirror().lineWith("apple").uncomment()
+    ut_mirror().lineWith("orange").commentOut()
     gradleWriteSS()
     ut_snapshot()
         .assertContent(
             """
-      ╔═ one ═╗
-      1
-      ╔═ [end of file] ═╗
-      
-    """
+            ╔═ selfie ═╗
+            apple
+            ╔═ [end of file] ═╗
+            
+        """
                 .trimIndent())
   }
 
   @Test @Order(3)
-  fun secondSelfieAppendsFile() {
-    ut_mirror().linesFrom("fun two").toFirst("}").uncomment()
-    gradleWriteSS()
-    ut_snapshot()
-        .assertContent(
-            """
-      ╔═ one ═╗
-      1
-      ╔═ two ═╗
-      2
-      ╔═ [end of file] ═╗
-      
-    """
-                .trimIndent())
+  fun assertApplePasses() {
+    gradleReadSS()
   }
 
   @Test @Order(4)
-  fun removingSelfieShrinksFile() {
-    ut_mirror().linesFrom("fun one").toFirst("}").commentOut()
-    gradleWriteSS()
+  fun assertOrangeFails() {
+    ut_mirror().lineWith("apple").commentOut()
+    ut_mirror().lineWith("orange").uncomment()
+    gradleReadSSFail()
     ut_snapshot()
         .assertContent(
             """
-      ╔═ two ═╗
-      2
-      ╔═ [end of file] ═╗
-      
-    """
+            ╔═ selfie ═╗
+            apple
+            ╔═ [end of file] ═╗
+            
+        """
                 .trimIndent())
   }
 
   @Test @Order(5)
-  fun removingAllSelfiesDeletesFile() {
-    ut_mirror().linesFrom("fun two").toFirst("}").commentOut()
+  fun writeOrange() {
     gradleWriteSS()
-    ut_snapshot().assertDoesNotExist()
+    ut_snapshot()
+        .assertContent(
+            """
+            ╔═ selfie ═╗
+            orange
+            ╔═ [end of file] ═╗
+            
+        """
+                .trimIndent())
   }
 }

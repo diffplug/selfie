@@ -1,10 +1,8 @@
 package com.diffplug.selfie.junit5
 // spotless:off
-import com.diffplug.selfie.expectSelfie
-import kotlin.test.Test
 // spotless:on
 
-class UT_MethodLevelGC {
+class UT_MethodLevelGCTest {
 //  @Test fun one() {
 //    expectSelfie("1").toMatchDisk()
 //  }
