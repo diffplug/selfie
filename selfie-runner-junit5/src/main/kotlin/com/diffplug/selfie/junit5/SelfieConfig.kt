@@ -44,7 +44,7 @@ internal class SnapshotFileLayout(val rootFolder: Path, val snapshotFolderName: 
           val lastSlash = subpath.lastIndexOf('/')
           val secondToLastSlash = subpath.lastIndexOf('/', lastSlash - 1)
           check(secondToLastSlash != -1) { "Expected at least two slashes in $subpath" }
-          check(secondToLastSlash - lastSlash == snapshotFolderName.length) {
+          check(lastSlash - secondToLastSlash - 1 == snapshotFolderName.length) {
             "Expected '$subpath' to be in a folder named '$snapshotFolderName'"
           }
           val simpleName = subpath.substring(lastSlash + 1, subpath.length - extension.length)
