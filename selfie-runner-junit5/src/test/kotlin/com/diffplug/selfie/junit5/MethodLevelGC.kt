@@ -29,7 +29,7 @@ class MethodLevelGC : Harness("undertest-junit5") {
   fun noSelfiesNoFile() {
     ut_snapshot().deleteIfExists()
     ut_snapshot().assertDoesNotExist()
-    ut_mirror().linesFrom("UT_AddAndRemoveSnapshots").toLast("}").shrinkByOne().commentOut()
+    ut_mirror().linesFrom("UT_MethodLevelGC").toLast("}").shrinkByOne().commentOut()
   }
 
   @Test @Order(2)
