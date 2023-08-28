@@ -48,7 +48,7 @@ object RW {
       }
     }
     val ci = lowercaseFromEnvOrSys("ci") ?: lowercaseFromEnvOrSys("CI")
-    return ci == "true"
+    return if (ci == null) true else ci == "true"
   }
   val isWrite = calcIsWrite()
 }
