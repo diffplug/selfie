@@ -86,13 +86,13 @@ private fun String.efficientReplace(find: String, replaceWith: String): String {
 private fun unixNewlines(str: String) = str.efficientReplace("\r\n", "\n")
 
 class SnapshotFile {
-  internal var isUnixNewline = true
+  internal var unixNewlines = true
   // this will probably become `<String, JsonObject>` we'll cross that bridge when we get to it
   var metadata: Map.Entry<String, String>? = null
   var snapshots = ArrayMap.empty<String, Snapshot>()
   fun serialize(valueWriterRaw: StringWriter) {
     val valueWriter =
-        if (isUnixNewline) valueWriterRaw
+        if (unixNewlines) valueWriterRaw
         else StringWriter { valueWriterRaw.write(it.efficientReplace("\n", "\r\n")) }
     metadata?.let {
       writeKey(valueWriter, "📷 ${it.key}", null)
@@ -156,7 +156,7 @@ class SnapshotFile {
     fun parse(valueReader: SnapshotValueReader): SnapshotFile {
       try {
         val result = SnapshotFile()
-        result.isUnixNewline =
+        result.unixNewlines =
             TODO("""add internal method to SnapshotValueReader to query if newline is \n or \r\n""")
         val reader = SnapshotReader(valueReader)
         // only if the first value starts with 📷
@@ -172,6 +172,11 @@ class SnapshotFile {
       } catch (e: IllegalArgumentException) {
         throw if (e is ParseException) e else ParseException(valueReader.lineReader, e)
       }
+    }
+    fun createEmptyWithUnixNewlines(unixNewlines: Boolean): SnapshotFile {
+      val result = SnapshotFile()
+      result.unixNewlines = unixNewlines
+      return result
     }
   }
 }

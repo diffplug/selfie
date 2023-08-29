@@ -19,7 +19,11 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 
-internal class SnapshotFileLayout(val rootFolder: Path, val snapshotFolderName: String?) {
+internal class SnapshotFileLayout(
+    val rootFolder: Path,
+    val snapshotFolderName: String?,
+    val unixNewlines: Boolean
+) {
   val extension: String = ".ss"
   fun snapshotPathForClass(className: String): Path {
     val lastDot = className.lastIndexOf('.')
@@ -69,7 +73,11 @@ internal class SnapshotFileLayout(val rootFolder: Path, val snapshotFolderName: 
       selfieDotProp?.openStream()?.use { properties.load(selfieDotProp.openStream()) }
       val snapshotFolderName = snapshotFolderName(properties.getProperty("snapshot-dir"))
       val snapshotRootFolder = rootFolder(properties.getProperty("output-dir"))
-      return SnapshotFileLayout(snapshotRootFolder, snapshotFolderName)
+      // it's pretty easy to preserve the line endings of existing snapshot files, but it's
+      // a bit harder to create a fresh snapshot file with the correct line endings.
+      val unixNewlines: Boolean =
+          TODO("find the first file in the snapshot folder and check if it has unix newlines")
+      return SnapshotFileLayout(snapshotRootFolder, snapshotFolderName, unixNewlines)
     }
     private fun snapshotFolderName(snapshotDir: String?): String? {
       if (snapshotDir == null) {
