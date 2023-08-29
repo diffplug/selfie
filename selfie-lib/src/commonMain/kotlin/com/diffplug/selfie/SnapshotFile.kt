@@ -38,7 +38,7 @@ sealed interface SnapshotValue {
 
   companion object {
     fun of(binary: ByteArray): SnapshotValue = SnapshotValueBinary(binary)
-    fun of(string: String): SnapshotValue = SnapshotValueString(string)
+    fun of(string: String): SnapshotValue = SnapshotValueString(unixNewlines(string))
   }
 }
 
@@ -66,7 +66,8 @@ data class Snapshot(
     get() = lensData
   fun lens(key: String, value: ByteArray) = lens(key, SnapshotValue.of(value))
   fun lens(key: String, value: String) = lens(key, SnapshotValue.of(value))
-  fun lens(key: String, value: SnapshotValue) = Snapshot(this.value, lensData.plus(key, value))
+  fun lens(key: String, value: SnapshotValue) =
+      Snapshot(this.value, lensData.plus(unixNewlines(key), value))
   override fun toString(): String = "[${value} ${lenses}]"
 
   companion object {
@@ -82,6 +83,7 @@ private fun String.efficientReplace(find: String, replaceWith: String): String {
   val idx = this.indexOf(find)
   return if (idx == -1) this else this.replace(find, replaceWith)
 }
+private fun unixNewlines(str: String) = str.efficientReplace("\r\n", "\n")
 
 class SnapshotFile {
   // this will probably become `<String, JsonObject>` we'll cross that bridge when we get to it
