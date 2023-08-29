@@ -24,7 +24,7 @@ import org.junitpioneer.jupiter.DisableIfTestFails
 /** Write-only test which asserts adding and removing snapshots results in same-class GC. */
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
 @DisableIfTestFails
-class WithinMethodGC : Harness("undertest-junit5") {
+class WithinMethodGCTest : Harness("undertest-junit5") {
   @Test @Order(1)
   fun noSelfiesNoFile() {
     ut_snapshot().deleteIfExists()
@@ -94,5 +94,10 @@ class WithinMethodGC : Harness("undertest-junit5") {
       
     """
                 .trimIndent())
+  }
+
+  @Test @Order(6)
+  fun deleteSelfie() {
+    ut_snapshot().deleteIfExists()
   }
 }

@@ -4,9 +4,9 @@ import com.diffplug.selfie.expectSelfie
 import kotlin.test.Test
 // spotless:on
 
-class UT_WithinMethodGC {
+class UT_WithinMethodGCTest {
 //    @Test fun selfie2() {
-    @Test fun selfie() {
+  @Test fun selfie() {
     expectSelfie("root").toMatchDisk()
     expectSelfie("maple").toMatchDisk("leaf")
   }
