@@ -24,11 +24,12 @@ data class CallLocation(val subpath: String, val line: Int) : Comparable<CallLoc
     val subpathCompare = subpath.compareTo(other.subpath)
     return if (subpathCompare != 0) subpathCompare else line.compareTo(other.line)
   }
+  override fun toString(): String = "$subpath:$line"
 }
 /** Represents the callstack above a given CallLocation. */
-internal class CallStack(val location: CallLocation, restOfStack: Any)
+class CallStack(val location: CallLocation, val restOfStack: Any)
 /** Generates a CallLocation and the CallStack behind it. */
-internal fun recordCall(): CallStack = TODO()
+fun recordCall(): CallStack = TODO()
 /** The first write at a given spot. */
 internal class FirstWrite<T>(val snapshot: T, val callStack: CallStack)
 
