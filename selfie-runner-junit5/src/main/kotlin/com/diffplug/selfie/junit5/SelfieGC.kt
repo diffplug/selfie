@@ -103,7 +103,7 @@ internal class MethodSnapshotGC {
             continue
           } else if (key.elementAt(gc.key.length) == '/') {
             // startWith + not same length = can safely query the `/`
-            val suffix = key.substring(gc.key.length + 1)
+            val suffix = key.substring(gc.key.length)
             if (!gc.value.keeps(suffix)) {
               staleIndices.add(keyIdx)
             }
@@ -162,6 +162,7 @@ internal class MethodSnapshotGC {
     private val EMPTY_SET = ArraySet<String>(arrayOf())
   }
 }
+
 /** An immutable, sorted, array-backed set. */
 internal class ArraySet<K : Comparable<K>>(private val data: Array<Any>) : ListBackedSet<K>() {
   override val size: Int
