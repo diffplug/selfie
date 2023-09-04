@@ -29,7 +29,18 @@ data class CallLocation(val subpath: String, val line: Int) : Comparable<CallLoc
 /** Represents the callstack above a given CallLocation. */
 class CallStack(val location: CallLocation, val restOfStack: Any)
 /** Generates a CallLocation and the CallStack behind it. */
-fun recordCall(): CallStack = TODO()
+fun recordCall(): CallStack {
+  // TODO: what will be restOfStack?
+  return CallStack(
+      StackWalker.getInstance().walk { frames ->
+        frames
+            .skip(1)
+            .findFirst()
+            .map { CallLocation(it.className.replace('.', '/') + ".kt", it.lineNumber) }
+            .orElseGet { CallLocation("<unknown>", -1) }
+      },
+      "")
+}
 /** The first write at a given spot. */
 internal class FirstWrite<T>(val snapshot: T, val callStack: CallStack)
 

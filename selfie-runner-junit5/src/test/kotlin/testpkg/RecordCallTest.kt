@@ -23,7 +23,7 @@ class RecordCallTest {
   @Test
   fun testRecordCall() {
     val stack = recordCall()
-    stack.location.toString() shouldBe "testpkg/RecordCallTest.kt:26"
-    stack.restOfStack.toString() shouldBe "anything, doesn't matter"
+    stack.location.toString() shouldBe "testpkg/RecordCallTest.kt:25"
+    stack.restOfStack.toString() shouldBe ""
   }
 }
