@@ -17,6 +17,7 @@ package com.diffplug.selfie.junit5
 
 import com.diffplug.selfie.RW
 import com.diffplug.selfie.Snapshot
+import java.util.stream.Collectors
 
 /** Represents the line at which user code called into Selfie. */
 data class CallLocation(val subpath: String, val line: Int) : Comparable<CallLocation> {
@@ -35,9 +36,9 @@ fun recordCall(): CallStack {
         frames
             .skip(1)
             .map { CallLocation(it.className.replace('.', '/') + ".kt", it.lineNumber) }
-            .toList()
+            .collect(Collectors.toList())
       }
-  return CallStack(calls.first(), calls.subList(1, calls.size))
+  return CallStack(calls.removeAt(0), calls)
 }
 /** The first write at a given spot. */
 internal class FirstWrite<T>(val snapshot: T, val callStack: CallStack)
