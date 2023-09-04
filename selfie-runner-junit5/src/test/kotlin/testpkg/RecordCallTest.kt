@@ -16,6 +16,7 @@
 package testpkg
 
 import com.diffplug.selfie.junit5.recordCall
+import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 
@@ -23,7 +24,7 @@ class RecordCallTest {
   @Test
   fun testRecordCall() {
     val stack = recordCall()
-    stack.location.toString() shouldBe "testpkg/RecordCallTest.kt:25"
-    stack.restOfStack.toString() shouldBe ""
+    stack.location.toString() shouldBe "testpkg/RecordCallTest.kt:26"
+    stack.restOfStack.size shouldBeGreaterThan 0
   }
 }
