@@ -16,11 +16,20 @@
 package com.diffplug.selfie.junit5
 
 import io.kotest.matchers.shouldBe
+import java.io.StringReader
+import java.util.regex.Matcher
+import java.util.regex.Pattern
+import javax.xml.parsers.DocumentBuilderFactory
+import javax.xml.xpath.XPathConstants
+import javax.xml.xpath.XPathFactory
 import okio.FileSystem
 import okio.Path
 import okio.Path.Companion.toPath
+import org.gradle.internal.impldep.junit.framework.AssertionFailedError
 import org.gradle.tooling.BuildException
 import org.gradle.tooling.GradleConnector
+import org.w3c.dom.NodeList
+import org.xml.sax.InputSource
 
 open class Harness(subproject: String) {
   val subprojectFolder: Path
@@ -165,7 +174,7 @@ open class Harness(subproject: String) {
       }
     }
   }
-  fun gradlew(task: String, vararg args: String): BuildException? {
+  fun gradlew(task: String, vararg args: String): AssertionFailedError? {
     val runner =
         GradleConnector.newConnector()
             .forProjectDirectory(subprojectFolder.parent!!.toFile())
@@ -185,8 +194,55 @@ open class Harness(subproject: String) {
       buildLauncher.run()
       return null
     } catch (e: BuildException) {
-      return e
+      return parseBuildException(task)
     }
+  }
+
+  /**
+   * Parse build exception from gradle by looking into <code>build</code> directory to the matching
+   * test.
+   *
+   * Parses the exception message as well as stacktrace.
+   */
+  private fun parseBuildException(task: String): AssertionFailedError {
+    val xmlFile =
+        subprojectFolder
+            .resolve("build")
+            .resolve("test-results")
+            .resolve(task)
+            .resolve("TEST-" + task.lowercase() + ".junit5.UT_" + javaClass.simpleName + ".xml")
+    val xml = FileSystem.SYSTEM.read(xmlFile) { readUtf8() }
+    val dbFactory = DocumentBuilderFactory.newInstance()
+    val dBuilder = dbFactory.newDocumentBuilder()
+    val xmlInput = InputSource(StringReader(xml))
+    val doc = dBuilder.parse(xmlInput)
+    val xpFactory = XPathFactory.newInstance()
+    val xPath = xpFactory.newXPath()
+
+    // <item type="T1" count="1">Value1</item>
+    val xpath = "/testsuite/testcase/failure"
+    val failures = xPath.evaluate(xpath, doc, XPathConstants.NODESET) as NodeList
+    val failure = failures.item(0)
+    val type = failure.attributes.getNamedItem("type").nodeValue
+    val message = failure.attributes.getNamedItem("message").nodeValue.replace("&#10;", "\n")
+    val lines = failure.textContent.replace(message, "").trim().split("\n")
+    val stacktrace: MutableList<StackTraceElement> = ArrayList()
+    val tracePattern =
+        Pattern.compile("\\s*at\\s+([\\w]+)//([\\w\\.]+)\\.([\\w]+)(\\(.*kt)?:(\\d+)\\)")
+    lines.forEach {
+      val traceMatcher: Matcher = tracePattern.matcher(it)
+      while (traceMatcher.find()) {
+        val module: String = traceMatcher.group(1)
+        val className: String = module + "//" + traceMatcher.group(2)
+        val methodName: String = traceMatcher.group(3)
+        val sourceFile: String = traceMatcher.group(4)
+        val lineNum: Int = traceMatcher.group(5).toInt()
+        stacktrace.add(StackTraceElement(className, methodName, sourceFile, lineNum))
+      }
+    }
+    val error = AssertionFailedError(message.replace("$type: ", "").trim())
+    error.stackTrace = stacktrace.toTypedArray()
+    return error
   }
   fun gradleWriteSS() {
     gradlew("underTest", "-Pselfie=write")?.let {
@@ -198,7 +254,7 @@ open class Harness(subproject: String) {
       throw AssertionError("Expected read snapshots to succeed, but it failed", it)
     }
   }
-  fun gradleReadSSFail(): BuildException {
+  fun gradleReadSSFail(): AssertionFailedError {
     val failure = gradlew("underTest", "-Pselfie=read")
     if (failure == null) {
       throw AssertionError("Expected read snapshots to fail, but it succeeded.")

@@ -28,7 +28,9 @@ data class CallLocation(val subpath: String, val line: Int) : Comparable<CallLoc
   override fun toString(): String = "$subpath:$line"
 }
 /** Represents the callstack above a given CallLocation. */
-class CallStack(val location: CallLocation, val restOfStack: List<CallLocation>)
+class CallStack(val location: CallLocation, val restOfStack: List<CallLocation>) {
+  override fun toString(): String = "$location"
+}
 /** Generates a CallLocation and the CallStack behind it. */
 fun recordCall(): CallStack {
   val calls =
