@@ -171,7 +171,7 @@ internal class ClassProgress(val className: String) {
             val content = Files.readAllBytes(snapshotPath)
             SnapshotFile.parse(SnapshotValueReader.of(content))
           } else {
-            SnapshotFile()
+            SnapshotFile.createEmptyWithUnixNewlines(Router.layout!!.unixNewlines)
           }
     }
     return file!!

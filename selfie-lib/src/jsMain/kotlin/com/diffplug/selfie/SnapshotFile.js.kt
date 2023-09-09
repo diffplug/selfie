@@ -22,4 +22,5 @@ actual class LineReader {
   }
   actual fun getLineNumber(): Int = TODO()
   actual fun readLine(): String? = TODO()
+  actual fun unixNewlines(): Boolean = TODO()
 }

@@ -38,7 +38,7 @@ sealed interface SnapshotValue {
 
   companion object {
     fun of(binary: ByteArray): SnapshotValue = SnapshotValueBinary(binary)
-    fun of(string: String): SnapshotValue = SnapshotValueString(string)
+    fun of(string: String): SnapshotValue = SnapshotValueString(unixNewlines(string))
   }
 }
 
@@ -66,7 +66,8 @@ data class Snapshot(
     get() = lensData
   fun lens(key: String, value: ByteArray) = lens(key, SnapshotValue.of(value))
   fun lens(key: String, value: String) = lens(key, SnapshotValue.of(value))
-  fun lens(key: String, value: SnapshotValue) = Snapshot(this.value, lensData.plus(key, value))
+  fun lens(key: String, value: SnapshotValue) =
+      Snapshot(this.value, lensData.plus(unixNewlines(key), value))
   override fun toString(): String = "[${value} ${lenses}]"
 
   companion object {
@@ -82,12 +83,17 @@ private fun String.efficientReplace(find: String, replaceWith: String): String {
   val idx = this.indexOf(find)
   return if (idx == -1) this else this.replace(find, replaceWith)
 }
+private fun unixNewlines(str: String) = str.efficientReplace("\r\n", "\n")
 
 class SnapshotFile {
+  internal var unixNewlines = true
   // this will probably become `<String, JsonObject>` we'll cross that bridge when we get to it
   var metadata: Map.Entry<String, String>? = null
   var snapshots = ArrayMap.empty<String, Snapshot>()
-  fun serialize(valueWriter: StringWriter) {
+  fun serialize(valueWriterRaw: StringWriter) {
+    val valueWriter =
+        if (unixNewlines) valueWriterRaw
+        else StringWriter { valueWriterRaw.write(it.efficientReplace("\n", "\r\n")) }
     metadata?.let {
       writeKey(valueWriter, "📷 ${it.key}", null)
       writeValue(valueWriter, SnapshotValue.of(it.value))
@@ -147,6 +153,7 @@ class SnapshotFile {
     fun parse(valueReader: SnapshotValueReader): SnapshotFile {
       try {
         val result = SnapshotFile()
+        result.unixNewlines = valueReader.unixNewlines
         val reader = SnapshotReader(valueReader)
         // only if the first value starts with 📷
         if (reader.peekKey()?.startsWith(HEADER_PREFIX) == true) {
@@ -161,6 +168,11 @@ class SnapshotFile {
       } catch (e: IllegalArgumentException) {
         throw if (e is ParseException) e else ParseException(valueReader.lineReader, e)
       }
+    }
+    fun createEmptyWithUnixNewlines(unixNewlines: Boolean): SnapshotFile {
+      val result = SnapshotFile()
+      result.unixNewlines = unixNewlines
+      return result
     }
   }
 }
@@ -207,6 +219,7 @@ class SnapshotReader(val valueReader: SnapshotValueReader) {
 /** Provides the ability to parse a snapshot file incrementally. */
 class SnapshotValueReader(val lineReader: LineReader) {
   var line: String? = null
+  val unixNewlines = lineReader.unixNewlines()
 
   /** The key of the next value, does not increment anything about the reader's state. */
   fun peekKey(): String? {
@@ -311,6 +324,7 @@ class SnapshotValueReader(val lineReader: LineReader) {
 expect class LineReader {
   fun getLineNumber(): Int
   fun readLine(): String?
+  fun unixNewlines(): Boolean
 
   companion object {
     fun forString(content: String): LineReader
