@@ -51,14 +51,15 @@ class CarriageReturnTest : Harness("undertest-junit5") {
 
   @Test @Order(3)
   fun if_ss_has_cr_then_it_will_stay_cr() {
-    ut_snapshot().setContent("\r\n")
+    val contentWithCr = expectedContent.replace("\n", "\r\n")
+    ut_snapshot().setContent(contentWithCr)
     gradleWriteSS()
-    ut_snapshot().assertContent(expectedContent.replace("\n", "\r\n"))
+    ut_snapshot().assertContent(contentWithCr)
   }
 
   @Test @Order(4)
   fun go_back_to_unix_and_it_stays_unix() {
-    ut_snapshot().setContent("\n")
+    ut_snapshot().setContent(expectedContent)
     gradleWriteSS()
     ut_snapshot().assertContent(expectedContent)
   }

@@ -59,7 +59,7 @@ private open class LineTerminatorAware(val lineTerminator: LineTerminatorReader)
  */
 private class LineTerminatorReader(reader: Reader) : BufferedReader(reader) {
   private val CR: Int = '\r'.code
-  private var unixNewlines = System.lineSeparator().equals("\n")
+  private var unixNewlines = true
   override fun read(cbuf: CharArray): Int {
     val result = super.read(cbuf)
     unixNewlines = cbuf.indexOf(CR.toChar()) == -1

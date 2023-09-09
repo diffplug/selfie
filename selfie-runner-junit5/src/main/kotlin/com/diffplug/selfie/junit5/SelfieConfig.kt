@@ -68,22 +68,20 @@ internal class SnapshotFileLayout(
             "src/test/scala",
             "src/test/resources")
     fun initialize(className: String): SnapshotFileLayout {
-      val selfieDotProp = SnapshotFileLayout.javaClass.getResource("/selfie.properties")
+      val selfieDotProp = SnapshotFileLayout::class.java.getResource("/selfie.properties")
       val properties = java.util.Properties()
       selfieDotProp?.openStream()?.use { properties.load(selfieDotProp.openStream()) }
       val snapshotFolderName = snapshotFolderName(properties.getProperty("snapshot-dir"))
       val snapshotRootFolder = rootFolder(properties.getProperty("output-dir"))
       // it's pretty easy to preserve the line endings of existing snapshot files, but it's
       // a bit harder to create a fresh snapshot file with the correct line endings.
-      val candidate =
+      val cr =
           snapshotRootFolder
               .resolve(snapshotFolderName!!)
               .toFile()
               .walkTopDown()
-              .maxDepth(1)
               .filter { it.isFile }
-              .firstOrNull()
-      val cr = candidate?.readText()?.contains('\r') ?: System.lineSeparator().equals("\r\n")
+              .any { it.readText().contains('\r') }
       return SnapshotFileLayout(snapshotRootFolder, snapshotFolderName, !cr)
     }
     private fun snapshotFolderName(snapshotDir: String?): String? {
