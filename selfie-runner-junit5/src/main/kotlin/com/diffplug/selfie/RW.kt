@@ -21,34 +21,39 @@ package com.diffplug.selfie
  * - if environment variable or system property named `ci` or `CI` with value `true` or `TRUE`
  *     - then Selfie is read-only and errors out on a snapshot mismatch
  * - if environment variable or system property named `selfie` or `SELFIE`
- *     - its value should be either `read` or `write` (case-insensitive)
- *     - that will override the presence of `CI`
+ *     - its value should be either `read`, `write`, or `writeonce` (case-insensitive)
+ *     - `write` allows a single snapshot to be set multiple times within a test, so long as it is
+ *       the same value. `writeonce` errors as soon as a snapshot is set twice even to the same
+ *       value.
+ *     - selfie, if set, will override the presence of `CI`
  */
-internal object RW {
-  private fun lowercaseFromEnvOrSys(key: String): String? {
-    val env = System.getenv(key)?.lowercase()
-    if (!env.isNullOrEmpty()) {
-      return env
-    }
-    val system = System.getProperty(key)?.lowercase()
-    if (!system.isNullOrEmpty()) {
-      return system
-    }
-    return null
-  }
-  private fun calcIsWrite(): Boolean {
-    val override = lowercaseFromEnvOrSys("selfie") ?: lowercaseFromEnvOrSys("SELFIE")
-    if (override != null) {
-      return when (override) {
-        "read" -> false
-        "write" -> true
-        else ->
-            throw IllegalArgumentException(
-                "Expected 'selfie' to be 'read' or 'write', but was '$override'")
+internal enum class RW {
+  read,
+  write,
+  writeonce;
+
+  companion object {
+    private fun lowercaseFromEnvOrSys(key: String): String? {
+      val env = System.getenv(key)?.lowercase()
+      if (!env.isNullOrEmpty()) {
+        return env
       }
+      val system = System.getProperty(key)?.lowercase()
+      if (!system.isNullOrEmpty()) {
+        return system
+      }
+      return null
     }
-    val ci = lowercaseFromEnvOrSys("ci") ?: lowercaseFromEnvOrSys("CI")
-    return ci != "true"
+    private fun calcRW(): RW {
+      val override = lowercaseFromEnvOrSys("selfie") ?: lowercaseFromEnvOrSys("SELFIE")
+      if (override != null) {
+        return RW.valueOf(override)
+      }
+      val ci = lowercaseFromEnvOrSys("ci") ?: lowercaseFromEnvOrSys("CI")
+      return if (ci == "true") read else write
+    }
+    val mode = calcRW()
+    val isWrite = mode != read
+    val isWriteOnce = mode == writeonce
   }
-  val isWrite = calcIsWrite()
 }
