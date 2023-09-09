@@ -49,9 +49,9 @@ class LineReaderTest {
   }
 
   @Test
-  fun shouldGetOSLineSeparatorWhenThereIsNone() {
+  fun shouldGetUnixLineSeparatorWhenThereIsNone() {
     val reader = LineReader.forBinary("This is a new line".encodeToByteArray())
-    reader.unixNewlines() shouldBe System.lineSeparator().equals("\n")
+    reader.unixNewlines() shouldBe true
     reader.readLine() shouldBe "This is a new line"
   }
 
