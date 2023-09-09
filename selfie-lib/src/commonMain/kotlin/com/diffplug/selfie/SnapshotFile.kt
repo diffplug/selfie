@@ -133,9 +133,6 @@ class SnapshotFile {
 
   var wasSetAtTestTime: Boolean = false
   fun setAtTestTime(key: String, snapshot: Snapshot) {
-    // TODO: track whenever a snapshot is set, so that we can:
-    //  - warn about duplicate snapshots when they are equal
-    //  - give good errors when they are not
     val newSnapshots = snapshots.plusOrReplace(key, snapshot)
     if (newSnapshots !== snapshots) {
       snapshots = newSnapshots

@@ -93,6 +93,7 @@ internal class ClassProgress(val className: String) {
 
   private var file: SnapshotFile? = null
   private var methods = ArrayMap.empty<String, MethodSnapshotGC>()
+  private var diskWriteTracker: DiskWriteTracker? = DiskWriteTracker()
   // the methods below called by the TestExecutionListener on its runtime thread
   @Synchronized fun startMethod(method: String) {
     assertNotTerminated()
@@ -132,6 +133,7 @@ internal class ClassProgress(val className: String) {
     }
     // now that we are done, allow our contents to be GC'ed
     methods = TERMINATED
+    diskWriteTracker = null
     file = null
   }
   // the methods below are called from the test thread for I/O on snapshots
@@ -145,8 +147,10 @@ internal class ClassProgress(val className: String) {
   }
   @Synchronized fun write(method: String, suffix: String, snapshot: Snapshot) {
     assertNotTerminated()
+    val key = "$method$suffix"
+    diskWriteTracker!!.record(key, snapshot, recordCall())
     methods[method]!!.keepSuffix(suffix)
-    read().setAtTestTime("$method$suffix", snapshot)
+    read().setAtTestTime(key, snapshot)
   }
   @Synchronized fun read(
       method: String,
