@@ -15,34 +15,42 @@
  */
 package com.diffplug.selfie
 
-object SelfieRouting {
-  var isWriting: Boolean = true
-  var currentFile: SnapshotFile? = null
-  var currentDiskPrefix: String? = null
-  private fun assertInitializedProperly() {
-    if (currentFile == null || currentDiskPrefix == null) {
-      throw AssertionError("You called `toMatchDisk` without setting up snapshots.")
+import com.diffplug.selfie.junit5.Router
+import org.opentest4j.AssertionFailedError
+
+/**
+ * Sometimes a selfie is environment-specific, but should not be deleted when run in a different
+ * environment.
+ */
+fun preserveSelfiesOnDisk(vararg subsToKeep: String): Unit {
+  if (subsToKeep.isEmpty()) {
+    Router.readOrWriteOrKeep(null, null)
+  } else {
+    for (sub in subsToKeep) {
+      Router.readOrWriteOrKeep(null, sub)
     }
-  }
-  fun onDiskRightNow(scenario: String?): Snapshot? {
-    assertInitializedProperly()
-    val snapshotSuffix = scenario?.let { "/$scenario" } ?: ""
-    val snapshotName = "${currentDiskPrefix!!}${snapshotSuffix}"
-    return currentFile!!.snapshots.get(snapshotName)
   }
 }
 
 open class DiskSelfie internal constructor(private val actual: Snapshot) {
-  fun toMatchDisk(scenario: String? = null): Snapshot {
-    val snapshot = SelfieRouting.onDiskRightNow(scenario)
-    if (actual != snapshot) {
-      if (SelfieRouting.isWriting) {
-        TODO("write snapshot")
-      } else {
-        throw AssertionError()
+  fun toMatchDisk(sub: String = ""): Snapshot {
+    val onDisk = Router.readOrWriteOrKeep(actual, sub)
+    if (RW.isWrite) return actual
+    else if (onDisk == null) throw AssertionFailedError("No such snapshot")
+    else if (actual.value != onDisk.value)
+        throw AssertionFailedError("Snapshot failure", onDisk.value, actual.value)
+    else if (actual.lenses.keys != onDisk.lenses.keys)
+        throw AssertionFailedError(
+            "Snapshot failure: mismatched lenses", onDisk.lenses.keys, actual.lenses.keys)
+    for (key in actual.lenses.keys) {
+      val actualValue = actual.lenses[key]!!
+      val onDiskValue = onDisk.lenses[key]!!
+      if (actualValue != onDiskValue) {
+        throw AssertionFailedError("Snapshot failure within lens $key", onDiskValue, actualValue)
       }
     }
-    return actual
+    // if we're in read mode and the equality checks passed, stick with the disk value
+    return onDisk
   }
 }
 fun <T> expectSelfie(actual: T, snapshotter: Snapshotter<T>) =
@@ -77,9 +85,6 @@ class BooleanSelfie(private val actual: Boolean) {
   fun toBe_TODO(): Boolean = TODO()
 }
 fun expectSelfie(actual: Boolean) = BooleanSelfie(actual)
-
-/** Sometimes a selfie doesn't get used. */
-fun preserveDiskSelfies(vararg names: String): Unit = TODO()
 
 // infix versions for the inline methods, consistent with Kotest's API
 infix fun String.shouldBeSelfie(expected: String): String = expectSelfie(this).toBe(expected)

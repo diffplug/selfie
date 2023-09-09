@@ -17,8 +17,8 @@ package com.diffplug.selfie
 
 import kotlin.collections.binarySearch
 
-internal abstract class ListBackedSet<T>() : AbstractSet<T>() {
-  abstract fun get(index: Int): T
+abstract class ListBackedSet<T>() : AbstractSet<T>() {
+  abstract operator fun get(index: Int): T
   override fun iterator(): Iterator<T> =
       object : Iterator<T> {
         private var index = 0
@@ -29,12 +29,12 @@ internal abstract class ListBackedSet<T>() : AbstractSet<T>() {
         }
       }
 }
-internal fun <T : Comparable<T>> ListBackedSet<T>.binarySearch(element: T): Int {
+private fun <T : Comparable<T>> ListBackedSet<T>.binarySearch(element: T): Int {
   val list =
       object : AbstractList<T>() {
         override val size: Int
           get() = this@binarySearch.size
-        override fun get(index: Int): T = this@binarySearch.get(index)
+        override fun get(index: Int): T = this@binarySearch[index]
       }
   return list.binarySearch(element)
 }
@@ -43,8 +43,31 @@ internal expect fun <K, V> entry(key: K, value: V): Map.Entry<K, V>
 
 /** An immutable, sorted, array-backed map. Wish it could be package-private! UGH!! */
 class ArrayMap<K : Comparable<K>, V : Any>(private val data: Array<Any>) : Map<K, V> {
+  fun minusSortedIndices(indicesToRemove: List<Int>): ArrayMap<K, V> {
+    if (indicesToRemove.isEmpty()) {
+      return this
+    }
+    val newData = arrayOfNulls<Any>(data.size - indicesToRemove.size * 2)
+    var newDataIdx = 0
+    var currentDataIdx = 0
+    var toRemoveIdx = 0
+    while (newDataIdx < newData.size) {
+      if (toRemoveIdx < indicesToRemove.size && currentDataIdx == indicesToRemove[toRemoveIdx]) {
+        ++toRemoveIdx
+        ++currentDataIdx
+      } else {
+        newData[newDataIdx++] = data[2 * currentDataIdx]
+        newData[newDataIdx++] = data[2 * currentDataIdx + 1]
+        ++currentDataIdx
+      }
+    }
+    check(toRemoveIdx == indicesToRemove.size) {
+      "The indices weren't sorted or were too big: $indicesToRemove"
+    }
+    return ArrayMap<K, V>(newData as Array<Any>)
+  }
   /**
-   * Returns a new FastMap which has added the given key. Throws an exception if the key already
+   * Returns a new ArrayMap which has added the given key. Throws an exception if the key already
    * exists.
    */
   fun plus(key: K, value: V): ArrayMap<K, V> {
@@ -53,6 +76,28 @@ class ArrayMap<K : Comparable<K>, V : Any>(private val data: Array<Any>) : Map<K
       throw IllegalArgumentException("Key already exists: $key")
     }
     val idxInsert = -(idxExisting + 1)
+    return insert(idxInsert, key, value)
+  }
+  /**
+   * Returns an ArrayMap which has added or overwritten the given key/value. If the map already
+   * contained that mapping (equal keys and values) then it returns the same map.
+   */
+  fun plusOrReplace(key: K, newValue: V): ArrayMap<K, V> {
+    val idxExisting = dataAsKeys.binarySearch(key)
+    if (idxExisting >= 0) {
+      val existingValue = data[idxExisting * 2 + 1] as V
+      return if (newValue == existingValue) this
+      else {
+        val copy = data.copyOf()
+        copy[idxExisting * 2 + 1] = newValue
+        return ArrayMap(copy)
+      }
+    } else {
+      val idxInsert = -(idxExisting + 1)
+      return insert(idxInsert, key, newValue)
+    }
+  }
+  private fun insert(idxInsert: Int, key: K, value: V): ArrayMap<K, V> {
     return when (data.size) {
       0 -> ArrayMap(arrayOf(key, value))
       1 -> {
@@ -60,7 +105,7 @@ class ArrayMap<K : Comparable<K>, V : Any>(private val data: Array<Any>) : Map<K
         else ArrayMap(arrayOf(data[0], data[1], key, value))
       }
       else ->
-          // TODO: use idxInsert and arrayCopy to do this faster
+          // TODO: use idxInsert and arrayCopy to do this faster, see ArraySet#plusOrThis
           of(
               MutableList(size + 1) {
                 if (it < size) Pair(data[it * 2] as K, data[it * 2 + 1] as V) else Pair(key, value)
@@ -76,13 +121,13 @@ class ArrayMap<K : Comparable<K>, V : Any>(private val data: Array<Any>) : Map<K
           return data[index * 2] as K
         }
       }
-  override val keys: Set<K>
+  override val keys: ListBackedSet<K>
     get() = dataAsKeys
   override fun get(key: K): V? {
     val idx = dataAsKeys.binarySearch(key)
     return if (idx < 0) null else data[idx * 2 + 1] as V
   }
-  override fun containsKey(key: K): Boolean = get(key) == null
+  override fun containsKey(key: K): Boolean = dataAsKeys.binarySearch(key) >= 0
   /** list-backed collection of values at odd indices. */
   override val values: List<V>
     get() =
@@ -93,7 +138,7 @@ class ArrayMap<K : Comparable<K>, V : Any>(private val data: Array<Any>) : Map<K
         }
   override fun containsValue(value: V): Boolean = values.contains(value)
   /** list-backed set of entries. */
-  override val entries: Set<Map.Entry<K, V>>
+  override val entries: ListBackedSet<Map.Entry<K, V>>
     get() =
         object : ListBackedSet<Map.Entry<K, V>>() {
           override val size: Int
@@ -111,10 +156,10 @@ class ArrayMap<K : Comparable<K>, V : Any>(private val data: Array<Any>) : Map<K
     if (other === this) return true
     if (other !is Map<*, *>) return false
     if (size != other.size) return false
-    if (other is ArrayMap<*, *>) {
-      return data.contentEquals(other.data)
+    return if (other is ArrayMap<*, *>) {
+      data.contentEquals(other.data)
     } else {
-      return other.entries.all { (key, value) -> this[key] == value }
+      other.entries.all { (key, value) -> this[key] == value }
     }
   }
   override fun hashCode(): Int = entries.hashCode()
