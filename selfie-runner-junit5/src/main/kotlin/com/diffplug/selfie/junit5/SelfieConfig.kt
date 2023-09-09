@@ -75,9 +75,16 @@ internal class SnapshotFileLayout(
       val snapshotRootFolder = rootFolder(properties.getProperty("output-dir"))
       // it's pretty easy to preserve the line endings of existing snapshot files, but it's
       // a bit harder to create a fresh snapshot file with the correct line endings.
-      val unixNewlines: Boolean =
-          TODO("find the first file in the snapshot folder and check if it has unix newlines")
-      return SnapshotFileLayout(snapshotRootFolder, snapshotFolderName, unixNewlines)
+      val candidate =
+          snapshotRootFolder
+              .resolve(snapshotFolderName!!)
+              .toFile()
+              .walkTopDown()
+              .maxDepth(1)
+              .filter { it.isFile }
+              .firstOrNull()
+      val cr = candidate?.readText()?.contains('\r') ?: System.lineSeparator().equals("\r\n")
+      return SnapshotFileLayout(snapshotRootFolder, snapshotFolderName, !cr)
     }
     private fun snapshotFolderName(snapshotDir: String?): String? {
       if (snapshotDir == null) {

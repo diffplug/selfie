@@ -153,8 +153,7 @@ class SnapshotFile {
     fun parse(valueReader: SnapshotValueReader): SnapshotFile {
       try {
         val result = SnapshotFile()
-        result.unixNewlines =
-            TODO("""add internal method to SnapshotValueReader to query if newline is \n or \r\n""")
+        result.unixNewlines = valueReader.unixNewlines
         val reader = SnapshotReader(valueReader)
         // only if the first value starts with 📷
         if (reader.peekKey()?.startsWith(HEADER_PREFIX) == true) {
@@ -220,6 +219,7 @@ class SnapshotReader(val valueReader: SnapshotValueReader) {
 /** Provides the ability to parse a snapshot file incrementally. */
 class SnapshotValueReader(val lineReader: LineReader) {
   var line: String? = null
+  val unixNewlines = lineReader.unixNewlines()
 
   /** The key of the next value, does not increment anything about the reader's state. */
   fun peekKey(): String? {
@@ -324,6 +324,7 @@ class SnapshotValueReader(val lineReader: LineReader) {
 expect class LineReader {
   fun getLineNumber(): Int
   fun readLine(): String?
+  fun unixNewlines(): Boolean
 
   companion object {
     fun forString(content: String): LineReader
