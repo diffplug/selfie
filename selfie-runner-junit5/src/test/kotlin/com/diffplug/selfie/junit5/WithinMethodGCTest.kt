@@ -102,9 +102,4 @@ class WithinMethodGCTest : Harness("undertest-junit5") {
     ut_mirror().lineWith("selfie2()").commentOut()
     ut_mirror().lineWith("selfie()").uncomment()
   }
-
-  @Test @Order(7)
-  fun deleteSelfie() {
-    ut_snapshot().deleteIfExists()
-  }
 }

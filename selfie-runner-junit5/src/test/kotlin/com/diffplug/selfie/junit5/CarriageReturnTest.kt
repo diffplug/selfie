@@ -63,9 +63,4 @@ class CarriageReturnTest : Harness("undertest-junit5") {
     gradleWriteSS()
     ut_snapshot().assertContent(expectedContent)
   }
-
-  @Test @Order(5)
-  fun deleteSelfie() {
-    ut_snapshot().deleteIfExists()
-  }
 }

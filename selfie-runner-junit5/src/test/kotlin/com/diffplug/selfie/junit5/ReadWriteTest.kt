@@ -81,9 +81,4 @@ class ReadWriteTest : Harness("undertest-junit5") {
         """
                 .trimIndent())
   }
-
-  @Test @Order(6)
-  fun deleteSelfie() {
-    ut_snapshot().deleteIfExists()
-  }
 }
