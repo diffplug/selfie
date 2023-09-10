@@ -1,4 +1,4 @@
-package com.diffplug.selfie.junit5
+package undertest.junit5
 // spotless:off
 import com.diffplug.selfie.expectSelfie
 import kotlin.test.Test

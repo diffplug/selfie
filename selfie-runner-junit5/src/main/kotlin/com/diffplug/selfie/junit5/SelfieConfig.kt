@@ -22,7 +22,7 @@ import java.nio.file.Paths
 internal class SnapshotFileLayout(
     val rootFolder: Path,
     val snapshotFolderName: String?,
-    val unixNewlines: Boolean
+    internal val unixNewlines: Boolean
 ) {
   val extension: String = ".ss"
   fun snapshotPathForClass(className: String): Path {
@@ -75,14 +75,27 @@ internal class SnapshotFileLayout(
       val snapshotRootFolder = rootFolder(properties.getProperty("output-dir"))
       // it's pretty easy to preserve the line endings of existing snapshot files, but it's
       // a bit harder to create a fresh snapshot file with the correct line endings.
-      val cr =
-          snapshotRootFolder
-              .resolve(snapshotFolderName!!)
-              .toFile()
-              .walkTopDown()
-              .filter { it.isFile }
-              .any { it.readText().contains('\r') }
-      return SnapshotFileLayout(snapshotRootFolder, snapshotFolderName, !cr)
+      return SnapshotFileLayout(
+          snapshotRootFolder, snapshotFolderName, inferDefaultLineEndingIsUnix(snapshotRootFolder))
+    }
+    private fun inferDefaultLineEndingIsUnix(rootFolder: Path): Boolean {
+      return rootFolder
+          .toFile()
+          .walkTopDown()
+          .filter { it.isFile }
+          .mapNotNull {
+            try {
+              val txt = it.readText()
+              // look for a file that has a newline somewhere in it
+              if (txt.indexOf('\n') != -1) txt else null
+            } catch (e: Exception) {
+              // might be a binary file that throws an encoding exception
+              null
+            }
+          }
+          .firstOrNull()
+          ?.let { it.indexOf('\r') == -1 }
+          ?: true // if we didn't find any files, assume unix
     }
     private fun snapshotFolderName(snapshotDir: String?): String? {
       if (snapshotDir == null) {

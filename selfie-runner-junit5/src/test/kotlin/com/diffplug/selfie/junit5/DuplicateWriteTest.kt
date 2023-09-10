@@ -62,9 +62,4 @@ class DuplicateWriteTest : Harness("undertest-junit5") {
     gradlew("underTest", "-Pselfie=writeonce")!!.message shouldStartWith
         "Snapshot was set to the same value multiple times"
   }
-
-  @Test @Order(6)
-  fun deleteSelfie() {
-    ut_snapshot().deleteIfExists()
-  }
 }
