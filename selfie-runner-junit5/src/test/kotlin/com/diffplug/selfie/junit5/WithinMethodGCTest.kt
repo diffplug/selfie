@@ -101,5 +101,17 @@ class WithinMethodGCTest : Harness("undertest-junit5") {
     ut_mirror().lineWith("root").uncomment()
     ut_mirror().lineWith("selfie2()").commentOut()
     ut_mirror().lineWith("selfie()").uncomment()
+    gradleWriteSS()
+    ut_snapshot()
+        .assertContent(
+            """
+      ╔═ selfie ═╗
+      root
+      ╔═ selfie/leaf ═╗
+      maple
+      ╔═ [end of file] ═╗
+      
+    """
+                .trimIndent())
   }
 }
