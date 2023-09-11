@@ -16,7 +16,6 @@
 package com.diffplug.selfie.junit5
 
 import io.kotest.matchers.shouldBe
-import java.io.StringReader
 import java.util.regex.Matcher
 import java.util.regex.Pattern
 import javax.xml.parsers.DocumentBuilderFactory
@@ -194,7 +193,7 @@ open class Harness(subproject: String) {
       buildLauncher.run()
       return null
     } catch (e: BuildException) {
-      return parseBuildException(task)
+      return parseBuildException(task, e)
     }
   }
 
@@ -204,27 +203,32 @@ open class Harness(subproject: String) {
    *
    * Parses the exception message as well as stacktrace.
    */
-  private fun parseBuildException(task: String): AssertionFailedError {
-    val xmlFile =
+  private fun parseBuildException(task: String, e: BuildException): AssertionFailedError {
+    val xpFactory = XPathFactory.newInstance()
+    val xPath = xpFactory.newXPath()
+    val failure =
         subprojectFolder
             .resolve("build")
             .resolve("test-results")
             .resolve(task)
-            .resolve("TEST-" + task.lowercase() + ".junit5.UT_" + javaClass.simpleName + ".xml")
-    val xml = FileSystem.SYSTEM.read(xmlFile) { readUtf8() }
-    val dbFactory = DocumentBuilderFactory.newInstance()
-    val dBuilder = dbFactory.newDocumentBuilder()
-    val xmlInput = InputSource(StringReader(xml))
-    val doc = dBuilder.parse(xmlInput)
-    val xpFactory = XPathFactory.newInstance()
-    val xPath = xpFactory.newXPath()
-
-    // <item type="T1" count="1">Value1</item>
-    val xpath = "/testsuite/testcase/failure"
-    val failures = xPath.evaluate(xpath, doc, XPathConstants.NODESET) as NodeList
-    val failure = failures.item(0)
-    val type = failure.attributes.getNamedItem("type").nodeValue
-    val message = failure.attributes.getNamedItem("message").nodeValue.replace("&#10;", "\n")
+            .toFile()
+            .walkTopDown()
+            .filter { it.isFile && it.name.endsWith(".xml") }
+            .mapNotNull {
+              val dbFactory = DocumentBuilderFactory.newInstance()
+              val dBuilder = dbFactory.newDocumentBuilder()
+              it.inputStream().use { source -> dBuilder.parse(InputSource(source)) }
+            }
+            .mapNotNull {
+              val xpath = "/testsuite/testcase/failure"
+              val failures = xPath.evaluate(xpath, it, XPathConstants.NODESET) as NodeList
+              failures.item(0)
+            }
+            .firstOrNull()
+            ?: return AssertionFailedError("Unable to find exception: " + e.stackTraceToString())
+    val attributes = failure!!.attributes
+    val type = attributes.getNamedItem("type").nodeValue
+    val message = attributes.getNamedItem("message").nodeValue.replace("&#10;", "\n")
     val lines = failure.textContent.replace(message, "").trim().split("\n")
     val stacktrace: MutableList<StackTraceElement> = ArrayList()
     val tracePattern =
