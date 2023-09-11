@@ -18,6 +18,7 @@ package com.diffplug.selfie
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import kotlin.test.Test
+import kotlin.test.assertFails
 
 class ArrayMapTest {
   @Test
@@ -145,5 +146,23 @@ class ArrayMapTest {
         ArrayMap.empty<String, String>().plus(key1, value1).plus(key2, value2).plus(key3, value3)
     map shouldBe
         ArrayMap.empty<String, String>().plus(key2, value2).plus(key1, value1).plus(key3, value3)
+  }
+
+  @Test
+  fun removeItemsWorks() {
+    val empty = ArrayMap.empty<String, String>()
+    val arrayMap = empty.plus("first", "1").plus("second", "2").plus("third", "3")
+    arrayMap.minusSortedIndices(listOf(2)) shouldBe mapOf("first" to "1", "second" to "2")
+    arrayMap.minusSortedIndices(listOf(0)) shouldBe mapOf("second" to "2", "third" to "3")
+    arrayMap.minusSortedIndices(listOf(1)) shouldBe mapOf("first" to "1", "third" to "3")
+
+    arrayMap.minusSortedIndices(listOf(0, 2)) shouldBe mapOf("second" to "2")
+
+    assertFails { arrayMap.minusSortedIndices(listOf(1, 0)) }.message shouldBe
+        "The indices weren't sorted or were too big: [1, 0]"
+    assertFails { arrayMap.minusSortedIndices(listOf(2, 1)) }.message shouldBe
+        "The indices weren't sorted or were too big: [2, 1]"
+    assertFails { arrayMap.minusSortedIndices(listOf(3)) }.message shouldBe
+        "The indices weren't sorted or were too big: [3]"
   }
 }

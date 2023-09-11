@@ -61,7 +61,13 @@ class ArrayMap<K : Comparable<K>, V : Any>(private val data: Array<Any>) : Map<K
         ++currentDataIdx
       }
     }
-    check(toRemoveIdx == indicesToRemove.size) {
+    val tailRemoval =
+        if (indicesToRemove.contains((data.size / 2) - 1)) {
+          1
+        } else {
+          0
+        }
+    check(toRemoveIdx + tailRemoval == indicesToRemove.size) {
       "The indices weren't sorted or were too big: $indicesToRemove"
     }
     return ArrayMap<K, V>(newData as Array<Any>)
