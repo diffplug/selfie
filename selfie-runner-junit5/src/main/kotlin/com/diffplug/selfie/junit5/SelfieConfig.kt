@@ -19,7 +19,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 
-internal class SnapshotFileLayout(
+class SnapshotFileLayout(
     val rootFolder: Path,
     val snapshotFolderName: String?,
     internal val unixNewlines: Boolean
