@@ -16,6 +16,7 @@
 package com.diffplug.selfie
 
 import com.diffplug.selfie.junit5.Router
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.opentest4j.AssertionFailedError
 
 /**
@@ -68,8 +69,13 @@ class BinarySelfie(private val actual: ByteArray) : DiskSelfie(Snapshot.of(actua
 }
 fun expectSelfie(actual: ByteArray) = BinarySelfie(actual)
 
-class IntSelfie(private val actual: Int) {
-  fun toBe(expected: Int): Int = TODO()
+class IntSelfie(private val actual: Int) : DiskSelfie(Snapshot.of(actual.toString())) {
+  infix fun toBe(expected: Int): Int {
+    // TODO: Is this right?
+    val snapshot = toMatchDisk()
+    assertEquals(expected, snapshot.value.valueString().toInt())
+    return expected
+  }
   fun toBe_TODO(): Int = TODO()
 }
 fun expectSelfie(actual: Int) = IntSelfie(actual)
