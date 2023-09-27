@@ -1,0 +1,94 @@
+## selfie is literal
+
+Sure, you could write your assertions like this.
+
+```java
+@Test
+public void login_then_redirect() {
+  given().redirects().follow(false)
+    .post("/confirm/login/erjchFbCXxMlUfFXx3oYiO-Rj6zM7tRGdRV8ziqRn5Jh")
+    .then()
+    .cookie("login", AuthRequest.authTokenValue(dev, InitialData.LUKE));
+}
+```
+
+But isn't this easier to read? And also more complete?
+
+```java
+@Test
+public void login_then_redirect() {
+		expectSelfie(given().redirects().follow(false)
+      .post("/confirm/login/erjchFbCXxMlUfFXx3oYiO-Rj6zM7tRGdRV8ziqRn5Jh"))
+      .toBe()
+
+}
+```
+
+The only reason we don't test that way already is that it's too tedious to write out that big string literal. Buf if you write this...
+
+```java
+@Test
+public void blah() {
+  expectSelfie("blah").toBe_TODO();
+}
+```
+
+... then selfie will rewrite the string literal for you when you run your tests. Unless you run the test on a CI server, in which case ERROR.
+
+## selfie is lensable
+
+Some snapshots are so big that it would be cumbersome to put them inline into your test code. So selfie helps you put them on disk.
+
+```java
+@Test
+public void should_redirect() {
+}
+```
+
+Here is a very simple test which snapshots the HTML served at various URLs.
+
+```java
+@Test public void gzipFavicon() {
+    expectSelfie(get("/favicon.ico", ContentEncoding.GZIP)).toMatchDisk();
+}
+@Test public void orderFlow() {
+  expectSelfie(get("/orders")).toMatchDisk("initial");
+  postOrder();
+  expectSelfie(get("/orders")).toMatchDisk("ordered");
+}
+```
+
+This will generate a snapshot file like so:
+
+```
+╔═ gzipFavicon ═╗ base64 length 823 bytes
+H4sIAAAAAAAA/8pIzcnJVyjPL8pJUQQAlQYXAAAA
+╔═ orderFlow/initial ═╗
+<html><body>
+  <button>Submit order</button>
+</body></html>
+╔═ orderFlow/ordered ═╗
+<html><body>
+  <p>Thanks for your business!</p>
+  <details>
+    <summary>Order information</summary>
+    <p>Tracking #ABC123</p>
+  </details>
+</body></html>
+```
+
+## selfie is like a filesystem
+
+A great thing about snapshots is that they are fast to write and update. A downside is that the asserted value is opaque. But it doesn't have to be! Just swap `toMatchDisk` for `toBe`.
+
+```java
+@Test public void preventCssBloat() {
+  //        selfie can update this literal value for you ▼
+  int size = expectSelfie(get("/index.css").length).toBe(5_236);
+  if (size > 100_000) {
+    Assert.fail("CSS has gotten too big!");
+  }
+}
+```
+
+Now we can see at a glance how a PR has affected the bundled size of our CSS. We can easily automate manual processes and turn "test execution time" values into source code constants, without wasting programmer time on fragile manual workflows.
