@@ -1,15 +1,26 @@
-import { CSSProperties } from "react";
-
+import clsx from "clsx";
 export function Logo() {
-  let style: CSSProperties = {
-    // fontSize: "148px", // Desktop
-    // filter: "drop-shadow(5px 5px 2px #000)", // Desktop
-    fontSize: "72px",
-    filter: "drop-shadow(3px 3px 2px #000)",
-  };
-
   return (
-    <h1 className="inline bg-gradient-to-r from-blue via-green to-red bg-clip-text font-logo text-[72px] text-transparent drop-shadow-logo">
+    <h1
+      className={clsx([
+        "inline",
+        "bg-gradient-to-r",
+        "from-blue",
+        "via-green",
+        "to-red",
+        "bg-clip-text",
+        "font-logo",
+        "text-[72px]",
+        "tablet:text-[99px]",
+        "leading-none",
+        "text-transparent",
+        "drop-shadow-logo",
+        "wide-phone:drop-shadow-logo-wide-phone",
+        "tablet:drop-shadow-logo-tablet",
+        "desktop:text-[148px]",
+        "desktop:drop-shadow-logo-desktop",
+      ])}
+    >
       Selfie
     </h1>
   );

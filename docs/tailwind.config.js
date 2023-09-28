@@ -9,7 +9,10 @@ module.exports = {
         red: "#E35C61",
       },
       dropShadow: {
-        logo: "5px 5px 2px #000",
+        logo: "3px 3px 2px #000",
+        "logo-wide-phone": "3px 3px 2px #000",
+        "logo-tablet": "5px 5px 2px #000",
+        "logo-desktop": "5px 5px 2px #000",
       },
     },
     fontFamily: {
