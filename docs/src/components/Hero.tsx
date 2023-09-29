@@ -6,7 +6,15 @@ import { Mascot } from "./Mascot";
 
 export function Hero() {
   return (
-    <div className="relative h-[1009px]">
+    <div
+      className={clsx([
+        "relative",
+        "h-[1009px]",
+        "wide-phone:h-[664px]",
+        "tablet:h-[825px]",
+        "desktop:h-[1150px]",
+      ])}
+    >
       <Mascot />
       <div
         className={clsx([

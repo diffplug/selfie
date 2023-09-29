@@ -59,6 +59,7 @@ export function Mascot() {
         "opacity-100",
         "wide-phone:top-[145px]",
         "tablet:top-[30px]",
+        "desktop:left-auto",
       ])}
     />
   );

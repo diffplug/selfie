@@ -18,6 +18,7 @@ export function IntroText() {
         "wide-phone:px-4",
         "tablet:top-[262px]",
         "tablet:gap-[40px]",
+        "desktop:top-[345px]",
       ])}
     >
       <p
@@ -25,6 +26,7 @@ export function IntroText() {
           "text-[20px]",
           "leading-[1.25em]",
           "tablet:text-[30px]",
+          "desktop:text-[45px]",
         ])}
       >
         Which is <br className="tablet:hidden" />{" "}
@@ -40,6 +42,7 @@ export function IntroText() {
           "grid",
           "gap-[30px]",
           "tablet:text-[22px]",
+          "desktop:text-[34px]",
         ])}
       >
         <p>
