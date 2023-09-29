@@ -15,7 +15,6 @@ export function Mascot() {
       document.body.style.setProperty("--page-scroll", "" + pageScrollOffset);
 
       // 0 at the top of the page, 1 when the literal section comes into view. Don't exceed 1.
-      console.log(literalOffsetTop.current);
       document.body.style.setProperty(
         "--literal-scroll",
         "" + Math.min(window.scrollY / literalOffsetTop.current, 1)
