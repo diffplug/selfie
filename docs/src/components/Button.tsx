@@ -21,10 +21,10 @@ export function Button({
     };
   } else {
     style = {
-      //   boxShadow: "2px 2px 1px #000", // mobile
-      //   boxShadow: "4px 4px 2px #000", // tablet
-      boxShadow: "4px 4px 2px #000", // desktop
-      color: "#000",
+      //   boxShadow: "2px 2px 1px #4D4D4D", // mobile
+      //   boxShadow: "4px 4px 2px #4D4D4D", // tablet
+      boxShadow: "4px 4px 2px #4D4D4D", // desktop
+      color: "#4D4D4D",
       backgroundColor: "#FFF",
     };
   }
@@ -39,7 +39,7 @@ export function Button({
         "border-2",
         "border-black",
         "hover:!text-white",
-        "hover:bg-blue",
+        "hover:!bg-blue",
         "cursor-pointer",
         isWide ? "text-[22px]" : "text-[14px]",
         isWide ? "tablet:w-[154px]" : "tablet:w-[73px]",
