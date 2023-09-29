@@ -1,0 +1,86 @@
+# Get started
+
+## Installation
+
+### Maven
+
+If you're using Maven, add the following dependency to your `pom.xml` file:
+
+```xml
+<dependency>
+    <groupId>com.yourdomain.selfie</groupId>
+    <artifactId>selfie</artifactId>
+    <version>LATEST_VERSION</version>
+    <scope>test</scope>
+</dependency>
+```
+
+Replace `LATEST_VERSION` with the latest available version of Selfie.
+
+### Gradle
+
+For Gradle users, add this to your `build.gradle` file:
+
+```gradle
+testImplementation 'com.yourdomain.selfie:selfie:LATEST_VERSION'
+```
+
+Again, replace `LATEST_VERSION` with the latest available version of Selfie.
+
+## Basic usage
+
+1. **Capture a Snapshot:**
+
+   Before you can use the snapshot testing, you need to capture an initial snapshot. This will be used as a reference for future tests.
+
+   ```java
+   import com.yourdomain.selfie.Selfie;
+
+   public class YourTestClass {
+       @Test
+       public void yourTestMethod() {
+           String output = someFunctionThatReturnsAString();
+           Selfie.capture(output);
+       }
+   }
+   ```
+
+2. **Compare with Snapshot:**
+
+   Once you've captured the initial snapshot, subsequent test runs will automatically compare the current output with the saved snapshot.
+
+   ```java
+   import com.yourdomain.selfie.Selfie;
+
+   public class YourTestClass {
+       @Test
+       public void yourTestMethod() {
+           String output = someFunctionThatReturnsAString();
+           Selfie.assertEqualsWithSnapshot(output);
+       }
+   }
+   ```
+
+   If the output differs from the saved snapshot, `assertEqualsWithSnapshot` will fail, pointing out the differences.
+
+3. **Update a Snapshot:**
+
+   If you made intentional changes to the application output and want to update the snapshot, you can do so with:
+
+   ```java
+   Selfie.updateSnapshot(output);
+   ```
+
+## Tips and tricks
+
+- **Folder Structure**: By default, Selfie saves snapshots in a directory named `__snapshots__` alongside your test files. Ensure you check this into your version control to keep reference snapshots consistent across different environments.
+  
+- **Named Snapshots**: You can name your snapshots to make it easier to identify them, especially if you have multiple snapshots in one test class.
+
+## Contribute
+
+Selfie is open source and we welcome contributions! Check out the project on [GitHub](https://github.com/diffplug/selfie), raise issues, or submit pull requests.
+
+---
+
+We hope this guide has helped you get started with Selfie. Enjoy seamless snapshot testing in Java!
