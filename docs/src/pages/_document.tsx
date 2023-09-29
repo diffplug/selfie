@@ -13,7 +13,7 @@ export default function Document() {
       </Head>
       <body>
         <div className="flex justify-center text-black">
-          <div className="w-full max-w-[1300px] overflow-hidden">
+          <div className="w-full max-w-[1300px]">
             <Main />
             <NextScript />
           </div>

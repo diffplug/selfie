@@ -1,4 +1,5 @@
 import clsx from "clsx";
+export { CodeGroup, Code as code, Pre as pre } from "@/components/Code";
 
 type ParentComponentProps = {
   children: React.ReactNode;
