@@ -15,10 +15,20 @@ export function IntroText() {
         "wide-phone:top-[184px]",
         "wide-phone:items-end",
         "wide-phone:text-right",
+        "wide-phone:px-4",
+        "tablet:top-[262px]",
+        "tablet:gap-[40px]",
       ])}
     >
-      <p className={clsx(["text-[20px]", "leading-[1.25em]"])}>
-        Which is <br /> <Link href="#literal">literal</Link>,{" "}
+      <p
+        className={clsx([
+          "text-[20px]",
+          "leading-[1.25em]",
+          "tablet:text-[30px]",
+        ])}
+      >
+        Which is <br className="tablet:hidden" />{" "}
+        <Link href="#literal">literal</Link>,{" "}
         <Link href="#lensable">lensable</Link>
         <br /> and <Link href="#like-a-filesytem">like a filesystem</Link>
       </p>
@@ -29,6 +39,7 @@ export function IntroText() {
           "leading-[1.2em]",
           "grid",
           "gap-[30px]",
+          "tablet:text-[22px]",
         ])}
       >
         <p>
