@@ -1,11 +1,12 @@
 import clsx from "clsx";
 import { ButtonList } from "./ButtonList";
+import { IntroText } from "./IntroText";
 import { Logo } from "./Logo";
 import { Mascot } from "./Mascot";
 
 export function Hero() {
   return (
-    <>
+    <div className="relative h-[1009px]">
       <Mascot />
       <div
         className={clsx([
@@ -45,6 +46,7 @@ export function Hero() {
           <ButtonList />
         </div>
       </div>
-    </>
+      <IntroText />
+    </div>
   );
 }
