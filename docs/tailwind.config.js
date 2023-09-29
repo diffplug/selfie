@@ -14,6 +14,26 @@ module.exports = {
         "logo-tablet": "5px 5px 2px #000",
         "logo-desktop": "5px 5px 2px #000",
       },
+      animation: {
+        "slide-and-fade":
+          "slide 1s linear calc(var(--page-scroll) * -0.9s) paused," +
+          "customFade 1s linear calc(var(--literal-scroll) * -0.9s) paused",
+      },
+      keyframes: {
+        slide: {
+          to: {
+            transform: "translateY(var(--innerHeight))",
+          },
+        },
+        customFade: {
+          from: {
+            opacity: 1,
+          },
+          to: {
+            opacity: 0.2,
+          },
+        },
+      },
     },
     fontFamily: {
       sans: "'Jost', sans-serif",

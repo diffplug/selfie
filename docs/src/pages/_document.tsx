@@ -11,10 +11,12 @@ export default function Document() {
           rel="stylesheet"
         />
       </Head>
-      <body className="flex justify-center">
-        <div className="w-full max-w-[1300px]">
-          <Main />
-          <NextScript />
+      <body>
+        <div className="flex justify-center">
+          <div className="w-full max-w-[1300px] overflow-hidden">
+            <Main />
+            <NextScript />
+          </div>
         </div>
       </body>
     </Html>
