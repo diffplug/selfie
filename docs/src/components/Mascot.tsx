@@ -44,12 +44,13 @@ export function Mascot() {
       src="/mascot.webp"
       alt="Selfie mascot"
       className={clsx([
+        "w-[830px]",
         "h-[1745px]",
         "fixed",
         "top-[80px]",
-        "left-[20px]",
+        "left-[-200px]",
         "object-cover",
-        "object-center",
+        "object-left",
         "block",
         "overflow-visible",
         "animate-slide-and-fade",
