@@ -48,6 +48,7 @@ module.exports = {
       "wide-phone": "600px",
       tablet: "800px",
       desktop: "1159px",
+      xl: "1300px",
     },
   },
 };

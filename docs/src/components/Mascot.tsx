@@ -59,7 +59,11 @@ export function Mascot() {
         "opacity-100",
         "wide-phone:top-[145px]",
         "tablet:top-[30px]",
-        "desktop:left-auto",
+        "desktop:max-w-[1245px]",
+        "desktop:h-[2616px]",
+        "desktop:left-[-250px]",
+        "xl:absolute",
+        "xl:left-[-250px]",
       ])}
     />
   );
