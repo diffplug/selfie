@@ -9,6 +9,10 @@ module.exports = {
         green: "#78ACAE",
         red: "#E35C61",
       },
+      boxShadow: {
+        button: "2px 2px 1px #4D4D4D",
+        "button-tablet": "4px 4px 2px #4D4D4D",
+      },
       dropShadow: {
         logo: "3px 3px 2px #000",
         "logo-wide-phone": "3px 3px 2px #000",
