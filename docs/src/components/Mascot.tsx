@@ -57,6 +57,8 @@ export function Mascot() {
         "block",
         "z-[-1]",
         "opacity-100",
+        "wide-phone:top-[145px]",
+        "tablet:top-[30px]",
       ])}
     />
   );

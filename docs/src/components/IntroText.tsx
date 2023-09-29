@@ -5,13 +5,16 @@ export function IntroText() {
   return (
     <div
       className={clsx([
-        "align-center",
+        "w-full",
         "flex",
         "flex-col",
         "absolute",
         "top-[529px]",
         "px-2",
         "gap-[30px]",
+        "wide-phone:top-[184px]",
+        "wide-phone:items-end",
+        "wide-phone:text-right",
       ])}
     >
       <p className={clsx(["text-[20px]", "leading-[1.25em]"])}>

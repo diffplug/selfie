@@ -25,6 +25,7 @@ export function Button({
       //   boxShadow: "4px 4px 2px #000", // tablet
       boxShadow: "4px 4px 2px #000", // desktop
       color: "#000",
+      backgroundColor: "#FFF",
     };
   }
   return (
