@@ -12,4 +12,18 @@
     @apply text-lg;
     @apply desktop:text-2xl;
   }
+
+  :root {
+    --shiki-color-text: #BBB;
+    --shiki-color-background: #EEE;
+    --shiki-token-constant: #ff8866;
+    --shiki-token-string: #8855ff;
+    --shiki-token-comment: #BBB;
+    --shiki-token-keyword: #0099ff;
+    --shiki-token-parameter: #33cccc;
+    --shiki-token-function: #FFAA00;
+    --shiki-token-string-expression: #8855ff;
+    --shiki-token-punctuation: #BBB;
+    --shiki-token-link: #0099ff;
+  }
 }

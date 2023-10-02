@@ -8,6 +8,7 @@ module.exports = {
         blue: "#63B9E3",
         green: "#78ACAE",
         red: "#E35C61",
+        grey: "#EEE",
       },
       boxShadow: {
         button: "2px 2px 1px #4D4D4D",
