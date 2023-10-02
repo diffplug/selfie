@@ -1,0 +1,102 @@
+import { Hero } from "@/components/Hero";
+
+<Hero />
+
+## selfie is literal
+
+Sure, you could write your assertions like this.
+
+```
+@Test
+public void login() {
+  given().redirects().follow(false)
+    .post("/confirm/login/erjchFbCXxMlUfFXx3oYiO-Rj6zM7tRGdRV8ziqRn5Jh")
+    .then()
+    .cookie("login", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiaXNzIjoiZGlmZnBsdWcuY29tIiwiYXVkIjoiZGlmZnBsdWcuY29tIiwiaWF0IjoxNTc3NjY0MDAsImVtYWlsIjoibHVrZS5za3l3YWxrZXJAZGlmZnBsdWcuY29tIiwic2FsZXMiOiJ0cnVlIn0.v7nes7_rTa0NiwTz6OLIAmRZJ-XzzGULRiAPWBiV5iI");
+}
+```
+
+But isn't this easier to read? And also more complete?
+
+```
+@Test
+public void login() {
+  expectSelfie(
+      given().redirects().follow(false).post("/confirm/login/erjchFbCXxMlUfFXx3oYiO-Rj6zM7tRGdRV8ziqRn5Jh").headers()
+    ).toBe("""
+      content-type=text/plain
+      set-cookie=flash=success=You+are+now+logged+in%21;Path=/;HttpOnly
+      set-cookie=loginui="{\"username\":\"testuser@diffplug.com\"}";Path=/;Max-Age=604800;Expires=Wed, 01-Jan-2000 00:00:00 GMT
+      set-cookie=login=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiaXNzIjoiZGlmZnBsdWcuY29tIiwiYXVkIjoiZGlmZnBsdWcuY29tIiwiaWF0IjoxNTc3NjY0MDAsImVtYWlsIjoibHVrZS5za3l3YWxrZXJAZGlmZnBsdWcuY29tIiwic2FsZXMiOiJ0cnVlIn0.v7nes7_rTa0NiwTz6OLIAmRZJ-XzzGULRiAPWBiV5iI;Path=/;HttpOnly;Max-Age=604800;Expires=Wed, 01-Jan-2000 00:00:00 GMT
+      location=/settings
+      content-length=0
+      """);
+}
+```
+
+The only reason we don't test that way already is that it's too tedious to write out that big string literal. Buf if you write this...
+
+```
+@Test
+public void login() {
+  expectSelfie(
+      given().redirects().follow(false).post("/confirm/login/erjchFbCXxMlUfFXx3oYiO-Rj6zM7tRGdRV8ziqRn5Jh").headers()
+    ).toBe_TODO()
+}
+```
+
+... then selfie will rewrite the string literal for you when you run your tests. Unless you run the test on a CI server, in which case ERROR.
+
+It's like a printf directly into your code. And it's not just for strings, it's for any literal.
+
+```
+@Test
+public void preventCssBloat() {
+  int size = expectSelfie(get("/index.css").length).toBe(5_236);
+  if (size > 100_000) {
+    Assert.fail("CSS has gotten too big! " + size);
+  }
+}
+```
+
+## selfie is lensable
+
+Some snapshots are so big that it would be cumbersome to put them inline into your test code. So selfie helps you put them on disk.
+
+```
+@Test public void gzipFavicon() {
+    expectSelfie(get("/favicon.ico", ContentEncoding.GZIP)).toMatchDisk();
+}
+@Test public void orderFlow() {
+  expectSelfie(get("/orders")).toMatchDisk("initial");
+  postOrder();
+  expectSelfie(get("/orders")).toMatchDisk("ordered");
+}
+```
+
+This will generate a snapshot file like so:
+
+```
+╔═ gzipFavicon ═╗ base64 length 823 bytes
+H4sIAAAAAAAA/8pIzcnJVyjPL8pJUQQAlQYXAAAA
+╔═ orderFlow/initial ═╗
+<html><body>
+  <button>Submit order</button>
+</body></html>
+╔═ orderFlow/ordered ═╗
+<html><body>
+  <p>Thanks for your business!</p>
+  <details>
+    <summary>Order information</summary>
+    <p>Tracking #ABC123</p>
+  </details>
+</body></html>
+```
+
+TODO.
+
+## selfie is like a filesystem
+
+Selfie's snapshot files `.ss` are incredibly simple to parse, and you can use `selfie-lib` to parse them for you if you want. You can treat them as an output deliverable of your code, and use them as an input to other tooling.
+
+TODO.
