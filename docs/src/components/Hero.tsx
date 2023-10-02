@@ -20,10 +20,7 @@ export function Hero() {
         className={clsx([
           "flex",
           "justify-between",
-          "px-2",
           "wide-phone:block",
-          "wide-phone:px-4",
-          "wide-phone:py-2",
           "wide-phone:text-right",
         ])}
       >
