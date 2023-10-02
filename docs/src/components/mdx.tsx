@@ -1,8 +1,7 @@
 import clsx from "clsx";
-export { CodeGroup, Code as code, Pre as pre } from "@/components/Code";
 
 type ParentComponentProps = {
-  children: React.ReactNode;
+  children?: React.ReactNode;
 };
 
 export function Row({ children }: ParentComponentProps) {
@@ -26,6 +25,24 @@ export function Col({ children, sticky = false }: ColProps) {
       )}
     >
       {children}
+    </div>
+  );
+}
+
+export function code({ children, ...props }: ParentComponentProps) {
+  return children ? (
+    <code {...props} dangerouslySetInnerHTML={{ __html: children }} />
+  ) : (
+    <code {...props} />
+  );
+}
+
+export function pre({ children, ...props }: ParentComponentProps) {
+  return (
+    <div className={clsx(["rounded-2xl", "bg-grey/60", "shadow"])}>
+      <pre className="overflow-scroll p-4" {...props}>
+        {children}
+      </pre>
     </div>
   );
 }
