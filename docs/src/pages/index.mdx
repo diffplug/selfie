@@ -7,7 +7,7 @@ import { Selfie } from "@/components/Selfie";
 
 Sure, you could write your assertions like this.
 
-```
+```java
 @Test
 public void login() {
   given().redirects().follow(false)
@@ -19,7 +19,7 @@ public void login() {
 
 But isn't this easier to read? And also more complete?
 
-```
+```java
 @Test
 public void login() {
   expectSelfie(
@@ -37,7 +37,7 @@ public void login() {
 
 The only reason we don't test that way already is that it's too tedious to write out that big string literal. Buf if you write this...
 
-```
+```java
 @Test
 public void login() {
   expectSelfie(
@@ -50,7 +50,7 @@ public void login() {
 
 It's like a printf directly into your code. And it's not just for strings, it's for any literal.
 
-```
+```java
 @Test
 public void preventCssBloat() {
   int size = expectSelfie(get("/index.css").length).toBe(5_236);
@@ -64,7 +64,7 @@ public void preventCssBloat() {
 
 Some snapshots are so big that it would be cumbersome to put them inline into your test code. So selfie helps you put them on disk.
 
-```
+```java
 @Test public void gzipFavicon() {
     expectSelfie(get("/favicon.ico", ContentEncoding.GZIP)).toMatchDisk();
 }
@@ -77,21 +77,24 @@ Some snapshots are so big that it would be cumbersome to put them inline into yo
 
 This will generate a snapshot file like so:
 
-```
+```html
 ╔═ gzipFavicon ═╗ base64 length 823 bytes
-H4sIAAAAAAAA/8pIzcnJVyjPL8pJUQQAlQYXAAAA
-╔═ orderFlow/initial ═╗
-<html><body>
-  <button>Submit order</button>
-</body></html>
+H4sIAAAAAAAA/8pIzcnJVyjPL8pJUQQAlQYXAAAA ╔═ orderFlow/initial ═╗
+<html>
+  <body>
+    <button>Submit order</button>
+  </body>
+</html>
 ╔═ orderFlow/ordered ═╗
-<html><body>
-  <p>Thanks for your business!</p>
-  <details>
-    <summary>Order information</summary>
-    <p>Tracking #ABC123</p>
-  </details>
-</body></html>
+<html>
+  <body>
+    <p>Thanks for your business!</p>
+    <details>
+      <summary>Order information</summary>
+      <p>Tracking #ABC123</p>
+    </details>
+  </body>
+</html>
 ```
 
 TODO.
