@@ -1,0 +1,96 @@
+# Advanced
+
+Diving deeper into Selfie's capabilities, this advanced usage guide will help you leverage the full potential of this robust Java snapshot testing library.
+
+## Configuring snapshot storage
+
+By default, snapshots are stored in a `__snapshots__` directory. However, if you wish to customize this location:
+
+```java
+Selfie.configure().setSnapshotDirectory("/custom/directory/path");
+```
+
+## Multiple snapshots in a single test
+
+While a common pattern is to have one snapshot per test, you might find yourself needing multiple snapshots in a single test. Name your snapshots for clarity:
+
+```java
+Selfie.capture(output1, "snapshotName1");
+Selfie.capture(output2, "snapshotName2");
+```
+
+## Handling dynamic data
+
+Sometimes, the output may contain dynamic elements, like timestamps or random IDs. You can use matchers to ignore or adapt to these dynamic parts:
+
+```java
+Selfie.captureWithMatchers(output, new DynamicDataMatcher("timestamp", "[0-9]{4}-[0-9]{2}-[0-9]{2}"));
+```
+
+In this example, the `DynamicDataMatcher` replaces a timestamp with a regular expression ensuring a consistent snapshot.
+
+## Comparing different data types
+
+Selfie isn't limited to just string comparisons. You can compare other data types too:
+
+```java
+List<String> outputList = someFunctionThatReturnsAList();
+Selfie.capture(outputList);
+
+Map<String, Object> outputMap = anotherFunctionThatReturnsAMap();
+Selfie.capture(outputMap);
+```
+
+## Interactive snapshot review
+
+In case of a snapshot mismatch, you might want to review the changes interactively:
+
+```java
+Selfie.configure().enableInteractiveMode();
+```
+
+This will prompt you during test execution, showing you the differences and letting you decide whether to update the snapshot or fail the test.
+
+## Snapshot serializers
+
+For complex objects, you might need to define how the object should be transformed into its snapshot representation:
+
+```java
+Selfie.configure().addSerializer(new CustomObjectSerializer());
+```
+
+Your `CustomObjectSerializer` should implement Selfie's `Serializer` interface, ensuring consistent string representation for your custom objects.
+
+## Setting snapshot lifetime
+
+If you want your snapshots to have a limited lifetime (for instance, if certain snapshots should be revisited after a month):
+
+```java
+Selfie.configure().setSnapshotLifetime(Duration.ofDays(30));
+```
+
+Once the lifetime exceeds, the snapshot will be treated as stale, prompting you to either update or validate its continued correctness.
+
+## Ignoring specific fields
+
+For certain objects, you might want to ignore specific fields from snapshot comparisons:
+
+```java
+Selfie.capture(outputObject, new IgnoreFieldsMatcher("field1", "field2"));
+```
+
+The `IgnoreFieldsMatcher` ensures that the specified fields are not taken into account during snapshot comparisons.
+
+## Custom diff viewers
+
+To get a visual diff when snapshots don't match, integrate a custom diff viewer:
+
+```java
+Selfie.configure().setDiffViewer(new CustomDiffViewer());
+```
+
+Your `CustomDiffViewer` should implement Selfie's `DiffViewer` interface.
+
+---
+
+With these advanced features, Selfie provides you with an expansive toolkit to make snapshot testing precise, convenient, and adaptable to various scenarios. Dive in and enhance your testing experience!
