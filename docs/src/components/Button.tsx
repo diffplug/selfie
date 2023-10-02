@@ -17,8 +17,10 @@ export function Button({
       className={clsx([
         "flex",
         isWide ? "w-[154px]" : "w-[44px]",
+        isWide ? "h-[35px]" : "h-[23px]",
         "justify-center",
-        "rounded-md",
+        "items-center",
+        isWide ? "rounded-[10px]" : "rounded-[4px]",
         "border",
         "border-2",
         "border-black",
@@ -30,14 +32,16 @@ export function Button({
         isDepressed ? "shadow-none" : "shadow-button",
         isWide ? "text-[22px]" : "text-[14px]",
         isWide ? "tablet:w-[154px]" : "tablet:w-[73px]",
+        "tablet:h-[35px]",
         "tablet:text-[22px]",
         "tablet:border-[3px]",
-        "tablet:rounded-lg",
+        "tablet:rounded-[10px]",
         isDepressed ? "shadow-none" : "tablet:shadow-button-tablet",
         isWide ? "desktop:w-[232px]" : "desktop:w-[110px]",
+        "desktop:h-[53px]",
         "desktop:text-[34px]",
         "desktop:border-[4px]",
-        "desktop:rounded-xl",
+        "desktop:rounded-[16px]",
       ])}
     >
       {text}
