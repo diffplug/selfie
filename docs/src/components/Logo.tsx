@@ -21,7 +21,7 @@ export function Logo() {
         "desktop:drop-shadow-logo-desktop",
       ])}
     >
-      Selfie
+      selfie
     </h1>
   );
 }

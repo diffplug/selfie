@@ -14,10 +14,10 @@ module.exports = {
         "button-tablet": "4px 4px 2px #4D4D4D",
       },
       dropShadow: {
-        logo: "3px 3px 2px #000",
-        "logo-wide-phone": "3px 3px 2px #000",
-        "logo-tablet": "5px 5px 2px #000",
-        "logo-desktop": "5px 5px 2px #000",
+        logo: "3px 3px 2px #4D4D4D",
+        "logo-wide-phone": "3px 3px 2px #4D4D4D",
+        "logo-tablet": "5px 5px 2px #4D4D4D",
+        "logo-desktop": "5px 5px 2px #4D4D4D",
       },
       animation: {
         "slide-and-fade":
