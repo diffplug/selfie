@@ -27,6 +27,7 @@ export function Button({
         "hover:text-white",
         "hover:bg-blue",
         "cursor-pointer",
+        isDepressed && "mt-[1px]",
         isDepressed ? "text-white" : "text-black",
         isDepressed ? "bg-blue" : "bg-white",
         isDepressed ? "shadow-none" : "shadow-button",
@@ -36,12 +37,14 @@ export function Button({
         "tablet:text-[22px]",
         "tablet:border-[3px]",
         "tablet:rounded-[10px]",
+        isDepressed && "tablet:mt-[2px]",
         isDepressed ? "shadow-none" : "tablet:shadow-button-tablet",
         isWide ? "desktop:w-[232px]" : "desktop:w-[110px]",
         "desktop:h-[53px]",
         "desktop:text-[34px]",
         "desktop:border-[4px]",
         "desktop:rounded-[16px]",
+        isDepressed && "tablet:mt-[3px]",
       ])}
     >
       {text}
