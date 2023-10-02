@@ -39,7 +39,7 @@ export function code({ children, ...props }: ParentComponentProps) {
 
 export function pre({ children, ...props }: ParentComponentProps) {
   return (
-    <div className={clsx(["rounded-2xl", "bg-grey/60", "shadow"])}>
+    <div className={clsx(["rounded-2xl", "bg-grey/60", "shadow", "text-base"])}>
       <pre className="overflow-scroll p-4" {...props}>
         {children}
       </pre>
