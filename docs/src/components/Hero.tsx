@@ -30,10 +30,13 @@ export function Hero() {
             "flex",
             "flex-col",
             "justify-between",
-            "pt-1",
+            "pt-3",
             "wide-phone:p-0",
             "wide-phone:justify-center",
             "wide-phone:items-end",
+            "wide-phone:h-[70px]",
+            "tablet:h-[140px]",
+            "tablet:gap-[15px]",
           ])}
         >
           <p
