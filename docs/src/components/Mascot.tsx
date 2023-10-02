@@ -5,7 +5,7 @@ export function Mascot() {
   const literalOffsetTop = useRef(0);
 
   useEffect(() => {
-    const literalSection = document.getElementById("selfie-is-literal")!;
+    const literalSection = document.getElementById("is-literal")!;
     literalOffsetTop.current = literalSection.offsetTop;
 
     function setScrollPosition() {
