@@ -75,8 +75,8 @@ module.exports = {
       ],
     },
     screens: {
-      "wide-phone": "600px",
-      tablet: "800px",
+      "wide-phone": "605px",
+      tablet: "725px",
       desktop: "1159px",
       xl: "1300px",
     },
