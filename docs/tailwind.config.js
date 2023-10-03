@@ -44,9 +44,39 @@ module.exports = {
       sans: "'Jost', sans-serif",
       logo: "'Bagel Fat One', cursive",
     },
+    fontSize: {
+      base: [
+        "22px",
+        {
+          lineHeight: "1.2em",
+          fontWeight: 400,
+        },
+      ],
+      lg: [
+        "30px",
+        {
+          lineHeight: "1.25em",
+          fontWeight: 400,
+        },
+      ],
+      xl: [
+        "34px",
+        {
+          lineHeight: "1.2em",
+          fontWeight: 400,
+        },
+      ],
+      "2xl": [
+        "45px",
+        {
+          lineHeight: "1.25em",
+          fontWeight: 400,
+        },
+      ],
+    },
     screens: {
-      "wide-phone": "600px",
-      tablet: "800px",
+      "wide-phone": "605px",
+      tablet: "725px",
       desktop: "1159px",
       xl: "1300px",
     },
