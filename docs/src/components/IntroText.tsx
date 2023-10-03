@@ -1,5 +1,6 @@
 import clsx from "clsx";
 import { Button } from "./Button";
+import Link from "next/link";
 
 export function IntroText() {
   return (
@@ -28,11 +29,21 @@ export function IntroText() {
         ])}
       >
         Which is <br className="tablet:hidden" />{" "}
-        <Link href="#literal">literal</Link>,{" "}
-        <Link href="#lensable">lensable</Link>
-        <br /> and <Link href="#like-a-filesytem">like a filesystem</Link>
+        <Link href="#literal" className="cursor-pointer underline">
+          literal
+        </Link>
+        ,{" "}
+        <Link href="#lensable" className="cursor-pointer underline">
+          lensable
+        </Link>
+        <br /> and{" "}
+        <Link href="#like-a-filesytem" className="cursor-pointer underline">
+          like a filesystem
+        </Link>
       </p>
-      <Button href="/jvm/get-started" text="get started" isWide={true} />
+      <Link href="/jvm/get-started">
+        <Button isWide={true}>get started</Button>
+      </Link>
       <div
         className={clsx([
           "text-[18px]",
@@ -69,17 +80,5 @@ export function IntroText() {
         </p>
       </div>
     </div>
-  );
-}
-
-type LinkProps = {
-  href: string;
-  children: React.ReactNode;
-};
-function Link({ href, children }: LinkProps) {
-  return (
-    <a href={href} className="cursor-pointer underline">
-      {children}
-    </a>
   );
 }

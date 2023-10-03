@@ -1,22 +1,19 @@
 import clsx from "clsx";
-import Link from "next/link";
+import { ReactNode } from "react";
 
 type ButtonProps = {
-  href: string;
-  text: string;
+  children: ReactNode;
   isDepressed?: boolean;
   isWide?: boolean;
 };
 
 export function Button({
-  href,
-  text,
+  children,
   isDepressed = false,
   isWide = false,
 }: ButtonProps) {
   return (
-    <Link
-      href={href}
+    <span
       className={clsx([
         "flex",
         isWide ? "w-[154px]" : "w-[44px]",
@@ -50,7 +47,7 @@ export function Button({
         isDepressed && "tablet:mt-[3px]",
       ])}
     >
-      {text}
-    </Link>
+      {children}
+    </span>
   );
 }
