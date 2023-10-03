@@ -42,7 +42,22 @@ export function IntroText() {
         </Link>
       </p>
       <Link href="/jvm/get-started">
-        <Button isWide={true}>get started</Button>
+        <Button
+          className={clsx([
+            "w-[154px]",
+            "h-[35px]",
+            "rounded-[10px]",
+            "text-[22px]",
+            "tablet:w-[154px]",
+            "desktop:w-[232px]",
+            "text-black",
+            "bg-white",
+            "shadow-button",
+            "tablet:shadow-button-tablet",
+          ])}
+        >
+          get started
+        </Button>
       </Link>
       <div
         className={clsx([

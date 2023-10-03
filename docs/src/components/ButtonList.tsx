@@ -21,21 +21,73 @@ export function ButtonList() {
       ])}
     >
       <Link href="/jvm">
-        <Button isDepressed={["jvm", ""].includes(selectedLanguage)}>
+        <Button
+          className={
+            ["jvm", ""].includes(selectedLanguage)
+              ? pressedClasses
+              : unPressedClasses
+          }
+        >
           jvm
         </Button>
       </Link>
       <Link href="/js">
-        <Button isDepressed={selectedLanguage === "js"}>js</Button>
+        <Button
+          className={
+            selectedLanguage === "js" ? pressedClasses : unPressedClasses
+          }
+        >
+          js
+        </Button>
       </Link>
       <Link href="/other-platforms">
-        <Button isDepressed={selectedLanguage === "go"}>go</Button>
+        <Button
+          className={
+            selectedLanguage === "go" ? pressedClasses : unPressedClasses
+          }
+        >
+          go
+        </Button>
       </Link>
       <Link href="/other-platforms">
-        <Button isDepressed={selectedLanguage === "other-platforms"}>
+        <Button
+          className={
+            selectedLanguage === "other-platforms"
+              ? pressedClasses
+              : unPressedClasses
+          }
+        >
           ...
         </Button>
       </Link>
     </div>
   );
 }
+
+const sharedClasses = clsx([
+  "w-[44px]",
+  "h-[23px]",
+  "rounded-[4px]",
+  "text-[14px]",
+  "tablet:w-[73px]",
+  "desktop:w-[110px]",
+]);
+
+const pressedClasses = clsx([
+  "mt-[1px]",
+  "text-white",
+  "bg-blue",
+  "shadow-none",
+  "tablet:mt-[2px]",
+  "shadow-none",
+  "tablet:mt-[3px]",
+  sharedClasses,
+]);
+
+const unPressedClasses = clsx([
+  "text-black",
+  "bg-white",
+  "shadow-button",
+  "tablet:shadow-button-tablet",
+  sharedClasses,
+]);
