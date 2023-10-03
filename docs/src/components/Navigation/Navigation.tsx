@@ -37,7 +37,7 @@ export function Navigation() {
           handleChange={handleChange}
         />
       </div>
-      <nav className={clsx(["flex", "items-end"])}>
+      <nav className={clsx(["flex", "items-end", "justify-end"])}>
         <ul role="list">
           <li className={clsx(["flex", "gap-[10px]"])}>
             <Link href={`/${pathParts.language}`}>
@@ -81,8 +81,10 @@ export function Navigation() {
 const sharedClasses = clsx([
   "h-[23px]",
   "rounded-[4px]",
-  "text-[14px]",
+  "text-[18px]",
   "px-2",
+  "hover:text-white",
+  "hover:bg-blue",
 ]);
 
 const pressedClasses = clsx([
