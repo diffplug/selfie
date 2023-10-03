@@ -2,11 +2,11 @@ import clsx from "clsx";
 import Link from "next/link";
 import { Button } from "./Button";
 import { useRouter } from "next/dist/client/router";
-import { languageFromPath } from "@/lib/languageFromPath";
+import { getPathParts } from "@/lib/languageFromPath";
 
 export function ButtonList() {
   const router = useRouter();
-  const selectedLanguage = languageFromPath(router.pathname);
+  const selectedLanguage = getPathParts(router.pathname).language;
   return (
     <div
       className={clsx([
@@ -71,14 +71,14 @@ const sharedClasses = clsx([
   "text-[14px]",
   "tablet:w-[73px]",
   "desktop:w-[110px]",
+  "hover:text-white",
+  "hover:bg-blue",
 ]);
 
 const pressedClasses = clsx([
   "mt-[1px]",
   "text-white",
   "bg-blue",
-  "shadow-none",
-  "tablet:mt-[2px]",
   "shadow-none",
   "tablet:mt-[3px]",
   sharedClasses,

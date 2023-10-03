@@ -16,8 +16,6 @@ export function Button({ children, className }: ButtonProps) {
         "border",
         "border-2",
         "border-black",
-        "hover:text-white",
-        "hover:bg-blue",
         "cursor-pointer",
         "tablet:h-[35px]",
         "tablet:text-[22px]",

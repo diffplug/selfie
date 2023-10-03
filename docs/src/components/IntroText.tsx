@@ -54,6 +54,8 @@ export function IntroText() {
             "bg-white",
             "shadow-button",
             "tablet:shadow-button-tablet",
+            "hover:text-white",
+            "hover:bg-blue",
           ])}
         >
           get started
