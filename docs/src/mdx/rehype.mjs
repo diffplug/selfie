@@ -20,11 +20,11 @@ function rehypeParseCodeBlocks() {
 }
 
 let highlighter
-
+const theme = await shiki.loadTheme("themes/github-light.json");
 function rehypeShiki() {
   return async (tree) => {
     highlighter =
-      highlighter ?? (await shiki.getHighlighter({ theme: 'css-variables' }))
+      highlighter ?? (await shiki.getHighlighter({ theme }))
 
     visit(tree, 'element', (node) => {
       if (node.tagName === 'pre' && node.children[0]?.tagName === 'code') {
