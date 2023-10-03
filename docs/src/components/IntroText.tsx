@@ -32,7 +32,7 @@ export function IntroText() {
         <Link href="#lensable">lensable</Link>
         <br /> and <Link href="#like-a-filesytem">like a filesystem</Link>
       </p>
-      <Button text="get started" isWide={true} />
+      <Button href="/jvm/get-started" text="get started" isWide={true} />
       <div
         className={clsx([
           "text-[18px]",

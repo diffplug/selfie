@@ -15,10 +15,10 @@ export function ButtonList() {
         "desktop:w-[490px]",
       ])}
     >
-      <Button text="jvm" isDepressed={true} />
-      <Button text="js" />
-      <Button text="go" />
-      <Button text="..." />
+      <Button href="/jvm" text="jvm" isDepressed={true} />
+      <Button href="/js" text="js" />
+      <Button href="/other-platforms" text="go" />
+      <Button href="/other-platforms" text="..." />
     </div>
   );
 }
