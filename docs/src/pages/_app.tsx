@@ -27,7 +27,7 @@ export default function App({ Component, pageProps }: AppProps) {
         >
           {pageProps.showHero ? <Hero /> : <Navigation {...pageProps} />}
         </div>
-        <div className={clsx(["px-2", "wide-phone:px-4, space-y-[10px]"])}>
+        <div className={clsx(["px-2", "wide-phone:px-4"])}>
           <Component {...pageProps} />
         </div>
       </MDXProvider>

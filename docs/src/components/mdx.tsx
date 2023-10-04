@@ -30,21 +30,38 @@ export function Col({ children, sticky = false }: ColProps) {
 }
 
 export function code({ children, ...props }: ParentComponentProps) {
+  // const className = clsx([
+  //   "bg-grey",
+  //   "px-[14px]",
+  //   "pt-[6px]",
+  //   "pb-[2px]",
+  //   "rounded-xl",
+  //   "text-sm",
+  //   "desktop:text-base",
+  //   "leading-[1.5em]",
+  // ]);
+  const className = "";
   return children ? (
-    <code {...props} dangerouslySetInnerHTML={{ __html: children }} />
+    <code
+      {...props}
+      className={className}
+      dangerouslySetInnerHTML={{ __html: children }}
+    />
   ) : (
-    <code {...props} />
+    <code {...props} className={className} />
   );
 }
 
 export function pre({ children, ...props }: ParentComponentProps) {
+  console.log({ children });
   return (
     <div
       className={clsx([
         "rounded-2xl",
         "bg-grey/60",
         "shadow",
-        "text-base",
+        "text-sm",
+        "desktop:text-base",
         "overflow-hidden",
         "leading-[1.5em]",
       ])}
@@ -53,5 +70,22 @@ export function pre({ children, ...props }: ParentComponentProps) {
         {children}
       </pre>
     </div>
+  );
+}
+
+export function p({ children, ...props }: ParentComponentProps) {
+  return (
+    <p {...props} className="py-[13px] desktop:py-[20px]">
+      {children}
+    </p>
+  );
+}
+
+export function h2({ children, ...props }: ParentComponentProps) {
+  return (
+    <>
+      <br />
+      <h2 {...props}>{children}</h2>
+    </>
   );
 }

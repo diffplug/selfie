@@ -31,7 +31,7 @@ Again, replace `LATEST_VERSION` with the latest available version of Selfie.
 
 ## Basic usage
 
-1. **Capture a Snapshot:**
+1. Capture a Snapshot:
 
    Before you can use the snapshot testing, you need to capture an initial snapshot. This will be used as a reference for future tests.
 
@@ -47,7 +47,7 @@ Again, replace `LATEST_VERSION` with the latest available version of Selfie.
    }
    ```
 
-2. **Compare with Snapshot:**
+2. Compare with Snapshot:
 
    Once you've captured the initial snapshot, subsequent test runs will automatically compare the current output with the saved snapshot.
 
@@ -65,7 +65,7 @@ Again, replace `LATEST_VERSION` with the latest available version of Selfie.
 
    If the output differs from the saved snapshot, `assertEqualsWithSnapshot` will fail, pointing out the differences.
 
-3. **Update a Snapshot:**
+3. Update a Snapshot:
 
    If you made intentional changes to the application output and want to update the snapshot, you can do so with:
 
@@ -75,8 +75,9 @@ Again, replace `LATEST_VERSION` with the latest available version of Selfie.
 
 ## Tips and tricks
 
-- **Folder Structure**: By default, Selfie saves snapshots in a directory named `__snapshots__` alongside your test files. Ensure you check this into your version control to keep reference snapshots consistent across different environments.
-- **Named Snapshots**: You can name your snapshots to make it easier to identify them, especially if you have multiple snapshots in one test class.
+Folder Structure: By default, Selfie saves snapshots in a directory named `__snapshots__` alongside your test files. Ensure you check this into your version control to keep reference snapshots consistent across different environments.
+
+Named Snapshots: You can name your snapshots to make it easier to identify them, especially if you have multiple snapshots in one test class.
 
 ## Contribute
 

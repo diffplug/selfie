@@ -46,6 +46,13 @@ module.exports = {
       logo: "'Bagel Fat One', cursive",
     },
     fontSize: {
+      sm: [
+        "16px",
+        {
+          lineHeight: "1.2em",
+          fontWeight: 400,
+        },
+      ],
       base: [
         "22px",
         {
@@ -70,7 +77,7 @@ module.exports = {
       "2xl": [
         "45px",
         {
-          lineHeight: "1.25em",
+          lineHeight: "1em",
           fontWeight: 400,
         },
       ],
