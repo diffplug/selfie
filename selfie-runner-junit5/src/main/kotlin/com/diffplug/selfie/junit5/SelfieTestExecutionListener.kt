@@ -15,7 +15,12 @@
  */
 package com.diffplug.selfie.junit5
 
-import com.diffplug.selfie.*
+import com.diffplug.selfie.ArrayMap
+import com.diffplug.selfie.LiteralValue
+import com.diffplug.selfie.RW
+import com.diffplug.selfie.Snapshot
+import com.diffplug.selfie.SnapshotFile
+import com.diffplug.selfie.SnapshotValueReader
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
@@ -30,6 +35,12 @@ import org.junit.platform.launcher.TestPlan
 internal object Router {
   private class ClassMethod(val clazz: ClassProgress, val method: String)
   private val threadCtx = ThreadLocal<ClassMethod?>()
+  fun writeInline(call: CallStack, literalValue: LiteralValue<*>) {
+    val classMethod =
+        threadCtx.get()
+            ?: throw AssertionError("Selfie `toBe` must be called only on the original thread.")
+    classMethod.clazz.writeInline(call, literalValue)
+  }
   fun readOrWriteOrKeep(snapshot: Snapshot?, subOrKeepAll: String?): Snapshot? {
     val classMethod =
         threadCtx.get()
@@ -94,6 +105,7 @@ internal class ClassProgress(val className: String) {
   private var file: SnapshotFile? = null
   private var methods = ArrayMap.empty<String, MethodSnapshotGC>()
   private var diskWriteTracker: DiskWriteTracker? = DiskWriteTracker()
+  private var inlineWriteTracker: InlineWriteTracker? = InlineWriteTracker()
   // the methods below called by the TestExecutionListener on its runtime thread
   @Synchronized fun startMethod(method: String) {
     assertNotTerminated()
@@ -108,6 +120,7 @@ internal class ClassProgress(val className: String) {
   }
   @Synchronized fun finishedClassWithSuccess(success: Boolean) {
     assertNotTerminated()
+    inlineWriteTracker!!.persistWrites()
     if (file != null) {
       val staleSnapshotIndices =
           MethodSnapshotGC.findStaleSnapshotsWithin(className, file!!.snapshots, methods)
@@ -134,6 +147,7 @@ internal class ClassProgress(val className: String) {
     // now that we are done, allow our contents to be GC'ed
     methods = TERMINATED
     diskWriteTracker = null
+    inlineWriteTracker = null
     file = null
   }
   // the methods below are called from the test thread for I/O on snapshots
@@ -144,6 +158,9 @@ internal class ClassProgress(val className: String) {
     } else {
       methods[method]!!.keepSuffix(suffixOrAll)
     }
+  }
+  @Synchronized fun writeInline(call: CallStack, literalValue: LiteralValue<*>) {
+    inlineWriteTracker!!.record(call, literalValue)
   }
   @Synchronized fun write(method: String, suffix: String, snapshot: Snapshot) {
     assertNotTerminated()
