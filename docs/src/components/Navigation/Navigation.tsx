@@ -30,7 +30,9 @@ export function Navigation() {
     >
       <div className={clsx(["flex", "items-end", "gap-[10px]"])}>
         <Link href={"/"}>
-          <Selfie />
+          <Selfie
+            className={clsx(["desktop:text-[93px]", "relative", "top-[7px]"])}
+          />
         </Link>
         <LanguageSelect
           selectedLanguage={pathParts.language}
