@@ -82,11 +82,12 @@ internal object Router {
     }
     threadCtx.set(null)
   }
-  fun fileLocationFor(className: String): Path {
+  fun fileLocationFor(className: String): Path = layout(className).snapshotPathForClass(className)
+  fun layout(className: String): SnapshotFileLayout {
     if (layout == null) {
       layout = SnapshotFileLayout.initialize(className)
     }
-    return layout!!.snapshotPathForClass(className)
+    return layout!!
   }
 
   var layout: SnapshotFileLayout? = null
@@ -120,7 +121,9 @@ internal class ClassProgress(val className: String) {
   }
   @Synchronized fun finishedClassWithSuccess(success: Boolean) {
     assertNotTerminated()
-    inlineWriteTracker!!.persistWrites()
+    if (inlineWriteTracker!!.hasWrites()) {
+      inlineWriteTracker!!.persistWrites(Router.layout(className))
+    }
     if (file != null) {
       val staleSnapshotIndices =
           MethodSnapshotGC.findStaleSnapshotsWithin(className, file!!.snapshots, methods)

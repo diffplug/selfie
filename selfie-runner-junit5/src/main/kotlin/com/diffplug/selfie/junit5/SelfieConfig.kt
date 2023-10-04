@@ -57,6 +57,14 @@ internal class SnapshotFileLayout(
         }
     return classnameWithSlashes.replace('/', '.')
   }
+  fun testSourceFile(location: CallLocation): Path {
+    // we should have a way to have multiple source roots to check against
+    val path = rootFolder.resolve(location.subpath)
+    if (!Files.exists(path)) {
+      throw AssertionError("Unable to find ${location.subpath} at ${path.toAbsolutePath()}")
+    }
+    return path
+  }
 
   companion object {
     private const val DEFAULT_SNAPSHOT_DIR = "__snapshots__"

@@ -18,6 +18,8 @@ package com.diffplug.selfie.junit5
 import com.diffplug.selfie.LiteralValue
 import com.diffplug.selfie.RW
 import com.diffplug.selfie.Snapshot
+import java.nio.file.Files
+import java.nio.file.Path
 import java.util.stream.Collectors
 
 /** Represents the line at which user code called into Selfie. */
@@ -76,19 +78,37 @@ internal class InlineWriteTracker : WriteTracker<CallLocation, LiteralValue<*>>(
   fun record(call: CallStack, literalValue: LiteralValue<*>) {
     recordInternal(call.location, literalValue, call)
   }
-  fun persistWrites() {
+  fun hasWrites(): Boolean = writes.isNotEmpty()
+  fun persistWrites(layout: SnapshotFileLayout) {
     val locations = writes.toList().sortedBy { it.first }
+    var subpath = ""
     var deltaLineNumbers = 0
+    var source = ""
+    var path: Path? = null
+    // If I was implementing this, I would use Slice https://github.com/diffplug/selfie/pull/22
+    // as the type of source, but that is by no means a requirement
     for (location in locations) {
-      val currentlyInFile = "TODO"
+      if (location.first.subpath != subpath) {
+        path?.let { Files.writeString(it, source) }
+        subpath = location.first.subpath
+        deltaLineNumbers = 0
+        path = layout.testSourceFile(location.first)
+        source = Files.readString(path)
+      }
+      // parse the location within the file
+      val currentlyInFile = "TODO parse using ${location.first.line + deltaLineNumbers}"
       val literalValue = location.second.snapshot
       val parsedInFile = literalValue.format.parse(currentlyInFile)
       if (parsedInFile != literalValue.expected) {
-        // warn that the parsing wasn't quite as expected
+        // warn that the parsing wasn't as expected
+        // TODO: we can't report failures to the user very well
+        //   someday, we should verify that the parse works in the `record()` and
+        //   throw an `AssertionFail` there so that the user sees it early
       }
       val toInjectIntoFile = literalValue.encodedActual()
       deltaLineNumbers += (toInjectIntoFile.countNewlines() - currentlyInFile.countNewlines())
       // TODO: inject the encoded thing into the file
     }
+    path?.let { Files.writeString(it, source) }
   }
 }
