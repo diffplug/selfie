@@ -46,6 +46,7 @@ export function pre({ children, ...props }: ParentComponentProps) {
         "shadow",
         "text-base",
         "overflow-hidden",
+        "leading-[1.5em]",
       ])}
     >
       <pre className="overflow-scroll p-4" {...props}>
