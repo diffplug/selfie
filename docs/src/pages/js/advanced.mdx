@@ -1,4 +1,8 @@
-# Advanced Usage of Selfie: Dive Deeper into Snapshot Testing
+import { Advanced } from "@/components/Advanced";
+
+<Advanced />
+
+## Advanced Usage of Selfie: Dive Deeper into Snapshot Testing
 
 Once you're familiar with the basics of Selfie, the snapshot testing library for JavaScript, you can explore its advanced features to enhance and fine-tune your testing processes. This guide will walk you through the more sophisticated functionalities Selfie offers.
 
@@ -32,11 +36,11 @@ registerSerializer(myCustomSerializer);
 By default, Selfie uses a simple string comparison to differentiate snapshots. However, there might be cases where you want a more flexible or granular comparison:
 
 ```javascript
-import { setDiffOptions } from 'selfie-testing';
+import { setDiffOptions } from "selfie-testing";
 
 setDiffOptions({
   ignoreWhitespace: true, // Ignores whitespace changes
-  ignoreOrder: false,     // Treats changes in order as significant
+  ignoreOrder: false, // Treats changes in order as significant
   // ... other options
 });
 ```
@@ -46,11 +50,11 @@ setDiffOptions({
 To improve the maintainability of your snapshot files, especially in larger projects, Selfie allows custom naming and organization strategies:
 
 ```javascript
-import { configure } from 'selfie-testing';
+import { configure } from "selfie-testing";
 
 configure({
   snapshotFileName: (componentName) => `${componentName}.snap.js`,
-  snapshotDirectory: './my-custom-snapshots-directory',
+  snapshotDirectory: "./my-custom-snapshots-directory",
 });
 ```
 
@@ -59,7 +63,7 @@ configure({
 When updating multiple components at once, it can be tedious to review and update each snapshot manually. Selfie's interactive mode lets you review and accept or reject changes one by one:
 
 ```javascript
-import { interactiveUpdate } from 'selfie-testing';
+import { interactiveUpdate } from "selfie-testing";
 
 // Run this after your tests
 interactiveUpdate();
@@ -70,8 +74,8 @@ interactiveUpdate();
 Components often rely on props or context for rendering. With Selfie, you can easily pass these when creating snapshots:
 
 ```javascript
-const props = { title: 'Test Title' };
-const context = { theme: 'dark' };
+const props = { title: "Test Title" };
+const context = { theme: "dark" };
 
 const snapshot = createSnapshot(<YourComponent {...props} />, context);
 ```

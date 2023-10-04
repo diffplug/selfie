@@ -1,4 +1,8 @@
-# Getting Started with Selfie: The Snapshot Testing Library
+import { GetStarted } from "@/components/GetStarted";
+
+<GetStarted />
+
+## Getting Started with Selfie: The Snapshot Testing Library
 
 Welcome to Selfie, an open-source snapshot testing library for JavaScript that simplifies and streamlines your testing processes. This guide will take you through the initial steps of setting up Selfie in your JavaScript project.
 
@@ -21,7 +25,7 @@ npm install selfie-testing --save-dev
    First, you'll need to import Selfie into your testing file.
 
    ```javascript
-   import { createSnapshot, compareWithSnapshot } from 'selfie-testing';
+   import { createSnapshot, compareWithSnapshot } from "selfie-testing";
    ```
 
 2. **Capture the Initial Snapshot**
@@ -37,7 +41,7 @@ npm install selfie-testing --save-dev
    In your tests, use the `compareWithSnapshot` function to ensure your component's current output matches the stored snapshot.
 
    ```javascript
-   test('YourComponent should match the snapshot', () => {
+   test("YourComponent should match the snapshot", () => {
      const currentOutput = <YourComponent />;
      expect(compareWithSnapshot(currentOutput, initialSnapshot)).toBe(true);
    });
@@ -58,7 +62,6 @@ npm install selfie-testing --save-dev
 ## Tips and Best Practices
 
 - **Commit Snapshots**: Always commit your snapshot files to your version control system. This ensures that all team members are working with the same snapshots.
-  
 - **Review Snapshot Differences**: When a snapshot test fails, review the changes carefully. Make sure that any differences between the snapshots are intentional.
 
 - **Regularly Update Snapshots**: As your codebase evolves, your components will change. Make it a habit to regularly update snapshots to reflect these changes.
