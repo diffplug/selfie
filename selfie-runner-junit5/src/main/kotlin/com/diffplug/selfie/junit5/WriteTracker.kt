@@ -15,6 +15,7 @@
  */
 package com.diffplug.selfie.junit5
 
+import com.diffplug.selfie.LiteralValue
 import com.diffplug.selfie.RW
 import com.diffplug.selfie.Snapshot
 import java.util.stream.Collectors
@@ -69,13 +70,25 @@ internal class DiskWriteTracker : WriteTracker<String, Snapshot>() {
     recordInternal(key, snapshot, call)
   }
 }
+private fun String.countNewlines(): Int = TODO()
 
-class LiteralValue {
-  // TODO: String, Int, Long, Boolean, etc
-}
-
-internal class InlineWriteTracker : WriteTracker<CallLocation, LiteralValue>() {
-  fun record(call: CallStack, snapshot: LiteralValue) {
-    recordInternal(call.location, snapshot, call)
+internal class InlineWriteTracker : WriteTracker<CallLocation, LiteralValue<*>>() {
+  fun record(call: CallStack, literalValue: LiteralValue<*>) {
+    recordInternal(call.location, literalValue, call)
+  }
+  fun persistWrites() {
+    val locations = writes.toList().sortedBy { it.first }
+    var deltaLineNumbers = 0
+    for (location in locations) {
+      val currentlyInFile = "TODO"
+      val literalValue = location.second.snapshot
+      val parsedInFile = literalValue.format.parse(currentlyInFile)
+      if (parsedInFile != literalValue.expected) {
+        // warn that the parsing wasn't quite as expected
+      }
+      val toInjectIntoFile = literalValue.encodedActual()
+      deltaLineNumbers += (toInjectIntoFile.countNewlines() - currentlyInFile.countNewlines())
+      // TODO: inject the encoded thing into the file
+    }
   }
 }
