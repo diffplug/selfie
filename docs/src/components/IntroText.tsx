@@ -30,25 +30,25 @@ export function IntroText() {
       >
         Which is <br className="tablet:hidden" />{" "}
         <Link
-          href="#is-literal"
+          href="#literal"
           scroll={false}
-          className="cursor-pointer underline"
+          className="cursor-pointer underline hover:text-blue"
         >
           literal
         </Link>
         ,{" "}
         <Link
-          href="#is-lensable"
+          href="#lensable"
           scroll={false}
-          className="cursor-pointer underline"
+          className="cursor-pointer underline hover:text-blue"
         >
           lensable
         </Link>
         <br /> and{" "}
         <Link
-          href="#is-like-a-filesystem"
+          href="#like-a-filesystem"
           scroll={false}
-          className="cursor-pointer underline"
+          className="cursor-pointer underline hover:text-blue"
         >
           like a filesystem
         </Link>

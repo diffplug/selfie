@@ -3,7 +3,7 @@ import clsx from "clsx";
 import { useRouter } from "next/dist/client/router";
 import Link from "next/link";
 import { Button } from "../Button";
-import { Logo } from "../Logo";
+import { Selfie } from "../Selfie";
 import { LanguageSelect } from "./LanguageSelect";
 
 export function Navigation() {
@@ -30,7 +30,7 @@ export function Navigation() {
     >
       <div className={clsx(["flex", "items-end", "gap-[10px]"])}>
         <Link href={"/"}>
-          <Logo />
+          <Selfie />
         </Link>
         <LanguageSelect
           selectedLanguage={pathParts.language}
@@ -40,7 +40,7 @@ export function Navigation() {
       <nav className={clsx(["flex", "items-end", "justify-end"])}>
         <ul role="list">
           <li className={clsx(["flex", "gap-[10px]"])}>
-            <Link href={`/${pathParts.language}`}>
+            <Link href={`/${pathParts.language}#literal`}>
               <Button
                 className={
                   pathParts.subpath === "" ? pressedClasses : unPressedClasses

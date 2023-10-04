@@ -5,7 +5,7 @@ export function Mascot() {
   const literalOffsetTop = useRef(0);
 
   useEffect(() => {
-    const literalSection = document.getElementById("is-literal")!;
+    const literalSection = document.getElementById("literal")!;
     literalOffsetTop.current = literalSection.offsetTop;
 
     function setScrollPosition() {
@@ -51,7 +51,6 @@ export function Mascot() {
         "left-[-200px]",
         "object-cover",
         "object-left",
-        "block",
         "animate-slide-and-fade",
         "block",
         "z-[-1]",
