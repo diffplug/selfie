@@ -12,10 +12,8 @@ export type PathParts = {
   subpath: "" | "get-started" | "advanced";
 };
 
-// TODO handle 404s
 export function getPathParts(path: string): PathParts {
   const splitPath = path.split("/");
-  console.log(splitPath);
   return {
     language: splitPath[1],
     subpath: splitPath.length === 3 ? splitPath[2] : "",

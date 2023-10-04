@@ -50,7 +50,7 @@ export function LanguageSelect({
           {Object.keys(languageSlugsToLabels)
             .filter((slug) => slug !== selectedLanguage)
             .map((slug) => (
-              <Listbox.Option value={slug}>
+              <Listbox.Option value={slug} key={slug}>
                 <Button
                   className={clsx([
                     "w-[110px]",
