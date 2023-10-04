@@ -19,19 +19,17 @@ export function Navigation() {
   }
 
   return (
-    <div
-      className={clsx([
-        "flex",
-        "flex-col",
-        "justify-between",
-        "wide-phone:flex-row",
-        "gap-[10px]",
-      ])}
-    >
+    <div className={clsx(["flex", "justify-between", "gap-[10px]"])}>
       <div className={clsx(["flex", "items-end", "gap-[10px]"])}>
         <Link href={"/"}>
           <Selfie
-            className={clsx(["desktop:text-[93px]", "relative", "top-[7px]"])}
+            className={clsx([
+              "relative",
+              "text-[45px]",
+              "top-[6px]",
+              "desktop:text-[93px]",
+              "wide-phone:text-[58px]",
+            ])}
           />
         </Link>
         <LanguageSelect
@@ -42,7 +40,14 @@ export function Navigation() {
       <nav className={clsx(["flex", "items-end", "justify-end"])}>
         <ul role="list">
           <li className={clsx(["flex", "gap-[10px]"])}>
-            <Link href={`/${pathParts.language}#literal`}>
+            <Link
+              href={`/${pathParts.language}#literal`}
+              className={
+                pathParts.subpath === ""
+                  ? pressedContainerClasses
+                  : unPressedContainerClasses
+              }
+            >
               <Button
                 className={
                   pathParts.subpath === "" ? pressedClasses : unPressedClasses
@@ -51,7 +56,14 @@ export function Navigation() {
                 why
               </Button>
             </Link>
-            <Link href={`/${pathParts.language}/get-started`}>
+            <Link
+              href={`/${pathParts.language}/get-started`}
+              className={
+                pathParts.subpath === "get-started"
+                  ? pressedContainerClasses
+                  : unPressedContainerClasses
+              }
+            >
               <Button
                 className={
                   pathParts.subpath === "get-started"
@@ -62,7 +74,14 @@ export function Navigation() {
                 get started
               </Button>
             </Link>
-            <Link href={`/${pathParts.language}/advanced`}>
+            <Link
+              href={`/${pathParts.language}/advanced`}
+              className={
+                pathParts.subpath === "advanced"
+                  ? pressedContainerClasses
+                  : unPressedContainerClasses
+              }
+            >
               <Button
                 className={
                   pathParts.subpath === "advanced"
@@ -80,21 +99,38 @@ export function Navigation() {
   );
 }
 
+const pressedContainerClasses = clsx(["pl-[4px]", "pt-[2px]"]);
+
+const unPressedContainerClasses = clsx(["pr-[4px]"]);
+
 const sharedClasses = clsx([
+  "px-1",
+  "flex",
+  "justify-center",
+  "items-center",
+  "cursor-pointer",
   "h-[23px]",
+  "text-[16px]",
+  "border",
+  "border-black",
+  "border-2",
   "rounded-[4px]",
-  "text-[18px]",
-  "px-2",
   "hover:text-white",
   "hover:bg-blue",
+  "tablet:h-[35px]",
+  "tablet:text-[22px]",
+  "tablet:border-[3px]",
+  "tablet:rounded-[10px]",
+  "desktop:h-[53px]",
+  "desktop:text-[34px]",
+  "desktop:border-[4px]",
+  "desktop:rounded-[16px]",
 ]);
 
 const pressedClasses = clsx([
-  "mt-[1px]",
   "text-white",
   "bg-blue",
   "shadow-none",
-  "tablet:mt-[3px]",
   sharedClasses,
 ]);
 

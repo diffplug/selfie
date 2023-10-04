@@ -14,7 +14,7 @@ export function LanguageSelect({
   handleChange,
 }: LanguageSelectProps) {
   return (
-    <div className={clsx(["relative"])}>
+    <div className={clsx(["relative", "hidden", "wide-phone:block"])}>
       <Listbox value={selectedLanguage} onChange={handleChange}>
         <Listbox.Button>
           {({ open }) => {
@@ -29,7 +29,12 @@ export function LanguageSelect({
               >
                 {languageSlugsToLabels[selectedLanguage]}
                 <CaretBottom
-                  className={clsx(["h-5", "w-5", open && "rotate-180"])}
+                  className={clsx([
+                    "h-5",
+                    "w-5",
+                    open && "rotate-180",
+                    open && "tablet:rotate-[270deg]",
+                  ])}
                   fill="#FFFFFF"
                 />
               </Button>
@@ -38,13 +43,20 @@ export function LanguageSelect({
         </Listbox.Button>
         <Listbox.Options
           className={clsx([
+            "hidden",
             "absolute",
+            "wide-phone:top-[-5px]",
+            "wide-phone:left-[104px]",
             "bg-white",
-            "shadow-xl",
-            "flex",
-            "flex-col",
+            "wide-phone:flex",
+            "flex-row",
+            "tablet:flex-col",
             "mt-[5px]",
             "gap-[5px]",
+            "px-[10px]",
+            "pb-[10px]",
+            "left-[-10px]",
+            "rounded-[20px]",
           ])}
         >
           {Object.keys(languageSlugsToLabels)
