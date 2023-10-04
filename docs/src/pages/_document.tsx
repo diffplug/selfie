@@ -12,7 +12,7 @@ export default function Document() {
         />
       </Head>
       <body>
-        <div className="flex justify-center text-black">
+        <div className="flex justify-center text-black antialiased">
           <div className="w-full max-w-[1300px]">
             <Main />
             <NextScript />
