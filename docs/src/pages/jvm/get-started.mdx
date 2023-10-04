@@ -1,4 +1,6 @@
-# Get started
+import { GetStarted } from "@/components/GetStarted";
+
+<GetStarted />
 
 ## Installation
 
@@ -21,7 +23,7 @@ Replace `LATEST_VERSION` with the latest available version of Selfie.
 
 For Gradle users, add this to your `build.gradle` file:
 
-```gradle
+```bash
 testImplementation 'com.yourdomain.selfie:selfie:LATEST_VERSION'
 ```
 
@@ -74,7 +76,6 @@ Again, replace `LATEST_VERSION` with the latest available version of Selfie.
 ## Tips and tricks
 
 - **Folder Structure**: By default, Selfie saves snapshots in a directory named `__snapshots__` alongside your test files. Ensure you check this into your version control to keep reference snapshots consistent across different environments.
-  
 - **Named Snapshots**: You can name your snapshots to make it easier to identify them, especially if you have multiple snapshots in one test class.
 
 ## Contribute

@@ -1,14 +1,21 @@
-## selfie is literal
+import { Selfie } from "@/components/Selfie";
+
+## <Selfie /> is literal
 
 Sure, you could write your assertions like this.
 
 ```javascript
-describe('login', () => {
-  it('should set the login cookie', () => {
-    const response = request.post('/confirm/login/erjchFbCXxMlUfFXx3oYiO-Rj6zM7tRGdRV8ziqRn5Jh', {
-      followRedirect: false
-    });
-    expect(response.cookies.login).toBe("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiaXNzIjoiZGlmZnBsdWcuY29tIiwiYXVkIjoiZGlmZnBsdWcuY29tIiwiaWF0IjoxNTc3NjY0MDAsImVtYWlsIjoibHVrZS5za3l3YWxrZXJAZGlmZnBsdWcuY29tIiwic2FsZXMiOiJ0cnVlIn0.v7nes7_rTa0NiwTz6OLIAmRZJ-XzzGULRiAPWBiV5iI");
+describe("login", () => {
+  it("should set the login cookie", () => {
+    const response = request.post(
+      "/confirm/login/erjchFbCXxMlUfFXx3oYiO-Rj6zM7tRGdRV8ziqRn5Jh",
+      {
+        followRedirect: false,
+      }
+    );
+    expect(response.cookies.login).toBe(
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiaXNzIjoiZGlmZnBsdWcuY29tIiwiYXVkIjoiZGlmZnBsdWcuY29tIiwiaWF0IjoxNTc3NjY0MDAsImVtYWlsIjoibHVrZS5za3l3YWxrZXJAZGlmZnBsdWcuY29tIiwic2FsZXMiOiJ0cnVlIn0.v7nes7_rTa0NiwTz6OLIAmRZJ-XzzGULRiAPWBiV5iI"
+    );
   });
 });
 ```
@@ -16,11 +23,14 @@ describe('login', () => {
 But isn't this easier to read? And also more complete?
 
 ```javascript
-describe('login', () => {
-  it('should match expected headers', () => {
-    const response = request.post('/confirm/login/erjchFbCXxMlUfFXx3oYiO-Rj6zM7tRGdRV8ziqRn5Jh', {
-      followRedirect: false
-    });
+describe("login", () => {
+  it("should match expected headers", () => {
+    const response = request.post(
+      "/confirm/login/erjchFbCXxMlUfFXx3oYiO-Rj6zM7tRGdRV8ziqRn5Jh",
+      {
+        followRedirect: false,
+      }
+    );
     expectSelfie(response.headers).toBe(`
       content-type=text/plain
       ...
@@ -32,25 +42,25 @@ describe('login', () => {
 
 ... And so on ...
 
-## selfie is lensable
+## <Selfie /> is lensable
 
 Some snapshots are so big that it would be cumbersome to put them inline into your test code. So selfie helps you put them on disk.
 
 ```javascript
-describe('gzipFavicon', () => {
-  it('should match the disk content', () => {
-    const response = request.get('/favicon.ico', { encoding: 'gzip' });
+describe("gzipFavicon", () => {
+  it("should match the disk content", () => {
+    const response = request.get("/favicon.ico", { encoding: "gzip" });
     expectSelfie(response).toMatchDisk();
   });
 });
 
-describe('orderFlow', () => {
-  it('should match the disk content', () => {
-    let response = request.get('/orders');
-    expectSelfie(response).toMatchDisk('initial');
+describe("orderFlow", () => {
+  it("should match the disk content", () => {
+    let response = request.get("/orders");
+    expectSelfie(response).toMatchDisk("initial");
     postOrder();
-    response = request.get('/orders');
-    expectSelfie(response).toMatchDisk('ordered');
+    response = request.get("/orders");
+    expectSelfie(response).toMatchDisk("ordered");
   });
 });
 ```

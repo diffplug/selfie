@@ -52,7 +52,6 @@ export function Mascot() {
         "object-cover",
         "object-left",
         "block",
-        "overflow-visible",
         "animate-slide-and-fade",
         "block",
         "z-[-1]",

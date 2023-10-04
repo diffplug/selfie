@@ -1,11 +1,11 @@
-import { AppProps } from "next/app";
-import Head from "next/head";
+import { Hero } from "@/components/Hero";
+import { Navigation } from "@/components/Navigation/Navigation";
+import * as mdxComponents from "@/components/mdx";
+import "@/styles/tailwind.css";
 import { MDXProvider } from "@mdx-js/react";
 import clsx from "clsx";
-
-import * as mdxComponents from "@/components/mdx";
-
-import "@/styles/tailwind.css";
+import { AppProps } from "next/app";
+import Head from "next/head";
 
 export default function App({ Component, pageProps }: AppProps) {
   return (
@@ -25,6 +25,9 @@ export default function App({ Component, pageProps }: AppProps) {
             "wide-phone:py-2",
           ])}
         >
+          {pageProps.showHero ? <Hero /> : <Navigation {...pageProps} />}
+        </div>
+        <div className={clsx(["px-2", "wide-phone:px-4, space-y-[10px]"])}>
           <Component {...pageProps} />
         </div>
       </MDXProvider>
