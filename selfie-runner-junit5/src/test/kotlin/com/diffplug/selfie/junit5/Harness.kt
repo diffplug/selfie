@@ -171,6 +171,21 @@ open class Harness(subproject: String) {
           }
         }
       }
+      fun content() = lines.subList(startInclusive, endInclusive).joinToString("\n")
+      fun setContent(mustBe: String) {
+        FileSystem.SYSTEM.write(subprojectFolder.resolve(subpath)) {
+          for (i in 0 ..< startInclusive) {
+            writeUtf8(lines[i])
+            writeUtf8("\n")
+          }
+          writeUtf8(mustBe)
+          writeUtf8("\n")
+          for (i in endInclusive + 1 ..< lines.size) {
+            writeUtf8(lines[i])
+            writeUtf8("\n")
+          }
+        }
+      }
     }
   }
   fun gradlew(task: String, vararg args: String): AssertionFailedError? {
