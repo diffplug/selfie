@@ -5,3 +5,11 @@ repositories {
   mavenCentral()
 }
 apply from: rootProject.file('gradle/spotless.gradle')
+
+// ./gradlew dokkaHtmlMultiModule && open build/dokka/htmlMultiModule/index.html
+subprojects {
+  if (it.name == 'selfie-lib' || it.name == 'selfie-runner-junit5') {
+    apply plugin: 'org.jetbrains.dokka'
+  }
+}
+apply plugin: 'org.jetbrains.dokka'
