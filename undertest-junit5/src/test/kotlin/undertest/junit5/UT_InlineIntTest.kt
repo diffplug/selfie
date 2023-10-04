@@ -5,8 +5,8 @@ import kotlin.test.Test
 
 // spotless:on
 
-class UT_IntSelfieTest {
+class UT_InlineIntTest {
   @Test fun singleInt() {
-    expectSelfie(678) toBe 678
+    expectSelfie(1234).toBe_TODO()
   }
 }
