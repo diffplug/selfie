@@ -30,7 +30,7 @@ class IntFormat : LiteralFormat<Int> {
     return value.toString()
   }
   override fun parse(str: String): Int {
-    return str.toInt()
+    return str.replace("_", "").toInt()
   }
 }
 
