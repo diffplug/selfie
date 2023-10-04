@@ -29,15 +29,27 @@ export function IntroText() {
         ])}
       >
         Which is <br className="tablet:hidden" />{" "}
-        <Link href="#literal" className="cursor-pointer underline">
+        <Link
+          href="#is-literal"
+          scroll={false}
+          className="cursor-pointer underline"
+        >
           literal
         </Link>
         ,{" "}
-        <Link href="#lensable" className="cursor-pointer underline">
+        <Link
+          href="#is-lensable"
+          scroll={false}
+          className="cursor-pointer underline"
+        >
           lensable
         </Link>
         <br /> and{" "}
-        <Link href="#like-a-filesytem" className="cursor-pointer underline">
+        <Link
+          href="#is-like-a-filesystem"
+          scroll={false}
+          className="cursor-pointer underline"
+        >
           like a filesystem
         </Link>
       </p>
