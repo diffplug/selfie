@@ -39,7 +39,9 @@ export function Navigation() {
         setSelectIsOpen={setSelectIsOpen}
         handleChange={handleChange}
       />
-      <SubNavigation pathParts={pathParts} selectIsOpen={selectIsOpen} />
+      {pathParts.language !== "other-platforms" && (
+        <SubNavigation pathParts={pathParts} selectIsOpen={selectIsOpen} />
+      )}
     </div>
   );
 }
