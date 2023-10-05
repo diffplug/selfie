@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react";
 
 export function Mascot() {
   const literalOffsetTop = useRef(0);
+  const mascotRef = useRef<HTMLImageElement | null>(null);
 
   useEffect(() => {
     const literalSection = document.getElementById("literal")!;
@@ -16,17 +17,20 @@ export function Mascot() {
       // 0 at the stop of the page, 1 at the bottom of the page
       const pageScrollOffset =
         window.scrollY / (document.body.offsetHeight - window.innerHeight);
-      document.body.style.setProperty("--page-scroll", "" + pageScrollOffset);
+      mascotRef.current!.style.setProperty(
+        "--page-scroll",
+        "" + pageScrollOffset
+      );
 
       // 0 at the top of the page, 1 when the literal section comes into view. Don't exceed 1.
-      document.body.style.setProperty(
+      mascotRef.current!.style.setProperty(
         "--literal-scroll",
         "" + Math.min(window.scrollY / literalOffsetTop.current, 1)
       );
     }
 
     function setViewportVariables() {
-      document.body.style.setProperty(
+      mascotRef.current!.style.setProperty(
         "--innerHeight",
         "-" + window.innerHeight + "px"
       );
@@ -47,6 +51,7 @@ export function Mascot() {
     <img
       src="/mascot.webp"
       alt="Selfie mascot"
+      ref={mascotRef}
       className={clsx([
         "max-w-[830px]",
         "h-[1745px]",
