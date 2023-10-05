@@ -6,7 +6,7 @@ export function Mascot() {
   const mascotRef = useRef<HTMLImageElement | null>(null);
 
   useEffect(() => {
-    const literalSection = document.getElementById("literal")!;
+    let literalSection = document.getElementById("literal")!;
     literalOffsetTop.current = literalSection.offsetTop;
 
     if (window.scrollY > 1000) {
@@ -21,6 +21,12 @@ export function Mascot() {
         "--page-scroll",
         "" + pageScrollOffset
       );
+
+      if (!literalOffsetTop.current) {
+        // ref gets removed when routing client-side. Get it back.
+        literalSection = document.getElementById("literal")!;
+        literalOffsetTop.current = literalSection.offsetTop;
+      }
 
       // 0 at the top of the page, 1 when the literal section comes into view. Don't exceed 1.
       mascotRef.current!.style.setProperty(
