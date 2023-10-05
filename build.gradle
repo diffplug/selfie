@@ -6,10 +6,42 @@ repositories {
 }
 apply from: rootProject.file('gradle/spotless.gradle')
 
-// ./gradlew dokkaHtmlMultiModule && open build/dokka/htmlMultiModule/index.html
+// ./gradlew :dokkatooGeneratePublicationHtml
+//     https://github.com/Kotlin/dokka/issues/3131
+// if IntelliJ is running, then you'll also get a localhost server link
+def HAS_DOCS = [
+  'selfie-lib',
+  'selfie-runner-junit5'
+]
+def FOOTER = "© 2023 DiffPlug LLC"
+
 subprojects {
-  if (it.name == 'selfie-lib' || it.name == 'selfie-runner-junit5') {
-    apply plugin: 'org.jetbrains.dokka'
+  if (name in HAS_DOCS) {
+    apply plugin: 'dev.adamko.dokkatoo-html'
+    dokkatoo {
+      pluginsConfiguration.html {
+        footerMessage.set(FOOTER)
+      }
+    }
   }
 }
-apply plugin: 'org.jetbrains.dokka'
+apply plugin: 'dev.adamko.dokkatoo-html'
+dokkatoo {
+  pluginsConfiguration.html {
+    footerMessage.set(FOOTER)
+  }
+}
+dependencies {
+  // aggregate both subproject-hello and subproject-world
+  // the subprojects must also have Dokkatoo applied
+  for (p in HAS_DOCS) {
+    dokkatoo(project(":${p}"))
+  }
+
+  // This is required at the moment, see https://github.com/adamko-dev/dokkatoo/issues/14
+  dokkatooPluginHtml(
+      dokkatoo.versions.jetbrainsDokka.map { dokkaVersion ->
+        "org.jetbrains.dokka:all-modules-page-plugin:$dokkaVersion"
+      }
+      )
+}
