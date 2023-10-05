@@ -54,6 +54,7 @@ export function LanguageSelect({
               "w-[70px]",
               "rounded-[4px]",
               "wide-phone:h-[30px]",
+              "desktop:w-[94px]",
             ])}
             onClick={() => setSelectIsOpen((prevIsOpen) => !prevIsOpen)}
           >
@@ -81,6 +82,7 @@ export function LanguageSelect({
           "transition-all",
           "duration-500",
           isOpen ? "translate-x-[230px]" : "translate-x-[-20px]",
+          isOpen ? "desktop:translate-x-[337px]" : "translate-x-[-20px]",
         ])}
       >
         {Object.keys(languageSlugsToLabels)
@@ -94,6 +96,7 @@ export function LanguageSelect({
                 "rounded-[4px]",
                 "hover:text-white",
                 "hover:bg-blue",
+                "desktop:w-[94px]",
               ])}
               onClick={() => handleChange(slug as LanguageSlug)}
               key={slug}
@@ -110,9 +113,12 @@ function ShadowHider() {
   return (
     <div
       className={clsx([
+        "hidden",
+        "wide-phone:block",
         "absolute",
         "bg-white",
         "w-[220px]",
+        "desktop:w-[330px]",
         "h-full",
         "bottom-[-4px]",
         "z-10",

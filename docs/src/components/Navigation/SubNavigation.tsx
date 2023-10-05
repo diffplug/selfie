@@ -41,7 +41,10 @@ export function SubNavigation({ pathParts, selectIsOpen }: SubNavigationProps) {
         "justify-end",
         "transition-all",
         "duration-500",
-        selectIsOpen ? "translate-x-[280px]" : "translate-x-0",
+        selectIsOpen ? "translate-x-[290px]" : "translate-x-0",
+        selectIsOpen ? "desktop:translate-x-[417px]" : "translate-x-0",
+        "pr-[2px]",
+        "tablet:pr-[5px]",
       ])}
     >
       <ul role="list">
