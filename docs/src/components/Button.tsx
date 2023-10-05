@@ -4,9 +4,10 @@ import { ReactNode } from "react";
 type ButtonProps = {
   children: ReactNode;
   className?: string;
+  onClick?: () => void;
 };
 
-export function Button({ children, className }: ButtonProps) {
+export function Button({ children, className, onClick }: ButtonProps) {
   return (
     <span
       className={clsx([
@@ -27,6 +28,8 @@ export function Button({ children, className }: ButtonProps) {
         "desktop:rounded-[16px]",
         className,
       ])}
+      onClick={onClick}
+      role="button"
     >
       {children}
     </span>

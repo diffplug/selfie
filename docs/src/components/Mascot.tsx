@@ -5,10 +5,14 @@ export function Mascot() {
   const literalOffsetTop = useRef(0);
 
   useEffect(() => {
-    const literalSection = document.getElementById("is-literal")!;
+    const literalSection = document.getElementById("literal")!;
     literalOffsetTop.current = literalSection.offsetTop;
 
-    function setScrollPosition() {
+    if (window.scrollY > 1000) {
+      setScrollPositionVariables();
+    }
+
+    function setScrollPositionVariables() {
       // 0 at the stop of the page, 1 at the bottom of the page
       const pageScrollOffset =
         window.scrollY / (document.body.offsetHeight - window.innerHeight);
@@ -31,10 +35,10 @@ export function Mascot() {
 
     setViewportVariables();
 
-    window.addEventListener("scroll", setScrollPosition, false);
+    window.addEventListener("scroll", setScrollPositionVariables, false);
     window.addEventListener("resize", setViewportVariables, false);
     return () => {
-      window.removeEventListener("scroll", setScrollPosition);
+      window.removeEventListener("scroll", setScrollPositionVariables);
       window.removeEventListener("resize", setViewportVariables);
     };
   }, []);
@@ -51,7 +55,6 @@ export function Mascot() {
         "left-[-200px]",
         "object-cover",
         "object-left",
-        "block",
         "animate-slide-and-fade",
         "block",
         "z-[-1]",

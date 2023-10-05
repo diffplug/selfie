@@ -1,4 +1,5 @@
 import clsx from "clsx";
+import { createContext, useContext } from "react";
 
 type ParentComponentProps = {
   children?: React.ReactNode;
@@ -29,28 +30,68 @@ export function Col({ children, sticky = false }: ColProps) {
   );
 }
 
+const CodeBlockContext = createContext(false);
+
 export function code({ children, ...props }: ParentComponentProps) {
+  let isBlock = useContext(CodeBlockContext);
+  const className = isBlock
+    ? ""
+    : clsx([
+        "bg-grey",
+        "px-[14px]",
+        "pt-[6px]",
+        "pb-[2px]",
+        "rounded-xl",
+        "text-sm",
+        "desktop:text-base",
+        "leading-[1.5em]",
+      ]);
   return children ? (
-    <code {...props} dangerouslySetInnerHTML={{ __html: children }} />
+    <code
+      {...props}
+      className={className}
+      dangerouslySetInnerHTML={{ __html: children }}
+    />
   ) : (
-    <code {...props} />
+    <code {...props} className={className} />
   );
 }
 
 export function pre({ children, ...props }: ParentComponentProps) {
   return (
-    <div
-      className={clsx([
-        "rounded-2xl",
-        "bg-grey/60",
-        "shadow",
-        "text-base",
-        "overflow-hidden",
-      ])}
-    >
-      <pre className="overflow-scroll p-4" {...props}>
-        {children}
-      </pre>
-    </div>
+    <CodeBlockContext.Provider value={true}>
+      <div
+        className={clsx([
+          "rounded-2xl",
+          "bg-grey/60",
+          "shadow",
+          "text-sm",
+          "desktop:text-base",
+          "overflow-hidden",
+          "leading-[1.5em]",
+        ])}
+      >
+        <pre className="overflow-scroll p-4" {...props}>
+          {children}
+        </pre>
+      </div>
+    </CodeBlockContext.Provider>
+  );
+}
+
+export function p({ children, ...props }: ParentComponentProps) {
+  return (
+    <p {...props} className="py-[13px] desktop:py-[20px]">
+      {children}
+    </p>
+  );
+}
+
+export function h2({ children, ...props }: ParentComponentProps) {
+  return (
+    <>
+      <br />
+      <h2 {...props}>{children}</h2>
+    </>
   );
 }

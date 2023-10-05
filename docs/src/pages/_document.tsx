@@ -2,7 +2,7 @@ import { Head, Html, Main, NextScript } from "next/document";
 
 export default function Document() {
   return (
-    <Html lang="en">
+    <Html lang="en" className="scroll-smooth">
       <Head>
         <link rel="preconnect" href="https://fonts.gstatic.com" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -12,7 +12,7 @@ export default function Document() {
         />
       </Head>
       <body>
-        <div className="flex justify-center text-black">
+        <div className="flex justify-center text-black antialiased">
           <div className="w-full max-w-[1300px]">
             <Main />
             <NextScript />

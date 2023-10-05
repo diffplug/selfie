@@ -1,4 +1,5 @@
 import clsx from "clsx";
+import slugify from "@sindresorhus/slugify";
 import { Button } from "./Button";
 import Link from "next/link";
 
@@ -29,17 +30,8 @@ export function IntroText() {
         ])}
       >
         Which is <br className="tablet:hidden" />{" "}
-        <Link href="#literal" className="cursor-pointer underline">
-          literal
-        </Link>
-        ,{" "}
-        <Link href="#lensable" className="cursor-pointer underline">
-          lensable
-        </Link>
-        <br /> and{" "}
-        <Link href="#like-a-filesytem" className="cursor-pointer underline">
-          like a filesystem
-        </Link>
+        <SectionLink title="literal" />, <SectionLink title="lensable" />
+        <br /> and <SectionLink title="like a filesystem" />
       </p>
       <Link href="/jvm/get-started">
         <Button
@@ -97,5 +89,20 @@ export function IntroText() {
         </p>
       </div>
     </div>
+  );
+}
+
+type SectionLinkProps = {
+  title: string;
+};
+function SectionLink({ title }: SectionLinkProps) {
+  return (
+    <Link
+      href={`#${slugify(title)}`}
+      scroll={false}
+      className="cursor-pointer underline hover:text-blue"
+    >
+      {title}
+    </Link>
   );
 }

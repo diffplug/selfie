@@ -1,10 +1,9 @@
 import { LanguageSlug, getPathParts } from "@/lib/languageFromPath";
 import clsx from "clsx";
 import { useRouter } from "next/dist/client/router";
-import Link from "next/link";
-import { Button } from "../Button";
-import { Logo } from "../Logo";
+import { useState } from "react";
 import { LanguageSelect } from "./LanguageSelect";
+import { SubNavigation } from "./SubNavigation";
 
 export function Navigation() {
   const router = useRouter();
@@ -16,90 +15,31 @@ export function Navigation() {
       nextRoute += "/" + pathParts.subpath;
     }
     router.push(nextRoute);
+    setSelectIsOpen(false);
   }
+
+  const [selectIsOpen, setSelectIsOpen] = useState<boolean>(false);
 
   return (
     <div
       className={clsx([
+        "relative",
         "flex",
-        "flex-col",
         "justify-between",
-        "wide-phone:flex-row",
         "gap-[10px]",
+        "z-10",
+        "overflow-hidden",
+        "mb-[-4px]",
+        "pb-[4px]",
       ])}
     >
-      <div className={clsx(["flex", "items-end", "gap-[10px]"])}>
-        <Link href={"/"}>
-          <Logo />
-        </Link>
-        <LanguageSelect
-          selectedLanguage={pathParts.language}
-          handleChange={handleChange}
-        />
-      </div>
-      <nav className={clsx(["flex", "items-end", "justify-end"])}>
-        <ul role="list">
-          <li className={clsx(["flex", "gap-[10px]"])}>
-            <Link href={`/${pathParts.language}`}>
-              <Button
-                className={
-                  pathParts.subpath === "" ? pressedClasses : unPressedClasses
-                }
-              >
-                why
-              </Button>
-            </Link>
-            <Link href={`/${pathParts.language}/get-started`}>
-              <Button
-                className={
-                  pathParts.subpath === "get-started"
-                    ? pressedClasses
-                    : unPressedClasses
-                }
-              >
-                get started
-              </Button>
-            </Link>
-            <Link href={`/${pathParts.language}/advanced`}>
-              <Button
-                className={
-                  pathParts.subpath === "advanced"
-                    ? pressedClasses
-                    : unPressedClasses
-                }
-              >
-                advanced
-              </Button>
-            </Link>
-          </li>
-        </ul>
-      </nav>
+      <LanguageSelect
+        pathParts={pathParts}
+        isOpen={selectIsOpen}
+        setSelectIsOpen={setSelectIsOpen}
+        handleChange={handleChange}
+      />
+      <SubNavigation pathParts={pathParts} selectIsOpen={selectIsOpen} />
     </div>
   );
 }
-
-const sharedClasses = clsx([
-  "h-[23px]",
-  "rounded-[4px]",
-  "text-[18px]",
-  "px-2",
-  "hover:text-white",
-  "hover:bg-blue",
-]);
-
-const pressedClasses = clsx([
-  "mt-[1px]",
-  "text-white",
-  "bg-blue",
-  "shadow-none",
-  "tablet:mt-[3px]",
-  sharedClasses,
-]);
-
-const unPressedClasses = clsx([
-  "text-black",
-  "bg-white",
-  "shadow-button",
-  "tablet:shadow-button-tablet",
-  sharedClasses,
-]);
