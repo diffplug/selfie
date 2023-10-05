@@ -13,12 +13,15 @@ def HAS_DOCS = [
   'selfie-lib',
   'selfie-runner-junit5'
 ]
-def FOOTER = "© 2023 DiffPlug LLC"
+def FOOTER = "Selfie API Reference. © 2023 DiffPlug LLC"
 
 subprojects {
   if (name in HAS_DOCS) {
     apply plugin: 'dev.adamko.dokkatoo-html'
     dokkatoo {
+      dokkatooSourceSets.configureEach {
+        includes.from("README.md")
+      }
       pluginsConfiguration.html {
         footerMessage.set(FOOTER)
       }
