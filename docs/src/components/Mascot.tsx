@@ -1,9 +1,10 @@
 import clsx from "clsx";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export function Mascot() {
   const literalOffsetTop = useRef(0);
-  const mascotRef = useRef<HTMLImageElement | null>(null);
+  const mascotRef = useRef<HTMLDivElement | null>(null);
+  let [spacerWidth, setSpacerWidth] = useState(0);
 
   useEffect(() => {
     let literalSection = document.getElementById("literal")!;
@@ -41,6 +42,8 @@ export function Mascot() {
         "-" + window.innerHeight + "px"
       );
       literalOffsetTop.current = literalSection.offsetTop;
+
+      setSpacerWidth(Math.max((window.innerWidth - 1300) / 2, 0));
     }
 
     setViewportVariables();
@@ -54,30 +57,39 @@ export function Mascot() {
   }, []);
 
   return (
-    <img
-      src="/mascot.webp"
-      alt="Selfie mascot"
+    <div
       ref={mascotRef}
       className={clsx([
-        "max-w-[830px]",
-        "h-[1745px]",
         "fixed",
         "top-[80px]",
         "left-[-200px]",
-        "object-cover",
-        "object-left",
         "animate-slide-and-fade",
         "block",
         "z-[-1]",
         "opacity-100",
         "wide-phone:top-[145px]",
         "tablet:top-[30px]",
-        "desktop:max-w-[1245px]",
-        "desktop:h-[2616px]",
         "desktop:left-[-250px]",
-        "xl:absolute",
-        "xl:left-[-250px]",
+        "flex",
+        "flex-start",
       ])}
-    />
+    >
+      <div
+        className={clsx(["h-1"])}
+        style={{ width: spacerWidth + "px" }}
+      ></div>
+      <img
+        src="/mascot.webp"
+        alt="Selfie mascot"
+        className={clsx([
+          "max-w-[830px]",
+          "h-[1745px]",
+          "object-cover",
+          "object-left",
+          "desktop:max-w-[1245px]",
+          "desktop:h-[2616px]",
+        ])}
+      />
+    </div>
   );
 }
