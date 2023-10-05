@@ -9,6 +9,7 @@ import { Dispatch, SetStateAction } from "react";
 import { Button } from "../Button";
 import { CaretBottom } from "../Icons/CaretBottom";
 import { Selfie } from "../Selfie";
+import { Close } from "../Icons/Close";
 
 type LanguageSelectProps = {
   pathParts: PathParts;
@@ -59,15 +60,27 @@ export function LanguageSelect({
             onClick={() => setSelectIsOpen((prevIsOpen) => !prevIsOpen)}
           >
             {languageSlugsToLabels[pathParts.language]}
-            <CaretBottom
-              className={clsx([
-                "h-5",
-                "w-5",
-                isOpen && "rotate-180",
-                isOpen && "tablet:rotate-[270deg]",
-              ])}
-              fill="#FFFFFF"
-            />
+            {isOpen ? (
+              <Close
+                className={clsx([
+                  "h-[12px]",
+                  "w-[12px]",
+                  "mt-[1px]",
+                  "desktop:h-5",
+                  "desktop:w-5",
+                  "desktop:mt-[5px]",
+                ])}
+              />
+            ) : (
+              <CaretBottom
+                className={clsx([
+                  "h-[12px]",
+                  "w-[12px]",
+                  "desktop:h-5",
+                  "desktop:w-5",
+                ])}
+              />
+            )}
           </Button>
         </div>
       </div>
