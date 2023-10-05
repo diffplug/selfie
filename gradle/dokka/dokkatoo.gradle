@@ -1,0 +1,13 @@
+apply plugin: 'dev.adamko.dokkatoo-html'
+dokkatoo {
+  if (project != rootProject) {
+    dokkatooSourceSets.configureEach {
+      includes.from("README.md")
+    }
+  }
+  pluginsConfiguration.html {
+    templatesDir.set(rootProject.file("gradle/dokka/templates"))
+    customStyleSheets.from(rootProject.file("gradle/dokka/styles/logo-styles.css"))
+    customAssets.from(rootProject.file("gradle/dokka/assets/logo-icon.svg"))
+  }
+}

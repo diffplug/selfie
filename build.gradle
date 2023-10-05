@@ -13,27 +13,12 @@ def HAS_DOCS = [
   'selfie-lib',
   'selfie-runner-junit5'
 ]
-def FOOTER = "Selfie API Reference. © 2023 DiffPlug LLC"
-
 subprojects {
   if (name in HAS_DOCS) {
-    apply plugin: 'dev.adamko.dokkatoo-html'
-    dokkatoo {
-      dokkatooSourceSets.configureEach {
-        includes.from("README.md")
-      }
-      pluginsConfiguration.html {
-        footerMessage.set(FOOTER)
-      }
-    }
+    apply from: rootProject.file("gradle/dokka/dokkatoo.gradle")
   }
 }
-apply plugin: 'dev.adamko.dokkatoo-html'
-dokkatoo {
-  pluginsConfiguration.html {
-    footerMessage.set(FOOTER)
-  }
-}
+apply from: rootProject.file("gradle/dokka/dokkatoo.gradle")
 dependencies {
   // aggregate both subproject-hello and subproject-world
   // the subprojects must also have Dokkatoo applied
