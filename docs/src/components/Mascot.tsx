@@ -10,11 +10,18 @@ export function Mascot() {
     let literalSection = document.getElementById("literal")!;
     literalOffsetTop.current = literalSection.offsetTop;
 
-    if (window.scrollY > 1000) {
+    if (window.scrollY > 10) {
       setScrollPositionVariables();
     }
 
     function setScrollPositionVariables() {
+      /**
+       * Pressing the back button on the home page triggers
+       * this event for some reason I can't figure out. The
+       * ref is unmounted, so just don't run the event.
+       */
+      if (!mascotRef.current!) return;
+
       // 0 at the stop of the page, 1 at the bottom of the page
       const pageScrollOffset =
         window.scrollY / (document.body.offsetHeight - window.innerHeight);
