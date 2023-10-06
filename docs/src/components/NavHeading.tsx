@@ -1,9 +1,9 @@
-import clsx from "clsx";
-import { Selfie } from "./Selfie";
-import { useRouter } from "next/router";
 import { LanguageSlug, getPathParts } from "@/lib/languageFromPath";
+import clsx from "clsx";
+import { useRouter } from "next/router";
 import { useState } from "react";
 import { HeadingLanguageSelect } from "./HeadingLanguageSelect";
+import { Selfie } from "./Selfie";
 
 type NavHeadingProps = {
   text: string;
