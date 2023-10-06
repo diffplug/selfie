@@ -3,6 +3,7 @@ import {
   PathParts,
   languageSlugsToLabels,
 } from "@/lib/languageFromPath";
+import { useResizing } from "@/lib/useResizing";
 import clsx from "clsx";
 import { Dispatch, SetStateAction } from "react";
 import { Button } from "./Button";
@@ -22,8 +23,9 @@ export function HeadingLanguageSelect({
   isOpen,
   handleChange,
 }: HeadingLanguageSelectProps) {
+  const resizing = useResizing();
   return (
-    <div className={clsx(["wide-phone:hidden", "relative"])}>
+    <div className={clsx(["relative", "mb-[7px]"])}>
       <Button
         className={clsx([
           "text-white",
@@ -33,6 +35,7 @@ export function HeadingLanguageSelect({
           "h-[30px]",
           "z-20",
           "relative",
+          "desktop:w-[94px]",
         ])}
         onClick={() => setSelectIsOpen((prevIsOpen) => !prevIsOpen)}
       >
@@ -55,10 +58,17 @@ export function HeadingLanguageSelect({
                 "bg-white",
                 "hover:text-white",
                 "hover:bg-blue",
-                "transition-transform",
+                !resizing && "transition-transform",
+                "desktop:w-[94px]",
                 isOpen
                   ? `translate-y-[${30 + (idx + 1) * 10}px]`
                   : `translate-y-[-${idx * 30}px]`,
+                isOpen
+                  ? `tablet:translate-y-[${35 + (idx + 1) * 10}px]`
+                  : `tablet:translate-y-[-${idx * 35}px]`,
+                isOpen
+                  ? `desktop:translate-y-[${53 + (idx + 1) * 10}px]`
+                  : `desktop:translate-y-[-${idx * 53}px]`,
               ])}
               onClick={() => handleChange(slug as LanguageSlug)}
               key={slug}
@@ -79,4 +89,8 @@ export function HeadingLanguageSelect({
  *
  * translate-y-[40px] translate-y-[50px] translate-y-[60px]
  * translate-y-[-0px] translate-y-[-30px] translate-y-[-60px]
+ * tablet:translate-y-[45px] tablet:translate-y-[55px] tablet:translate-y-[65px]
+ * tablet:translate-y-[-0px] tablet:translate-y-[-35px] tablet:translate-y-[-70px]
+ * desktop:translate-y-[63px] desktop:translate-y-[73px] desktop:translate-y-[83px]
+ * desktop:translate-y-[-0px] desktop:translate-y-[-53px] desktop:translate-y-[-106px]
  */
