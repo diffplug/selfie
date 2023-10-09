@@ -12,7 +12,9 @@
     <div class="selfie-sidebar-spacer"></div>
     <div class="selfie-main">
         <div class="selfie-main-content">
-            <img src="../../images/antique_humanoid.webp" id="selfie-navigation-bot" class="selfie-navigation-bot"/>
+            <@template_cmd name="pathToRoot">
+                <img src="${pathToRoot}/images/antique_humanoid.webp" id="selfie-navigation-bot" class="selfie-navigation-bot"/>
+            </@template_cmd>
         </div>
     </div>
 </div>
