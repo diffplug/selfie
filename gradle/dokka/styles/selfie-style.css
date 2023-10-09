@@ -12,3 +12,19 @@
     top: 35px;
     right: 125px;
 }
+
+.selfie-footer-bot {
+    width: 400px;
+    height: 450px;
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    z-index: 1;
+}
+
+.footer {
+    background: url("../images/background_seaside.webp");
+    background-repeat: repeat-x;
+    background-size: 500px;
+    min-height: 125px;
+}
