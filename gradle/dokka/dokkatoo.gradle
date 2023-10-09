@@ -13,6 +13,7 @@ dokkatoo {
       rootProject.file("gradle/dokka/assets/background_seaside.webp"),
       rootProject.file("gradle/dokka/assets/antique_bot.webp"),
       rootProject.file("gradle/dokka/assets/antique_humanoid.webp"),
+      rootProject.file("gradle/dokka/scripts/selfie.js"),
     )
   }
 }

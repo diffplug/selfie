@@ -35,6 +35,7 @@
     top: -65px;
     right: 16px;
     z-index: 10;
+    transform: translateY(var(--selfie-bot));
 }
 
 /* Header - search */
