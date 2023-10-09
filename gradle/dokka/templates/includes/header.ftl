@@ -13,7 +13,7 @@
     <div class="selfie-main">
         <div class="selfie-main-content">
             <@template_cmd name="pathToRoot">
-                <img src="${pathToRoot}/images/antique_humanoid.webp" id="selfie-navigation-bot" class="selfie-navigation-bot"/>
+                <img src="${pathToRoot}images/antique_humanoid.webp" id="selfie-navigation-bot" class="selfie-navigation-bot"/>
             </@template_cmd>
         </div>
     </div>

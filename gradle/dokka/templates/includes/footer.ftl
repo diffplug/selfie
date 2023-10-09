@@ -1,6 +1,6 @@
 <#macro display>
       <@template_cmd name="pathToRoot">
-        <img src="${pathToRoot}/images/antique_bot.webp" class="selfie-footer-bot"/>
+        <img src="${pathToRoot}images/antique_bot.webp" class="selfie-footer-bot"/>
       </@template_cmd>
       <div class="footer">
         <span class="go-to-top-icon"><a href="#content" id="go-to-top-link"></a></span><span>${footerMessage}</span><span
