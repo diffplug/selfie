@@ -5,12 +5,32 @@
     height: 170px;
 }
 
+.selfie-container {
+    display: flex;
+    position: relative;
+    z-index: 4;
+}
+
+.selfie-sidebar-spacer {
+    width: 280px;
+}
+
+.selfie-main {
+    flex: 1;
+}
+
+.selfie-main-content {
+    max-width: 1160px;
+    margin: auto;
+    position: relative;
+}
+
 .selfie-navigation-bot {
     width: 300px;
     height: 300px;
     position: absolute;
-    top: 35px;
-    right: 125px;
+    top: -65px;
+    right: 16px;
 }
 
 .selfie-footer-bot {

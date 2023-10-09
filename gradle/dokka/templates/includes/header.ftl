@@ -24,6 +24,13 @@
         <button class="navigation-controls--btn navigation-controls--theme" id="theme-toggle-button" type="button">switch theme</button>
         <div class="navigation-controls--btn navigation-controls--search" id="searchBar" role="button">search in API</div>
     </div>
-    <img src="../../images/antique_humanoid.webp" class="selfie-navigation-bot"/>
 </nav>
+<div class="selfie-container">
+    <div class="selfie-sidebar-spacer"></div>
+    <div class="selfie-main">
+        <div class="selfie-main-content">
+            <img src="../../images/antique_humanoid.webp" class="selfie-navigation-bot"/>
+        </div>
+    </div>
+</div>
 </#macro>
