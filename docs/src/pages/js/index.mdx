@@ -1,9 +1,10 @@
 import { Hero } from "@/components/Hero";
 import { Selfie } from "@/components/Selfie";
+import { NavHeading } from "@/components/NavHeading";
 
 export const showHero = true;
 
-## <Selfie /> is literal
+<NavHeading text="literal" />
 
 Sure, you could write your assertions like this.
 
@@ -45,7 +46,7 @@ describe("login", () => {
 
 ... And so on ...
 
-## <Selfie /> is lensable
+<NavHeading text="lensable" />
 
 Some snapshots are so big that it would be cumbersome to put them inline into your test code. So selfie helps you put them on disk.
 
@@ -68,4 +69,8 @@ describe("orderFlow", () => {
 });
 ```
 
-... Remaining content ...
+## <Selfie /> is like a filesystem
+
+Selfie's snapshot files `.ss` are incredibly simple to parse, and you can use `selfie-lib` to parse them for you if you want. You can treat them as an output deliverable of your code, and use them as an input to other tooling.
+
+TODO.

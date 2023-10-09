@@ -1,6 +1,6 @@
 import { LanguageSlug, getPathParts } from "@/lib/languageFromPath";
 import clsx from "clsx";
-import { useRouter } from "next/dist/client/router";
+import { useRouter } from "next/router";
 import { useState } from "react";
 import { LanguageSelect } from "./LanguageSelect";
 import { SubNavigation } from "./SubNavigation";
@@ -39,7 +39,9 @@ export function Navigation() {
         setSelectIsOpen={setSelectIsOpen}
         handleChange={handleChange}
       />
-      <SubNavigation pathParts={pathParts} selectIsOpen={selectIsOpen} />
+      {pathParts.language !== "other-platforms" && (
+        <SubNavigation pathParts={pathParts} selectIsOpen={selectIsOpen} />
+      )}
     </div>
   );
 }
