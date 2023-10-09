@@ -40,7 +40,7 @@ class InlineIntTest : Harness("undertest-junit5") {
   }
 
   @Test @Order(3)
-  fun cleanip() {
+  fun cleanup() {
     ut_mirror().lineWith("expectSelfie").setContent("    expectSelfie(1234).toBe_TODO()")
   }
 }

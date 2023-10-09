@@ -20,6 +20,8 @@ import com.diffplug.selfie.RW
 import com.diffplug.selfie.Snapshot
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.regex.Matcher
+import java.util.regex.Pattern
 import java.util.stream.Collectors
 
 /** Represents the line at which user code called into Selfie. */
@@ -72,7 +74,19 @@ internal class DiskWriteTracker : WriteTracker<String, Snapshot>() {
     recordInternal(key, snapshot, call)
   }
 }
-private fun String.countNewlines(): Int = TODO()
+private fun String.countNewlines(): Int = lineOffset { true }.size
+private fun String.lineOffset(filter: (Int) -> Boolean): List<Int> {
+  val lineTerminator = "\n"
+  var offset = 0
+  var next = indexOf(lineTerminator, offset)
+  val offsets = mutableListOf<Int>()
+  while (next != -1 && filter(offsets.size)) {
+    offsets.add(offset)
+    offset = next + lineTerminator.length
+    next = indexOf(lineTerminator, offset)
+  }
+  return offsets
+}
 
 internal class InlineWriteTracker : WriteTracker<CallLocation, LiteralValue<*>>() {
   fun record(call: CallStack, literalValue: LiteralValue<*>) {
@@ -96,7 +110,18 @@ internal class InlineWriteTracker : WriteTracker<CallLocation, LiteralValue<*>>(
         source = Files.readString(path)
       }
       // parse the location within the file
-      val currentlyInFile = "TODO parse using ${location.first.line + deltaLineNumbers}"
+      val line = location.first.line + deltaLineNumbers
+      val offsets = source.lineOffset { it <= line + 1 }
+      val startOffset = offsets[line]
+      // TODO: multi-line support
+      val endOffset =
+          if (line + 1 < offsets.size) {
+            offsets[line + 1]
+          } else {
+            source.length
+          }
+      val matcher = parseExpectSelfie(source.substring(startOffset, endOffset))
+      val currentlyInFile = matcher.group(2)
       val literalValue = location.second.snapshot
       val parsedInFile = literalValue.format.parse(currentlyInFile)
       if (parsedInFile != literalValue.expected) {
@@ -107,8 +132,25 @@ internal class InlineWriteTracker : WriteTracker<CallLocation, LiteralValue<*>>(
       }
       val toInjectIntoFile = literalValue.encodedActual()
       deltaLineNumbers += (toInjectIntoFile.countNewlines() - currentlyInFile.countNewlines())
-      // TODO: inject the encoded thing into the file
+      source =
+          source.replaceRange(startOffset, endOffset, matcher.replaceAll("$1$toInjectIntoFile$3"))
     }
     path?.let { Files.writeString(it, source) }
+  }
+  private fun replaceLiteral(matcher: Matcher, toInjectIntoFile: String): CharSequence {
+    val sb = StringBuilder()
+    matcher.appendReplacement(sb, toInjectIntoFile)
+    matcher.appendTail(sb)
+    return sb
+  }
+  private fun parseExpectSelfie(source: String): Matcher {
+    // TODO: support multi-line parsing
+    val pattern = Pattern.compile("^(\\s*expectSelfie\\()([^)]*)(\\))", Pattern.MULTILINE)
+    val matcher = pattern.matcher(source)
+    if (matcher.find()) {
+      return matcher
+    } else {
+      TODO("Unexpected line: $source")
+    }
   }
 }

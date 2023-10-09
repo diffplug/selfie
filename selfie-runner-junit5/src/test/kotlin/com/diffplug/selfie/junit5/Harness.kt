@@ -98,7 +98,8 @@ open class Harness(subproject: String) {
         }
         val matchingLines =
             allLines.mapIndexedNotNull() { index, line ->
-              if (line.contains(start)) "L$index: $line" else null
+              // TODO: probably need more than ignore import??
+              if (line.contains(start) && !line.contains("import ")) "L$index: $line" else null
             }
         if (matchingLines.size == 1) {
           val idx = matchingLines[0].substringAfter("L").substringBefore(":").toInt()
