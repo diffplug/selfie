@@ -7,10 +7,7 @@ dokkatoo {
   }
   pluginsConfiguration.html {
     templatesDir.set(rootProject.file("gradle/dokka/templates"))
-    customStyleSheets.from(
-      rootProject.file("gradle/dokka/styles/logo-styles.css"),
-      rootProject.file("gradle/dokka/styles/selfie-style.css")
-    )
+    customStyleSheets.from(rootProject.file("gradle/dokka/styles/selfie-style.css"))
     customAssets.from(
       rootProject.file("gradle/dokka/assets/background_floral.webp"),
       rootProject.file("gradle/dokka/assets/background_seaside.webp"),
