@@ -54,13 +54,11 @@
 
 /* Footer */
 .selfie-footer-bot {
-    width: 400px;
-    height: 450px;
-    position: fixed;
+    width: 260px;
+    position: absolute;
     bottom: 0;
     left: 0;
     z-index: 1;
-    transform: translateY(calc(var(--content-height) + 125px + var(--selfie-bot)));
     pointer-events: none;
 }
 
@@ -69,4 +67,5 @@
     background-repeat: repeat-x;
     background-size: 500px;
     min-height: 125px;
+    position: relative;
 }
