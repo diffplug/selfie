@@ -1,3 +1,5 @@
+/* Header */
+
 .navigation {
     background: url("../images/background_floral.webp");
     background-repeat: repeat-x;
@@ -5,6 +7,7 @@
     height: 170px;
 }
 
+/* Header - robot */
 .selfie-container {
     display: flex;
     position: relative;
@@ -31,8 +34,24 @@
     position: absolute;
     top: -65px;
     right: 16px;
+    z-index: 10;
 }
 
+/* Header - search */
+#pages-search svg path {
+    fill: var(--color-dark) !important;
+}
+
+/* Header - language filters */
+
+.selfie-filter-section {
+    position: absolute;
+    top: 32px;
+    right: 4px;
+    z-index: 10;
+}
+
+/* Footer */
 .selfie-footer-bot {
     width: 400px;
     height: 450px;
