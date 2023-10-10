@@ -45,10 +45,20 @@ function selfieMain() {
         clearTimeout(timeout);
         timeout = setTimeout(calculateBotOffset, 50);
     };
+
+    const platformSelectors = document.querySelectorAll(".platform-selector");
+    platformSelectors.forEach(function (ps) {
+        ps.addEventListener("click", calculateBotOffset)
+    })
 }
 
 window.addEventListener("load", selfieMain);
 
 function hasBorder(element) {
-    return element.matches(".cover > .with-platform-tabs > .content");
+    return (
+        element.matches(".cover > .with-platform-tabs > .content") ||
+        Array.from(element.classList).some(function (className) {
+            return className === "content";
+        })
+    );
 }
