@@ -56,7 +56,13 @@
 
 /* Footer */
 .selfie-footer-bot {
-    width: 260px;
+    width: 150px;
+    @media (min-width: 960px) {
+        width: 235px;
+    }
+    @media (min-width: 1680px) {
+        width: 260px;
+    }
     position: absolute;
     bottom: 0;
     left: 0;
