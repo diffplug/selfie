@@ -4,7 +4,7 @@
     background: url("../images/background_floral.webp");
     background-repeat: repeat-x;
     background-size: 500px;
-    height: 170px;
+    min-height: 75px;
 }
 
 /* Header - robot */
@@ -47,7 +47,7 @@
 
 .selfie-filter-section {
     position: absolute;
-    top: 32px;
+    top: 30px;
     right: 4px;
     z-index: 10;
 }
