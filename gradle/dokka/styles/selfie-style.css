@@ -28,6 +28,11 @@
     position: relative;
 }
 
+.selfie-box {
+    padding: 8px 16px;
+    border: 1px solid var(--border-color);
+}
+
 .selfie-navigation-bot {
     display: none;
     @media (min-width: 580px) {
@@ -40,8 +45,6 @@
     right: 16px;
     z-index: 10;
     transform: translateY(var(--selfie-bot));
-    opacity: 0;
-    transition: opacity 0.5s ease-in;
 }
 
 /* Header - search */

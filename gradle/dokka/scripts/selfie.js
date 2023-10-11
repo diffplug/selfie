@@ -11,7 +11,7 @@ function selfieMain() {
 
     function calculateBotOffset() {
         // The bottom of the selfie bot should align with the top of the first visible code block
-        const codeBlocks = Array.from(main.querySelectorAll(".symbol"));
+        const codeBlocks = Array.from(main.querySelectorAll(".symbol, .selfie-box"));
         const isFound = codeBlocks.some(function(cb) {
             const parent = cb.parentElement;
             const parentHasBorder = hasBorder(parent);
@@ -22,19 +22,7 @@ function selfieMain() {
         })
         if (isFound) {
             bot.style.setProperty("--selfie-bot", "" + baseBotOffset - main.scrollTop + "px");
-            fadeBotIn();
-        } else {
-            hideBot();
         }
-    }
-
-    function fadeBotIn() {
-        bot.style.setProperty("--selfie-opacity", "1");
-        bot.style.opacity = "var(--selfie-opacity)";
-    }
-
-    function hideBot() {
-        bot.style.setProperty("--selfie-opacity", "0");
     }
 
     calculateBotOffset();
