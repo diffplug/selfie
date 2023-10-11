@@ -28,7 +28,7 @@
     position: relative;
 }
 
-.selfie-box {
+.selfie-box--border {
     padding: 8px 16px;
     border: 1px solid var(--border-color);
 }
@@ -44,6 +44,7 @@
     top: -95px; /* must be the same as the nav height with padding */
     right: 16px;
     z-index: 10;
+    opacity: 0;
     transform: translateY(var(--selfie-bot));
 }
 

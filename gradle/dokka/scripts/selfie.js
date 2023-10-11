@@ -22,7 +22,12 @@ function selfieMain() {
         })
         if (isFound) {
             bot.style.setProperty("--selfie-bot", "" + baseBotOffset - main.scrollTop + "px");
+            showBot();
         }
+    }
+
+    function showBot() {
+        bot.style.opacity = "1";
     }
 
     calculateBotOffset();
