@@ -1,0 +1,92 @@
+/* Header */
+
+.navigation {
+    background: url("../images/background_floral.webp");
+    background-repeat: repeat-x;
+    background-size: 500px;
+    min-height: 75px;
+}
+
+/* Header - robot */
+.selfie-container {
+    display: flex;
+    position: relative;
+    z-index: 4;
+}
+
+.selfie-sidebar-spacer {
+    width: 280px;
+}
+
+.selfie-main {
+    flex: 1;
+}
+
+.selfie-main-content {
+    max-width: 1160px;
+    margin: auto;
+    position: relative;
+}
+
+.selfie-box--border {
+    padding: 8px 16px;
+    border: 1px solid var(--border-color);
+}
+
+.selfie-navigation-bot {
+    display: none;
+    @media (min-width: 580px) {
+        display: initial;
+    }
+    width: 300px;
+    height: 300px;
+    position: absolute;
+    top: -95px; /* must be the same as the nav height with padding */
+    right: 16px;
+    z-index: 10;
+    opacity: 0;
+    transform: translateY(var(--selfie-bot));
+}
+
+/* Header - search */
+#pages-search, #pages-search:hover {
+    background: white;
+    box-shadow: 1px 1px 3px grey;
+}
+
+#pages-search svg path {
+    fill: var(--color-dark) !important;
+}
+
+/* Header - language filters */
+
+.selfie-filter-section {
+    position: absolute;
+    top: 30px;
+    right: 4px;
+    z-index: 10;
+}
+
+/* Footer */
+.selfie-footer-bot {
+    width: 150px;
+    @media (min-width: 960px) {
+        width: 235px;
+    }
+    @media (min-width: 1680px) {
+        width: 260px;
+    }
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    z-index: 1;
+    pointer-events: none;
+}
+
+.footer {
+    background: url("../images/background_seaside.webp");
+    background-repeat: repeat-x;
+    background-size: 500px;
+    min-height: 125px;
+    position: relative;
+}

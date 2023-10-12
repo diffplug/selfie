@@ -10,6 +10,12 @@ export default function Document() {
           href="https://fonts.googleapis.com/css2?family=Bagel+Fat+One&family=Jost:ital,wght@0,400;0,700;1,400&display=swap"
           rel="stylesheet"
         />
+        <link
+          href="/logo-icon.svg"
+          rel="icon"
+          type="image/svg"
+          sizes="32x32"
+        ></link>
       </Head>
       <body>
         <div className="flex justify-center text-black antialiased">
