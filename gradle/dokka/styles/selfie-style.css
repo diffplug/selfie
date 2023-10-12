@@ -49,6 +49,11 @@
 }
 
 /* Header - search */
+#pages-search, #pages-search:hover {
+    background: white;
+    box-shadow: 1px 1px 3px grey;
+}
+
 #pages-search svg path {
     fill: var(--color-dark) !important;
 }
