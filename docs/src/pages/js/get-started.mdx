@@ -1,0 +1,75 @@
+import { GetStarted } from "@/components/GetStarted";
+
+<GetStarted />
+
+## Getting Started with Selfie: The Snapshot Testing Library
+
+Welcome to Selfie, an open-source snapshot testing library for JavaScript that simplifies and streamlines your testing processes. This guide will take you through the initial steps of setting up Selfie in your JavaScript project.
+
+## What is Snapshot Testing?
+
+Snapshot tests assert that a component's output remains consistent over time by capturing and storing a "snapshot" of a rendered component and then comparing it to future snapshots. If the two snapshots don't match, the test will fail, alerting you to any unexpected changes in your component's rendered output.
+
+## Installation
+
+Installing Selfie is easy using npm:
+
+```bash
+npm install selfie-testing --save-dev
+```
+
+## Setting Up Your First Test
+
+1. **Import the library**
+
+   First, you'll need to import Selfie into your testing file.
+
+   ```javascript
+   import { createSnapshot, compareWithSnapshot } from "selfie-testing";
+   ```
+
+2. **Capture the Initial Snapshot**
+
+   Use the `createSnapshot` function to capture the initial snapshot of your component. This will generate a snapshot file that Selfie will use for future comparisons.
+
+   ```javascript
+   const initialSnapshot = createSnapshot(<YourComponent />);
+   ```
+
+3. **Compare with Future Snapshots**
+
+   In your tests, use the `compareWithSnapshot` function to ensure your component's current output matches the stored snapshot.
+
+   ```javascript
+   test("YourComponent should match the snapshot", () => {
+     const currentOutput = <YourComponent />;
+     expect(compareWithSnapshot(currentOutput, initialSnapshot)).toBe(true);
+   });
+   ```
+
+   If the component's output has changed since the initial snapshot was taken, this test will fail.
+
+4. **Update Snapshots (when needed)**
+
+   Over time, you'll intentionally make changes to your components. When that happens, you'll need to update the stored snapshot to reflect these changes.
+
+   You can capture a new snapshot using the `createSnapshot` function, and then overwrite the old snapshot with the new one.
+
+   ```javascript
+   const updatedSnapshot = createSnapshot(<YourComponent />);
+   ```
+
+## Tips and Best Practices
+
+- **Commit Snapshots**: Always commit your snapshot files to your version control system. This ensures that all team members are working with the same snapshots.
+- **Review Snapshot Differences**: When a snapshot test fails, review the changes carefully. Make sure that any differences between the snapshots are intentional.
+
+- **Regularly Update Snapshots**: As your codebase evolves, your components will change. Make it a habit to regularly update snapshots to reflect these changes.
+
+## Conclusion
+
+Snapshot testing with Selfie offers a fast and effective way to ensure the consistent rendering of your JavaScript components. By capturing and comparing snapshots, you can quickly identify unexpected changes and maintain the reliability of your components.
+
+Thank you for choosing Selfie! If you have any feedback, issues, or suggestions, please feel free to contribute to our GitHub repository.
+
+Happy testing! 📸
