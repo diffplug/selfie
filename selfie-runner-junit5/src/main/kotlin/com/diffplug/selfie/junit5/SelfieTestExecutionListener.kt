@@ -30,28 +30,31 @@ import org.junit.platform.launcher.TestPlan
 internal object Router {
   private class ClassMethod(val clazz: ClassProgress, val method: String)
   private val threadCtx = ThreadLocal<ClassMethod?>()
-  fun readOrWriteOrKeep(snapshot: Snapshot?, subOrKeepAll: String?): Snapshot? {
-    val classMethod =
-        threadCtx.get()
-            ?: throw AssertionError(
-                "Selfie `toMatchDisk` must be called only on the original thread.")
-    return if (subOrKeepAll == null) {
-      assert(snapshot == null)
-      classMethod.clazz.keep(classMethod.method, null)
-      null
+  private fun classAndMethod() =
+      threadCtx.get()
+          ?: throw AssertionError(
+              "Selfie `toMatchDisk` must be called only on the original thread.")
+  private fun suffix(sub: String) = if (sub == "") "" else "/$sub"
+  fun readWriteThroughPipeline(actual: Snapshot, sub: String): ExpectedActual {
+    val cm = classAndMethod()
+    val suffix = suffix(sub)
+    val callStack = recordCall()
+    val transformed =
+        cm.clazz.parent.pipeline.transform(
+            cm.clazz.className, "${cm.method}$suffix", callStack, actual)
+    return if (RW.isWrite) {
+      cm.clazz.write(cm.method, suffix, transformed, callStack)
+      ExpectedActual(transformed, transformed)
     } else {
-      val suffix = if (subOrKeepAll == "") "" else "/$subOrKeepAll"
-      if (snapshot == null) {
-        classMethod.clazz.keep(classMethod.method, suffix)
-        null
-      } else {
-        if (RW.isWrite) {
-          classMethod.clazz.write(classMethod.method, suffix, snapshot)
-          snapshot
-        } else {
-          classMethod.clazz.read(classMethod.method, suffix)
-        }
-      }
+      ExpectedActual(cm.clazz.read(cm.method, suffix), transformed)
+    }
+  }
+  fun keep(subOrKeepAll: String?) {
+    val cm = classAndMethod()
+    if (subOrKeepAll == null) {
+      cm.clazz.keep(cm.method, null)
+    } else {
+      cm.clazz.keep(cm.method, suffix(subOrKeepAll))
     }
   }
   internal fun start(clazz: ClassProgress, method: String) {
@@ -137,10 +140,10 @@ internal class ClassProgress(val parent: Progress, val className: String) {
       methods[method]!!.keepSuffix(suffixOrAll)
     }
   }
-  @Synchronized fun write(method: String, suffix: String, snapshot: Snapshot) {
+  @Synchronized fun write(method: String, suffix: String, snapshot: Snapshot, callStack: CallStack) {
     assertNotTerminated()
     val key = "$method$suffix"
-    diskWriteTracker!!.record(key, snapshot, recordCall())
+    diskWriteTracker!!.record(key, snapshot, callStack)
     methods[method]!!.keepSuffix(suffix)
     read().setAtTestTime(key, snapshot)
   }
@@ -174,6 +177,7 @@ internal class ClassProgress(val parent: Progress, val className: String) {
 internal class Progress {
   val settings = SelfieSettingsAPI.initialize()
   val layout = SnapshotFileLayout.initialize(settings)
+  val pipeline = settings.openPipeline(layout)
 
   private var progressPerClass = ArrayMap.empty<String, ClassProgress>()
   private fun forClass(className: String) = synchronized(this) { progressPerClass[className]!! }
@@ -206,6 +210,7 @@ internal class Progress {
     }
   }
   fun finishedAllTests() {
+    pipeline.close()
     for (stale in findStaleSnapshotFiles(layout)) {
       deleteFileAndParentDirIfEmpty(layout.snapshotPathForClass(stale))
     }

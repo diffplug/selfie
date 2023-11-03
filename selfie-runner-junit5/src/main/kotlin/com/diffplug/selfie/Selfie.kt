@@ -24,33 +24,19 @@ import org.opentest4j.AssertionFailedError
  */
 fun preserveSelfiesOnDisk(vararg subsToKeep: String): Unit {
   if (subsToKeep.isEmpty()) {
-    Router.readOrWriteOrKeep(null, null)
+    Router.keep(null)
   } else {
-    for (sub in subsToKeep) {
-      Router.readOrWriteOrKeep(null, sub)
-    }
+    subsToKeep.forEach { Router.keep(it) }
   }
 }
 
 open class DiskSelfie internal constructor(private val actual: Snapshot) {
   fun toMatchDisk(sub: String = ""): Snapshot {
-    val onDisk = Router.readOrWriteOrKeep(actual, sub)
-    if (RW.isWrite) return actual
-    else if (onDisk == null) throw AssertionFailedError("No such snapshot")
-    else if (actual.value != onDisk.value)
-        throw AssertionFailedError("Snapshot failure", onDisk.value, actual.value)
-    else if (actual.lenses.keys != onDisk.lenses.keys)
-        throw AssertionFailedError(
-            "Snapshot failure: mismatched lenses", onDisk.lenses.keys, actual.lenses.keys)
-    for (key in actual.lenses.keys) {
-      val actualValue = actual.lenses[key]!!
-      val onDiskValue = onDisk.lenses[key]!!
-      if (actualValue != onDiskValue) {
-        throw AssertionFailedError("Snapshot failure within lens $key", onDiskValue, actualValue)
-      }
+    val comparison = Router.readWriteThroughPipeline(actual, sub)
+    if (!RW.isWrite) {
+      comparison.assertEqual()
     }
-    // if we're in read mode and the equality checks passed, stick with the disk value
-    return onDisk
+    return comparison.actual
   }
 }
 fun <T> expectSelfie(actual: T, snapshotter: Snapshotter<T>) =
@@ -93,3 +79,23 @@ infix fun ByteArray.shouldBeSelfieBase64(expected: String): ByteArray =
 infix fun Int.shouldBeSelfie(expected: Int): Int = expectSelfie(this).toBe(expected)
 infix fun Long.shouldBeSelfie(expected: Long): Long = expectSelfie(this).toBe(expected)
 infix fun Boolean.shouldBeSelfie(expected: Boolean): Boolean = expectSelfie(this).toBe(expected)
+
+internal class ExpectedActual(val expected: Snapshot?, val actual: Snapshot) {
+  fun assertEqual() {
+    if (expected == null) {
+      throw AssertionFailedError("No such snapshot")
+    }
+    if (expected.value != actual.value)
+        throw AssertionFailedError("Snapshot failure", expected.value, actual.value)
+    else if (expected.lenses.keys != actual.lenses.keys)
+        throw AssertionFailedError(
+            "Snapshot failure: mismatched lenses", expected.lenses.keys, actual.lenses.keys)
+    for (key in expected.lenses.keys) {
+      val expectedValue = expected.lenses[key]!!
+      val actualValue = actual.lenses[key]!!
+      if (actualValue != expectedValue) {
+        throw AssertionFailedError("Snapshot failure within lens $key", expectedValue, actualValue)
+      }
+    }
+  }
+}

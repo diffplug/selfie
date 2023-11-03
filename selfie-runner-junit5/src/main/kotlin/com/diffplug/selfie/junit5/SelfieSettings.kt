@@ -66,21 +66,12 @@ interface SelfieSettingsAPI {
 
 /** Transforms a full snapshot into a new snapshot. */
 interface SnapshotPipe : AutoCloseable {
-  fun transform(
-      testClass: Class<*>,
-      key: String,
-      callStack: CallStack,
-      snapshot: Snapshot
-  ): Snapshot
+  fun transform(className: String, key: String, callStack: CallStack, snapshot: Snapshot): Snapshot
 }
 
 object SnapshotPipeNoOp : SnapshotPipe {
-  override fun transform(
-      testClass: Class<*>,
-      key: String,
-      callStack: CallStack,
-      snapshot: Snapshot
-  ) = snapshot
+  override fun transform(testClass: String, key: String, callStack: CallStack, snapshot: Snapshot) =
+      snapshot
   override fun close() {}
 }
 
@@ -88,7 +79,7 @@ object SnapshotPipeNoOp : SnapshotPipe {
 interface SnapshotLens : AutoCloseable {
   val defaultLensName: String
   fun transform(
-      testClass: Class<*>,
+      testClass: String,
       key: String,
       callStack: CallStack,
       snapshot: Snapshot
@@ -104,7 +95,7 @@ class PipeWhere : SnapshotPipe {
     toApply.add(
         object : SnapshotPipe {
           override fun transform(
-              testClass: Class<*>,
+              testClass: String,
               key: String,
               callStack: CallStack,
               snapshot: Snapshot
@@ -127,7 +118,7 @@ class PipeWhere : SnapshotPipe {
   fun addLens(lens: SnapshotLens) = addLensOrReplaceRoot(lens.defaultLensName, lens)
   fun replaceRootWith(lens: SnapshotLens) = addLensOrReplaceRoot(null, lens)
   override fun transform(
-      testClass: Class<*>,
+      testClass: String,
       key: String,
       callStack: CallStack,
       snapshot: Snapshot
@@ -149,7 +140,7 @@ open class StandardSelfieSettings : SelfieSettingsAPI {
     return newPipe
   }
   override fun openPipeline(layout: SnapshotFileLayout): SnapshotPipe {
-    TODO("Not yet implemented")
+    return SnapshotPipeNoOp
   }
 }
 
