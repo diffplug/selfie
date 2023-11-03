@@ -18,7 +18,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install JDK ${{ matrix.jre }}
         uses: actions/setup-java@v3
         with:
@@ -33,7 +33,7 @@ jobs:
       - name: gradlew build
         run: ./gradlew build
       - name: junit result
-        uses: mikepenz/action-junit-report@v3
+        uses: mikepenz/action-junit-report@v4
         if: always() # always run even if the previous step fails
         with:
           check_name: JUnit ${{ matrix.jre }} ${{ matrix.os }}
