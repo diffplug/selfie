@@ -25,10 +25,13 @@ interface SelfieSettingsAPI {
   fun openPipeline(layout: SnapshotFileLayout): SnapshotPipe = SnapshotPipeNoOp
 
   /**
-   * null means that snapshots are stored at the same folder location as the test that created them.
+   * Defaults to `__snapshot__`, null means that snapshots are stored at the same folder location as
+   * the test that created them.
    */
   val snapshotFolderName: String?
     get() = "__snapshots__"
+
+  /** By default, the root folder is the first of the standard test directories. */
   val rootFolder: Path
     get() {
       val userDir = Paths.get(System.getProperty("user.dir"))
@@ -39,7 +42,7 @@ interface SelfieSettingsAPI {
         }
       }
       throw AssertionError(
-          "Could not find a standard test directory, 'user.dir' is equal to $userDir")
+          "Could not find a standard test directory, 'user.dir' is equal to $userDir, looked in $STANDARD_DIRS")
     }
 
   companion object {
