@@ -17,7 +17,51 @@ package com.diffplug.selfie.junit5
 
 import com.diffplug.selfie.Snapshot
 import com.diffplug.selfie.SnapshotValue
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.Paths
 
+interface SelfieSettingsAPI {
+  fun openPipeline(layout: SnapshotFileLayout): SnapshotPipe = SnapshotPipeNoOp
+
+  /**
+   * null means that snapshots are stored at the same folder location as the test that created them.
+   */
+  val snapshotFolderName: String?
+    get() = "__snapshots__"
+  val rootFolder: Path
+    get() {
+      val userDir = Paths.get(System.getProperty("user.dir"))
+      for (standardDir in STANDARD_DIRS) {
+        val candidate = userDir.resolve(standardDir)
+        if (Files.isDirectory(candidate)) {
+          return candidate
+        }
+      }
+      throw AssertionError(
+          "Could not find a standard test directory, 'user.dir' is equal to $userDir")
+    }
+
+  companion object {
+    private val STANDARD_DIRS =
+        listOf(
+            "src/test/java",
+            "src/test/kotlin",
+            "src/test/groovy",
+            "src/test/scala",
+            "src/test/resources")
+    internal fun initialize(): SelfieSettingsAPI {
+      try {
+        val clazz = Class.forName("com.diffplug.selfie.SelfiePipeline")
+        return clazz.getDeclaredConstructor().newInstance() as SelfieSettingsAPI
+      } catch (e: ClassNotFoundException) {
+        return StandardSelfieSettings()
+      }
+    }
+  }
+}
+
+/** Transforms a full snapshot into a new snapshot. */
 interface SnapshotPipe : AutoCloseable {
   fun transform(
       testClass: Class<*>,
@@ -27,6 +71,17 @@ interface SnapshotPipe : AutoCloseable {
   ): Snapshot
 }
 
+object SnapshotPipeNoOp : SnapshotPipe {
+  override fun transform(
+      testClass: Class<*>,
+      key: String,
+      callStack: CallStack,
+      snapshot: Snapshot
+  ) = snapshot
+  override fun close() {}
+}
+
+/** Extracts a specific value out of an existing snapshot. */
 interface SnapshotLens : AutoCloseable {
   val defaultLensName: String
   fun transform(
@@ -83,10 +138,6 @@ class PipeWhere : SnapshotPipe {
   }
 }
 
-interface SelfieSettingsAPI {
-  fun openPipeline(layout: SnapshotFileLayout): SnapshotPipe
-}
-
 open class StandardSelfieSettings : SelfieSettingsAPI {
   private val pipes = mutableListOf<PipeWhere>()
   protected fun addPipeWhere(): PipeWhere {
@@ -101,6 +152,6 @@ open class StandardSelfieSettings : SelfieSettingsAPI {
 
 class Example : StandardSelfieSettings() {
   init {
-      addPipeWhere().addLens()
+    addPipeWhere()
   }
 }

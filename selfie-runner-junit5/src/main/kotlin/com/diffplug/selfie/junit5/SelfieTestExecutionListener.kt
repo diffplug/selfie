@@ -28,6 +28,9 @@ import org.junit.platform.launcher.TestPlan
 
 /** Routes between `toMatchDisk()` calls and the snapshot file / pruning machinery. */
 internal object Router {
+  private val settings = SelfieSettingsAPI.initialize()
+  internal val layout = SnapshotFileLayout.initialize(settings)
+
   private class ClassMethod(val clazz: ClassProgress, val method: String)
   private val threadCtx = ThreadLocal<ClassMethod?>()
   fun readOrWriteOrKeep(snapshot: Snapshot?, subOrKeepAll: String?): Snapshot? {
@@ -72,13 +75,8 @@ internal object Router {
     threadCtx.set(null)
   }
   fun fileLocationFor(className: String): Path {
-    if (layout == null) {
-      layout = SnapshotFileLayout.initialize(className)
-    }
-    return layout!!.snapshotPathForClass(className)
+    return layout.snapshotPathForClass(className)
   }
-
-  var layout: SnapshotFileLayout? = null
 }
 
 /** Tracks the progress of test runs within a single class, so that snapshots can be pruned. */
@@ -171,7 +169,7 @@ internal class ClassProgress(val className: String) {
             val content = Files.readAllBytes(snapshotPath)
             SnapshotFile.parse(SnapshotValueReader.of(content))
           } else {
-            SnapshotFile.createEmptyWithUnixNewlines(Router.layout!!.unixNewlines)
+            SnapshotFile.createEmptyWithUnixNewlines(Router.layout.unixNewlines)
           }
     }
     return file!!
