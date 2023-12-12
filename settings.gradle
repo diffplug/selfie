@@ -6,41 +6,36 @@ pluginManagement {
 }
 plugins {
   // https://github.com/diffplug/blowdryer/blob/main/CHANGELOG.md
-  id 'com.diffplug.blowdryerSetup' version '1.7.0'
+  id 'com.diffplug.blowdryerSetup' version '1.7.1'
   // https://github.com/diffplug/spotless/blob/main/plugin-gradle/CHANGES.md
-  id 'com.diffplug.spotless' version '6.19.0' apply false
+  id 'com.diffplug.spotless' version '6.23.3' apply false
   // https://github.com/diffplug/spotless-changelog/blob/main/CHANGELOG.md
   id 'com.diffplug.spotless-changelog' version '3.0.2' apply false
   // https://plugins.gradle.org/plugin/com.gradle.plugin-publish
-  id 'com.gradle.plugin-publish' version '1.2.0' apply false
+  id 'com.gradle.plugin-publish' version '1.2.1' apply false
   // https://github.com/equodev/equo-ide/blob/main/plugin-gradle/CHANGELOG.md
-  id 'dev.equo.ide' version '1.3.0' apply false
+  id 'dev.equo.ide' version '1.7.5' apply false
   // https://github.com/gradle-nexus/publish-plugin/releases
-  id 'io.github.gradle-nexus.publish-plugin' version '1.3.0' apply false
+  id 'io.github.gradle-nexus.publish-plugin' version '2.0.0-rc-1' apply false
+  // https://plugins.gradle.org/plugin/org.jetbrains.dokka
+  id 'org.jetbrains.dokka'                       version '1.9.10' apply false
   // https://plugins.gradle.org/plugin/org.jetbrains.kotlin.jvm
-  id 'org.jetbrains.kotlin.jvm'                  version '1.9.10' apply false
+  id 'org.jetbrains.kotlin.jvm'                  version '1.9.21' apply false
   // https://plugins.gradle.org/plugin/org.jetbrains.kotlin.plugin.serialization
-  id 'org.jetbrains.kotlin.plugin.serialization' version '1.9.10' apply false
+  id 'org.jetbrains.kotlin.plugin.serialization' version '1.9.21' apply false
   // https://plugins.gradle.org/plugin/org.jetbrains.kotlin.multiplatform
-  id 'org.jetbrains.kotlin.multiplatform' version '1.9.10' apply false
+  id 'org.jetbrains.kotlin.multiplatform' version '1.9.21' apply false
   // https://github.com/adamko-dev/dokkatoo/releases
   id 'dev.adamko.dokkatoo-html' version '2.0.0' apply false
 }
 
 blowdryerSetup {
-  github 'diffplug/blowdryer-diffplug', 'tag', '7.1.0'
+  github 'diffplug/blowdryer-diffplug', 'tag', '7.1.1'
   //devLocal '../blowdryer-diffplug'
   setPluginsBlockTo {
     it.file 'plugin.versions'
     it.file 'plugin-kotlin.versions'
-    it.add "\t// https://plugins.gradle.org/plugin/org.jetbrains.kotlin.multiplatform"
-    it.add "\tid 'org.jetbrains.kotlin.multiplatform' version '1.8.22' apply false"
-    it.replace '1.8.22', '1.9.10'
-    it.add "\t// https://github.com/adamko-dev/dokkatoo/releases"
-    it.add "\tid 'dev.adamko.dokkatoo-html' version '2.0.0' apply false"
-    it.remove '\t// https://plugins.gradle.org/plugin/org.jetbrains.dokka'
-    it.remove "\tid 'org.jetbrains.dokka'                       version '1.8.20' apply false"
-    it.replace '\t', '  '
+    it.replace('\t', '  ')
   }
 }
 
