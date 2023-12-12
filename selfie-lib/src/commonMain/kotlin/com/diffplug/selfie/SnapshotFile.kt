@@ -31,8 +31,8 @@ class ParseException private constructor(val line: Int, message: String?, cause:
 }
 
 sealed interface SnapshotValue {
-  val isBinary: Boolean
-    get() = this is SnapshotValueBinary
+  val isString: Boolean
+    get() = this is SnapshotValueString
   fun valueBinary(): ByteArray
   fun valueString(): String
 
@@ -120,7 +120,7 @@ class SnapshotFile {
     valueWriter.write(" ═╗\n")
   }
   private fun writeValue(valueWriter: StringWriter, value: SnapshotValue) {
-    if (value.isBinary) {
+    if (!value.isString) {
       TODO("BASE64")
     } else {
       val escaped =

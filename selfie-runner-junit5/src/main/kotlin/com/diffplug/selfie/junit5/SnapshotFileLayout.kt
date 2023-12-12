@@ -85,8 +85,7 @@ class SnapshotFileLayout(
             }
           }
           .firstOrNull()
-          ?.let { it.indexOf('\r') == -1 }
-          ?: true // if we didn't find any files, assume unix
+          ?.let { it.indexOf('\r') == -1 } ?: true // if we didn't find any files, assume unix
     }
   }
 }

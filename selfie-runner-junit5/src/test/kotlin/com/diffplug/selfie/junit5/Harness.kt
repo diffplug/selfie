@@ -24,9 +24,9 @@ import javax.xml.xpath.XPathFactory
 import okio.FileSystem
 import okio.Path
 import okio.Path.Companion.toPath
-import org.gradle.internal.impldep.junit.framework.AssertionFailedError
 import org.gradle.tooling.BuildException
 import org.gradle.tooling.GradleConnector
+import org.opentest4j.AssertionFailedError
 import org.w3c.dom.NodeList
 import org.xml.sax.InputSource
 

@@ -87,10 +87,52 @@ interface SnapshotLens : AutoCloseable {
   override fun close() {
     // optional
   }
+
+  companion object {
+    fun htmlToMd() = com.diffplug.selfie.junit5.HtmlToMd()
+    fun htmlPrettyPrint() = com.diffplug.selfie.junit5.HtmlPrettyPrint()
+    fun htmlExtractCssN(cssSelector: String): SnapshotLens =
+        com.diffplug.selfie.junit5.HtmlExtract(cssSelector, 0)
+    fun htmlExtractCssExactlyOne(cssSelector: String): SnapshotLens =
+        com.diffplug.selfie.junit5.HtmlExtract(cssSelector, 1)
+    fun htmlExtractCssExactlyOneOrNull(cssSelector: String): SnapshotLens =
+        com.diffplug.selfie.junit5.HtmlExtract(cssSelector, -1)
+  }
+  fun andThen(lens: SnapshotLens): SnapshotLens = SnapshotLensSequence(this, lens)
 }
 
-class PipeWhere : SnapshotPipe {
+internal class SnapshotLensSequence(val first: SnapshotLens, val second: SnapshotLens) :
+    SnapshotLens {
+  override val defaultLensName: String
+    get() = "${first.defaultLensName}⇒${second.defaultLensName}"
+  override fun transform(
+      testClass: String,
+      key: String,
+      callStack: CallStack,
+      snapshot: Snapshot
+  ): SnapshotValue? =
+      first.transform(testClass, key, callStack, snapshot)?.let {
+        second.transform(testClass, key, callStack, snapshot.withNewRoot(it))
+      }
+}
+fun interface SnapshotPredicate {
+  fun test(testClass: String, key: String, callStack: CallStack, snapshot: Snapshot): Boolean
+}
+
+open class PipeWhere : SnapshotPipe {
+  private val predicates = mutableListOf<SnapshotPredicate>()
   private val toApply = mutableListOf<SnapshotPipe>()
+  fun matches(predicate: (String, String, CallStack, Snapshot) -> Boolean): PipeWhere {
+    predicates.add(predicate)
+    return this
+  }
+  fun contentIsString(predicate: (String) -> Boolean) = matches { _, _, _, snapshot ->
+    snapshot.value.isString && predicate(snapshot.value.valueString())
+  }
+  fun contentIsHtml(): PipeWhere {
+    val regex = "<\\/?[a-z][\\s\\S]*>".toRegex()
+    return contentIsString { regex.find(it) != null }
+  }
   private fun addLensOrReplaceRoot(name: String?, lens: SnapshotLens) {
     toApply.add(
         object : SnapshotPipe {
@@ -140,12 +182,30 @@ open class StandardSelfieSettings : SelfieSettingsAPI {
     return newPipe
   }
   override fun openPipeline(layout: SnapshotFileLayout): SnapshotPipe {
-    return SnapshotPipeNoOp
+    return object : SnapshotPipe {
+      override fun transform(
+          testClass: String,
+          key: String,
+          callStack: CallStack,
+          snapshot: Snapshot
+      ): Snapshot {
+        var current = snapshot
+        pipes.forEach { current = it.transform(testClass, key, callStack, current) }
+        return current
+      }
+      override fun close() {
+        pipes.forEach { it.close() }
+      }
+    }
   }
 }
 
 class Example : StandardSelfieSettings() {
   init {
+    addPipeWhere().contentIsHtml().replaceRootWith(SnapshotLens.htmlPrettyPrint())
     addPipeWhere()
+        .contentIsHtml()
+        .addLens(
+            SnapshotLens.htmlExtractCssExactlyOneOrNull("content").andThen(SnapshotLens.htmlToMd()))
   }
 }
