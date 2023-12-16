@@ -17,27 +17,43 @@ package com.diffplug.selfie.junit5
 
 import com.diffplug.selfie.RW
 import com.diffplug.selfie.Snapshot
+import java.nio.file.Files
+import java.nio.file.Paths
 import java.util.stream.Collectors
+import kotlin.io.path.name
 
 /** Represents the line at which user code called into Selfie. */
-data class CallLocation(val subpath: String, val line: Int) : Comparable<CallLocation> {
-  override fun compareTo(other: CallLocation): Int {
-    val subpathCompare = subpath.compareTo(other.subpath)
-    return if (subpathCompare != 0) subpathCompare else line.compareTo(other.line)
+data class CallLocation(val clazz: String, val method: String, val file: String?, val line: Int) :
+    Comparable<CallLocation> {
+  override fun compareTo(other: CallLocation): Int =
+      compareValuesBy(this, other, { it.clazz }, { it.method }, { it.file }, { it.line })
+  fun findFileIfAbsent(): String {
+    if (file != null) {
+      return file
+    }
+    val fileWithoutExtension = clazz.substringAfterLast('.').substringBefore('$')
+    val likelyExtensions = listOf("kt", "java", "scala", "groovy", "clj", "cljc")
+    val filenames = likelyExtensions.map { "$fileWithoutExtension.$it" }.toSet()
+    val firstPath = Files.walk(Paths.get("")).use { it.filter { it.name in filenames }.findFirst() }
+    return if (firstPath.isEmpty) fileWithoutExtension else firstPath.get().name
   }
-  override fun toString(): String = "$subpath:$line"
+
+  /** A `toString` which IntelliJ will render as a clickable link. */
+  override fun toString(): String = "$clazz.$method(${findFileIfAbsent()}:$line)"
 }
 /** Represents the callstack above a given CallLocation. */
 class CallStack(val location: CallLocation, val restOfStack: List<CallLocation>) {
-  override fun toString(): String = "$location"
+  override fun toString(): String {
+    return location.toString()
+  }
 }
 /** Generates a CallLocation and the CallStack behind it. */
 fun recordCall(): CallStack {
   val calls =
       StackWalker.getInstance().walk { frames ->
         frames
-            .skip(1)
-            .map { CallLocation(it.className.replace('.', '/') + ".kt", it.lineNumber) }
+            .dropWhile { it.className.startsWith("com.diffplug.selfie") }
+            .map { CallLocation(it.className, it.methodName, it.fileName, it.lineNumber) }
             .collect(Collectors.toList())
       }
   return CallStack(calls.removeAt(0), calls)
@@ -53,7 +69,7 @@ internal open class WriteTracker<K : Comparable<K>, V> {
     if (existing != null) {
       if (existing.snapshot != snapshot) {
         throw org.opentest4j.AssertionFailedError(
-            "Snapshot was set to multiple values:\nfirst time:${existing.callStack}\n\nthis time:${call}",
+            "Snapshot was set to multiple values!\n  first time: ${existing.callStack}\n   this time: ${call}",
             existing.snapshot,
             snapshot)
       } else if (RW.isWriteOnce) {
