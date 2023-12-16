@@ -41,7 +41,9 @@ internal fun findStaleSnapshotFiles(layout: SnapshotFileLayout): List<String> {
 }
 private fun classExistsAndHasTests(key: String): Boolean {
   return try {
-    Class.forName(key).methods.any { it.annotations.any { it.annotationClass.simpleName == "Test" } }
+    Class.forName(key).methods.any {
+      it.annotations.any { it.annotationClass.simpleName == "Test" }
+    }
   } catch (e: ClassNotFoundException) {
     false
   }
