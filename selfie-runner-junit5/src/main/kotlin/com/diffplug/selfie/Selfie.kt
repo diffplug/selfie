@@ -16,7 +16,6 @@
 package com.diffplug.selfie
 
 import com.diffplug.selfie.junit5.Router
-import com.diffplug.selfie.junit5.SelfieSettingsAPI
 import org.opentest4j.AssertionFailedError
 
 object Selfie {
@@ -46,10 +45,10 @@ object Selfie {
 
   @JvmStatic
   fun <T> expectSelfie(actual: T, snapshotter: Snapshotter<T>) =
-          DiskSelfie(snapshotter.snapshot(actual))
+      DiskSelfie(snapshotter.snapshot(actual))
 
   @JvmStatic
-  fun expectSelfieImplicit(actual: Any) : DiskSelfie {
+  fun expectSelfieImplicit(actual: Any): DiskSelfie {
     return expectSelfie(actual, Router.snapshotImplicit(actual))
   }
 
@@ -58,46 +57,40 @@ object Selfie {
     fun toBe_TODO(): String = TODO()
   }
 
-  @JvmStatic
-  fun expectSelfie(actual: String) = StringSelfie(actual)
+  @JvmStatic fun expectSelfie(actual: String) = StringSelfie(actual)
 
   class BinarySelfie(private val actual: ByteArray) : DiskSelfie(Snapshot.of(actual)) {
     fun toBeBase64(expected: String): ByteArray = TODO()
     fun toBeBase64_TODO(): ByteArray = TODO()
   }
 
-  @JvmStatic
-  fun expectSelfie(actual: ByteArray) = BinarySelfie(actual)
+  @JvmStatic fun expectSelfie(actual: ByteArray) = BinarySelfie(actual)
 
   class IntSelfie(private val actual: Int) {
     fun toBe(expected: Int): Int = TODO()
     fun toBe_TODO(): Int = TODO()
   }
 
-  @JvmStatic
-  fun expectSelfie(actual: Int) = IntSelfie(actual)
+  @JvmStatic fun expectSelfie(actual: Int) = IntSelfie(actual)
 
   class LongSelfie(private val actual: Long) {
     fun toBe(expected: Long): Long = TODO()
     fun toBe_TODO(): Long = TODO()
   }
 
-  @JvmStatic
-  fun expectSelfie(actual: Long) = LongSelfie(actual)
+  @JvmStatic fun expectSelfie(actual: Long) = LongSelfie(actual)
 
   class BooleanSelfie(private val actual: Boolean) {
     fun toBe(expected: Boolean): Boolean = TODO()
     fun toBe_TODO(): Boolean = TODO()
   }
 
-  @JvmStatic
-  fun expectSelfie(actual: Boolean) = BooleanSelfie(actual)
+  @JvmStatic fun expectSelfie(actual: Boolean) = BooleanSelfie(actual)
 
   // infix versions for the inline methods, consistent with Kotest's API
   infix fun String.shouldBeSelfie(expected: String): String = expectSelfie(this).toBe(expected)
   infix fun ByteArray.shouldBeSelfieBase64(expected: String): ByteArray =
-          expectSelfie(this).toBeBase64(expected)
-
+      expectSelfie(this).toBeBase64(expected)
   infix fun Int.shouldBeSelfie(expected: Int): Int = expectSelfie(this).toBe(expected)
   infix fun Long.shouldBeSelfie(expected: Long): Long = expectSelfie(this).toBe(expected)
   infix fun Boolean.shouldBeSelfie(expected: Boolean): Boolean = expectSelfie(this).toBe(expected)
@@ -109,10 +102,10 @@ internal class ExpectedActual(val expected: Snapshot?, val actual: Snapshot) {
       throw AssertionFailedError("No such snapshot")
     }
     if (expected.value != actual.value)
-      throw AssertionFailedError("Snapshot failure", expected.value, actual.value)
+        throw AssertionFailedError("Snapshot failure", expected.value, actual.value)
     else if (expected.lenses.keys != actual.lenses.keys)
-      throw AssertionFailedError(
-              "Snapshot failure: mismatched lenses", expected.lenses.keys, actual.lenses.keys)
+        throw AssertionFailedError(
+            "Snapshot failure: mismatched lenses", expected.lenses.keys, actual.lenses.keys)
     for (key in expected.lenses.keys) {
       val expectedValue = expected.lenses[key]!!
       val actualValue = actual.lenses[key]!!

@@ -24,8 +24,8 @@ import java.nio.file.Paths
 
 interface SelfieSettingsAPI {
   fun openPipeline(layout: SnapshotFileLayout): SnapshotPipe = SnapshotPipeNoOp
-
-  fun expectImplictSnapshotter(underTest: Any) : Snapshotter<*> = throw AssertionError("Implicit snapshots have not been setup, see TODO.")
+  fun expectImplictSnapshotter(underTest: Any): Snapshotter<*> =
+      throw AssertionError("Implicit snapshots have not been setup, see TODO.")
 
   /**
    * Defaults to `__snapshot__`, null means that snapshots are stored at the same folder location as

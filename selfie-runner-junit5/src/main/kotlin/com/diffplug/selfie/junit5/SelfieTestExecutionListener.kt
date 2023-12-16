@@ -19,14 +19,14 @@ import com.diffplug.selfie.*
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.concurrent.ConcurrentSkipListSet
+import java.util.concurrent.atomic.AtomicReference
 import org.junit.platform.engine.TestExecutionResult
 import org.junit.platform.engine.support.descriptor.ClassSource
 import org.junit.platform.engine.support.descriptor.MethodSource
 import org.junit.platform.launcher.TestExecutionListener
 import org.junit.platform.launcher.TestIdentifier
 import org.junit.platform.launcher.TestPlan
-import java.util.concurrent.ConcurrentSkipListSet
-import java.util.concurrent.atomic.AtomicReference
 
 /** Routes between `toMatchDisk()` calls and the snapshot file / pruning machinery. */
 internal object Router {
@@ -51,12 +51,10 @@ internal object Router {
       ExpectedActual(cm.clazz.read(cm.method, suffix), transformed)
     }
   }
-
   fun snapshotImplicit(actual: Any): Snapshotter<Any> {
     val cm = classAndMethod()
     return cm.clazz.parent.settings.expectImplictSnapshotter(actual) as Snapshotter<Any>
   }
-
   fun keep(subOrKeepAll: String?) {
     val cm = classAndMethod()
     if (subOrKeepAll == null) {
@@ -219,20 +217,24 @@ internal class Progress {
     }
   }
 
-  private var checkForInvalidStale : AtomicReference<MutableSet<Path>?> = AtomicReference(ConcurrentSkipListSet())
-
+  private var checkForInvalidStale: AtomicReference<MutableSet<Path>?> =
+      AtomicReference(ConcurrentSkipListSet())
   internal fun markPathAsWritten(path: Path) {
-    val written = checkForInvalidStale.get() ?: throw AssertionError("Snapshot file is being written after all tests were finished.")
+    val written =
+        checkForInvalidStale.get()
+            ?: throw AssertionError("Snapshot file is being written after all tests were finished.")
     written.add(path)
   }
-
   fun finishedAllTests() {
     pipeline.close()
-    val written = checkForInvalidStale.getAndSet(null) ?: throw AssertionError("finishedAllTests() was called more than once.")
+    val written =
+        checkForInvalidStale.getAndSet(null)
+            ?: throw AssertionError("finishedAllTests() was called more than once.")
     for (stale in findStaleSnapshotFiles(layout)) {
       val path = layout.snapshotPathForClass(stale)
       if (written.contains(path)) {
-        throw AssertionError("Selfie wrote a snapshot and then marked it stale for deletion it in the same run: $path\nSelfie will delete this snapshot on the next run, which is bad! Why is Selfie marking this snapshot as stale?")
+        throw AssertionError(
+            "Selfie wrote a snapshot and then marked it stale for deletion it in the same run: $path\nSelfie will delete this snapshot on the next run, which is bad! Why is Selfie marking this snapshot as stale?")
       } else {
         deleteFileAndParentDirIfEmpty(path)
       }
