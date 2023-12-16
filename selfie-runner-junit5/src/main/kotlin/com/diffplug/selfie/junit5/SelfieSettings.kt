@@ -17,12 +17,15 @@ package com.diffplug.selfie.junit5
 
 import com.diffplug.selfie.Snapshot
 import com.diffplug.selfie.SnapshotValue
+import com.diffplug.selfie.Snapshotter
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 
 interface SelfieSettingsAPI {
   fun openPipeline(layout: SnapshotFileLayout): SnapshotPipe = SnapshotPipeNoOp
+
+  fun expectImplictSnapshotter(underTest: Any) : Snapshotter<*> = throw AssertionError("Implicit snapshots have not been setup, see TODO.")
 
   /**
    * Defaults to `__snapshot__`, null means that snapshots are stored at the same folder location as
@@ -55,10 +58,12 @@ interface SelfieSettingsAPI {
             "src/test/resources")
     internal fun initialize(): SelfieSettingsAPI {
       try {
-        val clazz = Class.forName("com.diffplug.selfie.SelfiePipeline")
+        val clazz = Class.forName("com.diffplug.selfie.SelfieSettings")
         return clazz.getDeclaredConstructor().newInstance() as SelfieSettingsAPI
       } catch (e: ClassNotFoundException) {
         return StandardSelfieSettings()
+      } catch (e: InstantiationException) {
+        throw AssertionError("Unable to instantiate dev.selfie.SelfieSettings, is it abstract?", e)
       }
     }
   }
