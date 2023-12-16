@@ -27,10 +27,14 @@ test {
 }
 tasks.register('underTest', Test) {
   useJUnitPlatform()
+  testClassesDirs = testing.suites.test.sources.output.classesDirs
+  classpath = testing.suites.test.sources.runtimeClasspath
   // defaults to 'write'
   systemProperty 'selfie', findProperty('selfie')
 }
 tasks.register('underTestRead', Test) {
   useJUnitPlatform()
+  testClassesDirs = testing.suites.test.sources.output.classesDirs
+  classpath = testing.suites.test.sources.runtimeClasspath
   systemProperty 'selfie', 'read'
 }
