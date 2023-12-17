@@ -17,8 +17,6 @@ package com.diffplug.selfie.junit5
 
 import com.diffplug.selfie.RW
 import com.diffplug.selfie.Snapshot
-import java.nio.file.Files
-import java.nio.file.Paths
 import java.util.stream.Collectors
 import kotlin.io.path.name
 
@@ -32,24 +30,26 @@ data class CallLocation(val clazz: String, val method: String, val file: String?
    * If the runtime didn't give us the filename, guess it from the class, and try to find the source
    * file by walking the CWD. If we don't find it, report it as a `.class` file.
    */
-  private fun findFileIfAbsent(): String {
+  private fun findFileIfAbsent(layout: SnapshotFileLayout): String {
     if (file != null) {
       return file
     }
-    val fileWithoutExtension = clazz.substringAfterLast('.').substringBefore('$')
-    val likelyExtensions = listOf("kt", "java", "scala", "groovy", "clj", "cljc")
-    val filenames = likelyExtensions.map { "$fileWithoutExtension.$it" }.toSet()
-    val firstPath = Files.walk(Paths.get("")).use { it.filter { it.name in filenames }.findFirst() }
-    return if (firstPath.isEmpty) "${clazz.substringAfterLast('.')}.class" else firstPath.get().name
+    return layout.sourcecodeForCall(this)?.name ?: "${clazz.substringAfterLast('.')}.class"
   }
 
   /** A `toString` which an IDE will render as a clickable link. */
-  override fun toString(): String = "$clazz.$method(${findFileIfAbsent()}:$line)"
+  fun ideLink(layout: SnapshotFileLayout): String {
+    return "$clazz.$method(${findFileIfAbsent(layout)}:$line)"
+  }
 }
 /** Represents the callstack above a given CallLocation. */
 class CallStack(val location: CallLocation, val restOfStack: List<CallLocation>) {
-  override fun toString(): String {
-    return location.toString()
+  fun ideLink(layout: SnapshotFileLayout): String {
+    val list = buildList {
+      add(location)
+      addAll(restOfStack)
+    }
+    return list.joinToString("\n") { it.ideLink(layout) }
   }
 }
 /** Generates a CallLocation and the CallStack behind it. */
@@ -69,25 +69,27 @@ internal class FirstWrite<T>(val snapshot: T, val callStack: CallStack)
 /** For tracking the writes of disk snapshots literals. */
 internal open class WriteTracker<K : Comparable<K>, V> {
   val writes = mutableMapOf<K, FirstWrite<V>>()
-  protected fun recordInternal(key: K, snapshot: V, call: CallStack) {
+  protected fun recordInternal(key: K, snapshot: V, call: CallStack, layout: SnapshotFileLayout) {
     val existing = writes.putIfAbsent(key, FirstWrite(snapshot, call))
     if (existing != null) {
       if (existing.snapshot != snapshot) {
         throw org.opentest4j.AssertionFailedError(
-            "Snapshot was set to multiple values!\n  first time: ${existing.callStack}\n   this time: ${call}",
+            "Snapshot was set to multiple values!\n  first time: ${existing.callStack.location.ideLink(layout)}\n   this time: ${call.location.ideLink(layout)}",
             existing.snapshot,
             snapshot)
       } else if (RW.isWriteOnce) {
         throw org.opentest4j.AssertionFailedError(
-            "Snapshot was set to the same value multiple times.", existing.callStack, call)
+            "Snapshot was set to the same value multiple times.",
+            existing.callStack.ideLink(layout),
+            call.ideLink(layout))
       }
     }
   }
 }
 
 internal class DiskWriteTracker : WriteTracker<String, Snapshot>() {
-  fun record(key: String, snapshot: Snapshot, call: CallStack) {
-    recordInternal(key, snapshot, call)
+  fun record(key: String, snapshot: Snapshot, call: CallStack, layout: SnapshotFileLayout) {
+    recordInternal(key, snapshot, call, layout)
   }
 }
 
@@ -96,7 +98,7 @@ class LiteralValue {
 }
 
 internal class InlineWriteTracker : WriteTracker<CallLocation, LiteralValue>() {
-  fun record(call: CallStack, snapshot: LiteralValue) {
-    recordInternal(call.location, snapshot, call)
+  fun record(call: CallStack, snapshot: LiteralValue, layout: SnapshotFileLayout) {
+    recordInternal(call.location, snapshot, call, layout)
   }
 }
