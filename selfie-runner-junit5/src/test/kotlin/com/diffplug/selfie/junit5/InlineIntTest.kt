@@ -17,14 +17,13 @@ package com.diffplug.selfie.junit5
 
 import io.kotest.matchers.shouldBe
 import kotlin.test.Test
-import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.MethodOrderer
 import org.junit.jupiter.api.Order
 import org.junit.jupiter.api.TestMethodOrder
 
 /** Write-only test which asserts adding and removing snapshots results in same-class GC. */
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
-//@DisableIfTestFails don't disable if test fails because we *have* to run cleanup
+// @DisableIfTestFails don't disable if test fails because we *have* to run cleanup
 class InlineIntTest : Harness("undertest-junit5") {
   @Test @Order(1)
   fun toBe_TODO() {

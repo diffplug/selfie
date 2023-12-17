@@ -17,14 +17,27 @@ package com.diffplug.selfie.junit5
 
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.Paths
+import kotlin.io.path.name
 
-internal class SnapshotFileLayout(
+class SnapshotFileLayout(
     val rootFolder: Path,
     val snapshotFolderName: String?,
     internal val unixNewlines: Boolean
 ) {
   val extension: String = ".ss"
+  fun sourcecodeForCall(call: CallLocation): Path? {
+    if (call.file != null) {
+      return Files.walk(rootFolder).use {
+        it.filter { it.name == call.file }.findFirst().orElse(null)
+      }
+    }
+    val fileWithoutExtension = call.clazz.substringAfterLast('.').substringBefore('$')
+    val likelyExtensions = listOf("kt", "java", "scala", "groovy", "clj", "cljc")
+    val filenames = likelyExtensions.map { "$fileWithoutExtension.$it" }.toSet()
+    return Files.walk(rootFolder).use {
+      it.filter { it.name in filenames }.findFirst().orElse(null)
+    }
+  }
   fun snapshotPathForClass(className: String): Path {
     val lastDot = className.lastIndexOf('.')
     val classFolder: Path
@@ -57,35 +70,20 @@ internal class SnapshotFileLayout(
         }
     return classnameWithSlashes.replace('/', '.')
   }
-  fun testSourceFile(location: CallLocation): Path {
-    // we should have a way to have multiple source roots to check against
-    val path = rootFolder.resolve(location.subpath)
-    if (!Files.exists(path)) {
-      throw AssertionError("Unable to find ${location.subpath} at ${path.toAbsolutePath()}")
-    }
-    return path
-  }
 
   companion object {
-    private const val DEFAULT_SNAPSHOT_DIR = "__snapshots__"
-    private val STANDARD_DIRS =
-        listOf(
-            "src/test/java",
-            "src/test/kotlin",
-            "src/test/groovy",
-            "src/test/scala",
-            "src/test/resources")
-    fun initialize(className: String): SnapshotFileLayout {
-      val selfieDotProp = SnapshotFileLayout::class.java.getResource("/selfie.properties")
-      val properties = java.util.Properties()
-      selfieDotProp?.openStream()?.use { properties.load(selfieDotProp.openStream()) }
-      val snapshotFolderName = snapshotFolderName(properties.getProperty("snapshot-dir"))
-      val snapshotRootFolder = rootFolder(properties.getProperty("output-dir"))
-      // it's pretty easy to preserve the line endings of existing snapshot files, but it's
-      // a bit harder to create a fresh snapshot file with the correct line endings.
+    internal fun initialize(settings: SelfieSettingsAPI): SnapshotFileLayout {
+      val rootFolder = settings.rootFolder
       return SnapshotFileLayout(
-          snapshotRootFolder, snapshotFolderName, inferDefaultLineEndingIsUnix(snapshotRootFolder))
+          settings.rootFolder,
+          settings.snapshotFolderName,
+          inferDefaultLineEndingIsUnix(rootFolder))
     }
+
+    /**
+     * It's pretty easy to preserve the line endings of existing snapshot files, but it's a bit
+     * harder to create a fresh snapshot file with the correct line endings.
+     */
     private fun inferDefaultLineEndingIsUnix(rootFolder: Path): Boolean {
       return rootFolder
           .toFile()
@@ -103,33 +101,6 @@ internal class SnapshotFileLayout(
           }
           .firstOrNull()
           ?.let { it.indexOf('\r') == -1 } ?: true // if we didn't find any files, assume unix
-    }
-    private fun snapshotFolderName(snapshotDir: String?): String? {
-      if (snapshotDir == null) {
-        return DEFAULT_SNAPSHOT_DIR
-      } else {
-        assert(snapshotDir.indexOf('/') == -1 && snapshotDir.indexOf('\\') == -1) {
-          "snapshot-dir must not contain slashes, was '$snapshotDir'"
-        }
-        assert(snapshotDir.trim() == snapshotDir) {
-          "snapshot-dir must not have leading or trailing whitespace, was '$snapshotDir'"
-        }
-        return snapshotDir
-      }
-    }
-    private fun rootFolder(rootDir: String?): Path {
-      val userDir = Paths.get(System.getProperty("user.dir"))
-      if (rootDir != null) {
-        return userDir.resolve(rootDir)
-      }
-      for (standardDir in STANDARD_DIRS) {
-        val candidate = userDir.resolve(standardDir)
-        if (Files.isDirectory(candidate)) {
-          return candidate
-        }
-      }
-      throw AssertionError(
-          "Could not find a standard test directory, 'user.dir' is equal to $userDir")
     }
   }
 }

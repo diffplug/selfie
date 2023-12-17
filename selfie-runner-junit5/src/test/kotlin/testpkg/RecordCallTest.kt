@@ -15,16 +15,21 @@
  */
 package testpkg
 
+import com.diffplug.selfie.junit5.SnapshotFileLayout
 import com.diffplug.selfie.junit5.recordCall
 import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.shouldBe
+import java.nio.file.Paths
 import org.junit.jupiter.api.Test
 
 class RecordCallTest {
   @Test
   fun testRecordCall() {
     val stack = recordCall()
-    stack.location.toString() shouldBe "testpkg/RecordCallTest.kt:26"
+    // shows as clickable link in IDE
+    val layout = SnapshotFileLayout(Paths.get(""), null, true)
+    stack.location.ideLink(layout) shouldBe
+        "testpkg.RecordCallTest.testRecordCall(RecordCallTest.kt:28)"
     stack.restOfStack.size shouldBeGreaterThan 0
   }
 }

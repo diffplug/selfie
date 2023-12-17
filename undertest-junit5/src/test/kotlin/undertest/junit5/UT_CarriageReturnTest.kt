@@ -1,6 +1,6 @@
 package undertest.junit5
 
-import com.diffplug.selfie.expectSelfie
+import com.diffplug.selfie.Selfie.expectSelfie
 import kotlin.test.Test
 
 class UT_CarriageReturnTest {

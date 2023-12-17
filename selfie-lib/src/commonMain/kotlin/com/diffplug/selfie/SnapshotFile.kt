@@ -64,6 +64,7 @@ data class Snapshot(
   /** A sorted immutable map of extra values. */
   val lenses: Map<String, SnapshotValue>
     get() = lensData
+  fun withNewRoot(root: SnapshotValue) = Snapshot(root, lensData)
   fun lens(key: String, value: ByteArray) = lens(key, SnapshotValue.of(value))
   fun lens(key: String, value: String) = lens(key, SnapshotValue.of(value))
   fun lens(key: String, value: SnapshotValue) =
