@@ -174,27 +174,29 @@ open class Harness(subproject: String) {
     }
   }
   fun gradlew(task: String, vararg args: String): AssertionFailedError? {
-    val runner =
-        GradleConnector.newConnector()
-            .forProjectDirectory(subprojectFolder.parent!!.toFile())
-            .connect()
-
-    try {
-      val buildLauncher =
-          runner
-              .newBuild()
-              .forTasks(":${subprojectFolder.name}:$task")
-              .withArguments(
-                  buildList<String> {
-                    addAll(args)
-                    add("--configuration-cache") // ControlWR enabled vs disables is 11s vs 24s
-                    add("--stacktrace")
-                  })
-      buildLauncher.run()
-      return null
-    } catch (e: BuildException) {
-      return parseBuildException(task, e)
-    }
+    return GradleConnector.newConnector()
+        .forProjectDirectory(subprojectFolder.parent!!.toFile())
+        .connect()
+        .use { connection ->
+          try {
+            val buildLauncher =
+                connection
+                    .newBuild()
+                    // .setStandardError(System.err)
+                    // .setStandardOutput(System.out)
+                    .forTasks(":${subprojectFolder.name}:$task")
+                    .withArguments(
+                        buildList<String> {
+                          addAll(args)
+                          add("--configuration-cache") // enabled vs disabled is 11s vs 24s
+                          add("--stacktrace")
+                        })
+            buildLauncher.run()
+            return null
+          } catch (e: BuildException) {
+            return parseBuildException(task, e)
+          }
+        }
   }
 
   /**
