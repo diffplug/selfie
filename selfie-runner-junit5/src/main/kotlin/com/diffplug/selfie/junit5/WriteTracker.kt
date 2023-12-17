@@ -31,12 +31,15 @@ data class CallLocation(val subpath: String, val line: Int) : Comparable<CallLoc
 class CallStack(val location: CallLocation, val restOfStack: List<CallLocation>) {
   override fun toString(): String = "$location"
 }
-/** Generates a CallLocation and the CallStack behind it. */
+/**
+ * Generates a CallLocation and the CallStack behind it, starting at the entrypoint into the Selfie
+ * codebase.
+ */
 fun recordCall(): CallStack {
   val calls =
       StackWalker.getInstance().walk { frames ->
         frames
-            .skip(1)
+            .dropWhile { it.className.startsWith("com.diffplug.selfie") }
             .map { CallLocation(it.className.replace('.', '/') + ".kt", it.lineNumber) }
             .collect(Collectors.toList())
       }
