@@ -30,28 +30,28 @@ import org.junit.platform.launcher.TestPlan
 internal object Router {
   private class ClassMethod(val clazz: ClassProgress, val method: String)
   private val threadCtx = ThreadLocal<ClassMethod?>()
-  fun readOrWriteOrKeep(snapshot: Snapshot?, subOrKeepAll: String?): Snapshot? {
-    val classMethod =
-        threadCtx.get()
-            ?: throw AssertionError(
-                "Selfie `toMatchDisk` must be called only on the original thread.")
-    return if (subOrKeepAll == null) {
-      assert(snapshot == null)
-      classMethod.clazz.keep(classMethod.method, null)
-      null
+  private fun classAndMethod() =
+      threadCtx.get()
+          ?: throw AssertionError(
+              "Selfie `toMatchDisk` must be called only on the original thread.")
+  private fun suffix(sub: String) = if (sub == "") "" else "/$sub"
+  fun readWriteThroughPipeline(actual: Snapshot, sub: String): ExpectedActual {
+    val cm = classAndMethod()
+    val suffix = suffix(sub)
+    val callStack = recordCall()
+    return if (RW.isWrite) {
+      cm.clazz.write(cm.method, suffix, actual, callStack)
+      ExpectedActual(actual, actual)
     } else {
-      val suffix = if (subOrKeepAll == "") "" else "/$subOrKeepAll"
-      if (snapshot == null) {
-        classMethod.clazz.keep(classMethod.method, suffix)
-        null
-      } else {
-        if (RW.isWrite) {
-          classMethod.clazz.write(classMethod.method, suffix, snapshot)
-          snapshot
-        } else {
-          classMethod.clazz.read(classMethod.method, suffix)
-        }
-      }
+      ExpectedActual(cm.clazz.read(cm.method, suffix), actual)
+    }
+  }
+  fun keep(subOrKeepAll: String?) {
+    val cm = classAndMethod()
+    if (subOrKeepAll == null) {
+      cm.clazz.keep(cm.method, null)
+    } else {
+      cm.clazz.keep(cm.method, suffix(subOrKeepAll))
     }
   }
   internal fun start(clazz: ClassProgress, method: String) {
@@ -71,18 +71,10 @@ internal object Router {
     }
     threadCtx.set(null)
   }
-  fun fileLocationFor(className: String): Path {
-    if (layout == null) {
-      layout = SnapshotFileLayout.initialize(className)
-    }
-    return layout!!.snapshotPathForClass(className)
-  }
-
-  var layout: SnapshotFileLayout? = null
 }
 
 /** Tracks the progress of test runs within a single class, so that snapshots can be pruned. */
-internal class ClassProgress(val className: String) {
+internal class ClassProgress(val parent: Progress, val className: String) {
   companion object {
     val TERMINATED =
         ArrayMap.empty<String, MethodSnapshotGC>().plus(" ~ f!n1shed ~ ", MethodSnapshotGC())
@@ -113,7 +105,7 @@ internal class ClassProgress(val className: String) {
           MethodSnapshotGC.findStaleSnapshotsWithin(className, file!!.snapshots, methods)
       if (staleSnapshotIndices.isNotEmpty() || file!!.wasSetAtTestTime) {
         file!!.removeAllIndices(staleSnapshotIndices)
-        val snapshotPath = Router.fileLocationFor(className)
+        val snapshotPath = parent.layout.snapshotPathForClass(className)
         if (file!!.snapshots.isEmpty()) {
           deleteFileAndParentDirIfEmpty(snapshotPath)
         } else {
@@ -127,7 +119,7 @@ internal class ClassProgress(val className: String) {
       // we never read or wrote to the file
       val isStale = MethodSnapshotGC.isUnusedSnapshotFileStale(className, methods, success)
       if (isStale) {
-        val snapshotFile = Router.fileLocationFor(className)
+        val snapshotFile = parent.layout.snapshotPathForClass(className)
         deleteFileAndParentDirIfEmpty(snapshotFile)
       }
     }
@@ -145,17 +137,14 @@ internal class ClassProgress(val className: String) {
       methods[method]!!.keepSuffix(suffixOrAll)
     }
   }
-  @Synchronized fun write(method: String, suffix: String, snapshot: Snapshot) {
+  @Synchronized fun write(method: String, suffix: String, snapshot: Snapshot, callStack: CallStack) {
     assertNotTerminated()
     val key = "$method$suffix"
-    diskWriteTracker!!.record(key, snapshot, recordCall())
+    diskWriteTracker!!.record(key, snapshot, callStack)
     methods[method]!!.keepSuffix(suffix)
     read().setAtTestTime(key, snapshot)
   }
-  @Synchronized fun read(
-      method: String,
-      suffix: String,
-  ): Snapshot? {
+  @Synchronized fun read(method: String, suffix: String): Snapshot? {
     assertNotTerminated()
     val snapshot = read().snapshots["$method$suffix"]
     if (snapshot != null) {
@@ -165,13 +154,13 @@ internal class ClassProgress(val className: String) {
   }
   private fun read(): SnapshotFile {
     if (file == null) {
-      val snapshotPath = Router.fileLocationFor(className)
+      val snapshotPath = parent.layout.snapshotPathForClass(className)
       file =
           if (Files.exists(snapshotPath) && Files.isRegularFile(snapshotPath)) {
             val content = Files.readAllBytes(snapshotPath)
             SnapshotFile.parse(SnapshotValueReader.of(content))
           } else {
-            SnapshotFile.createEmptyWithUnixNewlines(Router.layout!!.unixNewlines)
+            SnapshotFile.createEmptyWithUnixNewlines(parent.layout.unixNewlines)
           }
     }
     return file!!
@@ -183,6 +172,9 @@ internal class ClassProgress(val className: String) {
  * - pruning unused snapshot files
  */
 internal class Progress {
+  val settings = SelfieSettingsAPI.initialize()
+  val layout = SnapshotFileLayout.initialize(settings)
+
   private var progressPerClass = ArrayMap.empty<String, ClassProgress>()
   private fun forClass(className: String) = synchronized(this) { progressPerClass[className]!! }
 
@@ -190,7 +182,7 @@ internal class Progress {
   fun start(className: String, method: String?) {
     if (method == null) {
       synchronized(this) {
-        progressPerClass = progressPerClass.plus(className, ClassProgress(className))
+        progressPerClass = progressPerClass.plus(className, ClassProgress(this, className))
       }
     } else {
       forClass(className).startMethod(method)
@@ -214,10 +206,9 @@ internal class Progress {
     }
   }
   fun finishedAllTests() {
-    Router.layout?.let { layout ->
-      for (stale in findStaleSnapshotFiles(layout)) {
-        deleteFileAndParentDirIfEmpty(layout.snapshotPathForClass(stale))
-      }
+    for (stale in findStaleSnapshotFiles(layout)) {
+      val path = layout.snapshotPathForClass(stale)
+      deleteFileAndParentDirIfEmpty(path)
     }
   }
 }
