@@ -33,6 +33,7 @@ dependencies {
 }
 test {
   useJUnitPlatform()
+  getInputs().dir('../undertest-junit5/src/test/kotlin')
 }
 
 // it all needs to get published and formatted
