@@ -24,7 +24,8 @@ class RecordCallTest {
   @Test
   fun testRecordCall() {
     val stack = recordCall()
-    stack.location.toString() shouldBe "testpkg/RecordCallTest.kt:26"
+    // shows as clickable link in IDE
+    stack.location.toString() shouldBe "testpkg.RecordCallTest.testRecordCall(RecordCallTest.kt:26)"
     stack.restOfStack.size shouldBeGreaterThan 0
   }
 }
