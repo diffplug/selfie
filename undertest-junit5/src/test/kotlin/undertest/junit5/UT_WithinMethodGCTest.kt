@@ -9,6 +9,6 @@ class UT_WithinMethodGCTest {
 //    @Test fun selfie2() {
   @Test fun selfie() {
     expectSelfie("root").toMatchDisk()
-//    expectSelfie("maple").toMatchDisk("leaf")
+    expectSelfie("maple").toMatchDisk("leaf")
   }
 }
