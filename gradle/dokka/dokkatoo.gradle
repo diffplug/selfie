@@ -1,0 +1,20 @@
+apply plugin: 'dev.adamko.dokkatoo-html'
+dokkatoo {
+  if (project != rootProject) {
+    dokkatooSourceSets.configureEach {
+      includes.from("README.md")
+    }
+  }
+  pluginsConfiguration.html {
+    templatesDir.set(rootProject.file("gradle/dokka/templates"))
+    customStyleSheets.from(rootProject.file("gradle/dokka/styles/selfie-style.css"))
+    customAssets.from(
+      rootProject.file("gradle/dokka/assets/background_floral.webp"),
+      rootProject.file("gradle/dokka/assets/background_seaside.webp"),
+      rootProject.file("gradle/dokka/assets/antique_bot.webp"),
+      rootProject.file("gradle/dokka/assets/antique_humanoid.webp"),
+      rootProject.file("gradle/dokka/assets/logo-icon.svg"),
+      rootProject.file("gradle/dokka/scripts/selfie.js"),
+    )
+  }
+}

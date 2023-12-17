@@ -1,0 +1,97 @@
+import { Advanced } from "@/components/Advanced";
+
+<Advanced />
+
+## Advanced Usage of Selfie: Dive Deeper into Snapshot Testing
+
+Once you're familiar with the basics of Selfie, the snapshot testing library for JavaScript, you can explore its advanced features to enhance and fine-tune your testing processes. This guide will walk you through the more sophisticated functionalities Selfie offers.
+
+## Table of Contents
+
+1. Custom Snapshot Serializers
+2. Snapshot Differencing Options
+3. Snapshot Naming and Organization
+4. Interactive Snapshot Update Mode
+5. Testing Components with Props and Context
+
+## 1. Custom Snapshot Serializers
+
+Selfie provides a way to customize how your components are serialized before generating a snapshot. This is particularly useful for components that rely on complex data structures or external libraries.
+
+To use a custom serializer:
+
+```javascript
+import { registerSerializer } from 'selfie-testing';
+
+const myCustomSerializer = {
+  print: (val) => /* custom serialization logic */,
+  test: (val) => /* logic to determine if this serializer should be used */
+};
+
+registerSerializer(myCustomSerializer);
+```
+
+## 2. Snapshot Differencing Options
+
+By default, Selfie uses a simple string comparison to differentiate snapshots. However, there might be cases where you want a more flexible or granular comparison:
+
+```javascript
+import { setDiffOptions } from "selfie-testing";
+
+setDiffOptions({
+  ignoreWhitespace: true, // Ignores whitespace changes
+  ignoreOrder: false, // Treats changes in order as significant
+  // ... other options
+});
+```
+
+## 3. Snapshot Naming and Organization
+
+To improve the maintainability of your snapshot files, especially in larger projects, Selfie allows custom naming and organization strategies:
+
+```javascript
+import { configure } from "selfie-testing";
+
+configure({
+  snapshotFileName: (componentName) => `${componentName}.snap.js`,
+  snapshotDirectory: "./my-custom-snapshots-directory",
+});
+```
+
+## 4. Interactive Snapshot Update Mode
+
+When updating multiple components at once, it can be tedious to review and update each snapshot manually. Selfie's interactive mode lets you review and accept or reject changes one by one:
+
+```javascript
+import { interactiveUpdate } from "selfie-testing";
+
+// Run this after your tests
+interactiveUpdate();
+```
+
+## 5. Testing Components with Props and Context
+
+Components often rely on props or context for rendering. With Selfie, you can easily pass these when creating snapshots:
+
+```javascript
+const props = { title: "Test Title" };
+const context = { theme: "dark" };
+
+const snapshot = createSnapshot(<YourComponent {...props} />, context);
+```
+
+## Tips for Advanced Users
+
+- **Fine-tune Serialization**: If you find that the default serialization doesn't quite capture your component's complexity, don't hesitate to create custom serializers tailored to your needs.
+
+- **Use Version Control Wisely**: Always check the snapshot diff in your version control system before committing. This gives you another opportunity to spot unintended changes.
+
+- **Collaborate with your Team**: Snapshot testing becomes more effective when your whole team understands and embraces it. Discuss and establish best practices together.
+
+## Conclusion
+
+The advanced features of Selfie bring snapshot testing to a new level, providing more control, flexibility, and precision. By harnessing these capabilities, you can ensure that your JavaScript components remain robust and consistent, even in complex scenarios.
+
+Remember, the true power of snapshot testing lies not just in capturing changes, but in understanding and managing them. Enjoy your journey with Selfie!
+
+Need further assistance? Visit our GitHub repository for more examples, discussions, and support. 📸
