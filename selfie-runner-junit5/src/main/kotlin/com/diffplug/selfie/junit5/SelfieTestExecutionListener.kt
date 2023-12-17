@@ -140,7 +140,7 @@ internal class ClassProgress(val parent: Progress, val className: String) {
   @Synchronized fun write(method: String, suffix: String, snapshot: Snapshot, callStack: CallStack) {
     assertNotTerminated()
     val key = "$method$suffix"
-    diskWriteTracker!!.record(key, snapshot, callStack)
+    diskWriteTracker!!.record(key, snapshot, callStack, parent.layout)
     methods[method]!!.keepSuffix(suffix)
     read().setAtTestTime(key, snapshot)
   }

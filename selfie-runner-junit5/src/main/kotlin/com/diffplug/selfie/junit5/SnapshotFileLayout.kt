@@ -15,7 +15,9 @@
  */
 package com.diffplug.selfie.junit5
 
+import java.nio.file.Files
 import java.nio.file.Path
+import kotlin.io.path.name
 
 class SnapshotFileLayout(
     val rootFolder: Path,
@@ -23,6 +25,19 @@ class SnapshotFileLayout(
     internal val unixNewlines: Boolean
 ) {
   val extension: String = ".ss"
+  fun sourcecodeForCall(call: CallLocation): Path? {
+    if (call.file != null) {
+      return Files.walk(rootFolder).use {
+        it.filter { it.name == call.file }.findFirst().orElse(null)
+      }
+    }
+    val fileWithoutExtension = call.clazz.substringAfterLast('.').substringBefore('$')
+    val likelyExtensions = listOf("kt", "java", "scala", "groovy", "clj", "cljc")
+    val filenames = likelyExtensions.map { "$fileWithoutExtension.$it" }.toSet()
+    return Files.walk(rootFolder).use {
+      it.filter { it.name in filenames }.findFirst().orElse(null)
+    }
+  }
   fun snapshotPathForClass(className: String): Path {
     val lastDot = className.lastIndexOf('.')
     val classFolder: Path
