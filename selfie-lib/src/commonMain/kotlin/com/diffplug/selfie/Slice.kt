@@ -26,8 +26,8 @@ import kotlin.math.min
  */
 internal expect fun groupImpl(slice: Slice, matchResult: MatchResult, group: Int): Slice
 
-class Slice private constructor(val base: CharSequence, val startIndex: Int, val endIndex: Int) :
-    CharSequence {
+internal class Slice
+private constructor(val base: CharSequence, val startIndex: Int, val endIndex: Int) : CharSequence {
   init {
     require(base is StringBuilder || base is String)
     require(0 <= startIndex)
@@ -174,21 +174,33 @@ class Slice private constructor(val base: CharSequence, val startIndex: Int, val
     }
     return true
   }
-  fun indexOf(lookingFor: String): Int {
+  fun indexOf(lookingFor: String, startOffset: Int = 0): Int {
     val result =
-        if (base is String) base.indexOf(lookingFor, startIndex)
-        else {
-          (base as StringBuilder).indexOf(lookingFor, startIndex)
-        }
+        if (base is String) base.indexOf(lookingFor, startIndex + startOffset)
+        else (base as StringBuilder).indexOf(lookingFor, startIndex + startOffset)
     return if (result == -1 || result >= endIndex) -1 else result - startIndex
   }
-  fun indexOf(lookingFor: Char): Int {
+  fun indexOf(lookingFor: Char, startOffset: Int = 0): Int {
     val result =
-        if (base is String) base.indexOf(lookingFor, startIndex)
-        else {
-          (base as StringBuilder).indexOf(lookingFor.toString(), startIndex)
-        }
+        if (base is String) base.indexOf(lookingFor, startIndex + startOffset)
+        else (base as StringBuilder).indexOf(lookingFor, startIndex + startOffset)
     return if (result == -1 || result >= endIndex) -1 else result - startIndex
+  }
+  /** Returns a slice at the nth line. Handy for expanding the slice from there. */
+  fun unixLine(count: Int): Slice {
+    check(count > 0)
+    var lineStart = 0
+    for (i in 1 until count) {
+      lineStart = indexOf('\n', lineStart)
+      require(lineStart >= 0) { "This string has only ${i - 1} lines, not $count" }
+      ++lineStart
+    }
+    var lineEnd = indexOf('\n', lineStart)
+    return if (lineEnd == -1) {
+      Slice(base, startIndex + lineStart, endIndex)
+    } else {
+      Slice(base, startIndex + lineStart, startIndex + lineEnd)
+    }
   }
 
   /**
@@ -262,6 +274,17 @@ class Slice private constructor(val base: CharSequence, val startIndex: Int, val
   fun endsAtSamePlace(other: Slice): Boolean {
     check(base === other.base)
     return endIndex == other.endIndex
+  }
+
+  /** Returns the underlying string with this slice replaced by the given string. */
+  fun replaceSelfWith(s: String): String {
+    check(base is String)
+    val deltaLength = s.length - length
+    val builder = StringBuilder(base.length + deltaLength)
+    builder.appendRange(base, 0, startIndex)
+    builder.append(s)
+    builder.appendRange(base, endIndex, base.length)
+    return builder.toString()
   }
 
   companion object {

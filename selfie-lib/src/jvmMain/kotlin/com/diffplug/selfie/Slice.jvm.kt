@@ -24,7 +24,7 @@ package com.diffplug.selfie
  * Would be cool to have PoolString.Root which differentiates the String-based ones from
  * StringBuilder-based ones.
  */
-actual fun groupImpl(slice: Slice, matchResult: MatchResult, group: Int): Slice {
+internal actual fun groupImpl(slice: Slice, matchResult: MatchResult, group: Int): Slice {
   val group = matchResult.groups[group]!!
   return slice.subSequence(group.range.start, group.range.endInclusive - 1)
 }
