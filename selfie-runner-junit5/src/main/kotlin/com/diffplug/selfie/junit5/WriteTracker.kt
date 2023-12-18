@@ -15,8 +15,12 @@
  */
 package com.diffplug.selfie.junit5
 
+import com.diffplug.selfie.LiteralValue
 import com.diffplug.selfie.RW
 import com.diffplug.selfie.Snapshot
+import com.diffplug.selfie.SourceFile
+import java.nio.file.Files
+import java.nio.file.Path
 import java.util.stream.Collectors
 import kotlin.io.path.name
 
@@ -52,6 +56,7 @@ class CallStack(val location: CallLocation, val restOfStack: List<CallLocation>)
     return list.joinToString("\n") { it.ideLink(layout) }
   }
 }
+
 /** Generates a CallLocation and the CallStack behind it. */
 fun recordCall(): CallStack {
   val calls =
@@ -93,12 +98,61 @@ internal class DiskWriteTracker : WriteTracker<String, Snapshot>() {
   }
 }
 
-class LiteralValue {
-  // TODO: String, Int, Long, Boolean, etc
-}
+internal class InlineWriteTracker : WriteTracker<CallLocation, LiteralValue<*>>() {
+  fun record(call: CallStack, literalValue: LiteralValue<*>, layout: SnapshotFileLayout) {
+    recordInternal(call.location, literalValue, call, layout)
+  }
+  fun hasWrites(): Boolean = writes.isNotEmpty()
 
-internal class InlineWriteTracker : WriteTracker<CallLocation, LiteralValue>() {
-  fun record(call: CallStack, snapshot: LiteralValue, layout: SnapshotFileLayout) {
-    recordInternal(call.location, snapshot, call, layout)
+  private class FileLineLiteral(val file: Path, val line: Int, val literal: LiteralValue<*>) :
+      Comparable<FileLineLiteral> {
+    override fun compareTo(other: FileLineLiteral): Int =
+        compareValuesBy(this, other, { it.file }, { it.line })
+  }
+  fun persistWrites(layout: SnapshotFileLayout) {
+    if (this.writes.isEmpty()) {
+      return
+    }
+    val writes =
+        this.writes
+            .toList()
+            .map {
+              FileLineLiteral(
+                  layout.sourcecodeForCall(it.first)!!, it.first.line, it.second.snapshot)
+            }
+            .sorted()
+
+    var file = writes.first().file
+    var content = SourceFile(file.name, Files.readString(file))
+    var deltaLineNumbers = 0
+    for (write in writes) {
+      if (write.file != file) {
+        Files.writeString(file, content.asString)
+        file = write.file
+        deltaLineNumbers = 0
+        content = SourceFile(file.name, Files.readString(file))
+      }
+      // parse the location within the file
+      val line = write.line + deltaLineNumbers
+      val toBe =
+          if (write.literal.expected == null) {
+            content.parseToBe_TODO(line)
+          } else {
+            content.parseToBe(line).also {
+              val currentValue = it.parseLiteral(write.literal.format)
+              if (currentValue != write.literal.expected) {
+                // TODO: this shouldn't happen here, it should happen
+                // when the write is recorded so that we can fail eagerly,
+                // exceptions thrown here are easy to miss
+                throw org.opentest4j.AssertionFailedError(
+                    "There is likely a bug in Selfie's literal parsing.",
+                    write.literal.expected,
+                    currentValue)
+              }
+            }
+          }
+      deltaLineNumbers += toBe.setLiteralAndGetNewlineDelta(write.literal)
+    }
+    Files.writeString(file, content.asString)
   }
 }

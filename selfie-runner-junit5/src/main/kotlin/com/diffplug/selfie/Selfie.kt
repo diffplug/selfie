@@ -16,6 +16,7 @@
 package com.diffplug.selfie
 
 import com.diffplug.selfie.junit5.Router
+import com.diffplug.selfie.junit5.recordCall
 import org.opentest4j.AssertionFailedError
 
 object Selfie {
@@ -62,8 +63,26 @@ object Selfie {
   @JvmStatic fun expectSelfie(actual: ByteArray) = BinarySelfie(actual)
 
   class IntSelfie(private val actual: Int) {
-    fun toBe(expected: Int): Int = TODO()
-    fun toBe_TODO(): Int = TODO()
+    fun toBe_TODO(): Int = toBeDidntMatch(null)
+    infix fun toBe(expected: Int): Int =
+        if (actual == expected) expected
+        else {
+          toBeDidntMatch(expected)
+        }
+    private fun toBeDidntMatch(expected: Int?): Int {
+      if (RW.isWrite) {
+        Router.writeInline(recordCall(), LiteralValue(expected, actual, IntFormat()))
+        return actual
+      } else {
+        if (expected == null) {
+          throw AssertionFailedError(
+              "`.toBe_TODO()` was called in `read` mode, try again with selfie in write mode")
+        } else {
+          throw AssertionFailedError(
+              "Inline literal did not match the actual value", expected, actual)
+        }
+      }
+    }
   }
 
   @JvmStatic fun expectSelfie(actual: Int) = IntSelfie(actual)

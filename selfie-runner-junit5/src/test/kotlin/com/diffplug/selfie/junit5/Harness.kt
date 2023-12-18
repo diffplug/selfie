@@ -98,7 +98,8 @@ open class Harness(subproject: String) {
         }
         val matchingLines =
             allLines.mapIndexedNotNull() { index, line ->
-              if (line.contains(start)) "L$index: $line" else null
+              // TODO: probably need more than ignore import??
+              if (line.contains(start) && !line.contains("import ")) "L$index: $line" else null
             }
         if (matchingLines.size == 1) {
           val idx = matchingLines[0].substringAfter("L").substringBefore(":").toInt()
@@ -171,6 +172,21 @@ open class Harness(subproject: String) {
           }
         }
       }
+      fun content() = lines.subList(startInclusive, endInclusive + 1).joinToString("\n")
+      fun setContent(mustBe: String) {
+        FileSystem.SYSTEM.write(subprojectFolder.resolve(subpath)) {
+          for (i in 0 ..< startInclusive) {
+            writeUtf8(lines[i])
+            writeUtf8("\n")
+          }
+          writeUtf8(mustBe)
+          writeUtf8("\n")
+          for (i in endInclusive + 1 ..< lines.size) {
+            writeUtf8(lines[i])
+            writeUtf8("\n")
+          }
+        }
+      }
     }
   }
   fun gradlew(task: String, vararg args: String): AssertionFailedError? {
@@ -182,8 +198,8 @@ open class Harness(subproject: String) {
             val buildLauncher =
                 connection
                     .newBuild()
-                    // .setStandardError(System.err)
-                    // .setStandardOutput(System.out)
+                    .setStandardError(System.err)
+                    .setStandardOutput(System.out)
                     .forTasks(":${subprojectFolder.name}:$task")
                     .withArguments(
                         buildList<String> {

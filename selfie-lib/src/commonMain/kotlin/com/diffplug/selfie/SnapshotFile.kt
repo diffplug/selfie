@@ -80,7 +80,7 @@ data class Snapshot(
 interface Snapshotter<T> {
   fun snapshot(value: T): Snapshot
 }
-private fun String.efficientReplace(find: String, replaceWith: String): String {
+internal fun String.efficientReplace(find: String, replaceWith: String): String {
   val idx = this.indexOf(find)
   return if (idx == -1) this else this.replace(find, replaceWith)
 }
