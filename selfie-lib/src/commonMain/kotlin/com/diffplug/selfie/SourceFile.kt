@@ -22,7 +22,7 @@ package com.diffplug.selfie
  */
 class SourceFile(val filename: String, content: String) {
   private val unixNewlines = content.indexOf('\r') == -1
-  private var contentSlice = Slice.of(content.efficientReplace("\r\n", "\n"))
+  private var contentSlice = Slice(content.efficientReplace("\r\n", "\n"))
   /**
    * Returns the content of the file, possibly modified by
    * [ToBeLiteral.setLiteralAndGetNewlineDelta].
@@ -44,7 +44,7 @@ class SourceFile(val filename: String, content: String) {
       val encoded = literalValue.format.encode(literalValue.actual)
       val existingNewlines = slice.count { it == '\n' }
       val newNewlines = encoded.count { it == '\n' }
-      contentSlice = Slice.of(slice.replaceSelfWith(".toBe($encoded)"))
+      contentSlice = Slice(slice.replaceSelfWith(".toBe($encoded)"))
       return newNewlines - existingNewlines
     }
 
