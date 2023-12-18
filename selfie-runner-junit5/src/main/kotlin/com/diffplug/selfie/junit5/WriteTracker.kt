@@ -18,10 +18,9 @@ package com.diffplug.selfie.junit5
 import com.diffplug.selfie.LiteralValue
 import com.diffplug.selfie.RW
 import com.diffplug.selfie.Snapshot
+import com.diffplug.selfie.SourceFile
 import java.nio.file.Files
 import java.nio.file.Path
-import java.util.regex.Matcher
-import java.util.regex.Pattern
 import java.util.stream.Collectors
 import kotlin.io.path.name
 
@@ -98,19 +97,6 @@ internal class DiskWriteTracker : WriteTracker<String, Snapshot>() {
     recordInternal(key, snapshot, call, layout)
   }
 }
-private fun String.countNewlines(): Int = lineOffset { true }.size
-private fun String.lineOffset(filter: (Int) -> Boolean): List<Int> {
-  val lineTerminator = "\n"
-  var offset = 0
-  var next = indexOf(lineTerminator, offset)
-  val offsets = mutableListOf<Int>()
-  while (next != -1 && filter(offsets.size)) {
-    offsets.add(offset)
-    offset = next + lineTerminator.length
-    next = indexOf(lineTerminator, offset)
-  }
-  return offsets
-}
 
 internal class InlineWriteTracker : WriteTracker<CallLocation, LiteralValue<*>>() {
   fun record(call: CallStack, literalValue: LiteralValue<*>, layout: SnapshotFileLayout) {
@@ -137,59 +123,36 @@ internal class InlineWriteTracker : WriteTracker<CallLocation, LiteralValue<*>>(
             .sorted()
 
     var file = writes.first().file
-    var contentOfFile = Files.readString(file)
+    var content = SourceFile(file.name, Files.readString(file))
     var deltaLineNumbers = 0
-    // If I was implementing this, I would use Slice https://github.com/diffplug/selfie/pull/22
-    // as the type of source, but that is by no means a requirement
     for (write in writes) {
       if (write.file != file) {
-        Files.writeString(file, contentOfFile)
+        Files.writeString(file, content.asString)
         file = write.file
         deltaLineNumbers = 0
-        contentOfFile = Files.readString(file)
+        content = SourceFile(file.name, Files.readString(file))
       }
       // parse the location within the file
       val line = write.line + deltaLineNumbers
-      val offsets = contentOfFile.lineOffset { it <= line + 1 }
-      val startOffset = offsets[line]
-      // TODO: multi-line support
-      val endOffset =
-          if (line + 1 < offsets.size) {
-            offsets[line + 1]
+      val toBe =
+          if (write.literal.expected == null) {
+            content.parseToBe_TODO(line)
           } else {
-            contentOfFile.length
+            content.parseToBe(line).also {
+              val currentValue = it.parseLiteral(write.literal.format)
+              if (currentValue != write.literal.expected) {
+                // TODO: this shouldn't happen here, it should happen
+                // when the write is recorded so that we can fail eagerly,
+                // exceptions thrown here are easy to miss
+                throw org.opentest4j.AssertionFailedError(
+                    "There is likely a bug in Selfie's literal parsing.",
+                    write.literal.expected,
+                    currentValue)
+              }
+            }
           }
-      val matcher = parseExpectSelfie(contentOfFile.substring(startOffset, endOffset))
-      val currentlyInFile = matcher.group(2)
-      val parsedInFile = write.literal.format.parse(currentlyInFile)
-      if (parsedInFile != write.literal.expected) {
-        // warn that the parsing wasn't as expected
-        // TODO: we can't report failures to the user very well
-        //   someday, we should verify that the parse works in the `record()` and
-        //   throw an `AssertionFail` there so that the user sees it early
-      }
-      val toInjectIntoFile = write.literal.encodedActual()
-      deltaLineNumbers += (toInjectIntoFile.countNewlines() - currentlyInFile.countNewlines())
-      contentOfFile =
-          contentOfFile.replaceRange(
-              startOffset, endOffset, matcher.replaceAll("$1$toInjectIntoFile$3"))
+      deltaLineNumbers += toBe.setLiteralAndGetNewlineDelta(write.literal)
     }
-    file?.let { Files.writeString(it, contentOfFile) }
-  }
-  private fun replaceLiteral(matcher: Matcher, toInjectIntoFile: String): CharSequence {
-    val sb = StringBuilder()
-    matcher.appendReplacement(sb, toInjectIntoFile)
-    matcher.appendTail(sb)
-    return sb
-  }
-  private fun parseExpectSelfie(source: String): Matcher {
-    // TODO: support multi-line parsing
-    val pattern = Pattern.compile("^(\\s*expectSelfie\\()([^)]*)(\\))", Pattern.MULTILINE)
-    val matcher = pattern.matcher(source)
-    if (matcher.find()) {
-      return matcher
-    } else {
-      TODO("Unexpected line: $source")
-    }
+    Files.writeString(file, content.asString)
   }
 }
