@@ -172,7 +172,7 @@ open class Harness(subproject: String) {
           }
         }
       }
-      fun content() = lines.subList(startInclusive, endInclusive).joinToString("\n")
+      fun content() = lines.subList(startInclusive, endInclusive + 1).joinToString("\n")
       fun setContent(mustBe: String) {
         FileSystem.SYSTEM.write(subprojectFolder.resolve(subpath)) {
           for (i in 0 ..< startInclusive) {
@@ -198,8 +198,8 @@ open class Harness(subproject: String) {
             val buildLauncher =
                 connection
                     .newBuild()
-                    // .setStandardError(System.err)
-                    // .setStandardOutput(System.out)
+                    .setStandardError(System.err)
+                    .setStandardOutput(System.out)
                     .forTasks(":${subprojectFolder.name}:$task")
                     .withArguments(
                         buildList<String> {
