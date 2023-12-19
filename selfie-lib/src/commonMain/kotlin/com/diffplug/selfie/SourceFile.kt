@@ -20,15 +20,11 @@ package com.diffplug.selfie
  *   parsing).
  * @param content The exact content of the file, unix or windows newlines will be preserved
  */
-class SourceFile(val filename: String, content: String) {
+class SourceFile(filename: String, content: String) {
   private val unixNewlines = content.indexOf('\r') == -1
   private var contentSlice = Slice(content.efficientReplace("\r\n", "\n"))
-  private val language =
-      when (filename.substringAfterLast('.')) {
-        "kt" -> Language.KOTLIN
-        "java" -> Language.JAVA_PRE15 // TODO: detect JRE and use JAVA if JVM >= 15
-        else -> throw IllegalArgumentException("Unknown language for file $filename")
-      }
+  private val language = Language.fromFilename(filename)
+
   /**
    * Returns the content of the file, possibly modified by
    * [ToBeLiteral.setLiteralAndGetNewlineDelta].
