@@ -71,7 +71,7 @@ object Selfie {
         }
     private fun toBeDidntMatch(expected: Int?): Int {
       if (RW.isWrite) {
-        Router.writeInline(recordCall(), LiteralValue(expected, actual, IntFormat()))
+        Router.writeInline(recordCall(), LiteralValue(expected, actual, IntFormat))
         return actual
       } else {
         if (expected == null) {
