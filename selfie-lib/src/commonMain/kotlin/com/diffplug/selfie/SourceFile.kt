@@ -34,8 +34,7 @@ class SourceFile(val filename: String, content: String) {
    * [ToBeLiteral.setLiteralAndGetNewlineDelta].
    */
   val asString: String
-    get() =
-        if (unixNewlines) contentSlice.toString() else contentSlice.toString().replace("\r\n", "\n")
+    get() = contentSlice.toString().let { if (unixNewlines) it else it.replace("\n", "\r\n") }
 
   /**
    * Represents a section of the sourcecode which is a `.toBe(LITERAL)` call. It might also be
