@@ -22,6 +22,20 @@ import java.nio.file.Files
 import kotlin.io.path.name
 import org.junit.jupiter.api.Test
 
+/** Search for any test annotation classes which are present on the classpath. */
+private val testAnnotations =
+    listOf(
+            "org.junit.jupiter.api.Test", // junit5,
+            "org.junit.Test" // junit4
+            )
+        .mapNotNull {
+          try {
+            Class.forName(it).asSubclass(Annotation::class.java)
+          } catch (e: ClassNotFoundException) {
+            null
+          }
+        }
+
 /**
  * Searches the whole snapshot directory, finds all the `.ss` files, and prunes any which don't have
  * matching test files anymore.
@@ -41,7 +55,9 @@ internal fun findStaleSnapshotFiles(layout: SnapshotFileLayout): List<String> {
 }
 private fun classExistsAndHasTests(key: String): Boolean {
   return try {
-    Class.forName(key).declaredMethods.any { it.isAnnotationPresent(Test::class.java) }
+    Class.forName(key).methods.any { method ->
+      testAnnotations.any { method.isAnnotationPresent(it) }
+    }
   } catch (e: ClassNotFoundException) {
     false
   }

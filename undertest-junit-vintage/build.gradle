@@ -18,8 +18,9 @@ spotless {
 
 dependencies {
   testImplementation project(':selfie-runner-junit5')
-  testImplementation "org.jetbrains.kotlin:kotlin-test-junit5:$ver_KOTLIN_TEST"
-  testImplementation "org.junit.jupiter:junit-jupiter:$ver_JUNIT_USE"
+  testCompileOnly "junit:junit:4.13.2"
+  testImplementation "org.junit.jupiter:junit-jupiter-api:${ver_JUNIT_USE}"
+  testImplementation "org.junit.vintage:junit-vintage-engine:${ver_JUNIT_USE}"
 }
 // this project is just a test environment for a different project
 test {

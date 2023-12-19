@@ -21,6 +21,8 @@ import com.diffplug.selfie.RW
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.concurrent.ConcurrentSkipListSet
+import java.util.concurrent.atomic.AtomicReference
 import org.junit.platform.engine.TestExecutionResult
 import org.junit.platform.engine.support.descriptor.ClassSource
 import org.junit.platform.engine.support.descriptor.MethodSource
@@ -121,6 +123,7 @@ internal class ClassProgress(val parent: Progress, val className: String) {
         if (file!!.snapshots.isEmpty()) {
           deleteFileAndParentDirIfEmpty(snapshotPath)
         } else {
+          parent.markPathAsWritten(parent.layout.snapshotPathForClass(className))
           Files.createDirectories(snapshotPath.parent)
           Files.newBufferedWriter(snapshotPath, StandardCharsets.UTF_8).use { writer ->
             file!!.serialize(writer::write)
@@ -227,10 +230,27 @@ internal class Progress {
       }
     }
   }
+
+  private var checkForInvalidStale: AtomicReference<MutableSet<Path>?> =
+      AtomicReference(ConcurrentSkipListSet())
+  internal fun markPathAsWritten(path: Path) {
+    val written =
+        checkForInvalidStale.get()
+            ?: throw AssertionError("Snapshot file is being written after all tests were finished.")
+    written.add(path)
+  }
   fun finishedAllTests() {
+    val written =
+        checkForInvalidStale.getAndSet(null)
+            ?: throw AssertionError("finishedAllTests() was called more than once.")
     for (stale in findStaleSnapshotFiles(layout)) {
       val path = layout.snapshotPathForClass(stale)
-      deleteFileAndParentDirIfEmpty(path)
+      if (written.contains(path)) {
+        throw AssertionError(
+            "Selfie wrote a snapshot and then marked it stale for deletion it in the same run: $path\nSelfie will delete this snapshot on the next run, which is bad! Why is Selfie marking this snapshot as stale?")
+      } else {
+        deleteFileAndParentDirIfEmpty(path)
+      }
     }
   }
 }

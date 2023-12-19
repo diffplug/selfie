@@ -42,4 +42,5 @@ blowdryerSetup {
 include 'selfie-lib'
 include 'selfie-runner-junit5'
 include 'undertest-junit5'
+include 'undertest-junit-vintage'
 rootProject.name = 'selfie'
