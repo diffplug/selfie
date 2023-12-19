@@ -50,6 +50,10 @@ internal object Router {
       ExpectedActual(cm.clazz.read(cm.method, suffix), actual)
     }
   }
+  fun snapshotImplicit(actual: Any): Snapshotter<Any> {
+    val cm = classAndMethod()
+    return cm.clazz.parent.settings.implictSnapshotterFor(actual) as Snapshotter<Any>
+  }
   fun keep(subOrKeepAll: String?) {
     val cm = classAndMethod()
     if (subOrKeepAll == null) {

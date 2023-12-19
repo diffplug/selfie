@@ -15,11 +15,16 @@
  */
 package com.diffplug.selfie.junit5
 
+import com.diffplug.selfie.Snapshotter
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 
 interface SelfieSettingsAPI {
+  /** API function which allows user to specify a custom snapshotter. */
+  fun implictSnapshotterFor(underTest: Any): Snapshotter<*> =
+      throw AssertionError("Implicit snapshots have not been setup, see TODO.")
+
   /**
    * Defaults to `__snapshot__`, null means that snapshots are stored at the same folder location as
    * the test that created them.
