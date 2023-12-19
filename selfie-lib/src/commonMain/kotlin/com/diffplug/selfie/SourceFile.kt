@@ -23,6 +23,12 @@ package com.diffplug.selfie
 class SourceFile(val filename: String, content: String) {
   private val unixNewlines = content.indexOf('\r') == -1
   private var contentSlice = Slice(content.efficientReplace("\r\n", "\n"))
+  private val language =
+      when (filename.substringAfterLast('.')) {
+        "kt" -> Language.KOTLIN
+        "java" -> Language.JAVA_PRE15 // TODO: detect JRE and use JAVA if JVM >= 15
+        else -> throw IllegalArgumentException("Unknown language for file $filename")
+      }
   /**
    * Returns the content of the file, possibly modified by
    * [ToBeLiteral.setLiteralAndGetNewlineDelta].
@@ -41,7 +47,7 @@ class SourceFile(val filename: String, content: String) {
      * change in newline count.
      */
     fun <T : Any> setLiteralAndGetNewlineDelta(literalValue: LiteralValue<T>): Int {
-      val encoded = literalValue.format.encode(literalValue.actual)
+      val encoded = literalValue.format.encode(literalValue.actual, language)
       val existingNewlines = slice.count { it == '\n' }
       val newNewlines = encoded.count { it == '\n' }
       contentSlice = Slice(slice.replaceSelfWith(".toBe($encoded)"))
