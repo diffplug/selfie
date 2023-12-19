@@ -16,15 +16,25 @@
 package com.diffplug.selfie
 
 enum class Language {
-  KOTLIN,
   JAVA,
-  JAVA_PRE15;
+  JAVA_PRE15,
+  KOTLIN,
+  GROOVY,
+  SCALA,
+  CLOJURE;
 
   companion object {
     fun fromFilename(filename: String): Language {
       return when (filename.substringAfterLast('.')) {
-        "kt" -> KOTLIN
         "java" -> JAVA_PRE15 // TODO: detect JRE and use JAVA if JVM >= 15
+        "kt" -> KOTLIN
+        "groovy",
+        "gvy",
+        "gy" -> GROOVY
+        "scala",
+        "sc" -> SCALA
+        "clj",
+        "cljs" -> CLOJURE
         else -> throw IllegalArgumentException("Unknown language for file $filename")
       }
     }
