@@ -201,7 +201,7 @@ internal class ClassProgress(val parent: Progress, val className: String) {
 internal class Progress {
   val settings = SelfieSettingsAPI.initialize()
   val layout = SnapshotFileLayout.initialize(settings)
-  val prismTrain = settings.openPrismTrain(layout)
+  val prismTrain = settings.createPrismTrain(layout)
 
   private var progressPerClass = ArrayMap.empty<String, ClassProgress>()
   private fun forClass(className: String) = synchronized(this) { progressPerClass[className]!! }
