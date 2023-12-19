@@ -28,7 +28,7 @@ interface LiteralFormat<T : Any> {
   fun parse(str: String, language: Language): T
 }
 
-object IntFormat : LiteralFormat<Int> {
+object LiteralInt : LiteralFormat<Int> {
   override fun encode(value: Int, language: Language): String {
     // TODO: 1000000 is hard to read, 1_000_000 is much much better
     return value.toString()
@@ -38,7 +38,7 @@ object IntFormat : LiteralFormat<Int> {
   }
 }
 
-object StrFormat : LiteralFormat<String> {
+object LiteralString : LiteralFormat<String> {
   override fun encode(value: String, language: Language): String {
     if (!value.contains("\n")) {
       // TODO: replace \t, maybe others...
