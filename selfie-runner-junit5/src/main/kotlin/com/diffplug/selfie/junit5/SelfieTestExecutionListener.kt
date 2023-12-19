@@ -43,11 +43,13 @@ internal object Router {
     val cm = classAndMethod()
     val suffix = suffix(sub)
     val callStack = recordCall()
+    val transformed =
+        cm.clazz.parent.train.transform(cm.clazz.className, "${cm.method}$suffix", actual)
     return if (RW.isWrite) {
-      cm.clazz.write(cm.method, suffix, actual, callStack, cm.clazz.parent.layout)
-      ExpectedActual(actual, actual)
+      cm.clazz.write(cm.method, suffix, transformed, callStack, cm.clazz.parent.layout)
+      ExpectedActual(transformed, transformed)
     } else {
-      ExpectedActual(cm.clazz.read(cm.method, suffix), actual)
+      ExpectedActual(cm.clazz.read(cm.method, suffix), transformed)
     }
   }
   fun keep(subOrKeepAll: String?) {
@@ -199,6 +201,7 @@ internal class ClassProgress(val parent: Progress, val className: String) {
 internal class Progress {
   val settings = SelfieSettingsAPI.initialize()
   val layout = SnapshotFileLayout.initialize(settings)
+  val train = settings.openPrismTrain(layout)
 
   private var progressPerClass = ArrayMap.empty<String, ClassProgress>()
   private fun forClass(className: String) = synchronized(this) { progressPerClass[className]!! }
@@ -240,6 +243,7 @@ internal class Progress {
     written.add(path)
   }
   fun finishedAllTests() {
+    train.close()
     val written =
         checkForInvalidStale.getAndSet(null)
             ?: throw AssertionError("finishedAllTests() was called more than once.")

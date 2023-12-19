@@ -15,11 +15,15 @@
  */
 package com.diffplug.selfie.junit5
 
+import com.diffplug.selfie.Snapshot
+import com.diffplug.selfie.SnapshotPrism
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 
 interface SelfieSettingsAPI {
+  fun openPrismTrain(layout: SnapshotFileLayout): SnapshotPrism
+
   /**
    * Defaults to `__snapshot__`, null means that snapshots are stored at the same folder location as
    * the test that created them.
@@ -54,12 +58,19 @@ interface SelfieSettingsAPI {
         val clazz = Class.forName("com.diffplug.selfie.SelfieSettings")
         return clazz.getDeclaredConstructor().newInstance() as SelfieSettingsAPI
       } catch (e: ClassNotFoundException) {
-        return StandardSelfieSettings()
+        return SelfieSettingsNoOp
       } catch (e: InstantiationException) {
-        throw AssertionError("Unable to instantiate dev.selfie.SelfieSettings, is it abstract?", e)
+        throw AssertionError(
+            "Unable to instantiate com.diffplug.SelfieSettings, is it abstract?", e)
       }
     }
   }
 }
 
-open class StandardSelfieSettings : SelfieSettingsAPI
+private object SelfieSettingsNoOp : SelfieSettingsAPI {
+  override fun openPrismTrain(layout: SnapshotFileLayout): SnapshotPrism =
+      object : SnapshotPrism {
+        override fun transform(testClass: String, key: String, snapshot: Snapshot): Snapshot =
+            snapshot
+      }
+}
