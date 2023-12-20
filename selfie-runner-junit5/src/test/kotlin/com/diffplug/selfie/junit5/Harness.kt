@@ -26,11 +26,14 @@ import okio.Path
 import okio.Path.Companion.toPath
 import org.gradle.tooling.BuildException
 import org.gradle.tooling.GradleConnector
+import org.gradle.tooling.TestExecutionException
 import org.opentest4j.AssertionFailedError
 import org.w3c.dom.NodeList
 import org.xml.sax.InputSource
 
-open class Harness(subproject: String, val onlyRunThisTest: Boolean = false) {
+open class Harness(subproject: String) {
+  // not sure why, but it doesn't work in this project
+  val onlyRunThisTest = subproject != "undertest-junit-vintage"
   val subprojectFolder: Path
   var settings = ""
 
@@ -225,6 +228,8 @@ open class Harness(subproject: String, val onlyRunThisTest: Boolean = false) {
                   .run()
             }
             null
+          } catch (e: TestExecutionException) {
+            parseBuildException(task, e)
           } catch (e: BuildException) {
             parseBuildException(task, e)
           }
@@ -237,7 +242,7 @@ open class Harness(subproject: String, val onlyRunThisTest: Boolean = false) {
    *
    * Parses the exception message as well as stacktrace.
    */
-  private fun parseBuildException(task: String, e: BuildException): AssertionFailedError {
+  private fun parseBuildException(task: String, e: Exception): AssertionFailedError {
     val xpFactory = XPathFactory.newInstance()
     val xPath = xpFactory.newXPath()
     val failure =
