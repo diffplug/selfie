@@ -39,9 +39,22 @@ fun interface SnapshotPredicate {
 /** A prism with a fluent API for creating [LensHoldingPrism]s gated by predicates. */
 open class CompoundPrism : SnapshotPrism {
   private val prisms = mutableListOf<SnapshotPrism>()
-  fun add(prism: SnapshotPrism): CompoundPrism {
+  fun add(prism: SnapshotPrism) {
     prisms.add(prism)
-    return this
+  }
+  fun forEveryString(transform: (String) -> String) {
+    add(
+        object : ForEveryStringPrism() {
+          override fun transform(
+              className: String,
+              key: String,
+              snapshot: Snapshot,
+              lensName: String,
+              lensValue: String
+          ): String {
+            return transform(lensValue)
+          }
+        })
   }
   fun ifClassKeySnapshot(predicate: SnapshotPredicate): LensHoldingPrism {
     val prismWhere = LensHoldingPrism(predicate)
@@ -99,4 +112,23 @@ open class LensHoldingPrism(val predicate: SnapshotPredicate) : SnapshotPrism {
   override fun close() {
     lenses.forEach(SnapshotPrism::close)
   }
+}
+
+abstract class ForEveryStringPrism : SnapshotPrism {
+  protected abstract fun transform(
+      className: String,
+      key: String,
+      snapshot: Snapshot,
+      lensName: String,
+      lensValue: String
+  ): String?
+  override fun transform(className: String, key: String, snapshot: Snapshot) =
+      Snapshot.ofEntries(
+          snapshot.allEntries().mapNotNull {
+            if (it.value.isBinary) it
+            else {
+              val newValue = transform(className, key, snapshot, it.key, it.value.valueString())
+              newValue?.let { newValue -> entry(it.key, SnapshotValue.of(newValue)) } ?: null
+            }
+          })
 }
