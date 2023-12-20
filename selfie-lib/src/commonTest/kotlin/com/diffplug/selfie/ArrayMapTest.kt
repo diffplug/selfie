@@ -158,11 +158,18 @@ class ArrayMapTest {
 
     arrayMap.minusSortedIndices(listOf(0, 2)) shouldBe mapOf("second" to "2")
 
+    //    arrayMap.minusSortedIndices(listOf(1, 0))
     assertFails { arrayMap.minusSortedIndices(listOf(1, 0)) }.message shouldBe
-        "The indices weren't sorted or were too big: [1, 0]"
+        "The indices weren't sorted or were >= size=3: [1, 0]"
     assertFails { arrayMap.minusSortedIndices(listOf(2, 1)) }.message shouldBe
-        "The indices weren't sorted or were too big: [2, 1]"
+        "The indices weren't sorted or were >= size=3: [2, 1]"
     assertFails { arrayMap.minusSortedIndices(listOf(3)) }.message shouldBe
-        "The indices weren't sorted or were too big: [3]"
+        "The indices weren't sorted or were >= size=3: [3]"
+  }
+
+  @Test
+  fun wasBroken() {
+    val map = ArrayMap.of(0.rangeTo(8).map { it to it.toString() }.toMutableList())
+    map.minusSortedIndices(listOf(0, 2, 3, 6, 7, 8)).toString() shouldBe "{1=1, 4=4, 5=5}"
   }
 }
