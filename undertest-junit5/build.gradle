@@ -34,14 +34,5 @@ tasks.register('underTest', Test) {
   outputs.upToDateWhen { false }
   // defaults to 'write'
   systemProperty 'selfie', findProperty('selfie')
-}
-tasks.register('underTestRead', Test) {
-  useJUnitPlatform()
-  testClassesDirs = testing.suites.test.sources.output.classesDirs
-  classpath = testing.suites.test.sources.runtimeClasspath
-  testLogging.showStandardStreams = true
-  // the snapshots are both output and input, for this harness best if the test just always runs
-  outputs.upToDateWhen { false }
-  // read-only
-  systemProperty 'selfie', 'read'
+  systemProperty 'selfie.settings', findProperty('selfie.settings')
 }

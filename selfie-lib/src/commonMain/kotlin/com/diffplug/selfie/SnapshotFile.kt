@@ -77,7 +77,7 @@ data class Snapshot(
   }
 }
 
-interface Snapshotter<T> {
+interface Camera<T> {
   fun snapshot(value: T): Snapshot
 }
 internal fun String.efficientReplace(find: String, replaceWith: String): String {

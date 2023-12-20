@@ -45,8 +45,7 @@ object Selfie {
   }
 
   @JvmStatic
-  fun <T> expectSelfie(actual: T, snapshotter: Snapshotter<T>) =
-      DiskSelfie(snapshotter.snapshot(actual))
+  fun <T> expectSelfie(actual: T, camera: Camera<T>) = DiskSelfie(camera.snapshot(actual))
 
   class StringSelfie(private val actual: String) : DiskSelfie(Snapshot.of(actual)) {
     fun toBe(expected: String): String = TODO()
