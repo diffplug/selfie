@@ -124,7 +124,7 @@ abstract class ForEveryStringPrism : SnapshotPrism {
   ): String?
   override fun transform(className: String, key: String, snapshot: Snapshot) =
       Snapshot.ofEntries(
-          snapshot.allValuesAsMap().entries.mapNotNull {
+          snapshot.allEntries().mapNotNull {
             if (it.value.isBinary) it
             else {
               val newValue = transform(className, key, snapshot, it.key, it.value.valueString())
