@@ -20,14 +20,14 @@ import kotlin.test.Test
 import org.junit.jupiter.api.MethodOrderer
 import org.junit.jupiter.api.Order
 import org.junit.jupiter.api.TestMethodOrder
+import org.junitpioneer.jupiter.DisableIfTestFails
 
 /** Write-only test which asserts adding and removing snapshots results in same-class GC. */
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
-// @DisableIfTestFails don't disable if test fails because we *have* to run cleanup
+@DisableIfTestFails
 class InlineIntTest : Harness("undertest-junit5") {
   @Test @Order(1)
   fun toBe_TODO() {
-    ut_mirror().lineWith("@Ignore").setContent("//@Ignore")
     ut_mirror().lineWith("expectSelfie").setContent("    expectSelfie(1234).toBe_TODO()")
     gradleReadSSFail()
   }
@@ -37,11 +37,5 @@ class InlineIntTest : Harness("undertest-junit5") {
     gradleWriteSS()
     ut_mirror().lineWith("expectSelfie").content() shouldBe "    expectSelfie(1234).toBe(1234)"
     gradleReadSS()
-  }
-
-  @Test @Order(3)
-  fun cleanup() {
-    ut_mirror().lineWith("expectSelfie").setContent("    expectSelfie(1234).toBe_TODO()")
-    ut_mirror().lineWith("//@Ignore").setContent("@Ignore")
   }
 }
