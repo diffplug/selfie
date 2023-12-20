@@ -18,7 +18,7 @@ package com.diffplug.selfie
 import io.kotest.matchers.shouldBe
 import kotlin.test.Test
 
-class IntFormatTest {
+class LiteralIntTest {
   @Test
   fun encode() {
     encode(0, "0")
@@ -33,7 +33,7 @@ class IntFormatTest {
     encode(-1_000_000, "-1000000")
   }
   private fun encode(value: Int, expected: String) {
-    val actual = IntFormat().encode(value)
+    val actual = LiteralInt.encode(value, Language.JAVA)
     actual shouldBe expected
   }
 
@@ -50,7 +50,7 @@ class IntFormatTest {
     decode("-9_9_9", -999)
   }
   private fun decode(value: String, expected: Int) {
-    val actual = IntFormat().parse(value)
+    val actual = LiteralInt.parse(value, Language.JAVA)
     actual shouldBe expected
   }
 }

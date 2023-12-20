@@ -15,38 +15,54 @@
  */
 package com.diffplug.selfie.junit5
 
-import io.kotest.matchers.shouldBe
 import kotlin.test.Test
 import org.junit.jupiter.api.MethodOrderer
 import org.junit.jupiter.api.Order
 import org.junit.jupiter.api.TestMethodOrder
 import org.junitpioneer.jupiter.DisableIfTestFails
 
-/** Write-only test which asserts adding and removing snapshots results in same-class GC. */
+/** Simplest test for verifying read/write of a snapshot. */
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
 @DisableIfTestFails
-class InlineIntTest : Harness("undertest-junit5") {
+class PrismTrainTest : Harness("undertest-junit5") {
   @Test @Order(1)
-  fun toBe_TODO() {
-    ut_mirror().lineWith("expectSelfie").setContent("    expectSelfie(1234).toBe_TODO()")
-    gradleReadSSFail()
+  fun noSelfie() {
+    ut_snapshot().deleteIfExists()
+    ut_snapshot().assertDoesNotExist()
   }
 
   @Test @Order(2)
-  fun toBe_writeTODO() {
-    ut_mirror().lineWith("expectSelfie").setContent("    expectSelfie(1234).toBe_TODO()")
-    gradleReadSSFail()
+  fun noTrain() {
     gradleWriteSS()
-    ut_mirror().lineWith("expectSelfie").content() shouldBe "    expectSelfie(1234).toBe(1234)"
+    ut_snapshot()
+        .assertContent(
+            """
+            ╔═ selfie ═╗
+            apple
+            ╔═ [end of file] ═╗
+            
+        """
+                .trimIndent())
     gradleReadSS()
   }
 
   @Test @Order(3)
-  fun toBe_writeLiteral() {
-    ut_mirror().lineWith("expectSelfie").setContent("    expectSelfie(7777).toBe(1234)")
+  fun withTrain() {
+    settings = "undertest.junit5.SettingsLensCount"
     gradleReadSSFail()
+    // now let's write it
     gradleWriteSS()
-    ut_mirror().lineWith("expectSelfie").content() shouldBe "    expectSelfie(7777).toBe(7777)"
+    ut_snapshot()
+        .assertContent(
+            """
+            ╔═ selfie ═╗
+            apple
+            ╔═ selfie[count] ═╗
+            5
+            ╔═ [end of file] ═╗
+            
+        """
+                .trimIndent())
     gradleReadSS()
   }
 }

@@ -21,6 +21,8 @@ import com.diffplug.selfie.RW
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.concurrent.ConcurrentSkipListSet
+import java.util.concurrent.atomic.AtomicReference
 import org.junit.platform.engine.TestExecutionResult
 import org.junit.platform.engine.support.descriptor.ClassSource
 import org.junit.platform.engine.support.descriptor.MethodSource
@@ -41,11 +43,13 @@ internal object Router {
     val cm = classAndMethod()
     val suffix = suffix(sub)
     val callStack = recordCall()
+    val transformed =
+        cm.clazz.parent.prismTrain.transform(cm.clazz.className, "${cm.method}$suffix", actual)
     return if (RW.isWrite) {
-      cm.clazz.write(cm.method, suffix, actual, callStack, cm.clazz.parent.layout)
-      ExpectedActual(actual, actual)
+      cm.clazz.write(cm.method, suffix, transformed, callStack, cm.clazz.parent.layout)
+      ExpectedActual(transformed, transformed)
     } else {
-      ExpectedActual(cm.clazz.read(cm.method, suffix), actual)
+      ExpectedActual(cm.clazz.read(cm.method, suffix), transformed)
     }
   }
   fun keep(subOrKeepAll: String?) {
@@ -121,6 +125,7 @@ internal class ClassProgress(val parent: Progress, val className: String) {
         if (file!!.snapshots.isEmpty()) {
           deleteFileAndParentDirIfEmpty(snapshotPath)
         } else {
+          parent.markPathAsWritten(parent.layout.snapshotPathForClass(className))
           Files.createDirectories(snapshotPath.parent)
           Files.newBufferedWriter(snapshotPath, StandardCharsets.UTF_8).use { writer ->
             file!!.serialize(writer::write)
@@ -196,6 +201,7 @@ internal class ClassProgress(val parent: Progress, val className: String) {
 internal class Progress {
   val settings = SelfieSettingsAPI.initialize()
   val layout = SnapshotFileLayout.initialize(settings)
+  val prismTrain = settings.createPrismTrain(layout)
 
   private var progressPerClass = ArrayMap.empty<String, ClassProgress>()
   private fun forClass(className: String) = synchronized(this) { progressPerClass[className]!! }
@@ -227,10 +233,28 @@ internal class Progress {
       }
     }
   }
+
+  private var checkForInvalidStale: AtomicReference<MutableSet<Path>?> =
+      AtomicReference(ConcurrentSkipListSet())
+  internal fun markPathAsWritten(path: Path) {
+    val written =
+        checkForInvalidStale.get()
+            ?: throw AssertionError("Snapshot file is being written after all tests were finished.")
+    written.add(path)
+  }
   fun finishedAllTests() {
+    prismTrain.close()
+    val written =
+        checkForInvalidStale.getAndSet(null)
+            ?: throw AssertionError("finishedAllTests() was called more than once.")
     for (stale in findStaleSnapshotFiles(layout)) {
       val path = layout.snapshotPathForClass(stale)
-      deleteFileAndParentDirIfEmpty(path)
+      if (written.contains(path)) {
+        throw AssertionError(
+            "Selfie wrote a snapshot and then marked it stale for deletion it in the same run: $path\nSelfie will delete this snapshot on the next run, which is bad! Why is Selfie marking this snapshot as stale?")
+      } else {
+        deleteFileAndParentDirIfEmpty(path)
+      }
     }
   }
 }

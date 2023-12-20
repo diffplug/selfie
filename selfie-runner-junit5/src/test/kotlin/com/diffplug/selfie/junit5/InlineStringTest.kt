@@ -20,33 +20,29 @@ import kotlin.test.Test
 import org.junit.jupiter.api.MethodOrderer
 import org.junit.jupiter.api.Order
 import org.junit.jupiter.api.TestMethodOrder
-import org.junitpioneer.jupiter.DisableIfTestFails
 
 /** Write-only test which asserts adding and removing snapshots results in same-class GC. */
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
-@DisableIfTestFails
-class InlineIntTest : Harness("undertest-junit5") {
+// @DisableIfTestFails don't disable if test fails because we *have* to run cleanup
+class InlineStringTest : Harness("undertest-junit5") {
   @Test @Order(1)
   fun toBe_TODO() {
-    ut_mirror().lineWith("expectSelfie").setContent("    expectSelfie(1234).toBe_TODO()")
+    ut_mirror().lineWith("@Ignore").setContent("//@Ignore")
+    ut_mirror().lineWith("expectSelfie").setContent("    expectSelfie(\"Hello world\").toBe_TODO()")
     gradleReadSSFail()
   }
 
   @Test @Order(2)
-  fun toBe_writeTODO() {
-    ut_mirror().lineWith("expectSelfie").setContent("    expectSelfie(1234).toBe_TODO()")
-    gradleReadSSFail()
+  fun toBe_write() {
     gradleWriteSS()
-    ut_mirror().lineWith("expectSelfie").content() shouldBe "    expectSelfie(1234).toBe(1234)"
+    ut_mirror().lineWith("expectSelfie").content() shouldBe
+        "    expectSelfie(\"Hello world\").toBe(\"Hello world\")"
     gradleReadSS()
   }
 
   @Test @Order(3)
-  fun toBe_writeLiteral() {
-    ut_mirror().lineWith("expectSelfie").setContent("    expectSelfie(7777).toBe(1234)")
-    gradleReadSSFail()
-    gradleWriteSS()
-    ut_mirror().lineWith("expectSelfie").content() shouldBe "    expectSelfie(7777).toBe(7777)"
-    gradleReadSS()
+  fun cleanup() {
+    ut_mirror().lineWith("expectSelfie").setContent("    expectSelfie(\"Hello world\").toBe_TODO()")
+    ut_mirror().lineWith("//@Ignore").setContent("@Ignore")
   }
 }
