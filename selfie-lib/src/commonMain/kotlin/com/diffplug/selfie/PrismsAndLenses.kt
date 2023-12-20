@@ -42,7 +42,7 @@ open class CompoundPrism : SnapshotPrism {
   fun add(prism: SnapshotPrism) {
     prisms.add(prism)
   }
-  fun forEveryString(transform: (String) -> String) {
+  fun forEveryString(transform: (String) -> String?) {
     add(
         object : ForEveryStringPrism() {
           override fun transform(
@@ -51,7 +51,7 @@ open class CompoundPrism : SnapshotPrism {
               snapshot: Snapshot,
               lensName: String,
               lensValue: String
-          ): String {
+          ): String? {
             return transform(lensValue)
           }
         })
