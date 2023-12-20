@@ -71,14 +71,25 @@ data class Snapshot(
       if (key == "")
           throw IllegalArgumentException("The empty string is reserved for the root snapshot.")
       else Snapshot(this.value, lensData.plus(unixNewlines(key), value))
-  /** Returns the root snapshot (whose key is empty string) along with all lens values. */
-  fun allEntries() =
-      Iterable<Map.Entry<String, SnapshotValue>> {
-        sequence {
-              yield(entry("", value))
-              yieldAll(lenses.entries)
+  fun valueOrLens(key: String): SnapshotValue = if (key.isEmpty()) value else lenses[key]!!
+
+  /**
+   * Returns all values in the snapshot, including the root, in a single map, with the root having
+   * key "".
+   */
+  fun allValuesAsMap() =
+      object : AbstractMap<String, SnapshotValue>() {
+        override val entries =
+            object : AbstractSet<Map.Entry<String, SnapshotValue>>() {
+              override val size: Int
+                get() = lenses.size + 1
+              override fun iterator() =
+                  sequence {
+                        yield(entry("", value))
+                        yieldAll(lenses.entries)
+                      }
+                      .iterator()
             }
-            .iterator()
       }
   override fun toString(): String = "[${value} ${lenses}]"
 
