@@ -67,13 +67,43 @@ data class Snapshot(
   fun withNewRoot(root: SnapshotValue) = Snapshot(root, lensData)
   fun lens(key: String, value: ByteArray) = lens(key, SnapshotValue.of(value))
   fun lens(key: String, value: String) = lens(key, SnapshotValue.of(value))
-  fun lens(key: String, value: SnapshotValue) =
-      Snapshot(this.value, lensData.plus(unixNewlines(key), value))
+  fun lens(key: String, value: SnapshotValue): Snapshot =
+      if (key == "")
+          throw IllegalArgumentException("The empty string is reserved for the root snapshot.")
+      else Snapshot(this.value, lensData.plus(unixNewlines(key), value))
+  /** Returns the root snapshot (whose key is empty string) along with all lens values. */
+  fun allEntries() =
+      Iterable<Map.Entry<String, SnapshotValue>> {
+        sequence {
+              yield(entry("", value))
+              yieldAll(lenses.entries)
+            }
+            .iterator()
+      }
   override fun toString(): String = "[${value} ${lenses}]"
 
   companion object {
     fun of(binary: ByteArray) = Snapshot(SnapshotValue.of(binary), ArrayMap.empty())
     fun of(string: String) = Snapshot(SnapshotValue.of(string), ArrayMap.empty())
+    /**
+     * Creates a [Snapshot] from an [Iterable]<Map.Entry<String, [SnapshotValue]>. If no root is
+     * provided, it will be automatically filled by an empty string.
+     */
+    fun ofEntries(entries: Iterable<Map.Entry<String, SnapshotValue>>): Snapshot {
+      var root: SnapshotValue? = null
+      var lenses = ArrayMap.empty<String, SnapshotValue>()
+      for (entry in entries) {
+        if (entry.key.isEmpty()) {
+          require(root == null) {
+            "Duplicate root snapshot.\n first: $root\nsecond: ${entry.value}"
+          }
+          root = entry.value
+        } else {
+          lenses = lenses.plus(entry.key, entry.value)
+        }
+      }
+      return Snapshot(root ?: SnapshotValue.of(""), lenses)
+    }
   }
 }
 
