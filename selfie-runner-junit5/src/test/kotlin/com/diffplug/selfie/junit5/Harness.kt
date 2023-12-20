@@ -30,7 +30,7 @@ import org.opentest4j.AssertionFailedError
 import org.w3c.dom.NodeList
 import org.xml.sax.InputSource
 
-open class Harness(subproject: String) {
+open class Harness(subproject: String, val onlyRunThisTest: Boolean = false) {
   val subprojectFolder: Path
   var settings = ""
 
@@ -196,22 +196,37 @@ open class Harness(subproject: String) {
         .connect()
         .use { connection ->
           try {
-            val buildLauncher =
-                connection
-                    .newBuild()
-                    .setStandardError(System.err)
-                    .setStandardOutput(System.out)
-                    .forTasks(":${subprojectFolder.name}:$task")
-                    .withArguments(
-                        buildList<String> {
-                          addAll(args)
-                          add("--configuration-cache") // enabled vs disabled is 11s vs 24s
-                          add("--stacktrace")
-                        })
-            buildLauncher.run()
-            return null
+            if (onlyRunThisTest) {
+              connection
+                  .newTestLauncher()
+                  .setStandardError(System.err)
+                  .setStandardOutput(System.out)
+                  .withTaskAndTestClasses(
+                      ":${subprojectFolder.name}:$task", listOf("UT_${javaClass.simpleName}"))
+                  .withArguments(
+                      buildList<String> {
+                        addAll(args)
+                        add("--configuration-cache") // enabled vs disabled is 11s vs 24s
+                        add("--stacktrace")
+                      })
+                  .run()
+            } else {
+              connection
+                  .newBuild()
+                  .setStandardError(System.err)
+                  .setStandardOutput(System.out)
+                  .forTasks(":${subprojectFolder.name}:$task")
+                  .withArguments(
+                      buildList<String> {
+                        addAll(args)
+                        add("--configuration-cache") // enabled vs disabled is 11s vs 24s
+                        add("--stacktrace")
+                      })
+                  .run()
+            }
+            null
           } catch (e: BuildException) {
-            return parseBuildException(task, e)
+            parseBuildException(task, e)
           }
         }
   }
