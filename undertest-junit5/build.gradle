@@ -34,6 +34,7 @@ tasks.register('underTest', Test) {
   outputs.upToDateWhen { false }
   // defaults to 'write'
   systemProperty 'selfie', findProperty('selfie')
+  systemProperty 'selfie.settings', findProperty('selfie.settings')
 }
 tasks.register('underTestRead', Test) {
   useJUnitPlatform()
@@ -44,4 +45,5 @@ tasks.register('underTestRead', Test) {
   outputs.upToDateWhen { false }
   // read-only
   systemProperty 'selfie', 'read'
+  systemProperty 'selfie.settings', findProperty('selfie.settings')
 }

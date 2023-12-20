@@ -55,14 +55,28 @@ interface SelfieSettingsAPI {
             "src/test/scala",
             "src/test/resources")
     internal fun initialize(): SelfieSettingsAPI {
+      val settings = System.getProperty("selfie.settings")
+      if (settings != null && settings.trim().isNotEmpty()) {
+        try {
+          return instantiate(Class.forName(settings))
+        } catch (e: ClassNotFoundException) {
+          throw Error(
+              "The system property selfie.settings was set to $settings, but that class could not be found.",
+              e)
+        }
+      }
       try {
-        val clazz = Class.forName("com.diffplug.selfie.SelfieSettings")
-        return clazz.getDeclaredConstructor().newInstance() as SelfieSettingsAPI
+        return instantiate(Class.forName("SelfieSettings"))
       } catch (e: ClassNotFoundException) {
         return SelfieSettingsNoOp()
+      }
+    }
+    private fun instantiate(clazz: Class<*>): SelfieSettingsAPI {
+      try {
+        return clazz.getDeclaredConstructor().newInstance() as SelfieSettingsAPI
       } catch (e: InstantiationException) {
         throw AssertionError(
-            "Unable to instantiate com.diffplug.SelfieSettings, is it abstract?", e)
+            "Unable to instantiate ${clazz.name}, is it abstract? Does it require arguments?", e)
       }
     }
   }

@@ -32,6 +32,7 @@ import org.xml.sax.InputSource
 
 open class Harness(subproject: String) {
   val subprojectFolder: Path
+  var settings = ""
 
   init {
     var rootFolder = FileSystem.SYSTEM.canonicalize("".toPath())
@@ -267,17 +268,17 @@ open class Harness(subproject: String) {
     return error
   }
   fun gradleWriteSS() {
-    gradlew("underTest", "-Pselfie=write")?.let {
+    gradlew("underTest", "-Pselfie=write", "-Pselfie.settings=${settings}")?.let {
       throw AssertionError("Expected write snapshots to succeed, but it failed", it)
     }
   }
   fun gradleReadSS() {
-    gradlew("underTest", "-Pselfie=read")?.let {
+    gradlew("underTest", "-Pselfie=read", "-Pselfie.settings=${settings}")?.let {
       throw AssertionError("Expected read snapshots to succeed, but it failed", it)
     }
   }
   fun gradleReadSSFail(): AssertionFailedError {
-    val failure = gradlew("underTest", "-Pselfie=read")
+    val failure = gradlew("underTest", "-Pselfie=read", "-Pselfie.settings=${settings}")
     if (failure == null) {
       throw AssertionError("Expected read snapshots to fail, but it succeeded.")
     } else {
