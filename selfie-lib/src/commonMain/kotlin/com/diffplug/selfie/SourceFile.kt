@@ -20,16 +20,17 @@ package com.diffplug.selfie
  *   parsing).
  * @param content The exact content of the file, unix or windows newlines will be preserved
  */
-class SourceFile(val filename: String, content: String) {
+class SourceFile(filename: String, content: String) {
   private val unixNewlines = content.indexOf('\r') == -1
   private var contentSlice = Slice(content.efficientReplace("\r\n", "\n"))
+  private val language = Language.fromFilename(filename)
+
   /**
    * Returns the content of the file, possibly modified by
    * [ToBeLiteral.setLiteralAndGetNewlineDelta].
    */
   val asString: String
-    get() =
-        if (unixNewlines) contentSlice.toString() else contentSlice.toString().replace("\r\n", "\n")
+    get() = contentSlice.toString().let { if (unixNewlines) it else it.replace("\n", "\r\n") }
 
   /**
    * Represents a section of the sourcecode which is a `.toBe(LITERAL)` call. It might also be
@@ -41,7 +42,7 @@ class SourceFile(val filename: String, content: String) {
      * change in newline count.
      */
     fun <T : Any> setLiteralAndGetNewlineDelta(literalValue: LiteralValue<T>): Int {
-      val encoded = literalValue.format.encode(literalValue.actual)
+      val encoded = literalValue.format.encode(literalValue.actual, language)
       val existingNewlines = slice.count { it == '\n' }
       val newNewlines = encoded.count { it == '\n' }
       contentSlice = Slice(slice.replaceSelfWith(".toBe($encoded)"))

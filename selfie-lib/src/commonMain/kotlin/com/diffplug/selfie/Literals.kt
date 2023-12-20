@@ -15,27 +15,51 @@
  */
 package com.diffplug.selfie
 
-class LiteralValue<T : Any>(val expected: T?, val actual: T, val format: LiteralFormat<T>) {
-  fun encodedActual(): String = format.encode(actual)
+enum class Language {
+  JAVA,
+  JAVA_PRE15,
+  KOTLIN,
+  GROOVY,
+  SCALA,
+  CLOJURE;
+
+  companion object {
+    fun fromFilename(filename: String): Language {
+      return when (filename.substringAfterLast('.')) {
+        "java" -> JAVA_PRE15 // TODO: detect JRE and use JAVA if JVM >= 15
+        "kt" -> KOTLIN
+        "groovy",
+        "gvy",
+        "gy" -> GROOVY
+        "scala",
+        "sc" -> SCALA
+        "clj",
+        "cljs" -> CLOJURE
+        else -> throw IllegalArgumentException("Unknown language for file $filename")
+      }
+    }
+  }
 }
+
+class LiteralValue<T : Any>(val expected: T?, val actual: T, val format: LiteralFormat<T>)
 
 interface LiteralFormat<T : Any> {
-  fun encode(value: T): String
-  fun parse(str: String): T
+  fun encode(value: T, language: Language): String
+  fun parse(str: String, language: Language): T
 }
 
-class IntFormat : LiteralFormat<Int> {
-  override fun encode(value: Int): String {
+object LiteralInt : LiteralFormat<Int> {
+  override fun encode(value: Int, language: Language): String {
     // TODO: 1000000 is hard to read, 1_000_000 is much much better
     return value.toString()
   }
-  override fun parse(str: String): Int {
+  override fun parse(str: String, language: Language): Int {
     return str.replace("_", "").toInt()
   }
 }
 
-class StrFormat : LiteralFormat<String> {
-  override fun encode(value: String): String {
+object LiteralString : LiteralFormat<String> {
+  override fun encode(value: String, language: Language): String {
     if (!value.contains("\n")) {
       // TODO: replace \t, maybe others...
       return "\"" + value.replace("\"", "\\\"") + "\""
@@ -44,7 +68,7 @@ class StrFormat : LiteralFormat<String> {
       return "\"\"\"\n" + value + "\"\"\""
     }
   }
-  override fun parse(str: String): String {
-    TODO("Harder than it seems!")
+  override fun parse(str: String, language: Language): String {
+    TODO()
   }
 }
