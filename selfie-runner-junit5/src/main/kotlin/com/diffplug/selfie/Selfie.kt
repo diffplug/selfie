@@ -47,9 +47,26 @@ object Selfie {
   @JvmStatic
   fun <T> expectSelfie(actual: T, camera: Camera<T>) = DiskSelfie(camera.snapshot(actual))
 
+  /** Implements the inline snapshot whenever a match fails. */
+  private fun <T : Any> toBeDidntMatch(expected: T?, actual: T, format: LiteralFormat<T>): T {
+    if (RW.isWrite) {
+      Router.writeInline(recordCall(), LiteralValue(expected, actual, format))
+      return actual
+    } else {
+      if (expected == null) {
+        throw AssertionFailedError(
+            "`.toBe_TODO()` was called in `read` mode, try again with selfie in write mode")
+      } else {
+        throw AssertionFailedError(
+            "Inline literal did not match the actual value", expected, actual)
+      }
+    }
+  }
+
   class StringSelfie(private val actual: String) : DiskSelfie(Snapshot.of(actual)) {
-    fun toBe(expected: String): String = TODO()
-    fun toBe_TODO(): String = TODO()
+    fun toBe_TODO() = toBeDidntMatch(null, actual, LiteralString)
+    infix fun toBe(expected: String) =
+        if (actual == expected) expected else toBeDidntMatch(expected, actual, LiteralString)
   }
 
   @JvmStatic fun expectSelfie(actual: String) = StringSelfie(actual)
@@ -62,26 +79,9 @@ object Selfie {
   @JvmStatic fun expectSelfie(actual: ByteArray) = BinarySelfie(actual)
 
   class IntSelfie(private val actual: Int) {
-    fun toBe_TODO(): Int = toBeDidntMatch(null)
-    infix fun toBe(expected: Int): Int =
-        if (actual == expected) expected
-        else {
-          toBeDidntMatch(expected)
-        }
-    private fun toBeDidntMatch(expected: Int?): Int {
-      if (RW.isWrite) {
-        Router.writeInline(recordCall(), LiteralValue(expected, actual, LiteralInt))
-        return actual
-      } else {
-        if (expected == null) {
-          throw AssertionFailedError(
-              "`.toBe_TODO()` was called in `read` mode, try again with selfie in write mode")
-        } else {
-          throw AssertionFailedError(
-              "Inline literal did not match the actual value", expected, actual)
-        }
-      }
-    }
+    fun toBe_TODO() = toBeDidntMatch(null, actual, LiteralInt)
+    infix fun toBe(expected: Int) =
+        if (actual == expected) expected else toBeDidntMatch(expected, actual, LiteralInt)
   }
 
   @JvmStatic fun expectSelfie(actual: Int) = IntSelfie(actual)

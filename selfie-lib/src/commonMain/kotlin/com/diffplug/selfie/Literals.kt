@@ -60,15 +60,63 @@ object LiteralInt : LiteralFormat<Int> {
 
 object LiteralString : LiteralFormat<String> {
   override fun encode(value: String, language: Language): String {
-    if (!value.contains("\n")) {
-      // TODO: replace \t, maybe others...
-      return "\"" + value.replace("\"", "\\\"") + "\""
-    } else {
-      // TODO: test! It's okay to assume Java 15+ for now
-      return "\"\"\"\n" + value + "\"\"\""
-    }
+    return singleLineJavaToSource(value)
   }
   override fun parse(str: String, language: Language): String {
-    TODO()
+    return singleLineJavaFromSource(str)
+  }
+  private fun singleLineJavaToSource(value: String): String {
+    val source = StringBuilder()
+    source.append("\"")
+    for (char in value) {
+      when (char) {
+        '\b' -> source.append("\\b")
+        '\n' -> source.append("\\n")
+        '\r' -> source.append("\\r")
+        '\t' -> source.append("\\t")
+        '\"' -> source.append("\\\"")
+        '\\' -> source.append("\\\\")
+        else ->
+            if (isControlChar(char)) {
+              source.append("\\u")
+              source.append(char.code.toString(16).padStart(4, '0'))
+            } else {
+              source.append(char)
+            }
+      }
+    }
+    source.append("\"")
+    return source.toString()
+  }
+  private fun isControlChar(c: Char): Boolean {
+    return c in '\u0000'..'\u001F' || c == '\u007F'
+  }
+  private fun singleLineJavaFromSource(source: String): String {
+    val value = StringBuilder()
+    var i = 0
+    while (i < source.length) {
+      var c = source[i]
+      if (c == '\\') {
+        i++
+        c = source[i]
+        when (c) {
+          'b' -> value.append('\b')
+          'n' -> value.append('\n')
+          'r' -> value.append('\r')
+          't' -> value.append('\t')
+          '\"' -> value.append('\"')
+          '\\' -> value.append('\\')
+          'u' -> {
+            val code = source.substring(i + 1, i + 5).toInt(16)
+            value.append(code.toChar())
+            i += 4
+          }
+        }
+      } else if (c != '\"') {
+        value.append(c)
+      }
+      i++
+    }
+    return value.toString()
   }
 }

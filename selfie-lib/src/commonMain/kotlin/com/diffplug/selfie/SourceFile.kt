@@ -43,6 +43,25 @@ class SourceFile(filename: String, content: String) {
      */
     fun <T : Any> setLiteralAndGetNewlineDelta(literalValue: LiteralValue<T>): Int {
       val encoded = literalValue.format.encode(literalValue.actual, language)
+      val roundTripped = literalValue.format.parse(encoded, language) // sanity check
+      if (roundTripped != literalValue.actual) {
+        throw Error(
+            "There is an error in " +
+                literalValue.format::class.simpleName +
+                ", the following value isn't roundtripping.\n" +
+                "Please this error and the data below at https://github.com/diffplug/selfie/issues/new\n" +
+                "```\n" +
+                "ORIGINAL\n" +
+                literalValue.actual +
+                "\n" +
+                "ROUNDTRIPPED\n" +
+                roundTripped +
+                "\n" +
+                "ENCODED ORIGINAL\n" +
+                encoded +
+                "\n" +
+                "```\n")
+      }
       val existingNewlines = slice.count { it == '\n' }
       val newNewlines = encoded.count { it == '\n' }
       contentSlice = Slice(slice.replaceSelfWith(".toBe($encoded)"))
