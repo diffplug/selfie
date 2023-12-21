@@ -23,7 +23,7 @@ import java.nio.file.Paths
 
 interface SelfieSettingsAPI {
   /** Returns a prism train which will be used to transform snapshots. */
-  fun createPrismTrain(layout: SnapshotFileLayout): SnapshotLens
+  fun createPrismTrain(layout: SnapshotFileLayout): SnapshotLens = CompoundLens()
 
   /**
    * Defaults to `__snapshot__`, null means that snapshots are stored at the same folder location as
