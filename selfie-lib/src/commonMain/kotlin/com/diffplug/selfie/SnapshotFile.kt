@@ -58,36 +58,37 @@ internal data class SnapshotValueString(val value: String) : SnapshotValue {
 }
 
 data class Snapshot(
-    val value: SnapshotValue,
-    private val lensData: ArrayMap<String, SnapshotValue>
+    val subject: SnapshotValue,
+    private val facetData: ArrayMap<String, SnapshotValue>
 ) {
   /** A sorted immutable map of extra values. */
-  val lenses: Map<String, SnapshotValue>
-    get() = lensData
-  fun withNewRoot(root: SnapshotValue) = Snapshot(root, lensData)
-  fun lens(key: String, value: ByteArray) = lens(key, SnapshotValue.of(value))
-  fun lens(key: String, value: String) = lens(key, SnapshotValue.of(value))
-  fun lens(key: String, value: SnapshotValue): Snapshot =
-      if (key == "")
-          throw IllegalArgumentException("The empty string is reserved for the root snapshot.")
-      else Snapshot(this.value, lensData.plus(unixNewlines(key), value))
-  fun valueOrLensMaybe(key: String): SnapshotValue? = if (key.isEmpty()) value else lenses[key]
-  fun valueOrLens(key: String): SnapshotValue =
-      valueOrLensMaybe(key) ?: throw NoSuchElementException(key)
+  val facets: Map<String, SnapshotValue>
+    get() = facetData
+  fun withNewSubject(subject: SnapshotValue) = Snapshot(subject, facetData)
+  fun plusFacet(key: String, value: ByteArray) = plusFacet(key, SnapshotValue.of(value))
+  fun plusFacet(key: String, value: String) = plusFacet(key, SnapshotValue.of(value))
+  fun plusFacet(key: String, value: SnapshotValue): Snapshot =
+      if (key.isEmpty())
+          throw IllegalArgumentException("The empty string is reserved for the subject.")
+      else Snapshot(subject, facetData.plus(unixNewlines(key), value))
+  fun subjectOrFacetMaybe(key: String): SnapshotValue? =
+      if (key.isEmpty()) subject else facetData[key]
+  fun subjectOrFacet(key: String): SnapshotValue =
+      subjectOrFacetMaybe(key)
+          ?: throw NoSuchElementException("'${key}' not found in ${facetData.keys}")
 
   /**
    * Returns all values in the snapshot, including the root, in a single map, with the root having
    * key "".
    */
-  fun allEntries() =
-      Iterable<Map.Entry<String, SnapshotValue>> {
-        sequence {
-              yield(entry("", value))
-              yieldAll(lenses.entries)
-            }
-            .iterator()
-      }
-  override fun toString(): String = "[${value} ${lenses}]"
+  fun allEntries(): Iterable<Map.Entry<String, SnapshotValue>> = Iterable {
+    sequence {
+          yield(entry("", subject))
+          yieldAll(facets.entries)
+        }
+        .iterator()
+  }
+  override fun toString(): String = "[${subject} ${facets}]"
 
   companion object {
     fun of(binary: ByteArray) = Snapshot(SnapshotValue.of(binary), ArrayMap.empty())
@@ -98,7 +99,7 @@ data class Snapshot(
      */
     fun ofEntries(entries: Iterable<Map.Entry<String, SnapshotValue>>): Snapshot {
       var root: SnapshotValue? = null
-      var lenses = ArrayMap.empty<String, SnapshotValue>()
+      var facets = ArrayMap.empty<String, SnapshotValue>()
       for (entry in entries) {
         if (entry.key.isEmpty()) {
           require(root == null) {
@@ -106,10 +107,10 @@ data class Snapshot(
           }
           root = entry.value
         } else {
-          lenses = lenses.plus(entry.key, entry.value)
+          facets = facets.plus(entry.key, entry.value)
         }
       }
-      return Snapshot(root ?: SnapshotValue.of(""), lenses)
+      return Snapshot(root ?: SnapshotValue.of(""), facets)
     }
   }
 }
@@ -138,20 +139,20 @@ class SnapshotFile {
     }
     snapshots.entries.forEach { entry ->
       writeKey(valueWriter, entry.key, null)
-      writeValue(valueWriter, entry.value.value)
-      for (lens in entry.value.lenses.entries) {
-        writeKey(valueWriter, entry.key, lens.key)
-        writeValue(valueWriter, lens.value)
+      writeValue(valueWriter, entry.value.subject)
+      for (facet in entry.value.facets.entries) {
+        writeKey(valueWriter, entry.key, facet.key)
+        writeValue(valueWriter, facet.value)
       }
     }
     writeKey(valueWriter, "", "end of file")
   }
-  private fun writeKey(valueWriter: StringWriter, key: String, lens: String?) {
+  private fun writeKey(valueWriter: StringWriter, key: String, facet: String?) {
     valueWriter.write("╔═ ")
     valueWriter.write(SnapshotValueReader.nameEsc.escape(key))
-    if (lens != null) {
+    if (facet != null) {
       valueWriter.write("[")
-      valueWriter.write(SnapshotValueReader.nameEsc.escape(lens))
+      valueWriter.write(SnapshotValueReader.nameEsc.escape(facet))
       valueWriter.write("]")
     }
     valueWriter.write(" ═╗\n")
@@ -231,18 +232,18 @@ class SnapshotReader(val valueReader: SnapshotValueReader) {
     var snapshot = Snapshot(valueReader.nextValue(), ArrayMap.empty())
     while (true) {
       val nextKey = valueReader.peekKey() ?: return snapshot
-      val lensIdx = nextKey.indexOf('[')
-      if (lensIdx == -1 || (lensIdx == 0 && nextKey == SnapshotFile.END_OF_FILE)) {
+      val facetIdx = nextKey.indexOf('[')
+      if (facetIdx == -1 || (facetIdx == 0 && nextKey == SnapshotFile.END_OF_FILE)) {
         return snapshot
       }
-      val lensRoot = nextKey.substring(0, lensIdx)
-      require(lensRoot == rootName) {
-        "Expected '$nextKey' to come after '$lensRoot', not '$rootName'"
+      val facetRoot = nextKey.substring(0, facetIdx)
+      require(facetRoot == rootName) {
+        "Expected '$nextKey' to come after '$facetRoot', not '$rootName'"
       }
-      val lensEndIdx = nextKey.indexOf(']', lensIdx + 1)
-      require(lensEndIdx != -1) { "Missing ] in $nextKey" }
-      val lensName = nextKey.substring(lensIdx + 1, lensEndIdx)
-      snapshot = snapshot.lens(lensName, valueReader.nextValue().valueString())
+      val facetEndIdx = nextKey.indexOf(']', facetIdx + 1)
+      require(facetEndIdx != -1) { "Missing ] in $nextKey" }
+      val facetName = nextKey.substring(facetIdx + 1, facetEndIdx)
+      snapshot = snapshot.plusFacet(facetName, valueReader.nextValue().valueString())
     }
   }
   fun skipSnapshot() {

@@ -15,7 +15,7 @@ class SettingsLensCount : StandardSelfieSettings() {
               override val defaultLensName = "count"
 
               override fun transform(snapshot: Snapshot) =
-                  SnapshotValue.of(snapshot.value.valueString().count().toString())
+                  SnapshotValue.of(snapshot.subject.valueString().count().toString())
             })
   }
 }

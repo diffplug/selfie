@@ -57,7 +57,7 @@ open class CompoundPrism : SnapshotPrism {
   }
   fun forEverySnapshot(): LensHoldingPrism = ifSnapshot { true }
   fun ifString(predicate: (String) -> Boolean) = ifSnapshot {
-    !it.value.isBinary && predicate(it.value.valueString())
+    !it.subject.isBinary && predicate(it.subject.valueString())
   }
   fun ifStringIsProbablyHtml(): LensHoldingPrism {
     val regex = Regex("<\\/?[a-z][\\s\\S]*>")
@@ -81,7 +81,8 @@ open class LensHoldingPrism(val predicate: SnapshotPredicate) : SnapshotPrism {
             val lensValue = lens.transform(snapshot)
             return if (lensValue == null) snapshot
             else {
-              if (name == null) snapshot.withNewRoot(lensValue) else snapshot.lens(name, lensValue)
+              if (name == null) snapshot.withNewSubject(lensValue)
+              else snapshot.plusFacet(name, lensValue)
             }
           }
           override fun close() = lens.close()

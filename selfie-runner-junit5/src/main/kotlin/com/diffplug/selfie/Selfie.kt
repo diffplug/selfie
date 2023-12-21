@@ -49,8 +49,8 @@ object Selfie {
   internal constructor(protected val actual: Snapshot, val onlyLenses: Collection<String>? = null) {
     init {
       if (onlyLenses != null) {
-        check(onlyLenses.all { it == "" || actual.lenses.containsKey(it) }) {
-          "The following lenses were not found in the snapshot: ${onlyLenses.filter { actual.valueOrLensMaybe(it) == null }}\navailable lenses are: ${actual.lenses.keys}"
+        check(onlyLenses.all { it == "" || actual.facets.containsKey(it) }) {
+          "The following lenses were not found in the snapshot: ${onlyLenses.filter { actual.subjectOrFacetMaybe(it) == null }}\navailable lenses are: ${actual.facets.keys}"
         }
         check(onlyLenses.size > 1) { "Must have at least one lens, this was empty." }
       }
@@ -60,10 +60,10 @@ object Selfie {
     /** Extract a multiple lenses from a snapshot in order to do an inline snapshot. */
     fun lenses(vararg lensNames: String) = LiteralStringSelfie(actual, lensNames.toList())
     private fun actualString(): String {
-      if ((onlyLenses == null && actual.lenses.isEmpty()) || actual.lenses.size == 1) {
+      if ((onlyLenses == null && actual.facets.isEmpty()) || actual.facets.size == 1) {
         // single value doesn't have to worry about escaping at all
         val onlyValue =
-            actual.run { if (lenses.isEmpty()) value else lenses[onlyLenses!!.first()]!! }
+            actual.run { if (facets.isEmpty()) subject else facets[onlyLenses!!.first()]!! }
         if (onlyValue.isBinary) {
           throw Error("Cannot use `toBe` with binary data, use `toBeBase64` instead")
         }
@@ -72,7 +72,7 @@ object Selfie {
         // multiple values might need our SnapshotFile escaping, we'll use it just in case
         val snapshotToWrite =
             if (onlyLenses == null) actual
-            else Snapshot.ofEntries(onlyLenses.map { entry(it, actual.valueOrLens(it)) })
+            else Snapshot.ofEntries(onlyLenses.map { entry(it, actual.subjectOrFacet(it)) })
         snapshotToWrite.allEntries().forEach {
           if (it.value.isBinary) {
             throw Error(
@@ -155,14 +155,14 @@ internal class ExpectedActual(val expected: Snapshot?, val actual: Snapshot) {
     if (expected == null) {
       throw AssertionFailedError("No such snapshot")
     }
-    if (expected.value != actual.value)
-        throw AssertionFailedError("Snapshot failure", expected.value, actual.value)
-    else if (expected.lenses.keys != actual.lenses.keys)
+    if (expected.subject != actual.subject)
+        throw AssertionFailedError("Snapshot failure", expected.subject, actual.subject)
+    else if (expected.facets.keys != actual.facets.keys)
         throw AssertionFailedError(
-            "Snapshot failure: mismatched lenses", expected.lenses.keys, actual.lenses.keys)
-    for (key in expected.lenses.keys) {
-      val expectedValue = expected.lenses[key]!!
-      val actualValue = actual.lenses[key]!!
+            "Snapshot failure: mismatched lenses", expected.facets.keys, actual.facets.keys)
+    for (key in expected.facets.keys) {
+      val expectedValue = expected.facets[key]!!
+      val actualValue = actual.facets[key]!!
       if (actualValue != expectedValue) {
         throw AssertionFailedError("Snapshot failure within lens $key", expectedValue, actualValue)
       }
