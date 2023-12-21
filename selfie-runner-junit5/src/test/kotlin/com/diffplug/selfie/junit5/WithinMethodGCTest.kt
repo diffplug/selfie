@@ -29,13 +29,15 @@ class WithinMethodGCTest : Harness("undertest-junit5") {
   fun noSelfiesNoFile() {
     ut_snapshot().deleteIfExists()
     ut_snapshot().assertDoesNotExist()
+    ut_mirror().lineWith("leaf").setContent("    expectSelfie(\"maple\").toMatchDisk(\"leaf\")")
+    ut_mirror().lineWith("abc").setContent("    expectSelfie(\"abc\").toMatchDisk()")
     ut_mirror().linesFrom("UT_WithinMethodGC").toLast("}").shrinkByOne().commentOut()
   }
 
   @Test @Order(2)
   fun rootOnly() {
     ut_mirror().linesFrom("fun selfie()").toFirst("}").uncomment()
-    ut_mirror().lineWith("maple").commentOut()
+    ut_mirror().lineWith("leaf").commentOut()
     gradleWriteSS()
     ut_snapshot()
         .assertContent(
@@ -50,7 +52,7 @@ class WithinMethodGCTest : Harness("undertest-junit5") {
 
   @Test @Order(3)
   fun rootAndLeaf() {
-    ut_mirror().lineWith("maple").uncomment()
+    ut_mirror().lineWith("leaf").uncomment()
     gradleWriteSS()
     ut_snapshot()
         .assertContent(
@@ -97,21 +99,56 @@ class WithinMethodGCTest : Harness("undertest-junit5") {
   }
 
   @Test @Order(6)
-  fun resetUTMirror() {
-    ut_mirror().lineWith("root").uncomment()
-    ut_mirror().lineWith("selfie2()").commentOut()
-    ut_mirror().lineWith("selfie()").uncomment()
+  fun addSecondMethod() {
+    ut_mirror().linesFrom("secondMethod()").toFirst("}").uncomment()
     gradleWriteSS()
     ut_snapshot()
         .assertContent(
             """
-      ╔═ selfie ═╗
-      root
-      ╔═ selfie/leaf ═╗
+      ╔═ secondMethod ═╗
+      abc
+      ╔═ selfie2/leaf ═╗
       maple
       ╔═ [end of file] ═╗
       
     """
                 .trimIndent())
+  }
+
+  @Test @Order(7)
+  fun runOnlyTheSecondTest() {
+    runOnlyMethod = "secondMethod"
+    ut_mirror().lineWith("leaf").setContent("    expectSelfie(\"oak\").toMatchDisk(\"leaf\")")
+    ut_mirror().lineWith("abc").setContent("    expectSelfie(\"abc123\").toMatchDisk()")
+    gradleWriteSS()
+    // set leaf to oak, and secondMethod to 123, but selfie2/lead should remain maple since we
+    // aren't running it
+    ut_snapshot()
+        .assertContent(
+            """
+      ╔═ secondMethod ═╗
+      abc123
+      ╔═ selfie2/leaf ═╗
+      maple
+      ╔═ [end of file] ═╗
+      
+    """
+                .trimIndent())
+    gradleReadSS()
+
+    runOnlyMethod = null
+    gradleWriteSS()
+    ut_snapshot()
+        .assertContent(
+            """
+      ╔═ secondMethod ═╗
+      abc123
+      ╔═ selfie2/leaf ═╗
+      oak
+      ╔═ [end of file] ═╗
+      
+    """
+                .trimIndent())
+    gradleReadSS()
   }
 }

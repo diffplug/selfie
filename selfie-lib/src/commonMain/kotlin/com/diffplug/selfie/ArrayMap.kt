@@ -49,29 +49,28 @@ class ArrayMap<K : Comparable<K>, V : Any>(private val data: Array<Any>) : Map<K
     }
     val newData = arrayOfNulls<Any>(data.size - indicesToRemove.size * 2)
     var newDataIdx = 0
-    var currentDataIdx = 0
+    var currentPairIdx = 0 // Index for key-value pairs
     var toRemoveIdx = 0
-    while (newDataIdx < newData.size) {
-      if (toRemoveIdx < indicesToRemove.size && currentDataIdx == indicesToRemove[toRemoveIdx]) {
-        ++toRemoveIdx
-        ++currentDataIdx
+    while (currentPairIdx < data.size / 2) {
+      if (toRemoveIdx < indicesToRemove.size && currentPairIdx == indicesToRemove[toRemoveIdx]) {
+        toRemoveIdx++
       } else {
-        newData[newDataIdx++] = data[2 * currentDataIdx]
-        newData[newDataIdx++] = data[2 * currentDataIdx + 1]
-        ++currentDataIdx
-      }
-    }
-    val tailRemoval =
-        if (indicesToRemove.contains((data.size / 2) - 1)) {
-          1
-        } else {
-          0
+        check(newDataIdx < newData.size) {
+          "The indices weren't sorted or were >= size=$size: $indicesToRemove"
         }
-    check(toRemoveIdx + tailRemoval == indicesToRemove.size) {
-      "The indices weren't sorted or were too big: $indicesToRemove"
+        newData[newDataIdx++] = data[2 * currentPairIdx] // Copy key
+        newData[newDataIdx++] = data[2 * currentPairIdx + 1] // Copy value
+      }
+      currentPairIdx++
+    }
+
+    // Ensure all indices to remove have been processed
+    check(toRemoveIdx == indicesToRemove.size) {
+      "The indices weren't sorted or were >= size($size): $indicesToRemove"
     }
     return ArrayMap<K, V>(newData as Array<Any>)
   }
+
   /**
    * Returns a new ArrayMap which has added the given key. Throws an exception if the key already
    * exists.
@@ -169,6 +168,7 @@ class ArrayMap<K : Comparable<K>, V : Any>(private val data: Array<Any>) : Map<K
     }
   }
   override fun hashCode(): Int = entries.hashCode()
+  override fun toString() = this.toMutableMap().toString()
 
   companion object {
     private val EMPTY = ArrayMap<String, Any>(arrayOf())
