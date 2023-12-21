@@ -15,20 +15,19 @@
  */
 package com.diffplug.selfie
 
-/** Given a full [Snapshot], a lens returns either null or a single [SnapshotValue]. */
+/** Given a full [Snapshot], a prism returns either null or a single [SnapshotValue]. */
 @OptIn(ExperimentalStdlibApi::class)
-interface SnapshotLens : AutoCloseable {
-  val defaultLensName: String
+fun interface SnapshotPrism : AutoCloseable {
   fun transform(snapshot: Snapshot): SnapshotValue?
   override fun close() {}
 }
 
 /**
- * A prism transforms a single [Snapshot] into a new [Snapshot], transforming / creating / removing
+ * A lens transforms a single [Snapshot] into a new [Snapshot], transforming / creating / removing
  * [SnapshotValue]s along the way.
  */
 @OptIn(ExperimentalStdlibApi::class)
-interface SnapshotPrism : AutoCloseable {
+fun interface SnapshotLens : AutoCloseable {
   fun transform(snapshot: Snapshot): Snapshot
   override fun close() {}
 }
@@ -36,30 +35,30 @@ fun interface SnapshotPredicate {
   fun test(snapshot: Snapshot): Boolean
 }
 
-/** A prism with a fluent API for creating [LensHoldingPrism]s gated by predicates. */
-open class CompoundPrism : SnapshotPrism {
-  private val prisms = mutableListOf<SnapshotPrism>()
-  fun add(prism: SnapshotPrism) {
+/** A prism with a fluent API for creating [PrismHoldingLens]s gated by predicates. */
+open class CompoundLens : SnapshotLens {
+  private val prisms = mutableListOf<SnapshotLens>()
+  fun add(prism: SnapshotLens) {
     prisms.add(prism)
   }
   fun forEveryString(transform: (String) -> String?) {
     add(
-        object : ForEveryStringPrism() {
+        object : ForEveryStringLens() {
           override fun transform(snapshot: Snapshot, lensName: String, lensValue: String): String? {
             return transform(lensValue)
           }
         })
   }
-  fun ifSnapshot(predicate: SnapshotPredicate): LensHoldingPrism {
-    val prismWhere = LensHoldingPrism(predicate)
+  fun ifSnapshot(predicate: SnapshotPredicate): PrismHoldingLens {
+    val prismWhere = PrismHoldingLens(predicate)
     add(prismWhere)
     return prismWhere
   }
-  fun forEverySnapshot(): LensHoldingPrism = ifSnapshot { true }
+  fun forEverySnapshot(): PrismHoldingLens = ifSnapshot { true }
   fun ifString(predicate: (String) -> Boolean) = ifSnapshot {
     !it.subject.isBinary && predicate(it.subject.valueString())
   }
-  fun ifStringIsProbablyHtml(): LensHoldingPrism {
+  fun ifStringIsProbablyHtml(): PrismHoldingLens {
     val regex = Regex("<\\/?[a-z][\\s\\S]*>")
     return ifString { regex.find(it) != null }
   }
@@ -68,15 +67,15 @@ open class CompoundPrism : SnapshotPrism {
     prisms.forEach { current = it.transform(current) }
     return current
   }
-  override fun close() = prisms.forEach(SnapshotPrism::close)
+  override fun close() = prisms.forEach(SnapshotLens::close)
 }
 
 /** A prism which applies lenses to a snapshot. */
-open class LensHoldingPrism(val predicate: SnapshotPredicate) : SnapshotPrism {
-  private val lenses = mutableListOf<SnapshotPrism>()
-  private fun addLensOrReplaceRoot(name: String?, lens: SnapshotLens): LensHoldingPrism {
+open class PrismHoldingLens(val predicate: SnapshotPredicate) : SnapshotLens {
+  private val lenses = mutableListOf<SnapshotLens>()
+  private fun addLensOrReplaceRoot(name: String?, lens: SnapshotPrism): PrismHoldingLens {
     lenses.add(
-        object : SnapshotPrism {
+        object : SnapshotLens {
           override fun transform(snapshot: Snapshot): Snapshot {
             val lensValue = lens.transform(snapshot)
             return if (lensValue == null) snapshot
@@ -89,10 +88,9 @@ open class LensHoldingPrism(val predicate: SnapshotPredicate) : SnapshotPrism {
         })
     return this
   }
-  fun addLens(name: String, lens: SnapshotLens): LensHoldingPrism = addLensOrReplaceRoot(name, lens)
-  fun addLens(lens: SnapshotLens): LensHoldingPrism =
-      addLensOrReplaceRoot(lens.defaultLensName, lens)
-  fun replaceRootWith(lens: SnapshotLens): LensHoldingPrism = addLensOrReplaceRoot(null, lens)
+  fun addLens(name: String, lens: SnapshotPrism): PrismHoldingLens =
+      addLensOrReplaceRoot(name, lens)
+  fun replaceRootWith(lens: SnapshotPrism): PrismHoldingLens = addLensOrReplaceRoot(null, lens)
   override fun transform(snapshot: Snapshot): Snapshot {
     if (!predicate.test(snapshot)) {
       return snapshot
@@ -102,11 +100,11 @@ open class LensHoldingPrism(val predicate: SnapshotPredicate) : SnapshotPrism {
     return current
   }
   override fun close() {
-    lenses.forEach(SnapshotPrism::close)
+    lenses.forEach(SnapshotLens::close)
   }
 }
 
-abstract class ForEveryStringPrism : SnapshotPrism {
+abstract class ForEveryStringLens : SnapshotLens {
   protected abstract fun transform(snapshot: Snapshot, lensName: String, lensValue: String): String?
   override fun transform(snapshot: Snapshot) =
       Snapshot.ofEntries(
