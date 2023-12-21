@@ -20,7 +20,6 @@ import com.diffplug.selfie.ListBackedSet
 import com.diffplug.selfie.Snapshot
 import java.nio.file.Files
 import kotlin.io.path.name
-import org.junit.jupiter.api.Test
 
 /** Search for any test annotation classes which are present on the classpath. */
 private val testAnnotations =
@@ -167,11 +166,12 @@ internal class MethodSnapshotGC {
         className: String,
         methodsThatRan: ArrayMap<String, MethodSnapshotGC>,
     ): List<String> {
-      return Class.forName(className).declaredMethods.mapNotNull {
-        if (methodsThatRan.containsKey(it.name) || !it.isAnnotationPresent(Test::class.java)) {
+      return Class.forName(className).methods.mapNotNull { method ->
+        if (methodsThatRan.containsKey(method.name) ||
+            testAnnotations.none { method.isAnnotationPresent(it) }) {
           null
         } else {
-          it.name
+          method.name
         }
       }
     }
