@@ -43,7 +43,7 @@ open class CompoundLens : SnapshotLens {
   }
   fun forEveryString(transform: (String) -> String?) {
     add(
-        object : ForEveryStringLens() {
+        object : ForEveryStringLens {
           override fun transform(snapshot: Snapshot, lensName: String, lensValue: String): String? {
             return transform(lensValue)
           }
@@ -103,9 +103,8 @@ open class PrismHoldingLens(val predicate: SnapshotPredicate) : SnapshotLens {
     lenses.forEach(SnapshotLens::close)
   }
 }
-
-abstract class ForEveryStringLens : SnapshotLens {
-  protected abstract fun transform(snapshot: Snapshot, lensName: String, lensValue: String): String?
+fun interface ForEveryStringLens : SnapshotLens {
+  fun transform(snapshot: Snapshot, facetName: String, facetValue: String): String?
   override fun transform(snapshot: Snapshot) =
       Snapshot.ofEntries(
           snapshot.allEntries().mapNotNull {
@@ -115,4 +114,13 @@ abstract class ForEveryStringLens : SnapshotLens {
               newValue?.let { newValue -> entry(it.key, SnapshotValue.of(newValue)) } ?: null
             }
           })
+}
+
+object Lenses {
+  fun forEveryString(transform: (String) -> String?) =
+      object : ForEveryStringLens {
+        override fun transform(snapshot: Snapshot, facetName: String, facetValue: String): String? {
+          return transform(facetValue)
+        }
+      }
 }

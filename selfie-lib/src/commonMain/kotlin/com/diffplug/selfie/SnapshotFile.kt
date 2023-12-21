@@ -117,6 +117,12 @@ data class Snapshot(
 
 interface Camera<Subject> {
   fun snapshot(subject: Subject): Snapshot
+  fun withLens(lens: SnapshotLens): Camera<Subject> {
+    val parent = this
+    return object : Camera<Subject> {
+      override fun snapshot(subject: Subject): Snapshot = lens.transform(parent.snapshot(subject))
+    }
+  }
 }
 internal fun String.efficientReplace(find: String, replaceWith: String): String {
   val idx = this.indexOf(find)
