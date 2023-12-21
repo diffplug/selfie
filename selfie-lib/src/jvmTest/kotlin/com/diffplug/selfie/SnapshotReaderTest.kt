@@ -20,7 +20,7 @@ import kotlin.test.Test
 
 class SnapshotReaderTest {
   @Test
-  fun lens() {
+  fun facet() {
     val reader =
         SnapshotReader(
             SnapshotValueReader.of(
@@ -37,7 +37,8 @@ class SnapshotReaderTest {
                     .trimIndent()))
     reader.peekKey() shouldBe "Apple"
     reader.peekKey() shouldBe "Apple"
-    reader.nextSnapshot() shouldBe Snapshot.of("Apple").lens("color", "green").lens("crisp", "yes")
+    reader.nextSnapshot() shouldBe
+        Snapshot.of("Apple").plusFacet("color", "green").plusFacet("crisp", "yes")
     reader.peekKey() shouldBe "Orange"
     reader.peekKey() shouldBe "Orange"
     reader.nextSnapshot() shouldBe Snapshot.of("Orange")

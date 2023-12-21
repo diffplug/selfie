@@ -15,15 +15,15 @@
  */
 package com.diffplug.selfie.junit5
 
-import com.diffplug.selfie.CompoundPrism
-import com.diffplug.selfie.SnapshotPrism
+import com.diffplug.selfie.CompoundLens
+import com.diffplug.selfie.SnapshotLens
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 
 interface SelfieSettingsAPI {
   /** Returns a prism train which will be used to transform snapshots. */
-  fun createPrismTrain(layout: SnapshotFileLayout): SnapshotPrism
+  fun createPrismTrain(layout: SnapshotFileLayout): SnapshotLens = CompoundLens()
 
   /**
    * Defaults to `__snapshot__`, null means that snapshots are stored at the same folder location as
@@ -83,13 +83,13 @@ interface SelfieSettingsAPI {
 }
 
 private class SelfieSettingsNoOp : StandardSelfieSettings() {
-  override fun setupPrismTrain(prismTrain: CompoundPrism) {}
+  override fun setupPrismTrain(prismTrain: CompoundLens) {}
 }
 
 abstract class StandardSelfieSettings : SelfieSettingsAPI {
-  protected abstract fun setupPrismTrain(prismTrain: CompoundPrism)
-  override fun createPrismTrain(layout: SnapshotFileLayout): SnapshotPrism {
-    val prismTrain = CompoundPrism()
+  protected abstract fun setupPrismTrain(prismTrain: CompoundLens)
+  override fun createPrismTrain(layout: SnapshotFileLayout): SnapshotLens {
+    val prismTrain = CompoundLens()
     setupPrismTrain(prismTrain)
     return prismTrain
   }
