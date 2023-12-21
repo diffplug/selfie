@@ -46,46 +46,33 @@ object Selfie {
   }
 
   open class LiteralStringSelfie
-  internal constructor(protected val actual: Snapshot, val onlyLenses: Collection<String>? = null) {
+  internal constructor(protected val actual: Snapshot, val onlyFacets: Collection<String>? = null) {
     init {
-      if (onlyLenses != null) {
-        check(onlyLenses.all { it == "" || actual.facets.containsKey(it) }) {
-          "The following lenses were not found in the snapshot: ${onlyLenses.filter { actual.subjectOrFacetMaybe(it) == null }}\navailable lenses are: ${actual.facets.keys}"
+      if (onlyFacets != null) {
+        check(onlyFacets.all { it == "" || actual.facets.containsKey(it) }) {
+          "The following facets were not found in the snapshot: ${onlyFacets.filter { actual.subjectOrFacetMaybe(it) == null }}\navailable facets are: ${actual.facets.keys}"
         }
-        check(onlyLenses.size > 1) { "Must have at least one lens, this was empty." }
+        check(onlyFacets.size > 1) { "Must have at least one facet to display, this was empty." }
       }
     }
-    /** Extract a single lens from a snapshot in order to do an inline snapshot. */
-    fun lens(lensName: String) = LiteralStringSelfie(actual, listOf(lensName))
-    /** Extract a multiple lenses from a snapshot in order to do an inline snapshot. */
-    fun lenses(vararg lensNames: String) = LiteralStringSelfie(actual, lensNames.toList())
+    /** Extract a single facet from a snapshot in order to do an inline snapshot. */
+    fun facet(facet: String) = LiteralStringSelfie(actual, listOf(facet))
+    /** Extract a multiple facets from a snapshot in order to do an inline snapshot. */
+    fun facets(vararg facets: String) = LiteralStringSelfie(actual, facets.toList())
     private fun actualString(): String {
-      if ((onlyLenses == null && actual.facets.isEmpty()) || actual.facets.size == 1) {
+      if ((onlyFacets == null && actual.facets.isEmpty()) || actual.facets.size == 1) {
         // single value doesn't have to worry about escaping at all
         val onlyValue =
-            actual.run { if (facets.isEmpty()) subject else facets[onlyLenses!!.first()]!! }
-        if (onlyValue.isBinary) {
-          throw Error("Cannot use `toBe` with binary data, use `toBeBase64` instead")
-        }
-        return onlyValue.valueString()
+            actual.run { if (facets.isEmpty()) subject else facets[onlyFacets!!.first()]!! }
+        return if (onlyValue.isBinary) {
+          TODO("BASE64")
+        } else onlyValue.valueString()
       } else {
         // multiple values might need our SnapshotFile escaping, we'll use it just in case
         val snapshotToWrite =
-            if (onlyLenses == null) actual
-            else Snapshot.ofEntries(onlyLenses.map { entry(it, actual.subjectOrFacet(it)) })
-        snapshotToWrite.allEntries().forEach {
-          if (it.value.isBinary) {
-            throw Error(
-                "Cannot use `toBe` with binary data, use `toBeBase64` instead, key='${it.key}' was binary")
-          }
-        }
-        val file = SnapshotFile()
-        file.snapshots = ArrayMap.of(mutableListOf("" to snapshotToWrite))
-        val buf = StringBuilder()
-        file.serialize(buf::append)
-        val removeEmptyRoot = onlyLenses != null && !onlyLenses.contains("")
-        val str = buf.toString()
-        return if (removeEmptyRoot) str else str
+            if (onlyFacets == null) actual
+            else Snapshot.ofEntries(onlyFacets.map { entry(it, actual.subjectOrFacet(it)) })
+        return serialize(snapshotToWrite, onlyFacets != null && !onlyFacets.contains(""))
       }
     }
     fun toBe_TODO() = toBeDidntMatch(null, actualString(), LiteralString)
@@ -154,18 +141,46 @@ internal class ExpectedActual(val expected: Snapshot?, val actual: Snapshot) {
   fun assertEqual() {
     if (expected == null) {
       throw AssertionFailedError("No such snapshot")
-    }
-    if (expected.subject != actual.subject)
-        throw AssertionFailedError("Snapshot failure", expected.subject, actual.subject)
-    else if (expected.facets.keys != actual.facets.keys)
-        throw AssertionFailedError(
-            "Snapshot failure: mismatched lenses", expected.facets.keys, actual.facets.keys)
-    for (key in expected.facets.keys) {
-      val expectedValue = expected.facets[key]!!
-      val actualValue = actual.facets[key]!!
-      if (actualValue != expectedValue) {
-        throw AssertionFailedError("Snapshot failure within lens $key", expectedValue, actualValue)
+    } else if (expected.subject == actual.subject && expected.facets == actual.facets) {
+      return
+    } else {
+      val allKeys =
+          mutableSetOf<String>()
+              .apply {
+                add("")
+                addAll(expected.facets.keys)
+                addAll(actual.facets.keys)
+              }
+              .toList()
+              .sorted()
+      val mismatchInExpected = mutableMapOf<String, SnapshotValue>()
+      val mismatchInActual = mutableMapOf<String, SnapshotValue>()
+      for (key in allKeys) {
+        val expectedValue = expected.facets[key]
+        val actualValue = actual.facets[key]
+        if (expectedValue != actualValue) {
+          expectedValue?.let { mismatchInExpected[key] = it }
+          actualValue?.let { mismatchInActual[key] = it }
+        }
       }
+      val includeRoot = mismatchInExpected.containsKey("")
+      throw AssertionFailedError(
+          "Snapshot failure",
+          serialize(Snapshot.ofEntries(mismatchInExpected.entries), !includeRoot),
+          serialize(Snapshot.ofEntries(mismatchInActual.entries), !includeRoot))
     }
   }
+}
+private fun serialize(actual: Snapshot, removeEmptySubject: Boolean): String {
+  if (removeEmptySubject) {
+    check(actual.subject.valueString().isEmpty()) {
+      "The subject was expected to be empty, was '${actual.subject.valueString()}'"
+    }
+  }
+  val file = SnapshotFile()
+  file.snapshots = ArrayMap.of(mutableListOf("" to actual))
+  val buf = StringBuilder()
+  file.serialize(buf::append)
+  val str = buf.toString()
+  return if (removeEmptySubject) str else str
 }
