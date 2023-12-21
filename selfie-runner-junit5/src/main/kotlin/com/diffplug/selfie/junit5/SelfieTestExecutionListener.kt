@@ -43,8 +43,7 @@ internal object Router {
     val cm = classAndMethod()
     val suffix = suffix(sub)
     val callStack = recordCall()
-    val transformed =
-        cm.clazz.parent.prismTrain.transform(cm.clazz.className, "${cm.method}$suffix", actual)
+    val transformed = cm.clazz.parent.prismTrain.transform(actual)
     return if (RW.isWrite) {
       cm.clazz.write(cm.method, suffix, transformed, callStack, cm.clazz.parent.layout)
       ExpectedActual(transformed, transformed)

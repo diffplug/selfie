@@ -66,7 +66,7 @@ interface SelfieSettingsAPI {
         }
       }
       try {
-        return instantiate(Class.forName("SelfieSettings"))
+        return instantiate(Class.forName("selfie.SelfieSettings"))
       } catch (e: ClassNotFoundException) {
         return SelfieSettingsNoOp()
       }
