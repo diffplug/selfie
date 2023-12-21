@@ -115,8 +115,8 @@ data class Snapshot(
   }
 }
 
-interface Camera<T> {
-  fun snapshot(value: T): Snapshot
+interface Camera<Subject> {
+  fun snapshot(subject: Subject): Snapshot
 }
 internal fun String.efficientReplace(find: String, replaceWith: String): String {
   val idx = this.indexOf(find)
