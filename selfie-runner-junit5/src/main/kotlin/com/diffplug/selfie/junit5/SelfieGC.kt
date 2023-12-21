@@ -167,12 +167,10 @@ internal class MethodSnapshotGC {
         methodsThatRan: ArrayMap<String, MethodSnapshotGC>,
     ): List<String> {
       return Class.forName(className).methods.mapNotNull { method ->
-        if (methodsThatRan.containsKey(method.name) ||
-            testAnnotations.none { method.isAnnotationPresent(it) }) {
-          null
-        } else {
+        if (!methodsThatRan.containsKey(method.name) &&
+            testAnnotations.any { method.isAnnotationPresent(it) }) {
           method.name
-        }
+        } else null
       }
     }
     private val EMPTY_SET = ArraySet<String>(arrayOf())
