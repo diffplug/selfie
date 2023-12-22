@@ -46,7 +46,10 @@ object Selfie {
   }
 
   open class LiteralStringSelfie
-  internal constructor(protected val actual: Snapshot, val onlyFacets: Collection<String>? = null) {
+  internal constructor(
+      protected val actual: Snapshot,
+      private val onlyFacets: Collection<String>? = null
+  ) {
     init {
       if (onlyFacets != null) {
         check(onlyFacets.all { it == "" || actual.facets.containsKey(it) }) {
@@ -71,9 +74,8 @@ object Selfie {
       } else {
         // multiple values might need our SnapshotFile escaping, we'll use it just in case
         val snapshotToWrite =
-            if (onlyFacets == null) actual
-            else Snapshot.ofEntries(onlyFacets.map { entry(it, actual.subjectOrFacet(it)) })
-        return serializeMultiple(snapshotToWrite, onlyFacets != null && !onlyFacets.contains(""))
+            Snapshot.ofEntries(onlyFacets.map { entry(it, actual.subjectOrFacet(it)) })
+        return serializeMultiple(snapshotToWrite, !onlyFacets.contains(""))
       }
     }
     fun toBe_TODO() = toBeDidntMatch(null, actualString(), LiteralString)
