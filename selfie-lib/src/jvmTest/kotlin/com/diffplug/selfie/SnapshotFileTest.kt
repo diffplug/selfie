@@ -69,7 +69,8 @@ class SnapshotFileTest {
     underTest.metadata = entry("com.acme.AcmeTest", """{"header":"data"}""")
     underTest.snapshots =
         underTest.snapshots.plus(
-            "Apple", Snapshot.of("Granny Smith").lens("color", "green").lens("crisp", "yes"))
+            "Apple",
+            Snapshot.of("Granny Smith").plusFacet("color", "green").plusFacet("crisp", "yes"))
     underTest.snapshots = underTest.snapshots.plus("Orange", Snapshot.of("Orange"))
     val buffer = StringBuffer()
     underTest.serialize { line -> buffer.append(line) }

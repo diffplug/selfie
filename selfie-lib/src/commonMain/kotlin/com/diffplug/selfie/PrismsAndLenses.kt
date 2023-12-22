@@ -15,88 +15,112 @@
  */
 package com.diffplug.selfie
 
-/** Given a full [Snapshot], a lens returns either null or a single [SnapshotValue]. */
+/** Given a full [Snapshot], a prism returns either null or a single [SnapshotValue]. */
 @OptIn(ExperimentalStdlibApi::class)
-interface SnapshotLens : AutoCloseable {
-  val defaultLensName: String
-  fun transform(testClass: String, key: String, snapshot: Snapshot): SnapshotValue?
+fun interface SnapshotPrism : AutoCloseable {
+  fun transform(snapshot: Snapshot): SnapshotValue?
   override fun close() {}
 }
 
 /**
- * A prism transforms a single [Snapshot] into a new [Snapshot], transforming / creating / removing
+ * A lens transforms a single [Snapshot] into a new [Snapshot], transforming / creating / removing
  * [SnapshotValue]s along the way.
  */
 @OptIn(ExperimentalStdlibApi::class)
-interface SnapshotPrism : AutoCloseable {
-  fun transform(className: String, key: String, snapshot: Snapshot): Snapshot
+fun interface SnapshotLens : AutoCloseable {
+  fun transform(snapshot: Snapshot): Snapshot
   override fun close() {}
 }
 fun interface SnapshotPredicate {
-  fun test(testClass: String, key: String, snapshot: Snapshot): Boolean
+  fun test(snapshot: Snapshot): Boolean
 }
 
-/** A prism with a fluent API for creating [LensHoldingPrism]s gated by predicates. */
-open class CompoundPrism : SnapshotPrism {
-  private val prisms = mutableListOf<SnapshotPrism>()
-  fun add(prism: SnapshotPrism): CompoundPrism {
+/** A prism with a fluent API for creating [PrismHoldingLens]s gated by predicates. */
+open class CompoundLens : SnapshotLens {
+  private val prisms = mutableListOf<SnapshotLens>()
+  fun add(prism: SnapshotLens) {
     prisms.add(prism)
-    return this
   }
-  fun ifClassKeySnapshot(predicate: SnapshotPredicate): LensHoldingPrism {
-    val prismWhere = LensHoldingPrism(predicate)
+  fun forEveryString(transform: (String) -> String?) {
+    add(
+        object : ForEveryStringLens {
+          override fun transform(snapshot: Snapshot, lensName: String, lensValue: String): String? {
+            return transform(lensValue)
+          }
+        })
+  }
+  fun ifSnapshot(predicate: SnapshotPredicate): PrismHoldingLens {
+    val prismWhere = PrismHoldingLens(predicate)
     add(prismWhere)
     return prismWhere
   }
-  fun ifSnapshot(predicate: (Snapshot) -> Boolean) = ifClassKeySnapshot { _, _, snapshot ->
-    predicate(snapshot)
-  }
-  fun forEverySnapshot(): LensHoldingPrism = ifSnapshot { true }
+  fun forEverySnapshot(): PrismHoldingLens = ifSnapshot { true }
   fun ifString(predicate: (String) -> Boolean) = ifSnapshot {
-    !it.value.isBinary && predicate(it.value.valueString())
+    !it.subject.isBinary && predicate(it.subject.valueString())
   }
-  fun ifStringIsProbablyHtml(): LensHoldingPrism {
+  fun ifStringIsProbablyHtml(): PrismHoldingLens {
     val regex = Regex("<\\/?[a-z][\\s\\S]*>")
     return ifString { regex.find(it) != null }
   }
-  override fun transform(className: String, key: String, snapshot: Snapshot): Snapshot {
+  override fun transform(snapshot: Snapshot): Snapshot {
     var current = snapshot
-    prisms.forEach { current = it.transform(className, key, current) }
+    prisms.forEach { current = it.transform(current) }
     return current
   }
-  override fun close() = prisms.forEach(SnapshotPrism::close)
+  override fun close() = prisms.forEach(SnapshotLens::close)
 }
 
 /** A prism which applies lenses to a snapshot. */
-open class LensHoldingPrism(val predicate: SnapshotPredicate) : SnapshotPrism {
-  private val lenses = mutableListOf<SnapshotPrism>()
-  private fun addLensOrReplaceRoot(name: String?, lens: SnapshotLens): LensHoldingPrism {
+open class PrismHoldingLens(val predicate: SnapshotPredicate) : SnapshotLens {
+  private val lenses = mutableListOf<SnapshotLens>()
+  private fun addLensOrReplaceRoot(name: String?, lens: SnapshotPrism): PrismHoldingLens {
     lenses.add(
-        object : SnapshotPrism {
-          override fun transform(testClass: String, key: String, snapshot: Snapshot): Snapshot {
-            val lensValue = lens.transform(testClass, key, snapshot)
+        object : SnapshotLens {
+          override fun transform(snapshot: Snapshot): Snapshot {
+            val lensValue = lens.transform(snapshot)
             return if (lensValue == null) snapshot
             else {
-              if (name == null) snapshot.withNewRoot(lensValue) else snapshot.lens(name, lensValue)
+              if (name == null) snapshot.withNewSubject(lensValue)
+              else snapshot.plusFacet(name, lensValue)
             }
           }
           override fun close() = lens.close()
         })
     return this
   }
-  fun addLens(name: String, lens: SnapshotLens): LensHoldingPrism = addLensOrReplaceRoot(name, lens)
-  fun addLens(lens: SnapshotLens): LensHoldingPrism =
-      addLensOrReplaceRoot(lens.defaultLensName, lens)
-  fun replaceRootWith(lens: SnapshotLens): LensHoldingPrism = addLensOrReplaceRoot(null, lens)
-  override fun transform(testClass: String, key: String, snapshot: Snapshot): Snapshot {
-    if (!predicate.test(testClass, key, snapshot)) {
+  fun addLens(name: String, lens: SnapshotPrism): PrismHoldingLens =
+      addLensOrReplaceRoot(name, lens)
+  fun replaceRootWith(lens: SnapshotPrism): PrismHoldingLens = addLensOrReplaceRoot(null, lens)
+  override fun transform(snapshot: Snapshot): Snapshot {
+    if (!predicate.test(snapshot)) {
       return snapshot
     }
     var current = snapshot
-    lenses.forEach { current = it.transform(testClass, key, snapshot) }
+    lenses.forEach { current = it.transform(snapshot) }
     return current
   }
   override fun close() {
-    lenses.forEach(SnapshotPrism::close)
+    lenses.forEach(SnapshotLens::close)
   }
+}
+fun interface ForEveryStringLens : SnapshotLens {
+  fun transform(snapshot: Snapshot, facetName: String, facetValue: String): String?
+  override fun transform(snapshot: Snapshot) =
+      Snapshot.ofEntries(
+          snapshot.allEntries().mapNotNull {
+            if (it.value.isBinary) it
+            else {
+              val newValue = transform(snapshot, it.key, it.value.valueString())
+              newValue?.let { newValue -> entry(it.key, SnapshotValue.of(newValue)) } ?: null
+            }
+          })
+}
+
+object Lenses {
+  fun forEveryString(transform: (String) -> String?) =
+      object : ForEveryStringLens {
+        override fun transform(snapshot: Snapshot, facetName: String, facetValue: String): String? {
+          return transform(facetValue)
+        }
+      }
 }

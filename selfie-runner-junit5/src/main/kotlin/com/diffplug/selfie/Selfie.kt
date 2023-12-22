@@ -17,6 +17,7 @@ package com.diffplug.selfie
 
 import com.diffplug.selfie.junit5.Router
 import com.diffplug.selfie.junit5.recordCall
+import java.util.Map.entry
 import org.opentest4j.AssertionFailedError
 
 object Selfie {
@@ -33,7 +34,7 @@ object Selfie {
     }
   }
 
-  open class DiskSelfie internal constructor(private val actual: Snapshot) {
+  class DiskSelfie internal constructor(actual: Snapshot) : LiteralStringSelfie(actual) {
     @JvmOverloads
     fun toMatchDisk(sub: String = ""): Snapshot {
       val comparison = Router.readWriteThroughPipeline(actual, sub)
@@ -44,8 +45,50 @@ object Selfie {
     }
   }
 
+  open class LiteralStringSelfie
+  internal constructor(protected val actual: Snapshot, val onlyFacets: Collection<String>? = null) {
+    init {
+      if (onlyFacets != null) {
+        check(onlyFacets.all { it == "" || actual.facets.containsKey(it) }) {
+          "The following facets were not found in the snapshot: ${onlyFacets.filter { actual.subjectOrFacetMaybe(it) == null }}\navailable facets are: ${actual.facets.keys}"
+        }
+        check(onlyFacets.size > 1) { "Must have at least one facet to display, this was empty." }
+      }
+    }
+    /** Extract a single facet from a snapshot in order to do an inline snapshot. */
+    fun facet(facet: String) = LiteralStringSelfie(actual, listOf(facet))
+    /** Extract a multiple facets from a snapshot in order to do an inline snapshot. */
+    fun facets(vararg facets: String) = LiteralStringSelfie(actual, facets.toList())
+    private fun actualString(): String {
+      if ((onlyFacets == null && actual.facets.isEmpty()) || actual.facets.size == 1) {
+        // single value doesn't have to worry about escaping at all
+        val onlyValue =
+            actual.run { if (facets.isEmpty()) subject else facets[onlyFacets!!.first()]!! }
+        return if (onlyValue.isBinary) {
+          TODO("BASE64")
+        } else onlyValue.valueString()
+      } else {
+        // multiple values might need our SnapshotFile escaping, we'll use it just in case
+        val snapshotToWrite =
+            if (onlyFacets == null) actual
+            else Snapshot.ofEntries(onlyFacets.map { entry(it, actual.subjectOrFacet(it)) })
+        return serialize(snapshotToWrite, onlyFacets != null && !onlyFacets.contains(""))
+      }
+    }
+    fun toBe_TODO() = toBeDidntMatch(null, actualString(), LiteralString)
+    infix fun toBe(expected: String): String {
+      val actualString = actualString()
+      return if (actualString == expected) actualString
+      else toBeDidntMatch(expected, actualString, LiteralString)
+    }
+  }
+
   @JvmStatic
   fun <T> expectSelfie(actual: T, camera: Camera<T>) = DiskSelfie(camera.snapshot(actual))
+
+  @JvmStatic fun expectSelfie(actual: String) = DiskSelfie(Snapshot.of(actual))
+
+  @JvmStatic fun expectSelfie(actual: ByteArray) = DiskSelfie(Snapshot.of(actual))
 
   /** Implements the inline snapshot whenever a match fails. */
   private fun <T : Any> toBeDidntMatch(expected: T?, actual: T, format: LiteralFormat<T>): T {
@@ -62,21 +105,6 @@ object Selfie {
       }
     }
   }
-
-  class StringSelfie(private val actual: String) : DiskSelfie(Snapshot.of(actual)) {
-    fun toBe_TODO() = toBeDidntMatch(null, actual, LiteralString)
-    infix fun toBe(expected: String) =
-        if (actual == expected) expected else toBeDidntMatch(expected, actual, LiteralString)
-  }
-
-  @JvmStatic fun expectSelfie(actual: String) = StringSelfie(actual)
-
-  class BinarySelfie(private val actual: ByteArray) : DiskSelfie(Snapshot.of(actual)) {
-    fun toBeBase64(expected: String): ByteArray = TODO()
-    fun toBeBase64_TODO(): ByteArray = TODO()
-  }
-
-  @JvmStatic fun expectSelfie(actual: ByteArray) = BinarySelfie(actual)
 
   class IntSelfie(private val actual: Int) {
     fun toBe_TODO() = toBeDidntMatch(null, actual, LiteralInt)
@@ -102,8 +130,8 @@ object Selfie {
 
   // infix versions for the inline methods, consistent with Kotest's API
   infix fun String.shouldBeSelfie(expected: String): String = expectSelfie(this).toBe(expected)
-  infix fun ByteArray.shouldBeSelfieBase64(expected: String): ByteArray =
-      expectSelfie(this).toBeBase64(expected)
+  infix fun ByteArray.shouldBeSelfieBase64(expected: String): String =
+      expectSelfie(this).toBe(expected)
   infix fun Int.shouldBeSelfie(expected: Int): Int = expectSelfie(this).toBe(expected)
   infix fun Long.shouldBeSelfie(expected: Long): Long = expectSelfie(this).toBe(expected)
   infix fun Boolean.shouldBeSelfie(expected: Boolean): Boolean = expectSelfie(this).toBe(expected)
@@ -113,18 +141,46 @@ internal class ExpectedActual(val expected: Snapshot?, val actual: Snapshot) {
   fun assertEqual() {
     if (expected == null) {
       throw AssertionFailedError("No such snapshot")
-    }
-    if (expected.value != actual.value)
-        throw AssertionFailedError("Snapshot failure", expected.value, actual.value)
-    else if (expected.lenses.keys != actual.lenses.keys)
-        throw AssertionFailedError(
-            "Snapshot failure: mismatched lenses", expected.lenses.keys, actual.lenses.keys)
-    for (key in expected.lenses.keys) {
-      val expectedValue = expected.lenses[key]!!
-      val actualValue = actual.lenses[key]!!
-      if (actualValue != expectedValue) {
-        throw AssertionFailedError("Snapshot failure within lens $key", expectedValue, actualValue)
+    } else if (expected.subject == actual.subject && expected.facets == actual.facets) {
+      return
+    } else {
+      val allKeys =
+          mutableSetOf<String>()
+              .apply {
+                add("")
+                addAll(expected.facets.keys)
+                addAll(actual.facets.keys)
+              }
+              .toList()
+              .sorted()
+      val mismatchInExpected = mutableMapOf<String, SnapshotValue>()
+      val mismatchInActual = mutableMapOf<String, SnapshotValue>()
+      for (key in allKeys) {
+        val expectedValue = expected.facets[key]
+        val actualValue = actual.facets[key]
+        if (expectedValue != actualValue) {
+          expectedValue?.let { mismatchInExpected[key] = it }
+          actualValue?.let { mismatchInActual[key] = it }
+        }
       }
+      val includeRoot = mismatchInExpected.containsKey("")
+      throw AssertionFailedError(
+          "Snapshot failure",
+          serialize(Snapshot.ofEntries(mismatchInExpected.entries), !includeRoot),
+          serialize(Snapshot.ofEntries(mismatchInActual.entries), !includeRoot))
     }
   }
+}
+private fun serialize(actual: Snapshot, removeEmptySubject: Boolean): String {
+  if (removeEmptySubject) {
+    check(actual.subject.valueString().isEmpty()) {
+      "The subject was expected to be empty, was '${actual.subject.valueString()}'"
+    }
+  }
+  val file = SnapshotFile()
+  file.snapshots = ArrayMap.of(mutableListOf("" to actual))
+  val buf = StringBuilder()
+  file.serialize(buf::append)
+  val str = buf.toString()
+  return if (removeEmptySubject) str else str
 }

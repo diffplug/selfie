@@ -15,16 +15,11 @@
  */
 package com.diffplug.selfie.junit5
 
-import com.diffplug.selfie.CompoundPrism
-import com.diffplug.selfie.SnapshotPrism
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 
-interface SelfieSettingsAPI {
-  /** Returns a prism train which will be used to transform snapshots. */
-  fun createPrismTrain(layout: SnapshotFileLayout): SnapshotPrism
-
+open class SelfieSettingsAPI {
   /**
    * Defaults to `__snapshot__`, null means that snapshots are stored at the same folder location as
    * the test that created them.
@@ -56,7 +51,7 @@ interface SelfieSettingsAPI {
             "src/test/resources")
     internal fun initialize(): SelfieSettingsAPI {
       val settings = System.getProperty("selfie.settings")
-      if (settings != null && settings.trim().isNotEmpty()) {
+      if (settings != null && settings.isNotBlank()) {
         try {
           return instantiate(Class.forName(settings))
         } catch (e: ClassNotFoundException) {
@@ -66,9 +61,9 @@ interface SelfieSettingsAPI {
         }
       }
       try {
-        return instantiate(Class.forName("SelfieSettings"))
+        return instantiate(Class.forName("selfie.SelfieSettings"))
       } catch (e: ClassNotFoundException) {
-        return SelfieSettingsNoOp()
+        return SelfieSettingsAPI()
       }
     }
     private fun instantiate(clazz: Class<*>): SelfieSettingsAPI {
@@ -79,18 +74,5 @@ interface SelfieSettingsAPI {
             "Unable to instantiate ${clazz.name}, is it abstract? Does it require arguments?", e)
       }
     }
-  }
-}
-
-private class SelfieSettingsNoOp : StandardSelfieSettings() {
-  override fun setupPrismTrain(prismTrain: CompoundPrism) {}
-}
-
-abstract class StandardSelfieSettings : SelfieSettingsAPI {
-  protected abstract fun setupPrismTrain(prismTrain: CompoundPrism)
-  override fun createPrismTrain(layout: SnapshotFileLayout): SnapshotPrism {
-    val prismTrain = CompoundPrism()
-    setupPrismTrain(prismTrain)
-    return prismTrain
   }
 }

@@ -193,6 +193,8 @@ open class Harness(subproject: String) {
       }
     }
   }
+
+  protected var runOnlyMethod: String? = null
   fun gradlew(task: String, vararg args: String): AssertionFailedError? {
     return GradleConnector.newConnector()
         .forProjectDirectory(subprojectFolder.parent!!.toFile())
@@ -200,12 +202,23 @@ open class Harness(subproject: String) {
         .use { connection ->
           try {
             if (onlyRunThisTest) {
-              connection
-                  .newTestLauncher()
-                  .setStandardError(System.err)
-                  .setStandardOutput(System.out)
-                  .withTaskAndTestClasses(
-                      ":${subprojectFolder.name}:$task", listOf("UT_${javaClass.simpleName}"))
+              var testLauncher =
+                  connection
+                      .newTestLauncher()
+                      .setStandardError(System.err)
+                      .setStandardOutput(System.out)
+              if (runOnlyMethod == null) {
+                testLauncher =
+                    testLauncher.withTaskAndTestClasses(
+                        ":${subprojectFolder.name}:$task", listOf("UT_${javaClass.simpleName}"))
+              } else {
+                testLauncher =
+                    testLauncher.withTaskAndTestMethods(
+                        ":${subprojectFolder.name}:$task",
+                        "UT_${javaClass.simpleName}",
+                        listOf(runOnlyMethod!!))
+              }
+              testLauncher
                   .withArguments(
                       buildList<String> {
                         addAll(args)
