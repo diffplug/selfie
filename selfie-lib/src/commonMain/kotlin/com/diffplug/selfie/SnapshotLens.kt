@@ -23,7 +23,15 @@ fun interface SnapshotLens {
   fun transform(snapshot: Snapshot): Snapshot
 }
 
-/** A prism with a fluent API for creating [PrismHoldingLens]s gated by predicates. */
+/** A function which transforms a string into either another string or null. */
+fun interface SnapshotStringFunc {
+  fun apply(value: String): String?
+  fun then(next: SnapshotStringFunc): SnapshotStringFunc = SnapshotStringFunc { outer ->
+    apply(outer)?.let { inner -> next.apply(inner) }
+  }
+}
+
+/** A lens which makes it easy to pipe data from one facet to another within a snapshot. */
 open class CompoundLens : SnapshotLens {
   private val lenses = mutableListOf<SnapshotLens>()
   fun add(lens: SnapshotLens) {
@@ -32,25 +40,24 @@ open class CompoundLens : SnapshotLens {
   fun replaceAll(toReplace: Regex, replacement: String) = mutateStrings {
     it.replace(toReplace, replacement)
   }
-  fun mutateStrings(perString: (String) -> String?) {
+  fun mutateStrings(perString: SnapshotStringFunc) {
     add { snapshot ->
       Snapshot.ofEntries(
           snapshot.allEntries().mapNotNull { e ->
             if (e.value.isBinary) e
-            else perString(e.value.valueString())?.let { entry(e.key, SnapshotValue.of(it)) }
+            else perString.apply(e.value.valueString())?.let { entry(e.key, SnapshotValue.of(it)) }
           })
     }
   }
-  fun setFacetUsing(target: String, function: (Snapshot) -> String?) {
-    add { snapshot -> setFacetOf(snapshot, target, function(snapshot)) }
-  }
-  fun setFacetUsingFacet(target: String, source: String, function: (String) -> String?) {
+  fun setFacetFrom(target: String, source: String, function: SnapshotStringFunc) {
     add { snapshot ->
       val sourceValue = snapshot.subjectOrFacetMaybe(source)
       if (sourceValue == null) snapshot
-      else setFacetOf(snapshot, target, function(sourceValue.valueString()))
+      else setFacetOf(snapshot, target, function.apply(sourceValue.valueString()))
     }
   }
+  fun mutateFacet(target: String, function: SnapshotStringFunc) =
+      setFacetFrom(target, target, function)
   private fun setFacetOf(snapshot: Snapshot, target: String, newValue: String?): Snapshot =
       if (newValue == null) snapshot else snapshot.plusOrReplace(target, SnapshotValue.of(newValue))
   override fun transform(snapshot: Snapshot): Snapshot {
