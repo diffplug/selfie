@@ -126,10 +126,6 @@ fun interface Camera<Subject> {
       override fun snapshot(subject: Subject): Snapshot = lens.transform(parent.snapshot(subject))
     }
   }
-
-  companion object {
-    fun <Subject> create(camera: Camera<Subject>, lens: SnapshotLens) = camera.withLens(lens)
-  }
 }
 internal fun String.efficientReplace(find: String, replaceWith: String): String {
   val idx = this.indexOf(find)
