@@ -52,7 +52,9 @@ object Selfie {
         check(onlyFacets.all { it == "" || actual.facets.containsKey(it) }) {
           "The following facets were not found in the snapshot: ${onlyFacets.filter { actual.subjectOrFacetMaybe(it) == null }}\navailable facets are: ${actual.facets.keys}"
         }
-        check(onlyFacets.size > 1) { "Must have at least one facet to display, this was empty." }
+        check(onlyFacets.isNotEmpty()) {
+          "Must have at least one facet to display, this was empty."
+        }
       }
     }
     /** Extract a single facet from a snapshot in order to do an inline snapshot. */
@@ -60,10 +62,9 @@ object Selfie {
     /** Extract a multiple facets from a snapshot in order to do an inline snapshot. */
     fun facets(vararg facets: String) = LiteralStringSelfie(actual, facets.toList())
     private fun actualString(): String {
-      if ((onlyFacets == null && actual.facets.isEmpty()) || actual.facets.size == 1) {
+      if ((onlyFacets == null && actual.facets.isEmpty()) || onlyFacets!!.size == 1) {
         // single value doesn't have to worry about escaping at all
-        val onlyValue =
-            actual.run { if (facets.isEmpty()) subject else facets[onlyFacets!!.first()]!! }
+        val onlyValue = actual.subjectOrFacet(onlyFacets?.first() ?: "")
         return if (onlyValue.isBinary) {
           TODO("BASE64")
         } else onlyValue.valueString()
@@ -72,7 +73,7 @@ object Selfie {
         val snapshotToWrite =
             if (onlyFacets == null) actual
             else Snapshot.ofEntries(onlyFacets.map { entry(it, actual.subjectOrFacet(it)) })
-        return serialize(snapshotToWrite, onlyFacets != null && !onlyFacets.contains(""))
+        return serializeMultiple(snapshotToWrite, onlyFacets != null && !onlyFacets.contains(""))
       }
     }
     fun toBe_TODO() = toBeDidntMatch(null, actualString(), LiteralString)
@@ -84,7 +85,9 @@ object Selfie {
   }
 
   @JvmStatic
-  fun <T> expectSelfie(actual: T, camera: Camera<T>) = DiskSelfie(camera.snapshot(actual))
+  fun <T> expectSelfie(actual: T, camera: Camera<T>) = expectSelfie(camera.snapshot(actual))
+
+  @JvmStatic fun expectSelfie(actual: Snapshot) = DiskSelfie(actual)
 
   @JvmStatic fun expectSelfie(actual: String) = DiskSelfie(Snapshot.of(actual))
 
@@ -166,12 +169,12 @@ internal class ExpectedActual(val expected: Snapshot?, val actual: Snapshot) {
       val includeRoot = mismatchInExpected.containsKey("")
       throw AssertionFailedError(
           "Snapshot failure",
-          serialize(Snapshot.ofEntries(mismatchInExpected.entries), !includeRoot),
-          serialize(Snapshot.ofEntries(mismatchInActual.entries), !includeRoot))
+          serializeMultiple(Snapshot.ofEntries(mismatchInExpected.entries), !includeRoot),
+          serializeMultiple(Snapshot.ofEntries(mismatchInActual.entries), !includeRoot))
     }
   }
 }
-private fun serialize(actual: Snapshot, removeEmptySubject: Boolean): String {
+private fun serializeMultiple(actual: Snapshot, removeEmptySubject: Boolean): String {
   if (removeEmptySubject) {
     check(actual.subject.valueString().isEmpty()) {
       "The subject was expected to be empty, was '${actual.subject.valueString()}'"
@@ -181,6 +184,17 @@ private fun serialize(actual: Snapshot, removeEmptySubject: Boolean): String {
   file.snapshots = ArrayMap.of(mutableListOf("" to actual))
   val buf = StringBuilder()
   file.serialize(buf::append)
-  val str = buf.toString()
-  return if (removeEmptySubject) str else str
+
+  check(buf.startsWith(EMPTY_SUBJECT))
+  check(buf.endsWith(EOF))
+  buf.setLength(buf.length - EOF.length)
+  val str = buf.substring(EMPTY_SUBJECT.length)
+  return if (!removeEmptySubject) str
+  else {
+    check(str[0] == '\n')
+    str.substring(1)
+  }
 }
+
+private const val EMPTY_SUBJECT = "╔═  ═╗\n"
+private const val EOF = "\n╔═ [end of file] ═╗\n"
