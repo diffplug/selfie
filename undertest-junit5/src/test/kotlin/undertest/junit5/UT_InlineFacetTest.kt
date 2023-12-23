@@ -50,6 +50,11 @@ class UT_InlineFacetTest {
     expectSelfie(multiple)
         .facets("facet3", "facet2")
         .toBe("╔═ [facet2] ═╗\n" + "facetValue2\n" + "╔═ [facet3] ═╗\n" + "facetValue3")
+// TODO: order of lenses should matter
     assertThrows<Throwable> { expectSelfie(multiple).facets("facet3", "facet2").toBe("WRONG") }
+    expectSelfie(multiple)
+        .facets("facet1", "")
+        .toBe("subject\n" + "╔═ [facet1] ═╗\n" + "facetValue1")
+    assertThrows<Throwable> { expectSelfie(multiple).facets("facet1", "").toBe("WRONG") }
   }
 }
