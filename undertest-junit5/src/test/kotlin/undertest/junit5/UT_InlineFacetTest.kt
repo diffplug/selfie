@@ -1,6 +1,7 @@
 package undertest.junit5
 
 import com.diffplug.selfie.Selfie.expectSelfie
+import com.diffplug.selfie.Selfie.shouldBeSelfie
 import com.diffplug.selfie.Snapshot
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
@@ -41,20 +42,22 @@ class UT_InlineFacetTest {
                 "╔═ [facet2] ═╗\n" +
                 "facetValue2\n" +
                 "╔═ [facet3] ═╗\n" +
-                "facetValue3")
+                "facetValue3\n")
     assertThrows<Throwable> { expectSelfie(multiple).toBe("WRONG") }
     expectSelfie(multiple)
         .facets("", "facet1")
-        .toBe("subject\n" + "╔═ [facet1] ═╗\n" + "facetValue1")
+        .toBe("subject\n" + "╔═ [facet1] ═╗\n" + "facetValue1\n")
     assertThrows<Throwable> { expectSelfie(multiple).facets("", "facet1").toBe("WRONG") }
     expectSelfie(multiple)
         .facets("facet3", "facet2")
-        .toBe("╔═ [facet2] ═╗\n" + "facetValue2\n" + "╔═ [facet3] ═╗\n" + "facetValue3")
-// TODO: order of lenses should matter
+        .toBe("╔═ [facet3] ═╗\n" + "facetValue3\n" + "╔═ [facet2] ═╗\n" + "facetValue2\n")
     assertThrows<Throwable> { expectSelfie(multiple).facets("facet3", "facet2").toBe("WRONG") }
-    expectSelfie(multiple)
-        .facets("facet1", "")
-        .toBe("subject\n" + "╔═ [facet1] ═╗\n" + "facetValue1")
-    assertThrows<Throwable> { expectSelfie(multiple).facets("facet1", "").toBe("WRONG") }
+    assertThrows<Throwable> {
+          expectSelfie(multiple)
+              .facets("facet1", "")
+              .toBe("subject\n" + "╔═ [facet1] ═╗\n" + "facetValue1\n")
+        }
+        .message!! shouldBeSelfie
+        "If you're going to specify the subject facet (\"\"), you have to list it first, this was [facet1, ]"
   }
 }
