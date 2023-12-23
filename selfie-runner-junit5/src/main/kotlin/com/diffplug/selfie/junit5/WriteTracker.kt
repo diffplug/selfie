@@ -16,7 +16,6 @@
 package com.diffplug.selfie.junit5
 
 import com.diffplug.selfie.LiteralValue
-import com.diffplug.selfie.RW
 import com.diffplug.selfie.Snapshot
 import com.diffplug.selfie.SourceFile
 import java.nio.file.Files

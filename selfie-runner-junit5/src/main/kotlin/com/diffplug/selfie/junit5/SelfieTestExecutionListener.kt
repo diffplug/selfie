@@ -17,7 +17,6 @@ package com.diffplug.selfie.junit5
 
 import com.diffplug.selfie.*
 import com.diffplug.selfie.ExpectedActual
-import com.diffplug.selfie.RW
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
@@ -32,6 +31,9 @@ import org.junit.platform.launcher.TestPlan
 
 /** Routes between `toMatchDisk()` calls and the snapshot file / pruning machinery. */
 internal object Router {
+  val isWrite: Boolean
+    get() = RW.isWrite
+
   private class ClassMethod(val clazz: ClassProgress, val method: String)
   private val threadCtx = ThreadLocal<ClassMethod?>()
   private fun classAndMethod() =

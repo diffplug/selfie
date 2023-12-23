@@ -38,7 +38,7 @@ object Selfie {
     @JvmOverloads
     fun toMatchDisk(sub: String = ""): Snapshot {
       val comparison = Router.readWriteThroughPipeline(actual, sub)
-      if (!RW.isWrite) {
+      if (!Router.isWrite) {
         comparison.assertEqual()
       }
       return comparison.actual
@@ -103,7 +103,7 @@ object Selfie {
 
   /** Implements the inline snapshot whenever a match fails. */
   private fun <T : Any> toBeDidntMatch(expected: T?, actual: T, format: LiteralFormat<T>): T {
-    if (RW.isWrite) {
+    if (Router.isWrite) {
       Router.writeInline(recordCall(), LiteralValue(expected, actual, format))
       return actual
     } else {
