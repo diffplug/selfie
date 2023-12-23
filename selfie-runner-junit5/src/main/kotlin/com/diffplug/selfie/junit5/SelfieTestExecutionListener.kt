@@ -28,6 +28,7 @@ import org.junit.platform.engine.support.descriptor.MethodSource
 import org.junit.platform.launcher.TestExecutionListener
 import org.junit.platform.launcher.TestIdentifier
 import org.junit.platform.launcher.TestPlan
+import org.opentest4j.AssertionFailedError
 
 /** Routes between `toMatchDisk()` calls and the snapshot file / pruning machinery. */
 internal object SnapshotStorageJUnit5 : SnapshotStorage {
@@ -60,6 +61,9 @@ internal object SnapshotStorageJUnit5 : SnapshotStorage {
       cm.clazz.keep(cm.method, suffix(subOrKeepAll))
     }
   }
+  override fun assertFailed(message: String, expected: Any?, actual: Any?): Error =
+      if (expected == null && actual == null) AssertionFailedError(message)
+      else AssertionFailedError(message, expected, actual)
   override fun writeInline(literalValue: LiteralValue<*>) {
     val call = recordCall()
     val cm =

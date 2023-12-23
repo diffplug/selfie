@@ -17,7 +17,6 @@ package com.diffplug.selfie
 
 import com.diffplug.selfie.junit5.SnapshotStorageJUnit5
 import java.util.Map.entry
-import org.opentest4j.AssertionFailedError
 
 /** NOT FOR ENDUSERS. Implemented by Selfie to integrate with various test frameworks. */
 interface SnapshotStorage {
@@ -32,6 +31,8 @@ interface SnapshotStorage {
    * currently executing class.
    */
   fun keep(subOrKeepAll: String?)
+  /** Creates an assertion failed exception to throw. */
+  fun assertFailed(message: String, expected: Any? = null, actual: Any? = null): Error
 }
 
 object Selfie {
@@ -55,7 +56,7 @@ object Selfie {
     fun toMatchDisk(sub: String = ""): Snapshot {
       val comparison = storage.readWriteDisk(actual, sub)
       if (!SnapshotStorageJUnit5.isWrite) {
-        comparison.assertEqual()
+        comparison.assertEqual(storage)
       }
       return comparison.actual
     }
@@ -124,10 +125,10 @@ object Selfie {
       return actual
     } else {
       if (expected == null) {
-        throw AssertionFailedError(
+        throw storage.assertFailed(
             "`.toBe_TODO()` was called in `read` mode, try again with selfie in write mode")
       } else {
-        throw AssertionFailedError(
+        throw storage.assertFailed(
             "Inline literal did not match the actual value", expected, actual)
       }
     }
@@ -165,9 +166,9 @@ object Selfie {
 }
 
 class ExpectedActual(val expected: Snapshot?, val actual: Snapshot) {
-  fun assertEqual() {
+  internal fun assertEqual(storage: SnapshotStorage) {
     if (expected == null) {
-      throw AssertionFailedError("No such snapshot")
+      throw storage.assertFailed("No such snapshot")
     } else if (expected.subject == actual.subject && expected.facets == actual.facets) {
       return
     } else {
@@ -191,7 +192,7 @@ class ExpectedActual(val expected: Snapshot?, val actual: Snapshot) {
         }
       }
       val includeRoot = mismatchInExpected.containsKey("")
-      throw AssertionFailedError(
+      throw storage.assertFailed(
           "Snapshot failure",
           serializeMultiple(Snapshot.ofEntries(mismatchInExpected.entries), !includeRoot),
           serializeMultiple(Snapshot.ofEntries(mismatchInActual.entries), !includeRoot))
