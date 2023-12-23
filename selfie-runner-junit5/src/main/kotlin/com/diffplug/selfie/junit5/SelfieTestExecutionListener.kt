@@ -30,7 +30,7 @@ import org.junit.platform.launcher.TestIdentifier
 import org.junit.platform.launcher.TestPlan
 
 /** Routes between `toMatchDisk()` calls and the snapshot file / pruning machinery. */
-internal object Router : SnapshotStorage {
+internal object SnapshotStorageJUnit5 : SnapshotStorage {
   override val isWrite: Boolean
     get() = RW.isWrite
 
@@ -103,13 +103,13 @@ internal class ClassProgress(val parent: Progress, val className: String) {
   // the methods below called by the TestExecutionListener on its runtime thread
   @Synchronized fun startMethod(method: String) {
     assertNotTerminated()
-    Router.start(this, method)
+    SnapshotStorageJUnit5.start(this, method)
     assert(method.indexOf('/') == -1) { "Method name cannot contain '/', was $method" }
     methods = methods.plus(method, MethodSnapshotGC())
   }
   @Synchronized fun finishedMethodWithSuccess(method: String, success: Boolean) {
     assertNotTerminated()
-    Router.finish(this, method)
+    SnapshotStorageJUnit5.finish(this, method)
     methods[method]!!.succeeded(success)
   }
   @Synchronized fun finishedClassWithSuccess(success: Boolean) {
