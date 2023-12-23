@@ -15,8 +15,8 @@
  */
 package com.diffplug.selfie
 
-import com.diffplug.selfie.junit5.SnapshotStorageJUnit5
-import java.util.Map.entry
+import kotlin.jvm.JvmOverloads
+import kotlin.jvm.JvmStatic
 
 /** NOT FOR ENDUSERS. Implemented by Selfie to integrate with various test frameworks. */
 interface SnapshotStorage {
@@ -36,7 +36,7 @@ interface SnapshotStorage {
 }
 
 object Selfie {
-  private val storage: SnapshotStorage = SnapshotStorageJUnit5
+  private val storage: SnapshotStorage = TODO()
 
   /**
    * Sometimes a selfie is environment-specific, but should not be deleted when run in a different
@@ -47,7 +47,7 @@ object Selfie {
     if (subsToKeep.isEmpty()) {
       storage.keep(null)
     } else {
-      subsToKeep.forEach { SnapshotStorageJUnit5.keep(it) }
+      subsToKeep.forEach { storage.keep(it) }
     }
   }
 
@@ -55,7 +55,7 @@ object Selfie {
     @JvmOverloads
     fun toMatchDisk(sub: String = ""): Snapshot {
       val comparison = storage.readWriteDisk(actual, sub)
-      if (!SnapshotStorageJUnit5.isWrite) {
+      if (!storage.isWrite) {
         comparison.assertEqual(storage)
       }
       return comparison.actual
@@ -120,7 +120,7 @@ object Selfie {
 
   /** Implements the inline snapshot whenever a match fails. */
   private fun <T : Any> toBeDidntMatch(expected: T?, actual: T, format: LiteralFormat<T>): T {
-    if (SnapshotStorageJUnit5.isWrite) {
+    if (storage.isWrite) {
       storage.writeInline(LiteralValue(expected, actual, format))
       return actual
     } else {
