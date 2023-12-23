@@ -36,26 +36,48 @@ class UT_InlineFacetTest {
             .plusFacet("facet3", "facetValue3")
     expectSelfie(multiple)
         .toBe(
-            "subject\n" +
-                "╔═ [facet1] ═╗\n" +
-                "facetValue1\n" +
-                "╔═ [facet2] ═╗\n" +
-                "facetValue2\n" +
-                "╔═ [facet3] ═╗\n" +
-                "facetValue3\n")
+            """
+            subject
+            ╔═ [facet1] ═╗
+            facetValue1
+            ╔═ [facet2] ═╗
+            facetValue2
+            ╔═ [facet3] ═╗
+            facetValue3
+        """
+                .trimIndent())
     assertThrows<Throwable> { expectSelfie(multiple).toBe("WRONG") }
     expectSelfie(multiple)
         .facets("", "facet1")
-        .toBe("subject\n" + "╔═ [facet1] ═╗\n" + "facetValue1\n")
+        .toBe(
+            """
+            subject
+            ╔═ [facet1] ═╗
+            facetValue1
+        """
+                .trimIndent())
     assertThrows<Throwable> { expectSelfie(multiple).facets("", "facet1").toBe("WRONG") }
     expectSelfie(multiple)
         .facets("facet3", "facet2")
-        .toBe("╔═ [facet3] ═╗\n" + "facetValue3\n" + "╔═ [facet2] ═╗\n" + "facetValue2\n")
+        .toBe(
+            """
+            ╔═ [facet3] ═╗
+            facetValue3
+            ╔═ [facet2] ═╗
+            facetValue2
+        """
+                .trimIndent())
     assertThrows<Throwable> { expectSelfie(multiple).facets("facet3", "facet2").toBe("WRONG") }
     assertThrows<Throwable> {
           expectSelfie(multiple)
               .facets("facet1", "")
-              .toBe("subject\n" + "╔═ [facet1] ═╗\n" + "facetValue1\n")
+              .toBe(
+                  """
+                    subject
+                    ╔═ [facet1] ═╗
+                    facetValue1
+                """
+                      .trimIndent())
         }
         .message!! shouldBeSelfie
         "If you're going to specify the subject facet (\"\"), you have to list it first, this was [facet1, ]"
