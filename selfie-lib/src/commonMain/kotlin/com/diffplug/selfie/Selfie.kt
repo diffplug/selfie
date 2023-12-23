@@ -96,7 +96,7 @@ object Selfie {
           TODO("BASE64")
         } else onlyValue.valueString()
       } else {
-        return serializeMultiple(
+        return serializeOnlyFacets(
             actual,
             onlyFacets
                 ?: buildList<String> {
@@ -191,20 +191,24 @@ class ExpectedActual(val expected: Snapshot?, val actual: Snapshot) {
               .sorted()
       throw storage.assertFailed(
           "Snapshot failure",
-          serializeMultiple(expected, mismatchedKeys),
-          serializeMultiple(actual, mismatchedKeys))
+          serializeOnlyFacets(expected, mismatchedKeys),
+          serializeOnlyFacets(actual, mismatchedKeys))
     }
   }
 }
-private fun serializeMultiple(snapshot: Snapshot, facets: Collection<String>): String {
+/**
+ * Returns a serialized form of only the given facets if they are available, silently omits missing
+ * facets.
+ */
+private fun serializeOnlyFacets(snapshot: Snapshot, keys: Collection<String>): String {
   val buf = StringBuilder()
   val writer = StringWriter { buf.append(it) }
-  for (facet in facets) {
-    if (facet.isEmpty()) {
-      SnapshotFile.writeValue(writer, snapshot.subjectOrFacet(facet))
+  for (key in keys) {
+    if (key.isEmpty()) {
+      SnapshotFile.writeValue(writer, snapshot.subjectOrFacet(key))
     } else {
-      snapshot.subjectOrFacetMaybe(facet)?.let {
-        SnapshotFile.writeKey(writer, "", facet)
+      snapshot.subjectOrFacetMaybe(key)?.let {
+        SnapshotFile.writeKey(writer, "", key)
         SnapshotFile.writeValue(writer, it)
       }
     }
