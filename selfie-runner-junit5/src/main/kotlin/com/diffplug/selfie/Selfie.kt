@@ -19,7 +19,24 @@ import com.diffplug.selfie.junit5.Router
 import java.util.Map.entry
 import org.opentest4j.AssertionFailedError
 
+/** NOT FOR ENDUSERS. Implemented by Selfie to integrate with various test frameworks. */
+interface SnapshotStorage {
+  /** Determines if the system is in write mode or read mode. */
+  val isWrite: Boolean
+  /** Indicates that the following value should be written into test sourcecode. */
+  fun writeInline(literalValue: LiteralValue<*>)
+  /** Performs a comparison between disk and actual, writing the actual to disk if necessary. */
+  fun readWriteDisk(actual: Snapshot, sub: String): ExpectedActual
+  /**
+   * Marks that the following sub snapshots should be kept, null means to keep all snapshots for the
+   * currently executing class.
+   */
+  fun keep(subOrKeepAll: String?)
+}
+
 object Selfie {
+  private val storage: SnapshotStorage = Router
+
   /**
    * Sometimes a selfie is environment-specific, but should not be deleted when run in a different
    * environment.
@@ -27,7 +44,7 @@ object Selfie {
   @JvmStatic
   fun preserveSelfiesOnDisk(vararg subsToKeep: String): Unit {
     if (subsToKeep.isEmpty()) {
-      Router.keep(null)
+      storage.keep(null)
     } else {
       subsToKeep.forEach { Router.keep(it) }
     }
@@ -36,7 +53,7 @@ object Selfie {
   class DiskSelfie internal constructor(actual: Snapshot) : LiteralStringSelfie(actual) {
     @JvmOverloads
     fun toMatchDisk(sub: String = ""): Snapshot {
-      val comparison = Router.readWriteThroughPipeline(actual, sub)
+      val comparison = storage.readWriteDisk(actual, sub)
       if (!Router.isWrite) {
         comparison.assertEqual()
       }
@@ -103,7 +120,7 @@ object Selfie {
   /** Implements the inline snapshot whenever a match fails. */
   private fun <T : Any> toBeDidntMatch(expected: T?, actual: T, format: LiteralFormat<T>): T {
     if (Router.isWrite) {
-      Router.writeInline(LiteralValue(expected, actual, format))
+      storage.writeInline(LiteralValue(expected, actual, format))
       return actual
     } else {
       if (expected == null) {
@@ -147,7 +164,7 @@ object Selfie {
   infix fun Boolean.shouldBeSelfie(expected: Boolean): Boolean = expectSelfie(this).toBe(expected)
 }
 
-internal class ExpectedActual(val expected: Snapshot?, val actual: Snapshot) {
+class ExpectedActual(val expected: Snapshot?, val actual: Snapshot) {
   fun assertEqual() {
     if (expected == null) {
       throw AssertionFailedError("No such snapshot")

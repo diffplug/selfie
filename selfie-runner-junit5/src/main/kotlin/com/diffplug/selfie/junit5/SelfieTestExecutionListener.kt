@@ -30,8 +30,8 @@ import org.junit.platform.launcher.TestIdentifier
 import org.junit.platform.launcher.TestPlan
 
 /** Routes between `toMatchDisk()` calls and the snapshot file / pruning machinery. */
-internal object Router {
-  val isWrite: Boolean
+internal object Router : SnapshotStorage {
+  override val isWrite: Boolean
     get() = RW.isWrite
 
   private class ClassMethod(val clazz: ClassProgress, val method: String)
@@ -41,7 +41,7 @@ internal object Router {
           ?: throw AssertionError(
               "Selfie `toMatchDisk` must be called only on the original thread.")
   private fun suffix(sub: String) = if (sub == "") "" else "/$sub"
-  fun readWriteThroughPipeline(actual: Snapshot, sub: String): ExpectedActual {
+  override fun readWriteDisk(actual: Snapshot, sub: String): ExpectedActual {
     val cm = classAndMethod()
     val suffix = suffix(sub)
     val callStack = recordCall()
@@ -52,7 +52,7 @@ internal object Router {
       ExpectedActual(cm.clazz.read(cm.method, suffix), actual)
     }
   }
-  fun keep(subOrKeepAll: String?) {
+  override fun keep(subOrKeepAll: String?) {
     val cm = classAndMethod()
     if (subOrKeepAll == null) {
       cm.clazz.keep(cm.method, null)
@@ -60,7 +60,7 @@ internal object Router {
       cm.clazz.keep(cm.method, suffix(subOrKeepAll))
     }
   }
-  fun writeInline(literalValue: LiteralValue<*>) {
+  override fun writeInline(literalValue: LiteralValue<*>) {
     val call = recordCall()
     val cm =
         threadCtx.get()
