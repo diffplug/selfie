@@ -65,7 +65,7 @@ object Selfie {
     /** Extract a multiple facets from a snapshot in order to do an inline snapshot. */
     fun facets(vararg facets: String) = LiteralStringSelfie(actual, facets.toList())
     private fun actualString(): String {
-      if ((onlyFacets == null && actual.facets.isEmpty()) || onlyFacets!!.size == 1) {
+      if (actual.facets.isEmpty() || onlyFacets?.size == 1) {
         // single value doesn't have to worry about escaping at all
         val onlyValue = actual.subjectOrFacet(onlyFacets?.first() ?: "")
         return if (onlyValue.isBinary) {
@@ -73,9 +73,15 @@ object Selfie {
         } else onlyValue.valueString()
       } else {
         // multiple values might need our SnapshotFile escaping, we'll use it just in case
+        val facetsToCheck =
+            onlyFacets
+                ?: buildList {
+                  add("")
+                  addAll(actual.facets.keys)
+                }
         val snapshotToWrite =
-            Snapshot.ofEntries(onlyFacets.map { entry(it, actual.subjectOrFacet(it)) })
-        return serializeMultiple(snapshotToWrite, !onlyFacets.contains(""))
+            Snapshot.ofEntries(facetsToCheck.map { entry(it, actual.subjectOrFacet(it)) })
+        return serializeMultiple(snapshotToWrite, !facetsToCheck.contains(""))
       }
     }
     fun toBe_TODO() = toBeDidntMatch(null, actualString(), LiteralString)
