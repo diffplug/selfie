@@ -16,7 +16,6 @@
 package com.diffplug.selfie
 
 import com.diffplug.selfie.junit5.Router
-import com.diffplug.selfie.junit5.recordCall
 import java.util.Map.entry
 import org.opentest4j.AssertionFailedError
 
@@ -104,7 +103,7 @@ object Selfie {
   /** Implements the inline snapshot whenever a match fails. */
   private fun <T : Any> toBeDidntMatch(expected: T?, actual: T, format: LiteralFormat<T>): T {
     if (Router.isWrite) {
-      Router.writeInline(recordCall(), LiteralValue(expected, actual, format))
+      Router.writeInline(LiteralValue(expected, actual, format))
       return actual
     } else {
       if (expected == null) {

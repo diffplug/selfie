@@ -60,7 +60,8 @@ internal object Router {
       cm.clazz.keep(cm.method, suffix(subOrKeepAll))
     }
   }
-  fun writeInline(call: CallStack, literalValue: LiteralValue<*>) {
+  fun writeInline(literalValue: LiteralValue<*>) {
+    val call = recordCall()
     val cm =
         threadCtx.get()
             ?: throw AssertionError("Selfie `toBe` must be called only on the original thread.")
