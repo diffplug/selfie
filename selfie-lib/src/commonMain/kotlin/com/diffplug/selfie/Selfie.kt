@@ -200,14 +200,15 @@ private fun serializeMultiple(snapshot: Snapshot, facets: Collection<String>): S
   val buf = StringBuilder()
   val writer = StringWriter { buf.append(it) }
   for (facet in facets) {
-    if (facet.isNotBlank()) {
+    if (facet.isEmpty()) {
+      SnapshotFile.writeValue(writer, snapshot.subjectOrFacet(facet))
+    } else {
       snapshot.subjectOrFacetMaybe(facet)?.let {
         SnapshotFile.writeKey(writer, "", facet)
         SnapshotFile.writeValue(writer, it)
       }
-    } else {
-      SnapshotFile.writeValue(writer, snapshot.subjectOrFacet(facet))
     }
   }
+  buf.setLength(buf.length - 1)
   return buf.toString()
 }
