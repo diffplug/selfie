@@ -35,8 +35,10 @@ interface SnapshotStorage {
   fun assertFailed(message: String, expected: Any? = null, actual: Any? = null): Error
 }
 
+expect fun initStorage(): SnapshotStorage
+
 object Selfie {
-  private val storage: SnapshotStorage = TODO()
+  private val storage: SnapshotStorage = initStorage()
 
   /**
    * Sometimes a selfie is environment-specific, but should not be deleted when run in a different

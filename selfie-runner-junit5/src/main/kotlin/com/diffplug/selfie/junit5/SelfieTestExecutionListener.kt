@@ -32,6 +32,7 @@ import org.opentest4j.AssertionFailedError
 
 /** Routes between `toMatchDisk()` calls and the snapshot file / pruning machinery. */
 internal object SnapshotStorageJUnit5 : SnapshotStorage {
+  @JvmStatic fun initStorage(): SnapshotStorage = this
   override val isWrite: Boolean
     get() = RW.isWrite
 
