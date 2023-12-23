@@ -101,6 +101,10 @@ internal class DiskWriteTracker : WriteTracker<String, Snapshot>() {
 internal class InlineWriteTracker : WriteTracker<CallLocation, LiteralValue<*>>() {
   fun record(call: CallStack, literalValue: LiteralValue<*>, layout: SnapshotFileLayout) {
     recordInternal(call.location, literalValue, call, layout)
+    if (literalValue.expected != null) {
+      throw UnsupportedOperationException(
+          "`.toBe() didn't match! Change to `toBe_TODO()` to record a new value until https://github.com/diffplug/selfie/pull/49 is merged.")
+    }
   }
   fun hasWrites(): Boolean = writes.isNotEmpty()
 
