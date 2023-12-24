@@ -17,7 +17,6 @@ package com.diffplug.selfie.junit5
 
 import com.diffplug.selfie.*
 import com.diffplug.selfie.ExpectedActual
-import com.diffplug.selfie.RW
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
@@ -29,9 +28,14 @@ import org.junit.platform.engine.support.descriptor.MethodSource
 import org.junit.platform.launcher.TestExecutionListener
 import org.junit.platform.launcher.TestIdentifier
 import org.junit.platform.launcher.TestPlan
+import org.opentest4j.AssertionFailedError
 
 /** Routes between `toMatchDisk()` calls and the snapshot file / pruning machinery. */
-internal object Router {
+internal object SnapshotStorageJUnit5 : SnapshotStorage {
+  @JvmStatic fun initStorage(): SnapshotStorage = this
+  override val isWrite: Boolean
+    get() = RW.isWrite
+
   private class ClassMethod(val clazz: ClassProgress, val method: String)
   private val threadCtx = ThreadLocal<ClassMethod?>()
   private fun classAndMethod() =
@@ -39,7 +43,7 @@ internal object Router {
           ?: throw AssertionError(
               "Selfie `toMatchDisk` must be called only on the original thread.")
   private fun suffix(sub: String) = if (sub == "") "" else "/$sub"
-  fun readWriteThroughPipeline(actual: Snapshot, sub: String): ExpectedActual {
+  override fun readWriteDisk(actual: Snapshot, sub: String): ExpectedActual {
     val cm = classAndMethod()
     val suffix = suffix(sub)
     val callStack = recordCall()
@@ -50,7 +54,7 @@ internal object Router {
       ExpectedActual(cm.clazz.read(cm.method, suffix), actual)
     }
   }
-  fun keep(subOrKeepAll: String?) {
+  override fun keep(subOrKeepAll: String?) {
     val cm = classAndMethod()
     if (subOrKeepAll == null) {
       cm.clazz.keep(cm.method, null)
@@ -58,7 +62,11 @@ internal object Router {
       cm.clazz.keep(cm.method, suffix(subOrKeepAll))
     }
   }
-  fun writeInline(call: CallStack, literalValue: LiteralValue<*>) {
+  override fun assertFailed(message: String, expected: Any?, actual: Any?): Error =
+      if (expected == null && actual == null) AssertionFailedError(message)
+      else AssertionFailedError(message, expected, actual)
+  override fun writeInline(literalValue: LiteralValue<*>) {
+    val call = recordCall()
     val cm =
         threadCtx.get()
             ?: throw AssertionError("Selfie `toBe` must be called only on the original thread.")
@@ -100,13 +108,13 @@ internal class ClassProgress(val parent: Progress, val className: String) {
   // the methods below called by the TestExecutionListener on its runtime thread
   @Synchronized fun startMethod(method: String) {
     assertNotTerminated()
-    Router.start(this, method)
+    SnapshotStorageJUnit5.start(this, method)
     assert(method.indexOf('/') == -1) { "Method name cannot contain '/', was $method" }
     methods = methods.plus(method, MethodSnapshotGC())
   }
   @Synchronized fun finishedMethodWithSuccess(method: String, success: Boolean) {
     assertNotTerminated()
-    Router.finish(this, method)
+    SnapshotStorageJUnit5.finish(this, method)
     methods[method]!!.succeeded(success)
   }
   @Synchronized fun finishedClassWithSuccess(success: Boolean) {

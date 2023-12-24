@@ -156,28 +156,6 @@ class SnapshotFile {
     }
     writeKey(valueWriter, "", "end of file")
   }
-  private fun writeKey(valueWriter: StringWriter, key: String, facet: String?) {
-    valueWriter.write("╔═ ")
-    valueWriter.write(SnapshotValueReader.nameEsc.escape(key))
-    if (facet != null) {
-      valueWriter.write("[")
-      valueWriter.write(SnapshotValueReader.nameEsc.escape(facet))
-      valueWriter.write("]")
-    }
-    valueWriter.write(" ═╗\n")
-  }
-  private fun writeValue(valueWriter: StringWriter, value: SnapshotValue) {
-    if (value.isBinary) {
-      TODO("BASE64")
-    } else {
-      val escaped =
-          SnapshotValueReader.bodyEsc
-              .escape(value.valueString())
-              .efficientReplace("\n╔", "\n\uD801\uDF41")
-      valueWriter.write(escaped)
-      valueWriter.write("\n")
-    }
-  }
 
   var wasSetAtTestTime: Boolean = false
   fun setAtTestTime(key: String, snapshot: Snapshot) {
@@ -221,6 +199,28 @@ class SnapshotFile {
       val result = SnapshotFile()
       result.unixNewlines = unixNewlines
       return result
+    }
+    internal fun writeKey(valueWriter: StringWriter, key: String, facet: String?) {
+      valueWriter.write("╔═ ")
+      valueWriter.write(SnapshotValueReader.nameEsc.escape(key))
+      if (facet != null) {
+        valueWriter.write("[")
+        valueWriter.write(SnapshotValueReader.nameEsc.escape(facet))
+        valueWriter.write("]")
+      }
+      valueWriter.write(" ═╗\n")
+    }
+    internal fun writeValue(valueWriter: StringWriter, value: SnapshotValue) {
+      if (value.isBinary) {
+        TODO("BASE64")
+      } else {
+        val escaped =
+            SnapshotValueReader.bodyEsc
+                .escape(value.valueString())
+                .efficientReplace("\n╔", "\n\uD801\uDF41")
+        valueWriter.write(escaped)
+        valueWriter.write("\n")
+      }
     }
   }
 }
