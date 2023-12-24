@@ -5,6 +5,7 @@ plugins {
 repositories {
   mavenCentral()
 }
+group = 干.proj('maven_group', 'the maven group, recommend com.diffplug')
 apply from: rootProject.file('gradle/spotless.gradle')
 apply from: 干.file('base/changelog.gradle')
 apply from: 干.file('base/sonatype.gradle')
