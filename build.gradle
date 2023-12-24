@@ -1,10 +1,13 @@
 plugins {
   id 'com.diffplug.blowdryer'
+  id 'com.diffplug.spotless-changelog'
 }
 repositories {
   mavenCentral()
 }
 apply from: rootProject.file('gradle/spotless.gradle')
+apply from: 干.file('base/changelog.gradle')
+apply from: 干.file('base/sonatype.gradle')
 
 // ./gradlew :dokkatooGeneratePublicationHtml
 //     https://github.com/Kotlin/dokka/issues/3131
