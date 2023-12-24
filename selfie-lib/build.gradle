@@ -11,7 +11,7 @@ ext {
   maven_desc = 'Core logic and parsing for Selfie'
 }
 
-apply from: 干.file('base/changelog.gradle')
+apply from: rootProject.file('gradle/changelog.gradle')
 apply from: rootProject.file('gradle/spotless.gradle')
 kotlin {
   jvm {
