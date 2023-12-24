@@ -77,6 +77,11 @@ object Selfie {
         check(onlyFacets.isNotEmpty()) {
           "Must have at least one facet to display, this was empty."
         }
+        if (onlyFacets.contains("")) {
+          check(onlyFacets.indexOf("") == 0) {
+            "If you're going to specify the subject facet (\"\"), you have to list it first, this was $onlyFacets"
+          }
+        }
       }
     }
     /** Extract a single facet from a snapshot in order to do an inline snapshot. */
@@ -91,16 +96,13 @@ object Selfie {
           TODO("BASE64")
         } else onlyValue.valueString()
       } else {
-        // multiple values might need our SnapshotFile escaping, we'll use it just in case
-        val facetsToCheck =
+        return serializeOnlyFacets(
+            actual,
             onlyFacets
-                ?: buildList {
+                ?: buildList<String> {
                   add("")
                   addAll(actual.facets.keys)
-                }
-        val snapshotToWrite =
-            Snapshot.ofEntries(facetsToCheck.map { entry(it, actual.subjectOrFacet(it)) })
-        return serializeMultiple(snapshotToWrite, !facetsToCheck.contains(""))
+                })
       }
     }
     fun toBe_TODO() = toBeDidntMatch(null, actualString(), LiteralString)
@@ -174,54 +176,43 @@ class ExpectedActual(val expected: Snapshot?, val actual: Snapshot) {
     } else if (expected.subject == actual.subject && expected.facets == actual.facets) {
       return
     } else {
-      val allKeys =
-          mutableSetOf<String>()
-              .apply {
-                add("")
-                addAll(expected.facets.keys)
-                addAll(actual.facets.keys)
+      val mismatchedKeys =
+          sequence {
+                yield("")
+                yieldAll(expected.facets.keys)
+                for (facet in actual.facets.keys) {
+                  if (!expected.facets.containsKey(facet)) {
+                    yield(facet)
+                  }
+                }
               }
+              .filter { expected.subjectOrFacetMaybe(it) != actual.subjectOrFacetMaybe(it) }
               .toList()
               .sorted()
-      val mismatchInExpected = mutableMapOf<String, SnapshotValue>()
-      val mismatchInActual = mutableMapOf<String, SnapshotValue>()
-      for (key in allKeys) {
-        val expectedValue = expected.facets[key]
-        val actualValue = actual.facets[key]
-        if (expectedValue != actualValue) {
-          expectedValue?.let { mismatchInExpected[key] = it }
-          actualValue?.let { mismatchInActual[key] = it }
-        }
-      }
-      val includeRoot = mismatchInExpected.containsKey("")
       throw storage.assertFailed(
           "Snapshot failure",
-          serializeMultiple(Snapshot.ofEntries(mismatchInExpected.entries), !includeRoot),
-          serializeMultiple(Snapshot.ofEntries(mismatchInActual.entries), !includeRoot))
+          serializeOnlyFacets(expected, mismatchedKeys),
+          serializeOnlyFacets(actual, mismatchedKeys))
     }
   }
 }
-private fun serializeMultiple(actual: Snapshot, removeEmptySubject: Boolean): String {
-  if (removeEmptySubject) {
-    check(actual.subject.valueString().isEmpty()) {
-      "The subject was expected to be empty, was '${actual.subject.valueString()}'"
-    }
-  }
-  val file = SnapshotFile()
-  file.snapshots = ArrayMap.of(mutableListOf("" to actual))
+/**
+ * Returns a serialized form of only the given facets if they are available, silently omits missing
+ * facets.
+ */
+private fun serializeOnlyFacets(snapshot: Snapshot, keys: Collection<String>): String {
   val buf = StringBuilder()
-  file.serialize(buf::append)
-
-  check(buf.startsWith(EMPTY_SUBJECT))
-  check(buf.endsWith(EOF))
-  buf.setLength(buf.length - EOF.length)
-  val str = buf.substring(EMPTY_SUBJECT.length)
-  return if (!removeEmptySubject) str
-  else {
-    check(str[0] == '\n')
-    str.substring(1)
+  val writer = StringWriter { buf.append(it) }
+  for (key in keys) {
+    if (key.isEmpty()) {
+      SnapshotFile.writeValue(writer, snapshot.subjectOrFacet(key))
+    } else {
+      snapshot.subjectOrFacetMaybe(key)?.let {
+        SnapshotFile.writeKey(writer, "", key)
+        SnapshotFile.writeValue(writer, it)
+      }
+    }
   }
+  buf.setLength(buf.length - 1)
+  return buf.toString()
 }
-
-private const val EMPTY_SUBJECT = "╔═  ═╗\n"
-private const val EOF = "\n╔═ [end of file] ═╗\n"
