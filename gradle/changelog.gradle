@@ -1,0 +1,85 @@
+// no parameters needed, just apply `com.diffplug.spotless-changelog` on whichever project has
+// CHANGELOG.md
+//
+// this script will look for the changelog tasks in either this project or the parent project,
+// and then set the version from the spotless-changelog plugin. It will also hook the jar task
+// (if present) to depend on changelogCheck, so that a jar will never get published with a bad
+// changelog.  Lastly, changelogBump will depend on a successful closeAndReleaseSonatypeStagingRepository.
+
+def requireEnablePublishing(Task task) {
+    if (project.findProperty('enable_publishing') == 'true') {
+        return true
+    } else {
+        task.doFirst {
+            throw new Error("Cannot run " + task + " without specifying enable_publishing=true")
+        }
+        return false
+    }
+}
+
+if (tasks.names.contains('changelogCheck')) {
+    spotlessChangelog {
+        branch 'release'
+        appendDashSnapshotUnless_dashPrelease = true
+    }
+    // set the project version for POM, jar manifest, etc.
+    version = spotlessChangelog.versionNext
+    // ensures that nothing will be built if changelogPush will end up failing
+    afterEvaluate {
+        if (tasks.names.contains('jar')) {
+            tasks.named('jar').configure {
+                dependsOn tasks.named('changelogCheck')
+            }
+        }
+        // ensures that changelog bump and push only happens if the publish was successful
+        tasks.named('changelogBump').configure {
+            if (requireEnablePublishing(it)) {
+                if (plugins.hasPlugin('maven-publish')) {
+                    if (plugins.hasPlugin('io.github.gradle-nexus.publish-plugin')) {
+                        String pubName = plugins.hasPlugin('java-gradle-plugin') ? 'PluginMaven' : 'MavenJava'
+                        dependsOn "publish${pubName}PublicationToSonatypeRepository"
+                        // only the root project has closeSonatypeStagingRepository, and it finalizes all publishToSonatype tasks
+                        // https://github.com/gradle-nexus/publish-plugin
+                        dependsOn rootProject.tasks.named('closeAndReleaseSonatypeStagingRepository')
+                    } else {
+                        dependsOn "publishAllPublicationsToGitLabRepository"
+                    }
+                }
+                // if we have a gradle plugin, we need to push it up to the plugin portal too
+                if (tasks.names.contains('publishPlugins')) {
+                    dependsOn tasks.named('publishPlugins')
+                }
+            }
+        }
+    }
+} else {
+    assert parent != null : 'If you apply this script to the root project, you must have plugin com.diffplug.spotless-changelog'
+    assert parent.tasks.names.contains('changelogCheck') : 'Neither this project nor its parent had the required plugin com.diffplug.spotless-changelog'
+
+    // same as above, but pull changelog stuff from the parent changelog
+    version = parent.spotlessChangelog.versionNext
+    def childProject = project;
+    afterEvaluate {
+        if (tasks.names.contains('jar')) {
+            tasks.named('jar').configure {
+                dependsOn parent.tasks.named('changelogCheck')
+            }
+        }
+        parent.tasks.named('changelogBump').configure {
+            if (requireEnablePublishing(it)) {
+                if (childProject.plugins.hasPlugin('maven-publish')) {
+                    if (rootProject.plugins.hasPlugin('io.github.gradle-nexus.publish-plugin')) {
+                        String pubName = childProject.plugins.hasPlugin('java-gradle-plugin') ? 'PluginMaven' : 'MavenJava'
+                        dependsOn childProject.tasks.named("publish${pubName}PublicationToSonatypeRepository")
+                        dependsOn rootProject.tasks.named('closeAndReleaseSonatypeStagingRepository')
+                    } else {
+                        dependsOn childProject.tasks.named("publishAllPublicationsToGitLabRepository")
+                    }
+                }
+                if (childProject.tasks.names.contains('publishPlugins')) {
+                    dependsOn childProject.tasks.named('publishPlugins')
+                }
+            }
+        }
+    }
+}
