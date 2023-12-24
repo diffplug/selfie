@@ -9,6 +9,7 @@ ext {
   maven_desc = 'JUnit 5 test runner for Selfie'
 }
 
+apply from: 干.file('base/changelog.gradle')
 apply from: rootProject.file('gradle/spotless.gradle')
 apply plugin: 'java-library'
 dependencies {
