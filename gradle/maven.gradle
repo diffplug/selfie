@@ -1,0 +1,101 @@
+// 干.mustRunAfter('base/gradle-plugin')
+// 干.mustRunAfter('base/changelog')
+
+apply plugin: 'maven-publish'
+
+def git_url        = 干.proj('git_url', 'the git url with no protocol, e.g.: github.com/diffplug/blowdryer')
+assert !git_url.startsWith('https://') : 'git_url should not start with https://'
+assert !git_url.startsWith('http://') : 'git_url should not start with http://'
+
+group              = 干.proj('maven_group',    'the maven group, recommend com.diffplug')
+def maven_artifact = project.name
+def maven_name     = 干.proj('maven_name', 'human-friendly name')
+def maven_desc     = 干.proj('maven_desc', 'human-friendly description')
+
+def javadocLinks   = 干.proj('javadoc_links', "space-delimited links, if you add '/package-list' to the urls you should get a package list").split()
+def license        = 干.proj('license', 'supported: [apache, confidential, lgpl-2.1]')
+
+def license_name     = 干.prop('base/maven', "${license}_name")
+def license_url      = 干.prop('base/maven', "${license}_url")
+def license_comments = 干.prop('base/maven', "${license}_comments")
+
+boolean isKMP = project.pluginManager.hasPlugin('org.jetbrains.kotlin.multiplatform')
+if (!isKMP) {
+    java {
+        withJavadocJar()
+        withSourcesJar()
+    }
+
+    tasks.named('sourcesJar') {
+        dependsOn 'jar'
+    }
+
+    javadoc {
+        def makeLink = { url, text -> "<a href=\"${url}\" style=\"text-transform: none;\">${text}</a>" }
+        def javadocInfo = '<h2>' + makeLink("https://${git_url}", "${maven_artifact}:${version}") +
+                ' by ' + makeLink('https://www.diffplug.com', 'DiffPlug') + '</h2>';
+        // Where it's possible to name parameters and methods clearly enough
+        // that javadoc is not necessary, why make the code bigger?
+        // Thus, no javadoc warnings.
+        options.addStringOption('Xdoclint:none', '-quiet')
+        // UTF-8!!!  Thanks to: https://github.com/freefair/gradle-plugins/blob/6d6f5ff6036e7da1c329075a02c6452c0bb669be/maven-plugin/src/main/java/io/freefair/gradle/plugins/maven/javadoc/JavadocUtf8Plugin.java
+        options.charSet('UTF-8');
+        options.docEncoding('UTF-8');
+        options.setEncoding('UTF-8');
+        // setup the header
+        options.header javadocInfo
+        options.footer javadocInfo
+        // setup links
+        options.links(javadocLinks)
+    }
+    apply from: 干.file('helper/javadoc-view.gradle')
+}
+
+boolean isPlugin = plugins.hasPlugin('java-gradle-plugin')
+publishing.publications.withType(MavenPublication) {
+    // KMP-aware artifactId
+    if (artifactId.endsWith('-jvm')) {
+        artifactId = maven_artifact + '-jvm'
+        // create javadoc manually to keep MavenCentral happy
+        def javadocJar = tasks.register('dokkaJavadoc', Jar.class) {
+            dependsOn('dokkatooGenerate')
+            archiveClassifier.set("javadoc")
+            from('build/dokka-module/html')
+        }
+        artifact javadocJar
+    } else if (artifactId.endsWith("-js")) {
+        artifactId = maven_artifact + '-js'
+    } else {
+        artifactId = maven_artifact
+    }
+    if (!isPlugin && !isKMP) {
+        from components.java
+    }
+    pom {
+        name = maven_name
+        description = maven_desc
+        url = "https://$git_url"
+        licenses {
+            // has to be it.license because of parameter license above
+            it.license {
+                // https://maven.apache.org/pom.html#Licenses
+                name = license_name
+                url = license_url
+                distribution = 'repo'
+                comments = license_comments
+            }
+        }
+        developers {
+            developer {
+                id = 'nedtwigg'
+                name = 'Ned Twigg'
+                email = 'ned.twigg@diffplug.com'
+            }
+        }
+        scm {
+            connection = "scm:git:git://${git_url}.git"
+            developerConnection = "scm:git:ssh://${git_url}.git"
+            url = "https://$git_url"
+        }
+    }
+}

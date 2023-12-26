@@ -40,5 +40,5 @@ tasks.create('test') {
 }
 
 // it all needs to get published and formatted
-apply from: 干.file('base/maven.gradle')
+apply from: rootProject.file('gradle/maven.gradle')
 apply from: 干.file('base/sonatype.gradle')
