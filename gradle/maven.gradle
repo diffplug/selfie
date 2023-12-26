@@ -20,6 +20,8 @@ def license_url      = 干.prop('base/maven', "${license}_url")
 def license_comments = 干.prop('base/maven', "${license}_comments")
 
 boolean isKMP = project.pluginManager.hasPlugin('org.jetbrains.kotlin.multiplatform')
+boolean isPlugin = plugins.hasPlugin('java-gradle-plugin')
+
 if (!isKMP) {
     java {
         withJavadocJar()
@@ -51,7 +53,12 @@ if (!isKMP) {
     apply from: 干.file('helper/javadoc-view.gradle')
 }
 
-boolean isPlugin = plugins.hasPlugin('java-gradle-plugin')
+
+if (publishing.publications.isEmpty()) {
+    publishing.publications.register(isPlugin ? 'pluginMaven' : 'mavenJava', MavenPublication, {
+    })
+}
+
 publishing.publications.withType(MavenPublication) {
     // KMP-aware artifactId
     if (artifactId.endsWith('-jvm')) {
