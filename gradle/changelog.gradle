@@ -17,13 +17,13 @@ def requireEnablePublishing(Task task) {
     }
 }
 
-def pubName() {
+def List<String> pubNames()  {
     if (plugins.hasPlugin('java-gradle-plugin')) {
-        return 'PluginMaven'
+        return ['PluginMaven']
     } else if (plugins.hasPlugin('org.jetbrains.kotlin.multiplatform')) {
-        return 'Jvm'
+        return ['KotlinMultiplatform', 'Jvm']
     } else {
-        return 'MavenJava'
+        return ['MavenJava']
     }
 }
 
@@ -46,7 +46,9 @@ if (tasks.names.contains('changelogCheck')) {
             if (requireEnablePublishing(it)) {
                 if (plugins.hasPlugin('maven-publish')) {
                     if (plugins.hasPlugin('io.github.gradle-nexus.publish-plugin')) {
-                        dependsOn "publish${pubName()}PublicationToSonatypeRepository"
+                        for (pubName in pubNames()) {
+                            dependsOn "publish${pubName}PublicationToSonatypeRepository"
+                        }
                         // only the root project has closeSonatypeStagingRepository, and it finalizes all publishToSonatype tasks
                         // https://github.com/gradle-nexus/publish-plugin
                         dependsOn rootProject.tasks.named('closeAndReleaseSonatypeStagingRepository')
@@ -78,7 +80,9 @@ if (tasks.names.contains('changelogCheck')) {
             if (requireEnablePublishing(it)) {
                 if (childProject.plugins.hasPlugin('maven-publish')) {
                     if (rootProject.plugins.hasPlugin('io.github.gradle-nexus.publish-plugin')) {
-                        dependsOn childProject.tasks.named("publish${pubName()}PublicationToSonatypeRepository")
+                        for (pubName in pubNames()) {
+                            dependsOn childProject.tasks.named("publish${pubName}PublicationToSonatypeRepository")
+                        }
                         dependsOn rootProject.tasks.named('closeAndReleaseSonatypeStagingRepository')
                     } else {
                         dependsOn childProject.tasks.named("publishAllPublicationsToGitLabRepository")
