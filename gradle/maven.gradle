@@ -51,9 +51,8 @@ if (!isKMP) {
     apply from: 干.file('helper/javadoc-view.gradle')
 }
 
-
 boolean isPlugin = plugins.hasPlugin('java-gradle-plugin')
-publishing.publications.register(isPlugin ? 'pluginMaven' : 'mavenJava', MavenPublication, {
+publishing.publications.withType(MavenPublication) {
     artifactId = maven_artifact
     if (!isPlugin && !isKMP) {
         from components.java
@@ -85,4 +84,4 @@ publishing.publications.register(isPlugin ? 'pluginMaven' : 'mavenJava', MavenPu
             url = "https://$git_url"
         }
     }
-})
+}
