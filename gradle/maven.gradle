@@ -53,7 +53,14 @@ if (!isKMP) {
 
 boolean isPlugin = plugins.hasPlugin('java-gradle-plugin')
 publishing.publications.withType(MavenPublication) {
-    artifactId = maven_artifact
+    // KMP-aware artifactId
+    if (artifactId.endsWith('-jvm')) {
+        artifactId = maven_artifact + '-jvm'
+    } else if (artifactId.endsWith("-js")) {
+        artifactId = maven_artifact + '-js'
+    } else {
+        artifactId = maven_artifact
+    }
     if (!isPlugin && !isKMP) {
         from components.java
     }
