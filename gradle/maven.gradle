@@ -56,6 +56,13 @@ publishing.publications.withType(MavenPublication) {
     // KMP-aware artifactId
     if (artifactId.endsWith('-jvm')) {
         artifactId = maven_artifact + '-jvm'
+        // create javadoc manually to keep MavenCentral happy
+        def javadocJar = tasks.register('dokkaJavadoc', Jar.class) {
+            dependsOn('dokkatooGenerate')
+            archiveClassifier.set("javadoc")
+            from('build/dokka-module/html')
+        }
+        artifact javadocJar
     } else if (artifactId.endsWith("-js")) {
         artifactId = maven_artifact + '-js'
     } else {
