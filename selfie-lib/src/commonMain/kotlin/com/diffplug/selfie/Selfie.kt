@@ -55,12 +55,12 @@ object Selfie {
 
   class DiskSelfie internal constructor(actual: Snapshot) : LiteralStringSelfie(actual) {
     @JvmOverloads
-    fun toMatchDisk(sub: String = ""): Snapshot {
+    fun toMatchDisk(sub: String = ""): DiskSelfie {
       val comparison = storage.readWriteDisk(actual, sub)
       if (!storage.isWrite) {
         comparison.assertEqual(storage)
       }
-      return comparison.actual
+      return this
     }
   }
 
