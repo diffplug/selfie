@@ -36,7 +36,8 @@ class SourceFile(filename: String, content: String) {
    * Represents a section of the sourcecode which is a `.toBe(LITERAL)` call. It might also be
    * `.toBe_TODO()` or ` toBe LITERAL` (infix notation).
    */
-  inner class ToBeLiteral internal constructor(private val slice: Slice) {
+  inner class ToBeLiteral
+  internal constructor(private val slice: Slice, private val valueStart: Int) {
     /**
      * Modifies the parent [SourceFile] to set the value within the `toBe` call, and returns the net
      * change in newline count.
@@ -48,7 +49,7 @@ class SourceFile(filename: String, content: String) {
         throw Error(
             "There is an error in " +
                 literalValue.format::class.simpleName +
-                ", the following value isn't roundtripping.\n" +
+                ", the following value isn't round tripping.\n" +
                 "Please this error and the data below at https://github.com/diffplug/selfie/issues/new\n" +
                 "```\n" +
                 "ORIGINAL\n" +
@@ -73,20 +74,45 @@ class SourceFile(filename: String, content: String) {
      * `toBe_TODO()`.
      */
     fun <T : Any> parseLiteral(literalFormat: LiteralFormat<T>): T {
-      // this won't work, because we need to find the `.toBe` and parens
-      TODO("return literalFormat.parse(slice.toString())")
+      return literalFormat.parse(
+          slice.subSequence(valueStart, slice.length - 1).toString(), language)
     }
   }
   fun parseToBe_TODO(lineOneIndexed: Int): ToBeLiteral {
-    val lineContent = contentSlice.unixLine(lineOneIndexed)
-    val idx = lineContent.indexOf(".toBe_TODO()")
-    if (idx == -1) {
-      throw AssertionError(
-          "Expected to find `.toBe_TODO()` on line $lineOneIndexed, but there was only `${lineContent}`")
-    }
-    return ToBeLiteral(lineContent.subSequence(idx, idx + ".toBe_TODO()".length))
+    return parseToBeLike(".toBe_TODO(", lineOneIndexed)
   }
   fun parseToBe(lineOneIndexed: Int): ToBeLiteral {
-    TODO("More complicated because we have to actually parse the literal")
+    return parseToBeLike(".toBe(", lineOneIndexed)
+  }
+  private fun parseToBeLike(prefix: String, lineOneIndexed: Int): ToBeLiteral {
+    val lineContent = contentSlice.unixLine(lineOneIndexed)
+    val idx = lineContent.indexOf(prefix)
+    if (idx == -1) {
+      throw AssertionError(
+          "Expected to find `$prefix)` on line $lineOneIndexed, but there was only `${lineContent}`")
+    }
+    var opened = 0
+    val startIndex = idx + prefix.length
+    var endIndex = -1
+    // TODO: do we need to detect paired parenthesis ( ( ) )?
+    for (i in startIndex ..< lineContent.length) {
+      val ch = lineContent[i]
+      // TODO: handle () inside string literal
+      if (ch == '(') {
+        opened += 1
+      } else if (ch == ')') {
+        if (opened == 0) {
+          endIndex = i
+          break
+        } else {
+          opened -= 1
+        }
+      }
+    }
+    if (endIndex == -1) {
+      throw AssertionError(
+          "Expected to find `$prefix)` on line $lineOneIndexed, but there was only `${lineContent}`")
+    }
+    return ToBeLiteral(lineContent.subSequence(idx, endIndex + 1), prefix.length)
   }
 }
