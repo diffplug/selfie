@@ -6,6 +6,6 @@ import kotlin.test.Test
 
 class UT_InlineIntTest {
   @Test fun singleInt() {
-    expectSelfie(1234).toBe(1234)
+    expectSelfie(7777).toBe(7777)
   }
 }

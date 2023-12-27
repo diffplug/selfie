@@ -22,6 +22,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.util.stream.Collectors
 import kotlin.io.path.name
+import org.opentest4j.AssertionFailedError
 
 /** Represents the line at which user code called into Selfie. */
 data class CallLocation(val clazz: String, val method: String, val file: String?, val line: Int) :
@@ -100,9 +101,21 @@ internal class DiskWriteTracker : WriteTracker<String, Snapshot>() {
 internal class InlineWriteTracker : WriteTracker<CallLocation, LiteralValue<*>>() {
   fun record(call: CallStack, literalValue: LiteralValue<*>, layout: SnapshotFileLayout) {
     recordInternal(call.location, literalValue, call, layout)
+    // assert that the value passed at runtime matches the value we parse at compile time
+    // because if that assert fails, we've got no business modifying test code
+    val file =
+        layout.sourcecodeForCall(call.location)
+            ?: throw Error("Unable to find source file for ${call.location.ideLink(layout)}")
     if (literalValue.expected != null) {
-      throw UnsupportedOperationException(
-          "`.toBe() didn't match! Change to `toBe_TODO()` to record a new value until https://github.com/diffplug/selfie/pull/49 is merged.")
+      // if expected == null, it's a `toBe_TODO()`, so there's nothing to check
+      val content = SourceFile(file.name, Files.readString(file))
+      val parsedValue = content.parseToBe(call.location.line).parseLiteral(literalValue.format)
+      if (parsedValue != literalValue.expected) {
+        throw AssertionFailedError(
+            "There is likely a bug in Selfie's literal parsing.",
+            literalValue.expected,
+            parsedValue)
+      }
     }
   }
   fun hasWrites(): Boolean = writes.isNotEmpty()
@@ -141,18 +154,7 @@ internal class InlineWriteTracker : WriteTracker<CallLocation, LiteralValue<*>>(
           if (write.literal.expected == null) {
             content.parseToBe_TODO(line)
           } else {
-            content.parseToBe(line).also {
-              val currentValue = it.parseLiteral(write.literal.format)
-              if (currentValue != write.literal.expected) {
-                // TODO: this shouldn't happen here, it should happen
-                // when the write is recorded so that we can fail eagerly,
-                // exceptions thrown here are easy to miss
-                throw org.opentest4j.AssertionFailedError(
-                    "There is likely a bug in Selfie's literal parsing.",
-                    write.literal.expected,
-                    currentValue)
-              }
-            }
+            content.parseToBe(line)
           }
       deltaLineNumbers += toBe.setLiteralAndGetNewlineDelta(write.literal)
     }
