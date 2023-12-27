@@ -15,12 +15,31 @@
  */
 package com.diffplug.selfie
 
-import com.diffplug.selfie.junit5.Router
-import com.diffplug.selfie.junit5.recordCall
-import java.util.Map.entry
-import org.opentest4j.AssertionFailedError
+import kotlin.jvm.JvmOverloads
+import kotlin.jvm.JvmStatic
+
+/** NOT FOR ENDUSERS. Implemented by Selfie to integrate with various test frameworks. */
+interface SnapshotStorage {
+  /** Determines if the system is in write mode or read mode. */
+  val isWrite: Boolean
+  /** Indicates that the following value should be written into test sourcecode. */
+  fun writeInline(literalValue: LiteralValue<*>)
+  /** Performs a comparison between disk and actual, writing the actual to disk if necessary. */
+  fun readWriteDisk(actual: Snapshot, sub: String): ExpectedActual
+  /**
+   * Marks that the following sub snapshots should be kept, null means to keep all snapshots for the
+   * currently executing class.
+   */
+  fun keep(subOrKeepAll: String?)
+  /** Creates an assertion failed exception to throw. */
+  fun assertFailed(message: String, expected: Any? = null, actual: Any? = null): Error
+}
+
+expect fun initStorage(): SnapshotStorage
 
 object Selfie {
+  private val storage: SnapshotStorage = initStorage()
+
   /**
    * Sometimes a selfie is environment-specific, but should not be deleted when run in a different
    * environment.
@@ -28,31 +47,41 @@ object Selfie {
   @JvmStatic
   fun preserveSelfiesOnDisk(vararg subsToKeep: String): Unit {
     if (subsToKeep.isEmpty()) {
-      Router.keep(null)
+      storage.keep(null)
     } else {
-      subsToKeep.forEach { Router.keep(it) }
+      subsToKeep.forEach { storage.keep(it) }
     }
   }
 
   class DiskSelfie internal constructor(actual: Snapshot) : LiteralStringSelfie(actual) {
     @JvmOverloads
-    fun toMatchDisk(sub: String = ""): Snapshot {
-      val comparison = Router.readWriteThroughPipeline(actual, sub)
-      if (!RW.isWrite) {
-        comparison.assertEqual()
+    fun toMatchDisk(sub: String = ""): DiskSelfie {
+      val comparison = storage.readWriteDisk(actual, sub)
+      if (!storage.isWrite) {
+        comparison.assertEqual(storage)
       }
-      return comparison.actual
+      return this
     }
   }
 
   open class LiteralStringSelfie
-  internal constructor(protected val actual: Snapshot, val onlyFacets: Collection<String>? = null) {
+  internal constructor(
+      protected val actual: Snapshot,
+      private val onlyFacets: Collection<String>? = null
+  ) {
     init {
       if (onlyFacets != null) {
         check(onlyFacets.all { it == "" || actual.facets.containsKey(it) }) {
           "The following facets were not found in the snapshot: ${onlyFacets.filter { actual.subjectOrFacetMaybe(it) == null }}\navailable facets are: ${actual.facets.keys}"
         }
-        check(onlyFacets.size > 1) { "Must have at least one facet to display, this was empty." }
+        check(onlyFacets.isNotEmpty()) {
+          "Must have at least one facet to display, this was empty."
+        }
+        if (onlyFacets.contains("")) {
+          check(onlyFacets.indexOf("") == 0) {
+            "If you're going to specify the subject facet (\"\"), you have to list it first, this was $onlyFacets"
+          }
+        }
       }
     }
     /** Extract a single facet from a snapshot in order to do an inline snapshot. */
@@ -60,19 +89,20 @@ object Selfie {
     /** Extract a multiple facets from a snapshot in order to do an inline snapshot. */
     fun facets(vararg facets: String) = LiteralStringSelfie(actual, facets.toList())
     private fun actualString(): String {
-      if ((onlyFacets == null && actual.facets.isEmpty()) || actual.facets.size == 1) {
+      if (actual.facets.isEmpty() || onlyFacets?.size == 1) {
         // single value doesn't have to worry about escaping at all
-        val onlyValue =
-            actual.run { if (facets.isEmpty()) subject else facets[onlyFacets!!.first()]!! }
+        val onlyValue = actual.subjectOrFacet(onlyFacets?.first() ?: "")
         return if (onlyValue.isBinary) {
           TODO("BASE64")
         } else onlyValue.valueString()
       } else {
-        // multiple values might need our SnapshotFile escaping, we'll use it just in case
-        val snapshotToWrite =
-            if (onlyFacets == null) actual
-            else Snapshot.ofEntries(onlyFacets.map { entry(it, actual.subjectOrFacet(it)) })
-        return serialize(snapshotToWrite, onlyFacets != null && !onlyFacets.contains(""))
+        return serializeOnlyFacets(
+            actual,
+            onlyFacets
+                ?: buildList<String> {
+                  add("")
+                  addAll(actual.facets.keys)
+                })
       }
     }
     fun toBe_TODO() = toBeDidntMatch(null, actualString(), LiteralString)
@@ -84,7 +114,9 @@ object Selfie {
   }
 
   @JvmStatic
-  fun <T> expectSelfie(actual: T, camera: Camera<T>) = DiskSelfie(camera.snapshot(actual))
+  fun <T> expectSelfie(actual: T, camera: Camera<T>) = expectSelfie(camera.snapshot(actual))
+
+  @JvmStatic fun expectSelfie(actual: Snapshot) = DiskSelfie(actual)
 
   @JvmStatic fun expectSelfie(actual: String) = DiskSelfie(Snapshot.of(actual))
 
@@ -92,15 +124,15 @@ object Selfie {
 
   /** Implements the inline snapshot whenever a match fails. */
   private fun <T : Any> toBeDidntMatch(expected: T?, actual: T, format: LiteralFormat<T>): T {
-    if (RW.isWrite) {
-      Router.writeInline(recordCall(), LiteralValue(expected, actual, format))
+    if (storage.isWrite) {
+      storage.writeInline(LiteralValue(expected, actual, format))
       return actual
     } else {
       if (expected == null) {
-        throw AssertionFailedError(
+        throw storage.assertFailed(
             "`.toBe_TODO()` was called in `read` mode, try again with selfie in write mode")
       } else {
-        throw AssertionFailedError(
+        throw storage.assertFailed(
             "Inline literal did not match the actual value", expected, actual)
       }
     }
@@ -137,50 +169,50 @@ object Selfie {
   infix fun Boolean.shouldBeSelfie(expected: Boolean): Boolean = expectSelfie(this).toBe(expected)
 }
 
-internal class ExpectedActual(val expected: Snapshot?, val actual: Snapshot) {
-  fun assertEqual() {
+class ExpectedActual(val expected: Snapshot?, val actual: Snapshot) {
+  internal fun assertEqual(storage: SnapshotStorage) {
     if (expected == null) {
-      throw AssertionFailedError("No such snapshot")
+      throw storage.assertFailed("No such snapshot")
     } else if (expected.subject == actual.subject && expected.facets == actual.facets) {
       return
     } else {
-      val allKeys =
-          mutableSetOf<String>()
-              .apply {
-                add("")
-                addAll(expected.facets.keys)
-                addAll(actual.facets.keys)
+      val mismatchedKeys =
+          sequence {
+                yield("")
+                yieldAll(expected.facets.keys)
+                for (facet in actual.facets.keys) {
+                  if (!expected.facets.containsKey(facet)) {
+                    yield(facet)
+                  }
+                }
               }
+              .filter { expected.subjectOrFacetMaybe(it) != actual.subjectOrFacetMaybe(it) }
               .toList()
               .sorted()
-      val mismatchInExpected = mutableMapOf<String, SnapshotValue>()
-      val mismatchInActual = mutableMapOf<String, SnapshotValue>()
-      for (key in allKeys) {
-        val expectedValue = expected.facets[key]
-        val actualValue = actual.facets[key]
-        if (expectedValue != actualValue) {
-          expectedValue?.let { mismatchInExpected[key] = it }
-          actualValue?.let { mismatchInActual[key] = it }
-        }
-      }
-      val includeRoot = mismatchInExpected.containsKey("")
-      throw AssertionFailedError(
+      throw storage.assertFailed(
           "Snapshot failure",
-          serialize(Snapshot.ofEntries(mismatchInExpected.entries), !includeRoot),
-          serialize(Snapshot.ofEntries(mismatchInActual.entries), !includeRoot))
+          serializeOnlyFacets(expected, mismatchedKeys),
+          serializeOnlyFacets(actual, mismatchedKeys))
     }
   }
 }
-private fun serialize(actual: Snapshot, removeEmptySubject: Boolean): String {
-  if (removeEmptySubject) {
-    check(actual.subject.valueString().isEmpty()) {
-      "The subject was expected to be empty, was '${actual.subject.valueString()}'"
+/**
+ * Returns a serialized form of only the given facets if they are available, silently omits missing
+ * facets.
+ */
+private fun serializeOnlyFacets(snapshot: Snapshot, keys: Collection<String>): String {
+  val buf = StringBuilder()
+  val writer = StringWriter { buf.append(it) }
+  for (key in keys) {
+    if (key.isEmpty()) {
+      SnapshotFile.writeValue(writer, snapshot.subjectOrFacet(key))
+    } else {
+      snapshot.subjectOrFacetMaybe(key)?.let {
+        SnapshotFile.writeKey(writer, "", key)
+        SnapshotFile.writeValue(writer, it)
+      }
     }
   }
-  val file = SnapshotFile()
-  file.snapshots = ArrayMap.of(mutableListOf("" to actual))
-  val buf = StringBuilder()
-  file.serialize(buf::append)
-  val str = buf.toString()
-  return if (removeEmptySubject) str else str
+  buf.setLength(buf.length - 1)
+  return buf.toString()
 }

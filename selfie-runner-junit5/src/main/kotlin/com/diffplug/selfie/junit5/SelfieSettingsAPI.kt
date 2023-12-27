@@ -24,11 +24,11 @@ open class SelfieSettingsAPI {
    * Defaults to `__snapshot__`, null means that snapshots are stored at the same folder location as
    * the test that created them.
    */
-  val snapshotFolderName: String?
+  open val snapshotFolderName: String?
     get() = "__snapshots__"
 
   /** By default, the root folder is the first of the standard test directories. */
-  val rootFolder: Path
+  open val rootFolder: Path
     get() {
       val userDir = Paths.get(System.getProperty("user.dir"))
       for (standardDir in STANDARD_DIRS) {
@@ -41,7 +41,7 @@ open class SelfieSettingsAPI {
           "Could not find a standard test directory, 'user.dir' is equal to $userDir, looked in $STANDARD_DIRS")
     }
 
-  companion object {
+  internal companion object {
     private val STANDARD_DIRS =
         listOf(
             "src/test/java",

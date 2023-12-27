@@ -64,13 +64,17 @@ data class Snapshot(
   /** A sorted immutable map of extra values. */
   val facets: Map<String, SnapshotValue>
     get() = facetData
-  fun withNewSubject(subject: SnapshotValue) = Snapshot(subject, facetData)
   fun plusFacet(key: String, value: ByteArray) = plusFacet(key, SnapshotValue.of(value))
   fun plusFacet(key: String, value: String) = plusFacet(key, SnapshotValue.of(value))
   fun plusFacet(key: String, value: SnapshotValue): Snapshot =
       if (key.isEmpty())
           throw IllegalArgumentException("The empty string is reserved for the subject.")
       else Snapshot(subject, facetData.plus(unixNewlines(key), value))
+  /** Adds or replaces the given facet or subject (subject is key=""). */
+  fun plusOrReplace(key: String, value: SnapshotValue): Snapshot =
+      if (key.isEmpty()) Snapshot(value, facetData)
+      else Snapshot(subject, facetData.plusOrReplace(unixNewlines(key), value))
+  /** Retrieves the given facet or subject (subject is key=""). */
   fun subjectOrFacetMaybe(key: String): SnapshotValue? =
       if (key.isEmpty()) subject else facetData[key]
   fun subjectOrFacet(key: String): SnapshotValue =
@@ -84,11 +88,11 @@ data class Snapshot(
   fun allEntries(): Iterable<Map.Entry<String, SnapshotValue>> = Iterable {
     sequence {
           yield(entry("", subject))
-          yieldAll(facets.entries)
+          yieldAll(facetData.entries)
         }
         .iterator()
   }
-  override fun toString(): String = "[${subject} ${facets}]"
+  override fun toString(): String = "[${subject} ${facetData}]"
 
   companion object {
     fun of(binary: ByteArray) = Snapshot(SnapshotValue.of(binary), ArrayMap.empty())
@@ -114,8 +118,7 @@ data class Snapshot(
     }
   }
 }
-
-interface Camera<Subject> {
+fun interface Camera<Subject> {
   fun snapshot(subject: Subject): Snapshot
   fun withLens(lens: SnapshotLens): Camera<Subject> {
     val parent = this
@@ -152,28 +155,6 @@ class SnapshotFile {
       }
     }
     writeKey(valueWriter, "", "end of file")
-  }
-  private fun writeKey(valueWriter: StringWriter, key: String, facet: String?) {
-    valueWriter.write("╔═ ")
-    valueWriter.write(SnapshotValueReader.nameEsc.escape(key))
-    if (facet != null) {
-      valueWriter.write("[")
-      valueWriter.write(SnapshotValueReader.nameEsc.escape(facet))
-      valueWriter.write("]")
-    }
-    valueWriter.write(" ═╗\n")
-  }
-  private fun writeValue(valueWriter: StringWriter, value: SnapshotValue) {
-    if (value.isBinary) {
-      TODO("BASE64")
-    } else {
-      val escaped =
-          SnapshotValueReader.bodyEsc
-              .escape(value.valueString())
-              .efficientReplace("\n╔", "\n\uD801\uDF41")
-      valueWriter.write(escaped)
-      valueWriter.write("\n")
-    }
   }
 
   var wasSetAtTestTime: Boolean = false
@@ -218,6 +199,28 @@ class SnapshotFile {
       val result = SnapshotFile()
       result.unixNewlines = unixNewlines
       return result
+    }
+    internal fun writeKey(valueWriter: StringWriter, key: String, facet: String?) {
+      valueWriter.write("╔═ ")
+      valueWriter.write(SnapshotValueReader.nameEsc.escape(key))
+      if (facet != null) {
+        valueWriter.write("[")
+        valueWriter.write(SnapshotValueReader.nameEsc.escape(facet))
+        valueWriter.write("]")
+      }
+      valueWriter.write(" ═╗\n")
+    }
+    internal fun writeValue(valueWriter: StringWriter, value: SnapshotValue) {
+      if (value.isBinary) {
+        TODO("BASE64")
+      } else {
+        val escaped =
+            SnapshotValueReader.bodyEsc
+                .escape(value.valueString())
+                .efficientReplace("\n╔", "\n\uD801\uDF41")
+        valueWriter.write(escaped)
+        valueWriter.write("\n")
+      }
     }
   }
 }
