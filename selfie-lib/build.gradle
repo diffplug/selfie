@@ -11,7 +11,7 @@ ext {
   maven_desc = 'Core logic and parsing for Selfie'
 }
 
-apply from: rootProject.file('gradle/changelog.gradle')
+apply from: 干.file('base/changelog.gradle')
 apply from: rootProject.file('gradle/spotless.gradle')
 kotlin {
   jvm {
@@ -40,5 +40,5 @@ tasks.create('test') {
 }
 
 // it all needs to get published and formatted
-apply from: rootProject.file('gradle/maven.gradle')
+apply from: 干.file('base/maven.gradle')
 apply from: 干.file('base/sonatype.gradle')
