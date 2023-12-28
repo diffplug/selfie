@@ -6,6 +6,7 @@ repositories {
 }
 dependencies {
   implementation 'io.jooby:jooby:3.0.6'
+  implementation 'jakarta.mail:jakarta.mail-api:2.1.2'
   testImplementation 'com.diffplug.selfie:selfie-lib-jvm:0.1.3'
   testImplementation 'com.diffplug.selfie:selfie-runner-junit5:0.1.3'
 }

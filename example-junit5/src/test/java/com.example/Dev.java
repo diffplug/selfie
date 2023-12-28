@@ -9,6 +9,8 @@ public class Dev extends Jooby {
   {
     getServices().put(SecureRandom.class, repeatableRandom());
     getServices().put(Time.class, new DevTime());
+    EmailDev.install(this);
+    Prod.controllers(this);
   }
 
   private static SecureRandom repeatableRandom() {
