@@ -136,3 +136,12 @@ object LiteralString : LiteralFormat<String> {
     return value.toString()
   }
 }
+
+object LiteralBoolean : LiteralFormat<Boolean> {
+  override fun encode(value: Boolean, language: Language): String {
+    return value.toString()
+  }
+  override fun parse(str: String, language: Language): Boolean {
+    return str.toBooleanStrict()
+  }
+}
