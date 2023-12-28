@@ -147,8 +147,9 @@ object Selfie {
   @JvmStatic fun expectSelfie(actual: Int) = IntSelfie(actual)
 
   class LongSelfie(private val actual: Long) {
-    fun toBe(expected: Long): Long = TODO()
-    fun toBe_TODO(): Long = TODO()
+    fun toBe_TODO() = toBeDidntMatch(null, actual, LiteralLong)
+    infix fun toBe(expected: Long) =
+        if (actual == expected) expected else toBeDidntMatch(expected, actual, LiteralLong)
   }
 
   @JvmStatic fun expectSelfie(actual: Long) = LongSelfie(actual)
