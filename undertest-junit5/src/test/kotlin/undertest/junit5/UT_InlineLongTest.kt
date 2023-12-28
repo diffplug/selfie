@@ -6,6 +6,6 @@ import kotlin.test.Test
 
 class UT_InlineLongTest {
   @Test fun singleInt() {
-    expectSelfie(9999999999).toBe(9999999999)
+    expectSelfie(9999999999L).toBe(9_999_999_999L)
   }
 }
