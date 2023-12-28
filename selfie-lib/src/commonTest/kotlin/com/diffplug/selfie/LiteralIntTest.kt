@@ -26,11 +26,16 @@ class LiteralIntTest {
     encode(-1, "-1")
     encode(999, "999")
     encode(-999, "-999")
-    // TODO: add underscores
-    encode(1_000, "1000")
-    encode(-1_000, "-1000")
-    encode(1_000_000, "1000000")
-    encode(-1_000_000, "-1000000")
+    encode(1_000, "1_000")
+    encode(-1_000, "-1_000")
+    encode(1_000_000, "1_000_000")
+    encode(-1_000_000, "-1_000_000")
+    encode(2400500, "2_400_500")
+    encode(2400501, "2_400_501")
+    encode(200, "200")
+    encode(1001, "1_001")
+    encode(1010, "1_010")
+    encode(10010, "10_010")
   }
   private fun encode(value: Int, expected: String) {
     val actual = LiteralInt.encode(value, Language.JAVA)

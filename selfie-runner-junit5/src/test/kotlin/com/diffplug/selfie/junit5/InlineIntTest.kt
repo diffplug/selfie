@@ -37,16 +37,16 @@ class InlineIntTest : Harness("undertest-junit5") {
     ut_mirror().lineWith("expectSelfie").setContent("    expectSelfie(1234).toBe_TODO()")
     gradleReadSSFail()
     gradleWriteSS()
-    ut_mirror().lineWith("expectSelfie").content() shouldBe "    expectSelfie(1234).toBe(1234)"
+    ut_mirror().lineWith("expectSelfie").content() shouldBe "    expectSelfie(1234).toBe(1_234)"
     gradleReadSS()
   }
 
   @Test @Order(3)
   fun toBe_writeLiteral() {
-    ut_mirror().lineWith("expectSelfie").setContent("    expectSelfie(7777).toBe(1234)")
+    ut_mirror().lineWith("expectSelfie").setContent("    expectSelfie(7777).toBe(1_234)")
     gradleReadSSFail()
     gradleWriteSS()
-    ut_mirror().lineWith("expectSelfie").content() shouldBe "    expectSelfie(7777).toBe(7777)"
+    ut_mirror().lineWith("expectSelfie").content() shouldBe "    expectSelfie(7777).toBe(7_777)"
     gradleReadSS()
   }
 }
