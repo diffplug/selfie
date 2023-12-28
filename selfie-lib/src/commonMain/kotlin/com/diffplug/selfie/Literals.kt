@@ -50,30 +50,44 @@ interface LiteralFormat<T : Any> {
   fun parse(str: String, language: Language): T
 }
 
-object LiteralInt : LiteralFormat<Int> {
-  const val MAX_RAW_NUMBER = 1000
-  const val PADDING_SIZE = MAX_RAW_NUMBER.toString().length - 1
-  override fun encode(value: Int, language: Language): String {
-    return encode(StringBuilder(), value, language).toString()
+private const val MAX_RAW_NUMBER = 1000
+private const val PADDING_SIZE = MAX_RAW_NUMBER.toString().length - 1
+private fun encode(buffer: StringBuilder, value: Long, language: Language): StringBuilder {
+  return if (value >= MAX_RAW_NUMBER) {
+    val mod = value % MAX_RAW_NUMBER
+    val leftPadding = PADDING_SIZE - mod.toString().length
+    encode(buffer, value / MAX_RAW_NUMBER, language)
+    buffer.append("_")
+    for (i in leftPadding downTo 1) buffer.append('0')
+    buffer.append(mod)
+    buffer
+  } else if (value < 0) {
+    buffer.append('-')
+    encode(buffer, abs(value), language)
+  } else {
+    buffer.append(value)
   }
-  private fun encode(buffer: StringBuilder, value: Int, language: Language): StringBuilder {
-    return if (value >= MAX_RAW_NUMBER) {
-      val mod = value % MAX_RAW_NUMBER
-      val leftPadding = PADDING_SIZE - mod.toString().length
-      encode(buffer, value / MAX_RAW_NUMBER, language)
-      buffer.append("_")
-      for (i in leftPadding downTo 1) buffer.append('0')
-      buffer.append(mod)
-      buffer
-    } else if (value < 0) {
-      buffer.append('-')
-      encode(buffer, abs(value), language)
-    } else {
-      buffer.append(value)
-    }
+}
+
+object LiteralInt : LiteralFormat<Int> {
+  override fun encode(value: Int, language: Language): String {
+    return encode(StringBuilder(), value.toLong(), language).toString()
   }
   override fun parse(str: String, language: Language): Int {
     return str.replace("_", "").toInt()
+  }
+}
+
+object LiteralLong : LiteralFormat<Long> {
+  override fun encode(value: Long, language: Language): String {
+    return encode(StringBuilder(), value, language).toString()
+  }
+  override fun parse(str: String, language: Language): Long {
+    var longStr = str.replace("_", "")
+    if (longStr.endsWith("L")) {
+      longStr = longStr.substring(0, longStr.length - 1)
+    }
+    return longStr.toLong()
   }
 }
 
