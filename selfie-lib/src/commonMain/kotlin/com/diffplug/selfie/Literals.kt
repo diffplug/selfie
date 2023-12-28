@@ -52,18 +52,24 @@ interface LiteralFormat<T : Any> {
 
 private const val MAX_RAW_NUMBER = 1000
 private const val PADDING_SIZE = MAX_RAW_NUMBER.toString().length - 1
-private fun encode(buffer: StringBuilder, value: Long, language: Language): StringBuilder {
+private fun encodeUnderscores(
+    buffer: StringBuilder,
+    value: Long,
+    language: Language
+): StringBuilder {
   return if (value >= MAX_RAW_NUMBER) {
     val mod = value % MAX_RAW_NUMBER
     val leftPadding = PADDING_SIZE - mod.toString().length
-    encode(buffer, value / MAX_RAW_NUMBER, language)
+    encodeUnderscores(buffer, value / MAX_RAW_NUMBER, language)
     buffer.append("_")
-    for (i in leftPadding downTo 1) buffer.append('0')
+    for (i in leftPadding downTo 1) {
+      buffer.append('0')
+    }
     buffer.append(mod)
     buffer
   } else if (value < 0) {
     buffer.append('-')
-    encode(buffer, abs(value), language)
+    encodeUnderscores(buffer, abs(value), language)
   } else {
     buffer.append(value)
   }
@@ -71,7 +77,7 @@ private fun encode(buffer: StringBuilder, value: Long, language: Language): Stri
 
 object LiteralInt : LiteralFormat<Int> {
   override fun encode(value: Int, language: Language): String {
-    return encode(StringBuilder(), value.toLong(), language).toString()
+    return encodeUnderscores(StringBuilder(), value.toLong(), language).toString()
   }
   override fun parse(str: String, language: Language): Int {
     return str.replace("_", "").toInt()
@@ -80,7 +86,11 @@ object LiteralInt : LiteralFormat<Int> {
 
 object LiteralLong : LiteralFormat<Long> {
   override fun encode(value: Long, language: Language): String {
-    return encode(StringBuilder(), value, language).toString()
+    val buffer = encodeUnderscores(StringBuilder(), value.toLong(), language)
+    if (language != Language.CLOJURE) {
+      buffer.append('L')
+    }
+    return buffer.toString()
   }
   override fun parse(str: String, language: Language): Long {
     var longStr = str.replace("_", "")
