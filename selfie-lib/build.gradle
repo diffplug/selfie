@@ -18,6 +18,11 @@ kotlin {
     testRuns["test"].executionTask.configure {
       useJUnitPlatform()
     }
+    compilations.main {
+      compilerOptions.configure((org.gradle.api.Action) {
+        it.setFreeCompilerArgs(['-Xjvm-default=all'])
+      })
+    }
   }
   js(IR) {
     browser {
