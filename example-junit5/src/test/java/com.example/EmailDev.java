@@ -65,6 +65,7 @@ public class EmailDev extends Email {
           var idx = ctx.path("idx").intValue() - 1;
           var messages = ctx.require(Storage.class).allEmails();
           if (idx >= 0 && idx < messages.size()) {
+            ctx.setResponseType(MediaType.html);
             return messages.get(idx).htmlMsg;
           } else {
             return "No such message";

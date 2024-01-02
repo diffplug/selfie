@@ -6,9 +6,17 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 
 public class Dev extends Jooby {
-  {
+  public static Dev realtime(boolean realtime) {
+    return new Dev(realtime);
+  }
+
+  public Dev() {
+    this(false);
+  }
+
+  private Dev(boolean realtime) {
     getServices().put(SecureRandom.class, repeatableRandom());
-    getServices().put(Time.class, new DevTime());
+    getServices().put(Time.class, realtime ? new Time.Realtime() : new DevTime());
     EmailDev.install(this);
     Prod.controllers(this);
   }
@@ -21,5 +29,9 @@ public class Dev extends Jooby {
     } catch (NoSuchAlgorithmException e) {
       throw SneakyThrows.propagate(e);
     }
+  }
+
+  public static void main(String[] args) {
+    Jooby.runApp(args, () -> new Dev(true));
   }
 }
