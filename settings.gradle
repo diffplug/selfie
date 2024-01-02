@@ -43,5 +43,7 @@ include 'selfie-lib'
 include 'selfie-runner-junit5'
 include 'undertest-junit5'
 include 'undertest-junit-vintage'
-include 'example-junit5'
+if (JavaVersion.current() >= JavaVersion.VERSION_15) {
+  include 'example-junit5'
+}
 rootProject.name = 'selfie'
