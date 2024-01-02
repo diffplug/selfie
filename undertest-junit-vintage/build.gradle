@@ -21,6 +21,7 @@ dependencies {
   testCompileOnly "junit:junit:4.13.2"
   testImplementation "org.junit.jupiter:junit-jupiter-api:${ver_JUNIT_USE}"
   testImplementation "org.junit.vintage:junit-vintage-engine:${ver_JUNIT_USE}"
+  testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 // this project is just a test environment for a different project
 test {

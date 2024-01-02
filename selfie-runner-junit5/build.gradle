@@ -22,7 +22,7 @@ dependencies {
   testImplementation "io.kotest:kotest-assertions-core:$ver_KOTEST"
   testImplementation "org.junit.jupiter:junit-jupiter:$ver_JUNIT_USE"
   testImplementation "org.junit-pioneer:junit-pioneer:$ver_JUNIT_PIONEER"
-
+  testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
   testImplementation gradleTestKit()
 }
 test {
