@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 DiffPlug
+ * Copyright (C) 2023-2024 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -105,8 +105,10 @@ object Selfie {
                 })
       }
     }
-    fun toBe_TODO() = toBeDidntMatch(null, actualString(), LiteralString)
-    infix fun toBe(expected: String): String {
+
+    @JvmOverloads
+    fun toBe_TODO(unusedArg: Any? = null) = toBeDidntMatch(null, actualString(), LiteralString)
+    fun toBe(expected: String): String {
       val actualString = actualString()
       return if (actualString == expected) actualString
       else toBeDidntMatch(expected, actualString, LiteralString)
@@ -139,36 +141,29 @@ object Selfie {
   }
 
   class IntSelfie(private val actual: Int) {
-    fun toBe_TODO() = toBeDidntMatch(null, actual, LiteralInt)
-    infix fun toBe(expected: Int) =
+    @JvmOverloads fun toBe_TODO(unusedArg: Any? = null) = toBeDidntMatch(null, actual, LiteralInt)
+    fun toBe(expected: Int) =
         if (actual == expected) expected else toBeDidntMatch(expected, actual, LiteralInt)
   }
 
   @JvmStatic fun expectSelfie(actual: Int) = IntSelfie(actual)
 
   class LongSelfie(private val actual: Long) {
-    fun toBe_TODO() = toBeDidntMatch(null, actual, LiteralLong)
-    infix fun toBe(expected: Long) =
+    @JvmOverloads fun toBe_TODO(unusedArg: Any? = null) = toBeDidntMatch(null, actual, LiteralLong)
+    fun toBe(expected: Long) =
         if (actual == expected) expected else toBeDidntMatch(expected, actual, LiteralLong)
   }
 
   @JvmStatic fun expectSelfie(actual: Long) = LongSelfie(actual)
 
   class BooleanSelfie(private val actual: Boolean) {
-    fun toBe_TODO() = toBeDidntMatch(null, actual, LiteralBoolean)
-    infix fun toBe(expected: Boolean) =
+    @JvmOverloads
+    fun toBe_TODO(unusedArg: Any? = null) = toBeDidntMatch(null, actual, LiteralBoolean)
+    fun toBe(expected: Boolean) =
         if (actual == expected) expected else toBeDidntMatch(expected, actual, LiteralBoolean)
   }
 
   @JvmStatic fun expectSelfie(actual: Boolean) = BooleanSelfie(actual)
-
-  // infix versions for the inline methods, consistent with Kotest's API
-  infix fun String.shouldBeSelfie(expected: String): String = expectSelfie(this).toBe(expected)
-  infix fun ByteArray.shouldBeSelfieBase64(expected: String): String =
-      expectSelfie(this).toBe(expected)
-  infix fun Int.shouldBeSelfie(expected: Int): Int = expectSelfie(this).toBe(expected)
-  infix fun Long.shouldBeSelfie(expected: Long): Long = expectSelfie(this).toBe(expected)
-  infix fun Boolean.shouldBeSelfie(expected: Boolean): Boolean = expectSelfie(this).toBe(expected)
 }
 
 class ExpectedActual(val expected: Snapshot?, val actual: Snapshot) {
