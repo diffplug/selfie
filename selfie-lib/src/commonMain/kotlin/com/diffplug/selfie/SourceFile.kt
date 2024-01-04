@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 DiffPlug
+ * Copyright (C) 2023-2024 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -77,6 +77,19 @@ class SourceFile(filename: String, content: String) {
       return literalFormat.parse(
           slice.subSequence(valueStart, slice.length - 1).toString(), language)
     }
+  }
+  private fun findOnLine(toFind: String, lineOneIndexed: Int): Slice {
+    val lineContent = contentSlice.unixLine(lineOneIndexed)
+    val idx = lineContent.indexOf(toFind)
+    if (idx == -1) {
+      throw AssertionError(
+          "Expected to find `$toFind` on line $lineOneIndexed, but there was only `${lineContent}`")
+    }
+    return lineContent.subSequence(idx, idx + toFind.length)
+  }
+  fun replaceToMatchDisk_TODO(lineOneIndexed: Int) {
+    val slice = findOnLine(".toMatchDisk_TODO(", lineOneIndexed)
+    contentSlice = Slice(slice.replaceSelfWith(".toMatchDisk("))
   }
   fun parseToBe_TODO(lineOneIndexed: Int): ToBeLiteral {
     return parseToBeLike(".toBe_TODO(", lineOneIndexed)
