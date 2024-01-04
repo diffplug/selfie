@@ -37,9 +37,9 @@ interface SnapshotStorage {
   val fs: FS
   val mode: Mode
   /** Indicates that the following value should be written into test sourcecode. */
-  fun writeInline(literalValue: LiteralValue<*>)
+  fun writeInline(literalValue: LiteralValue<*>, call: CallStack)
   /** Performs a comparison between disk and actual, writing the actual to disk if necessary. */
-  fun readWriteDisk(actual: Snapshot, sub: String): ExpectedActual
+  fun readWriteDisk(actual: Snapshot, sub: String, call: CallStack): ExpectedActual
   /**
    * Marks that the following sub snapshots should be kept, null means to keep all snapshots for the
    * currently executing class.

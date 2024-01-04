@@ -25,6 +25,7 @@ import com.diffplug.selfie.guts.LiteralString
 import com.diffplug.selfie.guts.LiteralValue
 import com.diffplug.selfie.guts.SnapshotStorage
 import com.diffplug.selfie.guts.initStorage
+import com.diffplug.selfie.guts.recordCall
 import kotlin.jvm.JvmOverloads
 import kotlin.jvm.JvmStatic
 
@@ -47,7 +48,8 @@ object Selfie {
   class DiskSelfie internal constructor(actual: Snapshot) : LiteralStringSelfie(actual) {
     @JvmOverloads
     fun toMatchDisk(sub: String = ""): DiskSelfie {
-      val comparison = storage.readWriteDisk(actual, sub)
+      val call = recordCall()
+      val comparison = storage.readWriteDisk(actual, sub, call)
       if (storage.mode == Mode.read) {
         comparison.assertEqual(storage.fs)
       }
@@ -56,11 +58,12 @@ object Selfie {
 
     @JvmOverloads
     fun toMatchDisk_TODO(sub: String = ""): DiskSelfie {
+      val call = recordCall()
       if (storage.mode == Mode.read) {
         throw storage.fs.assertFailed("Can't call `toMatchDisk_TODO` in readonly mode!")
       }
-      storage.readWriteDisk(actual, sub)
-      storage.writeInline(DiskSnapshotTodo.createLiteral())
+      storage.readWriteDisk(actual, sub, call)
+      storage.writeInline(DiskSnapshotTodo.createLiteral(), call)
       return this
     }
   }
@@ -127,8 +130,9 @@ object Selfie {
 
   /** Implements the inline snapshot whenever a match fails. */
   private fun <T : Any> toBeDidntMatch(expected: T?, actual: T, format: LiteralFormat<T>): T {
+    val call = recordCall()
     if (storage.mode == Mode.write) {
-      storage.writeInline(LiteralValue(expected, actual, format))
+      storage.writeInline(LiteralValue(expected, actual, format), call)
       return actual
     } else {
       if (expected == null) {
