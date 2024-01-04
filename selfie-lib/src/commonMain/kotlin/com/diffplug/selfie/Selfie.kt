@@ -16,6 +16,7 @@
 package com.diffplug.selfie
 
 import com.diffplug.selfie.guts.DiskSnapshotTodo
+import com.diffplug.selfie.guts.FS
 import com.diffplug.selfie.guts.LiteralBoolean
 import com.diffplug.selfie.guts.LiteralFormat
 import com.diffplug.selfie.guts.LiteralInt
@@ -48,7 +49,7 @@ object Selfie {
     fun toMatchDisk(sub: String = ""): DiskSelfie {
       val comparison = storage.readWriteDisk(actual, sub)
       if (storage.mode == Mode.read) {
-        comparison.assertEqual(storage)
+        comparison.assertEqual(storage.fs)
       }
       return this
     }
@@ -167,9 +168,9 @@ object Selfie {
 }
 
 class ExpectedActual(val expected: Snapshot?, val actual: Snapshot) {
-  internal fun assertEqual(storage: SnapshotStorage) {
+  internal fun assertEqual(fs: FS) {
     if (expected == null) {
-      throw storage.fs.assertFailed("No such snapshot")
+      throw fs.assertFailed("No such snapshot")
     } else if (expected.subject == actual.subject && expected.facets == actual.facets) {
       return
     } else {
@@ -186,7 +187,7 @@ class ExpectedActual(val expected: Snapshot?, val actual: Snapshot) {
               .filter { expected.subjectOrFacetMaybe(it) != actual.subjectOrFacetMaybe(it) }
               .toList()
               .sorted()
-      throw storage.fs.assertFailed(
+      throw fs.assertFailed(
           "Snapshot failure",
           serializeOnlyFacets(expected, mismatchedKeys),
           serializeOnlyFacets(actual, mismatchedKeys))
