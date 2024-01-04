@@ -66,7 +66,7 @@ object Selfie {
     @JvmOverloads
     fun toMatchDisk_TODO(sub: String = ""): DiskSelfie {
       if (!storage.isWrite) {
-        storage.assertFailed("Can't call `toMatchDisk_TODO` in readonly mode!")
+        throw storage.assertFailed("Can't call `toMatchDisk_TODO` in readonly mode!")
       }
       storage.readWriteDisk(actual, sub)
       storage.writeInline(DiskSnapshotTodo.createLiteral())
