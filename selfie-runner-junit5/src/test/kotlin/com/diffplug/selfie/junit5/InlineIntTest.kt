@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 DiffPlug
+ * Copyright (C) 2023-2024 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,6 +42,15 @@ class InlineIntTest : Harness("undertest-junit5") {
   }
 
   @Test @Order(3)
+  fun toBe_rewriteTODO() {
+    ut_mirror().lineWith("expectSelfie").setContent("    expectSelfie(555).toBe_TODO(789)")
+    gradleReadSSFail()
+    gradleWriteSS()
+    ut_mirror().lineWith("expectSelfie").content() shouldBe "    expectSelfie(555).toBe(555)"
+    gradleReadSS()
+  }
+
+  @Test @Order(4)
   fun toBe_writeLiteral() {
     ut_mirror().lineWith("expectSelfie").setContent("    expectSelfie(7777).toBe(1_234)")
     gradleReadSSFail()
