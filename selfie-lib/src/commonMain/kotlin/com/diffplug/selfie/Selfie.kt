@@ -49,8 +49,9 @@ object Selfie {
     @JvmOverloads
     fun toMatchDisk(sub: String = ""): DiskSelfie {
       val call = recordCall()
+      val writable = storage.mode.canWrite(false, call, storage)
       val comparison = storage.readWriteDisk(actual, sub, call)
-      if (storage.mode == Mode.readonly) {
+      if (!writable) {
         comparison.assertEqual(storage.fs)
       }
       return this
@@ -59,8 +60,9 @@ object Selfie {
     @JvmOverloads
     fun toMatchDisk_TODO(sub: String = ""): DiskSelfie {
       val call = recordCall()
-      if (storage.mode == Mode.readonly) {
-        throw storage.fs.assertFailed("Can't call `toMatchDisk_TODO` in readonly mode!")
+      val writable = storage.mode.canWrite(true, call, storage)
+      if (!writable) {
+        throw storage.fs.assertFailed("Can't call `toMatchDisk_TODO` in ${Mode.readonly} mode!")
       }
       storage.readWriteDisk(actual, sub, call)
       storage.writeInline(DiskSnapshotTodo.createLiteral(), call)
@@ -131,13 +133,13 @@ object Selfie {
   /** Implements the inline snapshot whenever a match fails. */
   private fun <T : Any> toBeDidntMatch(expected: T?, actual: T, format: LiteralFormat<T>): T {
     val call = recordCall()
-    if (storage.mode == Mode.overwrite) {
+    val writable = storage.mode.canWrite(expected == null, call, storage)
+    if (writable) {
       storage.writeInline(LiteralValue(expected, actual, format), call)
       return actual
     } else {
       if (expected == null) {
-        throw storage.fs.assertFailed(
-            "`.toBe_TODO()` was called in `read` mode, try again with selfie in write mode")
+        throw storage.fs.assertFailed("Can't call `toBe_TODO` in ${Mode.readonly} mode!")
       } else {
         throw storage.fs.assertFailed(
             "Inline literal did not match the actual value", expected, actual)

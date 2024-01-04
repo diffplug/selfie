@@ -36,6 +36,8 @@ interface FS {
 interface SnapshotStorage {
   val fs: FS
   val mode: Mode
+  /** Returns true if the sourcecode for the given call has a writable annotation. */
+  fun sourceFileHasWritableComment(call: CallStack): Boolean
   /** Indicates that the following value should be written into test sourcecode. */
   fun writeInline(literalValue: LiteralValue<*>, call: CallStack)
   /** Performs a comparison between disk and actual, writing the actual to disk if necessary. */

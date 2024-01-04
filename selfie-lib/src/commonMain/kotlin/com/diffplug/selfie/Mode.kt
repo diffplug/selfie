@@ -15,7 +15,17 @@
  */
 package com.diffplug.selfie
 
+import com.diffplug.selfie.guts.CallStack
+import com.diffplug.selfie.guts.SnapshotStorage
+
 enum class Mode {
+  interactive,
   readonly,
-  overwrite
+  overwrite;
+  fun canWrite(isTodo: Boolean, call: CallStack, storage: SnapshotStorage): Boolean =
+      when (this) {
+        interactive -> isTodo || storage.sourceFileHasWritableComment(call)
+        readonly -> false
+        overwrite -> true
+      }
 }

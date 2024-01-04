@@ -76,6 +76,9 @@ internal object SnapshotStorageJUnit5 : SnapshotStorage {
   @JvmStatic fun initStorage(): SnapshotStorage = this
   override val fs = FSJava
   override val mode = calcMode()
+  override fun sourceFileHasWritableComment(call: CallStack): Boolean {
+    TODO("Not yet implemented")
+  }
 
   private class ClassMethod(val clazz: ClassProgress, val method: String)
   private val threadCtx = ThreadLocal<ClassMethod?>()
