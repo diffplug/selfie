@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 DiffPlug
+ * Copyright (C) 2023-2024 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ open class SelfieSettingsAPI {
    * the test that created them.
    */
   open val snapshotFolderName: String?
-    get() = "__snapshots__"
+    get() = null
 
   /** By default, the root folder is the first of the standard test directories. */
   open val rootFolder: Path
