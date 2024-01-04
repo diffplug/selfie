@@ -13,77 +13,44 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.diffplug.selfie.junit5
+package com.diffplug.selfie
 
-import com.diffplug.selfie.DiskSnapshotTodo
-import com.diffplug.selfie.LiteralValue
-import com.diffplug.selfie.Snapshot
-import com.diffplug.selfie.SourceFile
-import java.nio.file.Files
-import java.nio.file.Path
-import java.util.stream.Collectors
-import kotlin.io.path.name
-import org.opentest4j.AssertionFailedError
-
-/** Represents the line at which user code called into Selfie. */
-data class CallLocation(val clazz: String, val method: String, val file: String?, val line: Int) :
-    Comparable<CallLocation> {
-  override fun compareTo(other: CallLocation): Int =
-      compareValuesBy(this, other, { it.clazz }, { it.method }, { it.file }, { it.line })
-
-  /**
-   * If the runtime didn't give us the filename, guess it from the class, and try to find the source
-   * file by walking the CWD. If we don't find it, report it as a `.class` file.
-   */
-  private fun findFileIfAbsent(layout: SnapshotFileLayout): String {
-    if (file != null) {
-      return file
-    }
-    return layout.sourcecodeForCall(this)?.name ?: "${clazz.substringAfterLast('.')}.class"
-  }
-
-  /** A `toString` which an IDE will render as a clickable link. */
-  fun ideLink(layout: SnapshotFileLayout): String {
-    return "$clazz.$method(${findFileIfAbsent(layout)}:$line)"
-  }
+expect class CallLocation : Comparable<CallLocation> {
+  val file: String?
+  val line: Int
+  fun ideLink(layout: SnapshotFileLayout): String
 }
+
+expect fun recordCall(): CallStack
+
 /** Represents the callstack above a given CallLocation. */
 class CallStack(val location: CallLocation, val restOfStack: List<CallLocation>) {
   fun ideLink(layout: SnapshotFileLayout) =
-      sequence<CallLocation> {
+      sequence {
             yield(location)
             yieldAll(restOfStack)
           }
           .joinToString("\n") { it.ideLink(layout) }
 }
 
-/** Generates a CallLocation and the CallStack behind it. */
-fun recordCall(): CallStack {
-  val calls =
-      StackWalker.getInstance().walk { frames ->
-        frames
-            .dropWhile { it.className.startsWith("com.diffplug.selfie") }
-            .map { CallLocation(it.className, it.methodName, it.fileName, it.lineNumber) }
-            .collect(Collectors.toList())
-      }
-  return CallStack(calls.removeAt(0), calls)
-}
 /** The first write at a given spot. */
 internal class FirstWrite<T>(val snapshot: T, val callStack: CallStack)
 
 /** For tracking the writes of disk snapshots literals. */
-internal open class WriteTracker<K : Comparable<K>, V> {
-  val writes = mutableMapOf<K, FirstWrite<V>>()
+open class WriteTracker<K : Comparable<K>, V> {
+  internal val writes = mutableMapOf<K, FirstWrite<V>>()
   protected fun recordInternal(key: K, snapshot: V, call: CallStack, layout: SnapshotFileLayout) {
-    val existing = writes.putIfAbsent(key, FirstWrite(snapshot, call))
-    if (existing != null) {
+    val existing = writes[key]
+    if (existing == null) {
+      writes[key] = FirstWrite(snapshot, call)
+    } else {
       if (existing.snapshot != snapshot) {
-        throw AssertionFailedError(
+        throw layout.fs.assertFailed(
             "Snapshot was set to multiple values!\n  first time: ${existing.callStack.location.ideLink(layout)}\n   this time: ${call.location.ideLink(layout)}",
             existing.snapshot,
             snapshot)
-      } else if (RW.isWriteOnce) {
-        throw AssertionFailedError(
+      } else if (TODO("RW.isWriteOnce")) {
+        throw layout.fs.assertFailed(
             "Snapshot was set to the same value multiple times.",
             existing.callStack.ideLink(layout),
             call.ideLink(layout))
@@ -92,13 +59,13 @@ internal open class WriteTracker<K : Comparable<K>, V> {
   }
 }
 
-internal class DiskWriteTracker : WriteTracker<String, Snapshot>() {
+class DiskWriteTracker : WriteTracker<String, Snapshot>() {
   fun record(key: String, snapshot: Snapshot, call: CallStack, layout: SnapshotFileLayout) {
     recordInternal(key, snapshot, call, layout)
   }
 }
 
-internal class InlineWriteTracker : WriteTracker<CallLocation, LiteralValue<*>>() {
+class InlineWriteTracker : WriteTracker<CallLocation, LiteralValue<*>>() {
   fun record(call: CallStack, literalValue: LiteralValue<*>, layout: SnapshotFileLayout) {
     recordInternal(call.location, literalValue, call, layout)
     // assert that the value passed at runtime matches the value we parse at compile time
@@ -108,10 +75,10 @@ internal class InlineWriteTracker : WriteTracker<CallLocation, LiteralValue<*>>(
             ?: throw Error("Unable to find source file for ${call.location.ideLink(layout)}")
     if (literalValue.expected != null) {
       // if expected == null, it's a `toBe_TODO()`, so there's nothing to check
-      val content = SourceFile(file.name, Files.readString(file))
+      val content = SourceFile(layout.fs.name(file), layout.fs.fileRead(file))
       val parsedValue = content.parseToBe(call.location.line).parseLiteral(literalValue.format)
       if (parsedValue != literalValue.expected) {
-        throw AssertionFailedError(
+        throw layout.fs.assertFailed(
             "There is likely a bug in Selfie's literal parsing.",
             literalValue.expected,
             parsedValue)
@@ -139,14 +106,14 @@ internal class InlineWriteTracker : WriteTracker<CallLocation, LiteralValue<*>>(
             .sorted()
 
     var file = writes.first().file
-    var content = SourceFile(file.name, Files.readString(file))
+    var content = SourceFile(layout.fs.name(file), layout.fs.fileRead(file))
     var deltaLineNumbers = 0
     for (write in writes) {
       if (write.file != file) {
-        Files.writeString(file, content.asString)
+        layout.fs.fileWrite(file, content.asString)
         file = write.file
         deltaLineNumbers = 0
-        content = SourceFile(file.name, Files.readString(file))
+        content = SourceFile(layout.fs.name(file), layout.fs.fileRead(file))
       }
       // parse the location within the file
       val line = write.line + deltaLineNumbers
@@ -162,6 +129,6 @@ internal class InlineWriteTracker : WriteTracker<CallLocation, LiteralValue<*>>(
         deltaLineNumbers += toBe.setLiteralAndGetNewlineDelta(write.literal)
       }
     }
-    Files.writeString(file, content.asString)
+    layout.fs.fileWrite(file, content.asString)
   }
 }
