@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 DiffPlug
+ * Copyright (C) 2023-2024 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,3 +23,5 @@ actual fun initStorage(): SnapshotStorage {
         "Missing required artifact `com.diffplug.spotless:selfie-runner-junit5", e)
   }
 }
+
+actual typealias Path = java.nio.file.Path

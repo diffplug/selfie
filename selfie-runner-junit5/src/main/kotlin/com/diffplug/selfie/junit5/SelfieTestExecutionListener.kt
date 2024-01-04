@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 DiffPlug
+ * Copyright (C) 2023-2024 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,11 +17,12 @@ package com.diffplug.selfie.junit5
 
 import com.diffplug.selfie.*
 import com.diffplug.selfie.ExpectedActual
+import com.diffplug.selfie.Path
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
-import java.nio.file.Path
 import java.util.concurrent.ConcurrentSkipListSet
 import java.util.concurrent.atomic.AtomicReference
+import kotlin.streams.asSequence
 import org.junit.platform.engine.TestExecutionResult
 import org.junit.platform.engine.support.descriptor.ClassSource
 import org.junit.platform.engine.support.descriptor.MethodSource
@@ -30,8 +31,21 @@ import org.junit.platform.launcher.TestIdentifier
 import org.junit.platform.launcher.TestPlan
 import org.opentest4j.AssertionFailedError
 
+internal object FSJava : FS {
+  override fun fileWrite(path: Path, content: String) {
+    Files.writeString(path, content)
+  }
+  override fun fileRead(path: Path) = Files.readString(path)
+  /** Walks the files (not directories) which are children and grandchildren of the given path. */
+  override fun <T> fileWalk(path: Path, walk: (Sequence<Path>) -> T): T =
+      Files.walk(path).use { walk(it.asSequence().filter { Files.isRegularFile(it) }) }
+  override fun name(path: Path): String = path.fileName.toString()
+}
+
 /** Routes between `toMatchDisk()` calls and the snapshot file / pruning machinery. */
 internal object SnapshotStorageJUnit5 : SnapshotStorage {
+  override val fs = FSJava
+
   @JvmStatic fun initStorage(): SnapshotStorage = this
   override val isWrite: Boolean
     get() = RW.isWrite
@@ -206,7 +220,7 @@ internal class ClassProgress(val parent: Progress, val className: String) {
  */
 internal class Progress {
   val settings = SelfieSettingsAPI.initialize()
-  val layout = SnapshotFileLayout.initialize(settings)
+  val layout = SnapshotFileLayout.initialize(settings, SnapshotStorageJUnit5.fs)
 
   private var progressPerClass = ArrayMap.empty<String, ClassProgress>()
   private fun forClass(className: String) = synchronized(this) { progressPerClass[className]!! }

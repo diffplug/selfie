@@ -18,8 +18,20 @@ package com.diffplug.selfie
 import kotlin.jvm.JvmOverloads
 import kotlin.jvm.JvmStatic
 
+expect interface Path
+
+interface FS {
+  /** Returns the name of the given path. */
+  fun name(path: Path): String
+  /** Walks the files (not directories) which are children and grandchildren of the given path. */
+  fun <T> fileWalk(path: Path, walk: (Sequence<Path>) -> T): T
+  fun fileRead(path: Path): String
+  fun fileWrite(path: Path, content: String)
+}
+
 /** NOT FOR ENDUSERS. Implemented by Selfie to integrate with various test frameworks. */
 interface SnapshotStorage {
+  val fs: FS
   /** Determines if the system is in write mode or read mode. */
   val isWrite: Boolean
   /** Indicates that the following value should be written into test sourcecode. */

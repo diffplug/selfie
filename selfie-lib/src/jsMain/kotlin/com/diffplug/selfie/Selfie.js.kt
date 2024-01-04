@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 DiffPlug
+ * Copyright (C) 2023-2024 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,3 +17,5 @@ package com.diffplug.selfie
 actual fun initStorage(): SnapshotStorage {
   TODO("Not yet implemented")
 }
+
+actual typealias Path = CharSequence

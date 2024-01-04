@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 DiffPlug
+ * Copyright (C) 2023-2024 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,27 +15,27 @@
  */
 package com.diffplug.selfie.junit5
 
-import java.nio.file.Files
-import java.nio.file.Path
-import kotlin.io.path.name
+import com.diffplug.selfie.FS
+import com.diffplug.selfie.Path
 
 class SnapshotFileLayout(
     val rootFolder: Path,
     val snapshotFolderName: String?,
-    internal val unixNewlines: Boolean
+    internal val unixNewlines: Boolean,
+    internal val fs: FS
 ) {
   val extension: String = ".ss"
   fun sourcecodeForCall(call: CallLocation): Path? {
     if (call.file != null) {
-      return Files.walk(rootFolder).use {
-        it.filter { it.name == call.file }.findFirst().orElse(null)
+      return fs.fileWalk(rootFolder) { walk ->
+        walk.filter { fs.name(it) == call.file }.firstOrNull()
       }
     }
     val fileWithoutExtension = call.clazz.substringAfterLast('.').substringBefore('$')
     val likelyExtensions = listOf("kt", "java", "scala", "groovy", "clj", "cljc")
-    val filenames = likelyExtensions.map { "$fileWithoutExtension.$it" }.toSet()
-    return Files.walk(rootFolder).use {
-      it.filter { it.name in filenames }.findFirst().orElse(null)
+    val possibleNames = likelyExtensions.map { "$fileWithoutExtension.$it" }.toSet()
+    return fs.fileWalk(rootFolder) { walk ->
+      walk.filter { fs.name(it) in possibleNames }.firstOrNull()
     }
   }
   fun snapshotPathForClass(className: String): Path {
@@ -72,35 +72,34 @@ class SnapshotFileLayout(
   }
 
   companion object {
-    internal fun initialize(settings: SelfieSettingsAPI): SnapshotFileLayout {
-      val rootFolder = settings.rootFolder
+    internal fun initialize(settings: SelfieSettingsAPI, fs: FS): SnapshotFileLayout {
       return SnapshotFileLayout(
           settings.rootFolder,
           settings.snapshotFolderName,
-          inferDefaultLineEndingIsUnix(rootFolder))
+          inferDefaultLineEndingIsUnix(settings.rootFolder, fs),
+          fs)
     }
 
     /**
      * It's pretty easy to preserve the line endings of existing snapshot files, but it's a bit
      * harder to create a fresh snapshot file with the correct line endings.
      */
-    private fun inferDefaultLineEndingIsUnix(rootFolder: Path): Boolean {
-      return rootFolder
-          .toFile()
-          .walkTopDown()
-          .filter { it.isFile }
-          .mapNotNull {
-            try {
-              val txt = it.readText()
-              // look for a file that has a newline somewhere in it
-              if (txt.indexOf('\n') != -1) txt else null
-            } catch (e: Exception) {
-              // might be a binary file that throws an encoding exception
-              null
+    private fun inferDefaultLineEndingIsUnix(rootFolder: Path, fs: FS): Boolean {
+      return fs.fileWalk(rootFolder) { walk ->
+        walk
+            .mapNotNull {
+              try {
+                val txt = fs.fileRead(it)
+                // look for a file that has a newline somewhere in it
+                if (txt.indexOf('\n') != -1) txt else null
+              } catch (e: Exception) {
+                // might be a binary file that throws an encoding exception
+                null
+              }
             }
-          }
-          .firstOrNull()
-          ?.let { it.indexOf('\r') == -1 } ?: true // if we didn't find any files, assume unix
+            .firstOrNull()
+            ?.let { it.indexOf('\r') == -1 } ?: true // if we didn't find any files, assume unix
+      }
     }
   }
 }
