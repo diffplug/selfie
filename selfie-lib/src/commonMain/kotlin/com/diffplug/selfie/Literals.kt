@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 DiffPlug
+ * Copyright (C) 2023-2024 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -171,4 +171,11 @@ object LiteralBoolean : LiteralFormat<Boolean> {
   override fun parse(str: String, language: Language): Boolean {
     return str.toBooleanStrict()
   }
+}
+
+// wish this were internal
+object DiskSnapshotTodo : LiteralFormat<Unit> {
+  override fun encode(value: Unit, language: Language) = throw UnsupportedOperationException()
+  override fun parse(str: String, language: Language) = throw UnsupportedOperationException()
+  fun createLiteral() = LiteralValue(null, Unit, DiskSnapshotTodo)
 }

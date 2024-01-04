@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 DiffPlug
+ * Copyright (C) 2023-2024 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
  */
 package com.diffplug.selfie.junit5
 
+import com.diffplug.selfie.DiskSnapshotTodo
 import com.diffplug.selfie.LiteralValue
 import com.diffplug.selfie.Snapshot
 import com.diffplug.selfie.SourceFile
@@ -48,13 +49,12 @@ data class CallLocation(val clazz: String, val method: String, val file: String?
 }
 /** Represents the callstack above a given CallLocation. */
 class CallStack(val location: CallLocation, val restOfStack: List<CallLocation>) {
-  fun ideLink(layout: SnapshotFileLayout): String {
-    val list = buildList {
-      add(location)
-      addAll(restOfStack)
-    }
-    return list.joinToString("\n") { it.ideLink(layout) }
-  }
+  fun ideLink(layout: SnapshotFileLayout) =
+      sequence<CallLocation> {
+            yield(location)
+            yieldAll(restOfStack)
+          }
+          .joinToString("\n") { it.ideLink(layout) }
 }
 
 /** Generates a CallLocation and the CallStack behind it. */
@@ -78,12 +78,12 @@ internal open class WriteTracker<K : Comparable<K>, V> {
     val existing = writes.putIfAbsent(key, FirstWrite(snapshot, call))
     if (existing != null) {
       if (existing.snapshot != snapshot) {
-        throw org.opentest4j.AssertionFailedError(
+        throw AssertionFailedError(
             "Snapshot was set to multiple values!\n  first time: ${existing.callStack.location.ideLink(layout)}\n   this time: ${call.location.ideLink(layout)}",
             existing.snapshot,
             snapshot)
       } else if (RW.isWriteOnce) {
-        throw org.opentest4j.AssertionFailedError(
+        throw AssertionFailedError(
             "Snapshot was set to the same value multiple times.",
             existing.callStack.ideLink(layout),
             call.ideLink(layout))
@@ -150,13 +150,17 @@ internal class InlineWriteTracker : WriteTracker<CallLocation, LiteralValue<*>>(
       }
       // parse the location within the file
       val line = write.line + deltaLineNumbers
-      val toBe =
-          if (write.literal.expected == null) {
-            content.parseToBe_TODO(line)
-          } else {
-            content.parseToBe(line)
-          }
-      deltaLineNumbers += toBe.setLiteralAndGetNewlineDelta(write.literal)
+      if (write.literal.format == DiskSnapshotTodo) {
+        val matchDiskTODO = content.parseToMatchDisk_TODO(line)
+
+      } else {
+        val toBe = if (write.literal.expected == null) {
+          content.parseToBe_TODO(line)
+        } else {
+          content.parseToBe(line)
+        }
+        deltaLineNumbers += toBe.setLiteralAndGetNewlineDelta(write.literal)
+      }
     }
     Files.writeString(file, content.asString)
   }
