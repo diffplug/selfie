@@ -15,9 +15,9 @@
  */
 package testpkg
 
-import com.diffplug.selfie.junit5.SnapshotFileLayout
+import com.diffplug.selfie.junit5.SnapshotFileLayoutJUnit5
 import com.diffplug.selfie.junit5.SnapshotStorageJUnit5
-import com.diffplug.selfie.junit5.recordCall
+import com.diffplug.selfie.recordCall
 import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.shouldBe
 import java.nio.file.Paths
@@ -28,7 +28,7 @@ class RecordCallTest {
   fun testRecordCall() {
     val stack = recordCall()
     // shows as clickable link in IDE
-    val layout = SnapshotFileLayout(Paths.get(""), null, true, SnapshotStorageJUnit5.fs)
+    val layout = SnapshotFileLayoutJUnit5(Paths.get(""), null, true, SnapshotStorageJUnit5.fs)
     stack.location.ideLink(layout) shouldBe
         "testpkg.RecordCallTest.testRecordCall(RecordCallTest.kt:29)"
     stack.restOfStack.size shouldBeGreaterThan 0

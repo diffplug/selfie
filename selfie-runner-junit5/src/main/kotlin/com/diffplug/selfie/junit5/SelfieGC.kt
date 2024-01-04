@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 DiffPlug
+ * Copyright (C) 2023-2024 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,7 +39,7 @@ private val testAnnotations =
  * Searches the whole snapshot directory, finds all the `.ss` files, and prunes any which don't have
  * matching test files anymore.
  */
-internal fun findStaleSnapshotFiles(layout: SnapshotFileLayout): List<String> {
+internal fun findStaleSnapshotFiles(layout: SnapshotFileLayoutJUnit5): List<String> {
   val needsPruning = mutableListOf<String>()
   Files.walk(layout.rootFolder).use { paths ->
     paths
