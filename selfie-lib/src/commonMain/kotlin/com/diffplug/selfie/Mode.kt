@@ -16,6 +16,6 @@
 package com.diffplug.selfie
 
 enum class Mode {
-  read,
-  write
+  readonly,
+  overwrite
 }

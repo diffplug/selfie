@@ -68,7 +68,7 @@ private fun calcMode(): Mode {
     return Mode.valueOf(override)
   }
   val ci = lowercaseFromEnvOrSys("ci") ?: lowercaseFromEnvOrSys("CI")
-  return if (ci == "true") Mode.read else Mode.write
+  return if (ci == "true") Mode.readonly else Mode.overwrite
 }
 
 /** Routes between `toMatchDisk()` calls and the snapshot file / pruning machinery. */
@@ -87,7 +87,7 @@ internal object SnapshotStorageJUnit5 : SnapshotStorage {
   override fun readWriteDisk(actual: Snapshot, sub: String, call: CallStack): ExpectedActual {
     val cm = classAndMethod()
     val suffix = suffix(sub)
-    return if (mode == Mode.write) {
+    return if (mode == Mode.overwrite) {
       cm.clazz.write(cm.method, suffix, actual, call, cm.clazz.parent.layout)
       ExpectedActual(actual, actual)
     } else {
