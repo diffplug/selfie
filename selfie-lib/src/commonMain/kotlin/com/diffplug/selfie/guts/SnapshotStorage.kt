@@ -18,7 +18,7 @@ package com.diffplug.selfie.guts
 import com.diffplug.selfie.ExpectedActual
 import com.diffplug.selfie.Snapshot
 
-expect interface Path : Comparable<Path>
+expect class Path : Comparable<Path>
 
 interface FS {
   /** Returns the name of the given path. */

@@ -24,4 +24,4 @@ actual fun initStorage(): SnapshotStorage {
   }
 }
 
-actual typealias Path = java.nio.file.Path
+actual typealias Path = java.io.File

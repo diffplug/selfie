@@ -18,4 +18,4 @@ actual fun initStorage(): SnapshotStorage {
   TODO("Not yet implemented")
 }
 
-actual typealias Path = CharSequence
+actual typealias Path = String

@@ -40,14 +40,14 @@ import org.junit.platform.launcher.TestPlan
 import org.opentest4j.AssertionFailedError
 
 internal object FSJava : FS {
-  override fun fileWrite(path: Path, content: String) {
-    Files.writeString(path, content)
-  }
-  override fun fileRead(path: Path) = Files.readString(path)
+  override fun fileWrite(file: Path, content: String) = file.writeText(content)
+  override fun fileRead(file: Path) = file.readText()
   /** Walks the files (not directories) which are children and grandchildren of the given path. */
-  override fun <T> fileWalk(path: Path, walk: (Sequence<Path>) -> T): T =
-      Files.walk(path).use { walk(it.asSequence().filter { Files.isRegularFile(it) }) }
-  override fun name(path: Path): String = path.fileName.toString()
+  override fun <T> fileWalk(file: Path, walk: (Sequence<Path>) -> T): T =
+      Files.walk(file.toPath()).use {
+        walk(it.asSequence().mapNotNull { if (Files.isRegularFile(it)) it.toFile() else null })
+      }
+  override fun name(file: Path): String = file.name
   override fun assertFailed(message: String, expected: Any?, actual: Any?): Error =
       if (expected == null && actual == null) AssertionFailedError(message)
       else AssertionFailedError(message, expected, actual)
@@ -154,8 +154,8 @@ internal class ClassProgress(val parent: Progress, val className: String) {
           deleteFileAndParentDirIfEmpty(snapshotPath)
         } else {
           parent.markPathAsWritten(parent.layout.snapshotPathForClass(className))
-          Files.createDirectories(snapshotPath.parent)
-          Files.newBufferedWriter(snapshotPath, StandardCharsets.UTF_8).use { writer ->
+          Files.createDirectories(snapshotPath.toPath().parent)
+          Files.newBufferedWriter(snapshotPath.toPath(), StandardCharsets.UTF_8).use { writer ->
             file!!.serialize(writer::write)
           }
         }
@@ -209,7 +209,7 @@ internal class ClassProgress(val parent: Progress, val className: String) {
   }
   private fun read(): SnapshotFile {
     if (file == null) {
-      val snapshotPath = parent.layout.snapshotPathForClass(className)
+      val snapshotPath = parent.layout.snapshotPathForClass(className).toPath()
       file =
           if (Files.exists(snapshotPath) && Files.isRegularFile(snapshotPath)) {
             val content = Files.readAllBytes(snapshotPath)
@@ -318,10 +318,10 @@ class SelfieTestExecutionListener : TestExecutionListener {
   }
 }
 private fun deleteFileAndParentDirIfEmpty(snapshotFile: Path) {
-  if (Files.isRegularFile(snapshotFile)) {
-    Files.delete(snapshotFile)
+  if (Files.isRegularFile(snapshotFile.toPath())) {
+    Files.delete(snapshotFile.toPath())
     // if the parent folder is now empty, delete it
-    val parent = snapshotFile.parent!!
+    val parent = snapshotFile.toPath().parent!!
     if (Files.list(parent).use { !it.findAny().isPresent }) {
       Files.delete(parent)
     }

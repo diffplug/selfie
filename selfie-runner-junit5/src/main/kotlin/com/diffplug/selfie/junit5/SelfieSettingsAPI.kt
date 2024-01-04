@@ -15,9 +15,7 @@
  */
 package com.diffplug.selfie.junit5
 
-import java.nio.file.Files
-import java.nio.file.Path
-import java.nio.file.Paths
+import java.io.File
 
 open class SelfieSettingsAPI {
   /**
@@ -39,12 +37,12 @@ open class SelfieSettingsAPI {
     get() = null
 
   /** By default, the root folder is the first of the standard test directories. */
-  open val rootFolder: Path
+  open val rootFolder: File
     get() {
-      val userDir = Paths.get(System.getProperty("user.dir"))
+      val userDir = File(System.getProperty("user.dir"))
       for (standardDir in STANDARD_DIRS) {
         val candidate = userDir.resolve(standardDir)
-        if (Files.isDirectory(candidate)) {
+        if (candidate.isDirectory) {
           return candidate
         }
       }
