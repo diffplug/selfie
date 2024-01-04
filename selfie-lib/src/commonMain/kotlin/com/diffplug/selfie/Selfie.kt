@@ -47,7 +47,7 @@ object Selfie {
     @JvmOverloads
     fun toMatchDisk_TODO(sub: String = ""): DiskSelfie {
       if (!storage.isWrite) {
-        throw storage.assertFailed("Can't call `toMatchDisk_TODO` in readonly mode!")
+        throw storage.fs.assertFailed("Can't call `toMatchDisk_TODO` in readonly mode!")
       }
       storage.readWriteDisk(actual, sub)
       storage.writeInline(DiskSnapshotTodo.createLiteral())
@@ -122,10 +122,10 @@ object Selfie {
       return actual
     } else {
       if (expected == null) {
-        throw storage.assertFailed(
+        throw storage.fs.assertFailed(
             "`.toBe_TODO()` was called in `read` mode, try again with selfie in write mode")
       } else {
-        throw storage.assertFailed(
+        throw storage.fs.assertFailed(
             "Inline literal did not match the actual value", expected, actual)
       }
     }
@@ -160,7 +160,7 @@ object Selfie {
 class ExpectedActual(val expected: Snapshot?, val actual: Snapshot) {
   internal fun assertEqual(storage: SnapshotStorage) {
     if (expected == null) {
-      throw storage.assertFailed("No such snapshot")
+      throw storage.fs.assertFailed("No such snapshot")
     } else if (expected.subject == actual.subject && expected.facets == actual.facets) {
       return
     } else {
@@ -177,7 +177,7 @@ class ExpectedActual(val expected: Snapshot?, val actual: Snapshot) {
               .filter { expected.subjectOrFacetMaybe(it) != actual.subjectOrFacetMaybe(it) }
               .toList()
               .sorted()
-      throw storage.assertFailed(
+      throw storage.fs.assertFailed(
           "Snapshot failure",
           serializeOnlyFacets(expected, mismatchedKeys),
           serializeOnlyFacets(actual, mismatchedKeys))

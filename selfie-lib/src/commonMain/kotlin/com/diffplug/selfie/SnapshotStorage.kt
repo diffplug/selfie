@@ -15,7 +15,7 @@
  */
 package com.diffplug.selfie
 
-expect interface Path
+expect interface Path : Comparable<Path>
 
 interface FS {
   /** Returns the name of the given path. */
@@ -24,6 +24,8 @@ interface FS {
   fun <T> fileWalk(path: Path, walk: (Sequence<Path>) -> T): T
   fun fileRead(path: Path): String
   fun fileWrite(path: Path, content: String)
+  /** Creates an assertion failed exception to throw. */
+  fun assertFailed(message: String, expected: Any? = null, actual: Any? = null): Error
 }
 
 /** NOT FOR ENDUSERS. Implemented by Selfie to integrate with various test frameworks. */
@@ -40,8 +42,12 @@ interface SnapshotStorage {
    * currently executing class.
    */
   fun keep(subOrKeepAll: String?)
-  /** Creates an assertion failed exception to throw. */
-  fun assertFailed(message: String, expected: Any? = null, actual: Any? = null): Error
 }
 
 expect fun initStorage(): SnapshotStorage
+
+interface SnapshotFileLayout {
+  val rootFolder: Path
+  val fs: FS
+  fun sourcecodeForCall(call: CallLocation): Path?
+}

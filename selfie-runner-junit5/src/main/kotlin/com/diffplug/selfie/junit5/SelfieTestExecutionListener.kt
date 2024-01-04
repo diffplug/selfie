@@ -40,6 +40,9 @@ internal object FSJava : FS {
   override fun <T> fileWalk(path: Path, walk: (Sequence<Path>) -> T): T =
       Files.walk(path).use { walk(it.asSequence().filter { Files.isRegularFile(it) }) }
   override fun name(path: Path): String = path.fileName.toString()
+  override fun assertFailed(message: String, expected: Any?, actual: Any?): Error =
+      if (expected == null && actual == null) AssertionFailedError(message)
+      else AssertionFailedError(message, expected, actual)
 }
 
 /** Routes between `toMatchDisk()` calls and the snapshot file / pruning machinery. */
@@ -76,9 +79,6 @@ internal object SnapshotStorageJUnit5 : SnapshotStorage {
       cm.clazz.keep(cm.method, suffix(subOrKeepAll))
     }
   }
-  override fun assertFailed(message: String, expected: Any?, actual: Any?): Error =
-      if (expected == null && actual == null) AssertionFailedError(message)
-      else AssertionFailedError(message, expected, actual)
   override fun writeInline(literalValue: LiteralValue<*>) {
     val call = recordCall()
     val cm =
@@ -220,7 +220,7 @@ internal class ClassProgress(val parent: Progress, val className: String) {
  */
 internal class Progress {
   val settings = SelfieSettingsAPI.initialize()
-  val layout = SnapshotFileLayout.initialize(settings, SnapshotStorageJUnit5.fs)
+  val layout = SnapshotFileLayoutJUnit5.initialize(settings, SnapshotStorageJUnit5.fs)
 
   private var progressPerClass = ArrayMap.empty<String, ClassProgress>()
   private fun forClass(className: String) = synchronized(this) { progressPerClass[className]!! }
