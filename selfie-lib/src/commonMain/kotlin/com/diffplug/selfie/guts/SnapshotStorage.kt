@@ -16,6 +16,7 @@
 package com.diffplug.selfie.guts
 
 import com.diffplug.selfie.ExpectedActual
+import com.diffplug.selfie.Mode
 import com.diffplug.selfie.Snapshot
 
 expect class Path : Comparable<Path>
@@ -34,8 +35,7 @@ interface FS {
 /** NOT FOR ENDUSERS. Implemented by Selfie to integrate with various test frameworks. */
 interface SnapshotStorage {
   val fs: FS
-  /** Determines if the system is in write mode or read mode. */
-  val isWrite: Boolean
+  val mode: Mode
   /** Indicates that the following value should be written into test sourcecode. */
   fun writeInline(literalValue: LiteralValue<*>)
   /** Performs a comparison between disk and actual, writing the actual to disk if necessary. */

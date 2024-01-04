@@ -52,14 +52,31 @@ internal object FSJava : FS {
       if (expected == null && actual == null) AssertionFailedError(message)
       else AssertionFailedError(message, expected, actual)
 }
+private fun lowercaseFromEnvOrSys(key: String): String? {
+  val env = System.getenv(key)?.lowercase()
+  if (!env.isNullOrEmpty()) {
+    return env
+  }
+  val system = System.getProperty(key)?.lowercase()
+  if (!system.isNullOrEmpty()) {
+    return system
+  }
+  return null
+}
+private fun calcMode(): Mode {
+  val override = lowercaseFromEnvOrSys("selfie") ?: lowercaseFromEnvOrSys("SELFIE")
+  if (override != null) {
+    return Mode.valueOf(override)
+  }
+  val ci = lowercaseFromEnvOrSys("ci") ?: lowercaseFromEnvOrSys("CI")
+  return if (ci == "true") Mode.read else Mode.write
+}
 
 /** Routes between `toMatchDisk()` calls and the snapshot file / pruning machinery. */
 internal object SnapshotStorageJUnit5 : SnapshotStorage {
-  override val fs = FSJava
-
   @JvmStatic fun initStorage(): SnapshotStorage = this
-  override val isWrite: Boolean
-    get() = RW.isWrite
+  override val fs = FSJava
+  override val mode = calcMode()
 
   private class ClassMethod(val clazz: ClassProgress, val method: String)
   private val threadCtx = ThreadLocal<ClassMethod?>()
@@ -72,7 +89,7 @@ internal object SnapshotStorageJUnit5 : SnapshotStorage {
     val cm = classAndMethod()
     val suffix = suffix(sub)
     val callStack = recordCall()
-    return if (RW.isWrite) {
+    return if (mode == Mode.write) {
       cm.clazz.write(cm.method, suffix, actual, callStack, cm.clazz.parent.layout)
       ExpectedActual(actual, actual)
     } else {
