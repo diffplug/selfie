@@ -220,7 +220,7 @@ internal class ClassProgress(val parent: Progress, val className: String) {
  */
 internal class Progress {
   val settings = SelfieSettingsAPI.initialize()
-  val layout = SnapshotFileLayoutJUnit5.initialize(settings, SnapshotStorageJUnit5.fs)
+  val layout = SnapshotFileLayoutJUnit5(settings, SnapshotStorageJUnit5.fs)
 
   private var progressPerClass = ArrayMap.empty<String, ClassProgress>()
   private fun forClass(className: String) = synchronized(this) { progressPerClass[className]!! }

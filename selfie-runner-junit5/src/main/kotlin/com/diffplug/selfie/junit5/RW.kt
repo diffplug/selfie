@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 DiffPlug
+ * Copyright (C) 2023-2024 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,8 +29,7 @@ package com.diffplug.selfie.junit5
  */
 internal enum class RW {
   read,
-  write,
-  writeonce;
+  write;
 
   companion object {
     private fun lowercaseFromEnvOrSys(key: String): String? {
@@ -54,6 +53,5 @@ internal enum class RW {
     }
     val mode = calcRW()
     val isWrite = mode != read
-    val isWriteOnce = mode == writeonce
   }
 }

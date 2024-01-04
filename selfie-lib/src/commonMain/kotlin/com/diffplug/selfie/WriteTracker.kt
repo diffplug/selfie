@@ -49,7 +49,7 @@ open class WriteTracker<K : Comparable<K>, V> {
             "Snapshot was set to multiple values!\n  first time: ${existing.callStack.location.ideLink(layout)}\n   this time: ${call.location.ideLink(layout)}",
             existing.snapshot,
             snapshot)
-      } else if (TODO("RW.isWriteOnce")) {
+      } else if (!layout.allowMultipleEquivalentWritesToOneLocation) {
         throw layout.fs.assertFailed(
             "Snapshot was set to the same value multiple times.",
             existing.callStack.ideLink(layout),

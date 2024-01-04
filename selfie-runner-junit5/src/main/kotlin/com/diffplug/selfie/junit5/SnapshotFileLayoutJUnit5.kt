@@ -20,12 +20,13 @@ import com.diffplug.selfie.FS
 import com.diffplug.selfie.Path
 import com.diffplug.selfie.SnapshotFileLayout
 
-class SnapshotFileLayoutJUnit5(
-    override val rootFolder: Path,
-    val snapshotFolderName: String?,
-    internal val unixNewlines: Boolean,
-    override val fs: FS
-) : SnapshotFileLayout {
+class SnapshotFileLayoutJUnit5(settings: SelfieSettingsAPI, override val fs: FS) :
+    SnapshotFileLayout {
+  override val rootFolder = settings.rootFolder
+  override val allowMultipleEquivalentWritesToOneLocation =
+      settings.allowMultipleEquivalentWritesToOneLocation
+  val snapshotFolderName = settings.snapshotFolderName
+  internal val unixNewlines = inferDefaultLineEndingIsUnix(settings.rootFolder, fs)
   val extension: String = ".ss"
   override fun sourcecodeForCall(call: CallLocation): Path? {
     if (call.file != null) {
@@ -74,13 +75,6 @@ class SnapshotFileLayoutJUnit5(
   }
 
   companion object {
-    internal fun initialize(settings: SelfieSettingsAPI, fs: FS) =
-        SnapshotFileLayoutJUnit5(
-            settings.rootFolder,
-            settings.snapshotFolderName,
-            inferDefaultLineEndingIsUnix(settings.rootFolder, fs),
-            fs)
-
     /**
      * It's pretty easy to preserve the line endings of existing snapshot files, but it's a bit
      * harder to create a fresh snapshot file with the correct line endings.

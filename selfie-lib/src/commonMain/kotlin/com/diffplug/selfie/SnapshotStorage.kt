@@ -49,5 +49,6 @@ expect fun initStorage(): SnapshotStorage
 interface SnapshotFileLayout {
   val rootFolder: Path
   val fs: FS
+  val allowMultipleEquivalentWritesToOneLocation: Boolean
   fun sourcecodeForCall(call: CallLocation): Path?
 }
