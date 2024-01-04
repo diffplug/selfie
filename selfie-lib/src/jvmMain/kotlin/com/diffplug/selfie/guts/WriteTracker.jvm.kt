@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.diffplug.selfie
+package com.diffplug.selfie.guts
 
 import java.util.stream.Collectors
 
@@ -51,7 +51,10 @@ actual fun recordCall(): CallStack {
       StackWalker.getInstance().walk { frames ->
         frames
             .dropWhile { it.className.startsWith("com.diffplug.selfie") }
-            .map { CallLocation(it.className, it.methodName, it.fileName, it.lineNumber) }
+            .map {
+              com.diffplug.selfie.guts.CallLocation(
+                  it.className, it.methodName, it.fileName, it.lineNumber)
+            }
             .collect(Collectors.toList())
       }
   return CallStack(calls.removeAt(0), calls)

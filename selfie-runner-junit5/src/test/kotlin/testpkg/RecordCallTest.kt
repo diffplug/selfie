@@ -15,10 +15,10 @@
  */
 package testpkg
 
+import com.diffplug.selfie.guts.recordCall
 import com.diffplug.selfie.junit5.SelfieSettingsAPI
 import com.diffplug.selfie.junit5.SnapshotFileLayoutJUnit5
 import com.diffplug.selfie.junit5.SnapshotStorageJUnit5
-import com.diffplug.selfie.recordCall
 import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test

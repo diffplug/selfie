@@ -13,9 +13,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.diffplug.selfie
-actual fun initStorage(): SnapshotStorage {
-  TODO("Not yet implemented")
-}
+package com.diffplug.selfie.guts
 
-actual typealias Path = CharSequence
+import io.kotest.matchers.shouldBe
+import kotlin.test.Test
+
+class LiteralBooleanTest {
+  @Test
+  fun encode() {
+    encode(true, "true")
+    encode(false, "false")
+  }
+  private fun encode(value: Boolean, expected: String) {
+    val actual = LiteralBoolean.encode(value, Language.JAVA)
+    actual shouldBe expected
+  }
+
+  @Test
+  fun decode() {
+    decode("true", true)
+    decode("false", false)
+  }
+  private fun decode(value: String, expected: Boolean) {
+    val actual = LiteralBoolean.parse(value, Language.JAVA)
+    actual shouldBe expected
+  }
+}

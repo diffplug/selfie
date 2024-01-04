@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 DiffPlug
+ * Copyright (C) 2023-2024 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,12 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.diffplug.selfie
-
-actual data class CallLocation(actual val file: String?, actual val line: Int) :
-    Comparable<CallLocation> {
-  override fun compareTo(other: CallLocation) =
-      compareValuesBy(this, other, { it.file }, { it.line })
-  actual fun ideLink(layout: SnapshotFileLayout): String = TODO()
+package com.diffplug.selfie.guts
+actual fun initStorage(): SnapshotStorage {
+  try {
+    val clazz = Class.forName("com.diffplug.selfie.junit5.SnapshotStorageJUnit5")
+    return clazz.getMethod("initStorage").invoke(null) as SnapshotStorage
+  } catch (e: ClassNotFoundException) {
+    throw IllegalStateException(
+        "Missing required artifact `com.diffplug.spotless:selfie-runner-junit5", e)
+  }
 }
-actual fun recordCall(): CallStack = TODO()
+
+actual typealias Path = java.nio.file.Path

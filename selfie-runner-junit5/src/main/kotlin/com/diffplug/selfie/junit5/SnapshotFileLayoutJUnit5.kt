@@ -15,10 +15,10 @@
  */
 package com.diffplug.selfie.junit5
 
-import com.diffplug.selfie.CallLocation
-import com.diffplug.selfie.FS
-import com.diffplug.selfie.Path
-import com.diffplug.selfie.SnapshotFileLayout
+import com.diffplug.selfie.guts.CallLocation
+import com.diffplug.selfie.guts.FS
+import com.diffplug.selfie.guts.Path
+import com.diffplug.selfie.guts.SnapshotFileLayout
 
 class SnapshotFileLayoutJUnit5(settings: SelfieSettingsAPI, override val fs: FS) :
     SnapshotFileLayout {

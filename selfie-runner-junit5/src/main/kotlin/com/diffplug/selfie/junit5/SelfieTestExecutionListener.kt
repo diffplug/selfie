@@ -17,7 +17,15 @@ package com.diffplug.selfie.junit5
 
 import com.diffplug.selfie.*
 import com.diffplug.selfie.ExpectedActual
-import com.diffplug.selfie.Path
+import com.diffplug.selfie.guts.CallStack
+import com.diffplug.selfie.guts.DiskWriteTracker
+import com.diffplug.selfie.guts.FS
+import com.diffplug.selfie.guts.InlineWriteTracker
+import com.diffplug.selfie.guts.LiteralValue
+import com.diffplug.selfie.guts.Path
+import com.diffplug.selfie.guts.SnapshotFileLayout
+import com.diffplug.selfie.guts.SnapshotStorage
+import com.diffplug.selfie.guts.recordCall
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.util.concurrent.ConcurrentSkipListSet

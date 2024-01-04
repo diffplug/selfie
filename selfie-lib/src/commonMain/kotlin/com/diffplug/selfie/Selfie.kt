@@ -15,6 +15,15 @@
  */
 package com.diffplug.selfie
 
+import com.diffplug.selfie.guts.DiskSnapshotTodo
+import com.diffplug.selfie.guts.LiteralBoolean
+import com.diffplug.selfie.guts.LiteralFormat
+import com.diffplug.selfie.guts.LiteralInt
+import com.diffplug.selfie.guts.LiteralLong
+import com.diffplug.selfie.guts.LiteralString
+import com.diffplug.selfie.guts.LiteralValue
+import com.diffplug.selfie.guts.SnapshotStorage
+import com.diffplug.selfie.guts.initStorage
 import kotlin.jvm.JvmOverloads
 import kotlin.jvm.JvmStatic
 

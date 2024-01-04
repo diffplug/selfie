@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 DiffPlug
+ * Copyright (C) 2020-2024 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,29 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.diffplug.selfie
+package com.diffplug.selfie.guts
 
 import io.kotest.matchers.shouldBe
 import kotlin.test.Test
 
-class LiteralBooleanTest {
+class SliceTest {
   @Test
-  fun encode() {
-    encode(true, "true")
-    encode(false, "false")
-  }
-  private fun encode(value: Boolean, expected: String) {
-    val actual = LiteralBoolean.encode(value, Language.JAVA)
-    actual shouldBe expected
-  }
-
-  @Test
-  fun decode() {
-    decode("true", true)
-    decode("false", false)
-  }
-  private fun decode(value: String, expected: Boolean) {
-    val actual = LiteralBoolean.parse(value, Language.JAVA)
-    actual shouldBe expected
+  fun unixLine() {
+    Slice("A single line").unixLine(1).toString() shouldBe "A single line"
+    val oneTwoThree = Slice("\nI am the first\nI, the second\n\nFOURTH\n")
+    oneTwoThree.unixLine(1).toString() shouldBe ""
+    oneTwoThree.unixLine(2).toString() shouldBe "I am the first"
+    oneTwoThree.unixLine(3).toString() shouldBe "I, the second"
+    oneTwoThree.unixLine(4).toString() shouldBe ""
+    oneTwoThree.unixLine(5).toString() shouldBe "FOURTH"
+    oneTwoThree.unixLine(6).toString() shouldBe ""
   }
 }
