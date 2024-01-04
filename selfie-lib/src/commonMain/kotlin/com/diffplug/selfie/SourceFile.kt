@@ -78,14 +78,18 @@ class SourceFile(filename: String, content: String) {
           slice.subSequence(valueStart, slice.length - 1).toString(), language)
     }
   }
-  fun findOnLine(toFind: String, lineOneIndexed: Int): Slice {
+  private fun findOnLine(toFind: String, lineOneIndexed: Int): Slice {
     val lineContent = contentSlice.unixLine(lineOneIndexed)
     val idx = lineContent.indexOf(toFind)
     if (idx == -1) {
       throw AssertionError(
-              "Expected to find `$toFind` on line $lineOneIndexed, but there was only `${lineContent}`")
+          "Expected to find `$toFind` on line $lineOneIndexed, but there was only `${lineContent}`")
     }
-    return lineContent.subSequence(idx, lineContent.length)
+    return lineContent.subSequence(idx, idx + toFind.length)
+  }
+  fun replaceToMatchDisk_TODO(lineOneIndexed: Int) {
+    val slice = findOnLine(".toMatchDisk_TODO(", lineOneIndexed)
+    contentSlice = Slice(slice.replaceSelfWith(".toMatchDisk("))
   }
   fun parseToBe_TODO(lineOneIndexed: Int): ToBeLiteral {
     return parseToBeLike(".toBe_TODO(", lineOneIndexed)
