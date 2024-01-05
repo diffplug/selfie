@@ -15,11 +15,20 @@
  */
 package com.diffplug.selfie.junit5
 
-import java.nio.file.Files
-import java.nio.file.Path
-import java.nio.file.Paths
+import java.io.File
 
 open class SelfieSettingsAPI {
+  /**
+   * It's possible that multiple codepaths from multiple tests can end up writing a single snapshot
+   * to a single location. If these snapshots are different, you get a "snapshot error" within a
+   * single invocation, so it can't be resolved by updating the snapshot.
+   *
+   * But if they're all writing the same value, it could be okay. By default, we allow this, but you
+   * can disable it if you want to be more strict.
+   */
+  open val allowMultipleEquivalentWritesToOneLocation: Boolean
+    get() = true
+
   /**
    * Defaults to `__snapshot__`, null means that snapshots are stored at the same folder location as
    * the test that created them.
@@ -28,12 +37,12 @@ open class SelfieSettingsAPI {
     get() = null
 
   /** By default, the root folder is the first of the standard test directories. */
-  open val rootFolder: Path
+  open val rootFolder: File
     get() {
-      val userDir = Paths.get(System.getProperty("user.dir"))
+      val userDir = File(System.getProperty("user.dir"))
       for (standardDir in STANDARD_DIRS) {
         val candidate = userDir.resolve(standardDir)
-        if (Files.isDirectory(candidate)) {
+        if (candidate.isDirectory) {
           return candidate
         }
       }

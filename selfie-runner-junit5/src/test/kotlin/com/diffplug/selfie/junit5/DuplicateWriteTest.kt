@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 DiffPlug
+ * Copyright (C) 2023-2024 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -59,7 +59,7 @@ class DuplicateWriteTest : Harness("undertest-junit5") {
   fun writeonce_mode() {
     ut_mirror().linesFrom("fun shouldFail()").toFirst("}").commentOut()
     ut_mirror().linesFrom("fun shouldPass()").toFirst("}").uncomment()
-    gradlew("underTest", "-Pselfie=writeonce")!!.message shouldStartWith
-        "Snapshot was set to the same value multiple times"
+    gradlew("underTest", "-Pselfie=write", "-Pselfie.settings=undertest.junit5.SelfieWriteOnce")!!
+        .message shouldStartWith "Snapshot was set to the same value multiple times"
   }
 }

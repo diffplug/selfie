@@ -15,27 +15,17 @@
  */
 package com.diffplug.selfie
 
+import com.diffplug.selfie.guts.DiskSnapshotTodo
+import com.diffplug.selfie.guts.LiteralBoolean
+import com.diffplug.selfie.guts.LiteralFormat
+import com.diffplug.selfie.guts.LiteralInt
+import com.diffplug.selfie.guts.LiteralLong
+import com.diffplug.selfie.guts.LiteralString
+import com.diffplug.selfie.guts.LiteralValue
+import com.diffplug.selfie.guts.SnapshotStorage
+import com.diffplug.selfie.guts.initStorage
 import kotlin.jvm.JvmOverloads
 import kotlin.jvm.JvmStatic
-
-/** NOT FOR ENDUSERS. Implemented by Selfie to integrate with various test frameworks. */
-interface SnapshotStorage {
-  /** Determines if the system is in write mode or read mode. */
-  val isWrite: Boolean
-  /** Indicates that the following value should be written into test sourcecode. */
-  fun writeInline(literalValue: LiteralValue<*>)
-  /** Performs a comparison between disk and actual, writing the actual to disk if necessary. */
-  fun readWriteDisk(actual: Snapshot, sub: String): ExpectedActual
-  /**
-   * Marks that the following sub snapshots should be kept, null means to keep all snapshots for the
-   * currently executing class.
-   */
-  fun keep(subOrKeepAll: String?)
-  /** Creates an assertion failed exception to throw. */
-  fun assertFailed(message: String, expected: Any? = null, actual: Any? = null): Error
-}
-
-expect fun initStorage(): SnapshotStorage
 
 object Selfie {
   private val storage: SnapshotStorage = initStorage()
@@ -66,7 +56,7 @@ object Selfie {
     @JvmOverloads
     fun toMatchDisk_TODO(sub: String = ""): DiskSelfie {
       if (!storage.isWrite) {
-        throw storage.assertFailed("Can't call `toMatchDisk_TODO` in readonly mode!")
+        throw storage.fs.assertFailed("Can't call `toMatchDisk_TODO` in readonly mode!")
       }
       storage.readWriteDisk(actual, sub)
       storage.writeInline(DiskSnapshotTodo.createLiteral())
@@ -141,10 +131,10 @@ object Selfie {
       return actual
     } else {
       if (expected == null) {
-        throw storage.assertFailed(
+        throw storage.fs.assertFailed(
             "`.toBe_TODO()` was called in `read` mode, try again with selfie in write mode")
       } else {
-        throw storage.assertFailed(
+        throw storage.fs.assertFailed(
             "Inline literal did not match the actual value", expected, actual)
       }
     }
@@ -179,7 +169,7 @@ object Selfie {
 class ExpectedActual(val expected: Snapshot?, val actual: Snapshot) {
   internal fun assertEqual(storage: SnapshotStorage) {
     if (expected == null) {
-      throw storage.assertFailed("No such snapshot")
+      throw storage.fs.assertFailed("No such snapshot")
     } else if (expected.subject == actual.subject && expected.facets == actual.facets) {
       return
     } else {
@@ -196,7 +186,7 @@ class ExpectedActual(val expected: Snapshot?, val actual: Snapshot) {
               .filter { expected.subjectOrFacetMaybe(it) != actual.subjectOrFacetMaybe(it) }
               .toList()
               .sorted()
-      throw storage.assertFailed(
+      throw storage.fs.assertFailed(
           "Snapshot failure",
           serializeOnlyFacets(expected, mismatchedKeys),
           serializeOnlyFacets(actual, mismatchedKeys))

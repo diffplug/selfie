@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.diffplug.selfie
+package com.diffplug.selfie.guts
 
 import kotlin.math.abs
 
@@ -75,7 +75,7 @@ private fun encodeUnderscores(
   }
 }
 
-object LiteralInt : LiteralFormat<Int> {
+internal object LiteralInt : LiteralFormat<Int> {
   override fun encode(value: Int, language: Language): String {
     return encodeUnderscores(StringBuilder(), value.toLong(), language).toString()
   }
@@ -84,7 +84,7 @@ object LiteralInt : LiteralFormat<Int> {
   }
 }
 
-object LiteralLong : LiteralFormat<Long> {
+internal object LiteralLong : LiteralFormat<Long> {
   override fun encode(value: Long, language: Language): String {
     val buffer = encodeUnderscores(StringBuilder(), value.toLong(), language)
     if (language != Language.CLOJURE) {
@@ -101,7 +101,7 @@ object LiteralLong : LiteralFormat<Long> {
   }
 }
 
-object LiteralString : LiteralFormat<String> {
+internal object LiteralString : LiteralFormat<String> {
   override fun encode(value: String, language: Language): String {
     return singleLineJavaToSource(value)
   }
@@ -164,7 +164,7 @@ object LiteralString : LiteralFormat<String> {
   }
 }
 
-object LiteralBoolean : LiteralFormat<Boolean> {
+internal object LiteralBoolean : LiteralFormat<Boolean> {
   override fun encode(value: Boolean, language: Language): String {
     return value.toString()
   }
@@ -173,8 +173,7 @@ object LiteralBoolean : LiteralFormat<Boolean> {
   }
 }
 
-// wish this were internal
-object DiskSnapshotTodo : LiteralFormat<Unit> {
+internal object DiskSnapshotTodo : LiteralFormat<Unit> {
   override fun encode(value: Unit, language: Language) = throw UnsupportedOperationException()
   override fun parse(str: String, language: Language) = throw UnsupportedOperationException()
   fun createLiteral() = LiteralValue(null, Unit, DiskSnapshotTodo)

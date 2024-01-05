@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 DiffPlug
+ * Copyright (C) 2023-2024 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,11 +17,20 @@ package com.diffplug.selfie.junit5
 
 import com.diffplug.selfie.*
 import com.diffplug.selfie.ExpectedActual
+import com.diffplug.selfie.guts.CallStack
+import com.diffplug.selfie.guts.DiskWriteTracker
+import com.diffplug.selfie.guts.FS
+import com.diffplug.selfie.guts.InlineWriteTracker
+import com.diffplug.selfie.guts.LiteralValue
+import com.diffplug.selfie.guts.Path
+import com.diffplug.selfie.guts.SnapshotFileLayout
+import com.diffplug.selfie.guts.SnapshotStorage
+import com.diffplug.selfie.guts.recordCall
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
-import java.nio.file.Path
 import java.util.concurrent.ConcurrentSkipListSet
 import java.util.concurrent.atomic.AtomicReference
+import kotlin.streams.asSequence
 import org.junit.platform.engine.TestExecutionResult
 import org.junit.platform.engine.support.descriptor.ClassSource
 import org.junit.platform.engine.support.descriptor.MethodSource
@@ -30,8 +39,24 @@ import org.junit.platform.launcher.TestIdentifier
 import org.junit.platform.launcher.TestPlan
 import org.opentest4j.AssertionFailedError
 
+internal object FSJava : FS {
+  override fun fileWrite(file: Path, content: String) = file.writeText(content)
+  override fun fileRead(file: Path) = file.readText()
+  /** Walks the files (not directories) which are children and grandchildren of the given path. */
+  override fun <T> fileWalk(file: Path, walk: (Sequence<Path>) -> T): T =
+      Files.walk(file.toPath()).use {
+        walk(it.asSequence().mapNotNull { if (Files.isRegularFile(it)) it.toFile() else null })
+      }
+  override fun name(file: Path): String = file.name
+  override fun assertFailed(message: String, expected: Any?, actual: Any?): Error =
+      if (expected == null && actual == null) AssertionFailedError(message)
+      else AssertionFailedError(message, expected, actual)
+}
+
 /** Routes between `toMatchDisk()` calls and the snapshot file / pruning machinery. */
 internal object SnapshotStorageJUnit5 : SnapshotStorage {
+  override val fs = FSJava
+
   @JvmStatic fun initStorage(): SnapshotStorage = this
   override val isWrite: Boolean
     get() = RW.isWrite
@@ -62,9 +87,6 @@ internal object SnapshotStorageJUnit5 : SnapshotStorage {
       cm.clazz.keep(cm.method, suffix(subOrKeepAll))
     }
   }
-  override fun assertFailed(message: String, expected: Any?, actual: Any?): Error =
-      if (expected == null && actual == null) AssertionFailedError(message)
-      else AssertionFailedError(message, expected, actual)
   override fun writeInline(literalValue: LiteralValue<*>) {
     val call = recordCall()
     val cm =
@@ -132,8 +154,8 @@ internal class ClassProgress(val parent: Progress, val className: String) {
           deleteFileAndParentDirIfEmpty(snapshotPath)
         } else {
           parent.markPathAsWritten(parent.layout.snapshotPathForClass(className))
-          Files.createDirectories(snapshotPath.parent)
-          Files.newBufferedWriter(snapshotPath, StandardCharsets.UTF_8).use { writer ->
+          Files.createDirectories(snapshotPath.toPath().parent)
+          Files.newBufferedWriter(snapshotPath.toPath(), StandardCharsets.UTF_8).use { writer ->
             file!!.serialize(writer::write)
           }
         }
@@ -187,7 +209,7 @@ internal class ClassProgress(val parent: Progress, val className: String) {
   }
   private fun read(): SnapshotFile {
     if (file == null) {
-      val snapshotPath = parent.layout.snapshotPathForClass(className)
+      val snapshotPath = parent.layout.snapshotPathForClass(className).toPath()
       file =
           if (Files.exists(snapshotPath) && Files.isRegularFile(snapshotPath)) {
             val content = Files.readAllBytes(snapshotPath)
@@ -206,7 +228,7 @@ internal class ClassProgress(val parent: Progress, val className: String) {
  */
 internal class Progress {
   val settings = SelfieSettingsAPI.initialize()
-  val layout = SnapshotFileLayout.initialize(settings)
+  val layout = SnapshotFileLayoutJUnit5(settings, SnapshotStorageJUnit5.fs)
 
   private var progressPerClass = ArrayMap.empty<String, ClassProgress>()
   private fun forClass(className: String) = synchronized(this) { progressPerClass[className]!! }
@@ -296,10 +318,10 @@ class SelfieTestExecutionListener : TestExecutionListener {
   }
 }
 private fun deleteFileAndParentDirIfEmpty(snapshotFile: Path) {
-  if (Files.isRegularFile(snapshotFile)) {
-    Files.delete(snapshotFile)
+  if (Files.isRegularFile(snapshotFile.toPath())) {
+    Files.delete(snapshotFile.toPath())
     // if the parent folder is now empty, delete it
-    val parent = snapshotFile.parent!!
+    val parent = snapshotFile.toPath().parent!!
     if (Files.list(parent).use { !it.findAny().isPresent }) {
       Files.delete(parent)
     }

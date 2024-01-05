@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 DiffPlug
+ * Copyright (C) 2023-2024 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,11 +15,12 @@
  */
 package testpkg
 
-import com.diffplug.selfie.junit5.SnapshotFileLayout
-import com.diffplug.selfie.junit5.recordCall
+import com.diffplug.selfie.guts.recordCall
+import com.diffplug.selfie.junit5.SelfieSettingsAPI
+import com.diffplug.selfie.junit5.SnapshotFileLayoutJUnit5
+import com.diffplug.selfie.junit5.SnapshotStorageJUnit5
 import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.shouldBe
-import java.nio.file.Paths
 import org.junit.jupiter.api.Test
 
 class RecordCallTest {
@@ -27,9 +28,10 @@ class RecordCallTest {
   fun testRecordCall() {
     val stack = recordCall()
     // shows as clickable link in IDE
-    val layout = SnapshotFileLayout(Paths.get(""), null, true)
+    val settings = SelfieSettingsAPI()
+    val layout = SnapshotFileLayoutJUnit5(settings, SnapshotStorageJUnit5.fs)
     stack.location.ideLink(layout) shouldBe
-        "testpkg.RecordCallTest.testRecordCall(RecordCallTest.kt:28)"
+        "testpkg.RecordCallTest.testRecordCall(RecordCallTest.kt:29)"
     stack.restOfStack.size shouldBeGreaterThan 0
   }
 }
