@@ -24,7 +24,7 @@ import org.junitpioneer.jupiter.DisableIfTestFails
 /** Simplest test for verifying read/write of a snapshot. */
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
 @DisableIfTestFails
-class ReadWriteTest : Harness("undertest-junit5") {
+class DiskBasicTest : Harness("undertest-junit5") {
   @Test @Order(1)
   fun noSelfie() {
     ut_snapshot().deleteIfExists()
