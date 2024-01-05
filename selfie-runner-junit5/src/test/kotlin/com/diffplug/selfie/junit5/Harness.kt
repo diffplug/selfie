@@ -317,4 +317,17 @@ open class Harness(subproject: String) {
       return failure
     }
   }
+  fun gradleInteractivePass() {
+    gradlew("underTest", "-Pselfie=interactive")?.let {
+      throw AssertionError("Expected interactive selfie run to succeed, but it failed.", it)
+    }
+  }
+  fun gradleInteractiveFail(): AssertionFailedError {
+    val failure = gradlew("underTest", "-Pselfie=interactive")
+    if (failure == null) {
+      throw AssertionError("Expected interactive selfie run to fail, but it succeeded.")
+    } else {
+      return failure
+    }
+  }
 }
