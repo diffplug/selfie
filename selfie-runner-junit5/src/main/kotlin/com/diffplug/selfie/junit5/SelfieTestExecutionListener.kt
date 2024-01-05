@@ -87,10 +87,15 @@ internal object SnapshotStorageJUnit5 : SnapshotStorage {
           ?: throw AssertionError(
               "Selfie `toMatchDisk` must be called only on the original thread.")
   private fun suffix(sub: String) = if (sub == "") "" else "/$sub"
-  override fun readWriteDisk(actual: Snapshot, sub: String, call: CallStack): ExpectedActual {
+  override fun readWriteDisk(
+      write: Boolean,
+      actual: Snapshot,
+      sub: String,
+      call: CallStack
+  ): ExpectedActual {
     val cm = classAndMethod()
     val suffix = suffix(sub)
-    return if (mode == Mode.overwrite) {
+    return if (write) {
       cm.clazz.write(cm.method, suffix, actual, call, cm.clazz.parent.layout)
       ExpectedActual(actual, actual)
     } else {

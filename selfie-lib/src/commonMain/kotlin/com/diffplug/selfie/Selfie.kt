@@ -50,7 +50,7 @@ object Selfie {
     fun toMatchDisk(sub: String = ""): DiskSelfie {
       val call = recordCall()
       val writable = storage.mode.canWrite(false, call, storage)
-      val comparison = storage.readWriteDisk(actual, sub, call)
+      val comparison = storage.readWriteDisk(writable, actual, sub, call)
       if (!writable) {
         comparison.assertEqual(storage.fs)
       }
@@ -64,7 +64,7 @@ object Selfie {
       if (!writable) {
         throw storage.fs.assertFailed("Can't call `toMatchDisk_TODO` in ${Mode.readonly} mode!")
       }
-      storage.readWriteDisk(actual, sub, call)
+      storage.readWriteDisk(writable, actual, sub, call)
       storage.writeInline(DiskSnapshotTodo.createLiteral(), call)
       return this
     }
