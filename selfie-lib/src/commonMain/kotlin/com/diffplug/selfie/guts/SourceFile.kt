@@ -80,6 +80,11 @@ class SourceFile(filename: String, content: String) {
           slice.subSequence(valueStart, slice.length - 1).toString(), language)
     }
   }
+  fun removeSelfieOnceComments() {
+    // TODO: there is a bug here due to string constants, and non-C file comments
+    contentSlice =
+        Slice(contentSlice.toString().replace("//selfieonce", "").replace("// selfieonce", ""))
+  }
   private fun findOnLine(toFind: String, lineOneIndexed: Int): Slice {
     val lineContent = contentSlice.unixLine(lineOneIndexed)
     val idx = lineContent.indexOf(toFind)

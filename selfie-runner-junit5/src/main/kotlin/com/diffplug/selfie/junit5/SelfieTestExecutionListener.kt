@@ -17,6 +17,7 @@ package com.diffplug.selfie.junit5
 
 import com.diffplug.selfie.*
 import com.diffplug.selfie.guts.CallStack
+import com.diffplug.selfie.guts.CommentTracker
 import com.diffplug.selfie.guts.DiskWriteTracker
 import com.diffplug.selfie.guts.FS
 import com.diffplug.selfie.guts.InlineWriteTracker
@@ -24,6 +25,7 @@ import com.diffplug.selfie.guts.LiteralValue
 import com.diffplug.selfie.guts.Path
 import com.diffplug.selfie.guts.SnapshotFileLayout
 import com.diffplug.selfie.guts.SnapshotStorage
+import com.diffplug.selfie.guts.SourceFile
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.util.concurrent.ConcurrentSkipListSet
@@ -75,9 +77,6 @@ internal object SnapshotStorageJUnit5 : SnapshotStorage {
   @JvmStatic fun initStorage(): SnapshotStorage = this
   override val fs = FSJava
   override val mode = calcMode()
-  override fun sourceFileHasWritableComment(call: CallStack): Boolean {
-    TODO("Not yet implemented")
-  }
 
   private class ClassMethod(val clazz: ClassProgress, val method: String)
   private val threadCtx = ThreadLocal<ClassMethod?>()
@@ -85,6 +84,10 @@ internal object SnapshotStorageJUnit5 : SnapshotStorage {
       threadCtx.get()
           ?: throw AssertionError(
               "Selfie `toMatchDisk` must be called only on the original thread.")
+  override fun sourceFileHasWritableComment(call: CallStack): Boolean {
+    val cm = classAndMethod()
+    return cm.clazz.parent.commentTracker!!.hasWritableComment(call, cm.clazz.parent.layout)
+  }
   private fun suffix(sub: String) = if (sub == "") "" else "/$sub"
   override fun readDisk(sub: String, call: CallStack): Snapshot? {
     val cm = classAndMethod()
@@ -245,6 +248,7 @@ internal class ClassProgress(val parent: Progress, val className: String) {
 internal class Progress {
   val settings = SelfieSettingsAPI.initialize()
   val layout = SnapshotFileLayoutJUnit5(settings, SnapshotStorageJUnit5.fs)
+  var commentTracker: CommentTracker? = CommentTracker()
 
   private var progressPerClass = ArrayMap.empty<String, ClassProgress>()
   private fun forClass(className: String) = synchronized(this) { progressPerClass[className]!! }
@@ -286,6 +290,14 @@ internal class Progress {
     written.add(path)
   }
   fun finishedAllTests() {
+    val paths = commentTracker!!.pathsWithOnce()
+    commentTracker = null
+    for (path in paths) {
+      val source = SourceFile(layout.fs.name(path), layout.fs.fileRead(path))
+      source.removeSelfieOnceComments()
+      layout.fs.fileWrite(path, source.asString)
+    }
+
     val written =
         checkForInvalidStale.getAndSet(null)
             ?: throw AssertionError("finishedAllTests() was called more than once.")
