@@ -69,7 +69,7 @@ private fun calcMode(): Mode {
     return Mode.valueOf(override)
   }
   val ci = lowercaseFromEnvOrSys("ci") ?: lowercaseFromEnvOrSys("CI")
-  return if (ci == "true") Mode.readonly else Mode.overwrite
+  return if (ci == "true") Mode.readonly else Mode.interactive
 }
 
 /** Routes between `toMatchDisk()` calls and the snapshot file / pruning machinery. */
