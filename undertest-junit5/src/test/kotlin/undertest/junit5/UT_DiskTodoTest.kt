@@ -3,7 +3,7 @@ package undertest.junit5
 import com.diffplug.selfie.Selfie.expectSelfie
 import kotlin.test.Test
 
-class UT_DiskTodo {
+class UT_DiskTodoTest {
   @Test fun selfie() {
     expectSelfie("noArg").toMatchDisk_TODO()
     expectSelfie("constantArg").toMatchDisk_TODO("constantArg")

@@ -25,7 +25,7 @@ import org.junitpioneer.jupiter.DisableIfTestFails
 
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
 @DisableIfTestFails
-class DiskTodo : Harness("undertest-junit5") {
+class DiskTodoTest : Harness("undertest-junit5") {
   companion object {
     var lineNoArg = ""
     var constantArg = ""
