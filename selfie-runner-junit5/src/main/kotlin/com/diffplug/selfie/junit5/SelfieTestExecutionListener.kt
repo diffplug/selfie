@@ -297,7 +297,6 @@ internal class Progress {
       source.removeSelfieOnceComments()
       layout.fs.fileWrite(path, source.asString)
     }
-
     val written =
         checkForInvalidStale.getAndSet(null)
             ?: throw AssertionError("finishedAllTests() was called more than once.")
