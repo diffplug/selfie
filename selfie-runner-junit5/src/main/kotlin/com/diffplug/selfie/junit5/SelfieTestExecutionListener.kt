@@ -16,8 +16,8 @@
 package com.diffplug.selfie.junit5
 
 import com.diffplug.selfie.*
-import com.diffplug.selfie.ExpectedActual
 import com.diffplug.selfie.guts.CallStack
+import com.diffplug.selfie.guts.CommentTracker
 import com.diffplug.selfie.guts.DiskWriteTracker
 import com.diffplug.selfie.guts.FS
 import com.diffplug.selfie.guts.InlineWriteTracker
@@ -25,6 +25,7 @@ import com.diffplug.selfie.guts.LiteralValue
 import com.diffplug.selfie.guts.Path
 import com.diffplug.selfie.guts.SnapshotFileLayout
 import com.diffplug.selfie.guts.SnapshotStorage
+import com.diffplug.selfie.guts.SourceFile
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.util.concurrent.ConcurrentSkipListSet
@@ -68,7 +69,7 @@ private fun calcMode(): Mode {
     return Mode.valueOf(override)
   }
   val ci = lowercaseFromEnvOrSys("ci") ?: lowercaseFromEnvOrSys("CI")
-  return if (ci == "true") Mode.readonly else Mode.overwrite
+  return if (ci == "true") Mode.readonly else Mode.interactive
 }
 
 /** Routes between `toMatchDisk()` calls and the snapshot file / pruning machinery. */
@@ -83,16 +84,20 @@ internal object SnapshotStorageJUnit5 : SnapshotStorage {
       threadCtx.get()
           ?: throw AssertionError(
               "Selfie `toMatchDisk` must be called only on the original thread.")
+  override fun sourceFileHasWritableComment(call: CallStack): Boolean {
+    val cm = classAndMethod()
+    return cm.clazz.parent.commentTracker!!.hasWritableComment(call, cm.clazz.parent.layout)
+  }
   private fun suffix(sub: String) = if (sub == "") "" else "/$sub"
-  override fun readWriteDisk(actual: Snapshot, sub: String, call: CallStack): ExpectedActual {
+  override fun readDisk(sub: String, call: CallStack): Snapshot? {
     val cm = classAndMethod()
     val suffix = suffix(sub)
-    return if (mode == Mode.overwrite) {
-      cm.clazz.write(cm.method, suffix, actual, call, cm.clazz.parent.layout)
-      ExpectedActual(actual, actual)
-    } else {
-      ExpectedActual(cm.clazz.read(cm.method, suffix), actual)
-    }
+    return cm.clazz.read(cm.method, suffix)
+  }
+  override fun writeDisk(actual: Snapshot, sub: String, call: CallStack) {
+    val cm = classAndMethod()
+    val suffix = suffix(sub)
+    cm.clazz.write(cm.method, suffix, actual, call, cm.clazz.parent.layout)
   }
   override fun keep(subOrKeepAll: String?) {
     val cm = classAndMethod()
@@ -243,6 +248,7 @@ internal class ClassProgress(val parent: Progress, val className: String) {
 internal class Progress {
   val settings = SelfieSettingsAPI.initialize()
   val layout = SnapshotFileLayoutJUnit5(settings, SnapshotStorageJUnit5.fs)
+  var commentTracker: CommentTracker? = CommentTracker()
 
   private var progressPerClass = ArrayMap.empty<String, ClassProgress>()
   private fun forClass(className: String) = synchronized(this) { progressPerClass[className]!! }
@@ -284,6 +290,13 @@ internal class Progress {
     written.add(path)
   }
   fun finishedAllTests() {
+    val paths = commentTracker!!.pathsWithOnce()
+    commentTracker = null
+    for (path in paths) {
+      val source = SourceFile(layout.fs.name(path), layout.fs.fileRead(path))
+      source.removeSelfieOnceComments()
+      layout.fs.fileWrite(path, source.asString)
+    }
     val written =
         checkForInvalidStale.getAndSet(null)
             ?: throw AssertionError("finishedAllTests() was called more than once.")

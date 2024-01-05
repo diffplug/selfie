@@ -15,11 +15,12 @@
  */
 package com.diffplug.selfie.guts
 
-actual data class CallLocation(actual val fileName: String?, actual val line: Int) :
-    Comparable<CallLocation> {
-  override fun compareTo(other: CallLocation) =
-      compareValuesBy(this, other, { it.fileName }, { it.line })
-  actual fun ideLink(layout: SnapshotFileLayout): String = TODO()
-  actual fun samePathAs(other: CallLocation): Boolean = TODO()
+internal actual fun <T> createCas(initial: T): CAS<T> = CAS(initial)
+
+internal actual class CAS<T>(var value: T) {
+  actual fun get() = value
+  actual fun updateAndGet(update: (T) -> T): T {
+    value = update(value)
+    return value
+  }
 }
-actual fun recordCall(): CallStack = TODO()

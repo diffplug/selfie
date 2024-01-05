@@ -37,7 +37,7 @@ object Selfie {
    * environment.
    */
   @JvmStatic
-  fun preserveSelfiesOnDisk(vararg subsToKeep: String): Unit {
+  fun preserveSelfiesOnDisk(vararg subsToKeep: String) {
     if (subsToKeep.isEmpty()) {
       storage.keep(null)
     } else {
@@ -49,9 +49,10 @@ object Selfie {
     @JvmOverloads
     fun toMatchDisk(sub: String = ""): DiskSelfie {
       val call = recordCall()
-      val comparison = storage.readWriteDisk(actual, sub, call)
-      if (storage.mode == Mode.readonly) {
-        comparison.assertEqual(storage.fs)
+      if (storage.mode.canWrite(false, call, storage)) {
+        storage.writeDisk(actual, sub, call)
+      } else {
+        assertEqual(storage.readDisk(sub, call), actual, storage.fs)
       }
       return this
     }
@@ -59,12 +60,13 @@ object Selfie {
     @JvmOverloads
     fun toMatchDisk_TODO(sub: String = ""): DiskSelfie {
       val call = recordCall()
-      if (storage.mode == Mode.readonly) {
-        throw storage.fs.assertFailed("Can't call `toMatchDisk_TODO` in readonly mode!")
+      if (storage.mode.canWrite(true, call, storage)) {
+        storage.writeDisk(actual, sub, call)
+        storage.writeInline(DiskSnapshotTodo.createLiteral(), call)
+        return this
+      } else {
+        throw storage.fs.assertFailed("Can't call `toMatchDisk_TODO` in ${Mode.readonly} mode!")
       }
-      storage.readWriteDisk(actual, sub, call)
-      storage.writeInline(DiskSnapshotTodo.createLiteral(), call)
-      return this
     }
   }
 
@@ -103,7 +105,7 @@ object Selfie {
         return serializeOnlyFacets(
             actual,
             onlyFacets
-                ?: buildList<String> {
+                ?: buildList {
                   add("")
                   addAll(actual.facets.keys)
                 })
@@ -131,13 +133,13 @@ object Selfie {
   /** Implements the inline snapshot whenever a match fails. */
   private fun <T : Any> toBeDidntMatch(expected: T?, actual: T, format: LiteralFormat<T>): T {
     val call = recordCall()
-    if (storage.mode == Mode.overwrite) {
+    val writable = storage.mode.canWrite(expected == null, call, storage)
+    if (writable) {
       storage.writeInline(LiteralValue(expected, actual, format), call)
       return actual
     } else {
       if (expected == null) {
-        throw storage.fs.assertFailed(
-            "`.toBe_TODO()` was called in `read` mode, try again with selfie in write mode")
+        throw storage.fs.assertFailed("Can't call `toBe_TODO` in ${Mode.readonly} mode!")
       } else {
         throw storage.fs.assertFailed(
             "Inline literal did not match the actual value", expected, actual)
@@ -169,13 +171,10 @@ object Selfie {
   }
 
   @JvmStatic fun expectSelfie(actual: Boolean) = BooleanSelfie(actual)
-}
-
-class ExpectedActual(val expected: Snapshot?, val actual: Snapshot) {
-  internal fun assertEqual(fs: FS) {
+  private fun assertEqual(expected: Snapshot?, actual: Snapshot, fs: FS) {
     if (expected == null) {
       throw fs.assertFailed("No such snapshot")
-    } else if (expected.subject == actual.subject && expected.facets == actual.facets) {
+    } else if (expected == actual) {
       return
     } else {
       val mismatchedKeys =
@@ -197,24 +196,25 @@ class ExpectedActual(val expected: Snapshot?, val actual: Snapshot) {
           serializeOnlyFacets(actual, mismatchedKeys))
     }
   }
-}
-/**
- * Returns a serialized form of only the given facets if they are available, silently omits missing
- * facets.
- */
-private fun serializeOnlyFacets(snapshot: Snapshot, keys: Collection<String>): String {
-  val buf = StringBuilder()
-  val writer = StringWriter { buf.append(it) }
-  for (key in keys) {
-    if (key.isEmpty()) {
-      SnapshotFile.writeValue(writer, snapshot.subjectOrFacet(key))
-    } else {
-      snapshot.subjectOrFacetMaybe(key)?.let {
-        SnapshotFile.writeKey(writer, "", key)
-        SnapshotFile.writeValue(writer, it)
+
+  /**
+   * Returns a serialized form of only the given facets if they are available, silently omits
+   * missing facets.
+   */
+  private fun serializeOnlyFacets(snapshot: Snapshot, keys: Collection<String>): String {
+    val buf = StringBuilder()
+    val writer = StringWriter { buf.append(it) }
+    for (key in keys) {
+      if (key.isEmpty()) {
+        SnapshotFile.writeValue(writer, snapshot.subjectOrFacet(key))
+      } else {
+        snapshot.subjectOrFacetMaybe(key)?.let {
+          SnapshotFile.writeKey(writer, "", key)
+          SnapshotFile.writeValue(writer, it)
+        }
       }
     }
+    buf.setLength(buf.length - 1)
+    return buf.toString()
   }
-  buf.setLength(buf.length - 1)
-  return buf.toString()
 }

@@ -18,9 +18,18 @@ package com.diffplug.selfie.guts
 import com.diffplug.selfie.Snapshot
 
 expect class CallLocation : Comparable<CallLocation> {
-  val file: String?
+  val fileName: String?
   val line: Int
+  /** Returns a string which an IDE can render as a hyperlink. */
   fun ideLink(layout: SnapshotFileLayout): String
+  /**
+   * Computing the exact path using [SnapshotFileLayout.sourcePathForCall] is expensive, so it can
+   * be helpful to cache these.
+   *
+   * If this method always returns false, that would be okay but slow. False negatives are okay,
+   * false positives will result in incorrect behavior.
+   */
+  fun samePathAs(other: CallLocation): Boolean
 }
 
 expect fun recordCall(): CallStack
@@ -73,7 +82,7 @@ class InlineWriteTracker : WriteTracker<CallLocation, LiteralValue<*>>() {
     // assert that the value passed at runtime matches the value we parse at compile time
     // because if that assert fails, we've got no business modifying test code
     val file =
-        layout.sourcecodeForCall(call.location)
+        layout.sourcePathForCall(call.location)
             ?: throw Error("Unable to find source file for ${call.location.ideLink(layout)}")
     if (literalValue.expected != null) {
       // if expected == null, it's a `toBe_TODO()`, so there's nothing to check
@@ -103,7 +112,7 @@ class InlineWriteTracker : WriteTracker<CallLocation, LiteralValue<*>>() {
             .toList()
             .map {
               FileLineLiteral(
-                  layout.sourcecodeForCall(it.first)!!, it.first.line, it.second.snapshot)
+                  layout.sourcePathForCall(it.first)!!, it.first.line, it.second.snapshot)
             }
             .sorted()
 

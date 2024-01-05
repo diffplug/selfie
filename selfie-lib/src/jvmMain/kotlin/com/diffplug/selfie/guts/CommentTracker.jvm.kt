@@ -15,11 +15,12 @@
  */
 package com.diffplug.selfie.guts
 
-actual data class CallLocation(actual val fileName: String?, actual val line: Int) :
-    Comparable<CallLocation> {
-  override fun compareTo(other: CallLocation) =
-      compareValuesBy(this, other, { it.fileName }, { it.line })
-  actual fun ideLink(layout: SnapshotFileLayout): String = TODO()
-  actual fun samePathAs(other: CallLocation): Boolean = TODO()
+import java.util.concurrent.atomic.AtomicReference
+
+internal actual fun <T> createCas(initial: T): CAS<T> = CAS(initial)
+
+internal actual class CAS<T>(value: T) {
+  val ref = AtomicReference(value)
+  actual fun get() = ref.get()
+  actual fun updateAndGet(update: (T) -> T): T = ref.updateAndGet(update)
 }
-actual fun recordCall(): CallStack = TODO()

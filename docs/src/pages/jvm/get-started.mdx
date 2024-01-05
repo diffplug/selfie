@@ -10,79 +10,101 @@ If you're using Maven, add the following dependency to your `pom.xml` file:
 
 ```xml
 <dependency>
-    <groupId>com.yourdomain.selfie</groupId>
-    <artifactId>selfie</artifactId>
+    <groupId>com.diffplug.selfie</groupId>
+    <artifactId>selfie-runner-junit5</artifactId>
     <version>LATEST_VERSION</version>
     <scope>test</scope>
 </dependency>
 ```
 
-Replace `LATEST_VERSION` with the latest available version of Selfie.
+Replace `LATEST_VERSION` with the latest available version of selfie.
 
 ### Gradle
 
 For Gradle users, add this to your `build.gradle` file:
 
-```bash
-testImplementation 'com.yourdomain.selfie:selfie:LATEST_VERSION'
+```groovy
+testImplementation 'com.diffplug.selfie:selfie-runner-junit5:LATEST_VERSION'
 ```
 
-Again, replace `LATEST_VERSION` with the latest available version of Selfie.
+Again, replace `LATEST_VERSION` with the latest available version of selfie.
 
-## Basic usage
+## Quickstart
 
-1. Capture a Snapshot:
+Let's say we have the following test code:
 
-   Before you can use the snapshot testing, you need to capture an initial snapshot. This will be used as a reference for future tests.
+```java
+expectSelfie(List.of(1, 2, 3).toString()).toBe_TODO();
+```
 
-   ```java
-   import com.yourdomain.selfie.Selfie;
+If you run this test, selfie will rewrite your sourcecode to be this:
 
-   public class YourTestClass {
-       @Test
-       public void yourTestMethod() {
-           String output = someFunctionThatReturnsAString();
-           Selfie.capture(output);
-       }
-   }
-   ```
+```java
+expectSelfie(List.of(1, 2, 3).toString()).toBe("[1, 2, 3]");
+```
 
-2. Compare with Snapshot:
+Now, let's change the code to this:
 
-   Once you've captured the initial snapshot, subsequent test runs will automatically compare the current output with the saved snapshot.
+```java
+expectSelfie(List.of(42).toString()).toBe("[1, 2, 3]");
+```
 
-   ```java
-   import com.yourdomain.selfie.Selfie;
+When we run the test, we will get a failure, and the failure message will be:
 
-   public class YourTestClass {
-       @Test
-       public void yourTestMethod() {
-           String output = someFunctionThatReturnsAString();
-           Selfie.assertEqualsWithSnapshot(output);
-       }
-   }
-   ```
+```
+Snapshot failure
+```
 
-   If the output differs from the saved snapshot, `assertEqualsWithSnapshot` will fail, pointing out the differences.
+As you can see, we have three options:
 
-3. Update a Snapshot:
+- rename `toBe` to `toBe_TODO` (you can leave the `"[1, 2, 3]"` or remove it, makes no difference)
+  - selfie will rewrite only this one snapshot, and selfie will remove the `_TODO`
+- put `//selfieonce` anywhere in the file
+  - this will rewrite all snapshots in the file, and selfie will remove `//selfieonce` after it has done so
+- put `//SELFIEWRITE` anywhere in that file
+  - this will rewrite all snapshots in the file until you remove `//SELFIEWRITE` yourself
 
-   If you made intentional changes to the application output and want to update the snapshot, you can do so with:
+## Disk
 
-   ```java
-   Selfie.updateSnapshot(output);
-   ```
+To store a snapshot on disk, swap `toBe` for `toMatchDisk`:
 
-## Tips and tricks
+```java
+expectSelfie(List.of(1, 2, 3).toString()).toMatchDisk_TODO();
+```
 
-Folder Structure: By default, Selfie saves snapshots in a directory named `__snapshots__` alongside your test files. Ensure you check this into your version control to keep reference snapshots consistent across different environments.
+This will create a file called `SomethingOrOther.ss` in the same directory as your test. It will also rewrite the test source to
 
-Named Snapshots: You can name your snapshots to make it easier to identify them, especially if you have multiple snapshots in one test class.
+```java
+expectSelfie(List.of(1, 2, 3).toString()).toMatchDisk();
+```
 
-## Contribute
+Just like inline snapshots, you can use  `_TODO`, `//selfieonce`, and `//SELFIEWRITE` to control how the snapshots are written and updated. You never have to use `_TODO` if you have the `//selfieonce` or `//SELFIEWRITE` comments in your file.
 
-Selfie is open source and we welcome contributions! Check out the project on [GitHub](https://github.com/diffplug/selfie), raise issues, or submit pull requests.
+If you want the disk snapshots to live in a different folder, set `snapshotFolderName` using [SelfieSettings](https://kdoc.selfie.dev/selfie-runner-junit5/com.diffplug.selfie.junit5/-selfie-settings-a-p-i/).
 
----
+## Modes
 
-We hope this guide has helped you get started with Selfie. Enjoy seamless snapshot testing in Java!
+Selfie has three modes:
+
+- `interactive`, the default mode, used in the quickstart above
+- `readonly`, the default mode if a `CI` environment variable is present, will cause tests to fail if `//selfieonce` or `//SELFIEWRITE` are present in the sourcecode
+- `overwrite`, which will cause all snapshots to be overwritten, without looking for `//selfieonce` or `//SELFIEWRITE`
+
+You can manually set the mode by setting the `SELFIE` environment variable or system property to `interactive`, `readonly`, or `overwrite`.
+
+## Reference
+
+- `.toBe_TODO()` or `.toBe_TODO(argumentIsIgnored)`
+  - creates or updates an inline literal snapshot
+- `.toMatchDisk_TODO()`
+  - creates or updates a disk snapshot
+- `//selfieonce`
+  - all snapshots in the file will be updated, whether they are `_TODO` or not
+  - selfie will remove the comment after the snapshots have updated
+- `//SELFIEWRITE`
+  - all snapshots in the file will be updated, whether they are `_TODO` or not
+  - selfie will not remove the comment after the snapshots have updated
+- mode is set by the `SELFIE` environment variable or system property
+  - `interactive`, default
+  - `readonly`, default if `CI` environment variable is `true`
+  - `overwrite`, all snapshots can be overwritten

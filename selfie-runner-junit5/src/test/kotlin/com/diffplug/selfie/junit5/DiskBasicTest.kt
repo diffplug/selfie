@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 DiffPlug
+ * Copyright (C) 2023-2024 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,60 +15,76 @@
  */
 package com.diffplug.selfie.junit5
 
-import io.kotest.matchers.shouldBe
-import io.kotest.matchers.string.shouldContain
 import kotlin.test.Test
 import org.junit.jupiter.api.MethodOrderer
 import org.junit.jupiter.api.Order
 import org.junit.jupiter.api.TestMethodOrder
 import org.junitpioneer.jupiter.DisableIfTestFails
 
+/** Simplest test for verifying read/write of a snapshot. */
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
 @DisableIfTestFails
-class DiskTodo : Harness("undertest-junit5") {
-  companion object {
-    var lineNoArg = ""
-    var constantArg = ""
-    var variableArg = ""
-  }
-
+class DiskBasicTest : Harness("undertest-junit5") {
   @Test @Order(1)
-  fun initialState() {
+  fun noSelfie() {
     ut_snapshot().deleteIfExists()
     ut_snapshot().assertDoesNotExist()
-
-    lineNoArg = ut_mirror().lineWith("noArg").content()
-    constantArg = ut_mirror().lineWith("constantArg").content()
-    variableArg = ut_mirror().lineWith("variableArg").content()
-
-    lineNoArg shouldContain "_TODO"
-    constantArg shouldContain "_TODO"
-    variableArg shouldContain "_TODO"
   }
 
   @Test @Order(2)
-  fun writeRemovesTODO() {
+  fun writeApple() {
+    ut_mirror().lineWith("apple").uncomment()
+    ut_mirror().lineWith("orange").commentOut()
     gradleWriteSS()
-    ut_mirror().lineWith("noArg").content() shouldBe lineNoArg.replace("_TODO", "")
-    ut_mirror().lineWith("constantArg").content() shouldBe constantArg.replace("_TODO", "")
-    ut_mirror().lineWith("variableArg").content() shouldBe variableArg.replace("_TODO", "")
+    ut_snapshot()
+        .assertContent(
+            """
+            ╔═ selfie ═╗
+            apple
+            ╔═ [end of file] ═╗
+            
+        """
+                .trimIndent())
   }
 
   @Test @Order(3)
-  fun nowItPasses() {
+  fun assertApplePasses() {
     gradleReadSS()
   }
 
   @Test @Order(4)
-  fun ifTodoComesBackItDoesntPass() {
-    ut_mirror().lineWith("noArg").setContent(lineNoArg)
-    ut_mirror().lineWith("constantArg").setContent(constantArg)
-    ut_mirror().lineWith("variableArg").setContent(variableArg)
+  fun assertOrangeFails() {
+    ut_mirror().lineWith("apple").commentOut()
+    ut_mirror().lineWith("orange").uncomment()
     gradleReadSSFail()
+    ut_snapshot()
+        .assertContent(
+            """
+            ╔═ selfie ═╗
+            apple
+            ╔═ [end of file] ═╗
+            
+        """
+                .trimIndent())
   }
 
   @Test @Order(5)
+  fun writeOrange() {
+    gradleWriteSS()
+    ut_snapshot()
+        .assertContent(
+            """
+            ╔═ selfie ═╗
+            orange
+            ╔═ [end of file] ═╗
+            
+        """
+                .trimIndent())
+  }
+
+  @Test @Order(6)
   fun cleanup() {
     ut_snapshot().deleteIfExists()
+    ut_snapshot().assertDoesNotExist()
   }
 }
