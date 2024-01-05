@@ -25,7 +25,6 @@ import com.diffplug.selfie.guts.LiteralValue
 import com.diffplug.selfie.guts.Path
 import com.diffplug.selfie.guts.SnapshotFileLayout
 import com.diffplug.selfie.guts.SnapshotStorage
-import com.diffplug.selfie.guts.recordCall
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.util.concurrent.ConcurrentSkipListSet
@@ -52,14 +51,31 @@ internal object FSJava : FS {
       if (expected == null && actual == null) AssertionFailedError(message)
       else AssertionFailedError(message, expected, actual)
 }
+private fun lowercaseFromEnvOrSys(key: String): String? {
+  val env = System.getenv(key)?.lowercase()
+  if (!env.isNullOrEmpty()) {
+    return env
+  }
+  val system = System.getProperty(key)?.lowercase()
+  if (!system.isNullOrEmpty()) {
+    return system
+  }
+  return null
+}
+private fun calcMode(): Mode {
+  val override = lowercaseFromEnvOrSys("selfie") ?: lowercaseFromEnvOrSys("SELFIE")
+  if (override != null) {
+    return Mode.valueOf(override)
+  }
+  val ci = lowercaseFromEnvOrSys("ci") ?: lowercaseFromEnvOrSys("CI")
+  return if (ci == "true") Mode.readonly else Mode.overwrite
+}
 
 /** Routes between `toMatchDisk()` calls and the snapshot file / pruning machinery. */
 internal object SnapshotStorageJUnit5 : SnapshotStorage {
-  override val fs = FSJava
-
   @JvmStatic fun initStorage(): SnapshotStorage = this
-  override val isWrite: Boolean
-    get() = RW.isWrite
+  override val fs = FSJava
+  override val mode = calcMode()
 
   private class ClassMethod(val clazz: ClassProgress, val method: String)
   private val threadCtx = ThreadLocal<ClassMethod?>()
@@ -68,12 +84,11 @@ internal object SnapshotStorageJUnit5 : SnapshotStorage {
           ?: throw AssertionError(
               "Selfie `toMatchDisk` must be called only on the original thread.")
   private fun suffix(sub: String) = if (sub == "") "" else "/$sub"
-  override fun readWriteDisk(actual: Snapshot, sub: String): ExpectedActual {
+  override fun readWriteDisk(actual: Snapshot, sub: String, call: CallStack): ExpectedActual {
     val cm = classAndMethod()
     val suffix = suffix(sub)
-    val callStack = recordCall()
-    return if (RW.isWrite) {
-      cm.clazz.write(cm.method, suffix, actual, callStack, cm.clazz.parent.layout)
+    return if (mode == Mode.overwrite) {
+      cm.clazz.write(cm.method, suffix, actual, call, cm.clazz.parent.layout)
       ExpectedActual(actual, actual)
     } else {
       ExpectedActual(cm.clazz.read(cm.method, suffix), actual)
@@ -87,8 +102,7 @@ internal object SnapshotStorageJUnit5 : SnapshotStorage {
       cm.clazz.keep(cm.method, suffix(subOrKeepAll))
     }
   }
-  override fun writeInline(literalValue: LiteralValue<*>) {
-    val call = recordCall()
+  override fun writeInline(literalValue: LiteralValue<*>, call: CallStack) {
     val cm =
         threadCtx.get()
             ?: throw AssertionError("Selfie `toBe` must be called only on the original thread.")

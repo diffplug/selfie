@@ -16,6 +16,7 @@
 package com.diffplug.selfie
 
 import com.diffplug.selfie.guts.DiskSnapshotTodo
+import com.diffplug.selfie.guts.FS
 import com.diffplug.selfie.guts.LiteralBoolean
 import com.diffplug.selfie.guts.LiteralFormat
 import com.diffplug.selfie.guts.LiteralInt
@@ -24,6 +25,7 @@ import com.diffplug.selfie.guts.LiteralString
 import com.diffplug.selfie.guts.LiteralValue
 import com.diffplug.selfie.guts.SnapshotStorage
 import com.diffplug.selfie.guts.initStorage
+import com.diffplug.selfie.guts.recordCall
 import kotlin.jvm.JvmOverloads
 import kotlin.jvm.JvmStatic
 
@@ -46,20 +48,22 @@ object Selfie {
   class DiskSelfie internal constructor(actual: Snapshot) : LiteralStringSelfie(actual) {
     @JvmOverloads
     fun toMatchDisk(sub: String = ""): DiskSelfie {
-      val comparison = storage.readWriteDisk(actual, sub)
-      if (!storage.isWrite) {
-        comparison.assertEqual(storage)
+      val call = recordCall()
+      val comparison = storage.readWriteDisk(actual, sub, call)
+      if (storage.mode == Mode.readonly) {
+        comparison.assertEqual(storage.fs)
       }
       return this
     }
 
     @JvmOverloads
     fun toMatchDisk_TODO(sub: String = ""): DiskSelfie {
-      if (!storage.isWrite) {
+      val call = recordCall()
+      if (storage.mode == Mode.readonly) {
         throw storage.fs.assertFailed("Can't call `toMatchDisk_TODO` in readonly mode!")
       }
-      storage.readWriteDisk(actual, sub)
-      storage.writeInline(DiskSnapshotTodo.createLiteral())
+      storage.readWriteDisk(actual, sub, call)
+      storage.writeInline(DiskSnapshotTodo.createLiteral(), call)
       return this
     }
   }
@@ -126,8 +130,9 @@ object Selfie {
 
   /** Implements the inline snapshot whenever a match fails. */
   private fun <T : Any> toBeDidntMatch(expected: T?, actual: T, format: LiteralFormat<T>): T {
-    if (storage.isWrite) {
-      storage.writeInline(LiteralValue(expected, actual, format))
+    val call = recordCall()
+    if (storage.mode == Mode.overwrite) {
+      storage.writeInline(LiteralValue(expected, actual, format), call)
       return actual
     } else {
       if (expected == null) {
@@ -167,9 +172,9 @@ object Selfie {
 }
 
 class ExpectedActual(val expected: Snapshot?, val actual: Snapshot) {
-  internal fun assertEqual(storage: SnapshotStorage) {
+  internal fun assertEqual(fs: FS) {
     if (expected == null) {
-      throw storage.fs.assertFailed("No such snapshot")
+      throw fs.assertFailed("No such snapshot")
     } else if (expected.subject == actual.subject && expected.facets == actual.facets) {
       return
     } else {
@@ -186,7 +191,7 @@ class ExpectedActual(val expected: Snapshot?, val actual: Snapshot) {
               .filter { expected.subjectOrFacetMaybe(it) != actual.subjectOrFacetMaybe(it) }
               .toList()
               .sorted()
-      throw storage.fs.assertFailed(
+      throw fs.assertFailed(
           "Snapshot failure",
           serializeOnlyFacets(expected, mismatchedKeys),
           serializeOnlyFacets(actual, mismatchedKeys))

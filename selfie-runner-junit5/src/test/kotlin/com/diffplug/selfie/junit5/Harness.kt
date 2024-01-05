@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 DiffPlug
+ * Copyright (C) 2023-2024 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,7 +35,6 @@ open class Harness(subproject: String) {
   // not sure why, but it doesn't work in this project
   val onlyRunThisTest = subproject != "undertest-junit-vintage"
   val subprojectFolder: Path
-  var settings = ""
 
   init {
     var rootFolder = FileSystem.SYSTEM.canonicalize("".toPath())
@@ -301,17 +300,17 @@ open class Harness(subproject: String) {
     return error
   }
   fun gradleWriteSS() {
-    gradlew("underTest", "-Pselfie=write", "-Pselfie.settings=${settings}")?.let {
+    gradlew("underTest", "-Pselfie=overwrite")?.let {
       throw AssertionError("Expected write snapshots to succeed, but it failed", it)
     }
   }
   fun gradleReadSS() {
-    gradlew("underTest", "-Pselfie=read", "-Pselfie.settings=${settings}")?.let {
+    gradlew("underTest", "-Pselfie=readonly")?.let {
       throw AssertionError("Expected read snapshots to succeed, but it failed", it)
     }
   }
   fun gradleReadSSFail(): AssertionFailedError {
-    val failure = gradlew("underTest", "-Pselfie=read", "-Pselfie.settings=${settings}")
+    val failure = gradlew("underTest", "-Pselfie=readonly")
     if (failure == null) {
       throw AssertionError("Expected read snapshots to fail, but it succeeded.")
     } else {

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 DiffPlug
+ * Copyright (C) 2023-2024 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -115,15 +115,6 @@ data class Snapshot(
         }
       }
       return Snapshot(root ?: SnapshotValue.of(""), facets)
-    }
-  }
-}
-fun interface Camera<Subject> {
-  fun snapshot(subject: Subject): Snapshot
-  fun withLens(lens: SnapshotLens): Camera<Subject> {
-    val parent = this
-    return object : Camera<Subject> {
-      override fun snapshot(subject: Subject): Snapshot = lens.transform(parent.snapshot(subject))
     }
   }
 }
