@@ -55,5 +55,5 @@ interface SnapshotFileLayout {
   val rootFolder: Path
   val fs: FS
   val allowMultipleEquivalentWritesToOneLocation: Boolean
-  fun sourcecodeForCall(call: CallLocation): Path?
+  fun sourcePathForCall(call: CallLocation): Path?
 }

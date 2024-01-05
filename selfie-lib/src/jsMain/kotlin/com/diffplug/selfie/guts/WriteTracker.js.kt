@@ -15,10 +15,11 @@
  */
 package com.diffplug.selfie.guts
 
-actual data class CallLocation(actual val file: String?, actual val line: Int) :
+actual data class CallLocation(actual val fileName: String?, actual val line: Int) :
     Comparable<CallLocation> {
   override fun compareTo(other: CallLocation) =
-      compareValuesBy(this, other, { it.file }, { it.line })
+      compareValuesBy(this, other, { it.fileName }, { it.line })
   actual fun ideLink(layout: SnapshotFileLayout): String = TODO()
+  actual fun samePathAs(other: CallLocation): Boolean = TODO()
 }
 actual fun recordCall(): CallStack = TODO()

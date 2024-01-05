@@ -21,21 +21,23 @@ import java.util.stream.Collectors
 actual data class CallLocation(
     val clazz: String,
     val method: String,
-    actual val file: String?,
+    actual val fileName: String?,
     actual val line: Int
 ) : Comparable<CallLocation> {
+  actual fun samePathAs(other: CallLocation): Boolean =
+      clazz == other.clazz && fileName == other.fileName
   override fun compareTo(other: CallLocation): Int =
-      compareValuesBy(this, other, { it.clazz }, { it.method }, { it.file }, { it.line })
+      compareValuesBy(this, other, { it.clazz }, { it.method }, { it.fileName }, { it.line })
 
   /**
    * If the runtime didn't give us the filename, guess it from the class, and try to find the source
    * file by walking the CWD. If we don't find it, report it as a `.class` file.
    */
   private fun findFileIfAbsent(layout: SnapshotFileLayout): String {
-    if (file != null) {
-      return file
+    if (fileName != null) {
+      return fileName
     }
-    return layout.sourcecodeForCall(this)?.let { layout.fs.name(it) }
+    return layout.sourcePathForCall(this)?.let { layout.fs.name(it) }
         ?: "${clazz.substringAfterLast('.')}.class"
   }
 
