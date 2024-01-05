@@ -15,7 +15,6 @@
  */
 package com.diffplug.selfie.guts
 
-import com.diffplug.selfie.ExpectedActual
 import com.diffplug.selfie.Mode
 import com.diffplug.selfie.Snapshot
 
@@ -40,8 +39,10 @@ interface SnapshotStorage {
   fun sourceFileHasWritableComment(call: CallStack): Boolean
   /** Indicates that the following value should be written into test sourcecode. */
   fun writeInline(literalValue: LiteralValue<*>, call: CallStack)
-  /** Performs a comparison between disk and actual, writing the actual to disk if necessary. */
-  fun readWriteDisk(write: Boolean, actual: Snapshot, sub: String, call: CallStack): ExpectedActual
+  /** Reads the given snapshot from disk. */
+  fun readDisk(sub: String, call: CallStack): Snapshot?
+  /** Writes the given snapshot to disk. */
+  fun writeDisk(actual: Snapshot, sub: String, call: CallStack)
   /**
    * Marks that the following sub snapshots should be kept, null means to keep all snapshots for the
    * currently executing class.

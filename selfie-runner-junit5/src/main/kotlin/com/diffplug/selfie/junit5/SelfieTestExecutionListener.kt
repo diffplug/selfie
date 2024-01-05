@@ -16,7 +16,6 @@
 package com.diffplug.selfie.junit5
 
 import com.diffplug.selfie.*
-import com.diffplug.selfie.ExpectedActual
 import com.diffplug.selfie.guts.CallStack
 import com.diffplug.selfie.guts.DiskWriteTracker
 import com.diffplug.selfie.guts.FS
@@ -87,20 +86,15 @@ internal object SnapshotStorageJUnit5 : SnapshotStorage {
           ?: throw AssertionError(
               "Selfie `toMatchDisk` must be called only on the original thread.")
   private fun suffix(sub: String) = if (sub == "") "" else "/$sub"
-  override fun readWriteDisk(
-      write: Boolean,
-      actual: Snapshot,
-      sub: String,
-      call: CallStack
-  ): ExpectedActual {
+  override fun readDisk(sub: String, call: CallStack): Snapshot? {
     val cm = classAndMethod()
     val suffix = suffix(sub)
-    return if (write) {
-      cm.clazz.write(cm.method, suffix, actual, call, cm.clazz.parent.layout)
-      ExpectedActual(actual, actual)
-    } else {
-      ExpectedActual(cm.clazz.read(cm.method, suffix), actual)
-    }
+    return cm.clazz.read(cm.method, suffix)
+  }
+  override fun writeDisk(actual: Snapshot, sub: String, call: CallStack) {
+    val cm = classAndMethod()
+    val suffix = suffix(sub)
+    cm.clazz.write(cm.method, suffix, actual, call, cm.clazz.parent.layout)
   }
   override fun keep(subOrKeepAll: String?) {
     val cm = classAndMethod()
