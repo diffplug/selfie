@@ -17,7 +17,7 @@ If you're using Maven, add the following dependency to your `pom.xml` file:
 </dependency>
 ```
 
-Replace `LATEST_VERSION` with the latest available version of Selfie.
+Replace `LATEST_VERSION` with the latest available version of selfie.
 
 ### Gradle
 
@@ -27,7 +27,7 @@ For Gradle users, add this to your `build.gradle` file:
 testImplementation 'com.diffplug.selfie:selfie-runner-junit5:LATEST_VERSION'
 ```
 
-Again, replace `LATEST_VERSION` with the latest available version of Selfie.
+Again, replace `LATEST_VERSION` with the latest available version of selfie.
 
 ## Quickstart
 
@@ -37,7 +37,7 @@ Let's say we have the following test code:
 expectSelfie(List.of(1, 2, 3).toString()).toBe_TODO();
 ```
 
-If you run this test, Selfie will rewrite your sourcecode to be this:
+If you run this test, selfie will rewrite your sourcecode to be this:
 
 ```java
 expectSelfie(List.of(1, 2, 3).toString()).toBe("[1, 2, 3]");
@@ -60,11 +60,9 @@ As you can see, we have three options:
 - rename `toBe` to `toBe_TODO` (you can leave the `"[1, 2, 3]"` or remove it, makes no difference)
   - selfie will rewrite only this one snapshot, and selfie will remove the `_TODO`
 - put `//selfieonce` anywhere in the file
-  - this will rewrite all snapshots in the file, and Selfie will remove `//selfieonce` after it has done so
+  - this will rewrite all snapshots in the file, and selfie will remove `//selfieonce` after it has done so
 - put `//SELFIEWRITE` anywhere in that file
   - this will rewrite all snapshots in the file until you remove `//SELFIEWRITE` yourself
-
-If you choose `selfieonce`, the comment will be removed after the first run. If you choose `SELFIEWRITE`, then all snapshots in that file will be silently updated, and Selfie will not automatically remove the comment.
 
 ## Disk
 
@@ -82,7 +80,7 @@ expectSelfie(List.of(1, 2, 3).toString()).toMatchDisk();
 
 Just like inline snapshots, you can use  `_TODO`, `//selfieonce`, and `//SELFIEWRITE` to control how the snapshots are written and updated. You never have to use `_TODO` if you have the `//selfieonce` or `//SELFIEWRITE` comments in your file.
 
-If you want the disk snapshots to live in a different folder, TODO.
+If you want the disk snapshots to live in a different folder, set `snapshotFolderName` using [SelfieSettings](https://kdoc.selfie.dev/selfie-runner-junit5/com.diffplug.selfie.junit5/-selfie-settings-a-p-i/).
 
 ## Modes
 
@@ -101,10 +99,10 @@ You can manually set the mode by setting the `SELFIE` environment variable or sy
 - `.toMatchDisk_TODO()`
   - creates or updates a disk snapshot
 - `//selfieonce`
-  - all snapshots in the file will be updated, whether they are `_TODO` or not.
+  - all snapshots in the file will be updated, whether they are `_TODO` or not
   - selfie will remove the comment after the snapshots have updated
 - `//SELFIEWRITE`
-  - all snapshots in the file will be updated, whether they are `_TODO` or not.
+  - all snapshots in the file will be updated, whether they are `_TODO` or not
   - selfie will not remove the comment after the snapshots have updated
 - mode is set by the `SELFIE` environment variable or system property
   - `interactive`, default
