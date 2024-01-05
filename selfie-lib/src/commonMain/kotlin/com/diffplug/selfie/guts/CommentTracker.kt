@@ -52,7 +52,7 @@ class CommentTracker {
       val newComment =
           if (str.contains("//selfieonce") || str.contains("// selfieonce")) {
             WritableComment.ONCE
-          } else if (str.contains("//SEFLIEWRITE") || str.contains("// SELFIEWRITE")) {
+          } else if (str.contains("//SELFIEWRITE") || str.contains("// SELFIEWRITE")) {
             WritableComment.FOREVER
           } else {
             WritableComment.NO_COMMENT
