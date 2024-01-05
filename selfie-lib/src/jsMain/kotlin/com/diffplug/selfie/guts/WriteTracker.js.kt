@@ -19,6 +19,7 @@ actual data class CallLocation(actual val fileName: String?, actual val line: In
     Comparable<CallLocation> {
   override fun compareTo(other: CallLocation) =
       compareValuesBy(this, other, { it.fileName }, { it.line })
+  actual fun withLine(line: Int): CallLocation = TODO()
   actual fun ideLink(layout: SnapshotFileLayout): String = TODO()
   actual fun samePathAs(other: CallLocation): Boolean = TODO()
 }

@@ -77,6 +77,8 @@ internal object SnapshotStorageJUnit5 : SnapshotStorage {
   @JvmStatic fun initStorage(): SnapshotStorage = this
   override val fs = FSJava
   override val mode = calcMode()
+  override val layout: SnapshotFileLayout
+    get() = classAndMethod().clazz.parent.layout
 
   private class ClassMethod(val clazz: ClassProgress, val method: String)
   private val threadCtx = ThreadLocal<ClassMethod?>()
@@ -292,10 +294,12 @@ internal class Progress {
   fun finishedAllTests() {
     val paths = commentTracker!!.pathsWithOnce()
     commentTracker = null
-    for (path in paths) {
-      val source = SourceFile(layout.fs.name(path), layout.fs.fileRead(path))
-      source.removeSelfieOnceComments()
-      layout.fs.fileWrite(path, source.asString)
+    if (SnapshotStorageJUnit5.mode != Mode.readonly) {
+      for (path in paths) {
+        val source = SourceFile(layout.fs.name(path), layout.fs.fileRead(path))
+        source.removeSelfieOnceComments()
+        layout.fs.fileWrite(path, source.asString)
+      }
     }
     val written =
         checkForInvalidStale.getAndSet(null)

@@ -24,6 +24,7 @@ actual data class CallLocation(
     actual val fileName: String?,
     actual val line: Int
 ) : Comparable<CallLocation> {
+  actual fun withLine(line: Int): CallLocation = CallLocation(clazz, "<unknown>", fileName, line)
   actual fun samePathAs(other: CallLocation): Boolean =
       clazz == other.clazz && fileName == other.fileName
   override fun compareTo(other: CallLocation): Int =

@@ -47,18 +47,34 @@ class CommentTracker {
     return if (comment != null) {
       comment.writable
     } else {
-      val str = layout.fs.fileRead(path)
-      // TODO: there is a bug here due to string constants, and non-C file comments
-      val newComment =
-          if (str.contains("//selfieonce") || str.contains("// selfieonce")) {
-            WritableComment.ONCE
-          } else if (str.contains("//SELFIEWRITE") || str.contains("// SELFIEWRITE")) {
-            WritableComment.FOREVER
-          } else {
-            WritableComment.NO_COMMENT
-          }
+      val newComment = commentAndLine(path, layout.fs).first
       cache.updateAndGet { it.plus(path, newComment) }
       newComment.writable
+    }
+  }
+
+  companion object {
+    fun commentString(path: Path, fs: FS): Pair<String, Int> {
+      val (comment, line) = commentAndLine(path, fs)
+      return when (comment) {
+        WritableComment.NO_COMMENT -> throw UnsupportedOperationException()
+        WritableComment.ONCE -> Pair("//selfieonce", line)
+        WritableComment.FOREVER -> Pair("//SELFIEWRITE", line)
+      }
+    }
+    private fun commentAndLine(path: Path, fs: FS): Pair<WritableComment, Int> {
+      // TODO: there is a bug here due to string constants, and non-C file comments
+      val content = Slice(fs.fileRead(path))
+      for (comment in listOf("//selfieonce", "// selfieonce", "//SELFIEWRITE", "// SELFIEWRITE")) {
+        val index = content.indexOf(comment)
+        if (index != -1) {
+          val lineNumber = content.baseLineAtOffset(index)
+          val comment =
+              if (comment.contains("once")) WritableComment.ONCE else WritableComment.FOREVER
+          return Pair(comment, lineNumber)
+        }
+      }
+      return Pair(WritableComment.NO_COMMENT, -1)
     }
   }
 }

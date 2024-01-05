@@ -20,6 +20,8 @@ import com.diffplug.selfie.Snapshot
 expect class CallLocation : Comparable<CallLocation> {
   val fileName: String?
   val line: Int
+  /** Returns a new CallLocation at the given line. */
+  fun withLine(line: Int): CallLocation
   /** Returns a string which an IDE can render as a hyperlink. */
   fun ideLink(layout: SnapshotFileLayout): String
   /**
