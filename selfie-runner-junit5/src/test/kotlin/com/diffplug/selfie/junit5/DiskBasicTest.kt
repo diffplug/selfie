@@ -81,4 +81,10 @@ class DiskBasicTest : Harness("undertest-junit5") {
         """
                 .trimIndent())
   }
+
+  @Test @Order(6)
+  fun cleanup() {
+    ut_snapshot().deleteIfExists()
+    ut_snapshot().assertDoesNotExist()
+  }
 }
