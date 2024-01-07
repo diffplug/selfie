@@ -292,25 +292,25 @@ internal class Progress {
     written.add(path)
   }
   fun finishedAllTests() {
-    val paths = commentTracker!!.pathsWithOnce()
+    val pathsWithOnce = commentTracker!!.pathsWithOnce()
     commentTracker = null
     if (SnapshotStorageJUnit5.mode != Mode.readonly) {
-      for (path in paths) {
+      for (path in pathsWithOnce) {
         val source = SourceFile(layout.fs.name(path), layout.fs.fileRead(path))
         source.removeSelfieOnceComments()
         layout.fs.fileWrite(path, source.asString)
       }
     }
-    val written =
+    val snapshotsFilesWrittenToDisk =
         checkForInvalidStale.getAndSet(null)
             ?: throw AssertionError("finishedAllTests() was called more than once.")
     for (stale in findStaleSnapshotFiles(layout)) {
-      val path = layout.snapshotPathForClass(stale)
-      if (written.contains(path)) {
+      val staleFile = layout.snapshotPathForClass(stale)
+      if (snapshotsFilesWrittenToDisk.contains(staleFile)) {
         throw AssertionError(
-            "Selfie wrote a snapshot and then marked it stale for deletion it in the same run: $path\nSelfie will delete this snapshot on the next run, which is bad! Why is Selfie marking this snapshot as stale?")
+            "Selfie wrote a snapshot and then marked it stale for deletion it in the same run: $staleFile\nSelfie will delete this snapshot on the next run, which is bad! Why is Selfie marking this snapshot as stale?")
       } else {
-        deleteFileAndParentDirIfEmpty(path)
+        deleteFileAndParentDirIfEmpty(staleFile)
       }
     }
   }
