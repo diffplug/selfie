@@ -34,7 +34,7 @@ expect class CallLocation : Comparable<CallLocation> {
   fun samePathAs(other: CallLocation): Boolean
 }
 
-expect fun recordCall(): CallStack
+internal expect fun recordCall(callerFileOnly: Boolean): CallStack
 
 /** Represents the callstack above a given CallLocation. */
 class CallStack(val location: CallLocation, val restOfStack: List<CallLocation>) {

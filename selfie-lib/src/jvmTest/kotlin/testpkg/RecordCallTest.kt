@@ -15,10 +15,11 @@
  */
 package testpkg
 
+import com.diffplug.selfie.guts.CallLocation
+import com.diffplug.selfie.guts.FS
+import com.diffplug.selfie.guts.Path
+import com.diffplug.selfie.guts.SnapshotFileLayout
 import com.diffplug.selfie.guts.recordCall
-import com.diffplug.selfie.junit5.SelfieSettingsAPI
-import com.diffplug.selfie.junit5.SnapshotFileLayoutJUnit5
-import com.diffplug.selfie.junit5.SnapshotStorageJUnit5
 import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
@@ -26,12 +27,23 @@ import org.junit.jupiter.api.Test
 class RecordCallTest {
   @Test
   fun testRecordCall() {
-    val stack = recordCall()
-    // shows as clickable link in IDE
-    val settings = SelfieSettingsAPI()
-    val layout = SnapshotFileLayoutJUnit5(settings, SnapshotStorageJUnit5.fs)
+    val stack = recordCall(false)
+    val layout =
+        object : SnapshotFileLayout {
+          override val rootFolder: Path
+            get() = TODO()
+          override val fs: FS
+            get() = TODO()
+          override val allowMultipleEquivalentWritesToOneLocation: Boolean
+            get() = TODO()
+          override fun sourcePathForCall(call: CallLocation) = Path("testpkg/RecordCallTest.kt")
+        }
     stack.location.ideLink(layout) shouldBe
-        "testpkg.RecordCallTest.testRecordCall(RecordCallTest.kt:29)"
+        "testpkg.RecordCallTest.testRecordCall(RecordCallTest.kt:30)"
     stack.restOfStack.size shouldBeGreaterThan 0
+    val briefStack = recordCall(true)
+    briefStack.location.ideLink(layout) shouldBe
+        "testpkg.RecordCallTest.<unknown>(RecordCallTest.kt:-1)"
+    briefStack.restOfStack.size shouldBe 0
   }
 }

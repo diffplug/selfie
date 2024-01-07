@@ -48,7 +48,7 @@ object Selfie {
   class DiskSelfie internal constructor(actual: Snapshot) : LiteralStringSelfie(actual) {
     @JvmOverloads
     fun toMatchDisk(sub: String = ""): DiskSelfie {
-      val call = recordCall()
+      val call = recordCall(false)
       if (storage.mode.canWrite(false, call, storage)) {
         storage.writeDisk(actual, sub, call)
       } else {
@@ -59,7 +59,7 @@ object Selfie {
 
     @JvmOverloads
     fun toMatchDisk_TODO(sub: String = ""): DiskSelfie {
-      val call = recordCall()
+      val call = recordCall(false)
       if (storage.mode.canWrite(true, call, storage)) {
         storage.writeDisk(actual, sub, call)
         storage.writeInline(DiskSnapshotTodo.createLiteral(), call)
@@ -132,7 +132,7 @@ object Selfie {
 
   /** Implements the inline snapshot whenever a match fails. */
   private fun <T : Any> toBeDidntMatch(expected: T?, actual: T, format: LiteralFormat<T>): T {
-    val call = recordCall()
+    val call = recordCall(false)
     val writable = storage.mode.canWrite(expected == null, call, storage)
     if (writable) {
       storage.writeInline(LiteralValue(expected, actual, format), call)
@@ -227,6 +227,6 @@ object Selfie {
  * in readonly mode.
  */
 private fun <T> SnapshotStorage.checkSrc(value: T): T {
-  mode.canWrite(false, recordCall(), this)
+  mode.canWrite(false, recordCall(true), this)
   return value
 }

@@ -23,4 +23,5 @@ actual data class CallLocation(actual val fileName: String?, actual val line: In
   actual fun ideLink(layout: SnapshotFileLayout): String = TODO()
   actual fun samePathAs(other: CallLocation): Boolean = TODO()
 }
-actual fun recordCall(): CallStack = TODO()
+
+internal actual fun recordCall(callerFileOnly: Boolean): CallStack = TODO()
