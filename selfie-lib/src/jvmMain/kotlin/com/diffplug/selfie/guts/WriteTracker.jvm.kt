@@ -54,11 +54,8 @@ actual fun recordCall(): CallStack {
       StackWalker.getInstance().walk { frames ->
         frames
             .dropWhile { it.className.startsWith("com.diffplug.selfie") }
-            .map {
-              com.diffplug.selfie.guts.CallLocation(
-                  it.className, it.methodName, it.fileName, it.lineNumber)
-            }
+            .map { CallLocation(it.className, it.methodName, it.fileName, it.lineNumber) }
             .collect(Collectors.toList())
       }
-  return CallStack(calls.removeAt(0), calls)
+  return CallStack(calls.get(0), calls.subList(1, calls.size))
 }

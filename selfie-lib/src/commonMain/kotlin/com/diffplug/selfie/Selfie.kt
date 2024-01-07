@@ -116,7 +116,7 @@ object Selfie {
     fun toBe_TODO(unusedArg: Any? = null) = toBeDidntMatch(null, actualString(), LiteralString)
     fun toBe(expected: String): String {
       val actualString = actualString()
-      return if (actualString == expected) actualString
+      return if (actualString == expected) storage.checkSrc(actualString)
       else toBeDidntMatch(expected, actualString, LiteralString)
     }
   }
@@ -150,7 +150,8 @@ object Selfie {
   class IntSelfie(private val actual: Int) {
     @JvmOverloads fun toBe_TODO(unusedArg: Any? = null) = toBeDidntMatch(null, actual, LiteralInt)
     fun toBe(expected: Int) =
-        if (actual == expected) expected else toBeDidntMatch(expected, actual, LiteralInt)
+        if (actual == expected) storage.checkSrc(actual)
+        else toBeDidntMatch(expected, actual, LiteralInt)
   }
 
   @JvmStatic fun expectSelfie(actual: Int) = IntSelfie(actual)
@@ -158,7 +159,8 @@ object Selfie {
   class LongSelfie(private val actual: Long) {
     @JvmOverloads fun toBe_TODO(unusedArg: Any? = null) = toBeDidntMatch(null, actual, LiteralLong)
     fun toBe(expected: Long) =
-        if (actual == expected) expected else toBeDidntMatch(expected, actual, LiteralLong)
+        if (actual == expected) storage.checkSrc(actual)
+        else toBeDidntMatch(expected, actual, LiteralLong)
   }
 
   @JvmStatic fun expectSelfie(actual: Long) = LongSelfie(actual)
@@ -167,7 +169,8 @@ object Selfie {
     @JvmOverloads
     fun toBe_TODO(unusedArg: Any? = null) = toBeDidntMatch(null, actual, LiteralBoolean)
     fun toBe(expected: Boolean) =
-        if (actual == expected) expected else toBeDidntMatch(expected, actual, LiteralBoolean)
+        if (actual == expected) storage.checkSrc(actual)
+        else toBeDidntMatch(expected, actual, LiteralBoolean)
   }
 
   @JvmStatic fun expectSelfie(actual: Boolean) = BooleanSelfie(actual)
@@ -217,4 +220,13 @@ object Selfie {
     buf.setLength(buf.length - 1)
     return buf.toString()
   }
+}
+
+/**
+ * Checks that the sourcecode of the given inline snapshot value doesn't have control comments when
+ * in readonly mode.
+ */
+private fun <T> SnapshotStorage.checkSrc(value: T): T {
+  mode.canWrite(false, recordCall(), this)
+  return value
 }

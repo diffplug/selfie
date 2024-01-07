@@ -41,6 +41,7 @@ class ReadOnlyTest : Harness("undertest-junit5") {
   @Test @Order(3)
   fun inlineMatchWithComment() {
     ut_mirror().lineWith("expectSelfie(").setContent("    expectSelfie(5).toBe(5) // selfieonce")
-    gradleReadSS()
+    gradleReadSSFail().message shouldBe
+        "Selfie is in readonly mode, so `//selfieonce` is illegal at undertest.junit5.UT_ReadOnlyTest.<unknown>(UT_ReadOnlyTest.kt:9)"
   }
 }
