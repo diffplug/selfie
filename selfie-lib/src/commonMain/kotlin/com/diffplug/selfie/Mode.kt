@@ -16,6 +16,7 @@
 package com.diffplug.selfie
 
 import com.diffplug.selfie.guts.CallStack
+import com.diffplug.selfie.guts.CommentTracker
 import com.diffplug.selfie.guts.SnapshotStorage
 
 enum class Mode {
@@ -25,7 +26,16 @@ enum class Mode {
   fun canWrite(isTodo: Boolean, call: CallStack, storage: SnapshotStorage): Boolean =
       when (this) {
         interactive -> isTodo || storage.sourceFileHasWritableComment(call)
-        readonly -> false
+        readonly -> {
+          if (storage.sourceFileHasWritableComment(call)) {
+            val layout = storage.layout
+            val path = layout.sourcePathForCall(call.location)!!
+            val (comment, line) = CommentTracker.commentString(path, storage.fs)
+            throw storage.fs.assertFailed(
+                "Selfie is in readonly mode, so `$comment` is illegal at ${call.location.withLine(line).ideLink(layout)}")
+          }
+          false
+        }
         overwrite -> true
       }
 }

@@ -17,6 +17,8 @@ package com.diffplug.selfie.guts
 
 import java.util.stream.Collectors
 
+private const val UNKNOWN_METHOD = "<unknown>"
+
 /** Represents the line at which user code called into Selfie. */
 actual data class CallLocation(
     val clazz: String,
@@ -24,6 +26,7 @@ actual data class CallLocation(
     actual val fileName: String?,
     actual val line: Int
 ) : Comparable<CallLocation> {
+  actual fun withLine(line: Int): CallLocation = CallLocation(clazz, UNKNOWN_METHOD, fileName, line)
   actual fun samePathAs(other: CallLocation): Boolean =
       clazz == other.clazz && fileName == other.fileName
   override fun compareTo(other: CallLocation): Int =
@@ -48,16 +51,22 @@ actual data class CallLocation(
 }
 
 /** Generates a CallLocation and the CallStack behind it. */
-actual fun recordCall(): CallStack {
-  val calls =
-      StackWalker.getInstance().walk { frames ->
-        frames
-            .dropWhile { it.className.startsWith("com.diffplug.selfie") }
-            .map {
-              com.diffplug.selfie.guts.CallLocation(
-                  it.className, it.methodName, it.fileName, it.lineNumber)
-            }
-            .collect(Collectors.toList())
+internal actual fun recordCall(callerFileOnly: Boolean): CallStack =
+    StackWalker.getInstance().walk { frames ->
+      val framesWithDrop = frames.dropWhile { it.className.startsWith("com.diffplug.selfie") }
+      if (callerFileOnly) {
+        val caller =
+            framesWithDrop
+                .limit(1)
+                .map { CallLocation(it.className, UNKNOWN_METHOD, it.fileName, -1) }
+                .findFirst()
+                .get()
+        CallStack(caller, emptyList())
+      } else {
+        val fullStack =
+            framesWithDrop
+                .map { CallLocation(it.className, it.methodName, it.fileName, it.lineNumber) }
+                .collect(Collectors.toList())
+        CallStack(fullStack.get(0), fullStack.subList(1, fullStack.size))
       }
-  return CallStack(calls.removeAt(0), calls)
-}
+    }

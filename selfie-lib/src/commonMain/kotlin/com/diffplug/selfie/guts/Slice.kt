@@ -100,4 +100,5 @@ internal class Slice(val base: String, val startIndex: Int = 0, val endIndex: In
     builder.appendRange(base, endIndex, base.length)
     return builder.toString()
   }
+  fun baseLineAtOffset(index: Int) = 1 + Slice(base, 0, index).count { it == '\n' }
 }
