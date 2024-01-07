@@ -31,7 +31,7 @@ class SnapshotFileLayoutJUnit5(settings: SelfieSettingsAPI, override val fs: FS)
   private val cache = ThreadLocal<Pair<CallLocation, Path>?>()
   override fun sourcePathForCall(call: CallLocation): Path? {
     val cached = cache.get()
-    if (cached?.first == call) {
+    if (cached?.first?.samePathAs(call) == true) {
       return cached.second
     }
     val path = computePathForCall(call)
