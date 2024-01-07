@@ -36,7 +36,10 @@ class InteractiveTest : Harness("undertest-junit5") {
   @Test @Order(2)
   fun inlineMismatch() {
     ut_mirror().lineWith("expectSelfie(").setContent("    expectSelfie(5).toBe(10)")
-    gradleInteractiveFail().message shouldBe "Inline literal did not match the actual value"
+    gradleInteractiveFail().message shouldBe
+        "Snapshot mismatch\n" +
+            "- update this snapshot by adding `_TODO` to the function name\n" +
+            "- update all snapshots in this file by adding `//selfieonce` or `//SELFIEWRITE`"
   }
 
   @Test @Order(3)
@@ -65,7 +68,10 @@ class InteractiveTest : Harness("undertest-junit5") {
   @Test @Order(6)
   fun diskMismatch() {
     ut_mirror().lineWith("expectSelfie(").setContent("    expectSelfie(\"5\").toMatchDisk()")
-    gradleInteractiveFail().message shouldBe "No such snapshot"
+    gradleInteractiveFail().message shouldBe
+        "Snapshot not found\n" +
+            "- update this snapshot by adding `_TODO` to the function name\n" +
+            "- update all snapshots in this file by adding `//selfieonce` or `//SELFIEWRITE`"
   }
 
   @Test @Order(7)
