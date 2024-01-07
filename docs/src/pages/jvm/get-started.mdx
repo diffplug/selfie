@@ -52,7 +52,9 @@ expectSelfie(List.of(42).toString()).toBe("[1, 2, 3]");
 When we run the test, we will get a failure, and the failure message will be:
 
 ```
-Snapshot failure
+Snapshot mismatch
+- update this snapshot by adding `_TODO` to the function name
+- update all snapshots in this file by adding `//selfieonce` or `//SELFIEWRITE`
 ```
 
 As you can see, we have three options:
@@ -87,8 +89,8 @@ If you want the disk snapshots to live in a different folder, set `snapshotFolde
 Selfie has three modes:
 
 - `interactive`, the default mode, used in the quickstart above
-- `readonly`, the default mode if a `CI` environment variable is present, will cause tests to fail if `//selfieonce` or `//SELFIEWRITE` are present in the sourcecode
-- `overwrite`, which will cause all snapshots to be overwritten, without looking for `//selfieonce` or `//SELFIEWRITE`
+- `readonly`, the default mode if a `CI` environment variable is present, will cause tests to fail if `_TODO()`, //selfieonce` or `//SELFIEWRITE` are present in the sourcecode
+- `overwrite`, which will cause all snapshots to be overwritten, without looking for `_TODO()`, `//selfieonce` or `//SELFIEWRITE`
 
 You can manually set the mode by setting the `SELFIE` environment variable or system property to `interactive`, `readonly`, or `overwrite`.
 

@@ -16,7 +16,6 @@
 package com.diffplug.selfie
 
 import com.diffplug.selfie.guts.DiskSnapshotTodo
-import com.diffplug.selfie.guts.FS
 import com.diffplug.selfie.guts.LiteralBoolean
 import com.diffplug.selfie.guts.LiteralFormat
 import com.diffplug.selfie.guts.LiteralInt
@@ -52,7 +51,7 @@ object Selfie {
       if (storage.mode.canWrite(false, call, storage)) {
         storage.writeDisk(actual, sub, call)
       } else {
-        assertEqual(storage.readDisk(sub, call), actual, storage.fs)
+        assertEqual(storage.readDisk(sub, call), actual, storage)
       }
       return this
     }
@@ -141,8 +140,7 @@ object Selfie {
       if (expected == null) {
         throw storage.fs.assertFailed("Can't call `toBe_TODO` in ${Mode.readonly} mode!")
       } else {
-        throw storage.fs.assertFailed(
-            "Inline literal did not match the actual value", expected, actual)
+        throw storage.fs.assertFailed(storage.mode.msgSnapshotMismatch(), expected, actual)
       }
     }
   }
@@ -171,29 +169,29 @@ object Selfie {
   }
 
   @JvmStatic fun expectSelfie(actual: Boolean) = BooleanSelfie(actual)
-  private fun assertEqual(expected: Snapshot?, actual: Snapshot, fs: FS) {
-    if (expected == null) {
-      throw fs.assertFailed("No such snapshot")
-    } else if (expected == actual) {
-      return
-    } else {
-      val mismatchedKeys =
-          sequence {
-                yield("")
-                yieldAll(expected.facets.keys)
-                for (facet in actual.facets.keys) {
-                  if (!expected.facets.containsKey(facet)) {
-                    yield(facet)
+  private fun assertEqual(expected: Snapshot?, actual: Snapshot, storage: SnapshotStorage) {
+    when (expected) {
+      null -> throw storage.fs.assertFailed(storage.mode.msgSnapshotNotFound())
+      actual -> return
+      else -> {
+        val mismatchedKeys =
+            sequence {
+                  yield("")
+                  yieldAll(expected.facets.keys)
+                  for (facet in actual.facets.keys) {
+                    if (!expected.facets.containsKey(facet)) {
+                      yield(facet)
+                    }
                   }
                 }
-              }
-              .filter { expected.subjectOrFacetMaybe(it) != actual.subjectOrFacetMaybe(it) }
-              .toList()
-              .sorted()
-      throw fs.assertFailed(
-          "Snapshot failure",
-          serializeOnlyFacets(expected, mismatchedKeys),
-          serializeOnlyFacets(actual, mismatchedKeys))
+                .filter { expected.subjectOrFacetMaybe(it) != actual.subjectOrFacetMaybe(it) }
+                .toList()
+                .sorted()
+        throw storage.fs.assertFailed(
+            storage.mode.msgSnapshotMismatch(),
+            serializeOnlyFacets(expected, mismatchedKeys),
+            serializeOnlyFacets(actual, mismatchedKeys))
+      }
     }
   }
 

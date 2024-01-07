@@ -38,4 +38,15 @@ enum class Mode {
         }
         overwrite -> true
       }
+  fun msgSnapshotNotFound() = msg("Snapshot not found")
+  fun msgSnapshotMismatch() = msg("Snapshot mismatch")
+  private fun msg(headline: String) =
+      when (this) {
+        interactive ->
+            "$headline\n" +
+                "- update this snapshot by adding `_TODO` to the function name\n" +
+                "- update all snapshots in this file by adding `//selfieonce` or `//SELFIEWRITE`"
+        readonly -> headline
+        overwrite -> "$headline\n(didn't expect this to ever happen in overwrite mode)"
+      }
 }
