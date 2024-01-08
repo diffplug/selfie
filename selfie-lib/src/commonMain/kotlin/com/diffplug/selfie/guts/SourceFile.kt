@@ -150,7 +150,7 @@ class SourceFile(filename: String, content: String) {
       } else {
         argType = ToBeArg.STRING_SINGLEQUOTE
         argStart += 1
-        endArg = argStart + 1
+        endArg = argStart
         while (contentSlice[endArg] != '"' || contentSlice[endArg - 1] == '\\') {
           ++endArg
           if (endArg == contentSlice.length) {

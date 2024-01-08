@@ -19,7 +19,12 @@ import io.kotest.matchers.shouldBe
 import kotlin.test.Test
 
 class SourceFileToBeTest {
-  private fun javaTest(source: String, functionCallPlusArg: String, arg: String) {
+  private fun javaTest(sourceRaw: String, arg: String) {
+    javaTest(sourceRaw, sourceRaw, arg)
+  }
+  private fun javaTest(sourceRaw: String, functionCallPlusArgRaw: String, arg: String) {
+    val source = sourceRaw.replace('\'', '"')
+    val functionCallPlusArg = functionCallPlusArgRaw.replace('\'', '"')
     val parsed = SourceFile("UnderTest.java", source)
     if (source.contains(".toBe_TODO(")) {
       parsed.parseToBe_TODO(1).functionCallPlusArg.toString() shouldBe functionCallPlusArg
@@ -31,7 +36,7 @@ class SourceFileToBeTest {
   }
 
   @Test
-  fun parseToBeTodo() {
+  fun todo() {
     javaTest(".toBe_TODO()", ".toBe_TODO()", "")
     javaTest("  .toBe_TODO()  ", ".toBe_TODO()", "")
     javaTest("  .toBe_TODO( )  ", ".toBe_TODO( )", "")
@@ -39,7 +44,7 @@ class SourceFileToBeTest {
   }
 
   @Test
-  fun parseToBeNumeric() {
+  fun numeric() {
     javaTest(".toBe(7)", ".toBe(7)", "7")
     javaTest("  .toBe(7)", ".toBe(7)", "7")
     javaTest(".toBe(7)  ", ".toBe(7)", "7")
@@ -47,5 +52,15 @@ class SourceFileToBeTest {
     javaTest("  .toBe( 7 )  ", ".toBe( 7 )", "7")
     javaTest("  .toBe(\n7)  ", ".toBe(\n7)", "7")
     javaTest("  .toBe(7\n)  ", ".toBe(7\n)", "7")
+  }
+
+  @Test
+  fun singleLineString() {
+    javaTest(".toBe('7')", "7")
+    javaTest(".toBe('')", "")
+    javaTest(".toBe( '' )", "")
+    javaTest(".toBe( \n '' \n )", "")
+    javaTest(".toBe( \n '78' \n )", "78")
+    javaTest(".toBe('\\'')", "\\\"")
   }
 }
