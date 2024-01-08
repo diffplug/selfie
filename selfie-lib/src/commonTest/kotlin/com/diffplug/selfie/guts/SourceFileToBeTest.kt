@@ -15,6 +15,7 @@
  */
 package com.diffplug.selfie.guts
 
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import kotlin.test.Test
 
@@ -55,8 +56,37 @@ class SourceFileToBeTest {
     javaTest(".toBe('''\n7\n''')", "\n7\n")
     javaTest(".toBe(''' ' '' ' ''')", " ' '' ' ")
   }
-  private fun javaTest(sourceRaw: String, arg: String) {
-    javaTest(sourceRaw, sourceRaw, arg)
+
+  @Test
+  fun errorUnclosed() {
+    javaTestError(".toBe(", "Appears to be an unclosed function call `.toBe()` on line 1")
+    javaTestError(".toBe(  \n ", "Appears to be an unclosed function call `.toBe()` on line 1")
+    javaTestError(".toBe_TODO(", "Appears to be an unclosed function call `.toBe_TODO()` on line 1")
+    javaTestError(
+        ".toBe_TODO(  \n ", "Appears to be an unclosed function call `.toBe_TODO()` on line 1")
+
+    javaTestError(".toBe_TODO(')", "Appears to be an unclosed string literal `\"` on line 1")
+    javaTestError(
+        ".toBe_TODO(''')", "Appears to be an unclosed multiline string literal `\"\"\"` on line 1")
+  }
+
+  @Test
+  fun errorNonPrimitive() {
+    javaTestError(
+        ".toBe(1 + 1)",
+        "Non-primitive literal in `.toBe()` starting at line 1: error for character `+` on line 1")
+    javaTestError(
+        ".toBe('1' + '1')",
+        "Non-primitive literal in `.toBe()` starting at line 1: error for character `+` on line 1")
+    javaTestError(
+        ".toBe('''1''' + '''1''')",
+        "Non-primitive literal in `.toBe()` starting at line 1: error for character `+` on line 1")
+  }
+  private fun javaTestError(sourceRaw: String, errorMsg: String) {
+    shouldThrow<AssertionError> { javaTest(sourceRaw, "unusedArg") }.message shouldBe errorMsg
+  }
+  private fun javaTest(sourceRaw: String, functionCallPlusArgRaw: String) {
+    javaTest(sourceRaw, sourceRaw, functionCallPlusArgRaw)
   }
   private fun javaTest(sourceRaw: String, functionCallPlusArgRaw: String, argRaw: String) {
     val source = sourceRaw.replace('\'', '"')

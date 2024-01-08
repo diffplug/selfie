@@ -124,6 +124,10 @@ class SourceFile(filename: String, content: String) {
     }
     val dotFunctionCall = dotFunctionCallInPlace + lineContent.startIndex
     var argStart = dotFunctionCall + prefix.length
+    if (contentSlice.length == argStart) {
+      throw AssertionError(
+          "Appears to be an unclosed function call `$prefix)` on line $lineOneIndexed")
+    }
     while (contentSlice[argStart].isWhitespace()) {
       ++argStart
       if (contentSlice.length == argStart) {
@@ -177,7 +181,7 @@ class SourceFile(filename: String, content: String) {
     while (contentSlice[endParen] != ')') {
       if (!contentSlice[endParen].isWhitespace()) {
         throw AssertionError(
-            "Non-primitive literal in `$prefix)` starting at line $lineOneIndexed: error for character ${contentSlice[endParen]} at line ${contentSlice.baseLineAtOffset(endParen)}")
+            "Non-primitive literal in `$prefix)` starting at line $lineOneIndexed: error for character `${contentSlice[endParen]}` on line ${contentSlice.baseLineAtOffset(endParen)}")
       }
       ++endParen
       if (endParen == contentSlice.length) {
