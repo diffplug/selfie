@@ -17,6 +17,8 @@ package com.diffplug.selfie.guts
 
 import com.diffplug.selfie.efficientReplace
 
+private const val TRIPLE_QUOTE = "\"\"\""
+
 /**
  * @param filename The filename (not full path, but the extension is used for language-specific
  *   parsing).
@@ -34,12 +36,22 @@ class SourceFile(filename: String, content: String) {
   val asString: String
     get() = contentSlice.toString().let { if (unixNewlines) it else it.replace("\n", "\r\n") }
 
+  internal enum class ToBeArg {
+    NUMERIC,
+    STRING_SINGLEQUOTE,
+    STRING_TRIPLEQUOTE
+  }
+
   /**
    * Represents a section of the sourcecode which is a `.toBe(LITERAL)` call. It might also be
    * `.toBe_TODO()` or ` toBe LITERAL` (infix notation).
    */
   inner class ToBeLiteral
-  internal constructor(private val slice: Slice, private val valueStart: Int) {
+  internal constructor(
+      internal val functionCallPlusArg: Slice,
+      internal val arg: Slice,
+      internal val argType: ToBeArg
+  ) {
     /**
      * Modifies the parent [SourceFile] to set the value within the `toBe` call, and returns the net
      * change in newline count.
@@ -65,9 +77,9 @@ class SourceFile(filename: String, content: String) {
                 "\n" +
                 "```\n")
       }
-      val existingNewlines = slice.count { it == '\n' }
+      val existingNewlines = functionCallPlusArg.count { it == '\n' }
       val newNewlines = encoded.count { it == '\n' }
-      contentSlice = Slice(slice.replaceSelfWith(".toBe($encoded)"))
+      contentSlice = Slice(functionCallPlusArg.replaceSelfWith(".toBe($encoded)"))
       return newNewlines - existingNewlines
     }
 
@@ -76,8 +88,7 @@ class SourceFile(filename: String, content: String) {
      * `toBe_TODO()`.
      */
     fun <T : Any> parseLiteral(literalFormat: LiteralFormat<T>): T {
-      return literalFormat.parse(
-          slice.subSequence(valueStart, slice.length - 1).toString(), language)
+      return literalFormat.parse(arg.toString(), language)
     }
   }
   fun removeSelfieOnceComments() {
@@ -106,33 +117,77 @@ class SourceFile(filename: String, content: String) {
   }
   private fun parseToBeLike(prefix: String, lineOneIndexed: Int): ToBeLiteral {
     val lineContent = contentSlice.unixLine(lineOneIndexed)
-    val idx = lineContent.indexOf(prefix)
-    if (idx == -1) {
+    val dotFunctionCallInPlace = lineContent.indexOf(prefix)
+    if (dotFunctionCallInPlace == -1) {
       throw AssertionError(
           "Expected to find `$prefix)` on line $lineOneIndexed, but there was only `${lineContent}`")
     }
-    var opened = 0
-    val startIndex = idx + prefix.length
-    var endIndex = -1
-    // TODO: do we need to detect paired parenthesis ( ( ) )?
-    for (i in startIndex ..< lineContent.length) {
-      val ch = lineContent[i]
-      // TODO: handle () inside string literal
-      if (ch == '(') {
-        opened += 1
-      } else if (ch == ')') {
-        if (opened == 0) {
-          endIndex = i
-          break
-        } else {
-          opened -= 1
-        }
+    val dotFunctionCall = dotFunctionCallInPlace + lineContent.startIndex
+    var argStart = dotFunctionCall + prefix.length
+    while (contentSlice[argStart].isWhitespace()) {
+      ++argStart
+      if (contentSlice.length == argStart) {
+        throw AssertionError(
+            "Appears to be an unclosed function call `$prefix)` on line $lineOneIndexed")
       }
     }
-    if (endIndex == -1) {
-      throw AssertionError(
-          "Expected to find `$prefix)` on line $lineOneIndexed, but there was only `${lineContent}`")
+
+    // argStart is now the first non-whitespace character after the opening paren
+    var endArg = -1
+    var endParen: Int
+    val argType: ToBeArg
+    if (contentSlice[argStart] == '"') {
+      if (contentSlice.subSequence(argStart, contentSlice.length).startsWith(TRIPLE_QUOTE)) {
+        argType = ToBeArg.STRING_TRIPLEQUOTE
+        argStart += TRIPLE_QUOTE.length
+        endArg = contentSlice.indexOf(TRIPLE_QUOTE, argStart)
+        if (endArg == -1) {
+          throw AssertionError(
+              "Appears to be an unclosed multiline string literal `${TRIPLE_QUOTE}` on line $lineOneIndexed")
+        } else {
+          endParen = endArg + TRIPLE_QUOTE.length
+        }
+      } else {
+        argType = ToBeArg.STRING_SINGLEQUOTE
+        argStart += 1
+        endArg = argStart + 1
+        while (contentSlice[endArg] != '"' || contentSlice[endArg - 1] == '\\') {
+          ++endArg
+          if (endArg == contentSlice.length) {
+            throw AssertionError(
+                "Appears to be an unclosed string literal `\"` on line $lineOneIndexed")
+          }
+        }
+        endParen = endArg + 1
+      }
+    } else {
+      argType = ToBeArg.NUMERIC
+      endArg = argStart
+      while (!contentSlice[endArg].isWhitespace()) {
+        if (contentSlice[endArg] == ')') {
+          break
+        }
+        ++endArg
+        if (endArg == contentSlice.length) {
+          throw AssertionError("Appears to be an unclosed numeric literal on line $lineOneIndexed")
+        }
+      }
+      endParen = endArg
     }
-    return ToBeLiteral(lineContent.subSequence(idx, endIndex + 1), prefix.length)
+    while (contentSlice[endParen] != ')') {
+      if (!contentSlice[endParen].isWhitespace()) {
+        throw AssertionError(
+            "Non-primitive literal in `$prefix)` starting at line $lineOneIndexed: error for character ${contentSlice[endParen]} at line ${contentSlice.baseLineAtOffset(endParen)}")
+      }
+      ++endParen
+      if (endParen == contentSlice.length) {
+        throw AssertionError(
+            "Appears to be an unclosed function call `$prefix)` starting at line $lineOneIndexed")
+      }
+    }
+    return ToBeLiteral(
+        contentSlice.subSequence(dotFunctionCall, endParen + 1),
+        contentSlice.subSequence(argStart, endArg),
+        argType)
   }
 }
