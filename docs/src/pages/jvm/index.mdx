@@ -47,7 +47,7 @@ public void login() {
 }
 ```
 
-... then selfie will rewrite the string literal for you when you run your tests. Unless you run the test on a CI server, in which case ERROR.
+... then selfie will rewrite the string literal for you when you run your tests.
 
 It's like a printf directly into your code. And it's not just for strings, it's for any literal.
 
@@ -61,7 +61,7 @@ public void preventCssBloat() {
 }
 ```
 
-<NavHeading text="lensable" />
+<NavHeading text="like-a-filesystem" />
 
 Some snapshots are so big that it would be cumbersome to put them inline into your test code. So selfie helps you put them on disk.
 
@@ -78,7 +78,7 @@ Some snapshots are so big that it would be cumbersome to put them inline into yo
 
 This will generate a snapshot file like so:
 
-```
+```html
 ╔═ gzipFavicon ═╗ base64 length 823 bytes
 H4sIAAAAAAAA/8pIzcnJVyjPL8pJUQQAlQYXAAAA
 ╔═ orderFlow/initial ═╗
@@ -95,10 +95,57 @@ H4sIAAAAAAAA/8pIzcnJVyjPL8pJUQQAlQYXAAAA
 </body></html>
 ```
 
-TODO.
+Selfie's snapshot files `.ss` are simple to parse, just split them up on `\n╔═`. Escaping rules only come into play if the content you are escaping has lines that start with `╔`,  and you can always use `selfie-lib` as a parser if you want.
 
-## <Selfie /> is like a filesystem
+You can treat your snapshot files as an output deliverable of your code, and use them as an input to other tooling.
 
-Selfie's snapshot files `.ss` are incredibly simple to parse, and you can use `selfie-lib` to parse them for you if you want. You can treat them as an output deliverable of your code, and use them as an input to other tooling.
+<NavHeading text="lensable" />
 
-TODO.
+A problem with the snapshots we've shown so far is that they are one dimensional. What about headers and cookies? What about the content the user actually sees, without all the markup? What if we could do this? 
+
+```
+╔═ orderFlow/initial [md] ═╗
+Submit order
+╔═ orderFlow/ordered [md] ═╗
+Thanks for your business!</p>
+```
+
+Well, you can! Every snapshot has a *subject*, which is the main thing you are recording. And that subject can have any number of *facets*, which are named views of the subject from a different lens.
+
+```java
+var html = "<html>..."
+var snapshot = Snapshot.of(html).plusFacet("md", HtmlToMdParser.parse(html))
+expectSelfie(snapshot).toMatchDisk()
+```
+
+You can also use facets in combination with disk and inline literal snapshots to make your tests more like a story.
+
+```java
+@Test public void orderFlow() {
+  expectSelfie(get("/orders")).toMatchDisk("initial")
+    .facet("md").toBe("Submit order");
+  postOrder();
+  expectSelfie(get("/orders")).toMatchDisk("ordered")
+    .facet("md").toBe("Thanks for your business!");
+}
+```
+
+Selfie's faceting is built around [Camera](https://kdoc.selfie.dev/selfie-lib/com.diffplug.selfie/-camera/), [Lens](https://kdoc.selfie.dev/selfie-lib/com.diffplug.selfie/-lens/), and [Snapshot](https://kdoc.selfie.dev/selfie-lib/com.diffplug.selfie/-snapshot/), whose API is roughly:
+
+```java
+final class Snapshot {
+  final SnapshotValue subject;
+  final ImmutableSortedMap<String, SnapshotValue> facets;
+}
+interface Lens {
+  Snapshot transform(Snapshot snapshot);
+}
+interface Camera<T> {
+  Snapshot snapshot(T subject);
+  default Camera<T> withLens(Lens lens) {
+    // returns a new Camera which applies the given lens to every snapshot
+  }
+}
+```
+
+See the [advanced section](/jvm/advanced) for more details.

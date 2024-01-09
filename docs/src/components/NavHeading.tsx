@@ -32,7 +32,7 @@ export function NavHeading({ text }: NavHeadingProps) {
       <br />
       <div className={clsx(["flex", "items-end", "justify-between"])}>
         <h2 id={text}>
-          <Selfie /> is {text}{" "}
+          <Selfie /> is {text.replace(/\-/g, ' ')}{" "}
         </h2>
         <HeadingLanguageSelect
           pathParts={pathParts}

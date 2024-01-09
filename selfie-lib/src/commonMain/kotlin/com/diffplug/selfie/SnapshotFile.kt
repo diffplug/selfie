@@ -15,6 +15,8 @@
  */
 package com.diffplug.selfie
 
+import kotlin.jvm.JvmStatic
+
 class ParseException private constructor(val line: Int, message: String?, cause: Throwable?) :
     IllegalArgumentException(message, cause) {
   constructor(
@@ -57,7 +59,8 @@ internal data class SnapshotValueString(val value: String) : SnapshotValue {
   override fun toString(): String = value
 }
 
-data class Snapshot(
+data class Snapshot
+private constructor(
     val subject: SnapshotValue,
     private val facetData: ArrayMap<String, SnapshotValue>
 ) {
@@ -95,8 +98,12 @@ data class Snapshot(
   override fun toString(): String = "[${subject} ${facetData}]"
 
   companion object {
-    fun of(binary: ByteArray) = Snapshot(SnapshotValue.of(binary), ArrayMap.empty())
-    fun of(string: String) = Snapshot(SnapshotValue.of(string), ArrayMap.empty())
+    @JvmStatic fun of(binary: ByteArray) = of(SnapshotValue.of(binary))
+
+    @JvmStatic fun of(string: String) = of(SnapshotValue.of(string))
+
+    @JvmStatic fun of(subject: SnapshotValue) = Snapshot(subject, ArrayMap.empty())
+
     /**
      * Creates a [Snapshot] from an [Iterable]<Map.Entry<String, [SnapshotValue]>. If no root is
      * provided, it will be automatically filled by an empty string.
@@ -229,7 +236,7 @@ class SnapshotReader(val valueReader: SnapshotValueReader) {
   }
   fun nextSnapshot(): Snapshot {
     val rootName = peekKey()
-    var snapshot = Snapshot(valueReader.nextValue(), ArrayMap.empty())
+    var snapshot = Snapshot.of(valueReader.nextValue())
     while (true) {
       val nextKey = valueReader.peekKey() ?: return snapshot
       val facetIdx = nextKey.indexOf('[')
