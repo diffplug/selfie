@@ -105,7 +105,7 @@ private const val TRIPLE_QUOTE = "\"\"\""
 
 internal object LiteralString : LiteralFormat<String>() {
   override fun encode(value: String, language: Language): String =
-      if (value.indexOf('\n') != -1) singleLineJavaToSource(value)
+      if (value.indexOf('\n') == -1) singleLineJavaToSource(value)
       else
           when (language) {
             Language.GROOVY,
