@@ -23,7 +23,7 @@ import org.junitpioneer.jupiter.DisableIfTestFails
 
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
 @DisableIfTestFails
-class JavaStringLiteralsTest : Harness("undertest-junit5") {
+class StringLiteralsJavaTest : Harness("undertest-junit5") {
   @Test @Order(1)
   fun readFailsBecauseTodo() {
     gradleReadSSFail()
