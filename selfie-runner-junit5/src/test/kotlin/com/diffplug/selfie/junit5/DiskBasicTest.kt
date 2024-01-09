@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 DiffPlug
+ * Copyright (C) 2023-2024 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ import org.junitpioneer.jupiter.DisableIfTestFails
 /** Simplest test for verifying read/write of a snapshot. */
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
 @DisableIfTestFails
-class ReadWriteTest : Harness("undertest-junit5") {
+class DiskBasicTest : Harness("undertest-junit5") {
   @Test @Order(1)
   fun noSelfie() {
     ut_snapshot().deleteIfExists()
@@ -80,5 +80,11 @@ class ReadWriteTest : Harness("undertest-junit5") {
             
         """
                 .trimIndent())
+  }
+
+  @Test @Order(6)
+  fun cleanup() {
+    ut_snapshot().deleteIfExists()
+    ut_snapshot().assertDoesNotExist()
   }
 }

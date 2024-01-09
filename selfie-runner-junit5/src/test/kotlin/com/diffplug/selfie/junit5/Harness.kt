@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 DiffPlug
+ * Copyright (C) 2023-2024 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,7 +35,6 @@ open class Harness(subproject: String) {
   // not sure why, but it doesn't work in this project
   val onlyRunThisTest = subproject != "undertest-junit-vintage"
   val subprojectFolder: Path
-  var settings = ""
 
   init {
     var rootFolder = FileSystem.SYSTEM.canonicalize("".toPath())
@@ -52,6 +51,7 @@ open class Harness(subproject: String) {
       "The subproject folder $subproject must exist"
     }
   }
+  protected fun ut_mirrorJava() = file("UT_${javaClass.simpleName}.java")
   protected fun ut_mirror() = file("UT_${javaClass.simpleName}.kt")
   protected fun ut_snapshot() = file("UT_${javaClass.simpleName}.ss")
   fun file(nameOrSubpath: String): FileHarness {
@@ -75,6 +75,11 @@ open class Harness(subproject: String) {
   }
 
   inner class FileHarness(val subpath: String) {
+    fun restoreFromGit() {
+      val path = subprojectFolder.resolve(subpath)
+      Runtime.getRuntime()
+          .exec("git checkout **/${path.toFile().name}", arrayOf(), subprojectFolder.toFile())
+    }
     fun assertDoesNotExist() {
       if (FileSystem.SYSTEM.exists(subprojectFolder.resolve(subpath))) {
         throw AssertionError("Expected $subpath to not exist, but it does")
@@ -301,19 +306,32 @@ open class Harness(subproject: String) {
     return error
   }
   fun gradleWriteSS() {
-    gradlew("underTest", "-Pselfie=write", "-Pselfie.settings=${settings}")?.let {
+    gradlew("underTest", "-Pselfie=overwrite")?.let {
       throw AssertionError("Expected write snapshots to succeed, but it failed", it)
     }
   }
   fun gradleReadSS() {
-    gradlew("underTest", "-Pselfie=read", "-Pselfie.settings=${settings}")?.let {
+    gradlew("underTest", "-Pselfie=readonly")?.let {
       throw AssertionError("Expected read snapshots to succeed, but it failed", it)
     }
   }
   fun gradleReadSSFail(): AssertionFailedError {
-    val failure = gradlew("underTest", "-Pselfie=read", "-Pselfie.settings=${settings}")
+    val failure = gradlew("underTest", "-Pselfie=readonly")
     if (failure == null) {
       throw AssertionError("Expected read snapshots to fail, but it succeeded.")
+    } else {
+      return failure
+    }
+  }
+  fun gradleInteractivePass() {
+    gradlew("underTest", "-Pselfie=interactive")?.let {
+      throw AssertionError("Expected interactive selfie run to succeed, but it failed.", it)
+    }
+  }
+  fun gradleInteractiveFail(): AssertionFailedError {
+    val failure = gradlew("underTest", "-Pselfie=interactive")
+    if (failure == null) {
+      throw AssertionError("Expected interactive selfie run to fail, but it succeeded.")
     } else {
       return failure
     }

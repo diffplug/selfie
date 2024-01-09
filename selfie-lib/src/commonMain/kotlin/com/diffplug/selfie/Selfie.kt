@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 DiffPlug
+ * Copyright (C) 2023-2024 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,27 +15,18 @@
  */
 package com.diffplug.selfie
 
+import com.diffplug.selfie.guts.DiskSnapshotTodo
+import com.diffplug.selfie.guts.LiteralBoolean
+import com.diffplug.selfie.guts.LiteralFormat
+import com.diffplug.selfie.guts.LiteralInt
+import com.diffplug.selfie.guts.LiteralLong
+import com.diffplug.selfie.guts.LiteralString
+import com.diffplug.selfie.guts.LiteralValue
+import com.diffplug.selfie.guts.SnapshotStorage
+import com.diffplug.selfie.guts.initStorage
+import com.diffplug.selfie.guts.recordCall
 import kotlin.jvm.JvmOverloads
 import kotlin.jvm.JvmStatic
-
-/** NOT FOR ENDUSERS. Implemented by Selfie to integrate with various test frameworks. */
-interface SnapshotStorage {
-  /** Determines if the system is in write mode or read mode. */
-  val isWrite: Boolean
-  /** Indicates that the following value should be written into test sourcecode. */
-  fun writeInline(literalValue: LiteralValue<*>)
-  /** Performs a comparison between disk and actual, writing the actual to disk if necessary. */
-  fun readWriteDisk(actual: Snapshot, sub: String): ExpectedActual
-  /**
-   * Marks that the following sub snapshots should be kept, null means to keep all snapshots for the
-   * currently executing class.
-   */
-  fun keep(subOrKeepAll: String?)
-  /** Creates an assertion failed exception to throw. */
-  fun assertFailed(message: String, expected: Any? = null, actual: Any? = null): Error
-}
-
-expect fun initStorage(): SnapshotStorage
 
 object Selfie {
   private val storage: SnapshotStorage = initStorage()
@@ -45,7 +36,7 @@ object Selfie {
    * environment.
    */
   @JvmStatic
-  fun preserveSelfiesOnDisk(vararg subsToKeep: String): Unit {
+  fun preserveSelfiesOnDisk(vararg subsToKeep: String) {
     if (subsToKeep.isEmpty()) {
       storage.keep(null)
     } else {
@@ -56,11 +47,25 @@ object Selfie {
   class DiskSelfie internal constructor(actual: Snapshot) : LiteralStringSelfie(actual) {
     @JvmOverloads
     fun toMatchDisk(sub: String = ""): DiskSelfie {
-      val comparison = storage.readWriteDisk(actual, sub)
-      if (!storage.isWrite) {
-        comparison.assertEqual(storage)
+      val call = recordCall(false)
+      if (storage.mode.canWrite(false, call, storage)) {
+        storage.writeDisk(actual, sub, call)
+      } else {
+        assertEqual(storage.readDisk(sub, call), actual, storage)
       }
       return this
+    }
+
+    @JvmOverloads
+    fun toMatchDisk_TODO(sub: String = ""): DiskSelfie {
+      val call = recordCall(false)
+      if (storage.mode.canWrite(true, call, storage)) {
+        storage.writeDisk(actual, sub, call)
+        storage.writeInline(DiskSnapshotTodo.createLiteral(), call)
+        return this
+      } else {
+        throw storage.fs.assertFailed("Can't call `toMatchDisk_TODO` in ${Mode.readonly} mode!")
+      }
     }
   }
 
@@ -99,16 +104,18 @@ object Selfie {
         return serializeOnlyFacets(
             actual,
             onlyFacets
-                ?: buildList<String> {
+                ?: buildList {
                   add("")
                   addAll(actual.facets.keys)
                 })
       }
     }
-    fun toBe_TODO() = toBeDidntMatch(null, actualString(), LiteralString)
-    infix fun toBe(expected: String): String {
+
+    @JvmOverloads
+    fun toBe_TODO(unusedArg: Any? = null) = toBeDidntMatch(null, actualString(), LiteralString)
+    fun toBe(expected: String): String {
       val actualString = actualString()
-      return if (actualString == expected) actualString
+      return if (actualString == expected) storage.checkSrc(actualString)
       else toBeDidntMatch(expected, actualString, LiteralString)
     }
   }
@@ -124,97 +131,100 @@ object Selfie {
 
   /** Implements the inline snapshot whenever a match fails. */
   private fun <T : Any> toBeDidntMatch(expected: T?, actual: T, format: LiteralFormat<T>): T {
-    if (storage.isWrite) {
-      storage.writeInline(LiteralValue(expected, actual, format))
+    val call = recordCall(false)
+    val writable = storage.mode.canWrite(expected == null, call, storage)
+    if (writable) {
+      storage.writeInline(LiteralValue(expected, actual, format), call)
       return actual
     } else {
       if (expected == null) {
-        throw storage.assertFailed(
-            "`.toBe_TODO()` was called in `read` mode, try again with selfie in write mode")
+        throw storage.fs.assertFailed("Can't call `toBe_TODO` in ${Mode.readonly} mode!")
       } else {
-        throw storage.assertFailed(
-            "Inline literal did not match the actual value", expected, actual)
+        throw storage.fs.assertFailed(storage.mode.msgSnapshotMismatch(), expected, actual)
       }
     }
   }
 
   class IntSelfie(private val actual: Int) {
-    fun toBe_TODO() = toBeDidntMatch(null, actual, LiteralInt)
-    infix fun toBe(expected: Int) =
-        if (actual == expected) expected else toBeDidntMatch(expected, actual, LiteralInt)
+    @JvmOverloads fun toBe_TODO(unusedArg: Any? = null) = toBeDidntMatch(null, actual, LiteralInt)
+    fun toBe(expected: Int) =
+        if (actual == expected) storage.checkSrc(actual)
+        else toBeDidntMatch(expected, actual, LiteralInt)
   }
 
   @JvmStatic fun expectSelfie(actual: Int) = IntSelfie(actual)
 
   class LongSelfie(private val actual: Long) {
-    fun toBe_TODO() = toBeDidntMatch(null, actual, LiteralLong)
-    infix fun toBe(expected: Long) =
-        if (actual == expected) expected else toBeDidntMatch(expected, actual, LiteralLong)
+    @JvmOverloads fun toBe_TODO(unusedArg: Any? = null) = toBeDidntMatch(null, actual, LiteralLong)
+    fun toBe(expected: Long) =
+        if (actual == expected) storage.checkSrc(actual)
+        else toBeDidntMatch(expected, actual, LiteralLong)
   }
 
   @JvmStatic fun expectSelfie(actual: Long) = LongSelfie(actual)
 
   class BooleanSelfie(private val actual: Boolean) {
-    fun toBe_TODO() = toBeDidntMatch(null, actual, LiteralBoolean)
-    infix fun toBe(expected: Boolean) =
-        if (actual == expected) expected else toBeDidntMatch(expected, actual, LiteralBoolean)
+    @JvmOverloads
+    fun toBe_TODO(unusedArg: Any? = null) = toBeDidntMatch(null, actual, LiteralBoolean)
+    fun toBe(expected: Boolean) =
+        if (actual == expected) storage.checkSrc(actual)
+        else toBeDidntMatch(expected, actual, LiteralBoolean)
   }
 
   @JvmStatic fun expectSelfie(actual: Boolean) = BooleanSelfie(actual)
-
-  // infix versions for the inline methods, consistent with Kotest's API
-  infix fun String.shouldBeSelfie(expected: String): String = expectSelfie(this).toBe(expected)
-  infix fun ByteArray.shouldBeSelfieBase64(expected: String): String =
-      expectSelfie(this).toBe(expected)
-  infix fun Int.shouldBeSelfie(expected: Int): Int = expectSelfie(this).toBe(expected)
-  infix fun Long.shouldBeSelfie(expected: Long): Long = expectSelfie(this).toBe(expected)
-  infix fun Boolean.shouldBeSelfie(expected: Boolean): Boolean = expectSelfie(this).toBe(expected)
-}
-
-class ExpectedActual(val expected: Snapshot?, val actual: Snapshot) {
-  internal fun assertEqual(storage: SnapshotStorage) {
-    if (expected == null) {
-      throw storage.assertFailed("No such snapshot")
-    } else if (expected.subject == actual.subject && expected.facets == actual.facets) {
-      return
-    } else {
-      val mismatchedKeys =
-          sequence {
-                yield("")
-                yieldAll(expected.facets.keys)
-                for (facet in actual.facets.keys) {
-                  if (!expected.facets.containsKey(facet)) {
-                    yield(facet)
+  private fun assertEqual(expected: Snapshot?, actual: Snapshot, storage: SnapshotStorage) {
+    when (expected) {
+      null -> throw storage.fs.assertFailed(storage.mode.msgSnapshotNotFound())
+      actual -> return
+      else -> {
+        val mismatchedKeys =
+            sequence {
+                  yield("")
+                  yieldAll(expected.facets.keys)
+                  for (facet in actual.facets.keys) {
+                    if (!expected.facets.containsKey(facet)) {
+                      yield(facet)
+                    }
                   }
                 }
-              }
-              .filter { expected.subjectOrFacetMaybe(it) != actual.subjectOrFacetMaybe(it) }
-              .toList()
-              .sorted()
-      throw storage.assertFailed(
-          "Snapshot failure",
-          serializeOnlyFacets(expected, mismatchedKeys),
-          serializeOnlyFacets(actual, mismatchedKeys))
-    }
-  }
-}
-/**
- * Returns a serialized form of only the given facets if they are available, silently omits missing
- * facets.
- */
-private fun serializeOnlyFacets(snapshot: Snapshot, keys: Collection<String>): String {
-  val buf = StringBuilder()
-  val writer = StringWriter { buf.append(it) }
-  for (key in keys) {
-    if (key.isEmpty()) {
-      SnapshotFile.writeValue(writer, snapshot.subjectOrFacet(key))
-    } else {
-      snapshot.subjectOrFacetMaybe(key)?.let {
-        SnapshotFile.writeKey(writer, "", key)
-        SnapshotFile.writeValue(writer, it)
+                .filter { expected.subjectOrFacetMaybe(it) != actual.subjectOrFacetMaybe(it) }
+                .toList()
+                .sorted()
+        throw storage.fs.assertFailed(
+            storage.mode.msgSnapshotMismatch(),
+            serializeOnlyFacets(expected, mismatchedKeys),
+            serializeOnlyFacets(actual, mismatchedKeys))
       }
     }
   }
-  buf.setLength(buf.length - 1)
-  return buf.toString()
+
+  /**
+   * Returns a serialized form of only the given facets if they are available, silently omits
+   * missing facets.
+   */
+  private fun serializeOnlyFacets(snapshot: Snapshot, keys: Collection<String>): String {
+    val buf = StringBuilder()
+    val writer = StringWriter { buf.append(it) }
+    for (key in keys) {
+      if (key.isEmpty()) {
+        SnapshotFile.writeValue(writer, snapshot.subjectOrFacet(key))
+      } else {
+        snapshot.subjectOrFacetMaybe(key)?.let {
+          SnapshotFile.writeKey(writer, "", key)
+          SnapshotFile.writeValue(writer, it)
+        }
+      }
+    }
+    buf.setLength(buf.length - 1)
+    return buf.toString()
+  }
+}
+
+/**
+ * Checks that the sourcecode of the given inline snapshot value doesn't have control comments when
+ * in readonly mode.
+ */
+private fun <T> SnapshotStorage.checkSrc(value: T): T {
+  mode.canWrite(false, recordCall(true), this)
+  return value
 }

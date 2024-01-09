@@ -1,7 +1,6 @@
 package undertest.junit5
 
 import com.diffplug.selfie.Selfie.expectSelfie
-import com.diffplug.selfie.Selfie.shouldBeSelfie
 import com.diffplug.selfie.Snapshot
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
@@ -68,18 +67,20 @@ class UT_InlineFacetTest {
         """
                 .trimIndent())
     assertThrows<Throwable> { expectSelfie(multiple).facets("facet3", "facet2").toBe("WRONG") }
-    assertThrows<Throwable> {
-          expectSelfie(multiple)
-              .facets("facet1", "")
-              .toBe(
-                  """
+    expectSelfie(
+            assertThrows<Throwable> {
+                  expectSelfie(multiple)
+                      .facets("facet1", "")
+                      .toBe(
+                          """
                     subject
                     ╔═ [facet1] ═╗
                     facetValue1
                 """
-                      .trimIndent())
-        }
-        .message!! shouldBeSelfie
-        "If you're going to specify the subject facet (\"\"), you have to list it first, this was [facet1, ]"
+                              .trimIndent())
+                }
+                .message!!)
+        .toBe(
+            "If you're going to specify the subject facet (\"\"), you have to list it first, this was [facet1, ]")
   }
 }

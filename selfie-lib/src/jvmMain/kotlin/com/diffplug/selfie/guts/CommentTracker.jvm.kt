@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 DiffPlug
+ * Copyright (C) 2024 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.diffplug.selfie
-actual fun initStorage(): SnapshotStorage {
-  TODO("Not yet implemented")
+package com.diffplug.selfie.guts
+
+import java.util.concurrent.atomic.AtomicReference
+
+internal actual fun <T> createCas(initial: T): CAS<T> = CAS(initial)
+
+internal actual class CAS<T>(value: T) {
+  val ref = AtomicReference(value)
+  actual fun get() = ref.get()
+  actual fun updateAndGet(update: (T) -> T): T = ref.updateAndGet(update)
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 DiffPlug
+ * Copyright (C) 2023-2024 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,6 @@ package com.diffplug.selfie.junit5
 import com.diffplug.selfie.ArrayMap
 import com.diffplug.selfie.ListBackedSet
 import com.diffplug.selfie.Snapshot
-import java.nio.file.Files
 import kotlin.io.path.name
 
 /** Search for any test annotation classes which are present on the classpath. */
@@ -39,18 +38,17 @@ private val testAnnotations =
  * Searches the whole snapshot directory, finds all the `.ss` files, and prunes any which don't have
  * matching test files anymore.
  */
-internal fun findStaleSnapshotFiles(layout: SnapshotFileLayout): List<String> {
-  val needsPruning = mutableListOf<String>()
-  Files.walk(layout.rootFolder).use { paths ->
-    paths
-        .filter { it.name.endsWith(layout.extension) && Files.isRegularFile(it) }
+internal fun findStaleSnapshotFiles(layout: SnapshotFileLayoutJUnit5): List<String> {
+  return layout.fs.fileWalk(layout.rootFolder) { walk ->
+    walk
+        .filter { layout.fs.name(it).endsWith(layout.extension) }
         .map {
-          layout.subpathToClassname(layout.rootFolder.relativize(it).toString().replace('\\', '/'))
+          layout.subpathToClassname(
+              layout.rootFolder.toPath().relativize(it.toPath()).toString().replace('\\', '/'))
         }
         .filter { !classExistsAndHasTests(it) }
-        .forEach(needsPruning::add)
+        .toMutableList()
   }
-  return needsPruning
 }
 private fun classExistsAndHasTests(key: String): Boolean {
   return try {

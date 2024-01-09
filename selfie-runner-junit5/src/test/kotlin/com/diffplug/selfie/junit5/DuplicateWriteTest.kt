@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 DiffPlug
+ * Copyright (C) 2023-2024 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,7 +37,7 @@ class DuplicateWriteTest : Harness("undertest-junit5") {
   fun cannot_write_multiple_things_to_one_snapshot() {
     ut_mirror().linesFrom("fun shouldFail()").toFirst("}").uncomment()
     ut_mirror().linesFrom("fun shouldPass()").toFirst("}").commentOut()
-    gradlew("underTest", "-Pselfie=write")!!.message shouldStartWith
+    gradlew("underTest", "-Pselfie=overwrite")!!.message shouldStartWith
         "Snapshot was set to multiple values"
   }
 
@@ -45,21 +45,24 @@ class DuplicateWriteTest : Harness("undertest-junit5") {
   fun can_write_one_thing_multiple_times_to_one_snapshot() {
     ut_mirror().linesFrom("fun shouldFail()").toFirst("}").commentOut()
     ut_mirror().linesFrom("fun shouldPass()").toFirst("}").uncomment()
-    gradlew("underTest", "-Pselfie=write") shouldBe null
+    gradlew("underTest", "-Pselfie=overwrite") shouldBe null
   }
 
   @Test @Order(4)
   fun can_read_one_thing_multiple_times_from_one_snapshot() {
     ut_mirror().linesFrom("fun shouldFail()").toFirst("}").commentOut()
     ut_mirror().linesFrom("fun shouldPass()").toFirst("}").uncomment()
-    gradlew("underTest", "-Pselfie=read") shouldBe null
+    gradlew("underTest", "-Pselfie=readonly") shouldBe null
   }
 
   @Test @Order(5)
   fun writeonce_mode() {
     ut_mirror().linesFrom("fun shouldFail()").toFirst("}").commentOut()
     ut_mirror().linesFrom("fun shouldPass()").toFirst("}").uncomment()
-    gradlew("underTest", "-Pselfie=writeonce")!!.message shouldStartWith
-        "Snapshot was set to the same value multiple times"
+    gradlew(
+            "underTest",
+            "-Pselfie=overwrite",
+            "-Pselfie.settings=undertest.junit5.SelfieWriteOnce")!!
+        .message shouldStartWith "Snapshot was set to the same value multiple times"
   }
 }
