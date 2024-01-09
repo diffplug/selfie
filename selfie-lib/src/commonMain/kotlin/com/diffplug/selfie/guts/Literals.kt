@@ -108,7 +108,7 @@ internal object LiteralString : LiteralFormat<String> {
   override fun parse(str: String, language: Language): String {
     return singleLineJavaFromSource(str)
   }
-  private fun singleLineJavaToSource(value: String): String {
+  fun singleLineJavaToSource(value: String): String {
     val source = StringBuilder()
     source.append("\"")
     for (char in value) {
@@ -134,7 +134,7 @@ internal object LiteralString : LiteralFormat<String> {
   private fun isControlChar(c: Char): Boolean {
     return c in '\u0000'..'\u001F' || c == '\u007F'
   }
-  private fun singleLineJavaFromSource(source: String): String {
+  fun singleLineJavaFromSource(source: String): String {
     val value = StringBuilder()
     var i = 0
     while (i < source.length) {

@@ -20,42 +20,24 @@ import kotlin.test.Test
 
 class LiteralStringTest {
   @Test
-  fun encode() {
-    encode(
-        "1",
-        """
-      "1"
-    """
-            .trimIndent())
-    encode(
-        "1\n\tABC",
-        """
-      "1\n\tABC"
-    """
-            .trimIndent())
+  fun singleLineJavaToSource() {
+    singleLineJavaToSource("1", "'1'")
+    singleLineJavaToSource("\\", "'\\\\'")
+    singleLineJavaToSource("1\n\tABC", "'1\\n\\tABC'")
   }
-  private fun encode(value: String, expected: String) {
-    val actual = LiteralString.encode(value, Language.JAVA)
-    actual shouldBe expected
+  private fun singleLineJavaToSource(value: String, expected: String) {
+    val actual = LiteralString.singleLineJavaToSource(value)
+    actual shouldBe expected.replace("'", "\"")
   }
 
   @Test
-  fun decode() {
-    decode(
-        """
-      "1"
-    """
-            .trimIndent(),
-        "1")
-    decode(
-        """
-      "1\n\tABC"
-    """
-            .trimIndent(),
-        "1\n\tABC")
+  fun singleLineJavaFromSource() {
+    singleLineJavaFromSource("'1'", "1")
+    singleLineJavaFromSource("'\\\\'", "\\")
+    singleLineJavaFromSource("'1\\n\\tABC'", "1\n\tABC")
   }
-  private fun decode(value: String, expected: String) {
-    val actual = LiteralString.parse(value, Language.JAVA)
+  private fun singleLineJavaFromSource(value: String, expected: String) {
+    val actual = LiteralString.singleLineJavaFromSource(value.replace("'", "\""))
     actual shouldBe expected
   }
 }
