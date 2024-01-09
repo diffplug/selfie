@@ -36,12 +36,6 @@ class SourceFile(filename: String, content: String) {
   val asString: String
     get() = contentSlice.toString().let { if (unixNewlines) it else it.replace("\n", "\r\n") }
 
-  internal enum class ToBeArg {
-    NUMERIC,
-    STRING_SINGLEQUOTE,
-    STRING_TRIPLEQUOTE
-  }
-
   /**
    * Represents a section of the sourcecode which is a `.toBe(LITERAL)` call. It might also be
    * `.toBe_TODO()` or ` toBe LITERAL` (infix notation).
@@ -50,7 +44,6 @@ class SourceFile(filename: String, content: String) {
   internal constructor(
       internal val functionCallPlusArg: Slice,
       internal val arg: Slice,
-      internal val argType: ToBeArg
   ) {
     /**
      * Modifies the parent [SourceFile] to set the value within the `toBe` call, and returns the net
@@ -139,22 +132,18 @@ class SourceFile(filename: String, content: String) {
     // argStart is now the first non-whitespace character after the opening paren
     var endArg = -1
     var endParen: Int
-    val argType: ToBeArg
     if (contentSlice[argStart] == '"') {
       if (contentSlice.subSequence(argStart, contentSlice.length).startsWith(TRIPLE_QUOTE)) {
-        argType = ToBeArg.STRING_TRIPLEQUOTE
-        argStart += TRIPLE_QUOTE.length
-        endArg = contentSlice.indexOf(TRIPLE_QUOTE, argStart)
+        endArg = contentSlice.indexOf(TRIPLE_QUOTE, argStart + TRIPLE_QUOTE.length)
         if (endArg == -1) {
           throw AssertionError(
               "Appears to be an unclosed multiline string literal `${TRIPLE_QUOTE}` on line $lineOneIndexed")
         } else {
-          endParen = endArg + TRIPLE_QUOTE.length
+          endArg += TRIPLE_QUOTE.length
+          endParen = endArg
         }
       } else {
-        argType = ToBeArg.STRING_SINGLEQUOTE
-        argStart += 1
-        endArg = argStart
+        endArg = argStart + 1
         while (contentSlice[endArg] != '"' || contentSlice[endArg - 1] == '\\') {
           ++endArg
           if (endArg == contentSlice.length) {
@@ -162,10 +151,10 @@ class SourceFile(filename: String, content: String) {
                 "Appears to be an unclosed string literal `\"` on line $lineOneIndexed")
           }
         }
-        endParen = endArg + 1
+        endArg += 1
+        endParen = endArg
       }
     } else {
-      argType = ToBeArg.NUMERIC
       endArg = argStart
       while (!contentSlice[endArg].isWhitespace()) {
         if (contentSlice[endArg] == ')') {
@@ -191,7 +180,6 @@ class SourceFile(filename: String, content: String) {
     }
     return ToBeLiteral(
         contentSlice.subSequence(dotFunctionCall, endParen + 1),
-        contentSlice.subSequence(argStart, endArg),
-        argType)
+        contentSlice.subSequence(argStart, endArg))
   }
 }
