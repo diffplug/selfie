@@ -23,6 +23,7 @@ import com.diffplug.selfie.guts.SnapshotFileLayout
 class SnapshotFileLayoutJUnit5(settings: SelfieSettingsAPI, override val fs: FS) :
     SnapshotFileLayout {
   override val rootFolder = settings.rootFolder
+  private val otherSourceRoots = settings.otherSourceRoots
   override val allowMultipleEquivalentWritesToOneLocation =
       settings.allowMultipleEquivalentWritesToOneLocation
   val snapshotFolderName = settings.snapshotFolderName
@@ -48,16 +49,22 @@ class SnapshotFileLayoutJUnit5(settings: SelfieSettingsAPI, override val fs: FS)
       path
     }
   }
-  private fun computePathForCall(call: CallLocation): Path? {
+  private fun computePathForCall(call: CallLocation): Path? =
+      sequence {
+            yield(rootFolder)
+            yieldAll(otherSourceRoots)
+          }
+          .firstNotNullOfOrNull { computePathForCall(it, call) }
+  private fun computePathForCall(folder: Path, call: CallLocation): Path? {
     if (call.fileName != null) {
-      return fs.fileWalk(rootFolder) { walk ->
+      return fs.fileWalk(folder) { walk ->
         walk.filter { fs.name(it) == call.fileName }.firstOrNull()
       }
     }
     val fileWithoutExtension = call.clazz.substringAfterLast('.').substringBefore('$')
     val likelyExtensions = listOf("kt", "java", "scala", "groovy", "clj", "cljc")
     val possibleNames = likelyExtensions.map { "$fileWithoutExtension.$it" }.toSet()
-    return fs.fileWalk(rootFolder) { walk ->
+    return fs.fileWalk(folder) { walk ->
       walk.filter { fs.name(it) in possibleNames }.firstOrNull()
     }
   }

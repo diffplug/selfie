@@ -50,6 +50,24 @@ open class SelfieSettingsAPI {
           "Could not find a standard test directory, 'user.dir' is equal to $userDir, looked in $STANDARD_DIRS")
     }
 
+  /**
+   * If Selfie should look for test sourcecode in places other than the rootFolder, you can specify
+   * them here.
+   */
+  open val otherSourceRoots: List<File>
+    get() {
+      return buildList {
+        val rootDir = rootFolder
+        val userDir = File(System.getProperty("user.dir"))
+        for (standardDir in STANDARD_DIRS) {
+          val candidate = userDir.resolve(standardDir)
+          if (candidate.isDirectory && candidate != rootDir) {
+            add(candidate)
+          }
+        }
+      }
+    }
+
   internal companion object {
     private val STANDARD_DIRS =
         listOf(
