@@ -29,7 +29,7 @@ enum class Mode {
         readonly -> {
           if (storage.sourceFileHasWritableComment(call)) {
             val layout = storage.layout
-            val path = layout.sourcePathForCall(call.location)!!
+            val path = layout.sourcePathForCall(call.location)
             val (comment, line) = CommentTracker.commentString(path, storage.fs)
             throw storage.fs.assertFailed(
                 "Selfie is in readonly mode, so `$comment` is illegal at ${call.location.withLine(line).ideLink(layout)}")

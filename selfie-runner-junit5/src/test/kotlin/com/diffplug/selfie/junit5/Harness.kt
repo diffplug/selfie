@@ -51,6 +51,7 @@ open class Harness(subproject: String) {
       "The subproject folder $subproject must exist"
     }
   }
+  protected fun ut_mirrorJava() = file("UT_${javaClass.simpleName}.java")
   protected fun ut_mirror() = file("UT_${javaClass.simpleName}.kt")
   protected fun ut_snapshot() = file("UT_${javaClass.simpleName}.ss")
   fun file(nameOrSubpath: String): FileHarness {
@@ -74,6 +75,11 @@ open class Harness(subproject: String) {
   }
 
   inner class FileHarness(val subpath: String) {
+    fun restoreFromGit() {
+      val path = subprojectFolder.resolve(subpath)
+      Runtime.getRuntime()
+          .exec("git checkout **/${path.toFile().name}", arrayOf(), subprojectFolder.toFile())
+    }
     fun assertDoesNotExist() {
       if (FileSystem.SYSTEM.exists(subprojectFolder.resolve(subpath))) {
         throw AssertionError("Expected $subpath to not exist, but it does")

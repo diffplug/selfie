@@ -23,13 +23,21 @@ import com.diffplug.selfie.guts.SnapshotFileLayout
 class SnapshotFileLayoutJUnit5(settings: SelfieSettingsAPI, override val fs: FS) :
     SnapshotFileLayout {
   override val rootFolder = settings.rootFolder
+  private val otherSourceRoots = settings.otherSourceRoots
   override val allowMultipleEquivalentWritesToOneLocation =
       settings.allowMultipleEquivalentWritesToOneLocation
   val snapshotFolderName = settings.snapshotFolderName
   internal val unixNewlines = inferDefaultLineEndingIsUnix(settings.rootFolder, fs)
   val extension: String = ".ss"
   private val cache = ThreadLocal<Pair<CallLocation, Path>?>()
-  override fun sourcePathForCall(call: CallLocation): Path? {
+  override fun sourcePathForCall(call: CallLocation): Path {
+    val nonNull =
+        sourcePathForCallMaybe(call)
+            ?: throw fs.assertFailed(
+                "Couldn't find source file for $call, looked in $rootFolder and $otherSourceRoots, maybe there are other source roots?")
+    return nonNull
+  }
+  override fun sourcePathForCallMaybe(call: CallLocation): Path? {
     val cached = cache.get()
     if (cached?.first?.samePathAs(call) == true) {
       return cached.second
@@ -41,16 +49,22 @@ class SnapshotFileLayoutJUnit5(settings: SelfieSettingsAPI, override val fs: FS)
       path
     }
   }
-  private fun computePathForCall(call: CallLocation): Path? {
+  private fun computePathForCall(call: CallLocation): Path? =
+      sequence {
+            yield(rootFolder)
+            yieldAll(otherSourceRoots)
+          }
+          .firstNotNullOfOrNull { computePathForCall(it, call) }
+  private fun computePathForCall(folder: Path, call: CallLocation): Path? {
     if (call.fileName != null) {
-      return fs.fileWalk(rootFolder) { walk ->
+      return fs.fileWalk(folder) { walk ->
         walk.filter { fs.name(it) == call.fileName }.firstOrNull()
       }
     }
     val fileWithoutExtension = call.clazz.substringAfterLast('.').substringBefore('$')
     val likelyExtensions = listOf("kt", "java", "scala", "groovy", "clj", "cljc")
     val possibleNames = likelyExtensions.map { "$fileWithoutExtension.$it" }.toSet()
-    return fs.fileWalk(rootFolder) { walk ->
+    return fs.fileWalk(folder) { walk ->
       walk.filter { fs.name(it) in possibleNames }.firstOrNull()
     }
   }

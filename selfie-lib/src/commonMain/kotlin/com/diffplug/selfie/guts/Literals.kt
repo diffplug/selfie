@@ -17,6 +17,8 @@ package com.diffplug.selfie.guts
 
 import kotlin.math.abs
 
+internal expect fun jreVersion(): Int
+
 enum class Language {
   JAVA,
   JAVA_PRE15,
@@ -28,7 +30,7 @@ enum class Language {
   companion object {
     fun fromFilename(filename: String): Language {
       return when (filename.substringAfterLast('.')) {
-        "java" -> JAVA_PRE15 // TODO: detect JRE and use JAVA if JVM >= 15
+        "java" -> if (jreVersion() < 15) JAVA_PRE15 else JAVA
         "kt" -> KOTLIN
         "groovy",
         "gvy",
@@ -101,14 +103,24 @@ internal object LiteralLong : LiteralFormat<Long>() {
   }
 }
 
+private const val TRIPLE_QUOTE = "\"\"\""
+
 internal object LiteralString : LiteralFormat<String>() {
-  override fun encode(value: String, language: Language): String {
-    return singleLineJavaToSource(value)
-  }
-  override fun parse(str: String, language: Language): String {
-    return singleLineJavaFromSource(str)
-  }
-  private fun singleLineJavaToSource(value: String): String {
+  override fun encode(value: String, language: Language): String =
+      if (value.indexOf('\n') == -1) singleLineJavaToSource(value)
+      else
+          when (language) {
+            Language.GROOVY,
+            Language.SCALA,
+            Language.CLOJURE,
+            Language.JAVA_PRE15 -> singleLineJavaToSource(value)
+            Language.JAVA -> multiLineJavaToSource(value)
+            Language.KOTLIN -> multiLineJavaToSource(value)
+          }
+  override fun parse(str: String, language: Language): String =
+      if (str.startsWith(TRIPLE_QUOTE)) multiLineJavaFromSource(str)
+      else singleLineJavaFromSource(str)
+  fun singleLineJavaToSource(value: String): String {
     val source = StringBuilder()
     source.append("\"")
     for (char in value) {
@@ -134,33 +146,91 @@ internal object LiteralString : LiteralFormat<String>() {
   private fun isControlChar(c: Char): Boolean {
     return c in '\u0000'..'\u001F' || c == '\u007F'
   }
-  private fun singleLineJavaFromSource(source: String): String {
+  fun multiLineJavaToSource(arg: String): String {
+    val escapeBackslashes = arg.replace("\\", "\\\\")
+    val escapeTripleQuotes = escapeBackslashes.replace(TRIPLE_QUOTE, "\\\"\\\"\\\"")
+    val protectWhitespace =
+        escapeTripleQuotes.lines().joinToString("\n") { line ->
+          val protectTrailingWhitespace =
+              if (line.endsWith(" ")) {
+                line.dropLast(1) + "\\s"
+              } else if (line.endsWith("\t")) {
+                line.dropLast(1) + "\\t"
+              } else line
+          val protectLeadingWhitespace =
+              if (protectTrailingWhitespace.startsWith(" ")) {
+                "\\s" + protectTrailingWhitespace.drop(1)
+              } else if (protectTrailingWhitespace.startsWith("\t")) {
+                "\\t" + protectTrailingWhitespace.drop(1)
+              } else protectTrailingWhitespace
+          protectLeadingWhitespace
+        }
+    return "$TRIPLE_QUOTE\n$protectWhitespace$TRIPLE_QUOTE"
+  }
+  fun singleLineJavaFromSource(sourceWithQuotes: String): String {
+    check(sourceWithQuotes.startsWith('"'))
+    check(sourceWithQuotes.endsWith('"'))
+    return unescapeJava(sourceWithQuotes.substring(1, sourceWithQuotes.length - 1))
+  }
+  private fun unescapeJava(source: String): String {
+    val firstEscape = source.indexOf('\\')
+    if (firstEscape == -1) {
+      return source
+    }
     val value = StringBuilder()
-    var i = 0
+    value.append(source.substring(0, firstEscape))
+    var i = firstEscape
     while (i < source.length) {
       var c = source[i]
       if (c == '\\') {
         i++
         c = source[i]
         when (c) {
-          'b' -> value.append('\b')
-          'n' -> value.append('\n')
-          'r' -> value.append('\r')
-          't' -> value.append('\t')
           '\"' -> value.append('\"')
           '\\' -> value.append('\\')
+          'b' -> value.append('\b')
+          'f' -> value.append('\u000c')
+          'n' -> value.append('\n')
+          'r' -> value.append('\r')
+          's' -> value.append(' ')
+          't' -> value.append('\t')
           'u' -> {
             val code = source.substring(i + 1, i + 5).toInt(16)
             value.append(code.toChar())
             i += 4
           }
+          else -> throw IllegalArgumentException("Unknown escape sequence $c")
         }
-      } else if (c != '\"') {
+      } else {
         value.append(c)
       }
       i++
     }
     return value.toString()
+  }
+  fun multiLineJavaFromSource(sourceWithQuotes: String): String {
+    check(sourceWithQuotes.startsWith("$TRIPLE_QUOTE\n"))
+    check(sourceWithQuotes.endsWith(TRIPLE_QUOTE))
+    val source =
+        sourceWithQuotes.substring(
+            TRIPLE_QUOTE.length + 1, sourceWithQuotes.length - TRIPLE_QUOTE.length)
+    val lines = source.lines()
+    val commonPrefix =
+        lines
+            .mapNotNull { line ->
+              if (line.isNotBlank()) line.takeWhile { it.isWhitespace() } else null
+            }
+            .minOrNull() ?: ""
+    return lines.joinToString("\n") { line ->
+      if (line.isBlank()) {
+        ""
+      } else {
+        val removedPrefix = if (commonPrefix.isEmpty()) line else line.removePrefix(commonPrefix)
+        val removeTrailingWhitespace = removedPrefix.trimEnd()
+        val handleEscapeSequences = unescapeJava(removeTrailingWhitespace)
+        handleEscapeSequences
+      }
+    }
   }
 }
 

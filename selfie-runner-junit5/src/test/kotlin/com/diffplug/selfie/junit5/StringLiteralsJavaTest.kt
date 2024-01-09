@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 DiffPlug
+ * Copyright (C) 2024 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,34 +15,32 @@
  */
 package com.diffplug.selfie.junit5
 
-import io.kotest.matchers.shouldBe
 import kotlin.test.Test
 import org.junit.jupiter.api.MethodOrderer
 import org.junit.jupiter.api.Order
 import org.junit.jupiter.api.TestMethodOrder
+import org.junitpioneer.jupiter.DisableIfTestFails
 
-/** Write-only test which asserts adding and removing snapshots results in same-class GC. */
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
-// @DisableIfTestFails don't disable if test fails because we *have* to run cleanup
-class InlineStringTest : Harness("undertest-junit5") {
+@DisableIfTestFails
+class StringLiteralsJavaTest : Harness("undertest-junit5") {
   @Test @Order(1)
-  fun toBe_TODO() {
-    ut_mirror().lineWith("@Ignore").setContent("//@Ignore")
-    ut_mirror().lineWith("expectSelfie").setContent("    expectSelfie(\"Hello world\").toBe_TODO()")
+  fun readFailsBecauseTodo() {
     gradleReadSSFail()
   }
 
   @Test @Order(2)
-  fun toBe_write() {
+  fun writeSucceeds() {
     gradleWriteSS()
-    ut_mirror().lineWith("expectSelfie").content() shouldBe
-        "    expectSelfie(\"Hello world\").toBe(\"Hello world\")"
-    gradleReadSS()
   }
 
   @Test @Order(3)
+  fun nowReadSucceeds() {
+    gradleReadSS()
+  }
+
+  @Test @Order(4)
   fun cleanup() {
-    ut_mirror().lineWith("expectSelfie").setContent("    expectSelfie(\"Hello world\").toBe_TODO()")
-    ut_mirror().lineWith("//@Ignore").setContent("@Ignore")
+    ut_mirrorJava().restoreFromGit()
   }
 }

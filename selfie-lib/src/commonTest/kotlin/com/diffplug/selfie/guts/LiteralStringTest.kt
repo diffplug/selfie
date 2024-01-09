@@ -20,42 +20,48 @@ import kotlin.test.Test
 
 class LiteralStringTest {
   @Test
-  fun encode() {
-    encode(
-        "1",
-        """
-      "1"
-    """
-            .trimIndent())
-    encode(
-        "1\n\tABC",
-        """
-      "1\n\tABC"
-    """
-            .trimIndent())
+  fun singleLineJavaToSource() {
+    singleLineJavaToSource("1", "'1'")
+    singleLineJavaToSource("\\", "'\\\\'")
+    singleLineJavaToSource("1\n\tABC", "'1\\n\\tABC'")
   }
-  private fun encode(value: String, expected: String) {
-    val actual = LiteralString.encode(value, Language.JAVA)
+  private fun singleLineJavaToSource(value: String, expected: String) {
+    val actual = LiteralString.singleLineJavaToSource(value)
+    actual shouldBe expected.replace("'", "\"")
+  }
+
+  @Test
+  fun multiLineJavaToSource() {
+    multiLineJavaToSource("1", "'''\n1'''")
+    multiLineJavaToSource("\\", "'''\n\\\\'''")
+    multiLineJavaToSource("  leading\ntrailing  ", "'''\n" + "\\s leading\n" + "trailing \\s'''")
+  }
+  private fun multiLineJavaToSource(value: String, expected: String) {
+    val actual = LiteralString.multiLineJavaToSource(value)
+    actual shouldBe expected.replace("'", "\"")
+  }
+
+  @Test
+  fun singleLineJavaFromSource() {
+    singleLineJavaFromSource("1", "1")
+    singleLineJavaFromSource("\\\\", "\\")
+    singleLineJavaFromSource("1\\n\\tABC", "1\n\tABC")
+  }
+  private fun singleLineJavaFromSource(value: String, expected: String) {
+    val actual = LiteralString.singleLineJavaFromSource("\"${value.replace("'", "\"")}\"")
     actual shouldBe expected
   }
 
   @Test
-  fun decode() {
-    decode(
-        """
-      "1"
-    """
-            .trimIndent(),
-        "1")
-    decode(
-        """
-      "1\n\tABC"
-    """
-            .trimIndent(),
-        "1\n\tABC")
+  fun multiLineJavaFromSource() {
+    multiLineJavaFromSource("\n123\nabc", "123\nabc")
+    multiLineJavaFromSource("\n  123\n  abc", "123\nabc")
+    multiLineJavaFromSource("\n  123  \n  abc\t", "123\nabc")
+    multiLineJavaFromSource("\n  123  \n  abc\t", "123\nabc")
+    multiLineJavaFromSource("\n  123  \\s\n  abc\t\\s", "123   \nabc\t ")
   }
-  private fun decode(value: String, expected: String) {
-    val actual = LiteralString.parse(value, Language.JAVA)
+  private fun multiLineJavaFromSource(value: String, expected: String) {
+    val actual = LiteralString.multiLineJavaFromSource("\"\"\"${value.replace("'", "\"")}\"\"\"")
     actual shouldBe expected
   }
 }
