@@ -3,7 +3,7 @@ package undertest.junit5;
 import org.junit.jupiter.api.Test;
 import static com.diffplug.selfie.Selfie.expectSelfie;
 
-public class UT_JavaStringLiteralsTest {
+public class UT_StringLiteralsJavaTest {
     @Test
     public void empty() {
         expectSelfie("").toBe_TODO();
