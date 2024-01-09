@@ -45,9 +45,9 @@ enum class Language {
 
 class LiteralValue<T : Any>(val expected: T?, val actual: T, val format: LiteralFormat<T>)
 
-interface LiteralFormat<T : Any> {
-  fun encode(value: T, language: Language): String
-  fun parse(str: String, language: Language): T
+abstract class LiteralFormat<T : Any> {
+  internal abstract fun encode(value: T, language: Language): String
+  internal abstract fun parse(str: String, language: Language): T
 }
 
 private const val MAX_RAW_NUMBER = 1000
@@ -75,7 +75,7 @@ private fun encodeUnderscores(
   }
 }
 
-internal object LiteralInt : LiteralFormat<Int> {
+internal object LiteralInt : LiteralFormat<Int>() {
   override fun encode(value: Int, language: Language): String {
     return encodeUnderscores(StringBuilder(), value.toLong(), language).toString()
   }
@@ -84,7 +84,7 @@ internal object LiteralInt : LiteralFormat<Int> {
   }
 }
 
-internal object LiteralLong : LiteralFormat<Long> {
+internal object LiteralLong : LiteralFormat<Long>() {
   override fun encode(value: Long, language: Language): String {
     val buffer = encodeUnderscores(StringBuilder(), value.toLong(), language)
     if (language != Language.CLOJURE) {
@@ -101,7 +101,9 @@ internal object LiteralLong : LiteralFormat<Long> {
   }
 }
 
-internal object LiteralString : LiteralFormat<String> {
+private const val TRIPLE_QUOTE = "\"\"\""
+
+internal object LiteralString : LiteralFormat<String>() {
   override fun encode(value: String, language: Language): String {
     return singleLineJavaToSource(value)
   }
@@ -133,6 +135,27 @@ internal object LiteralString : LiteralFormat<String> {
   }
   private fun isControlChar(c: Char): Boolean {
     return c in '\u0000'..'\u001F' || c == '\u007F'
+  }
+  fun multiLineJavaToSource(arg: String): String {
+    val escapeBackslashes = arg.replace("\\", "\\\\")
+    val escapeTripleQuotes = escapeBackslashes.replace(TRIPLE_QUOTE, "\\\"\\\"\\\"")
+    val protectWhitespace =
+        escapeTripleQuotes.lines().joinToString("\n") { line ->
+          val protectTrailingWhitespace =
+              if (line.endsWith(" ")) {
+                line.dropLast(1) + "\\s"
+              } else if (line.endsWith("\t")) {
+                line.dropLast(1) + "\\t"
+              } else line
+          val protectLeadingWhitespace =
+              if (protectTrailingWhitespace.startsWith(" ")) {
+                "\\s" + protectTrailingWhitespace.drop(1)
+              } else if (protectTrailingWhitespace.startsWith("\t")) {
+                "\\t" + protectTrailingWhitespace.drop(1)
+              } else protectTrailingWhitespace
+          protectLeadingWhitespace
+        }
+    return "$TRIPLE_QUOTE\n$protectWhitespace$TRIPLE_QUOTE"
   }
   fun singleLineJavaFromSource(source: String): String {
     val firstEscape = source.indexOf('\\')
@@ -192,7 +215,7 @@ internal object LiteralString : LiteralFormat<String> {
   }
 }
 
-internal object LiteralBoolean : LiteralFormat<Boolean> {
+internal object LiteralBoolean : LiteralFormat<Boolean>() {
   override fun encode(value: Boolean, language: Language): String {
     return value.toString()
   }
@@ -201,7 +224,7 @@ internal object LiteralBoolean : LiteralFormat<Boolean> {
   }
 }
 
-internal object DiskSnapshotTodo : LiteralFormat<Unit> {
+internal object DiskSnapshotTodo : LiteralFormat<Unit>() {
   override fun encode(value: Unit, language: Language) = throw UnsupportedOperationException()
   override fun parse(str: String, language: Language) = throw UnsupportedOperationException()
   fun createLiteral() = LiteralValue(null, Unit, DiskSnapshotTodo)
