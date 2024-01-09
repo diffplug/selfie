@@ -31,6 +31,17 @@ class LiteralStringTest {
   }
 
   @Test
+  fun multiLineJavaToSource() {
+    multiLineJavaToSource("1", "'''\n1'''")
+    multiLineJavaToSource("\\", "'''\n\\\\'''")
+    multiLineJavaToSource("  leading\ntrailing  ", "'''\n" + "\\s leading\n" + "trailing \\s'''")
+  }
+  private fun multiLineJavaToSource(value: String, expected: String) {
+    val actual = LiteralString.multiLineJavaToSource(value)
+    actual shouldBe expected.replace("'", "\"")
+  }
+
+  @Test
   fun singleLineJavaFromSource() {
     singleLineJavaFromSource("1", "1")
     singleLineJavaFromSource("\\\\", "\\")
