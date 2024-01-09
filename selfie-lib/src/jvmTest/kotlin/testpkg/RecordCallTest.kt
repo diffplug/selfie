@@ -37,6 +37,7 @@ class RecordCallTest {
           override val allowMultipleEquivalentWritesToOneLocation: Boolean
             get() = TODO()
           override fun sourcePathForCall(call: CallLocation) = Path("testpkg/RecordCallTest.kt")
+          override fun sourcePathForCallMaybe(call: CallLocation): Path? = sourcePathForCall(call)
         }
     stack.location.ideLink(layout) shouldBe
         "testpkg.RecordCallTest.testRecordCall(RecordCallTest.kt:30)"
