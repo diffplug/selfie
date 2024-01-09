@@ -83,9 +83,7 @@ class InlineWriteTracker : WriteTracker<CallLocation, LiteralValue<*>>() {
     recordInternal(call.location, literalValue, call, layout)
     // assert that the value passed at runtime matches the value we parse at compile time
     // because if that assert fails, we've got no business modifying test code
-    val file =
-        layout.sourcePathForCall(call.location)
-            ?: throw Error("Unable to find source file for ${call.location.ideLink(layout)}")
+    val file = layout.sourcePathForCall(call.location)
     if (literalValue.expected != null) {
       // if expected == null, it's a `toBe_TODO()`, so there's nothing to check
       val content = SourceFile(layout.fs.name(file), layout.fs.fileRead(file))

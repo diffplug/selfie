@@ -29,7 +29,14 @@ class SnapshotFileLayoutJUnit5(settings: SelfieSettingsAPI, override val fs: FS)
   internal val unixNewlines = inferDefaultLineEndingIsUnix(settings.rootFolder, fs)
   val extension: String = ".ss"
   private val cache = ThreadLocal<Pair<CallLocation, Path>?>()
-  override fun sourcePathForCall(call: CallLocation): Path? {
+  override fun sourcePathForCall(call: CallLocation): Path {
+    val nonNull =
+        sourcePathForCallMaybe(call)
+            ?: throw fs.assertFailed(
+                "Couldn't find source file for $call, looked in $rootFolder, maybe there are other source roots?")
+    return nonNull
+  }
+  override fun sourcePathForCallMaybe(call: CallLocation): Path? {
     val cached = cache.get()
     if (cached?.first?.samePathAs(call) == true) {
       return cached.second
