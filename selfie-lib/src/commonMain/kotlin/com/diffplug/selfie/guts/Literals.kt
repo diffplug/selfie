@@ -17,6 +17,8 @@ package com.diffplug.selfie.guts
 
 import kotlin.math.abs
 
+internal expect fun jreVersion(): Int
+
 enum class Language {
   JAVA,
   JAVA_PRE15,
@@ -28,7 +30,7 @@ enum class Language {
   companion object {
     fun fromFilename(filename: String): Language {
       return when (filename.substringAfterLast('.')) {
-        "java" -> JAVA_PRE15 // TODO: detect JRE and use JAVA if JVM >= 15
+        "java" -> if (jreVersion() < 15) JAVA_PRE15 else JAVA
         "kt" -> KOTLIN
         "groovy",
         "gvy",
