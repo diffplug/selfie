@@ -41,20 +41,20 @@ class SourceFileToBeTest {
 
   @Test
   fun singleLineString() {
-    javaTest(".toBe('7')", "7")
-    javaTest(".toBe('')", "")
-    javaTest(".toBe( '' )", "")
-    javaTest(".toBe( \n '' \n )", "")
-    javaTest(".toBe( \n '78' \n )", "78")
-    javaTest(".toBe('\\'')", "\\'")
+    javaTest(".toBe('7')", "'7'")
+    javaTest(".toBe('')", "''")
+    javaTest(".toBe( '' )", "''")
+    javaTest(".toBe( \n '' \n )", "''")
+    javaTest(".toBe( \n '78' \n )", "'78'")
+    javaTest(".toBe('\\'')", "'\\''")
   }
 
   @Test
   fun multiLineString() {
-    javaTest(".toBe('''7''')", "7")
-    javaTest(".toBe(''' 7 ''')", " 7 ")
-    javaTest(".toBe('''\n7\n''')", "\n7\n")
-    javaTest(".toBe(''' ' '' ' ''')", " ' '' ' ")
+    javaTest(".toBe('''7''')", "'''7'''")
+    javaTest(".toBe(''' 7 ''')", "''' 7 '''")
+    javaTest(".toBe('''\n7\n''')", "'''\n7\n'''")
+    javaTest(".toBe(''' ' '' ' ''')", "''' ' '' ' '''")
   }
 
   @Test

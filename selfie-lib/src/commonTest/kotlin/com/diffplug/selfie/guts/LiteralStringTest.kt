@@ -48,7 +48,7 @@ class LiteralStringTest {
     singleLineJavaFromSource("1\\n\\tABC", "1\n\tABC")
   }
   private fun singleLineJavaFromSource(value: String, expected: String) {
-    val actual = LiteralString.singleLineJavaFromSource(value.replace("'", "\""))
+    val actual = LiteralString.singleLineJavaFromSource("\"${value.replace("'", "\"")}\"")
     actual shouldBe expected
   }
 
@@ -61,7 +61,7 @@ class LiteralStringTest {
     multiLineJavaFromSource("\n  123  \\s\n  abc\t\\s", "123   \nabc\t ")
   }
   private fun multiLineJavaFromSource(value: String, expected: String) {
-    val actual = LiteralString.multiLineJavaFromSource(value.replace("'", "\""))
+    val actual = LiteralString.multiLineJavaFromSource("\"\"\"${value.replace("'", "\"")}\"\"\"")
     actual shouldBe expected
   }
 }

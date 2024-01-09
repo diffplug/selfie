@@ -157,7 +157,12 @@ internal object LiteralString : LiteralFormat<String>() {
         }
     return "$TRIPLE_QUOTE\n$protectWhitespace$TRIPLE_QUOTE"
   }
-  fun singleLineJavaFromSource(source: String): String {
+  fun singleLineJavaFromSource(sourceWithQuotes: String): String {
+    check(sourceWithQuotes.startsWith('"'))
+    check(sourceWithQuotes.endsWith('"'))
+    return unescapeJava(sourceWithQuotes.substring(1, sourceWithQuotes.length - 1))
+  }
+  private fun unescapeJava(source: String): String {
     val firstEscape = source.indexOf('\\')
     if (firstEscape == -1) {
       return source
@@ -184,6 +189,7 @@ internal object LiteralString : LiteralFormat<String>() {
             value.append(code.toChar())
             i += 4
           }
+          else -> throw IllegalArgumentException("Unknown escape sequence $c")
         }
       } else {
         value.append(c)
@@ -192,23 +198,26 @@ internal object LiteralString : LiteralFormat<String>() {
     }
     return value.toString()
   }
-  fun multiLineJavaFromSource(source: String): String {
-    val linesRaw = source.lines()
-    require(linesRaw[0].isBlank())
-    val lines = linesRaw.drop(1)
+  fun multiLineJavaFromSource(sourceWithQuotes: String): String {
+    check(sourceWithQuotes.startsWith("$TRIPLE_QUOTE\n"))
+    check(sourceWithQuotes.endsWith(TRIPLE_QUOTE))
+    val source =
+        sourceWithQuotes.substring(
+            TRIPLE_QUOTE.length + 1, sourceWithQuotes.length - TRIPLE_QUOTE.length)
+    val lines = source.lines()
     val commonPrefix =
         lines
             .mapNotNull { line ->
               if (line.isNotBlank()) line.takeWhile { it.isWhitespace() } else null
             }
-            .minOrNull()
+            .minOrNull() ?: ""
     return lines.joinToString("\n") { line ->
       if (line.isBlank()) {
         ""
       } else {
-        val removedPrefix = commonPrefix?.let { line.removePrefix(it) } ?: line
+        val removedPrefix = if (commonPrefix.isEmpty()) line else line.removePrefix(commonPrefix)
         val removeTrailingWhitespace = removedPrefix.trimEnd()
-        val handleEscapeSequences = singleLineJavaFromSource(removeTrailingWhitespace)
+        val handleEscapeSequences = unescapeJava(removeTrailingWhitespace)
         handleEscapeSequences
       }
     }
