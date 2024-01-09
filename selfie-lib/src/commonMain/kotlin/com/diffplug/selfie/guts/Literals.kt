@@ -104,12 +104,11 @@ internal object LiteralLong : LiteralFormat<Long>() {
 private const val TRIPLE_QUOTE = "\"\"\""
 
 internal object LiteralString : LiteralFormat<String>() {
-  override fun encode(value: String, language: Language): String {
-    return singleLineJavaToSource(value)
-  }
-  override fun parse(str: String, language: Language): String {
-    return singleLineJavaFromSource(str)
-  }
+  override fun encode(value: String, language: Language): String =
+      if (value.contains("\n")) multiLineJavaToSource(value) else singleLineJavaToSource(value)
+  override fun parse(str: String, language: Language): String =
+      if (str.startsWith(TRIPLE_QUOTE)) multiLineJavaFromSource(str)
+      else singleLineJavaFromSource(str)
   fun singleLineJavaToSource(value: String): String {
     val source = StringBuilder()
     source.append("\"")
