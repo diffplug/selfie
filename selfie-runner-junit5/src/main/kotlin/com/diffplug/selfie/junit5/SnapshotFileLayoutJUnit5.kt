@@ -34,7 +34,7 @@ class SnapshotFileLayoutJUnit5(settings: SelfieSettingsAPI, override val fs: FS)
     val nonNull =
         sourcePathForCallMaybe(call)
             ?: throw fs.assertFailed(
-                "Couldn't find source file for $call, looked in $rootFolder, maybe there are other source roots?")
+                "Couldn't find source file for $call, looked in $rootFolder and $otherSourceRoots, maybe there are other source roots?")
     return nonNull
   }
   override fun sourcePathForCallMaybe(call: CallLocation): Path? {
