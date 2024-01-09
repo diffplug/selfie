@@ -32,12 +32,25 @@ class LiteralStringTest {
 
   @Test
   fun singleLineJavaFromSource() {
-    singleLineJavaFromSource("'1'", "1")
-    singleLineJavaFromSource("'\\\\'", "\\")
-    singleLineJavaFromSource("'1\\n\\tABC'", "1\n\tABC")
+    singleLineJavaFromSource("1", "1")
+    singleLineJavaFromSource("\\\\", "\\")
+    singleLineJavaFromSource("1\\n\\tABC", "1\n\tABC")
   }
   private fun singleLineJavaFromSource(value: String, expected: String) {
     val actual = LiteralString.singleLineJavaFromSource(value.replace("'", "\""))
+    actual shouldBe expected
+  }
+
+  @Test
+  fun multiLineJavaFromSource() {
+    multiLineJavaFromSource("\n123\nabc", "123\nabc")
+    multiLineJavaFromSource("\n  123\n  abc", "123\nabc")
+    multiLineJavaFromSource("\n  123  \n  abc\t", "123\nabc")
+    multiLineJavaFromSource("\n  123  \n  abc\t", "123\nabc")
+    multiLineJavaFromSource("\n  123  \\s\n  abc\t\\s", "123   \nabc\t ")
+  }
+  private fun multiLineJavaFromSource(value: String, expected: String) {
+    val actual = LiteralString.multiLineJavaFromSource(value.replace("'", "\""))
     actual shouldBe expected
   }
 }

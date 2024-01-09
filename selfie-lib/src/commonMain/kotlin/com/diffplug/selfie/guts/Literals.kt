@@ -135,32 +135,60 @@ internal object LiteralString : LiteralFormat<String> {
     return c in '\u0000'..'\u001F' || c == '\u007F'
   }
   fun singleLineJavaFromSource(source: String): String {
+    val firstEscape = source.indexOf('\\')
+    if (firstEscape == -1) {
+      return source
+    }
     val value = StringBuilder()
-    var i = 0
+    value.append(source.substring(0, firstEscape))
+    var i = firstEscape
     while (i < source.length) {
       var c = source[i]
       if (c == '\\') {
         i++
         c = source[i]
         when (c) {
-          'b' -> value.append('\b')
-          'n' -> value.append('\n')
-          'r' -> value.append('\r')
-          't' -> value.append('\t')
           '\"' -> value.append('\"')
           '\\' -> value.append('\\')
+          'b' -> value.append('\b')
+          'f' -> value.append('\u000c')
+          'n' -> value.append('\n')
+          'r' -> value.append('\r')
+          's' -> value.append(' ')
+          't' -> value.append('\t')
           'u' -> {
             val code = source.substring(i + 1, i + 5).toInt(16)
             value.append(code.toChar())
             i += 4
           }
         }
-      } else if (c != '\"') {
+      } else {
         value.append(c)
       }
       i++
     }
     return value.toString()
+  }
+  fun multiLineJavaFromSource(source: String): String {
+    val linesRaw = source.lines()
+    require(linesRaw[0].isBlank())
+    val lines = linesRaw.drop(1)
+    val commonPrefix =
+        lines
+            .mapNotNull { line ->
+              if (line.isNotBlank()) line.takeWhile { it.isWhitespace() } else null
+            }
+            .minOrNull()
+    return lines.joinToString("\n") { line ->
+      if (line.isBlank()) {
+        ""
+      } else {
+        val removedPrefix = commonPrefix?.let { line.removePrefix(it) } ?: line
+        val removeTrailingWhitespace = removedPrefix.trimEnd()
+        val handleEscapeSequences = singleLineJavaFromSource(removeTrailingWhitespace)
+        handleEscapeSequences
+      }
+    }
   }
 }
 
