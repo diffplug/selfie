@@ -48,8 +48,7 @@ public class AccountTest {
 HTTP/1.1 302 Found
 content-type=text/html;charset=UTF-8
 set-cookie=login=user@domain.com;Path=/
-location=/
-""");
+location=/""");
   }
 
   private static String headersToString(Response response) {
