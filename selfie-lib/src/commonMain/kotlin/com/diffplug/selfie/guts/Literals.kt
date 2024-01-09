@@ -105,7 +105,16 @@ private const val TRIPLE_QUOTE = "\"\"\""
 
 internal object LiteralString : LiteralFormat<String>() {
   override fun encode(value: String, language: Language): String =
-      if (value.contains("\n")) multiLineJavaToSource(value) else singleLineJavaToSource(value)
+      if (value.indexOf('\n') != -1) singleLineJavaToSource(value)
+      else
+          when (language) {
+            Language.GROOVY,
+            Language.SCALA,
+            Language.CLOJURE,
+            Language.JAVA_PRE15 -> singleLineJavaToSource(value)
+            Language.JAVA -> multiLineJavaToSource(value)
+            Language.KOTLIN -> multiLineJavaToSource(value)
+          }
   override fun parse(str: String, language: Language): String =
       if (str.startsWith(TRIPLE_QUOTE)) multiLineJavaFromSource(str)
       else singleLineJavaFromSource(str)

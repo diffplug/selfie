@@ -24,14 +24,12 @@ import javax.xml.xpath.XPathFactory
 import okio.FileSystem
 import okio.Path
 import okio.Path.Companion.toPath
-import okio.internal.commonToUtf8String
 import org.gradle.tooling.BuildException
 import org.gradle.tooling.GradleConnector
 import org.gradle.tooling.TestExecutionException
 import org.opentest4j.AssertionFailedError
 import org.w3c.dom.NodeList
 import org.xml.sax.InputSource
-import java.nio.charset.StandardCharsets
 
 open class Harness(subproject: String) {
   // not sure why, but it doesn't work in this project
@@ -78,13 +76,9 @@ open class Harness(subproject: String) {
 
   inner class FileHarness(val subpath: String) {
     fun restoreFromGit() {
-      val absolute = subprojectFolder.resolve(subpath)
-      val pwd = Runtime.getRuntime().exec("pwd", arrayOf(), subprojectFolder.toFile()).inputStream.readAllBytes().toString(StandardCharsets.UTF_8)
-      val git = Runtime.getRuntime().exec("git checkout **/${absolute.toFile().name}", arrayOf(), subprojectFolder.toFile())
-      println(pwd)
-      println(git.inputStream.readAllBytes().toString(StandardCharsets.UTF_8))
-      println(git.errorStream.readAllBytes().toString(StandardCharsets.UTF_8))
-      println("done")
+      val path = subprojectFolder.resolve(subpath)
+      Runtime.getRuntime()
+          .exec("git checkout **/${path.toFile().name}", arrayOf(), subprojectFolder.toFile())
     }
     fun assertDoesNotExist() {
       if (FileSystem.SYSTEM.exists(subprojectFolder.resolve(subpath))) {
