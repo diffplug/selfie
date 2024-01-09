@@ -45,9 +45,9 @@ enum class Language {
 
 class LiteralValue<T : Any>(val expected: T?, val actual: T, val format: LiteralFormat<T>)
 
-interface LiteralFormat<T : Any> {
-  fun encode(value: T, language: Language): String
-  fun parse(str: String, language: Language): T
+abstract class LiteralFormat<T : Any> {
+  internal abstract fun encode(value: T, language: Language): String
+  internal abstract fun parse(str: String, language: Language): T
 }
 
 private const val MAX_RAW_NUMBER = 1000
@@ -75,7 +75,7 @@ private fun encodeUnderscores(
   }
 }
 
-internal object LiteralInt : LiteralFormat<Int> {
+internal object LiteralInt : LiteralFormat<Int>() {
   override fun encode(value: Int, language: Language): String {
     return encodeUnderscores(StringBuilder(), value.toLong(), language).toString()
   }
@@ -84,7 +84,7 @@ internal object LiteralInt : LiteralFormat<Int> {
   }
 }
 
-internal object LiteralLong : LiteralFormat<Long> {
+internal object LiteralLong : LiteralFormat<Long>() {
   override fun encode(value: Long, language: Language): String {
     val buffer = encodeUnderscores(StringBuilder(), value.toLong(), language)
     if (language != Language.CLOJURE) {
@@ -101,7 +101,7 @@ internal object LiteralLong : LiteralFormat<Long> {
   }
 }
 
-internal object LiteralString : LiteralFormat<String> {
+internal object LiteralString : LiteralFormat<String>() {
   override fun encode(value: String, language: Language): String {
     return singleLineJavaToSource(value)
   }
@@ -164,7 +164,7 @@ internal object LiteralString : LiteralFormat<String> {
   }
 }
 
-internal object LiteralBoolean : LiteralFormat<Boolean> {
+internal object LiteralBoolean : LiteralFormat<Boolean>() {
   override fun encode(value: Boolean, language: Language): String {
     return value.toString()
   }
@@ -173,7 +173,7 @@ internal object LiteralBoolean : LiteralFormat<Boolean> {
   }
 }
 
-internal object DiskSnapshotTodo : LiteralFormat<Unit> {
+internal object DiskSnapshotTodo : LiteralFormat<Unit>() {
   override fun encode(value: Unit, language: Language) = throw UnsupportedOperationException()
   override fun parse(str: String, language: Language) = throw UnsupportedOperationException()
   fun createLiteral() = LiteralValue(null, Unit, DiskSnapshotTodo)
