@@ -19,19 +19,19 @@ import io.kotest.matchers.shouldBe
 import kotlin.test.Test
 
 class KotlinMultilineString {
-    @Test
-    fun newlines() {
-        """first
+  @Test
+  fun newlines() {
+    """first
 """ shouldBe "first\n"
-        """
+    """
 second""" shouldBe "\nsecond"
-    }
+  }
 
-    @Test
-    fun indentation() {
-        """
+  @Test
+  fun indentation() {
+    """
 """ shouldBe "\n"
-        """
+    """
   """ shouldBe "\n  "
-    }
+  }
 }
