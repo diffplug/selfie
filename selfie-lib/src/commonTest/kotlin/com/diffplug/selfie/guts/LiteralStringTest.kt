@@ -20,83 +20,83 @@ import kotlin.test.Test
 
 class LiteralStringTest {
   @Test
-  fun singleLineJavaToSource() {
-    singleLineJavaToSource("1", "'1'")
-    singleLineJavaToSource("\\", "'\\\\'")
-    singleLineJavaToSource("1\n\tABC", "'1\\n\\tABC'")
+  fun encodeSingleJava() {
+    encodeSingleJava("1", "'1'")
+    encodeSingleJava("\\", "'\\\\'")
+    encodeSingleJava("1\n\tABC", "'1\\n\\tABC'")
   }
-  private fun singleLineJavaToSource(value: String, expected: String) {
-    val actual = LiteralString.singleLineJavaToSource(value)
+  private fun encodeSingleJava(value: String, expected: String) {
+    val actual = LiteralString.encodeSingleJava(value)
     actual shouldBe expected.replace("'", "\"")
   }
 
   @Test
-  fun singleLineKotlinToSource() {
-    singleLineKotlinToSource("1", "`1`")
-    singleLineKotlinToSource("\\", "`\\\\`")
-    singleLineKotlinToSource("$", "`s{'s'}`".replace('s', '$'))
-    singleLineKotlinToSource("1\n\tABC", "`1\\n\\tABC`")
+  fun encodeSingleJavaWithDollars() {
+    encodeSingleJavaWithDollars("1", "`1`")
+    encodeSingleJavaWithDollars("\\", "`\\\\`")
+    encodeSingleJavaWithDollars("$", "`s{'s'}`".replace('s', '$'))
+    encodeSingleJavaWithDollars("1\n\tABC", "`1\\n\\tABC`")
   }
-  private fun singleLineKotlinToSource(value: String, expected: String) {
-    val actual = LiteralString.singleLineKotlinGroovyToSource(value)
+  private fun encodeSingleJavaWithDollars(value: String, expected: String) {
+    val actual = LiteralString.encodeSingleJavaWithDollars(value)
     actual shouldBe expected.replace("`", "\"")
   }
 
   @Test
-  fun multiLineJavaToSource() {
-    multiLineJavaToSource("1", "'''\n1'''")
-    multiLineJavaToSource("\\", "'''\n\\\\'''")
-    multiLineJavaToSource("  leading\ntrailing  ", "'''\n" + "\\s leading\n" + "trailing \\s'''")
+  fun encodeMultiJava() {
+    encodeMultiJava("1", "'''\n1'''")
+    encodeMultiJava("\\", "'''\n\\\\'''")
+    encodeMultiJava("  leading\ntrailing  ", "'''\n" + "\\s leading\n" + "trailing \\s'''")
   }
-  private fun multiLineJavaToSource(value: String, expected: String) {
-    val actual = LiteralString.multiLineJavaToSource(value)
+  private fun encodeMultiJava(value: String, expected: String) {
+    val actual = LiteralString.encodeMultiJava(value)
     actual shouldBe expected.replace("'", "\"")
   }
   private val KOTLIN_DOLLAR = "s{'s'}".replace('s', '$')
 
   @Test
-  fun multiLineKotlinToSource() {
-    multiLineKotlinToSource("1", "```1```")
-    multiLineKotlinToSource("$", "```$KOTLIN_DOLLAR```")
+  fun encodeMultiKotlin() {
+    encodeMultiKotlin("1", "```1```")
+    encodeMultiKotlin("$", "```$KOTLIN_DOLLAR```")
   }
-  private fun multiLineKotlinToSource(value: String, expected: String) {
-    val actual = LiteralString.multiLineKotlinToSource(value)
+  private fun encodeMultiKotlin(value: String, expected: String) {
+    val actual = LiteralString.encodeMultiKotlin(value)
     actual shouldBe expected.replace("`", "\"")
   }
 
   @Test
-  fun singleLineJavaFromSource() {
-    singleLineJavaFromSource("1", "1")
-    singleLineJavaFromSource("\\\\", "\\")
-    singleLineJavaFromSource("1\\n\\tABC", "1\n\tABC")
+  fun parseSingleJava() {
+    parseSingleJava("1", "1")
+    parseSingleJava("\\\\", "\\")
+    parseSingleJava("1\\n\\tABC", "1\n\tABC")
   }
-  private fun singleLineJavaFromSource(value: String, expected: String) {
-    val actual = LiteralString.singleLineJavaFromSource("\"${value.replace("'", "\"")}\"")
+  private fun parseSingleJava(value: String, expected: String) {
+    val actual = LiteralString.parseSingleJava("\"${value.replace("'", "\"")}\"")
     actual shouldBe expected
   }
 
   @Test
-  fun multiLineJavaFromSource() {
-    multiLineJavaFromSource("\n123\nabc", "123\nabc")
-    multiLineJavaFromSource("\n  123\n  abc", "123\nabc")
-    multiLineJavaFromSource("\n  123  \n  abc\t", "123\nabc")
-    multiLineJavaFromSource("\n  123  \n  abc\t", "123\nabc")
-    multiLineJavaFromSource("\n  123  \\s\n  abc\t\\s", "123   \nabc\t ")
+  fun parseMultiJava() {
+    parseMultiJava("\n123\nabc", "123\nabc")
+    parseMultiJava("\n  123\n  abc", "123\nabc")
+    parseMultiJava("\n  123  \n  abc\t", "123\nabc")
+    parseMultiJava("\n  123  \n  abc\t", "123\nabc")
+    parseMultiJava("\n  123  \\s\n  abc\t\\s", "123   \nabc\t ")
   }
-  private fun multiLineJavaFromSource(value: String, expected: String) {
-    val actual = LiteralString.multiLineJavaFromSource("\"\"\"${value.replace("'", "\"")}\"\"\"")
+  private fun parseMultiJava(value: String, expected: String) {
+    val actual = LiteralString.parseMultiJava("\"\"\"${value.replace("'", "\"")}\"\"\"")
     actual shouldBe expected
   }
 
   @Test
-  fun singleLineKotlinFromSource() {
-    singleLineKotlinFromSource("1", "1")
-    singleLineKotlinFromSource("\\\\", "\\")
-    singleLineKotlinFromSource("s{'s'}".replace('s', '$'), "$")
-    singleLineKotlinFromSource("1\\n\\tABC", "1\n\tABC")
+  fun parseSingleJavaWithDollars() {
+    parseSingleJavaWithDollars("1", "1")
+    parseSingleJavaWithDollars("\\\\", "\\")
+    parseSingleJavaWithDollars("s{'s'}".replace('s', '$'), "$")
+    parseSingleJavaWithDollars("1\\n\\tABC", "1\n\tABC")
   }
-  private fun singleLineKotlinFromSource(value: String, expected: String) {
-    val actual = LiteralString.singleLineKotlinGroovyFromSource("\"${value}\"")
+  private fun parseSingleJavaWithDollars(value: String, expected: String) {
+    val actual = LiteralString.parseSingleJavaWithDollars("\"${value}\"")
     actual shouldBe expected
   }
 }
