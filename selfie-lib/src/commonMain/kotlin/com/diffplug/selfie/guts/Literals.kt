@@ -24,8 +24,7 @@ enum class Language {
   JAVA_PRE15,
   KOTLIN,
   GROOVY,
-  SCALA,
-  CLOJURE;
+  SCALA;
 
   companion object {
     fun fromFilename(filename: String): Language {
@@ -37,8 +36,6 @@ enum class Language {
         "gy" -> GROOVY
         "scala",
         "sc" -> SCALA
-        "clj",
-        "cljs" -> CLOJURE
         else -> throw IllegalArgumentException("Unknown language for file $filename")
       }
     }
@@ -88,10 +85,8 @@ internal object LiteralInt : LiteralFormat<Int>() {
 
 internal object LiteralLong : LiteralFormat<Long>() {
   override fun encode(value: Long, language: Language): String {
-    val buffer = encodeUnderscores(StringBuilder(), value.toLong(), language)
-    if (language != Language.CLOJURE) {
-      buffer.append('L')
-    }
+    val buffer = encodeUnderscores(StringBuilder(), value, language)
+    buffer.append('L')
     return buffer.toString()
   }
   override fun parse(str: String, language: Language): Long {
@@ -107,12 +102,18 @@ private const val TRIPLE_QUOTE = "\"\"\""
 
 internal object LiteralString : LiteralFormat<String>() {
   override fun encode(value: String, language: Language): String =
-      if (value.indexOf('\n') == -1) singleLineJavaToSource(value)
+      if (value.indexOf('\n') == -1)
+          when (language) {
+            Language.JAVA_PRE15,
+            Language.JAVA -> singleLineJavaToSource(value)
+            Language.GROOVY,
+            Language.SCALA,
+            Language.KOTLIN -> singleLineJavaToSource(value)
+          }
       else
           when (language) {
             Language.GROOVY,
             Language.SCALA,
-            Language.CLOJURE,
             Language.JAVA_PRE15 -> singleLineJavaToSource(value)
             Language.JAVA -> multiLineJavaToSource(value)
             Language.KOTLIN -> multiLineJavaToSource(value)
