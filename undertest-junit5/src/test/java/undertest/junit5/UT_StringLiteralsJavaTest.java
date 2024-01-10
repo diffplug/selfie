@@ -27,6 +27,12 @@ public class UT_StringLiteralsJavaTest {
     }
 
     @Test
+    public void escapableCharacters() {
+        expectSelfie(" ' \" $ ").toBe_TODO();
+        expectSelfie(" ' \" $ \n \"\"\"\"\"\"\"\"\"\t").toBe_TODO();
+    }
+
+    @Test
     public void allOfIt() {
         expectSelfie("  a\n" +
                 "a  \n" +

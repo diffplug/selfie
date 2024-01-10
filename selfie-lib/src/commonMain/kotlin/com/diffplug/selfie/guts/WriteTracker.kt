@@ -87,10 +87,17 @@ class InlineWriteTracker : WriteTracker<CallLocation, LiteralValue<*>>() {
     if (literalValue.expected != null) {
       // if expected == null, it's a `toBe_TODO()`, so there's nothing to check
       val content = SourceFile(layout.fs.name(file), layout.fs.fileRead(file))
-      val parsedValue = content.parseToBe(call.location.line).parseLiteral(literalValue.format)
+      val parsedValue =
+          try {
+            content.parseToBe(call.location.line).parseLiteral(literalValue.format)
+          } catch (e: Exception) {
+            throw AssertionError(
+                "Error while parsing the literal at ${call.location.ideLink(layout)}. Please report this error at https://github.com/diffplug/selfie",
+                e)
+          }
       if (parsedValue != literalValue.expected) {
         throw layout.fs.assertFailed(
-            "There is likely a bug in Selfie's literal parsing.",
+            "Selfie cannot modify the literal at ${call.location.ideLink(layout)} because Selfie has a parsing bug. Please report this error at https://github.com/diffplug/selfie",
             literalValue.expected,
             parsedValue)
       }
