@@ -100,6 +100,7 @@ internal object LiteralLong : LiteralFormat<Long>() {
 
 private const val TRIPLE_QUOTE = "\"\"\""
 private const val KOTLIN_DOLLAR = "\${'\$'}"
+private const val KOTLIN_DOLLARQUOTE = "\${'\"'}"
 
 internal object LiteralString : LiteralFormat<String>() {
   override fun encode(value: String, language: Language): String =
@@ -169,20 +170,22 @@ internal object LiteralString : LiteralFormat<String>() {
   }
   fun multiLineKotlinToSource(arg: String): String {
     val escapeDollars = arg.replace("$", KOTLIN_DOLLAR)
-    val escapeTripleQuotes = escapeDollars.replace(TRIPLE_QUOTE, "\${'\"'}${'"'}${'"'}")
+    val escapeTripleQuotes =
+        escapeDollars.replace(
+            TRIPLE_QUOTE, "$KOTLIN_DOLLARQUOTE$KOTLIN_DOLLARQUOTE$KOTLIN_DOLLARQUOTE")
     val protectWhitespace =
         escapeTripleQuotes.lines().joinToString("\n") { line ->
           val protectTrailingWhitespace =
               if (line.endsWith(" ")) {
                 line.dropLast(1) + "\${' '}"
               } else if (line.endsWith("\t")) {
-                line.dropLast(1) + "\${'\t'}"
+                line.dropLast(1) + "\${'\\t'}"
               } else line
           val protectLeadingWhitespace =
               if (protectTrailingWhitespace.startsWith(" ")) {
                 "\${' '}" + protectTrailingWhitespace.drop(1)
               } else if (protectTrailingWhitespace.startsWith("\t")) {
-                "\${'\t'}" + protectTrailingWhitespace.drop(1)
+                "\${'\\t'}" + protectTrailingWhitespace.drop(1)
               } else protectTrailingWhitespace
           protectLeadingWhitespace
         }
@@ -304,7 +307,7 @@ internal object LiteralString : LiteralFormat<String>() {
     }
   }
   fun multiLineKotlinFromSource(sourceWithQuotes: String): String {
-    check(sourceWithQuotes.startsWith("$TRIPLE_QUOTE"))
+    check(sourceWithQuotes.startsWith(TRIPLE_QUOTE))
     check(sourceWithQuotes.endsWith(TRIPLE_QUOTE))
     val source =
         sourceWithQuotes.substring(
