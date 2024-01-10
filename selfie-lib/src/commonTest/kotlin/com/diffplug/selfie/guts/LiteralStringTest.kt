@@ -52,6 +52,17 @@ class LiteralStringTest {
     val actual = LiteralString.multiLineJavaToSource(value)
     actual shouldBe expected.replace("'", "\"")
   }
+  private val KOTLIN_DOLLAR = "s{'s'}".replace('s', '$')
+
+  @Test
+  fun multiLineKotlinToSource() {
+    multiLineKotlinToSource("1", "```1```")
+    multiLineKotlinToSource("$", "```$KOTLIN_DOLLAR```")
+  }
+  private fun multiLineKotlinToSource(value: String, expected: String) {
+    val actual = LiteralString.multiLineKotlinToSource(value)
+    actual shouldBe expected.replace("`", "\"")
+  }
 
   @Test
   fun singleLineJavaFromSource() {

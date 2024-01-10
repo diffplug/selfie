@@ -99,7 +99,7 @@ internal object LiteralLong : LiteralFormat<Long>() {
 }
 
 private const val TRIPLE_QUOTE = "\"\"\""
-private const val KOTLIN_DOLLAR = "${'$'}{'${'$'}'}"
+private const val KOTLIN_DOLLAR = "\${'\$'}"
 
 internal object LiteralString : LiteralFormat<String>() {
   override fun encode(value: String, language: Language): String =
@@ -109,19 +109,35 @@ internal object LiteralString : LiteralFormat<String>() {
             Language.JAVA_PRE15,
             Language.JAVA -> singleLineJavaToSource(value)
             Language.GROOVY,
-            Language.KOTLIN -> singleLineJavaToSource(value)
+            Language.KOTLIN -> singleLineKotlinGroovyToSource(value)
           }
       else
           when (language) {
-            Language.GROOVY,
             Language.SCALA,
             Language.JAVA_PRE15 -> singleLineJavaToSource(value)
             Language.JAVA -> multiLineJavaToSource(value)
-            Language.KOTLIN -> multiLineJavaToSource(value)
+            Language.GROOVY,
+            Language.KOTLIN -> multiLineKotlinToSource(value)
           }
   override fun parse(str: String, language: Language): String =
-      if (str.startsWith(TRIPLE_QUOTE)) multiLineJavaFromSource(str)
-      else singleLineJavaFromSource(str)
+      if (str.startsWith(TRIPLE_QUOTE))
+          when (language) {
+            Language.SCALA ->
+                throw UnsupportedOperationException(
+                    "Selfie doesn't support triple-quoted strings in Scala")
+            Language.JAVA_PRE15,
+            Language.JAVA -> multiLineJavaFromSource(str)
+            Language.GROOVY,
+            Language.KOTLIN -> multiLineKotlinFromSource(str)
+          }
+      else
+          when (language) {
+            Language.SCALA,
+            Language.JAVA_PRE15,
+            Language.JAVA -> singleLineJavaFromSource(str)
+            Language.GROOVY,
+            Language.KOTLIN -> singleLineKotlinGroovyFromSource(str)
+          }
   fun singleLineJavaToSource(value: String): String = singleLineToJavaIshSource(value, false)
   fun singleLineKotlinGroovyToSource(value: String) = singleLineToJavaIshSource(value, true)
   private fun singleLineToJavaIshSource(value: String, escapeDollars: Boolean): String {
@@ -150,6 +166,27 @@ internal object LiteralString : LiteralFormat<String>() {
   }
   private fun isControlChar(c: Char): Boolean {
     return c in '\u0000'..'\u001F' || c == '\u007F'
+  }
+  fun multiLineKotlinToSource(arg: String): String {
+    val escapeDollars = arg.replace("$", KOTLIN_DOLLAR)
+    val escapeTripleQuotes = escapeDollars.replace(TRIPLE_QUOTE, "\${'\"'}${'"'}${'"'}")
+    val protectWhitespace =
+        escapeTripleQuotes.lines().joinToString("\n") { line ->
+          val protectTrailingWhitespace =
+              if (line.endsWith(" ")) {
+                line.dropLast(1) + "\${' '}"
+              } else if (line.endsWith("\t")) {
+                line.dropLast(1) + "\${'\t'}"
+              } else line
+          val protectLeadingWhitespace =
+              if (protectTrailingWhitespace.startsWith(" ")) {
+                "\${' '}" + protectTrailingWhitespace.drop(1)
+              } else if (protectTrailingWhitespace.startsWith("\t")) {
+                "\${'\t'}" + protectTrailingWhitespace.drop(1)
+              } else protectTrailingWhitespace
+          protectLeadingWhitespace
+        }
+    return "$TRIPLE_QUOTE$protectWhitespace$TRIPLE_QUOTE"
   }
   fun multiLineJavaToSource(arg: String): String {
     val escapeBackslashes = arg.replace("\\", "\\\\")
@@ -265,6 +302,14 @@ internal object LiteralString : LiteralFormat<String>() {
         handleEscapeSequences
       }
     }
+  }
+  fun multiLineKotlinFromSource(sourceWithQuotes: String): String {
+    check(sourceWithQuotes.startsWith("$TRIPLE_QUOTE"))
+    check(sourceWithQuotes.endsWith(TRIPLE_QUOTE))
+    val source =
+        sourceWithQuotes.substring(
+            TRIPLE_QUOTE.length, sourceWithQuotes.length - TRIPLE_QUOTE.length)
+    return inlineDollars(source)
   }
 }
 
