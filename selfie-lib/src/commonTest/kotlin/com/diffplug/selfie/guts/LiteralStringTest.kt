@@ -31,6 +31,18 @@ class LiteralStringTest {
   }
 
   @Test
+  fun singleLineKotlinToSource() {
+    singleLineKotlinToSource("1", "`1`")
+    singleLineKotlinToSource("\\", "`\\\\`")
+    singleLineKotlinToSource("$", "`s{'s'}`".replace('s', '$'))
+    singleLineKotlinToSource("1\n\tABC", "`1\\n\\tABC`")
+  }
+  private fun singleLineKotlinToSource(value: String, expected: String) {
+    val actual = LiteralString.singleLineKotlinGroovyToSource(value)
+    actual shouldBe expected.replace("`", "\"")
+  }
+
+  @Test
   fun multiLineJavaToSource() {
     multiLineJavaToSource("1", "'''\n1'''")
     multiLineJavaToSource("\\", "'''\n\\\\'''")
@@ -62,6 +74,18 @@ class LiteralStringTest {
   }
   private fun multiLineJavaFromSource(value: String, expected: String) {
     val actual = LiteralString.multiLineJavaFromSource("\"\"\"${value.replace("'", "\"")}\"\"\"")
+    actual shouldBe expected
+  }
+
+  @Test
+  fun singleLineKotlinFromSource() {
+    singleLineKotlinFromSource("1", "1")
+    singleLineKotlinFromSource("\\\\", "\\")
+    singleLineKotlinFromSource("s{'s'}".replace('s', '$'), "$")
+    singleLineKotlinFromSource("1\\n\\tABC", "1\n\tABC")
+  }
+  private fun singleLineKotlinFromSource(value: String, expected: String) {
+    val actual = LiteralString.singleLineKotlinGroovyFromSource("\"${value}\"")
     actual shouldBe expected
   }
 }

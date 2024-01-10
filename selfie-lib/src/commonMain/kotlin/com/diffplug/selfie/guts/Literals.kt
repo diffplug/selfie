@@ -99,15 +99,16 @@ internal object LiteralLong : LiteralFormat<Long>() {
 }
 
 private const val TRIPLE_QUOTE = "\"\"\""
+private const val KOTLIN_DOLLAR = "${'$'}{'${'$'}'}"
 
 internal object LiteralString : LiteralFormat<String>() {
   override fun encode(value: String, language: Language): String =
       if (value.indexOf('\n') == -1)
           when (language) {
+            Language.SCALA, // scala only does $ substitution for s" and f" strings
             Language.JAVA_PRE15,
             Language.JAVA -> singleLineJavaToSource(value)
             Language.GROOVY,
-            Language.SCALA,
             Language.KOTLIN -> singleLineJavaToSource(value)
           }
       else
@@ -121,7 +122,9 @@ internal object LiteralString : LiteralFormat<String>() {
   override fun parse(str: String, language: Language): String =
       if (str.startsWith(TRIPLE_QUOTE)) multiLineJavaFromSource(str)
       else singleLineJavaFromSource(str)
-  fun singleLineJavaToSource(value: String): String {
+  fun singleLineJavaToSource(value: String): String = singleLineToJavaIshSource(value, false)
+  fun singleLineKotlinGroovyToSource(value: String) = singleLineToJavaIshSource(value, true)
+  private fun singleLineToJavaIshSource(value: String, escapeDollars: Boolean): String {
     val source = StringBuilder()
     source.append("\"")
     for (char in value) {
@@ -132,6 +135,7 @@ internal object LiteralString : LiteralFormat<String>() {
         '\t' -> source.append("\\t")
         '\"' -> source.append("\\\"")
         '\\' -> source.append("\\\\")
+        '$' -> if (escapeDollars) source.append(KOTLIN_DOLLAR) else source.append('$')
         else ->
             if (isControlChar(char)) {
               source.append("\\u")
@@ -168,10 +172,39 @@ internal object LiteralString : LiteralFormat<String>() {
         }
     return "$TRIPLE_QUOTE\n$protectWhitespace$TRIPLE_QUOTE"
   }
-  fun singleLineJavaFromSource(sourceWithQuotes: String): String {
+  fun singleLineJavaFromSource(sourceWithQuotes: String) = singleLineJvm(sourceWithQuotes, false)
+  fun singleLineKotlinGroovyFromSource(sourceWithQuotes: String) =
+      singleLineJvm(sourceWithQuotes, true)
+  private fun singleLineJvm(sourceWithQuotes: String, removeDollars: Boolean): String {
     check(sourceWithQuotes.startsWith('"'))
     check(sourceWithQuotes.endsWith('"'))
-    return unescapeJava(sourceWithQuotes.substring(1, sourceWithQuotes.length - 1))
+    val source = sourceWithQuotes.substring(1, sourceWithQuotes.length - 1)
+    val toUnescape = if (removeDollars) inlineDollars(source) else source
+    return unescapeJava(toUnescape)
+  }
+  private val charLiteralRegex = """\$\{'(\\?.)'\}""".toRegex()
+  private fun inlineDollars(source: String): String {
+    if (source.indexOf('$') == -1) {
+      return source
+    }
+    return charLiteralRegex.replace(source) { matchResult ->
+      val charLiteral = matchResult.groupValues[1]
+      when {
+        charLiteral.length == 1 -> charLiteral
+        charLiteral.length == 2 && charLiteral[0] == '\\' ->
+            when (charLiteral[1]) {
+              't' -> "\t"
+              'b' -> "\b"
+              'n' -> "\n"
+              'r' -> "\r"
+              '\'' -> "'"
+              '\\' -> "\\"
+              '$' -> "$"
+              else -> charLiteral
+            }
+        else -> throw IllegalArgumentException("Unknown character literal $charLiteral")
+      }
+    }
   }
   private fun unescapeJava(source: String): String {
     val firstEscape = source.indexOf('\\')
