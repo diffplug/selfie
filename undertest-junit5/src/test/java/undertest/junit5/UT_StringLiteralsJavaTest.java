@@ -6,51 +6,36 @@ import static com.diffplug.selfie.Selfie.expectSelfie;
 public class UT_StringLiteralsJavaTest {
     @Test
     public void empty() {
-        expectSelfie("").toBe("");
+        expectSelfie("").toBe_TODO();
     }
 
     @Test
     public void tabs() {
-        expectSelfie("\t\t\t").toBe("\t\t\t");
+        expectSelfie("\t\t\t").toBe_TODO();
     }
 
     @Test
     public void spaces() {
-        expectSelfie("   ").toBe("   ");
+        expectSelfie("   ").toBe_TODO();
     }
 
     @Test
     public void newlines() {
-        expectSelfie("\n").toBe("""
-
-""");
-        expectSelfie("\n\n").toBe("""
-
-
-""");
-        expectSelfie("\n\n\n").toBe("""
-
-
-
-""");
+        expectSelfie("\n").toBe_TODO();
+        expectSelfie("\n\n").toBe_TODO();
+        expectSelfie("\n\n\n").toBe_TODO();
     }
 
     @Test
     public void escapableCharacters() {
-        expectSelfie(" ' \" $ ").toBe(" ' \" $ ");
-        expectSelfie(" ' \" $ \n \"\"\"\"\"\"\"\"\"\t").toBe("""
-\s' " $\s
-\s\"\"\"\"\"\"\"\"\"\t""");
+        expectSelfie(" ' \" $ ").toBe_TODO();
+        expectSelfie(" ' \" $ \n \"\"\"\"\"\"\"\"\"\t").toBe_TODO();
     }
 
     @Test
     public void allOfIt() {
         expectSelfie("  a\n" +
                 "a  \n" +
-                "\t a \t\n").toBe("""
-\s a
-a \s
-\t a \t
-""");
+                "\t a \t\n").toBe_TODO();
     }
 }
