@@ -9,6 +9,7 @@ module.exports = {
         green: "#78ACAE",
         red: "#E35C61",
         grey: "#EEE",
+        purple: "#8250DF",
       },
       boxShadow: {
         button: "2px 2px 1px #4D4D4D",
@@ -56,7 +57,7 @@ module.exports = {
       base: [
         "22px",
         {
-          lineHeight: "1.2em",
+          lineHeight: "1.4em",
           fontWeight: 400,
         },
       ],
