@@ -80,20 +80,24 @@ open class SelfieSettingsAPI {
             "src/test/scala",
             "src/test/resources")
     internal fun initialize(): SelfieSettingsAPI {
-      val settings = System.getProperty("selfie.settings")
-      if (settings != null && settings.isNotBlank()) {
-        try {
-          return instantiate(Class.forName(settings))
-        } catch (e: ClassNotFoundException) {
-          throw Error(
-              "The system property selfie.settings was set to $settings, but that class could not be found.",
-              e)
-        }
-      }
       try {
-        return instantiate(Class.forName("selfie.SelfieSettings"))
-      } catch (e: ClassNotFoundException) {
-        return SelfieSettingsAPI()
+        val settings = System.getProperty("selfie.settings")
+        if (settings != null && settings.isNotBlank()) {
+          try {
+            return instantiate(Class.forName(settings))
+          } catch (e: ClassNotFoundException) {
+            throw Error(
+                "The system property selfie.settings was set to $settings, but that class could not be found.",
+                e)
+          }
+        }
+        try {
+          return instantiate(Class.forName("selfie.SelfieSettings"))
+        } catch (e: ClassNotFoundException) {
+          return SelfieSettingsAPI()
+        }
+      } catch (e: Throwable) {
+        return SelfieSettingsSmuggleError(e)
       }
     }
     private fun instantiate(clazz: Class<*>): SelfieSettingsAPI {
@@ -106,3 +110,5 @@ open class SelfieSettingsAPI {
     }
   }
 }
+
+class SelfieSettingsSmuggleError(val error: Throwable) : SelfieSettingsAPI() {}

@@ -22,6 +22,8 @@ import com.diffplug.selfie.guts.SnapshotFileLayout
 
 class SnapshotFileLayoutJUnit5(settings: SelfieSettingsAPI, override val fs: FS) :
     SnapshotFileLayout {
+  private val smuggledError: Throwable? =
+      if (settings is SelfieSettingsSmuggleError) settings.error else null
   override val rootFolder = settings.rootFolder
   private val otherSourceRoots = settings.otherSourceRoots
   override val allowMultipleEquivalentWritesToOneLocation =
@@ -31,6 +33,9 @@ class SnapshotFileLayoutJUnit5(settings: SelfieSettingsAPI, override val fs: FS)
   val extension: String = ".ss"
   private val cache = ThreadLocal<Pair<CallLocation, Path>?>()
   override fun sourcePathForCall(call: CallLocation): Path {
+    if (smuggledError != null) {
+      throw smuggledError
+    }
     val nonNull =
         sourcePathForCallMaybe(call)
             ?: throw fs.assertFailed(
