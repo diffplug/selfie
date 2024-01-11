@@ -41,7 +41,7 @@ export function code({ children, ...props }: ParentComponentProps) {
         "px-[14px]",
         "pt-[6px]",
         "pb-[2px]",
-        "rounded-xl",
+        "rounded",
         "text-sm",
         "desktop:text-base",
         "leading-[1.5em]",
