@@ -81,7 +81,7 @@ export function pre({ children, ...props }: ParentComponentProps) {
 
 export function p({ children, ...props }: ParentComponentProps) {
   return (
-    <p {...props} className="py-[13px] desktop:py-[20px]">
+    <p {...props} className="py-[13px]">
       {children}
     </p>
   );

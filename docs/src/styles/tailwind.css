@@ -5,7 +5,6 @@
 @layer base {
   body {
     @apply text-base;
-    @apply desktop:text-xl;
   }
 
   h2 {
