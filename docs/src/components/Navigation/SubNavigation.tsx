@@ -77,6 +77,7 @@ export function SubNavigation({ pathParts, selectIsOpen }: SubNavigationProps) {
                 unPressedClasses,
                 "fill-black",
                 "hover:fill-white",
+                "desktop:px-2",
               ])}
             >
               <Octocat
