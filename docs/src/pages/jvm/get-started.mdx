@@ -4,6 +4,23 @@ import { GetStarted } from "@/components/GetStarted";
 
 ## Installation
 
+### Requirements
+
+Selfie works with the following JVM test runners:
+
+- JUnit5
+- JUnit4 through junit-vintage
+- PRs welcome for other test runners
+
+Disk snapshots can be used with any JVM language, but inline literal snapshots only work if the test code is written in:
+
+- java (8+ is okay, but 15+ is recommended)
+- kotlin
+- groovy
+- scala
+
+Adding support for other languages is [straightforward](https://github.com/diffplug/selfie/blob/main/selfie-lib/src/commonMain/kotlin/com/diffplug/selfie/guts/Literals.kt), PRs are welcome!
+
 ### Maven
 
 If you're using Maven, add the following dependency to your `pom.xml` file:
@@ -59,12 +76,12 @@ Snapshot mismatch
 
 As you can see, we have three options:
 
-- rename `toBe` to `toBe_TODO` (you can leave the `"[1, 2, 3]"` or remove it, makes no difference)
-  - selfie will rewrite only this one snapshot, and selfie will remove the `_TODO`
+- replace `toBe` with `toBe_TODO` (you can leave or remove the `"[1, 2, 3]"`, makes no difference)
+  - rewrites only this one snapshot, and selfie will remove the `_TODO`
 - put `//selfieonce` anywhere in the file
-  - this will rewrite all snapshots in the file, and selfie will remove `//selfieonce` after it has done so
+  - rewrites all snapshots in the file, and selfie will remove `//selfieonce` after it has done so
 - put `//SELFIEWRITE` anywhere in that file
-  - this will rewrite all snapshots in the file until you remove `//SELFIEWRITE` yourself
+  - rewrites all snapshots in the file until you remove `//SELFIEWRITE` yourself
 
 ## Disk
 
@@ -74,27 +91,42 @@ To store a snapshot on disk, swap `toBe` for `toMatchDisk`:
 expectSelfie(List.of(1, 2, 3).toString()).toMatchDisk_TODO();
 ```
 
-This will create a file called `SomethingOrOther.ss` in the same directory as your test. It will also rewrite the test source to
+This will create a file called `SomethingOrOther.ss` in the same directory as your test. It will also rewrite the test source to:
 
 ```java
 expectSelfie(List.of(1, 2, 3).toString()).toMatchDisk();
 ```
 
-Just like inline snapshots, you can use  `_TODO`, `//selfieonce`, and `//SELFIEWRITE` to control how the snapshots are written and updated. You never have to use `_TODO` if you have the `//selfieonce` or `//SELFIEWRITE` comments in your file.
+Just like inline literal snapshots, you can use  `_TODO`, `//selfieonce`, and `//SELFIEWRITE` to control how the snapshots are written and updated. You don't have to use `_TODO` if you have the `//selfieonce` or `//SELFIEWRITE` comments in your file.
 
 If you want the disk snapshots to live in a different folder, set `snapshotFolderName` using [SelfieSettings](https://kdoc.selfie.dev/selfie-runner-junit5/com.diffplug.selfie.junit5/-selfie-settings-a-p-i/).
 
-## Modes
+## CI
 
-Selfie has three modes:
+The nice thing about `//SELFIEWRITE` is that all of your snapshots will update on every run, which makes it easy to explore — like multiassert on steroids. **The bad thing about `//SELFIEWRITE` is that all of the tests always pass, even if the snapshots actually change on every run.**
 
-- `interactive`, the default mode, used in the quickstart above
-- `readonly`, the default mode if a `CI` environment variable is present, will cause tests to fail if `_TODO()`, `//selfieonce` or `//SELFIEWRITE` are present in the sourcecode
-- `overwrite`, which will cause all snapshots to be overwritten, without looking for `_TODO()`, `//selfieonce` or `//SELFIEWRITE`
+For example, you might have a realtime timestamp or a random port number embedded in a snapshot. Randomness and realtime cannot be present in a repeatable assertion, and you might not realize that a tiny part of a large snapshot is changing while you're in `//SELFIEWRITE` mode.
 
-You can manually set the mode by setting the `SELFIE` environment variable or system property to `interactive`, `readonly`, or `overwrite`.
+For this reason, it is critical that a CI server should always run in `readonly` mode. No action is needed on your part, selfie automatically puts itself into `readonly` mode if the `CI=true` environment variable is present, which is true for all popular CI systems.
+
+When in `readonly` mode, selfie not only refuses to update any snapshots, it also fails the build if `_TODO`, `//selfieonce`, or `//SELFIEWRITE` are present in the sourcecode, even if the snapshots were correct. Writing snapshots is a strictly private affair 😏.
+
+## Beyond toString
+
+All of the examples so far have asserted on Strings. You can also do inline literal assertions on primitive values, and disk assertions on byte arrays:
+
+```java 
+expectSelfie(10/4).toBe(2);
+expectSelfie((10/4) == 2).toBe(true);
+expectSelfie(TimeUnit.DAYS.toMillis(365*1_000_000L)).toBe(31_536_000_000_000_000L);
+expectSelfie(new byte[100]).toMatchDisk();
+```
+
+But the real power of selfie is asserting on arbitrary objects using **facets**, which are covered in the [advanced section](/jvm/advanced).
 
 ## Reference
+
+Full API documentation is available at [kdoc.selfie.dev](https://kdoc.selfie.dev/).
 
 - `.toBe_TODO()` or `.toBe_TODO(argumentIsIgnored)`
   - creates or updates an inline literal snapshot
