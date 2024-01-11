@@ -17,6 +17,12 @@ package com.diffplug.selfie.junit5
 
 import java.io.File
 
+/**
+ * If you create a class named `SelfieSettings` in the package `selfie`, it must extend this class,
+ * and you can override the methods below to customize various behaviors of selfie. You can also put
+ * the settings class somewhere else if you set the `selfie.settings` system property to the fully
+ * qualified name of the class you want selfie to use.
+ */
 open class SelfieSettingsAPI {
   /**
    * It's possible that multiple codepaths from multiple tests can end up writing a single snapshot
