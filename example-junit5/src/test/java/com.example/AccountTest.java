@@ -17,27 +17,51 @@ import org.junit.jupiter.api.TestMethodOrder;
 @TestMethodOrder(MethodOrderer.MethodName.class)
 public class AccountTest {
   @Test
+  public void homepage() {
+    expectSelfie(get("/").body().asString())
+        .toBe(
+            """
+<html><body>
+\s <h1>Please login</h1>
+\s <form action="/login" method="post">
+\s   <input type="text" name="email" placeholder="email">
+\s   <input type="submit" value="login">
+\s </form>
+</body></html>""");
+  }
+
+  @Test
   public void T01_not_logged_in() {
     expectSelfie(get("/"))
         .toBe(
             """
-                <html><body>
-                  <h1>Please login</h1>
-                  <form action="/login" method="post">
-                    <input type="text" name="email" placeholder="email">
-                    <input type="submit" value="login">
-                  </form>
-                </body></html>""");
+<html><body>
+\s <h1>Please login</h1>
+\s <form action="/login" method="post">
+\s   <input type="text" name="email" placeholder="email">
+\s   <input type="submit" value="login">
+\s </form>
+</body></html>
+╔═ [statusLine] ═╗
+HTTP/1.1 200 OK""");
   }
 
   @Test
   public void T02_login(Jooby app) {
     expectSelfie(given().param("email", "user@domain.com").post("/login"))
         .toBe(
-            "<html><body><h1>Email sent!</h1><p>Check your email for your login link.</p></body></html>");
+            """
+<html><body><h1>Email sent!</h1><p>Check your email for your login link.</p></body></html>
+╔═ [statusLine] ═╗
+HTTP/1.1 200 OK""");
     var email = EmailDev.waitForIncoming(app);
     expectSelfie(email)
-        .toBe("Click <a href=\"http://localhost:8911/login-confirm/erjchFY=\">here</a> to login.");
+        .toBe(
+            """
+Click <a href="http://localhost:8911/login-confirm/erjchFY=">here</a> to login.
+╔═ [metadata] ═╗
+subject=Login to example.com
+to=user@domain.com from=team@example.com""");
   }
 
   @Test
