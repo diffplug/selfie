@@ -95,3 +95,12 @@ export function h2({ children, ...props }: ParentComponentProps) {
     </>
   );
 }
+
+export function a({ children, ...props }: ParentComponentProps) {
+  // TODO: contrast issue against the transparent Selfie bot
+  return (
+    <a {...props} className="text-blue hover:underline">
+      {children}
+    </a>
+  );
+}
