@@ -38,12 +38,11 @@ export function code({ children, ...props }: ParentComponentProps) {
     ? ""
     : clsx([
         "bg-grey",
-        "px-[14px]",
+        "px-[7px]",
         "pt-[6px]",
         "pb-[2px]",
         "rounded",
         "text-sm",
-        "desktop:text-base",
         "leading-[1.5em]",
       ]);
   return children ? (
@@ -62,16 +61,15 @@ export function pre({ children, ...props }: ParentComponentProps) {
     <CodeBlockContext.Provider value={true}>
       <div
         className={clsx([
-          "rounded-2xl",
+          "rounded-lg",
           "bg-grey/60",
           "shadow",
           "text-sm",
-          "desktop:text-base",
           "overflow-hidden",
           "leading-[1.5em]",
         ])}
       >
-        <pre className="overflow-scroll p-4" {...props}>
+        <pre className="overflow-scroll p-2" {...props}>
           {children}
         </pre>
       </div>
