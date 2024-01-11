@@ -39,8 +39,7 @@ export function code({ children, ...props }: ParentComponentProps) {
     : clsx([
         "bg-grey",
         "px-[7px]",
-        "pt-[6px]",
-        "pb-[2px]",
+        "py-[2px]",
         "rounded",
         "text-sm",
         "leading-[1.5em]",
@@ -103,9 +102,8 @@ export function h3({ children, ...props }: ParentComponentProps) {
 }
 
 export function a({ children, ...props }: ParentComponentProps) {
-  // TODO: contrast issue against the transparent Selfie bot
   return (
-    <a {...props} className="text-blue hover:underline">
+    <a {...props} className="hover:text-purple underline">
       {children}
     </a>
   );
@@ -116,5 +114,15 @@ export function ul({ children, ...props }: ParentComponentProps) {
     <ul {...props} className="list-inside list-disc">
       {children}
     </ul>
+  );
+}
+
+export function li({ children, ...props }: ParentComponentProps) {
+  return (
+    <li {...props}>
+      <span className="-ml-3">
+        {children}
+      </span>
+    </li>
   );
 }
