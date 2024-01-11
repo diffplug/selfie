@@ -24,7 +24,7 @@ spotless {
     googleJavaFormat()
   }
 }
-tasks.register('runDev', JavaExec) {
+tasks.register('exampleAppJvm', JavaExec) {
   dependsOn 'testClasses'
   description = 'Run example app in dev mode'
   classpath = sourceSets.test.runtimeClasspath
