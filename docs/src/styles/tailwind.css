@@ -25,4 +25,12 @@
     --shiki-token-punctuation: #BBB;
     --shiki-token-link: #0099ff;
   }
+
+  ul ul {
+    margin-left: 16px;
+  }
+
+  ul ul li {
+    list-style-type: circle;
+  }
 }

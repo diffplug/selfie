@@ -104,3 +104,11 @@ export function a({ children, ...props }: ParentComponentProps) {
     </a>
   );
 }
+
+export function ul({ children, ...props }: ParentComponentProps) {
+  return (
+    <ul {...props} className="list-inside list-disc">
+      {children}
+    </ul>
+  );
+}
