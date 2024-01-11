@@ -94,6 +94,14 @@ export function h2({ children, ...props }: ParentComponentProps) {
   );
 }
 
+export function h3({ children, ...props }: ParentComponentProps) {
+  return (
+    <>
+      <h3 {...props} className="text-lg">{children}</h3>
+    </>
+  );
+}
+
 export function a({ children, ...props }: ParentComponentProps) {
   // TODO: contrast issue against the transparent Selfie bot
   return (
