@@ -105,7 +105,7 @@ export function h3({ children, ...props }: ParentComponentProps) {
 
 export function a({ children, ...props }: ParentComponentProps) {
   return (
-    <a {...props} className="text-blue underline visited:text-purple">
+    <a {...props} className="underline hover:text-blue visited:hover:text-purple">
       {children}
     </a>
   );
