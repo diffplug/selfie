@@ -96,14 +96,16 @@ export function h2({ children, ...props }: ParentComponentProps) {
 export function h3({ children, ...props }: ParentComponentProps) {
   return (
     <>
-      <h3 {...props} className="text-lg">{children}</h3>
+      <h3 {...props} className="text-lg">
+        {children}
+      </h3>
     </>
   );
 }
 
 export function a({ children, ...props }: ParentComponentProps) {
   return (
-    <a {...props} className="hover:text-purple underline">
+    <a {...props} className="text-blue underline visited:text-purple">
       {children}
     </a>
   );
@@ -120,9 +122,7 @@ export function ul({ children, ...props }: ParentComponentProps) {
 export function li({ children, ...props }: ParentComponentProps) {
   return (
     <li {...props}>
-      <span className="-ml-3">
-        {children}
-      </span>
+      <span className="-ml-3">{children}</span>
     </li>
   );
 }
