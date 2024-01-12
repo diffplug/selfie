@@ -2,97 +2,131 @@ import { Advanced } from "@/components/Advanced";
 
 <Advanced />
 
-Diving deeper into Selfie's capabilities, this advanced usage guide will help you leverage the full potential of this robust Java snapshot testing library.
+Assuming you have [installed selfie](/jvm/get-started#installation) and glanced through the [quickstart](/jvm/get-started#quickstart), then you're ready to start taking multifaceted snapshots of arbitrary typed data.
 
-## Configuring snapshot storage
+## Our toy project
 
-By default, snapshots are stored in a `__snapshots__` directory. However, if you wish to customize this location:
+We'll be using the [`example-junit5`](https://github.com/diffplug/selfie/tree/main/example-junit5) project from the selfie GitHub repo. You can clone the code and follow along, but there's no need to. If you did clone the project, you could run `gradlew exampleAppJvm` and you'd have a little [jooby](https://jooby.io/) webapp running at `localhost:8080`.
 
-```java
-Selfie.configure().setSnapshotDirectory("/custom/directory/path");
-```
+It has a homepage where we can login. We can go to `/email` to see the emails the server has sent and click our login link, and boom we've got some auth cookies.
 
-## Multiple snapshots in a single test
+There's nothing web-specific about selfie, it's just a familiar example.
 
-While a common pattern is to have one snapshot per test, you might find yourself needing multiple snapshots in a single test. Name your snapshots for clarity:
+## Typed snapshots
 
-```java
-Selfie.capture(output1, "snapshotName1");
-Selfie.capture(output2, "snapshotName2");
-```
-
-## Handling dynamic data
-
-Sometimes, the output may contain dynamic elements, like timestamps or random IDs. You can use matchers to ignore or adapt to these dynamic parts:
+Let's use [REST-assured](https://rest-assured.io/) to do gets and posts. So if we want to assert that the homepage is working, we can do this:
 
 ```java
-Selfie.captureWithMatchers(output, new DynamicDataMatcher("timestamp", "[0-9]{4}-[0-9]{2}-[0-9]{2}"));
+@Test
+public void homepage() {
+  expectSelfie(RestAssured.get("/").body().asString()).toBe("""
+<html><body>
+\s <h1>Please login</h1>
+\s <form action="/login" method="post">
+\s   <input type="text" name="email" placeholder="email">
+\s   <input type="submit" value="login">
+\s </form>
+</body></html>""");
+}
 ```
 
-In this example, the `DynamicDataMatcher` replaces a timestamp with a regular expression ensuring a consistent snapshot.
+Since you [saw the quickstart](/jvm/get-started#quickstart), you know that selfie wrote that big bad string literal for us. The `\s` is just escaped whitespace, to protect it from getting mangled by terrible autoformatters like [spotless](https://github.com/diffplug/spotless).
 
-## Comparing different data types
-
-Selfie isn't limited to just string comparisons. You can compare other data types too:
+The first thing to notice is that we'll be doing a lot of `RestAssured.get().body().asString()`. It would be nice if we could just do `expectSelfie(get("/"))`, but we'll have to write our own `expectSelfie(io.restassured.response.Response)` method. Selfie gives us [`expectSelfie(T, Camera&lt;T&gt;)`](https://kdoc.selfie.dev/selfie-lib/com.diffplug.selfie/-selfie/#1263457170%2FFunctions%2F1751769771) and [`Camera`](https://kdoc.selfie.dev/selfie-lib/com.diffplug.selfie/-camera/) to do exactly that.
 
 ```java
-List<String> outputList = someFunctionThatReturnsAList();
-Selfie.capture(outputList);
-
-Map<String, Object> outputMap = anotherFunctionThatReturnsAMap();
-Selfie.capture(outputMap);
+class Selfie {
+  public static <T> Selfie.DiskSelfie expectSelfie(T actual, Camera<T> camera) { ... }
+}
+@FunctionalInterface
+interface Camera<T> {
+  Snapshot snapshot(T subject);
+}
 ```
 
-## Interactive snapshot review
-
-In case of a snapshot mismatch, you might want to review the changes interactively:
+We can write our `expectSelfie(Response)` anywhere, but we recommend putting it into a class named `SelfieSettings` in the package `selfie`, but you can use any name and put these methods anywhere. We recommend `expectSelfie` because it's a good hint that the string constants are self-updating.
 
 ```java
-Selfie.configure().enableInteractiveMode();
+package selfie; // recommend using this package
+
+import com.diffplug.selfie.Camera;
+import com.diffplug.selfie.Selfie;
+import com.diffplug.selfie.Snapshot;
+import com.diffplug.selfie.junit5.SelfieSettingsAPI;
+import io.restassured.response.Response;
+
+// Recommend using SelfieSettings so that all your project-specific selfie entry points are in one place.
+public class SelfieSettings extends SelfieSettingsAPI {
+  private static final Camera<Response> RESPONSE = (Response response) ->
+    Snapshot.of(response.getBody().asString());
+
+  public static Selfie.DiskSelfie expectSelfie(Response response) {
+    return Selfie.expectSelfie(response, RESPONSE);
+  }
+}
 ```
 
-This will prompt you during test execution, showing you the differences and letting you decide whether to update the snapshot or fail the test.
+## Facets
 
-## Snapshot serializers
-
-For complex objects, you might need to define how the object should be transformed into its snapshot representation:
+Every snapshot has a "subject": `Snapshot.of(String subject)`. But each snapshot can also have an unlimited number of "facets", which are other named values. For example, maybe we want to add the response's status line.
 
 ```java
-Selfie.configure().addSerializer(new CustomObjectSerializer());
+private static final Camera<Response> RESPONSE = (Response response) ->
+   Snapshot.of(response.getBody().asString())
+           .plusFacet("statusLine", response.getStatusLine());
 ```
 
-Your `CustomObjectSerializer` should implement Selfie's `Serializer` interface, ensuring consistent string representation for your custom objects.
-
-## Setting snapshot lifetime
-
-If you want your snapshots to have a limited lifetime (for instance, if certain snapshots should be revisited after a month):
+And now our snapshots have `statusLine`, which we can use in both literal and disk snapshots.
 
 ```java
-Selfie.configure().setSnapshotLifetime(Duration.ofDays(30));
+@Test
+public void homepage() {
+  expectSelfie(get("/")).toBe("""
+<html><body>
+\s <h1>Please login</h1>
+\s <form action="/login" method="post">
+\s   <input type="text" name="email" placeholder="email">
+\s   <input type="submit" value="login">
+\s </form>
+</body></html>
+╔═ [statusLine] ═╗
+HTTP/1.1 200 OK""");
+}
 ```
 
-Once the lifetime exceeds, the snapshot will be treated as stale, prompting you to either update or validate its continued correctness.
-
-## Ignoring specific fields
-
-For certain objects, you might want to ignore specific fields from snapshot comparisons:
+Now that we have the status code, it begs the question: what should the subject be for a 301 redirect? Surely the redirected URL, not just an empty string?
 
 ```java
-Selfie.capture(outputObject, new IgnoreFieldsMatcher("field1", "field2"));
+private static final Camera<Response> RESPONSE = (Response response) -> {
+    var redirectReason = REDIRECTS.get(response.getStatusCode());
+    if (redirectReason != null) {
+        return Snapshot.of("REDIRECT " + response.getStatusCode() + " " + redirectReason + " to " + response.getHeader("Location"));
+    } else {
+        return Snapshot.of(response.getBody().asString()).plusFacet("statusLine", response.getStatusLine());
+    }
+  };
+private static final Map<Integer, String> REDIRECTS = Stream.of(
+    StatusCode.SEE_OTHER,
+    StatusCode.FOUND,
+    StatusCode.TEMPORARY_REDIRECT,
+    StatusCode.MOVED_PERMANENTLY
+  ).collect(Collectors.toMap(StatusCode::value, StatusCode::reason));
 ```
 
-The `IgnoreFieldsMatcher` ensures that the specified fields are not taken into account during snapshot comparisons.
+So a snapshot doesn't have to be only one value, and it's fine if the schema changes depending on the value being snapshotted. The snapshots are for you to read (and look at diffs of), so put whatever you want in there.
 
-## Custom diff viewers
+## Lenses
 
-To get a visual diff when snapshots don't match, integrate a custom diff viewer:
+A [Lens](https://kdoc.selfie.dev/selfie-lib/com.diffplug.selfie/-lens/) is just a function that transforms one `Snapshot` into another `Snapshot`, transforming / creating / removing values along the way.
+
+In our example above, we have been snapshotting `Response` objects, but we might also want to snapshot emails that the server sends.
 
 ```java
-Selfie.configure().setDiffViewer(new CustomDiffViewer());
+public static Selfie.DiskSelfie expectSelfie(EmailDev email) {
+  return Selfie.expectSelfie(email, EMAIL);
+}
+private static final Camera<EmailDev> EMAIL = (EmailDev email) -> Snapshot.of(email.htmlMsg
+  .plusFacet("metadata", "subject=" + email.subject + "\nto=" + email.to + "\nfrom=" + email.from);
 ```
 
-Your `CustomDiffViewer` should implement Selfie's `DiffViewer` interface.
-
----
-
-With these advanced features, Selfie provides you with an expansive toolkit to make snapshot testing precise, convenient, and adaptable to various scenarios. Dive in and enhance your testing experience!
+Now we're getting HTML data from two different places. If you've ever tried to style an email, you know that it gets messy fast, with tons of inline styles. Assertions on semantic HTML can be cumbersome to read already, how are we going to handle this monstrosity?

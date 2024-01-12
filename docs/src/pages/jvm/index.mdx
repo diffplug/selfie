@@ -24,7 +24,7 @@ public void testMcTestFace() {
 }
 ```
 
-With literal snapshots, you can `println` directly into your testcode, combining the speed and freedom of `println` with the repeatability and team friendliness of conventional assertions.
+With literal snapshots, you can `println` directly into your testcode, combining the speed and freedom of `println` with the repeatability and collaborative spirit of conventional assertions.
 
 ```java
 @Test
@@ -47,13 +47,16 @@ And from now on it's a proper assertion, but you didn't have to spend any time w
 
 <NavHeading text="like-a-filesystem" />
 
-Some snapshots are so big that it would be cumbersome to put them inline into your test code, so selfie helps you put them on disk.
+That `primesBelow(100)` snapshot above is almost too long. Something bigger, such as `primesBelow(10_000)` is definitely too big. To handle this, selfie lets you put your snapshots on disk.
 
 ```java
-@Test public void gzipFavicon() {
+@Test
+public void gzipFavicon() {
     expectSelfie(get("/favicon.ico", ContentEncoding.GZIP)).toMatchDisk();
 }
-@Test public void orderFlow() {
+
+@Test
+public void orderFlow() {
   expectSelfie(get("/orders")).toMatchDisk("initial");
   postOrder();
   expectSelfie(get("/orders")).toMatchDisk("ordered");
@@ -105,7 +108,8 @@ expectSelfie(snapshot).toMatchDisk()
 You can also use facets in combination with disk and inline literal snapshots to make your tests more like a story.
 
 ```java
-@Test public void orderFlow() {
+@Test
+public void orderFlow() {
   expectSelfie(get("/orders")).toMatchDisk("initial")
     .facet("md").toBe("Submit order");
   postOrder();
