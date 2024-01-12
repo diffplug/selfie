@@ -12,6 +12,7 @@ dependencies {
   testImplementation "org.junit.jupiter:junit-jupiter:$ver_JUNIT_USE"
   testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
   testImplementation 'io.rest-assured:rest-assured:5.4.0'
+  testImplementation 'org.assertj:assertj-core:3.25.1'
   testImplementation project(':selfie-runner-junit5')
 }
 test {
@@ -23,7 +24,7 @@ spotless {
     googleJavaFormat()
   }
 }
-tasks.register('runDev', JavaExec) {
+tasks.register('exampleAppJvm', JavaExec) {
   dependsOn 'testClasses'
   description = 'Run example app in dev mode'
   classpath = sourceSets.test.runtimeClasspath

@@ -17,26 +17,35 @@ package com.diffplug.selfie.junit5
 
 import java.io.File
 
+/**
+ * If you create a class named `SelfieSettings` in the package `selfie`, it must extend this class,
+ * and you can override the methods below to customize various behaviors of selfie. You can also put
+ * the settings class somewhere else if you set the `selfie.settings` system property to the fully
+ * qualified name of the class you want selfie to use.
+ */
 open class SelfieSettingsAPI {
   /**
    * It's possible that multiple codepaths from multiple tests can end up writing a single snapshot
-   * to a single location. If these snapshots are different, you get a "snapshot error" within a
-   * single invocation, so it can't be resolved by updating the snapshot.
-   *
-   * But if they're all writing the same value, it could be okay. By default, we allow this, but you
-   * can disable it if you want to be more strict.
+   * to a single location. If all these codepaths are writing the same value, it's fine. But it's a
+   * bit of a problem waiting to happen, because if they start writing different values, we'll have
+   * a "snapshot error" even within a single invocation, so it can't be resolved by updating the
+   * snapshot. By default we let this happen and give a nice error message if it goes wrong, but you
+   * can disallow it in the first place if you want.
    */
   open val allowMultipleEquivalentWritesToOneLocation: Boolean
     get() = true
 
   /**
-   * Defaults to `__snapshot__`, null means that snapshots are stored at the same folder location as
-   * the test that created them.
+   * Defaults to null, which means that snapshots are stored right next to the test that created
+   * them. Set to `__snapshots__` to mimic Jest behavior.
    */
   open val snapshotFolderName: String?
     get() = null
 
-  /** By default, the root folder is the first of the standard test directories. */
+  /**
+   * By default, the root folder is the first of the standard test directories. All snapshots are
+   * stored within the root folder.
+   */
   open val rootFolder: File
     get() {
       val userDir = File(System.getProperty("user.dir"))
@@ -52,7 +61,7 @@ open class SelfieSettingsAPI {
 
   /**
    * If Selfie should look for test sourcecode in places other than the rootFolder, you can specify
-   * them here.
+   * them here. Selfie will not store snapshots in these folders.
    */
   open val otherSourceRoots: List<File>
     get() {
@@ -77,20 +86,24 @@ open class SelfieSettingsAPI {
             "src/test/scala",
             "src/test/resources")
     internal fun initialize(): SelfieSettingsAPI {
-      val settings = System.getProperty("selfie.settings")
-      if (settings != null && settings.isNotBlank()) {
-        try {
-          return instantiate(Class.forName(settings))
-        } catch (e: ClassNotFoundException) {
-          throw Error(
-              "The system property selfie.settings was set to $settings, but that class could not be found.",
-              e)
-        }
-      }
       try {
-        return instantiate(Class.forName("selfie.SelfieSettings"))
-      } catch (e: ClassNotFoundException) {
-        return SelfieSettingsAPI()
+        val settings = System.getProperty("selfie.settings")
+        if (settings != null && settings.isNotBlank()) {
+          try {
+            return instantiate(Class.forName(settings))
+          } catch (e: ClassNotFoundException) {
+            throw Error(
+                "The system property selfie.settings was set to $settings, but that class could not be found.",
+                e)
+          }
+        }
+        try {
+          return instantiate(Class.forName("selfie.SelfieSettings"))
+        } catch (e: ClassNotFoundException) {
+          return SelfieSettingsAPI()
+        }
+      } catch (e: Throwable) {
+        return SelfieSettingsSmuggleError(e)
       }
     }
     private fun instantiate(clazz: Class<*>): SelfieSettingsAPI {
@@ -103,3 +116,5 @@ open class SelfieSettingsAPI {
     }
   }
 }
+
+class SelfieSettingsSmuggleError(val error: Throwable) : SelfieSettingsAPI() {}

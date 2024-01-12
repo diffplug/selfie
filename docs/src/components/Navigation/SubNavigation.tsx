@@ -2,6 +2,7 @@ import { PathParts } from "@/lib/languageFromPath";
 import clsx from "clsx";
 import Link from "next/link";
 import { Button } from "../Button";
+import { Octocat } from "../Icons/Octocat";
 
 type SubNavButton = {
   text: string;
@@ -70,6 +71,27 @@ export function SubNavigation({ pathParts, selectIsOpen }: SubNavigationProps) {
               </Link>
             );
           })}
+          <Link href="https://github.com/diffplug/selfie">
+            <Button
+              className={clsx([
+                unPressedClasses,
+                "fill-black",
+                "hover:fill-white",
+                "desktop:px-2",
+              ])}
+            >
+              <Octocat
+                className={clsx([
+                  "w-[16px]",
+                  "h-[16px]",
+                  "wide-phone:w-[22px]",
+                  "wide-phone:h-[22px]",
+                  "desktop:w-[32px]",
+                  "desktop:h-[32px]",
+                ])}
+              />
+            </Button>
+          </Link>
         </li>
       </ul>
     </nav>

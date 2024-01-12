@@ -3,6 +3,8 @@ import slugify from "@sindresorhus/slugify";
 import { Button } from "./Button";
 import Link from "next/link";
 
+const THE_CONTEXT_WINDOW = "https://thecontextwindow.ai/assertions-are-just-bad-snapshots";
+
 export function IntroText() {
   return (
     <div
@@ -65,18 +67,18 @@ export function IntroText() {
       >
         <p>
           Snapshot testing is the <br />{" "}
-          <span className="text-blue">fastest and most precise</span>
+          <a href={THE_CONTEXT_WINDOW} className="text-blue hover:underline cursor-pointer">fastest and most precise</a>
           <br />
           mechanism to{" "}
-          <span className="text-red">
+          <a href={THE_CONTEXT_WINDOW} className="text-red hover:underline cursor-pointer">
             record <br /> and specify
-          </span>{" "}
+          </a>{" "}
           the <br />
-          <span className="text-green">
+          <a href={THE_CONTEXT_WINDOW} className="text-green hover:underline cursor-pointer">
             behavior of your <br />
             system and its <br />
             components
-          </span>
+          </a>
           .
         </p>
         <p>

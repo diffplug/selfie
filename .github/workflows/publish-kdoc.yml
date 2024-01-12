@@ -1,5 +1,6 @@
-on: workflow_dispatch
-
+on:
+  push:
+    branches: [release]
 jobs:
   publish:
     runs-on: ubuntu-latest

@@ -32,6 +32,7 @@ public class Dev extends Jooby {
   }
 
   public static void main(String[] args) {
+    System.out.println("Opening selfie demo app at http://localhost:8080");
     Jooby.runApp(args, () -> new Dev(true));
   }
 }
