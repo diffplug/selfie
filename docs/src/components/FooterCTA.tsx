@@ -1,7 +1,11 @@
 import clsx from "clsx";
-import { useEffect, useRef, useState } from "react";
+import { useRef } from "react";
 
-const IMG_HEIGHT = 615; // 568 works for all screen sizes
+// STYLES IN COMMENTS REQUIRED FOR TAILWIND TO INCLUDE THEM
+// h-[568px] w-[1136px] max-h-[568px] min-h-[568px]
+const IMG_HEIGHT = 568;
+const IMG_WIDTH = 1136;
+
 export function FooterCTA() {
   const horseRef = useRef<HTMLElement | null>(null);
   const spacerRef = useRef<HTMLDivElement | null>(null);
@@ -10,7 +14,6 @@ export function FooterCTA() {
   function handleScroll() {
     if (!horseRef.current || !footerRef.current || !spacerRef.current) return;
     // 0 at the current scroll position, 1 at the bottom of the page
-
     const topOfHorseFromBottomOfScreen =
       window.innerHeight - spacerRef.current.getBoundingClientRect().top;
 
@@ -53,8 +56,7 @@ export function FooterCTA() {
     };
     const observer = new IntersectionObserver(onIntersect, options);
     // Trigger an event when the horse image is 100% in view
-    // observer.observe(horse);
-    addScrollListener();
+    observer.observe(horse);
   }
 
   return (
@@ -64,7 +66,6 @@ export function FooterCTA() {
         className={clsx([
           `h-[${IMG_HEIGHT}px]`, // spacer under the images to allow for more scrolling
           "w-full",
-          "opacity-50",
           "relative",
           "z-0",
         ])}
@@ -76,7 +77,6 @@ export function FooterCTA() {
           "bottom-0",
           `h-[${IMG_HEIGHT}px]`,
           "z-10",
-          "relative",
         ])}
       >
         <div
@@ -87,27 +87,38 @@ export function FooterCTA() {
             horseRef.current = node;
           }}
           className={clsx([
-            `h-[${IMG_HEIGHT}px]`, // animate this to zero
+            `h-[${IMG_HEIGHT}px]`,
+            `max-h-[${IMG_HEIGHT}px]`, // animates to zero
             "animate-shrink-with-scroll",
-            "overflow-hidden", // horse container
+            "overflow-hidden",
             "absolute",
             "top-0",
             "z-20",
+            "left-0",
+            "right-0",
           ])}
         >
           <img
             src="/horse.webp"
-            className={clsx([`h-[${IMG_HEIGHT}px]`, `min-h-[${IMG_HEIGHT}px]`])}
+            className={clsx([
+              `h-[${IMG_HEIGHT}px]`,
+              `min-h-[${IMG_HEIGHT}px]`,
+              `w-[${IMG_WIDTH}px]`,
+              "m-auto",
+            ])}
           />
         </div>
         <img
           src="/car.webp"
           className={clsx([
             `h-[${IMG_HEIGHT}px]`,
-            "w-full",
+            `w-[${IMG_WIDTH}px]`,
+            "left-0",
+            "right-0",
             "z-10",
             "absolute",
-            "top-0", // car
+            "top-0",
+            "m-auto",
           ])}
         />
       </div>
