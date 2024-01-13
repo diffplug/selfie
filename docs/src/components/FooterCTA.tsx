@@ -1,5 +1,5 @@
 import clsx from "clsx";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 
 // STYLES IN COMMENTS REQUIRED FOR TAILWIND TO INCLUDE THEM
 // h-[568px] w-[1136px] max-h-[568px] min-h-[568px]
@@ -7,12 +7,11 @@ const IMG_HEIGHT = 568;
 const IMG_WIDTH = 1136;
 
 export function FooterCTA() {
-  const horseRef = useRef<HTMLElement | null>(null);
   const spacerRef = useRef<HTMLDivElement | null>(null);
   const footerRef = useRef<HTMLDivElement | null>(null);
 
   function handleScroll() {
-    if (!horseRef.current || !footerRef.current || !spacerRef.current) return;
+    if (!footerRef.current || !spacerRef.current) return;
     // 0 at the current scroll position, 1 at the bottom of the page
     const topOfHorseFromBottomOfScreen =
       window.innerHeight - spacerRef.current.getBoundingClientRect().top;
@@ -30,37 +29,35 @@ export function FooterCTA() {
       "--horse-height-scale",
       "" + horseHeightScale
     );
-  }
 
-  function addScrollListener() {
-    window.addEventListener("scroll", handleScroll, false);
-  }
-  function removeScrollListener() {
-    window.removeEventListener("scroll", handleScroll, false);
-  }
+    const bottomOfDocument = document.body.scrollHeight;
+    const currentPosition = window.innerHeight + window.scrollY;
 
-  function onIntersect(entries: IntersectionObserverEntry[]) {
-    if (entries[0].isIntersecting) {
-      // Horse image is stuck to the bottom of the viewport
-      addScrollListener();
-    } else {
-      // ScrollY is too low and the horse is out of view
-      removeScrollListener();
+    //  Set a variable to 0 when currentPosition is 0 bottomOfDocument - IMG_HEIGHT
+    // and -IMG_HEIGHT when currentPosition is bottomOfDocument
+    const distanceToBottom = bottomOfDocument - currentPosition;
+    let footerTranslateY = distanceToBottom - IMG_HEIGHT;
+    if (footerTranslateY > 0) {
+      footerTranslateY = 0;
     }
+    footerRef.current!.style.setProperty(
+      "--footer-translate-y",
+      "" + footerTranslateY + "px"
+    );
   }
-  function createIntersectionObserver(horse: HTMLElement) {
-    let options = {
-      root: null,
-      rootMargin: "0px",
-      threshold: 1.0,
+
+  useEffect(() => {
+    window.addEventListener("scroll", handleScroll, false);
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
     };
-    const observer = new IntersectionObserver(onIntersect, options);
-    // Trigger an event when the horse image is 100% in view
-    observer.observe(horse);
-  }
+  }, []);
 
   return (
-    <div ref={footerRef}>
+    <div
+      ref={footerRef}
+      style={{ transform: "translateY(var(--footer-translate-y))" }}
+    >
       <div
         ref={spacerRef}
         className={clsx([
@@ -80,12 +77,6 @@ export function FooterCTA() {
         ])}
       >
         <div
-          ref={(node) => {
-            if (node) {
-              createIntersectionObserver(node);
-            }
-            horseRef.current = node;
-          }}
           className={clsx([
             `h-[${IMG_HEIGHT}px]`,
             `max-h-[${IMG_HEIGHT}px]`, // animates to zero
