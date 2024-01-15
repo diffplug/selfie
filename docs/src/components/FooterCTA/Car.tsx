@@ -1,5 +1,9 @@
 import clsx from "clsx";
-import { FOOTER_IMG_HEIGHT, FOOTER_IMG_WIDTH } from "./constants";
+import {
+  buttonClasses,
+  FOOTER_IMG_HEIGHT,
+  FOOTER_IMG_WIDTH,
+} from "./constants";
 
 export function Car() {
   function handleClick() {
@@ -34,26 +38,12 @@ export function Car() {
         let your codebase take its own selfies
       </span>
       <span
+        onClick={handleClick}
+        role="button"
         className={clsx([
-          "flex",
-          "justify-center",
-          "items-center",
-          "border",
-          "border-2",
-          "border-black",
-          "cursor-pointer",
+          buttonClasses,
           "absolute",
           "bottom-[150px]",
-          "border-[4px]",
-          "h-[53px]",
-          "rounded-[16px]",
-          "text-lg",
-          "hover:text-white",
-          "hover:bg-blue",
-          "text-black",
-          "bg-white",
-          "shadow-button",
-          "tablet:shadow-button-tablet",
           "w-[210px]",
           "left-0",
           "right-0",

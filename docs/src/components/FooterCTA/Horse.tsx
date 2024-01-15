@@ -1,6 +1,9 @@
 import clsx from "clsx";
-import { FOOTER_IMG_HEIGHT, FOOTER_IMG_WIDTH } from "./constants";
-import { Button } from "../Button";
+import {
+  buttonClasses,
+  FOOTER_IMG_HEIGHT,
+  FOOTER_IMG_WIDTH,
+} from "./constants";
 
 export function Horse() {
   function handleClick() {
@@ -29,26 +32,12 @@ export function Horse() {
         are you still writing assertions
       </span>
       <span
+        onClick={handleClick}
+        role="button"
         className={clsx([
-          "flex",
-          "justify-center",
-          "items-center",
-          "border",
-          "border-2",
-          "border-black",
-          "cursor-pointer",
+          buttonClasses,
           "absolute",
           "top-16",
-          "border-[4px]",
-          "h-[53px]",
-          "rounded-[16px]",
-          "text-lg",
-          "hover:text-white",
-          "hover:bg-blue",
-          "text-black",
-          "bg-white",
-          "shadow-button",
-          "tablet:shadow-button-tablet",
           "w-[210px]",
           "left-[300px]",
           "tablet:left-[400px]",
