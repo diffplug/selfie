@@ -12,7 +12,6 @@ export function ButtonList() {
       className={clsx([
         "align-center",
         "flex",
-        "w-[187px]",
         "flex-row",
         "justify-between",
         "wide-phone:w-[220px]",
@@ -65,10 +64,11 @@ export function ButtonList() {
 }
 
 const sharedClasses = clsx([
-  "w-[44px]",
+  "w-[34px]",
   "h-[23px]",
   "rounded-[4px]",
-  "text-[14px]",
+  "text-[12px]",
+  "wide-phone:w-[44px]",
   "tablet:w-[73px]",
   "desktop:w-[110px]",
   "hover:text-white",
