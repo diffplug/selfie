@@ -104,7 +104,7 @@ const sharedClasses = clsx([
   "justify-center",
   "items-center",
   "cursor-pointer",
-  "text-[16px]",
+  "text-[8px]",
   "border",
   "h-[23px]",
   "border-black",
