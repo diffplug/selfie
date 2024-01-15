@@ -29,7 +29,8 @@ export function Horse({ imageRef, setImageHeight }: HorseProps) {
           "wide-phone:text-base",
           "wide-phone:top-1",
           "tablet:text-lg",
-          "tablet:top-4",
+          "tablet:top-2",
+          "desktop:top-4",
           "text-center",
         ])}
       >
@@ -45,10 +46,11 @@ export function Horse({ imageRef, setImageHeight }: HorseProps) {
           "wide-phone:top-10",
           "wide-phone:w-[150px]",
           "wide-phone:left-[300px]",
-          "tablet:top-16",
+          "tablet:top-14",
           "tablet:w-[210px]",
           "tablet:left-[300px]",
           "tablet:left-[400px]",
+          "desktop:top-16",
           "right-6",
           "m-auto",
         ])}
