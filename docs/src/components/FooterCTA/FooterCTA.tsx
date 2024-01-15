@@ -9,7 +9,9 @@ export function FooterCTA() {
   const imageRef = useRef<HTMLImageElement | null>(null);
   const [imageHeight, setImageHeight] = useState(0);
 
-  function handleResize() {}
+  function handleResize() {
+    setImageHeight(imageRef.current!.height);
+  }
 
   function handleScroll() {
     if (!footerRef.current || !spacerRef.current) return;
