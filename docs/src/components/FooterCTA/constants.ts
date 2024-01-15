@@ -1,6 +1,4 @@
 import clsx from "clsx";
-export const FOOTER_IMG_HEIGHT = 568;
-export const FOOTER_IMG_WIDTH = 1136;
 export const buttonClasses = clsx([
   "flex",
   "justify-center",

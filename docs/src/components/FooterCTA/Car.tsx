@@ -1,9 +1,5 @@
 import clsx from "clsx";
-import {
-  buttonClasses,
-  FOOTER_IMG_HEIGHT,
-  FOOTER_IMG_WIDTH,
-} from "./constants";
+import { buttonClasses } from "./constants";
 import Link from "next/link";
 
 interface CarProps {
@@ -14,15 +10,7 @@ export function Car({ imageHeight }: CarProps) {
     <div style={{ height: imageHeight }} className={clsx(["relative", "z-10"])}>
       <img
         src="/car.webp"
-        className={clsx([
-          `max-h-[${FOOTER_IMG_HEIGHT}px]`,
-          `w-[${FOOTER_IMG_WIDTH}px]`,
-          "left-0",
-          "right-0",
-          "absolute",
-          "top-0",
-          "m-auto",
-        ])}
+        className={clsx(["left-0", "right-0", "absolute", "top-0", "m-auto"])}
       />
       <span
         className={clsx([

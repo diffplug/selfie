@@ -1,9 +1,5 @@
 import clsx from "clsx";
-import {
-  buttonClasses,
-  FOOTER_IMG_HEIGHT,
-  FOOTER_IMG_WIDTH,
-} from "./constants";
+import { buttonClasses } from "./constants";
 import Link from "next/link";
 import { MutableRefObject } from "react";
 
@@ -22,11 +18,7 @@ export function Horse({ imageRef, setImageHeight }: HorseProps) {
           }
           imageRef.current = el;
         }}
-        className={clsx([
-          `max-h-[${FOOTER_IMG_HEIGHT}px]`,
-          `w-[${FOOTER_IMG_WIDTH}px]`,
-          "m-auto",
-        ])}
+        className={clsx(["m-auto"])}
       />
       <span
         className={clsx([

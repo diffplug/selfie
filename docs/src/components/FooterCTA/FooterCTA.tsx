@@ -1,12 +1,7 @@
 import clsx from "clsx";
 import { useEffect, useRef, useState } from "react";
-import { FOOTER_IMG_HEIGHT } from "./constants";
 import { Horse } from "./Horse";
 import { Car } from "./Car";
-
-// STYLES IN COMMENTS REQUIRED FOR TAILWIND TO INCLUDE THEM
-// h-[568px] w-[1136px] max-h-[568px] min-h-[568px]
-// max-h-[568px] w-[1136px] max-h-[568px] min-h-[568px]
 
 export function FooterCTA() {
   const spacerRef = useRef<HTMLDivElement | null>(null);
@@ -61,18 +56,17 @@ export function FooterCTA() {
         ])}
       ></div>
       <div
+        style={{ height: imageHeight }}
         className={clsx([
           "max-w-full", // sticky image container
           "sticky",
           "bottom-0",
-          `h-[${FOOTER_IMG_HEIGHT}px]`,
           "z-10",
         ])}
       >
         <div
+          style={{ height: imageHeight, maxHeight: imageHeight }}
           className={clsx([
-            `h-[${FOOTER_IMG_HEIGHT}px]`,
-            `max-h-[${FOOTER_IMG_HEIGHT}px]`, // animates to zero
             "animate-shrink-with-scroll",
             "overflow-hidden",
             "absolute",
