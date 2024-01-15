@@ -26,7 +26,7 @@ module.exports = {
           "slide 1s linear calc(var(--page-scroll) * -0.9s) paused," +
           "customFade 1s linear calc(var(--literal-scroll) * -0.9s) paused",
         "shrink-with-scroll":
-          "horseHeight 1s linear calc(var(--horse-height-scale) * -1s) paused",
+          "horseHeight 1s linear calc(var(--horse-height-scale) * -0.999s) paused",
       },
       keyframes: {
         slide: {
