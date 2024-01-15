@@ -44,10 +44,10 @@ module.exports = {
         },
         horseHeight: {
           from: {
-            "max-height": "615px",
+            "max-height": "100%",
           },
           to: {
-            "max-height": "0px",
+            "max-height": "0%",
           },
         },
       },
