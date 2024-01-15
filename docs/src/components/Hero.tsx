@@ -42,7 +42,7 @@ export function Hero() {
           <p
             className={clsx([
               "font-sans",
-              "text-[22px]",
+              "text-[16px]",
               "wide-phone:text-[30px]",
               "wide-phone:mb-2",
               "tablet:text-[40px]",

@@ -1,3 +1,4 @@
+import { FooterCTA } from "@/components/FooterCTA/FooterCTA";
 import { Hero } from "@/components/Hero";
 import { Navigation } from "@/components/Navigation/Navigation";
 import * as mdxComponents from "@/components/mdx";
