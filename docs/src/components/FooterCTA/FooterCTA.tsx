@@ -2,6 +2,7 @@ import clsx from "clsx";
 import { useEffect, useRef } from "react";
 import { FOOTER_IMG_HEIGHT, FOOTER_IMG_WIDTH } from "./constants";
 import { Horse } from "./Horse";
+import { Car } from "./Car";
 
 // STYLES IN COMMENTS REQUIRED FOR TAILWIND TO INCLUDE THEM
 // h-[568px] w-[1136px] max-h-[568px] min-h-[568px]
@@ -91,19 +92,7 @@ export function FooterCTA() {
         >
           <Horse />
         </div>
-        <img
-          src="/car.webp"
-          className={clsx([
-            `h-[${FOOTER_IMG_HEIGHT}px]`,
-            `w-[${FOOTER_IMG_WIDTH}px]`,
-            "left-0",
-            "right-0",
-            "z-10",
-            "absolute",
-            "top-0",
-            "m-auto",
-          ])}
-        />
+        <Car />
       </div>
     </div>
   );
