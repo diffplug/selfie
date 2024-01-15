@@ -32,8 +32,10 @@ export function Horse({ imageRef, setImageHeight }: HorseProps) {
         className={clsx([
           "absolute",
           "w-full",
-          "top-4",
-          "text-lg",
+          "top-0",
+          "text-sm",
+          "wide-phone:text-lg",
+          "wide-phone:top-4",
           "text-center",
         ])}
       >
@@ -44,11 +46,13 @@ export function Horse({ imageRef, setImageHeight }: HorseProps) {
         className={clsx([
           buttonClasses,
           "absolute",
-          "top-16",
-          "w-[210px]",
-          "left-[300px]",
+          "top-5",
+          "w-[130px]",
+          "wide-phone:top-16",
+          "wide-phone:w-[210px]",
+          "wide-phone:left-[300px]",
           "tablet:left-[400px]",
-          "right-0",
+          "right-6",
           "m-auto",
         ])}
       >

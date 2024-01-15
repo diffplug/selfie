@@ -84,7 +84,7 @@ export function FooterCTA() {
         >
           <Horse imageRef={imageRef} setImageHeight={setImageHeight} />
         </div>
-        <Car />
+        <Car imageHeight={imageHeight} />
       </div>
     </div>
   );
