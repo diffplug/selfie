@@ -4,11 +4,9 @@ import {
   FOOTER_IMG_HEIGHT,
   FOOTER_IMG_WIDTH,
 } from "./constants";
+import Link from "next/link";
 
 export function Horse() {
-  function handleClick() {
-    console.log("clicked");
-  }
   return (
     <div className="relative">
       <img
@@ -31,9 +29,8 @@ export function Horse() {
       >
         are you still writing assertions
       </span>
-      <span
-        onClick={handleClick}
-        role="button"
+      <Link
+        href="https://thecontextwindow.ai/p/todo"
         className={clsx([
           buttonClasses,
           "absolute",
@@ -46,7 +43,7 @@ export function Horse() {
         ])}
       >
         by hand?
-      </span>
+      </Link>
     </div>
   );
 }

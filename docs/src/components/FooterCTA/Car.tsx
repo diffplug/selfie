@@ -4,11 +4,9 @@ import {
   FOOTER_IMG_HEIGHT,
   FOOTER_IMG_WIDTH,
 } from "./constants";
+import Link from "next/link";
 
 export function Car() {
-  function handleClick() {
-    console.log("clicked");
-  }
   return (
     <div className={clsx(["relative", "z-10", "h-full"])}>
       <img
@@ -37,9 +35,8 @@ export function Car() {
       >
         let your codebase take its own selfies
       </span>
-      <span
-        onClick={handleClick}
-        role="button"
+      <Link
+        href="/jvm/get-started"
         className={clsx([
           buttonClasses,
           "absolute",
@@ -51,7 +48,7 @@ export function Car() {
         ])}
       >
         get started
-      </span>
+      </Link>
     </div>
   );
 }
