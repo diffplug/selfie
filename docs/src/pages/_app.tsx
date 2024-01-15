@@ -31,7 +31,6 @@ export default function App({ Component, pageProps }: AppProps) {
         <div className={clsx(["px-2", "wide-phone:px-4"])}>
           <Component {...pageProps} />
         </div>
-        <FooterCTA />
       </MDXProvider>
     </>
   );
