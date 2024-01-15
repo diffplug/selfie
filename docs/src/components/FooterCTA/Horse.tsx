@@ -5,15 +5,25 @@ import {
   FOOTER_IMG_WIDTH,
 } from "./constants";
 import Link from "next/link";
+import { MutableRefObject } from "react";
 
-export function Horse() {
+interface HorseProps {
+  imageRef: MutableRefObject<HTMLImageElement | null>;
+  setImageHeight: (height: number) => void;
+}
+export function Horse({ imageRef, setImageHeight }: HorseProps) {
   return (
     <div className="relative">
       <img
         src="/horse.webp"
+        ref={(el) => {
+          if (el) {
+            setImageHeight(el.height);
+          }
+          imageRef.current = el;
+        }}
         className={clsx([
-          `h-[${FOOTER_IMG_HEIGHT}px]`,
-          `min-h-[${FOOTER_IMG_HEIGHT}px]`,
+          `max-h-[${FOOTER_IMG_HEIGHT}px]`,
           `w-[${FOOTER_IMG_WIDTH}px]`,
           "m-auto",
         ])}

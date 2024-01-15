@@ -1,15 +1,20 @@
 import clsx from "clsx";
-import { useEffect, useRef } from "react";
-import { FOOTER_IMG_HEIGHT, FOOTER_IMG_WIDTH } from "./constants";
+import { useEffect, useRef, useState } from "react";
+import { FOOTER_IMG_HEIGHT } from "./constants";
 import { Horse } from "./Horse";
 import { Car } from "./Car";
 
 // STYLES IN COMMENTS REQUIRED FOR TAILWIND TO INCLUDE THEM
 // h-[568px] w-[1136px] max-h-[568px] min-h-[568px]
+// max-h-[568px] w-[1136px] max-h-[568px] min-h-[568px]
 
 export function FooterCTA() {
   const spacerRef = useRef<HTMLDivElement | null>(null);
   const footerRef = useRef<HTMLDivElement | null>(null);
+  const imageRef = useRef<HTMLImageElement | null>(null);
+  const [imageHeight, setImageHeight] = useState(0);
+
+  function handleResize() {}
 
   function handleScroll() {
     if (!footerRef.current || !spacerRef.current) return;
@@ -18,13 +23,13 @@ export function FooterCTA() {
       window.innerHeight - spacerRef.current.getBoundingClientRect().top;
 
     let horseHeightScale: number;
-    if (topOfHorseFromBottomOfScreen < FOOTER_IMG_HEIGHT) {
+    if (topOfHorseFromBottomOfScreen < imageHeight) {
       horseHeightScale = 0;
-    } else if (topOfHorseFromBottomOfScreen > FOOTER_IMG_HEIGHT * 2) {
+    } else if (topOfHorseFromBottomOfScreen > imageHeight * 2) {
       horseHeightScale = 1;
     } else {
       horseHeightScale =
-        (topOfHorseFromBottomOfScreen - FOOTER_IMG_HEIGHT) / FOOTER_IMG_HEIGHT;
+        (topOfHorseFromBottomOfScreen - imageHeight) / imageHeight;
     }
     footerRef.current!.style.setProperty(
       "--horse-height-scale",
@@ -34,10 +39,12 @@ export function FooterCTA() {
 
   useEffect(() => {
     window.addEventListener("scroll", handleScroll, false);
+    window.addEventListener("resize", handleResize, false);
     return () => {
       window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("resize", handleResize);
     };
-  }, []);
+  }, [imageHeight]);
 
   return (
     <div
@@ -46,9 +53,9 @@ export function FooterCTA() {
     >
       <div
         ref={spacerRef}
+        style={{ height: imageHeight }}
         className={clsx([
-          `h-[${FOOTER_IMG_HEIGHT}px]`, // spacer under the images to allow for more scrolling
-          "w-full",
+          "w-full", // spacer under the images to allow for more scrolling
           "relative",
           "z-0",
         ])}
@@ -75,7 +82,7 @@ export function FooterCTA() {
             "right-0",
           ])}
         >
-          <Horse />
+          <Horse imageRef={imageRef} setImageHeight={setImageHeight} />
         </div>
         <Car />
       </div>

@@ -12,7 +12,7 @@ export function Car() {
       <img
         src="/car.webp"
         className={clsx([
-          `h-[${FOOTER_IMG_HEIGHT}px]`,
+          `max-h-[${FOOTER_IMG_HEIGHT}px]`,
           `w-[${FOOTER_IMG_WIDTH}px]`,
           "left-0",
           "right-0",
