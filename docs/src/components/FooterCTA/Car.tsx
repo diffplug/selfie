@@ -1,11 +1,15 @@
 import clsx from "clsx";
 import { buttonClasses } from "./constants";
 import Link from "next/link";
+import { useRouter } from "next/router";
+import { getPathParts } from "@/lib/languageFromPath";
 
 interface CarProps {
   imageHeight: number;
 }
 export function Car({ imageHeight }: CarProps) {
+  const router = useRouter();
+  const pathParts = getPathParts(router.pathname);
   return (
     <div style={{ height: imageHeight }} className={clsx(["relative", "z-10"])}>
       <img
@@ -32,7 +36,7 @@ export function Car({ imageHeight }: CarProps) {
         let your codebase take its own selfies
       </span>
       <Link
-        href="/jvm/get-started"
+        href={`/${pathParts.language}/get-started`}
         className={clsx([
           buttonClasses,
           "absolute",
