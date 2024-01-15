@@ -30,21 +30,6 @@ export function FooterCTA() {
       "--horse-height-scale",
       "" + horseHeightScale
     );
-
-    const bottomOfDocument = document.body.scrollHeight;
-    const currentPosition = window.innerHeight + window.scrollY;
-
-    //  Set a variable to 0 when currentPosition is 0 bottomOfDocument - FOOTER_IMG_HEIGHT
-    // and -FOOTER_IMG_HEIGHT when currentPosition is bottomOfDocument
-    const distanceToBottom = bottomOfDocument - currentPosition;
-    let footerTranslateY = distanceToBottom - FOOTER_IMG_HEIGHT;
-    if (footerTranslateY > 0) {
-      footerTranslateY = 0;
-    }
-    footerRef.current!.style.setProperty(
-      "--footer-translate-y",
-      "" + footerTranslateY + "px"
-    );
   }
 
   useEffect(() => {
