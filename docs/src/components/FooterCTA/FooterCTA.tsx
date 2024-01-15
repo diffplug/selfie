@@ -1,10 +1,10 @@
 import clsx from "clsx";
 import { useEffect, useRef } from "react";
+import { FOOTER_IMG_HEIGHT, FOOTER_IMG_WIDTH } from "./constants";
+import { Horse } from "./Horse";
 
 // STYLES IN COMMENTS REQUIRED FOR TAILWIND TO INCLUDE THEM
 // h-[568px] w-[1136px] max-h-[568px] min-h-[568px]
-const IMG_HEIGHT = 568;
-const IMG_WIDTH = 1136;
 
 export function FooterCTA() {
   const spacerRef = useRef<HTMLDivElement | null>(null);
@@ -17,13 +17,13 @@ export function FooterCTA() {
       window.innerHeight - spacerRef.current.getBoundingClientRect().top;
 
     let horseHeightScale: number;
-    if (topOfHorseFromBottomOfScreen < IMG_HEIGHT) {
+    if (topOfHorseFromBottomOfScreen < FOOTER_IMG_HEIGHT) {
       horseHeightScale = 0;
-    } else if (topOfHorseFromBottomOfScreen > IMG_HEIGHT * 2) {
+    } else if (topOfHorseFromBottomOfScreen > FOOTER_IMG_HEIGHT * 2) {
       horseHeightScale = 1;
     } else {
       horseHeightScale =
-        (topOfHorseFromBottomOfScreen - IMG_HEIGHT) / IMG_HEIGHT;
+        (topOfHorseFromBottomOfScreen - FOOTER_IMG_HEIGHT) / FOOTER_IMG_HEIGHT;
     }
     footerRef.current!.style.setProperty(
       "--horse-height-scale",
@@ -33,10 +33,10 @@ export function FooterCTA() {
     const bottomOfDocument = document.body.scrollHeight;
     const currentPosition = window.innerHeight + window.scrollY;
 
-    //  Set a variable to 0 when currentPosition is 0 bottomOfDocument - IMG_HEIGHT
-    // and -IMG_HEIGHT when currentPosition is bottomOfDocument
+    //  Set a variable to 0 when currentPosition is 0 bottomOfDocument - FOOTER_IMG_HEIGHT
+    // and -FOOTER_IMG_HEIGHT when currentPosition is bottomOfDocument
     const distanceToBottom = bottomOfDocument - currentPosition;
-    let footerTranslateY = distanceToBottom - IMG_HEIGHT;
+    let footerTranslateY = distanceToBottom - FOOTER_IMG_HEIGHT;
     if (footerTranslateY > 0) {
       footerTranslateY = 0;
     }
@@ -61,7 +61,7 @@ export function FooterCTA() {
       <div
         ref={spacerRef}
         className={clsx([
-          `h-[${IMG_HEIGHT}px]`, // spacer under the images to allow for more scrolling
+          `h-[${FOOTER_IMG_HEIGHT}px]`, // spacer under the images to allow for more scrolling
           "w-full",
           "relative",
           "z-0",
@@ -72,14 +72,14 @@ export function FooterCTA() {
           "max-w-full", // sticky image container
           "sticky",
           "bottom-0",
-          `h-[${IMG_HEIGHT}px]`,
+          `h-[${FOOTER_IMG_HEIGHT}px]`,
           "z-10",
         ])}
       >
         <div
           className={clsx([
-            `h-[${IMG_HEIGHT}px]`,
-            `max-h-[${IMG_HEIGHT}px]`, // animates to zero
+            `h-[${FOOTER_IMG_HEIGHT}px]`,
+            `max-h-[${FOOTER_IMG_HEIGHT}px]`, // animates to zero
             "animate-shrink-with-scroll",
             "overflow-hidden",
             "absolute",
@@ -89,21 +89,13 @@ export function FooterCTA() {
             "right-0",
           ])}
         >
-          <img
-            src="/horse.webp"
-            className={clsx([
-              `h-[${IMG_HEIGHT}px]`,
-              `min-h-[${IMG_HEIGHT}px]`,
-              `w-[${IMG_WIDTH}px]`,
-              "m-auto",
-            ])}
-          />
+          <Horse />
         </div>
         <img
           src="/car.webp"
           className={clsx([
-            `h-[${IMG_HEIGHT}px]`,
-            `w-[${IMG_WIDTH}px]`,
+            `h-[${FOOTER_IMG_HEIGHT}px]`,
+            `w-[${FOOTER_IMG_WIDTH}px]`,
             "left-0",
             "right-0",
             "z-10",
