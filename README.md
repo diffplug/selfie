@@ -4,7 +4,8 @@ Snapshot testing is the [fastest and most precise mechanism to record and specif
 
 Robots are writing their own code. Are you still writing assertions by hand?
 
-- Production ready for [JVM](https://selfie.diffplug.com/jvm).
+- *Almost* production ready for [JVM](https://selfie.diffplug.com/jvm).
+  - see [the changelog](CHANGELOG.md) to see the remaining "known broken" items.
 - Help wanted using Kotlin Multiplatform for js and wasm (node and browser) ([#84](https://github.com/diffplug/selfie/issues/84)).
 - Help also wanted for non-Kotlin platforms such as python and go ([#85](https://github.com/diffplug/selfie/issues/85)).
 
