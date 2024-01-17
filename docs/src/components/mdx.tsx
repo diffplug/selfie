@@ -43,6 +43,7 @@ export function code({ children, ...props }: ParentComponentProps) {
         "rounded",
         "text-sm",
         "leading-[1.5em]",
+        "break-words",
       ]);
   return children ? (
     <code
@@ -105,7 +106,10 @@ export function h3({ children, ...props }: ParentComponentProps) {
 
 export function a({ children, ...props }: ParentComponentProps) {
   return (
-    <a {...props} className="underline hover:text-blue visited:hover:text-purple">
+    <a
+      {...props}
+      className="underline hover:text-blue visited:hover:text-purple"
+    >
       {children}
     </a>
   );

@@ -1,10 +1,11 @@
+import { FooterCTA } from "@/components/FooterCTA/FooterCTA";
 import { Hero } from "@/components/Hero";
 import { Selfie } from "@/components/Selfie";
 import { NavHeading } from "@/components/NavHeading";
 
 export const showHero = true;
 
-<NavHeading text="literal" />
+<NavHeading text="literal" popout="/jvm/get-started#quickstart" />
 
 This is a reasonable way to test.
 
@@ -45,7 +46,7 @@ public void primesBelow100() {
 
 And from now on it's a proper assertion, but you didn't have to spend any time writing it. It's not only less work, but also more complete than the usual `.startsWith().endsWith()` rigamarole.
 
-<NavHeading text="like-a-filesystem" />
+<NavHeading text="like-a-filesystem" popout="/jvm/get-started#disk" />
 
 That `primesBelow(100)` snapshot above is almost too long. Something bigger, such as `primesBelow(10_000)` is definitely too big. To handle this, selfie lets you put your snapshots on disk.
 
@@ -86,7 +87,7 @@ Selfie's snapshot files `.ss` are simple to parse, just split them up on `\nâ•”â
 
 You can treat your snapshot files as an output deliverable of your code, and use them as an input to other tooling.
 
-<NavHeading text="lensable" />
+<NavHeading text="lensable" popout="/jvm/advanced" />
 
 A problem with the snapshots we've shown so far is that they are one dimensional. What about headers and cookies? What about the content the user actually sees, without all the markup? What if we could do this? 
 
@@ -137,3 +138,5 @@ interface Camera<T> {
 ```
 
 See the [advanced section](/jvm/advanced) for more details.
+
+<FooterCTA />

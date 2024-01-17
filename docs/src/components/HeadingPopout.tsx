@@ -4,25 +4,28 @@ import { Button } from "./Button";
 import { Popout } from "./Icons/Popout";
 
 type HeadingPopoutProps = {
-  pathParts: PathParts;
+  destinationUrl: string;
   currentHeading: string;
 };
 
 export function HeadingPopout({
   currentHeading,
-  pathParts,
+  destinationUrl,
 }: HeadingPopoutProps) {
   function handleClick() {
-    window.history.pushState({}, "", `#${currentHeading}`);
-    window.location.href = `/${pathParts.language}/get-started#quickstart`;
+    window.location.href = destinationUrl;
   }
   return (
     <Button
       className={clsx([
-        "text-white",
-        "bg-blue",
+        "bg-white",
+        "fill:black",
+        "hover:bg-blue",
+        "hover:fill-white",
+        "shadow-button",
+        "tablet:shadow-button-tablet",
         "w-[70px]",
-        "rounded-[4px]",
+        "rounded-[10px]",
         "h-[30px]",
         "z-20",
         "relative",
@@ -31,7 +34,7 @@ export function HeadingPopout({
       ])}
       onClick={handleClick}
     >
-      <Popout width={36} height={36} />
+      <Popout />
     </Button>
   );
 }

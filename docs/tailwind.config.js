@@ -1,6 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  content: ["./src/**/*.{js,mjs,jsx,mdx,tsx}"],
+  content: ["./src/**/*.{js,mjs,jsx,mdx,ts,tsx}"],
   theme: {
     extend: {
       colors: {
@@ -25,6 +25,8 @@ module.exports = {
         "slide-and-fade":
           "slide 1s linear calc(var(--page-scroll) * -0.9s) paused," +
           "customFade 1s linear calc(var(--literal-scroll) * -0.9s) paused",
+        "shrink-with-scroll":
+          "horseHeight 1s linear calc(var(--horse-height-scale) * -0.999s) paused",
       },
       keyframes: {
         slide: {
@@ -38,6 +40,14 @@ module.exports = {
           },
           to: {
             opacity: 0.2,
+          },
+        },
+        horseHeight: {
+          from: {
+            "max-height": "100%",
+          },
+          to: {
+            "max-height": "0%",
           },
         },
       },

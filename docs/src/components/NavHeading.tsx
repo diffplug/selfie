@@ -6,15 +6,10 @@ import { Selfie } from "./Selfie";
 
 type NavHeadingProps = {
   text: string;
+  popout: string;
 };
 
-export function NavHeading({ text }: NavHeadingProps) {
-  const router = useRouter();
-  const pathParts = getPathParts(router.pathname);
-  if (!pathParts.language) {
-    pathParts.language = "jvm";
-  }
-
+export function NavHeading({ text, popout }: NavHeadingProps) {
   return (
     <>
       <br />
@@ -24,7 +19,7 @@ export function NavHeading({ text }: NavHeadingProps) {
         </h2>
         <HeadingPopout
           currentHeading={text}
-          pathParts={pathParts}
+          destinationUrl={popout}
         />
       </div>
     </>

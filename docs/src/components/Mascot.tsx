@@ -22,7 +22,7 @@ export function Mascot() {
        */
       if (!mascotRef.current!) return;
 
-      // 0 at the stop of the page, 1 at the bottom of the page
+      // 0 at the top of the page, 1 at the bottom of the page
       const pageScrollOffset =
         window.scrollY / (document.body.offsetHeight - window.innerHeight);
       mascotRef.current!.style.setProperty(

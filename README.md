@@ -1,10 +1,12 @@
 # <img align="left" src="docs/selfie_logo_only.png"> Selfie 
 
-Snapshot testing is the fastest and most precise mechanism to record and specify the behavior of your system and its components.
+Snapshot testing is the [fastest and most precise mechanism to record and specify the behavior of your system and its components](https://thecontextwindow.ai/p/temporarily-embarrassed-snapshots).
 
 Robots are writing their own code. Are you still writing assertions by hand?
 
-More info for [jvm](https://selfie.diffplug.com/jvm), [js](https://selfie.diffplug.com/js), and [other platforms](https://selfie.diffplug.com/other-platforms).
+- Production ready for [JVM](https://selfie.diffplug.com/jvm).
+- Help wanted using Kotlin Multiplatform for js and wasm (node and browser) ([#84](https://github.com/diffplug/selfie/issues/84)).
+- Help also wanted for non-Kotlin platforms such as python and go ([#85](https://github.com/diffplug/selfie/issues/85)).
 
 ### Acknowledgements
 
