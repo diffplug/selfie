@@ -42,10 +42,10 @@ export function ButtonList() {
       <Link href="/other-platforms">
         <Button
           className={
-            selectedLanguage === "go" ? pressedClasses : unPressedClasses
+            selectedLanguage === "py" ? pressedClasses : unPressedClasses
           }
         >
-          go
+          py
         </Button>
       </Link>
       <Link href="/other-platforms">
