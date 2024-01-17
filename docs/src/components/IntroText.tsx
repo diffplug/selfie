@@ -3,7 +3,7 @@ import slugify from "@sindresorhus/slugify";
 import { Button } from "./Button";
 import Link from "next/link";
 
-const THE_CONTEXT_WINDOW = "https://thecontextwindow.ai/assertions-are-just-bad-snapshots";
+const THE_CONTEXT_WINDOW = "https://thecontextwindow.ai/p/temporarily-embarrassed-snapshots";
 
 export function IntroText() {
   return (
