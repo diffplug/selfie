@@ -37,7 +37,7 @@ export function Horse({ imageRef, setImageHeight }: HorseProps) {
         are you still writing assertions
       </span>
       <Link
-        href="https://thecontextwindow.ai/p/todo"
+        href="https://thecontextwindow.ai/p/temporarily-embarrassed-snapshots"
         className={clsx([
           buttonClasses,
           "absolute",
