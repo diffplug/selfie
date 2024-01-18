@@ -25,6 +25,8 @@ import com.diffplug.selfie.guts.LiteralValue
 import com.diffplug.selfie.guts.SnapshotStorage
 import com.diffplug.selfie.guts.initStorage
 import com.diffplug.selfie.guts.recordCall
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.jvm.JvmOverloads
 import kotlin.jvm.JvmStatic
 
@@ -93,12 +95,14 @@ object Selfie {
     fun facet(facet: String) = LiteralStringSelfie(actual, listOf(facet))
     /** Extract a multiple facets from a snapshot in order to do an inline snapshot. */
     fun facets(vararg facets: String) = LiteralStringSelfie(actual, facets.toList())
+
+    @OptIn(ExperimentalEncodingApi::class)
     private fun actualString(): String {
       if (actual.facets.isEmpty() || onlyFacets?.size == 1) {
         // single value doesn't have to worry about escaping at all
         val onlyValue = actual.subjectOrFacet(onlyFacets?.first() ?: "")
         return if (onlyValue.isBinary) {
-          TODO("BASE64")
+          Base64.Mime.encode(onlyValue.valueBinary())
         } else onlyValue.valueString()
       } else {
         return serializeOnlyFacets(
