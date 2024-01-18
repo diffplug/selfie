@@ -1,17 +1,21 @@
-import { LanguageSlug, getPathParts } from "@/lib/languageFromPath";
+import { LanguageSlug, PathParts, getPathParts } from "@/lib/languageFromPath";
 import clsx from "clsx";
 import { useRouter } from "next/router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { LanguageSelect } from "./LanguageSelect";
 import { SubNavigation } from "./SubNavigation";
 
 export function Navigation() {
   const router = useRouter();
-  const pathParts = getPathParts(router.pathname);
+  const [pathParts, setPathParts] = useState<PathParts>();
+
+  useEffect(() => {
+    setPathParts(getPathParts(window.location.pathname));
+  }, []);
 
   function handleChange(value: LanguageSlug) {
     let nextRoute = "/" + value;
-    if (pathParts.subpath) {
+    if (pathParts?.subpath) {
       nextRoute += "/" + pathParts.subpath;
     }
     router.push(nextRoute);
@@ -33,14 +37,18 @@ export function Navigation() {
         "pb-[4px]",
       ])}
     >
-      <LanguageSelect
-        pathParts={pathParts}
-        isOpen={selectIsOpen}
-        setSelectIsOpen={setSelectIsOpen}
-        handleChange={handleChange}
-      />
-      {pathParts.language !== "other-platforms" && (
-        <SubNavigation pathParts={pathParts} selectIsOpen={selectIsOpen} />
+      {pathParts && (
+        <>
+          <LanguageSelect
+            pathParts={pathParts}
+            isOpen={selectIsOpen}
+            setSelectIsOpen={setSelectIsOpen}
+            handleChange={handleChange}
+          />
+          {pathParts.language !== "other-platforms" && (
+            <SubNavigation pathParts={pathParts} selectIsOpen={selectIsOpen} />
+          )}
+        </>
       )}
     </div>
   );
