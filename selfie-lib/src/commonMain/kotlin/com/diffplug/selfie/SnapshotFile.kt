@@ -303,14 +303,14 @@ class SnapshotValueReader(val lineReader: LineReader) {
       }
       buffer.append('\n')
     }
-    val stringValue =
+    val rawString =
         if (buffer.isEmpty()) ""
         else {
           buffer.setLength(buffer.length - 1)
-          bodyEsc.unescape(buffer.toString())
+          buffer.toString()
         }
-    return if (isBase64) SnapshotValue.of(Base64.Mime.decode(stringValue))
-    else SnapshotValue.of(stringValue)
+    return if (isBase64) SnapshotValue.of(Base64.Mime.decode(rawString))
+    else SnapshotValue.of(bodyEsc.unescape(rawString))
   }
 
   /** Same as nextValue, but faster. */
