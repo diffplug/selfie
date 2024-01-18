@@ -212,7 +212,8 @@ class SnapshotFile {
     @OptIn(ExperimentalEncodingApi::class)
     internal fun writeValue(valueWriter: Appendable, value: SnapshotValue) {
       if (value.isBinary) {
-        Base64.Mime.encodeToAppendable(value.valueBinary(), valueWriter)
+        val escaped = Base64.Mime.encode(value.valueBinary())
+        valueWriter.append(escaped.efficientReplace("\r", ""))
       } else {
         val escaped =
             SnapshotValueReader.bodyEsc
