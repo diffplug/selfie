@@ -15,6 +15,8 @@
  */
 package com.diffplug.selfie
 
+import kotlin.jvm.JvmStatic
+
 /** A camera transforms a subject of a specific type into a [Snapshot]. */
 fun interface Camera<Subject> {
   fun snapshot(subject: Subject): Snapshot
@@ -23,6 +25,11 @@ fun interface Camera<Subject> {
     return object : Camera<Subject> {
       override fun snapshot(subject: Subject): Snapshot = lens.transform(parent.snapshot(subject))
     }
+  }
+
+  companion object {
+    @JvmStatic
+    fun <Subject> of(camera: Camera<Subject>, lens: Lens): Camera<Subject> = camera.withLens(lens)
   }
 }
 

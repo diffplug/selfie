@@ -190,17 +190,19 @@ private static final Lens HTML = new CompoundLens()
 
 ## Mixing disk and inline literals
 
-Snapshot testing has been underused for three reasons:
+Snapshot testing has been badly underused for three reasons:
 
-- controlling read vs write is cumbersome (fixed by [control comments](https://selfie.dev/jvm/get-started#quickstart))
-- stale snapshots pile up (fixed by [garbage collection](https://github.com/diffplug/selfie/blob/main/selfie-runner-junit5/src/main/kotlin/com/diffplug/selfie/junit5/SelfieGC.kt))
+- controlling read vs write used to be cumbersome (fixed by [control comments](https://selfie.dev/jvm/get-started#quickstart))
+- stale snapshots used to pile up (fixed by [garbage collection](https://github.com/diffplug/selfie/blob/main/selfie-runner-junit5/src/main/kotlin/com/diffplug/selfie/junit5/SelfieGC.kt))
 - a great test should tell a story, and disk snapshots can't do that
 
-Inline snapshots are a partial fix for storytelling within a test, but the harnessing required can be verbose. This is where we combline all of selfie's features:
+Inline snapshots are a partial fix for storytelling within a test, but the harnessing can become verbose. This is where we combine all of selfie's features:
 
-- exhaustively detailed on disk
+- exhaustively detailed specification on disk
 - succinct storytelling inline
-- eliminate boilerplate and harnessing thanks to `Camera` and `CompoundLens`
+- very little boilerplate thanks to `Camera` and `CompoundLens`
+
+Let's look at a test that puts all of this together.
 
 ```java
 
