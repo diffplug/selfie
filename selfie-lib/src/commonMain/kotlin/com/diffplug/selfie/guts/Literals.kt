@@ -108,16 +108,20 @@ internal object LiteralString : LiteralFormat<String>() {
           when (language) {
             Language.SCALA, // scala only does $ substitution for s" and f" strings
             Language.JAVA_PRE15,
-            Language.JAVA -> encodeSingleJava(value)
             Language.GROOVY,
+            Language.JAVA -> encodeSingleJava(value)
             Language.KOTLIN -> encodeSingleJavaWithDollars(value)
           }
       else
           when (language) {
+            // TODO: support triple-quoted strings in scala
+            // https://github.com/diffplug/selfie/issues/106
             Language.SCALA,
+            // TODO: support triple-quoted strings in groovy
+            // https://github.com/diffplug/selfie/issues/105
+            Language.GROOVY,
             Language.JAVA_PRE15 -> encodeSingleJava(value)
             Language.JAVA -> encodeMultiJava(value)
-            Language.GROOVY,
             Language.KOTLIN -> encodeMultiKotlin(value)
           }
   override fun parse(str: String, language: Language): String =
@@ -133,10 +137,12 @@ internal object LiteralString : LiteralFormat<String>() {
           when (language) {
             Language.SCALA ->
                 throw UnsupportedOperationException(
-                    "Selfie doesn't support triple-quoted strings in Scala")
+                    "Selfie doesn't support triple-quoted strings in Scala, yet - help wanted: https://github.com/diffplug/selfie/issues/106")
+            Language.GROOVY ->
+                throw UnsupportedOperationException(
+                    "Selfie doesn't support triple-quoted strings in Groovy, yet - help wanted: https://github.com/diffplug/selfie/issues/105")
             Language.JAVA_PRE15,
             Language.JAVA -> parseMultiJava(str)
-            Language.GROOVY,
             Language.KOTLIN -> parseMultiKotlin(str)
           }
   fun encodeSingleJava(value: String): String = encodeSingleJavaish(value, false)
