@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 DiffPlug
+ * Copyright (C) 2023-2024 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,6 +42,32 @@ class SnapshotReaderTest {
     reader.peekKey() shouldBe "Orange"
     reader.peekKey() shouldBe "Orange"
     reader.nextSnapshot() shouldBe Snapshot.of("Orange")
+    reader.peekKey() shouldBe null
+  }
+
+  @Test
+  fun binary() {
+    val reader =
+        SnapshotReader(
+            SnapshotValueReader.of(
+                """
+            ╔═ Apple ═╗
+            Apple
+            ╔═ Apple[color] ═╗ base64 length 3 bytes
+            c2Fk
+            ╔═ Apple[crisp] ═╗
+            yes
+            ╔═ Orange ═╗ base64 length 3 bytes
+            c2Fk
+        """
+                    .trimIndent()))
+    reader.peekKey() shouldBe "Apple"
+    reader.peekKey() shouldBe "Apple"
+    reader.nextSnapshot() shouldBe
+        Snapshot.of("Apple").plusFacet("color", "sad".toByteArray()).plusFacet("crisp", "yes")
+    reader.peekKey() shouldBe "Orange"
+    reader.peekKey() shouldBe "Orange"
+    reader.nextSnapshot() shouldBe Snapshot.of("sad".toByteArray())
     reader.peekKey() shouldBe null
   }
 }

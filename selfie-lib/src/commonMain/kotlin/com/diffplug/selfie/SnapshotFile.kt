@@ -253,7 +253,7 @@ class SnapshotReader(val valueReader: SnapshotValueReader) {
       val facetEndIdx = nextKey.indexOf(']', facetIdx + 1)
       require(facetEndIdx != -1) { "Missing ] in $nextKey" }
       val facetName = nextKey.substring(facetIdx + 1, facetEndIdx)
-      snapshot = snapshot.plusFacet(facetName, valueReader.nextValue().valueString())
+      snapshot = snapshot.plusFacet(facetName, valueReader.nextValue())
     }
   }
   fun skipSnapshot() {
@@ -276,9 +276,11 @@ class SnapshotValueReader(val lineReader: LineReader) {
   }
 
   /** Reads the next value. */
+  @OptIn(ExperimentalEncodingApi::class)
   fun nextValue(): SnapshotValue {
     // validate key
     nextKey()
+    val isBase64 = nextLine()!!.contains(FLAG_BASE64)
     resetLine()
 
     // read value
@@ -292,12 +294,14 @@ class SnapshotValueReader(val lineReader: LineReader) {
       }
       buffer.append('\n')
     }
-    return SnapshotValue.of(
+    val stringValue =
         if (buffer.isEmpty()) ""
         else {
           buffer.setLength(buffer.length - 1)
           bodyEsc.unescape(buffer.toString())
-        })
+        }
+    return if (isBase64) SnapshotValue.of(Base64.Mime.decode(stringValue))
+    else SnapshotValue.of(stringValue)
   }
 
   /** Same as nextValue, but faster. */
@@ -359,6 +363,7 @@ class SnapshotValueReader(val lineReader: LineReader) {
     private const val KEY_FIRST_CHAR = '╔'
     private const val KEY_START = "╔═ "
     private const val KEY_END = " ═╗"
+    private const val FLAG_BASE64 = " ═╗ base64"
 
     /**
      * https://github.com/diffplug/selfie/blob/main/selfie-lib/src/commonTest/resources/com/diffplug/selfie/scenarios_and_lenses.ss
