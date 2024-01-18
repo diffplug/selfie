@@ -140,19 +140,14 @@ class SnapshotFile {
   var snapshots = ArrayMap.empty<String, Snapshot>()
   fun serialize(valueWriterRaw: Appendable) {
     val valueWriter = if (unixNewlines) valueWriterRaw else ConvertToWindowsNewlines(valueWriterRaw)
-    metadata?.let {
-      writeKey(valueWriter, "📷 ${it.key}", null)
-      writeValue(valueWriter, SnapshotValue.of(it.value))
-    }
+    metadata?.let { writeEntry(valueWriter, "📷 ${it.key}", null, SnapshotValue.of(it.value)) }
     snapshots.entries.forEach { entry ->
-      writeKey(valueWriter, entry.key, null)
-      writeValue(valueWriter, entry.value.subject)
+      writeEntry(valueWriter, entry.key, null, entry.value.subject)
       for (facet in entry.value.facets.entries) {
-        writeKey(valueWriter, entry.key, facet.key)
-        writeValue(valueWriter, facet.value)
+        writeEntry(valueWriter, entry.key, facet.key, facet.value)
       }
     }
-    writeKey(valueWriter, "", "end of file")
+    writeEntry(valueWriter, "", "end of file", SnapshotValue.of(""))
   }
 
   var wasSetAtTestTime: Boolean = false
@@ -198,7 +193,14 @@ class SnapshotFile {
       result.unixNewlines = unixNewlines
       return result
     }
-    internal fun writeKey(valueWriter: Appendable, key: String, facet: String?) {
+
+    @OptIn(ExperimentalEncodingApi::class)
+    internal fun writeEntry(
+        valueWriter: Appendable,
+        key: String,
+        facet: String?,
+        value: SnapshotValue
+    ) {
       valueWriter.append("╔═ ")
       valueWriter.append(SnapshotValueReader.nameEsc.escape(key))
       if (facet != null) {
@@ -206,11 +208,18 @@ class SnapshotFile {
         valueWriter.append(SnapshotValueReader.nameEsc.escape(facet))
         valueWriter.append("]")
       }
-      valueWriter.append(" ═╗\n")
-    }
+      valueWriter.append(" ═╗")
+      if (value.isBinary) {
+        valueWriter.append(" base64 length ")
+        valueWriter.append(value.valueBinary().size.toString())
+        valueWriter.append(" bytes")
+      }
+      valueWriter.append("\n")
 
-    @OptIn(ExperimentalEncodingApi::class)
-    internal fun writeValue(valueWriter: Appendable, value: SnapshotValue) {
+      if (key.isEmpty() && facet == "end of file") {
+        return
+      }
+
       if (value.isBinary) {
         val escaped = Base64.Mime.encode(value.valueBinary())
         valueWriter.append(escaped.efficientReplace("\r", ""))

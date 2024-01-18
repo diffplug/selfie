@@ -210,16 +210,19 @@ object Selfie {
     val writer = StringBuilder()
     for (key in keys) {
       if (key.isEmpty()) {
-        SnapshotFile.writeValue(writer, snapshot.subjectOrFacet(key))
+        SnapshotFile.writeEntry(writer, "", null, snapshot.subjectOrFacet(key))
       } else {
-        snapshot.subjectOrFacetMaybe(key)?.let {
-          SnapshotFile.writeKey(writer, "", key)
-          SnapshotFile.writeValue(writer, it)
-        }
+        snapshot.subjectOrFacetMaybe(key)?.let { SnapshotFile.writeEntry(writer, "", key, it) }
       }
     }
-    writer.setLength(writer.length - 1)
-    return writer.toString()
+    val EMPTY_KEY_AND_FACET = "╔═  ═╗\n"
+    return if (writer.startsWith(EMPTY_KEY_AND_FACET)) {
+      // this codepath is triggered by the `key.isEmpty()` line above
+      writer.subSequence(EMPTY_KEY_AND_FACET.length, writer.length - 1).toString()
+    } else {
+      writer.setLength(writer.length - 1)
+      writer.toString()
+    }
   }
 }
 
