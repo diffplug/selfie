@@ -1,7 +1,7 @@
-import { LanguageSlug, PathParts, getPathParts } from "@/lib/languageFromPath";
+import { LanguageSlug, getPathParts } from "@/lib/languageFromPath";
 import clsx from "clsx";
 import { useRouter } from "next/router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { LanguageSelect } from "./LanguageSelect";
 import { SubNavigation } from "./SubNavigation";
 
