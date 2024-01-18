@@ -6,10 +6,7 @@ import { getPathParts } from "@/lib/languageFromPath";
 
 export function ButtonList() {
   const router = useRouter();
-  const selectedLanguage = getPathParts(
-    router.pathname,
-    router.pathname
-  ).language;
+  const selectedLanguage = getPathParts(router.pathname).language;
   return (
     <div
       className={clsx([

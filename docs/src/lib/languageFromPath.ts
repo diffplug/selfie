@@ -13,11 +13,10 @@ export type PathParts = {
   is404: boolean;
 };
 
-export function getPathParts(path: string, nextRouterPath: string): PathParts {
+export function getPathParts(path: string): PathParts {
   const splitPath = path.split("/");
   return {
     language: languageSlugsToLabels[splitPath[1] as LanguageSlug] || "jvm",
     subpath: splitPath.length === 3 ? splitPath[2] : "",
-    is404: nextRouterPath === "/404",
   } as PathParts;
 }

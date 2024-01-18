@@ -10,7 +10,7 @@ export function Navigation() {
   const [pathParts, setPathParts] = useState<PathParts>();
 
   useEffect(() => {
-    setPathParts(getPathParts(window.location.pathname, router.pathname));
+    setPathParts(getPathParts(router.pathname));
   }, []);
 
   function handleChange(value: LanguageSlug) {
