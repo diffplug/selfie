@@ -11,7 +11,7 @@ export function Navigation() {
 
   function handleChange(value: LanguageSlug) {
     let nextRoute = "/" + value;
-    if (pathParts.subpath) {
+    if (pathParts?.subpath) {
       nextRoute += "/" + pathParts.subpath;
     }
     router.push(nextRoute);
@@ -33,14 +33,18 @@ export function Navigation() {
         "pb-[4px]",
       ])}
     >
-      <LanguageSelect
-        pathParts={pathParts}
-        isOpen={selectIsOpen}
-        setSelectIsOpen={setSelectIsOpen}
-        handleChange={handleChange}
-      />
-      {pathParts.language !== "other-platforms" && (
-        <SubNavigation pathParts={pathParts} selectIsOpen={selectIsOpen} />
+      {pathParts && (
+        <>
+          <LanguageSelect
+            pathParts={pathParts}
+            isOpen={selectIsOpen}
+            setSelectIsOpen={setSelectIsOpen}
+            handleChange={handleChange}
+          />
+          {pathParts.language !== "other-platforms" && (
+            <SubNavigation pathParts={pathParts} selectIsOpen={selectIsOpen} />
+          )}
+        </>
       )}
     </div>
   );

@@ -55,12 +55,15 @@ export function SubNavigation({ pathParts, selectIsOpen }: SubNavigationProps) {
               <Link
                 href={`/${pathParts.language}${subNavButton.hrefSubpath}`}
                 className={clsx([
-                  subNavButton.isPressed(pathParts.subpath) && "pt-[2px]",
+                  !pathParts.is404 &&
+                    subNavButton.isPressed(pathParts.subpath) &&
+                    "pt-[2px]",
                 ])}
                 key={subNavButton.hrefSubpath}
               >
                 <Button
                   className={
+                    !pathParts.is404 &&
                     subNavButton.isPressed(pathParts.subpath)
                       ? pressedClasses
                       : unPressedClasses

@@ -31,7 +31,7 @@ export function Car({ imageHeight }: CarProps) {
           "right-[10px]",
           "tablet:right-[20px]",
           "desktop:right-[110px]",
-          "text-white"
+          "text-white",
         ])}
       >
         let your codebase take its own selfies
