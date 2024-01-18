@@ -15,6 +15,8 @@
  */
 package com.diffplug.selfie
 
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.jvm.JvmStatic
 
 class ParseException private constructor(val line: Int, message: String?, cause: Throwable?) :
@@ -206,17 +208,19 @@ class SnapshotFile {
       }
       valueWriter.append(" ═╗\n")
     }
+
+    @OptIn(ExperimentalEncodingApi::class)
     internal fun writeValue(valueWriter: Appendable, value: SnapshotValue) {
       if (value.isBinary) {
-        TODO("BASE64")
+        Base64.Mime.encodeToAppendable(value.valueBinary(), valueWriter)
       } else {
         val escaped =
             SnapshotValueReader.bodyEsc
                 .escape(value.valueString())
                 .efficientReplace("\n╔", "\n\uD801\uDF41")
         valueWriter.append(escaped)
-        valueWriter.append("\n")
       }
+      valueWriter.append("\n")
     }
   }
 }
