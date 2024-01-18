@@ -136,10 +136,8 @@ class SnapshotFile {
   // this will probably become `<String, JsonObject>` we'll cross that bridge when we get to it
   var metadata: Map.Entry<String, String>? = null
   var snapshots = ArrayMap.empty<String, Snapshot>()
-  fun serialize(valueWriterRaw: StringWriter) {
-    val valueWriter =
-        if (unixNewlines) valueWriterRaw
-        else StringWriter { valueWriterRaw.write(it.efficientReplace("\n", "\r\n")) }
+  fun serialize(valueWriterRaw: Appendable) {
+    val valueWriter = if (unixNewlines) valueWriterRaw else ConvertToWindowsNewlines(valueWriterRaw)
     metadata?.let {
       writeKey(valueWriter, "📷 ${it.key}", null)
       writeValue(valueWriter, SnapshotValue.of(it.value))
@@ -198,17 +196,17 @@ class SnapshotFile {
       result.unixNewlines = unixNewlines
       return result
     }
-    internal fun writeKey(valueWriter: StringWriter, key: String, facet: String?) {
-      valueWriter.write("╔═ ")
-      valueWriter.write(SnapshotValueReader.nameEsc.escape(key))
+    internal fun writeKey(valueWriter: Appendable, key: String, facet: String?) {
+      valueWriter.append("╔═ ")
+      valueWriter.append(SnapshotValueReader.nameEsc.escape(key))
       if (facet != null) {
-        valueWriter.write("[")
-        valueWriter.write(SnapshotValueReader.nameEsc.escape(facet))
-        valueWriter.write("]")
+        valueWriter.append("[")
+        valueWriter.append(SnapshotValueReader.nameEsc.escape(facet))
+        valueWriter.append("]")
       }
-      valueWriter.write(" ═╗\n")
+      valueWriter.append(" ═╗\n")
     }
-    internal fun writeValue(valueWriter: StringWriter, value: SnapshotValue) {
+    internal fun writeValue(valueWriter: Appendable, value: SnapshotValue) {
       if (value.isBinary) {
         TODO("BASE64")
       } else {
@@ -216,8 +214,8 @@ class SnapshotFile {
             SnapshotValueReader.bodyEsc
                 .escape(value.valueString())
                 .efficientReplace("\n╔", "\n\uD801\uDF41")
-        valueWriter.write(escaped)
-        valueWriter.write("\n")
+        valueWriter.append(escaped)
+        valueWriter.append("\n")
       }
     }
   }
@@ -377,6 +375,22 @@ expect class LineReader {
     fun forBinary(content: ByteArray): LineReader
   }
 }
-fun interface StringWriter {
-  fun write(string: String)
+
+internal class ConvertToWindowsNewlines(val sink: Appendable) : Appendable {
+  override fun append(value: Char): Appendable {
+    if (value != '\n') sink.append(value)
+    else {
+      sink.append('\r')
+      sink.append('\n')
+    }
+    return this
+  }
+  override fun append(value: CharSequence?): Appendable {
+    value?.let { sink.append(it.toString().efficientReplace("\n", "\r\n")) }
+    return this
+  }
+  override fun append(value: CharSequence?, startIndex: Int, endIndex: Int): Appendable {
+    value?.let { sink.append(it.substring(startIndex, endIndex).efficientReplace("\n", "\r\n")) }
+    return this
+  }
 }

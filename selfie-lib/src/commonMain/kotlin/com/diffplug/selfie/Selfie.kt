@@ -203,8 +203,7 @@ object Selfie {
    * missing facets.
    */
   private fun serializeOnlyFacets(snapshot: Snapshot, keys: Collection<String>): String {
-    val buf = StringBuilder()
-    val writer = StringWriter { buf.append(it) }
+    val writer = StringBuilder()
     for (key in keys) {
       if (key.isEmpty()) {
         SnapshotFile.writeValue(writer, snapshot.subjectOrFacet(key))
@@ -215,8 +214,8 @@ object Selfie {
         }
       }
     }
-    buf.setLength(buf.length - 1)
-    return buf.toString()
+    writer.setLength(writer.length - 1)
+    return writer.toString()
   }
 }
 

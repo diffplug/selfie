@@ -177,7 +177,7 @@ internal class ClassProgress(val parent: Progress, val className: String) {
           parent.markPathAsWritten(parent.layout.snapshotPathForClass(className))
           Files.createDirectories(snapshotPath.toPath().parent)
           Files.newBufferedWriter(snapshotPath.toPath(), StandardCharsets.UTF_8).use { writer ->
-            file!!.serialize(writer::write)
+            file!!.serialize(writer)
           }
         }
       }
