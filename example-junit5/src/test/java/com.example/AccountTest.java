@@ -35,13 +35,20 @@ public class AccountTest {
     expectSelfie(get("/"))
         .toBe(
             """
-<html><body>
+<html>
+\s<head></head>
+\s<body>
 \s <h1>Please login</h1>
 \s <form action="/login" method="post">
-\s   <input type="text" name="email" placeholder="email">
-\s   <input type="submit" value="login">
+\s  <input type="text" name="email" placeholder="email"> <input type="submit" value="login">
 \s </form>
-</body></html>
+\s</body>
+</html>
+╔═ [md] ═╗
+Please login
+============
+
+
 ╔═ [statusLine] ═╗
 HTTP/1.1 200 OK""");
   }
@@ -51,7 +58,19 @@ HTTP/1.1 200 OK""");
     expectSelfie(given().param("email", "user@domain.com").post("/login"))
         .toBe(
             """
-<html><body><h1>Email sent!</h1><p>Check your email for your login link.</p></body></html>
+<html>
+\s<head></head>
+\s<body>
+\s <h1>Email sent!</h1>
+\s <p>Check your email for your login link.</p>
+\s</body>
+</html>
+╔═ [md] ═╗
+Email sent!
+===========
+
+Check your email for your login link.
+
 ╔═ [statusLine] ═╗
 HTTP/1.1 200 OK""");
     var email = EmailDev.waitForIncoming(app);
@@ -61,7 +80,8 @@ HTTP/1.1 200 OK""");
 Click <a href="http://localhost:8911/login-confirm/erjchFY=">here</a> to login.
 ╔═ [metadata] ═╗
 subject=Login to example.com
-to=user@domain.com from=team@example.com""");
+to=user@domain.com
+from=team@example.com""");
   }
 
   @Test
