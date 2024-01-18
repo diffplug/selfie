@@ -10,16 +10,20 @@ interface HorseProps {
 export function Horse({ imageRef, setImageHeight }: HorseProps) {
   return (
     <div className="relative">
-      <img
-        src="/horse.webp"
-        ref={(el) => {
-          if (el) {
-            setImageHeight(el.height);
-          }
-          imageRef.current = el;
-        }}
-        className={clsx(["m-auto"])}
-      />
+      <picture>
+        <source media="(max-width: 604px)" srcSet="/horse-1536w.webp" />
+        <source media="(min-width: 605px)" srcSet="/horse-3072w.webp" />
+        <img
+          src="/horse-3072w.webp"
+          ref={(el) => {
+            if (el) {
+              setImageHeight(el.height);
+            }
+            imageRef.current = el;
+          }}
+          className={clsx(["m-auto"])}
+        />
+      </picture>
       <span
         className={clsx([
           "absolute",
