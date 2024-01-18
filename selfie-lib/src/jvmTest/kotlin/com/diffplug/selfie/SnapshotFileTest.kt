@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 DiffPlug
+ * Copyright (C) 2023-2024 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -72,8 +72,8 @@ class SnapshotFileTest {
             "Apple",
             Snapshot.of("Granny Smith").plusFacet("color", "green").plusFacet("crisp", "yes"))
     underTest.snapshots = underTest.snapshots.plus("Orange", Snapshot.of("Orange"))
-    val buffer = StringBuffer()
-    underTest.serialize { line -> buffer.append(line) }
+    val buffer = StringBuilder()
+    underTest.serialize(buffer)
     buffer.toString() shouldBe
         """
             ╔═ 📷 com.acme.AcmeTest ═╗

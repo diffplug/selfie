@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 DiffPlug
+ * Copyright (C) 2023-2024 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -162,5 +162,14 @@ class SnapshotValueReaderTest {
     while (reader.peekKey() != null) {
       reader.skipValue()
     }
+  }
+
+  @Test
+  fun binary() {
+    val reader = SnapshotValueReader.of("""╔═ Apple ═╗ base64 length 3 bytes
+c2Fk
+""")
+    reader.peekKey() shouldBe "Apple"
+    reader.nextValue().valueBinary() shouldBe "sad".toByteArray()
   }
 }

@@ -15,6 +15,8 @@
  */
 package com.diffplug.selfie
 
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.jvm.JvmStatic
 
 class ParseException private constructor(val line: Int, message: String?, cause: Throwable?) :
@@ -136,23 +138,16 @@ class SnapshotFile {
   // this will probably become `<String, JsonObject>` we'll cross that bridge when we get to it
   var metadata: Map.Entry<String, String>? = null
   var snapshots = ArrayMap.empty<String, Snapshot>()
-  fun serialize(valueWriterRaw: StringWriter) {
-    val valueWriter =
-        if (unixNewlines) valueWriterRaw
-        else StringWriter { valueWriterRaw.write(it.efficientReplace("\n", "\r\n")) }
-    metadata?.let {
-      writeKey(valueWriter, "📷 ${it.key}", null)
-      writeValue(valueWriter, SnapshotValue.of(it.value))
-    }
+  fun serialize(valueWriterRaw: Appendable) {
+    val valueWriter = if (unixNewlines) valueWriterRaw else ConvertToWindowsNewlines(valueWriterRaw)
+    metadata?.let { writeEntry(valueWriter, "📷 ${it.key}", null, SnapshotValue.of(it.value)) }
     snapshots.entries.forEach { entry ->
-      writeKey(valueWriter, entry.key, null)
-      writeValue(valueWriter, entry.value.subject)
+      writeEntry(valueWriter, entry.key, null, entry.value.subject)
       for (facet in entry.value.facets.entries) {
-        writeKey(valueWriter, entry.key, facet.key)
-        writeValue(valueWriter, facet.value)
+        writeEntry(valueWriter, entry.key, facet.key, facet.value)
       }
     }
-    writeKey(valueWriter, "", "end of file")
+    writeEntry(valueWriter, "", "end of file", SnapshotValue.of(""))
   }
 
   var wasSetAtTestTime: Boolean = false
@@ -198,27 +193,44 @@ class SnapshotFile {
       result.unixNewlines = unixNewlines
       return result
     }
-    internal fun writeKey(valueWriter: StringWriter, key: String, facet: String?) {
-      valueWriter.write("╔═ ")
-      valueWriter.write(SnapshotValueReader.nameEsc.escape(key))
+
+    @OptIn(ExperimentalEncodingApi::class)
+    internal fun writeEntry(
+        valueWriter: Appendable,
+        key: String,
+        facet: String?,
+        value: SnapshotValue
+    ) {
+      valueWriter.append("╔═ ")
+      valueWriter.append(SnapshotValueReader.nameEsc.escape(key))
       if (facet != null) {
-        valueWriter.write("[")
-        valueWriter.write(SnapshotValueReader.nameEsc.escape(facet))
-        valueWriter.write("]")
+        valueWriter.append("[")
+        valueWriter.append(SnapshotValueReader.nameEsc.escape(facet))
+        valueWriter.append("]")
       }
-      valueWriter.write(" ═╗\n")
-    }
-    internal fun writeValue(valueWriter: StringWriter, value: SnapshotValue) {
+      valueWriter.append(" ═╗")
       if (value.isBinary) {
-        TODO("BASE64")
+        valueWriter.append(" base64 length ")
+        valueWriter.append(value.valueBinary().size.toString())
+        valueWriter.append(" bytes")
+      }
+      valueWriter.append("\n")
+
+      if (key.isEmpty() && facet == "end of file") {
+        return
+      }
+
+      if (value.isBinary) {
+        val escaped = Base64.Mime.encode(value.valueBinary())
+        valueWriter.append(escaped.efficientReplace("\r", ""))
       } else {
         val escaped =
             SnapshotValueReader.bodyEsc
                 .escape(value.valueString())
                 .efficientReplace("\n╔", "\n\uD801\uDF41")
-        valueWriter.write(escaped)
-        valueWriter.write("\n")
+        valueWriter.append(escaped)
       }
+      valueWriter.append("\n")
     }
   }
 }
@@ -250,7 +262,7 @@ class SnapshotReader(val valueReader: SnapshotValueReader) {
       val facetEndIdx = nextKey.indexOf(']', facetIdx + 1)
       require(facetEndIdx != -1) { "Missing ] in $nextKey" }
       val facetName = nextKey.substring(facetIdx + 1, facetEndIdx)
-      snapshot = snapshot.plusFacet(facetName, valueReader.nextValue().valueString())
+      snapshot = snapshot.plusFacet(facetName, valueReader.nextValue())
     }
   }
   fun skipSnapshot() {
@@ -273,9 +285,11 @@ class SnapshotValueReader(val lineReader: LineReader) {
   }
 
   /** Reads the next value. */
+  @OptIn(ExperimentalEncodingApi::class)
   fun nextValue(): SnapshotValue {
     // validate key
     nextKey()
+    val isBase64 = nextLine()!!.contains(FLAG_BASE64)
     resetLine()
 
     // read value
@@ -289,12 +303,14 @@ class SnapshotValueReader(val lineReader: LineReader) {
       }
       buffer.append('\n')
     }
-    return SnapshotValue.of(
+    val stringValue =
         if (buffer.isEmpty()) ""
         else {
           buffer.setLength(buffer.length - 1)
           bodyEsc.unescape(buffer.toString())
-        })
+        }
+    return if (isBase64) SnapshotValue.of(Base64.Mime.decode(stringValue))
+    else SnapshotValue.of(stringValue)
   }
 
   /** Same as nextValue, but faster. */
@@ -356,6 +372,7 @@ class SnapshotValueReader(val lineReader: LineReader) {
     private const val KEY_FIRST_CHAR = '╔'
     private const val KEY_START = "╔═ "
     private const val KEY_END = " ═╗"
+    private const val FLAG_BASE64 = " ═╗ base64"
 
     /**
      * https://github.com/diffplug/selfie/blob/main/selfie-lib/src/commonTest/resources/com/diffplug/selfie/scenarios_and_lenses.ss
@@ -377,6 +394,22 @@ expect class LineReader {
     fun forBinary(content: ByteArray): LineReader
   }
 }
-fun interface StringWriter {
-  fun write(string: String)
+
+internal class ConvertToWindowsNewlines(val sink: Appendable) : Appendable {
+  override fun append(value: Char): Appendable {
+    if (value != '\n') sink.append(value)
+    else {
+      sink.append('\r')
+      sink.append('\n')
+    }
+    return this
+  }
+  override fun append(value: CharSequence?): Appendable {
+    value?.let { sink.append(it.toString().efficientReplace("\n", "\r\n")) }
+    return this
+  }
+  override fun append(value: CharSequence?, startIndex: Int, endIndex: Int): Appendable {
+    value?.let { sink.append(it.substring(startIndex, endIndex).efficientReplace("\n", "\r\n")) }
+    return this
+  }
 }

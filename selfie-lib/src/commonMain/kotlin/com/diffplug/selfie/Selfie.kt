@@ -25,6 +25,8 @@ import com.diffplug.selfie.guts.LiteralValue
 import com.diffplug.selfie.guts.SnapshotStorage
 import com.diffplug.selfie.guts.initStorage
 import com.diffplug.selfie.guts.recordCall
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.jvm.JvmOverloads
 import kotlin.jvm.JvmStatic
 
@@ -93,12 +95,14 @@ object Selfie {
     fun facet(facet: String) = LiteralStringSelfie(actual, listOf(facet))
     /** Extract a multiple facets from a snapshot in order to do an inline snapshot. */
     fun facets(vararg facets: String) = LiteralStringSelfie(actual, facets.toList())
+
+    @OptIn(ExperimentalEncodingApi::class)
     private fun actualString(): String {
       if (actual.facets.isEmpty() || onlyFacets?.size == 1) {
         // single value doesn't have to worry about escaping at all
         val onlyValue = actual.subjectOrFacet(onlyFacets?.first() ?: "")
         return if (onlyValue.isBinary) {
-          TODO("BASE64")
+          Base64.Mime.encode(onlyValue.valueBinary()).replace("\r", "")
         } else onlyValue.valueString()
       } else {
         return serializeOnlyFacets(
@@ -203,20 +207,22 @@ object Selfie {
    * missing facets.
    */
   private fun serializeOnlyFacets(snapshot: Snapshot, keys: Collection<String>): String {
-    val buf = StringBuilder()
-    val writer = StringWriter { buf.append(it) }
+    val writer = StringBuilder()
     for (key in keys) {
       if (key.isEmpty()) {
-        SnapshotFile.writeValue(writer, snapshot.subjectOrFacet(key))
+        SnapshotFile.writeEntry(writer, "", null, snapshot.subjectOrFacet(key))
       } else {
-        snapshot.subjectOrFacetMaybe(key)?.let {
-          SnapshotFile.writeKey(writer, "", key)
-          SnapshotFile.writeValue(writer, it)
-        }
+        snapshot.subjectOrFacetMaybe(key)?.let { SnapshotFile.writeEntry(writer, "", key, it) }
       }
     }
-    buf.setLength(buf.length - 1)
-    return buf.toString()
+    val EMPTY_KEY_AND_FACET = "╔═  ═╗\n"
+    return if (writer.startsWith(EMPTY_KEY_AND_FACET)) {
+      // this codepath is triggered by the `key.isEmpty()` line above
+      writer.subSequence(EMPTY_KEY_AND_FACET.length, writer.length - 1).toString()
+    } else {
+      writer.setLength(writer.length - 1)
+      writer.toString()
+    }
   }
 }
 
