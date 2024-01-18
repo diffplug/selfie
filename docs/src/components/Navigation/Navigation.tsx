@@ -7,11 +7,7 @@ import { SubNavigation } from "./SubNavigation";
 
 export function Navigation() {
   const router = useRouter();
-  const [pathParts, setPathParts] = useState<PathParts>();
-
-  useEffect(() => {
-    setPathParts(getPathParts(router.pathname));
-  }, []);
+  const pathParts = getPathParts(router.pathname);
 
   function handleChange(value: LanguageSlug) {
     let nextRoute = "/" + value;

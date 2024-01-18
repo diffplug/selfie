@@ -18,5 +18,6 @@ export function getPathParts(path: string): PathParts {
   return {
     language: languageSlugsToLabels[splitPath[1] as LanguageSlug] || "jvm",
     subpath: splitPath.length === 3 ? splitPath[2] : "",
+    is404: splitPath[1] === "404",
   } as PathParts;
 }
