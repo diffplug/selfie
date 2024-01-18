@@ -9,7 +9,7 @@ interface CarProps {
 }
 export function Car({ imageHeight }: CarProps) {
   const router = useRouter();
-  const pathParts = getPathParts(router.pathname);
+  const pathParts = getPathParts(router.pathname, router.pathname);
   return (
     <div style={{ height: imageHeight }} className={clsx(["relative", "z-10"])}>
       <img
@@ -31,7 +31,7 @@ export function Car({ imageHeight }: CarProps) {
           "right-[10px]",
           "tablet:right-[20px]",
           "desktop:right-[110px]",
-          "text-white"
+          "text-white",
         ])}
       >
         let your codebase take its own selfies
