@@ -11,10 +11,21 @@ export function Car({ imageHeight }: CarProps) {
   const router = useRouter();
   const pathParts = getPathParts(router.pathname);
   return (
-    <div style={{ height: imageHeight }} className={clsx(["relative", "z-10"])}>
+    <div
+      style={{ height: imageHeight }}
+      className={clsx(["relative", "overflow-x-hidden", "mx-[-0.5rem]"])}
+    >
       <img
         src="/car.webp"
-        className={clsx(["left-0", "right-0", "absolute", "top-0", "m-auto"])}
+        className={clsx([
+          "scale-150",
+          "wide-phone:scale-100",
+          "left-0",
+          "right-0",
+          "absolute",
+          "top-0",
+          "m-auto",
+        ])}
       />
       <span
         className={clsx([
@@ -31,7 +42,7 @@ export function Car({ imageHeight }: CarProps) {
           "right-[10px]",
           "tablet:right-[20px]",
           "desktop:right-[110px]",
-          "text-white"
+          "text-white",
         ])}
       >
         let your codebase take its own selfies

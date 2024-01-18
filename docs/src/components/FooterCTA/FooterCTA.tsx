@@ -8,9 +8,19 @@ export function FooterCTA() {
   const footerRef = useRef<HTMLDivElement | null>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
   const [imageHeight, setImageHeight] = useState(0);
+  const [imageScale, setImageScale] = useState(1);
+
+  function setImageScaleFromRef() {
+    if (window.innerWidth < 605) {
+      setImageScale(1.5);
+    } else {
+      setImageScale(1);
+    }
+    setImageHeightFromRef();
+  }
 
   function setImageHeightFromRef() {
-    setImageHeight(imageRef.current!.height);
+    setImageHeight(imageRef.current!.height * imageScale);
   }
 
   function handleScroll() {
@@ -39,12 +49,16 @@ export function FooterCTA() {
 
   useEffect(() => {
     window.addEventListener("scroll", handleScroll, false);
-    window.addEventListener("resize", setImageHeightFromRef, false);
+    window.addEventListener("resize", setImageScaleFromRef, false);
     return () => {
       window.removeEventListener("scroll", handleScroll);
-      window.removeEventListener("resize", setImageHeightFromRef);
+      window.removeEventListener("resize", setImageScaleFromRef);
     };
   }, [imageHeight]);
+
+  useEffect(() => {
+    setImageScaleFromRef();
+  }, [imageScale]);
 
   return (
     <div
@@ -79,9 +93,14 @@ export function FooterCTA() {
             "z-20",
             "left-0",
             "right-0",
+            "mx-[-0.5rem]",
           ])}
         >
-          <Horse imageRef={imageRef} setImageHeight={setImageHeight} />
+          <Horse
+            imageRef={imageRef}
+            imageScale={imageScale}
+            setImageHeight={setImageHeight}
+          />
         </div>
         <Car imageHeight={imageHeight} />
       </div>
