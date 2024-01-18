@@ -76,7 +76,7 @@ private static final Camera<Response> RESPONSE = (Response response) ->
            .plusFacet("statusLine", response.getStatusLine());
 ```
 
-And now our snapshots have `statusLine`, which we can use in both literal and disk snapshots.
+And now our snapshot has `statusLine` at the bottom, which we can use in both literal and disk snapshots.
 
 ```java
 @Test
@@ -113,20 +113,100 @@ private static final Map<Integer, String> REDIRECTS = Stream.of(
   ).collect(Collectors.toMap(StatusCode::value, StatusCode::reason));
 ```
 
-So a snapshot doesn't have to be only one value, and it's fine if the schema changes depending on the value being snapshotted. The snapshots are for you to read (and look at diffs of), so put whatever you want in there.
+So a snapshot doesn't have to be only one value, and it's fine if the schema changes depending on the content of the value being snapshotted. The snapshots are for you to read (and look at diffs of), so record whatever is meaningful to you.
 
 ## Lenses
 
-A [Lens](https://kdoc.selfie.dev/selfie-lib/com.diffplug.selfie/-lens/) is just a function that transforms one `Snapshot` into another `Snapshot`, transforming / creating / removing values along the way.
-
-In our example above, we have been snapshotting `Response` objects, but we might also want to snapshot emails that the server sends.
+A [Lens](https://kdoc.selfie.dev/selfie-lib/com.diffplug.selfie/-lens/) is just a function that transforms one `Snapshot` into another `Snapshot`, transforming / creating / removing values along the way. For example, we might want to pretty-print the HTML in our snapshots.
 
 ```java
-public static Selfie.DiskSelfie expectSelfie(EmailDev email) {
-  return Selfie.expectSelfie(email, EMAIL);
+// need 'org.jsoup:jsoup:1.17.1' on the test claspath
+private static String prettyPrintHtml(String html) {
+  var doc = Jsoup.parse(html);
+  doc.outputSettings().prettyPrint(true);
+  return doc.outerHtml();
 }
-private static final Camera<EmailDev> EMAIL = (EmailDev email) -> Snapshot.of(email.htmlMsg
-  .plusFacet("metadata", "subject=" + email.subject + "\nto=" + email.to + "\nfrom=" + email.from);
+
+private static final Camera<Response> RESPONSE = (Response response) -> {
+  (...)
+  // call prettyPrint when we take the snapshot
+  return Snapshot.of(prettyPrintHtml(response.getBody().asString()))
+      .plusFacet("statusLine", response.getStatusLine());
+};
 ```
 
-Now we're getting HTML data from two different places. If you've ever tried to style an email, you know that it gets messy fast, with tons of inline styles. Assertions on semantic HTML can be cumbersome to read already, how are we going to handle this monstrosity?
+Calling transformation functions inside the `Camera` is fine, but another option is to create a `Lens` and then use `Camera.withLens`. This approach is especially helpful if there are multiple `Camera`s which need the same transformation.
+
+```java
+private static final Lens PRETTY_PRINT = (Snapshot snapshot) -> {
+  String subject = snapshot.getSubject().valueString();
+  if (subject.contains("<html>")) {
+    // the facet "" is another name for the subject
+    return snapshot.plusOrReplace("", prettyPrintHtml(subject));
+  } else {
+    return snapshot;
+  }
+};
+
+public static Selfie.DiskSelfie expectSelfie(Response response) {
+  return Selfie.expectSelfie(response, RESPONSE.withLens(PRETTY_PRINT));
+}
+public static Selfie.DiskSelfie expectSelfie(Email email) {
+  return Selfie.expectSelfie(response, EMAIL.withLens(PRETTY_PRINT));
+}
+```
+
+## Compound lens
+
+Selfie has a useful class called [`CompoundLens`](https://kdoc.selfie.dev/selfie-lib/com.diffplug.selfie/-compound-lens/). It is a fluent API for mutating facets and piping data through functions from one facet into another. An important gotcha here is that the **subject** can be treated as a facet named `""` (empty string). `CompoundLens` uses this hack to simplify a snapshot into only a map of facets, instead of a subject plus a map of facets.
+
+We can easily mutate an specific facet, such as to pretty-print HTML in the subject...
+
+```java
+private static final Lens HTML = new CompoundLens()
+  .mutateFacet("", (String maybeHtml) -> maybeHtml.contains("<html>") ? prettyPrintHtml(maybeHtml) : null);
+```
+
+Or we can mutate all facets, such as to remove a random local port number...
+
+```java
+private static final Lens HTML = new CompoundLens()
+  .mutateFacet("", maybeHtml -> maybeHtml.contains("<html>") ? prettyPrintHtml(maybeHtml) : null)
+  .replaceAllRegex("http://localhost:\\d+/", "https://www.example.com/")
+```
+
+Or we can render HTML into markdown, and store the easy-to-read markdown in its own facet...
+
+```java
+// need 'com.vladsch.flexmark:flexmark-html2md-converter:0.64.8' on the test claspath
+private static String htmlToMd(String html) {
+  return new FlexmarkHtmlConverter.Builder().build().convert(html);
+}
+private static final Lens HTML = new CompoundLens()
+  .mutateFacet("", SelfieSettings::prettyPrintHtml)
+  .replaceAllRegex("http://localhost:\\d+/", "https://www.diffplug.com/")
+  .setFacetFrom("md", "", SelfieSettings::htmlToMd);
+```
+
+## Mixing disk and inline literals
+
+Snapshot testing has been underused for three reasons:
+
+- controlling read vs write is cumbersome (fixed by [control comments](https://selfie.dev/jvm/get-started#quickstart))
+- stale snapshots pile up (fixed by [garbage collection](https://github.com/diffplug/selfie/blob/main/selfie-runner-junit5/src/main/kotlin/com/diffplug/selfie/junit5/SelfieGC.kt))
+- a great test should tell a story, and disk snapshots can't do that
+
+Inline snapshots are a partial fix for storytelling within a test, but the harnessing required can be verbose. This is where we combline all of selfie's features:
+
+- exhaustively detailed on disk
+- succinct storytelling inline
+- eliminate boilerplate and harnessing thanks to `Camera` and `CompoundLens`
+
+```java
+
+
+
+
+to persuade you that [assertions are just temporarily embarrassed snapshots](https://thecontextwindow.ai/p/temporarily-embarrassed-snapshots).
+
+
