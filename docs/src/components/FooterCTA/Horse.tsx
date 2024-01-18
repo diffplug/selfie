@@ -5,21 +5,20 @@ import { MutableRefObject } from "react";
 
 interface HorseProps {
   imageRef: MutableRefObject<HTMLImageElement | null>;
-  imageScale: number;
   setImageHeight: (height: number) => void;
 }
-export function Horse({ imageRef, imageScale, setImageHeight }: HorseProps) {
+export function Horse({ imageRef, setImageHeight }: HorseProps) {
   return (
-    <div className={clsx(["relative", "overflow-x-hiddezn"])}>
+    <div className="relative">
       <img
         src="/horse.webp"
         ref={(el) => {
           if (el) {
-            setImageHeight(el.height * imageScale);
+            setImageHeight(el.height);
           }
           imageRef.current = el;
         }}
-        className={clsx(["scale-150", "wide-phone:scale-100", "m-auto"])}
+        className={clsx(["m-auto"])}
       />
       <span
         className={clsx([
