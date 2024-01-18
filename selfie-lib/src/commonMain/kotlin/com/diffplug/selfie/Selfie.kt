@@ -102,7 +102,7 @@ object Selfie {
         // single value doesn't have to worry about escaping at all
         val onlyValue = actual.subjectOrFacet(onlyFacets?.first() ?: "")
         return if (onlyValue.isBinary) {
-          Base64.Mime.encode(onlyValue.valueBinary())
+          Base64.Mime.encode(onlyValue.valueBinary()).replace("\r", ""  )
         } else onlyValue.valueString()
       } else {
         return serializeOnlyFacets(
