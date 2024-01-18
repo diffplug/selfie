@@ -5,6 +5,9 @@ plugins {
 repositories {
   mavenCentral()
 }
+spotlessChangelog {
+  forceNextVersion '1.0.0'
+}
 group = 干.proj('maven_group', 'the maven group, recommend com.diffplug')
 apply from: rootProject.file('gradle/spotless.gradle')
 apply from: 干.file('base/changelog.gradle')
