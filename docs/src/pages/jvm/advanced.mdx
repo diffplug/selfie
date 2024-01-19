@@ -207,26 +207,26 @@ Let's look at a test that puts all of this together.
 ```java
 @Test
 public void loginFlow(Jooby app) {
-  expectSelfie(get("/")).toMatchDisk("1) not logged in").facet("md").toBe("Please login");
-  expectSelfie(given().param("email", "user@domain.com").post("/login")).toMatchDisk("2) post login form")
+  expectSelfie(get("/")).toMatchDisk("1. not logged in").facet("md").toBe("Please login");
+  expectSelfie(given().param("email", "user@domain.com").post("/login")).toMatchDisk("2. post login form")
     .facet("md").toBe("""
 Email sent!
 
 Check your email for your login link.""");
 
   var email = EmailDev.waitForIncoming(app);
-  expectSelfie(email).toMatchDisk("3) login email")
+  expectSelfie(email).toMatchDisk("3. login email")
     .facet("md").toBe("Click [here](https://www.example.com/login-confirm/erjchFY=) to login.");
 
-  expectSelfie(get("/login-confirm/erjchFY=")).toMatchDisk("4) open login email link")
+  expectSelfie(get("/login-confirm/erjchFY=")).toMatchDisk("4. open login email link")
     .facets("", "cookies").toBe("""
 REDIRECT 302 Found to /
 ╔═ [cookies] ═╗
 login=user@domain.com|JclThw==;Path=/""");
-  expectSelfie(given().cookie("login", "user@domain.com|JclThw==").get("/")).toMatchDisk("5) follow redirect")
+  expectSelfie(given().cookie("login", "user@domain.com|JclThw==").get("/")).toMatchDisk("5. follow redirect")
     .facet("md").toBe("Welcome back user@domain.com");
 
-  expectSelfie(given().cookie("login", "user@domain.com|badsignature").get("/")).toMatchDisk("6) bad signature")
+  expectSelfie(given().cookie("login", "user@domain.com|badsignature").get("/")).toMatchDisk("6. bad signature")
     .facets("md").toBe("""
 Unauthorized
 
@@ -234,7 +234,7 @@ status code: 401""");
 }
 ```
 
-We just wrote a high-level specification of a realistic login flow, and it only took 25 lines — most of which were generated for us, and could be regenerated on a whim if we want to change our copywriting. The [corresponding disk snapshot](https://github.com/diffplug/selfie/blob/main/example-junit5/src/test/java/com.example/LoginFlowTest.ss) gives us an exhaustive specification and description of the server's behavior.
+We just wrote a high-level specification of a realistic login flow, and it only took 25 lines — most of which were generated for us, and could be regenerated on a whim if we want to change our copywriting. The [corresponding disk snapshot](https://github.com/diffplug/selfie/blob/main/example-junit5/src/test/java/com/example/LoginFlowTest.ss) gives us an exhaustive specification and description of the server's behavior.
 
 Didn't think that adopting a bugfixed version of your internationalization lib would cause any changes to your website whatsever? Oops. Don't wade through failed assertions, get a diff in every failure. If you want, regenerate all the snapshots to get a full view of the problem across the whole codebase in your git client.
 
