@@ -1,5 +1,8 @@
 import clsx from "clsx";
 import { createContext, useContext } from "react";
+import { LinkIcon } from "./Icons/LinkIcon";
+import slugify from "@sindresorhus/slugify";
+import { HeadingAnchor } from "./HeadingAnchor";
 
 type ParentComponentProps = {
   children?: React.ReactNode;
@@ -86,19 +89,23 @@ export function p({ children, ...props }: ParentComponentProps) {
 }
 
 export function h2({ children, ...props }: ParentComponentProps) {
+  const slug = typeof children === "string" ? slugify(children) : "";
   return (
     <>
       <br />
-      <h2 {...props}>{children}</h2>
+      <h2 {...props} className="group flex items-center">
+        {children} <HeadingAnchor slug={slug} />
+      </h2>
     </>
   );
 }
 
 export function h3({ children, ...props }: ParentComponentProps) {
+  const slug = typeof children === "string" ? slugify(children) : "";
   return (
     <>
-      <h3 {...props} className="text-lg">
-        {children}
+      <h3 {...props} className="group flex items-center text-lg">
+        {children} <HeadingAnchor slug={slug} />
       </h3>
     </>
   );
