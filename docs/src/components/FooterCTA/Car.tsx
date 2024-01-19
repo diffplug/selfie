@@ -22,9 +22,13 @@ export function Car({ imageHeight }: CarProps) {
     >
       <picture>
         <source media="(max-width: 604px)" srcSet="/car-1536w.webp" />
-        <source media="(min-width: 605px)" srcSet="/car-3072w.webp" />
+        <source
+          media="(min-width: 605px) and (max-width: 1299px)"
+          srcSet="/car-3072w.webp"
+        />
+        <source media="(min-width: 1300px)" srcSet="/car_feathered.webp" />
         <img
-          src="/car-3072w.webp"
+          src="/car_feathered.webp"
           className={clsx(["left-0", "right-0", "absolute", "top-0", "m-auto"])}
         />
       </picture>
