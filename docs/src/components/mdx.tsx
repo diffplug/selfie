@@ -101,10 +101,11 @@ export function h2({ children, ...props }: ParentComponentProps) {
 }
 
 export function h3({ children, ...props }: ParentComponentProps) {
+  const slug = typeof children === "string" ? slugify(children) : "";
   return (
     <>
-      <h3 {...props} className="text-lg">
-        {children}
+      <h3 {...props} className="group flex items-center text-lg">
+        {children} <HeadingAnchor slug={slug} />
       </h3>
     </>
   );
