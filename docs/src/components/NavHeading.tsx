@@ -17,7 +17,7 @@ export function NavHeading({ text, popout }: NavHeadingProps) {
           <Selfie /> is {text.replace(/\-/g, " ")}
           <HeadingAnchor slug={text} />
         </h2>
-        <HeadingPopout currentHeading={text} destinationUrl={popout} />
+        <HeadingPopout destinationUrl={popout} />
       </div>
     </>
   );
