@@ -11,7 +11,7 @@ interface HeadingAnchorProps {
  */
 export function HeadingAnchor({ className, slug }: HeadingAnchorProps) {
   function handleLinkClick() {
-    history.pushState({}, "", window.location.href.split("#")[0] + `#${slug}`);
+    window.location.href = window.location.href.split("#")[0] + `#${slug}`;
   }
   return (
     <LinkIcon
