@@ -9,11 +9,14 @@ export function FooterCTA() {
   const imageRef = useRef<HTMLImageElement | null>(null);
   const [imageHeight, setImageHeight] = useState(0);
 
-  function handleResize() {
+  function setImageHeightFromRef() {
     setImageHeight(imageRef.current!.height);
   }
 
   function handleScroll() {
+    if (!imageHeight) {
+      setImageHeightFromRef();
+    }
     if (!footerRef.current || !spacerRef.current) return;
     // 0 at the current scroll position, 1 at the bottom of the page
     const topOfHorseFromBottomOfScreen =
@@ -36,10 +39,10 @@ export function FooterCTA() {
 
   useEffect(() => {
     window.addEventListener("scroll", handleScroll, false);
-    window.addEventListener("resize", handleResize, false);
+    window.addEventListener("resize", setImageHeightFromRef, false);
     return () => {
       window.removeEventListener("scroll", handleScroll);
-      window.removeEventListener("resize", handleResize);
+      window.removeEventListener("resize", setImageHeightFromRef);
     };
   }, [imageHeight]);
 
