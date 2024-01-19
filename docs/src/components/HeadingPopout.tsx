@@ -1,22 +1,14 @@
-import { PathParts } from "@/lib/languageFromPath";
 import clsx from "clsx";
-import { Button } from "./Button";
+import { ButtonLink } from "./Button";
 import { Popout } from "./Icons/Popout";
 
 type HeadingPopoutProps = {
   destinationUrl: string;
-  currentHeading: string;
 };
 
-export function HeadingPopout({
-  currentHeading,
-  destinationUrl,
-}: HeadingPopoutProps) {
-  function handleClick() {
-    window.location.href = destinationUrl;
-  }
+export function HeadingPopout({ destinationUrl }: HeadingPopoutProps) {
   return (
-    <Button
+    <ButtonLink
       className={clsx([
         "bg-white",
         "fill:black",
@@ -32,9 +24,9 @@ export function HeadingPopout({
         "desktop:w-[94px]",
         "mb-[7px]",
       ])}
-      onClick={handleClick}
+      href={destinationUrl}
     >
       <Popout />
-    </Button>
+    </ButtonLink>
   );
 }
