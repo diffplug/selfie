@@ -21,7 +21,7 @@ export function HeadingAnchor({ className, slug }: HeadingAnchorProps) {
         className={clsx([
           "inline",
           "wide-phone:mr-2",
-          "opacity-0",
+          "tablet:opacity-0",
           "h-6",
           "w-6",
           "cursor-pointer",
