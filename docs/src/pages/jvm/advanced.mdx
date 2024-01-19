@@ -188,7 +188,7 @@ private static final Lens HTML = new CompoundLens()
   .setFacetFrom("md", "", SelfieSettings::htmlToMd);
 ```
 
-## Mixing disk and inline literals
+## Harmonizing disk and inline literals
 
 Snapshot testing has been badly underused for three reasons:
 
@@ -196,19 +196,48 @@ Snapshot testing has been badly underused for three reasons:
 - stale snapshots used to pile up (fixed by [garbage collection](https://github.com/diffplug/selfie/blob/main/selfie-runner-junit5/src/main/kotlin/com/diffplug/selfie/junit5/SelfieGC.kt))
 - a great test should tell a story, and disk snapshots can't do that
 
-Inline snapshots are a partial fix for storytelling within a test, but the harnessing can become verbose. This is where we combine all of selfie's features:
+Inline snapshots are a partial fix for storytelling within a test, but the harnessing can become verbose. This is where we combine it all:
 
-- exhaustively detailed specification on disk
+- exhaustive specification on disk
 - succinct storytelling inline
-- very little boilerplate thanks to `Camera` and `CompoundLens`
+- minimal boilerplate thanks to [`Camera`](#typed-snapshots) and [`CompoundLens`](#compound-lens)
 
 Let's look at a test that puts all of this together.
 
 ```java
+@Test
+public void loginFlow(Jooby app) {
+  expectSelfie(get("/")).toMatchDisk("1) not logged in").facet("md").toBe("Please login");
+  expectSelfie(given().param("email", "user@domain.com").post("/login")).toMatchDisk("2) post login form")
+    .facet("md").toBe("""
+Email sent!
 
+Check your email for your login link.""");
 
+  var email = EmailDev.waitForIncoming(app);
+  expectSelfie(email).toMatchDisk("3) login email")
+    .facet("md").toBe("Click [here](https://www.example.com/login-confirm/erjchFY=) to login.");
 
+  expectSelfie(get("/login-confirm/erjchFY=")).toMatchDisk("4) open login email link")
+    .facets("", "cookies").toBe("""
+REDIRECT 302 Found to /
+╔═ [cookies] ═╗
+login=user@domain.com|JclThw==;Path=/""");
+  expectSelfie(given().cookie("login", "user@domain.com|JclThw==").get("/")).toMatchDisk("5) follow redirect")
+    .facet("md").toBe("Welcome back user@domain.com");
 
-to persuade you that [assertions are just temporarily embarrassed snapshots](https://thecontextwindow.ai/p/temporarily-embarrassed-snapshots).
+  expectSelfie(given().cookie("login", "user@domain.com|badsignature").get("/")).toMatchDisk("6) bad signature")
+    .facets("md").toBe("""
+Unauthorized
 
+status code: 401""");
+}
+```
 
+We just wrote a high-level specification of a realistic login flow, and it only took 25 lines — most of which were generated for us, and could be regenerated on a whim if we want to change our copywriting. The [corresponding disk snapshot](https://github.com/diffplug/selfie/blob/main/example-junit5/src/test/java/com.example/LoginFlowTest.ss) gives us an exhaustive specification and description of the server's behavior.
+
+Didn't think that adopting a bugfixed version of your internationalization lib would cause any changes to your website whatsever? Oops. Don't wade through failed assertions, get a diff in every failure. If you want, regenerate all the snapshots to get a full view of the problem across the whole codebase in your git client.
+
+Testing software is a bit like tailoring a suit for an octopus. Not because the octopus needs a suit — because we need a map! And we only have one hand — better hand some pins to the octopus!
+
+*Pull requests to improve the landing page and documentation are greatly appreciated, you can find the [source code here](https://github.com/diffplug/selfie/tree/main/docs/src/pages/jvm).*
