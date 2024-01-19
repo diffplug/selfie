@@ -10,7 +10,7 @@ import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 
-@JoobyTest(Dev.class) 
+@JoobyTest(Dev.class)
 @TestMethodOrder(MethodOrderer.MethodName.class)
 public class LoginFlowTest {
   @Test
@@ -39,5 +39,5 @@ login=user@domain.com|JclThw==;Path=/""");
 Unauthorized
 
 status code: 401""");
-  } 
+  }
 }
