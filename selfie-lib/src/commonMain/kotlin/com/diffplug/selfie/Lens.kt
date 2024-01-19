@@ -17,7 +17,10 @@ package com.diffplug.selfie
 
 import kotlin.jvm.JvmStatic
 
-/** A camera transforms a subject of a specific type into a [Snapshot]. */
+/**
+ * A camera transforms a subject of a specific type into a [Snapshot] ([jvm
+ * docs](https://selfie.dev/jvm/advanced#typed-snapshots)).
+ */
 fun interface Camera<Subject> {
   fun snapshot(subject: Subject): Snapshot
   fun withLens(lens: Lens): Camera<Subject> {
@@ -35,7 +38,7 @@ fun interface Camera<Subject> {
 
 /**
  * A lens transforms a single [Snapshot] into a new [Snapshot], transforming / creating / removing
- * [SnapshotValue]s along the way.
+ * [SnapshotValue]s along the way ([jvm docs](https://selfie.dev/jvm/advanced#lenses)).
  */
 fun interface Lens {
   fun transform(snapshot: Snapshot): Snapshot
@@ -49,7 +52,10 @@ fun interface StringOptionalFunction {
   }
 }
 
-/** A lens which makes it easy to pipe data from one facet to another within a snapshot. */
+/**
+ * A lens which makes it easy to pipe data from one facet to another within a snapshot
+ * ([jvm docs](https://selfie.dev/jvm/advanced#compound-lens)).
+ */
 open class CompoundLens : Lens {
   private val lenses = mutableListOf<Lens>()
   fun add(lens: Lens): CompoundLens {
