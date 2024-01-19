@@ -13,9 +13,9 @@ export function NavHeading({ text, popout }: NavHeadingProps) {
     <>
       <br />
       <div className={clsx(["flex", "items-end", "justify-between"])}>
-        <h2 id={text} className="group flex items-end">
-          <Selfie /> is {text.replace(/\-/g, " ")}{" "}
-          <HeadingAnchor className="translate-y-[-10px]" slug={text} />
+        <h2 id={text} className={clsx(["group"])}>
+          <Selfie /> is {text.replace(/\-/g, " ")}
+          <HeadingAnchor slug={text} />
         </h2>
         <HeadingPopout currentHeading={text} destinationUrl={popout} />
       </div>
