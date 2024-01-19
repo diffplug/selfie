@@ -79,6 +79,8 @@ export function FooterCTA() {
             "z-20",
             "left-0",
             "right-0",
+            "mx-[-0.5rem]",
+            "wide-phone:mx-[-1rem]",
           ])}
         >
           <Horse imageRef={imageRef} setImageHeight={setImageHeight} />
