@@ -1,4 +1,4 @@
-╔═ homepage/1) not logged in ═╗
+╔═ loginFlow/1) not logged in ═╗
 <html>
  <head></head>
  <body>
@@ -8,11 +8,11 @@
   </form>
  </body>
 </html>
-╔═ homepage/1) not logged in[md] ═╗
+╔═ loginFlow/1) not logged in[md] ═╗
 Please login
-╔═ homepage/1) not logged in[statusLine] ═╗
+╔═ loginFlow/1) not logged in[statusLine] ═╗
 HTTP/1.1 200 OK
-╔═ homepage/2) post login form ═╗
+╔═ loginFlow/2) post login form ═╗
 <html>
  <head></head>
  <body>
@@ -20,38 +20,38 @@ HTTP/1.1 200 OK
   <p>Check your email for your login link.</p>
  </body>
 </html>
-╔═ homepage/2) post login form[md] ═╗
+╔═ loginFlow/2) post login form[md] ═╗
 Email sent!
 
 Check your email for your login link.
-╔═ homepage/2) post login form[statusLine] ═╗
+╔═ loginFlow/2) post login form[statusLine] ═╗
 HTTP/1.1 200 OK
-╔═ homepage/3) login email ═╗
+╔═ loginFlow/3) login email ═╗
 Click <a href="https://www.example.com/login-confirm/erjchFY=">here</a> to login.
-╔═ homepage/3) login email[md] ═╗
+╔═ loginFlow/3) login email[md] ═╗
 Click [here](https://www.example.com/login-confirm/erjchFY=) to login.
-╔═ homepage/3) login email[metadata] ═╗
+╔═ loginFlow/3) login email[metadata] ═╗
 subject=Login to example.com
 to=user@domain.com
 from=team@example.com
-╔═ homepage/4) open login email link ═╗
+╔═ loginFlow/4) open login email link ═╗
 REDIRECT 302 Found to /
-╔═ homepage/4) open login email link[cookies] ═╗
+╔═ loginFlow/4) open login email link[cookies] ═╗
 login=user@domain.com|JclThw==;Path=/
-╔═ homepage/4) open login email link[md] ═╗
+╔═ loginFlow/4) open login email link[md] ═╗
 REDIRECT 302 Found to /
-╔═ homepage/5) follow redirect ═╗
+╔═ loginFlow/5) should be logged in ═╗
 <html>
  <head></head>
  <body>
   <h1>Welcome back user@domain.com</h1>
  </body>
 </html>
-╔═ homepage/5) follow redirect[md] ═╗
+╔═ loginFlow/5) should be logged in[md] ═╗
 Welcome back user@domain.com
-╔═ homepage/5) follow redirect[statusLine] ═╗
+╔═ loginFlow/5) should be logged in[statusLine] ═╗
 HTTP/1.1 200 OK
-╔═ homepage/6) bad signature ═╗
+╔═ loginFlow/6) bad signature should fail ═╗
 <!doctype html>
 <html>
  <head>
@@ -74,10 +74,10 @@ p.tab {padding-left: 40px;}
   <h2>status code: 401</h2>
  </body>
 </html>
-╔═ homepage/6) bad signature[md] ═╗
+╔═ loginFlow/6) bad signature should fail[md] ═╗
 Unauthorized
 
 status code: 401
-╔═ homepage/6) bad signature[statusLine] ═╗
+╔═ loginFlow/6) bad signature should fail[statusLine] ═╗
 HTTP/1.1 401 Unauthorized
 ╔═ [end of file] ═╗

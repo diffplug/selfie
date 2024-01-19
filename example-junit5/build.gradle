@@ -24,6 +24,8 @@ apply plugin: 'com.diffplug.spotless'
 spotless {
   java {
     googleJavaFormat()
+    replaceRegex("dense toMatchDisk", "\n(\\s*)\\.toMatchDisk\\(", ".toMatchDisk(")
+    replaceRegex("dense toBe", "\n(\\s*)\\.toBe\\(", ".toBe(")
   }
 }
 tasks.register('exampleAppJvm', JavaExec) {

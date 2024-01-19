@@ -18,8 +18,7 @@ import org.junit.jupiter.api.TestMethodOrder;
 public class AccountTest {
   @Test
   public void homepage() {
-    expectSelfie(get("/").body().asString())
-        .toBe(
+    expectSelfie(get("/").body().asString()).toBe(
             """
 <html><body>
 \s <h1>Please login</h1>
@@ -32,8 +31,7 @@ public class AccountTest {
 
   @Test
   public void T01_not_logged_in() {
-    expectSelfie(get("/"))
-        .toBe(
+    expectSelfie(get("/")).toBe(
             """
 <html>
 \s<head></head>
@@ -52,8 +50,7 @@ HTTP/1.1 200 OK""");
 
   @Test
   public void T02_login(Jooby app) {
-    expectSelfie(given().param("email", "user@domain.com").post("/login"))
-        .toBe(
+    expectSelfie(given().param("email", "user@domain.com").post("/login")).toBe(
             """
 <html>
 \s<head></head>
@@ -69,8 +66,7 @@ Check your email for your login link.
 ╔═ [statusLine] ═╗
 HTTP/1.1 200 OK""");
     var email = EmailDev.waitForIncoming(app);
-    expectSelfie(email)
-        .toBe(
+    expectSelfie(email).toBe(
             """
 Click <a href="https://www.example.com/login-confirm/erjchFY=">here</a> to login.
 ╔═ [md] ═╗
@@ -83,8 +79,7 @@ from=team@example.com""");
 
   @Test
   public void T03_login_confirm() {
-    expectSelfie(headersToString(get("/login-confirm/erjchFY=")))
-        .toBe(
+    expectSelfie(headersToString(get("/login-confirm/erjchFY="))).toBe(
             """
 HTTP/1.1 302 Found
 content-type=text/html;charset=UTF-8
