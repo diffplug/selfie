@@ -46,9 +46,6 @@ public class AccountTest {
 </html>
 ╔═ [md] ═╗
 Please login
-============
-
-
 ╔═ [statusLine] ═╗
 HTTP/1.1 200 OK""");
   }
@@ -67,17 +64,17 @@ HTTP/1.1 200 OK""");
 </html>
 ╔═ [md] ═╗
 Email sent!
-===========
 
 Check your email for your login link.
-
 ╔═ [statusLine] ═╗
 HTTP/1.1 200 OK""");
     var email = EmailDev.waitForIncoming(app);
     expectSelfie(email)
         .toBe(
             """
-Click <a href="http://localhost:8911/login-confirm/erjchFY=">here</a> to login.
+Click <a href="https://www.example.com/login-confirm/erjchFY=">here</a> to login.
+╔═ [md] ═╗
+Click [here](https://www.example.com/login-confirm/erjchFY=) to login.
 ╔═ [metadata] ═╗
 subject=Login to example.com
 to=user@domain.com
@@ -91,7 +88,7 @@ from=team@example.com""");
             """
 HTTP/1.1 302 Found
 content-type=text/html;charset=UTF-8
-set-cookie=login=user@domain.com;Path=/
+set-cookie=login=user@domain.com|JclThw==;Path=/
 location=/""");
   }
 
