@@ -12,9 +12,13 @@ export function Horse({ imageRef, setImageHeight }: HorseProps) {
     <div className="relative">
       <picture>
         <source media="(max-width: 604px)" srcSet="/horse-1536w.webp" />
-        <source media="(min-width: 605px)" srcSet="/horse-3072w.webp" />
+        <source
+          media="(min-width: 605px) and (max-width: 1299px)"
+          srcSet="/horse-3072w.webp"
+        />
+        <source media="(min-width: 1300px)" srcSet="/horse_feathered.webp" />
         <img
-          src="/horse-3072w.webp"
+          src="/horse_feathered.webp"
           ref={(el) => {
             if (el) {
               setImageHeight(el.height);
