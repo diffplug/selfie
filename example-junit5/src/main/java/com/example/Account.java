@@ -7,6 +7,7 @@ import io.jooby.Extension;
 import io.jooby.Jooby;
 import io.jooby.StatusCode;
 import io.jooby.Value;
+import io.jooby.exception.StatusCodeException;
 import jakarta.mail.internet.InternetAddress;
 import java.security.SecureRandom;
 import java.util.Base64;
@@ -93,7 +94,7 @@ public class Account implements Extension {
       this.email = email;
     }
 
-    static @Nullable AuthorizedUser auth(Context ctx) {
+    static @Nullable AuthorizedUser auth(Context ctx) throws Exception {
       AuthorizedUser existing = ctx.getAttribute(REQ_LOGIN_STATUS);
       if (existing != null) {
         return existing;
@@ -102,16 +103,39 @@ public class Account implements Extension {
       if (loginCookie.isMissing()) {
         return null;
       }
-      AuthorizedUser user = new AuthorizedUser(loginCookie.value());
+      String cookie = loginCookie.value();
+      int comma = cookie.indexOf('|');
+      if (comma == -1) {
+        throw new StatusCodeException(StatusCode.UNAUTHORIZED);
+      }
+      String email = cookie.substring(0, comma);
+      String signature = cookie.substring(comma + 1);
+      if (!signature.equals(signatureFor(email))) {
+        throw new StatusCodeException(StatusCode.UNAUTHORIZED);
+      }
+
+      AuthorizedUser user = new AuthorizedUser(email);
       ctx.setAttribute(REQ_LOGIN_STATUS, user);
       return user;
     }
 
     private void setCookies(Context ctx) {
-      ctx.setResponseCookie(new Cookie(LOGIN_COOKIE, email));
+      ctx.setResponseCookie(new Cookie(LOGIN_COOKIE, email + "|" + signatureFor(email)));
+    }
+
+    private static String signatureFor(String email) {
+      String terribleSecurity = "password";
+      int signed = (email + terribleSecurity).hashCode();
+      return Base64.getUrlEncoder().encodeToString(intToByteArray(signed));
     }
 
     private static final String REQ_LOGIN_STATUS = "reqLoginStatus";
     private static final String LOGIN_COOKIE = "login";
+
+    private static byte[] intToByteArray(int value) {
+      return new byte[] {
+        (byte) (value >> 24), (byte) (value >> 16), (byte) (value >> 8), (byte) value
+      };
+    }
   }
 }
