@@ -1,5 +1,7 @@
 import clsx from "clsx";
 import { createContext, useContext } from "react";
+import { LinkIcon } from "./Icons/LinkIcon";
+import slugify from "@sindresorhus/slugify";
 
 type ParentComponentProps = {
   children?: React.ReactNode;
@@ -86,10 +88,25 @@ export function p({ children, ...props }: ParentComponentProps) {
 }
 
 export function h2({ children, ...props }: ParentComponentProps) {
+  function handleLinkClick() {
+    if (typeof children === "string") {
+      history.pushState(
+        {},
+        "",
+        window.location.href.split("#")[0] + `#${slugify(children)}`
+      );
+    }
+  }
   return (
     <>
       <br />
-      <h2 {...props}>{children}</h2>
+      <h2 {...props} className="group flex items-center">
+        {children}{" "}
+        <LinkIcon
+          onClick={handleLinkClick}
+          className="ml-2 hidden h-6 w-6 cursor-pointer stroke-black stroke-2 group-hover:block"
+        />
+      </h2>
     </>
   );
 }
