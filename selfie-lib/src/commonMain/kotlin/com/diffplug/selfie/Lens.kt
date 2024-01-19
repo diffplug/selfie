@@ -15,6 +15,8 @@
  */
 package com.diffplug.selfie
 
+import kotlin.jvm.JvmStatic
+
 /** A camera transforms a subject of a specific type into a [Snapshot]. */
 fun interface Camera<Subject> {
   fun snapshot(subject: Subject): Snapshot
@@ -23,6 +25,11 @@ fun interface Camera<Subject> {
     return object : Camera<Subject> {
       override fun snapshot(subject: Subject): Snapshot = lens.transform(parent.snapshot(subject))
     }
+  }
+
+  companion object {
+    @JvmStatic
+    fun <Subject> of(camera: Camera<Subject>, lens: Lens): Camera<Subject> = camera.withLens(lens)
   }
 }
 
@@ -45,28 +52,29 @@ fun interface StringOptionalFunction {
 /** A lens which makes it easy to pipe data from one facet to another within a snapshot. */
 open class CompoundLens : Lens {
   private val lenses = mutableListOf<Lens>()
-  fun add(lens: Lens) {
+  fun add(lens: Lens): CompoundLens {
     lenses.add(lens)
+    return this
   }
-  fun replaceAll(toReplace: Regex, replacement: String) = mutateStrings {
+  fun replaceAll(toReplace: String, replacement: String): CompoundLens = mutateAllFacets {
     it.replace(toReplace, replacement)
   }
-  fun mutateStrings(perString: StringOptionalFunction) {
-    add { snapshot ->
-      Snapshot.ofEntries(
-          snapshot.allEntries().mapNotNull { e ->
-            if (e.value.isBinary) e
-            else perString.apply(e.value.valueString())?.let { entry(e.key, SnapshotValue.of(it)) }
-          })
-    }
+  fun replaceAllRegex(regex: String, replacement: String): CompoundLens = mutateAllFacets {
+    it.replace(regex.toRegex(), replacement)
   }
-  fun setFacetFrom(target: String, source: String, function: StringOptionalFunction) {
-    add { snapshot ->
-      val sourceValue = snapshot.subjectOrFacetMaybe(source)
-      if (sourceValue == null) snapshot
-      else setFacetOf(snapshot, target, function.apply(sourceValue.valueString()))
-    }
+  fun mutateAllFacets(perString: StringOptionalFunction): CompoundLens = add { snapshot ->
+    Snapshot.ofEntries(
+        snapshot.allEntries().mapNotNull { e ->
+          if (e.value.isBinary) e
+          else perString.apply(e.value.valueString())?.let { entry(e.key, SnapshotValue.of(it)) }
+        })
   }
+  fun setFacetFrom(target: String, source: String, function: StringOptionalFunction) =
+      add { snapshot ->
+        val sourceValue = snapshot.subjectOrFacetMaybe(source)
+        if (sourceValue == null) snapshot
+        else setFacetOf(snapshot, target, function.apply(sourceValue.valueString()))
+      }
   fun mutateFacet(target: String, function: StringOptionalFunction) =
       setFacetFrom(target, target, function)
   private fun setFacetOf(snapshot: Snapshot, target: String, newValue: String?): Snapshot =
