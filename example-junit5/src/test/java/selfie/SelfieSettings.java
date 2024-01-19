@@ -17,17 +17,17 @@ import org.jsoup.Jsoup;
 
 public class SelfieSettings extends SelfieSettingsAPI {
   private static final Lens htmlClean =
-          new CompoundLens()
-                  .mutateFacet("", SelfieSettings::prettyPrintHtml)
-                  .replaceAllRegex("http://localhost:\\d+/", "https://www.example.com/")
-                  .setFacetFrom("md", "", SelfieSettings::htmlToMd);
+      new CompoundLens()
+          .mutateFacet("", SelfieSettings::prettyPrintHtml)
+          .replaceAllRegex("http://localhost:\\d+/", "https://www.example.com/")
+          .setFacetFrom("md", "", SelfieSettings::htmlToMd);
 
   private static final Camera<EmailDev> EMAIL = Camera.of(SelfieSettings::cameraEmail, htmlClean);
 
   private static Snapshot cameraEmail(EmailDev email) {
-    return Snapshot.of(email.htmlMsg).plusFacet(
-                    "metadata",
-                    "subject=" + email.subject + "\nto=" + email.to + "\nfrom=" + email.from);
+    return Snapshot.of(email.htmlMsg)
+        .plusFacet(
+            "metadata", "subject=" + email.subject + "\nto=" + email.to + "\nfrom=" + email.from);
   }
 
   public static Selfie.DiskSelfie expectSelfie(EmailDev email) {
@@ -50,16 +50,18 @@ public class SelfieSettings extends SelfieSettingsAPI {
         var redirectReason = REDIRECTS.get(response.getStatusCode());
         Snapshot snapshot;
         if (redirectReason != null) {
-          snapshot = Snapshot.of(
-              "REDIRECT "
-                  + response.getStatusCode()
-                  + " "
-                  + redirectReason
-                  + " to "
-                  + response.getHeader("Location"));
+          snapshot =
+              Snapshot.of(
+                  "REDIRECT "
+                      + response.getStatusCode()
+                      + " "
+                      + redirectReason
+                      + " to "
+                      + response.getHeader("Location"));
         } else {
-          snapshot = Snapshot.of(response.getBody().asString())
-              .plusFacet("statusLine", response.getStatusLine());
+          snapshot =
+              Snapshot.of(response.getBody().asString())
+                  .plusFacet("statusLine", response.getStatusLine());
         }
         if (response.getHeaders().hasHeaderWithName("set-cookie")) {
           var cookies = response.getHeaders().getValues("set-cookie");
@@ -81,8 +83,14 @@ public class SelfieSettings extends SelfieSettingsAPI {
 
   // need 'com.vladsch.flexmark:flexmark-html2md-converter:0.64.8' on the test claspath
   private static String htmlToMd(String html) {
-    var md = new FlexmarkHtmlConverter.Builder().build().convert(html);
-    var noHR = md.replaceAll("(?m)^====+", "").replaceAll("\n\n+", "\n\n");
-    return noHR.trim();
+    var md =
+        new FlexmarkHtmlConverter.Builder()
+            .build()
+            .convert(html)
+            .replaceAll("(?m)^====+", "")
+            .replaceAll("(?m)^\\-\\-\\-+", "")
+            .replaceAll("(?m)^\\*\\*\\*[\\* ]+", "")
+            .replaceAll("\n\n+", "\n\n");
+    return md.trim();
   }
 }
