@@ -24,6 +24,7 @@ import kotlin.io.path.name
 private val testAnnotations =
     listOf(
             "org.junit.jupiter.api.Test", // junit5,
+            "org.junit.jupiter.params.ParameterizedTest",
             "org.junit.Test" // junit4
             )
         .mapNotNull {
