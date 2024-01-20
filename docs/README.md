@@ -1,6 +1,6 @@
-This page gets built with `npm run build` and deployed to [https://selfie.dev](https://selfie.dev) via CloudFlare, which is deploying the `prod/selfie.dev` branch.
+This page gets built with `npm run build` and deployed to [https://selfie.dev](https://selfie.dev) via CloudFlare, which is deploying the `release` branch. A preview will be generated for `selfie.dev/*` branches.
 
-To develop it, run `npm run dev` and you'll get a local dev server with hotreload.
+To develop locally, run `npm run dev` and you'll get a local dev server with hotreload.
 
 ### Entry points
 
