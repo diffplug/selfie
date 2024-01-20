@@ -319,22 +319,34 @@ internal class Progress {
 class SelfieTestExecutionListener : TestExecutionListener {
   private val progress = Progress()
   override fun executionStarted(testIdentifier: TestIdentifier) {
-    if (isRoot(testIdentifier)) return
-    val (clazz, method) = parseClassMethod(testIdentifier)
-    progress.start(clazz, method)
+    try {
+      if (isRoot(testIdentifier)) return
+      val (clazz, method) = parseClassMethod(testIdentifier)
+      progress.start(clazz, method)
+    } catch (e: Throwable) {
+      progress.layout.smuggledError = e
+    }
   }
   override fun executionSkipped(testIdentifier: TestIdentifier, reason: String) {
-    val (clazz, method) = parseClassMethod(testIdentifier)
-    progress.skip(clazz, method)
+    try {
+      val (clazz, method) = parseClassMethod(testIdentifier)
+      progress.skip(clazz, method)
+    } catch (e: Throwable) {
+      progress.layout.smuggledError = e
+    }
   }
   override fun executionFinished(
       testIdentifier: TestIdentifier,
       testExecutionResult: TestExecutionResult
   ) {
-    if (isRoot(testIdentifier)) return
-    val (clazz, method) = parseClassMethod(testIdentifier)
-    progress.finishWithSuccess(
-        clazz, method, testExecutionResult.status == TestExecutionResult.Status.SUCCESSFUL)
+    try {
+      if (isRoot(testIdentifier)) return
+      val (clazz, method) = parseClassMethod(testIdentifier)
+      progress.finishWithSuccess(
+          clazz, method, testExecutionResult.status == TestExecutionResult.Status.SUCCESSFUL)
+    } catch (e: Throwable) {
+      progress.layout.smuggledError = e
+    }
   }
   override fun testPlanExecutionFinished(testPlan: TestPlan?) {
     progress.finishedAllTests()
