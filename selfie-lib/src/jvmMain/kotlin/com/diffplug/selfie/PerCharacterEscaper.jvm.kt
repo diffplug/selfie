@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 DiffPlug
+ * Copyright (C) 2023-2024 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -132,29 +132,11 @@ private constructor(
       }
       return -1
     }
-
-    /**
-     * If your escape policy is "'123", it means this:
-     * ```
-     * abc->abc
-     * 123->'1'2'3
-     * I won't->I won''t
-     * ```
-     */
     actual fun selfEscape(escapePolicy: String): PerCharacterEscaper {
       val escapedCodePoints = escapePolicy.codePoints().toArray()
       val escapeCodePoint = escapedCodePoints[0]
       return PerCharacterEscaper(escapeCodePoint, escapedCodePoints, escapedCodePoints)
     }
-
-    /**
-     * If your escape policy is "'a1b2c3d", it means this:
-     * ```
-     * abc->abc
-     * 123->'b'c'd
-     * I won't->I won'at
-     * ```
-     */
     actual fun specifiedEscape(escapePolicy: String): PerCharacterEscaper {
       val codePoints = escapePolicy.codePoints().toArray()
       require(codePoints.size % 2 == 0)
