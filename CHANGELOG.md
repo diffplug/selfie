@@ -7,8 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 - Support for `@ParameterizedTest`. ([#118](https://github.com/diffplug/selfie/pull/118))
+- `ArraySet<K>` has been added to the standard library alongside `ArrayMap<K, V>`. ([#119](https://github.com/diffplug/selfie/pull/119))
+  - These have the strange property that if the key is `String`, then `/` characters are sorted to be the lowest possible character.
 ### Fixed
 - We already [smuggle errors from initialization](https://github.com/diffplug/selfie/pull/94) to help debug them, and now we also smuggle errors that happen during test execution. ([#117](https://github.com/diffplug/selfie/pull/117))
+- Fix a garbage collection bug which occurred when a test method's name was a prefix of another test method's name. ([#119](https://github.com/diffplug/selfie/pull/119))
+### Changed
+- If you were using `/` in the name of a test or facet, it will now be escaped within snapshot files by `\÷`. ([#119](https://github.com/diffplug/selfie/pull/119))
 
 ## [1.0.1] - 2024-01-19
 ### Fixed
