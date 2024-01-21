@@ -16,7 +16,7 @@
 package com.diffplug.selfie.junit5
 
 import com.diffplug.selfie.ArrayMap
-import com.diffplug.selfie.ListBackedSet
+import com.diffplug.selfie.ArraySet
 import com.diffplug.selfie.Snapshot
 
 /** Search for any test annotation classes which are present on the classpath. */
@@ -61,7 +61,7 @@ private fun classExistsAndHasTests(key: String): Boolean {
 }
 
 internal class MethodSnapshotGC {
-  private var suffixesToKeep: ArraySet<String>? = EMPTY_SET
+  private var suffixesToKeep: ArraySet<String>? = ArraySet.empty()
   fun keepSuffix(suffix: String) {
     suffixesToKeep = suffixesToKeep?.plusOrThis(suffix)
   }
@@ -70,7 +70,7 @@ internal class MethodSnapshotGC {
     return this
   }
   override fun toString() = java.util.Objects.toString(suffixesToKeep)
-  private fun succeededAndUsedNoSnapshots() = suffixesToKeep == EMPTY_SET
+  private fun succeededAndUsedNoSnapshots() = ArraySet.empty<String>() == suffixesToKeep
   private fun keeps(s: String): Boolean = suffixesToKeep?.contains(s) ?: true
 
   companion object {
@@ -166,40 +166,6 @@ internal class MethodSnapshotGC {
             testAnnotations.any { method.isAnnotationPresent(it) }) {
           method.name
         } else null
-      }
-    }
-    private val EMPTY_SET = ArraySet<String>(arrayOf())
-  }
-}
-
-/** An immutable, sorted, array-backed set. */
-internal class ArraySet<K : Comparable<K>>(private val data: Array<Any>) : ListBackedSet<K>() {
-  override val size: Int
-    get() = data.size
-  override fun get(index: Int): K = data[index] as K
-  override fun contains(element: K): Boolean = data.binarySearch(element) >= 0
-  fun plusOrThis(key: K): ArraySet<K> {
-    val idxExisting = data.binarySearch(key)
-    if (idxExisting >= 0) {
-      return this
-    }
-    val idxInsert = -(idxExisting + 1)
-    return when (data.size) {
-      0 -> ArraySet(arrayOf(key))
-      1 -> {
-        if (idxInsert == 0)
-            ArraySet(
-                arrayOf(
-                    key,
-                    data[0],
-                ))
-        else ArraySet(arrayOf(data[0], key))
-      }
-      else -> {
-        // TODO: use idxInsert and arrayCopy to do this faster, see ArrayMap#insert
-        val array = Array(size + 1) { if (it < size) data[it] else key }
-        array.sort()
-        ArraySet(array)
       }
     }
   }

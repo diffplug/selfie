@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 DiffPlug
+ * Copyright (C) 2023-2024 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,8 @@ expect class PerCharacterEscaper {
 
   companion object {
     /**
-     * If your escape policy is "'123", it means this:
+     * If your escape policy is `'123`, it means this: <br>
+     *
      * ```
      * abc->abc
      * 123->'1'2'3
@@ -31,7 +32,8 @@ expect class PerCharacterEscaper {
     fun selfEscape(escapePolicy: String): PerCharacterEscaper
 
     /**
-     * If your escape policy is "'a1b2c3d", it means this:
+     * If your escape policy is `'a1b2c3d`, it means this: <br>
+     *
      * ```
      * abc->abc
      * 123->'b'c'd

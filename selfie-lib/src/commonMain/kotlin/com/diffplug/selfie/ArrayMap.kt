@@ -16,6 +16,25 @@
 package com.diffplug.selfie
 
 import kotlin.collections.binarySearch
+private val STRING_SLASHFIRST =
+    Comparator<String> { a, b ->
+      var i = 0
+      while (i < a.length && i < b.length) {
+        val charA = a[i]
+        val charB = b[i]
+        if (charA != charB) {
+          return@Comparator ( // treat
+          if (charA == '/') -1 // slash as
+          else if (charB == '/') 1 // the lowest
+          else charA.compareTo(charB) // character
+          )
+        }
+        i++
+      }
+      a.length.compareTo(b.length)
+    }
+private val PAIR_STRING_SLASHFIRST =
+    Comparator<Pair<String, Any>> { a, b -> STRING_SLASHFIRST.compare(a.first, b.first) }
 
 abstract class ListBackedSet<T>() : AbstractSet<T>() {
   abstract operator fun get(index: Int): T
@@ -36,12 +55,17 @@ private fun <T : Comparable<T>> ListBackedSet<T>.binarySearch(element: T): Int {
           get() = this@binarySearch.size
         override fun get(index: Int): T = this@binarySearch[index]
       }
-  return list.binarySearch(element)
+  return if (element is String) {
+    (list as List<String>).binarySearch(element, STRING_SLASHFIRST)
+  } else list.binarySearch(element)
 }
 
 internal expect fun <K, V> entry(key: K, value: V): Map.Entry<K, V>
 
-/** An immutable, sorted, array-backed map. Wish it could be package-private! UGH!! */
+/**
+ * An immutable, sorted, array-backed map - if keys are [String], they have a special sort order
+ * where `/` is the lowest key.
+ */
 class ArrayMap<K : Comparable<K>, V : Any>(private val data: Array<Any>) : Map<K, V> {
   fun minusSortedIndices(indicesToRemove: List<Int>): ArrayMap<K, V> {
     if (indicesToRemove.isEmpty()) {
@@ -185,13 +209,64 @@ class ArrayMap<K : Comparable<K>, V : Any>(private val data: Array<Any>) : Map<K
     private val EMPTY = ArrayMap<String, Any>(arrayOf())
     fun <K : Comparable<K>, V : Any> empty() = EMPTY as ArrayMap<K, V>
     fun <K : Comparable<K>, V : Any> of(pairs: MutableList<Pair<K, V>>): ArrayMap<K, V> {
+      if (pairs.size > 1) {
+        if (pairs[0].first is String) {
+          (pairs as (MutableList<Pair<String, Any>>)).sortWith(PAIR_STRING_SLASHFIRST)
+        } else {
+          pairs.sortBy { it.first }
+        }
+      }
       val array = arrayOfNulls<Any>(pairs.size * 2)
-      pairs.sortBy { it.first }
       for (i in 0 until pairs.size) {
         array[i * 2] = pairs[i].first
         array[i * 2 + 1] = pairs[i].second
       }
       return ArrayMap(array as Array<Any>)
     }
+  }
+}
+
+/**
+ * An immutable, sorted, array-backed set - if keys are [String], they have a special sort order
+ * where `/` is the lowest key.
+ */
+class ArraySet<K : Comparable<K>>(private val data: Array<Any>) : ListBackedSet<K>() {
+  override val size: Int
+    get() = data.size
+  override fun get(index: Int): K = data[index] as K
+  override fun contains(element: K): Boolean = binarySearch(element) >= 0
+  fun plusOrThis(key: K): ArraySet<K> {
+    val idxExisting = binarySearch(key)
+    if (idxExisting >= 0) {
+      return this
+    }
+    val idxInsert = -(idxExisting + 1)
+    return when (data.size) {
+      0 -> ArraySet(arrayOf(key))
+      1 -> {
+        if (idxInsert == 0)
+            ArraySet(
+                arrayOf(
+                    key,
+                    data[0],
+                ))
+        else ArraySet(arrayOf(data[0], key))
+      }
+      else -> {
+        // TODO: use idxInsert and arrayCopy to do this faster, see ArrayMap#insert
+        val array = Array(size + 1) { if (it < size) data[it] else key }
+        if (key is String) {
+          array.sortWith(STRING_SLASHFIRST as Comparator<Any>)
+        } else {
+          (array as Array<K>).sort()
+        }
+        ArraySet(array)
+      }
+    }
+  }
+
+  companion object {
+    private val EMPTY = ArraySet<String>(arrayOf())
+    fun <K : Comparable<K>> empty() = EMPTY as ArraySet<K>
   }
 }
