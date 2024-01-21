@@ -149,16 +149,22 @@ internal class ClassProgress(val parent: Progress, val className: String) {
   private var diskWriteTracker: DiskWriteTracker? = DiskWriteTracker()
   private var inlineWriteTracker: InlineWriteTracker? = InlineWriteTracker()
   // the methods below called by the TestExecutionListener on its runtime thread
-  @Synchronized fun startMethod(method: String) {
+  @Synchronized fun startMethod(method: String, isTest: Boolean) {
     assertNotTerminated()
-    SnapshotStorageJUnit5.start(this, method)
+    if (isTest) {
+      SnapshotStorageJUnit5.start(this, method)
+    }
     assert(method.indexOf('/') == -1) { "Method name cannot contain '/', was $method" }
-    methods = methods.plus(method, MethodSnapshotGC())
+    methods = methods.plusOrNoOp(method, MethodSnapshotGC())
   }
-  @Synchronized fun finishedMethodWithSuccess(method: String, success: Boolean) {
+  @Synchronized fun finishedMethodWithSuccess(method: String, isTest: Boolean, success: Boolean) {
     assertNotTerminated()
-    SnapshotStorageJUnit5.finish(this, method)
-    methods[method]!!.succeeded(success)
+    if (isTest) {
+      SnapshotStorageJUnit5.finish(this, method)
+    }
+    if (!success) {
+      methods[method]!!.keepAll()
+    }
   }
   @Synchronized fun finishedClassWithSuccess(success: Boolean) {
     assertNotTerminated()
@@ -256,27 +262,27 @@ internal class Progress {
   private fun forClass(className: String) = synchronized(this) { progressPerClass[className]!! }
 
   // TestExecutionListener
-  fun start(className: String, method: String?) {
+  fun start(className: String, method: String?, isTest: Boolean) {
     if (method == null) {
       synchronized(this) {
         progressPerClass = progressPerClass.plus(className, ClassProgress(this, className))
       }
     } else {
-      forClass(className).startMethod(method)
+      forClass(className).startMethod(method, isTest)
     }
   }
-  fun skip(className: String, method: String?) {
+  fun skip(className: String, method: String?, isTest: Boolean) {
     if (method == null) {
-      start(className, null)
-      finishWithSuccess(className, null, false)
+      start(className, null, isTest)
+      finishWithSuccess(className, null, isTest, false)
     } else {
       // thanks to reflection, we don't have to rely on method skip events
     }
   }
-  fun finishWithSuccess(className: String, method: String?, isSuccess: Boolean) {
+  fun finishWithSuccess(className: String, method: String?, isTest: Boolean, isSuccess: Boolean) {
     forClass(className).let {
       if (method != null) {
-        it.finishedMethodWithSuccess(method, isSuccess)
+        it.finishedMethodWithSuccess(method, isTest, isSuccess)
       } else {
         it.finishedClassWithSuccess(isSuccess)
       }
@@ -322,7 +328,7 @@ class SelfieTestExecutionListener : TestExecutionListener {
     try {
       if (isRoot(testIdentifier)) return
       val (clazz, method) = parseClassMethod(testIdentifier)
-      progress.start(clazz, method)
+      progress.start(clazz, method, testIdentifier.isTest)
     } catch (e: Throwable) {
       progress.layout.smuggledError = e
     }
@@ -330,7 +336,7 @@ class SelfieTestExecutionListener : TestExecutionListener {
   override fun executionSkipped(testIdentifier: TestIdentifier, reason: String) {
     try {
       val (clazz, method) = parseClassMethod(testIdentifier)
-      progress.skip(clazz, method)
+      progress.skip(clazz, method, testIdentifier.isTest)
     } catch (e: Throwable) {
       progress.layout.smuggledError = e
     }
@@ -343,7 +349,10 @@ class SelfieTestExecutionListener : TestExecutionListener {
       if (isRoot(testIdentifier)) return
       val (clazz, method) = parseClassMethod(testIdentifier)
       progress.finishWithSuccess(
-          clazz, method, testExecutionResult.status == TestExecutionResult.Status.SUCCESSFUL)
+          clazz,
+          method,
+          testIdentifier.isTest,
+          testExecutionResult.status == TestExecutionResult.Status.SUCCESSFUL)
     } catch (e: Throwable) {
       progress.layout.smuggledError = e
     }

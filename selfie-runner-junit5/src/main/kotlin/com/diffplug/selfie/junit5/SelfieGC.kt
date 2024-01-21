@@ -18,12 +18,12 @@ package com.diffplug.selfie.junit5
 import com.diffplug.selfie.ArrayMap
 import com.diffplug.selfie.ListBackedSet
 import com.diffplug.selfie.Snapshot
-import kotlin.io.path.name
 
 /** Search for any test annotation classes which are present on the classpath. */
 private val testAnnotations =
     listOf(
             "org.junit.jupiter.api.Test", // junit5,
+            "org.junit.jupiter.params.ParameterizedTest",
             "org.junit.Test" // junit4
             )
         .mapNotNull {
@@ -68,9 +68,6 @@ internal class MethodSnapshotGC {
   fun keepAll(): MethodSnapshotGC {
     suffixesToKeep = null
     return this
-  }
-  fun succeeded(success: Boolean) {
-    if (!success) keepAll() // if a method fails we have to keep all its snapshots just in case
   }
   override fun toString() = java.util.Objects.toString(suffixesToKeep)
   private fun succeededAndUsedNoSnapshots() = suffixesToKeep == EMPTY_SET
@@ -180,6 +177,7 @@ internal class ArraySet<K : Comparable<K>>(private val data: Array<Any>) : ListB
   override val size: Int
     get() = data.size
   override fun get(index: Int): K = data[index] as K
+  override fun contains(element: K): Boolean = data.binarySearch(element) >= 0
   fun plusOrThis(key: K): ArraySet<K> {
     val idxExisting = data.binarySearch(key)
     if (idxExisting >= 0) {
