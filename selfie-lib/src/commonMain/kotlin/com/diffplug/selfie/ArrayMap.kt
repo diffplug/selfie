@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 DiffPlug
+ * Copyright (C) 2023-2024 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -76,12 +76,23 @@ class ArrayMap<K : Comparable<K>, V : Any>(private val data: Array<Any>) : Map<K
    * exists.
    */
   fun plus(key: K, value: V): ArrayMap<K, V> {
-    val idxExisting = dataAsKeys.binarySearch(key)
-    if (idxExisting >= 0) {
+    val next = plusOrNoOp(key, value)
+    if (next === this) {
       throw IllegalArgumentException("Key already exists: $key")
     }
-    val idxInsert = -(idxExisting + 1)
-    return insert(idxInsert, key, value)
+    return next
+  }
+  /**
+   * Returns a new ArrayMap which has added the given key, or the current map if the key was already
+   * in the map.
+   */
+  fun plusOrNoOp(key: K, value: V): ArrayMap<K, V> {
+    val idxExisting = dataAsKeys.binarySearch(key)
+    return if (idxExisting >= 0) this
+    else {
+      val idxInsert = -(idxExisting + 1)
+      insert(idxInsert, key, value)
+    }
   }
   /**
    * Returns an ArrayMap which has added or overwritten the given key/value. If the map already
