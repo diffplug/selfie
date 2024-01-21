@@ -70,9 +70,6 @@ internal class MethodSnapshotGC {
     suffixesToKeep = null
     return this
   }
-  fun succeeded(success: Boolean) {
-    if (!success) keepAll() // if a method fails we have to keep all its snapshots just in case
-  }
   override fun toString() = java.util.Objects.toString(suffixesToKeep)
   private fun succeededAndUsedNoSnapshots() = suffixesToKeep == EMPTY_SET
   private fun keeps(s: String): Boolean = suffixesToKeep?.contains(s) ?: true
