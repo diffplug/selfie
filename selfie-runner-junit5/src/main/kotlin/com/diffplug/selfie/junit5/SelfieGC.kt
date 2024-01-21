@@ -18,7 +18,6 @@ package com.diffplug.selfie.junit5
 import com.diffplug.selfie.ArrayMap
 import com.diffplug.selfie.ListBackedSet
 import com.diffplug.selfie.Snapshot
-import kotlin.io.path.name
 
 /** Search for any test annotation classes which are present on the classpath. */
 private val testAnnotations =
@@ -178,6 +177,7 @@ internal class ArraySet<K : Comparable<K>>(private val data: Array<Any>) : ListB
   override val size: Int
     get() = data.size
   override fun get(index: Int): K = data[index] as K
+  override fun contains(element: K): Boolean = data.binarySearch(element) >= 0
   fun plusOrThis(key: K): ArraySet<K> {
     val idxExisting = data.binarySearch(key)
     if (idxExisting >= 0) {
