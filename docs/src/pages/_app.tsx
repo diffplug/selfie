@@ -21,12 +21,13 @@ export default function App({ Component, pageProps, router }: AppProps) {
         <meta property="og:title" content={pageTitle} />
         <meta property="og:type" content="website" />
         <meta property="og:image" content={pageImage} />
+        <meta property="og:url" content={pageUrl} />
+        <meta property="og:description" content={pageDescription} />
+        <meta name="twitter:card" content="summary_large_image" />
         <meta
           name="twitter:image"
           content={"https://selfie.dev/twitter-card.webp"}
         />
-        <meta property="og:url" content={pageUrl} />
-        <meta property="og:description" content={pageDescription} />
       </Head>
       <MDXProvider components={mdxComponents}>
         <div
