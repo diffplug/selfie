@@ -7,12 +7,22 @@ import clsx from "clsx";
 import { AppProps } from "next/app";
 import Head from "next/head";
 
-export default function App({ Component, pageProps }: AppProps) {
+export default function App({ Component, pageProps, router }: AppProps) {
+  const pageTitle = pageProps.title || "Selfie";
+  const pageDescription =
+    pageProps.description || "Let your codebase take its own selfies.";
+  const pageImage = pageProps.imageUrl || "https://selfie.dev/car-3072w.webp";
+  const pageUrl = `https://selfie.dev${router.pathname}`;
   return (
     <>
       <Head>
-        <title>Selfie</title>
-        <meta name="description" content={pageProps.description} />
+        <title>{pageTitle}</title>
+        <meta name="description" content={pageDescription} />
+        <meta name="og:title" content={pageTitle} />
+        <meta property="og:type" content="website" />
+        <meta name="og:image" content={pageImage} />
+        <meta name="og:url" content={pageUrl} />
+        <meta name="og:description" content={pageDescription} />
       </Head>
       <MDXProvider components={mdxComponents}>
         <div
