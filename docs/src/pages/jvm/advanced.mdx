@@ -237,7 +237,7 @@ status code: 401""");
 }
 ```
 
-We just wrote a high-level specification of a realistic login flow, and it only took 25 lines — most of which were generated for us, and could be regenerated on a whim if we want to change our copywriting. The [corresponding disk snapshot](https://github.com/diffplug/selfie/blob/main/example-junit5/src/test/java/com/example/LoginFlowTest.ss) gives us an exhaustive specification and description of the server's behavior.
+We just wrote a high-level specification of a realistic login flow, and it only took 25 lines of java code — most of which were generated for us, and could be regenerated on a whim if we want to change our copywriting. The [corresponding disk snapshot](https://github.com/diffplug/selfie/blob/main/example-junit5/src/test/java/com/example/LoginFlowTest.ss) gives us an exhaustive specification and description of the server's behavior.
 
 Didn't think that adopting a bugfixed version of your internationalization lib would cause any changes to your website whatsever? Oops. Don't wade through failed assertions, get a diff in every failure. If you want, regenerate all the snapshots to get a full view of the problem across the whole codebase in your git client.
 
