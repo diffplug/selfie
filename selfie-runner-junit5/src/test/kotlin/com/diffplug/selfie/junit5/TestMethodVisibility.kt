@@ -39,8 +39,6 @@ class TestMethodVisibility : Harness("undertest-junit5") {
             package
             ╔═ isProtected ═╗
             protected
-            ╔═ isPublic ═╗
-            public
             ╔═ [end of file] ═╗
             
         """

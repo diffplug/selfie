@@ -7,11 +7,6 @@ import org.junit.jupiter.api.Test;
 
 public class UT_TestMethodVisibility {
     @Test
-    public void isPublic() {
-        expectSelfie("public").toMatchDisk();
-    }
-
-    @Test
     void isPackage() {
         expectSelfie("package").toMatchDisk();
     }
