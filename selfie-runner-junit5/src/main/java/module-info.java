@@ -7,5 +7,5 @@ module com.diffplug.selfie.junit {
     requires org.junit.platform.engine;
     requires org.opentest4j;
 
-    provides org.junit.platform.launcher.TestExecutionListener with com.diffplug.selfie.junit5.SelfieTestExecutionListener;
+    provides org.junit.platform.launcher.TestExecutionListener with com.diffplug.selfie.junit5.SelfieTestExecutionListenerShim;
 }
