@@ -1,6 +1,6 @@
 on:
   push:
-    branches: [release, main]
+    branches: [release]
 jobs:
   publish:
     runs-on: ubuntu-latest
