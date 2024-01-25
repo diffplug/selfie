@@ -155,7 +155,7 @@ public static Selfie.DiskSelfie expectSelfie(Response response) {
   return Selfie.expectSelfie(response, RESPONSE_CAMERA.withLens(PRETTY_PRINT));
 }
 public static Selfie.DiskSelfie expectSelfie(Email email) {
-  return Selfie.expectSelfie(response, EMAIL_CAMERA.withLens(PRETTY_PRINT));
+  return Selfie.expectSelfie(email, EMAIL_CAMERA.withLens(PRETTY_PRINT));
 }
 ```
 
