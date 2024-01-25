@@ -1,6 +1,6 @@
 # <img align="left" src="docs/selfie_logo_only.png"> Selfie
 
-Snapshot testing for the JVM (more platforms coming soon! [js](https://github.com/diffplug/selfie/issues/84), [other](https://github.com/diffplug/selfie/issues/85))
+Snapshot testing for the JVM.
 
 Supports inline snapshots, disk snapshots, garbage collection, and more.
 
@@ -8,6 +8,7 @@ Supports inline snapshots, disk snapshots, garbage collection, and more.
 - [Advanced usage](https://selfie.dev/jvm/advanced)
 - [Why selfie?](https://selfie.dev/jvm)
 - [Contributing](CONTRIBUTING.md)
+- Other platforms on the way: [js](https://github.com/diffplug/selfie/issues/84), [python, go, ...](https://github.com/diffplug/selfie/issues/85))
 
 ### Acknowledgements
 
