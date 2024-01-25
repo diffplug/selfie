@@ -8,7 +8,7 @@ Supports inline snapshots, disk snapshots, garbage collection, and more.
 - [Advanced usage](https://selfie.dev/jvm/advanced)
 - [Why selfie?](https://selfie.dev/jvm)
 - [Contributing](CONTRIBUTING.md)
-- Other platforms on the way: [js](https://github.com/diffplug/selfie/issues/84), [py, go, ...](https://github.com/diffplug/selfie/issues/85))
+- Other platforms on the way: [js](https://github.com/diffplug/selfie/issues/84), [py, go, ...](https://github.com/diffplug/selfie/issues/85)
 
 ### Acknowledgements
 
