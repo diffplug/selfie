@@ -308,7 +308,7 @@ internal class Progress {
       val staleFile = layout.snapshotPathForClass(stale)
       if (snapshotsFilesWrittenToDisk.contains(staleFile)) {
         throw AssertionError(
-            "Selfie wrote a snapshot and then marked it stale for deletion it in the same run: $staleFile\nSelfie will delete this snapshot on the next run, which is bad! Why is Selfie marking this snapshot as stale?")
+            "Selfie wrote a snapshot and then marked it stale for deletion in the same run: $staleFile\nSelfie will delete this snapshot on the next run, which is bad! Why is Selfie marking this snapshot as stale?")
       } else {
         deleteFileAndParentDirIfEmpty(staleFile)
       }
