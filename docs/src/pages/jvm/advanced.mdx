@@ -60,11 +60,11 @@ import io.restassured.response.Response;
 
 // Recommend using SelfieSettings so that all your project-specific selfie entry points are in one place.
 public class SelfieSettings extends SelfieSettingsAPI {
-  private static final Camera<Response> RESPONSE = (Response response) ->
+  private static final Camera<Response> RESPONSE_CAMERA = (Response response) ->
     Snapshot.of(response.getBody().asString());
 
   public static Selfie.DiskSelfie expectSelfie(Response response) {
-    return Selfie.expectSelfie(response, RESPONSE);
+    return Selfie.expectSelfie(response, RESPONSE_CAMERA);
   }
 }
 ```
@@ -74,7 +74,7 @@ public class SelfieSettings extends SelfieSettingsAPI {
 Every snapshot has a "subject": `Snapshot.of(String subject)`. But each snapshot can also have an unlimited number of "facets", which are other named values. For example, maybe we want to add the response's status line.
 
 ```java
-private static final Camera<Response> RESPONSE = (Response response) ->
+private static final Camera<Response> RESPONSE_CAMERA = (Response response) ->
    Snapshot.of(response.getBody().asString())
            .plusFacet("statusLine", response.getStatusLine());
 ```
@@ -100,7 +100,7 @@ HTTP/1.1 200 OK""");
 Now that we have the status code, it begs the question: what should the subject be for a 301 redirect? Surely the redirected URL, not just an empty string?
 
 ```java
-private static final Camera<Response> RESPONSE = (Response response) -> {
+private static final Camera<Response> RESPONSE_CAMERA = (Response response) -> {
     var redirectReason = REDIRECTS.get(response.getStatusCode());
     if (redirectReason != null) {
         return Snapshot.of("REDIRECT " + response.getStatusCode() + " " + redirectReason + " to " + response.getHeader("Location"));
@@ -120,7 +120,7 @@ So a snapshot doesn't have to be only one value, and it's fine if the schema cha
 
 ## Lenses
 
-A [Lens](https://kdoc.selfie.dev/selfie-lib/com.diffplug.selfie/-lens/) is just a function that transforms one `Snapshot` into another `Snapshot`, transforming / creating / removing values along the way. For example, we might want to pretty-print the HTML in our snapshots.
+A [Lens](https://kdoc.selfie.dev/selfie-lib/com.diffplug.selfie/-lens/) is a function that transforms one `Snapshot` into another `Snapshot`, transforming / creating / removing values along the way. For example, we might want to pretty-print the HTML in our snapshots.
 
 ```java
 // need 'org.jsoup:jsoup:1.17.1' on the test claspath
@@ -130,7 +130,7 @@ private static String prettyPrintHtml(String html) {
   return doc.outerHtml();
 }
 
-private static final Camera<Response> RESPONSE = (Response response) -> {
+private static final Camera<Response> RESPONSE_CAMERA = (Response response) -> {
   (...)
   // call prettyPrint when we take the snapshot
   return Snapshot.of(prettyPrintHtml(response.getBody().asString()))
@@ -152,10 +152,10 @@ private static final Lens PRETTY_PRINT = (Snapshot snapshot) -> {
 };
 
 public static Selfie.DiskSelfie expectSelfie(Response response) {
-  return Selfie.expectSelfie(response, RESPONSE.withLens(PRETTY_PRINT));
+  return Selfie.expectSelfie(response, RESPONSE_CAMERA.withLens(PRETTY_PRINT));
 }
 public static Selfie.DiskSelfie expectSelfie(Email email) {
-  return Selfie.expectSelfie(response, EMAIL.withLens(PRETTY_PRINT));
+  return Selfie.expectSelfie(email, EMAIL_CAMERA.withLens(PRETTY_PRINT));
 }
 ```
 
@@ -163,7 +163,7 @@ public static Selfie.DiskSelfie expectSelfie(Email email) {
 
 Selfie has a useful class called [`CompoundLens`](https://kdoc.selfie.dev/selfie-lib/com.diffplug.selfie/-compound-lens/). It is a fluent API for mutating facets and piping data through functions from one facet into another. An important gotcha here is that the **subject** can be treated as a facet named `""` (empty string). `CompoundLens` uses this hack to simplify a snapshot into only a map of facets, instead of a subject plus a map of facets.
 
-We can easily mutate an specific facet, such as to pretty-print HTML in the subject...
+We can easily mutate a specific facet, such as to pretty-print HTML in the subject...
 
 ```java
 private static final Lens HTML = new CompoundLens()
@@ -181,7 +181,7 @@ private static final Lens HTML = new CompoundLens()
 Or we can render HTML into markdown, and store the easy-to-read markdown in its own facet...
 
 ```java
-// need 'com.vladsch.flexmark:flexmark-html2md-converter:0.64.8' on the test claspath
+// need 'com.vladsch.flexmark:flexmark-html2md-converter:0.64.8' on the test classpath
 private static String htmlToMd(String html) {
   return new FlexmarkHtmlConverter.Builder().build().convert(html);
 }

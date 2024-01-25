@@ -22,7 +22,8 @@ public class SelfieSettings extends SelfieSettingsAPI {
           .replaceAllRegex("http://localhost:\\d+/", "https://www.example.com/")
           .setFacetFrom("md", "", SelfieSettings::htmlToMd);
 
-  private static final Camera<EmailDev> EMAIL = Camera.of(SelfieSettings::cameraEmail, htmlClean);
+  private static final Camera<EmailDev> EMAIL_CAMERA =
+      Camera.of(SelfieSettings::cameraEmail, htmlClean);
 
   private static Snapshot cameraEmail(EmailDev email) {
     return Snapshot.of(email.htmlMsg)
@@ -31,11 +32,11 @@ public class SelfieSettings extends SelfieSettingsAPI {
   }
 
   public static Selfie.DiskSelfie expectSelfie(EmailDev email) {
-    return Selfie.expectSelfie(email, EMAIL);
+    return Selfie.expectSelfie(email, EMAIL_CAMERA);
   }
 
   public static Selfie.DiskSelfie expectSelfie(Response response) {
-    return Selfie.expectSelfie(response, RESPONSE.withLens(htmlClean));
+    return Selfie.expectSelfie(response, RESPONSE_CAMERA.withLens(htmlClean));
   }
 
   private static final Map<Integer, String> REDIRECTS =
@@ -45,7 +46,7 @@ public class SelfieSettings extends SelfieSettingsAPI {
               StatusCode.TEMPORARY_REDIRECT,
               StatusCode.MOVED_PERMANENTLY)
           .collect(Collectors.toMap(StatusCode::value, StatusCode::reason));
-  private static final Camera<Response> RESPONSE =
+  private static final Camera<Response> RESPONSE_CAMERA =
       (Response response) -> {
         var redirectReason = REDIRECTS.get(response.getStatusCode());
         Snapshot snapshot;
