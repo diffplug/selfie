@@ -52,9 +52,16 @@ internal fun findStaleSnapshotFiles(layout: SnapshotFileLayoutJUnit5): List<Stri
 }
 private fun classExistsAndHasTests(key: String): Boolean {
   return try {
-    Class.forName(key).methods.any { method ->
-      testAnnotations.any { method.isAnnotationPresent(it) }
+    var clazz: Class<*> = Class.forName(key)
+    while (clazz != Object::class.java) {
+      if (clazz.declaredMethods.any { method ->
+        testAnnotations.any { method.isAnnotationPresent(it) }
+      }) {
+        return true
+      }
+      clazz = clazz.superclass
     }
+    return false
   } catch (e: ClassNotFoundException) {
     false
   }
