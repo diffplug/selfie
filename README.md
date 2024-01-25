@@ -1,12 +1,13 @@
-# <img align="left" src="docs/selfie_logo_only.png"> Selfie 
+# <img align="left" src="docs/selfie_logo_only.png"> Selfie
 
-Snapshot testing is the [fastest and most precise mechanism to record and specify the behavior of your system and its components](https://thecontextwindow.ai/p/temporarily-embarrassed-snapshots).
+Snapshot testing for the JVM (more platforms coming soon! [js](https://github.com/diffplug/selfie/issues/84), [other](https://github.com/diffplug/selfie/issues/85))
 
-Robots are writing their own code. Are you still writing assertions by hand?
+Supports inline snapshots, disk snapshots, garbage collection, and more.
 
-- Production ready for [JVM](https://selfie.diffplug.com/jvm).
-- Help wanted using Kotlin Multiplatform for js and wasm (node and browser) ([#84](https://github.com/diffplug/selfie/issues/84)).
-- Help also wanted for non-Kotlin platforms such as python and go ([#85](https://github.com/diffplug/selfie/issues/85)).
+- [Get started](https://selfie.dev/jvm/get-started)
+- [Advanced usage](https://selfie.dev/jvm/advanced)
+- [Why selfie?](https://selfie.dev/jvm)
+- [Contributing](CONTRIBUTING.md)
 
 ### Acknowledgements
 
