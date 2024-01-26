@@ -5,7 +5,7 @@ repositories {
   mavenCentral()
 }
 dependencies {
-  implementation 'io.jooby:jooby:3.0.6'
+  implementation 'io.jooby:jooby:3.0.7'
   implementation 'io.jooby:jooby-netty:3.0.6'
   implementation 'jakarta.mail:jakarta.mail-api:2.1.2'
   testImplementation 'io.jooby:jooby-test:3.0.6'
