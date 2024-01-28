@@ -375,7 +375,7 @@ class SnapshotValueReader(val lineReader: LineReader) {
     private const val FLAG_BASE64 = " ═╗ base64"
 
     /**
-     * https://github.com/diffplug/selfie/blob/main/selfie-lib/src/commonTest/resources/com/diffplug/selfie/scenarios_and_lenses.ss
+     * https://github.com/diffplug/selfie/blob/main/kotlin/selfie-lib/src/commonTest/resources/com/diffplug/selfie/scenarios_and_lenses.ss
      */
     internal val nameEsc = PerCharacterEscaper.specifiedEscape("\\\\[(])\nn\tt╔┌╗┐═─")
 
