@@ -3,10 +3,10 @@ on:
     branches: [main]
   pull_request:
     paths:
-      - 'kotlin/*'
+      - 'jvm/*'
 defaults:
   run:
-    working-directory: kotlin
+    working-directory: jvm
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true

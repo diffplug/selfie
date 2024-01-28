@@ -22,7 +22,7 @@ on:
           - all
 defaults:
   run:
-    working-directory: kotlin
+    working-directory: jvm
 jobs:
   build:
     runs-on: ubuntu-latest

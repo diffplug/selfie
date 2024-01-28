@@ -2,10 +2,10 @@ on:
   push:
     branches: [release]
     paths:
-      - 'kotlin/*'
+      - 'jvm/*'
 defaults:
   run:
-    working-directory: kotlin
+    working-directory: jvm
 jobs:
   publish:
     runs-on: ubuntu-latest
