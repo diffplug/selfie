@@ -1,7 +1,12 @@
 on:
-  pull_request:
   push:
     branches: [main]
+  pull_request:
+    paths:
+      - 'kotlin/*'
+defaults:
+  run:
+    working-directory: kotlin
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true

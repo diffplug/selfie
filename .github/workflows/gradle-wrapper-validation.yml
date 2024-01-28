@@ -2,18 +2,19 @@ name: "Validate Gradle Wrapper"
 on:
   push:
     paths:
-      - 'gradlew'
-      - 'gradlew.bat'
-      - 'gradle/wrapper/'
+      - 'kotlin/gradlew'
+      - 'kotlin/gradlew.bat'
+      - 'kotlin/gradle/wrapper/'
   pull_request:
     paths:
-      - 'gradlew'
-      - 'gradlew.bat'
-      - 'gradle/wrapper/'
-
+      - 'kotlin/gradlew'
+      - 'kotlin/gradlew.bat'
+      - 'kotlin/gradle/wrapper/'
 permissions:
   contents: read
-
+defaults:
+  run:
+    working-directory: kotlin
 jobs:
   validation:
     name: "Validation"

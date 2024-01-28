@@ -10,7 +10,6 @@
 # GRADLE_KEY
 # GRADLE_SECRET
 
-name: deploy
 on:
   workflow_dispatch:
     inputs:
@@ -21,7 +20,9 @@ on:
         type: choice
         options:
           - all
-
+defaults:
+  run:
+    working-directory: kotlin
 jobs:
   build:
     runs-on: ubuntu-latest
