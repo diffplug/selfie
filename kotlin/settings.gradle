@@ -32,11 +32,6 @@ plugins {
 blowdryerSetup {
   github 'diffplug/blowdryer-diffplug', 'tag', '7.2.0'
   //devLocal '../blowdryer-diffplug'
-  setPluginsBlockTo {
-    it.file 'plugin.versions'
-    it.file 'plugin-kotlin.versions'
-    it.replace('\t', '  ')
-  }
 }
 
 include 'selfie-lib'
