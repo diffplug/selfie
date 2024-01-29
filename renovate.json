@@ -3,6 +3,7 @@
   "extends": [
     "config:recommended"
   ],
+  "ignoreDeps": ["junit-jupiter-api", "junit-platform-launcher"],
   "packageRules": [
     {
       "paths": ["selfie.dev/"],
