@@ -1,4 +1,4 @@
-# <img align="left" src="docs/selfie_logo_only.png"> Selfie
+# <img align="left" src="selfie.dev/selfie_logo_only.png"> Selfie
 
 Snapshot testing for the JVM.
 
@@ -12,4 +12,4 @@ Supports inline snapshots, disk snapshots, garbage collection, and more.
 
 ### Acknowledgements
 
-Heavily inspired by [origin-energy's java-snapshot-testing](https://github.com/origin-energy/java-snapshot-testing), which in turn is heavily inspired by [Facebook's jest-snapshot](https://jestjs.io/docs/snapshot-testing).
+Heavily inspired by [origin-energy's java-snapshot-testing](https://github.com/origin-energy/java-snapshot-testing), which in turn is heavily inspired by [Facebook's jest-snapshot](https://jestjs.io/selfie.dev/snapshot-testing).

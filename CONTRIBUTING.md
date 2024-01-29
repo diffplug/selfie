@@ -1,6 +1,6 @@
 # Contributing to Selfie
 
-- If you want to improve our webpage, [`selfie.dev`](https://selfie.dev), go to [`docs/README.md`](docs/README.md)
+- If you want to improve our webpage, [`selfie.dev`](https://selfie.dev), go to [`selfie.dev/README.md`](selfie.dev/README.md)
 - If you want to improve our JVM, Javascript, or WASM implementations, go to [`kotlin/README.md``](kotlin/README.md)
   - If you want to remove the webpage of our published kdoc, [kdoc.selfie.dev](https://kdoc.selfie.dev), go to [`kotlin/gradle/dokka/README.md`](kotlin/gradle/dokka/README.md)
 - If you want to contribute for a different platform (python, go, etc.) we're happy to help! It should probably live in a different repo until it's close to `1.0`, but once it's near completion we're happy to maintain it here if you would like. Discuss in [selfie#85](https://github.com/diffplug/selfie/issues/85), but also feel free to open a PR with any ideas you have.
