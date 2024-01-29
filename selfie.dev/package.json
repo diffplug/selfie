@@ -19,7 +19,7 @@
     "@tailwindcss/typography": "^0.5.8",
     "acorn": "^8.8.1",
     "autoprefixer": "^10.4.7",
-    "clsx": "^1.2.0",
+    "clsx": "^2.0.0",
     "fast-glob": "^3.2.12",
     "flexsearch": "^0.7.31",
     "framer-motion": "11.0.3",
