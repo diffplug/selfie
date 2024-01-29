@@ -23,7 +23,7 @@
     "fast-glob": "^3.2.12",
     "flexsearch": "^0.7.31",
     "framer-motion": "11.0.3",
-    "mdast-util-to-string": "^3.2.0",
+    "mdast-util-to-string": "^4.0.0",
     "mdx-annotations": "^0.1.1",
     "next": "^13.5.6",
     "react": "18.2.0",
