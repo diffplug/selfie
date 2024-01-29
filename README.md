@@ -1,4 +1,4 @@
-# <img align="left" src="docs/selfie_logo_only.png"> Selfie
+# <img align="left" src="selfie.dev/selfie_logo_only.png"> Selfie
 
 Snapshot testing for the JVM.
 

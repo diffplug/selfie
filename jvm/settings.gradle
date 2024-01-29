@@ -1,0 +1,44 @@
+pluginManagement {
+  repositories {
+    mavenCentral()
+    gradlePluginPortal()
+  }
+}
+plugins {
+  // https://github.com/diffplug/blowdryer/blob/main/CHANGELOG.md
+  id 'com.diffplug.blowdryerSetup' version '1.7.1'
+  // https://github.com/diffplug/spotless/blob/main/plugin-gradle/CHANGES.md
+  id 'com.diffplug.spotless' version '6.23.3' apply false
+  // https://github.com/diffplug/spotless-changelog/blob/main/CHANGELOG.md
+  id 'com.diffplug.spotless-changelog' version '3.0.2' apply false
+  // https://plugins.gradle.org/plugin/com.gradle.plugin-publish
+  id 'com.gradle.plugin-publish' version '1.2.1' apply false
+  // https://github.com/equodev/equo-ide/blob/main/plugin-gradle/CHANGELOG.md
+  id 'dev.equo.ide' version '1.7.5' apply false
+  // https://github.com/gradle-nexus/publish-plugin/releases
+  id 'io.github.gradle-nexus.publish-plugin' version '2.0.0-rc-1' apply false
+  // https://plugins.gradle.org/plugin/org.jetbrains.dokka
+  id 'org.jetbrains.dokka'                       version '1.9.10' apply false
+  // https://plugins.gradle.org/plugin/org.jetbrains.kotlin.jvm
+  id 'org.jetbrains.kotlin.jvm'                  version '1.9.21' apply false
+  // https://plugins.gradle.org/plugin/org.jetbrains.kotlin.plugin.serialization
+  id 'org.jetbrains.kotlin.plugin.serialization' version '1.9.21' apply false
+  // https://plugins.gradle.org/plugin/org.jetbrains.kotlin.multiplatform
+  id 'org.jetbrains.kotlin.multiplatform' version '1.9.21' apply false
+  // https://github.com/adamko-dev/dokkatoo/releases
+  id 'dev.adamko.dokkatoo-html' version '2.0.0' apply false
+}
+
+blowdryerSetup {
+  github 'diffplug/blowdryer-diffplug', 'tag', '7.2.0'
+  //devLocal '../blowdryer-diffplug'
+}
+
+include 'selfie-lib'
+include 'selfie-runner-junit5'
+include 'undertest-junit5'
+include 'undertest-junit-vintage'
+if (JavaVersion.current() >= JavaVersion.VERSION_15) {
+  include 'example-junit5'
+}
+rootProject.name = 'selfie'
