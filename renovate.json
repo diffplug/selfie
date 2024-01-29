@@ -5,8 +5,8 @@
   ],
   "packageRules": [
     {
-      "paths": ["docs/"],
-      "labels": ["docs"]
+      "paths": ["selfie.dev/"],
+      "labels": ["selfie.dev"]
     },
     {
       "paths": ["jvm/"],
