@@ -3,14 +3,14 @@
   "extends": [
     "config:recommended"
   ],
-  "ignoreDeps": ["junit-jupiter-api", "junit-platform-launcher"],
+  "ignoreDeps": ["org.junit.jupiter:junit-jupiter-api", "org.junit.platform:junit-platform-launcher"],
   "packageRules": [
     {
-      "paths": ["selfie.dev/"],
-      "labels": ["selfie.dev"]
+      "matchFileNames": ["selfie.dev/**"],
+      "labels": ["docs"]
     },
     {
-      "paths": ["jvm/"],
+      "matchFileNames": ["jvm/**"],
       "labels": ["jvm"]
     }
   ]
