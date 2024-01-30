@@ -10,6 +10,7 @@ import com.example.EmailDev;
 import com.vladsch.flexmark.html2md.converter.FlexmarkHtmlConverter;
 import io.jooby.StatusCode;
 import io.restassured.response.Response;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -84,14 +85,17 @@ public class SelfieSettings extends SelfieSettingsAPI {
 
   // need 'com.vladsch.flexmark:flexmark-html2md-converter:0.64.8' on the test claspath
   private static String htmlToMd(String html) {
+    var cleanHtml = html.replaceAll("<br.*?>", "");
     var md =
         new FlexmarkHtmlConverter.Builder()
             .build()
-            .convert(html)
+            .convert(cleanHtml)
             .replaceAll("(?m)^====+", "")
             .replaceAll("(?m)^\\-\\-\\-+", "")
             .replaceAll("(?m)^\\*\\*\\*[\\* ]+", "")
             .replaceAll("\n\n+", "\n\n");
-    return md.trim();
+    var trimLines =
+        Arrays.stream(md.split("\n")).map(String::trim).collect(Collectors.joining("\n"));
+    return trimLines;
   }
 }
