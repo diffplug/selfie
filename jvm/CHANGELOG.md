@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Fixed
+- `@ParameterizedTest` no longer has. ([#140](https://github.com/diffplug/selfie/issues/140))
 - If a test class contained package-private methods and a single test method was run without the others, selfie would erroneously garbage collect disk snapshots for the other methods, now fixed. ([#175](https://github.com/diffplug/selfie/pull/175) fixes [#174](https://github.com/diffplug/selfie/issues/174))
 
 ## [1.1.1] - 2024-01-25
