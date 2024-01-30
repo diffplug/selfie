@@ -1,6 +1,6 @@
-# <img align="left" src="selfie.dev/selfie_logo_only.png"> Selfie
+# Selfie snapshot testing for Java, Kotlin, and the JVM
 
-Snapshot testing for the JVM.
+![gif demo of selfie in action](https://docs.diffplug.com/selfie/selfie-demo.gif)
 
 Supports inline snapshots, disk snapshots, garbage collection, and more.
 
