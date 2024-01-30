@@ -52,16 +52,9 @@ internal fun findStaleSnapshotFiles(layout: SnapshotFileLayoutJUnit5): List<Stri
 }
 private fun classExistsAndHasTests(key: String): Boolean {
   return try {
-    var clazz: Class<*> = Class.forName(key)
-    while (clazz != Object::class.java) {
-      if (clazz.declaredMethods.any { method ->
-        testAnnotations.any { method.isAnnotationPresent(it) }
-      }) {
-        return true
-      }
-      clazz = clazz.superclass
-    }
-    return false
+    generateSequence(Class.forName(key)) { it.superclass }
+        .flatMap { it.declaredMethods.asSequence() }
+        .any { method -> testAnnotations.any { method.isAnnotationPresent(it) } }
   } catch (e: ClassNotFoundException) {
     false
   }
@@ -162,18 +155,16 @@ internal class MethodSnapshotGC {
           // we need every method to succeed and not use any snapshots
           methods.values.all { it.succeededAndUsedNoSnapshots() } &&
           // we need every method to run
-          findTestMethodsThatDidntRun(className, methods).isEmpty()
+          findTestMethodsThatDidntRun(className, methods).none()
     }
     private fun findTestMethodsThatDidntRun(
         className: String,
         methodsThatRan: ArrayMap<String, MethodSnapshotGC>,
-    ): List<String> {
-      return Class.forName(className).methods.mapNotNull { method ->
-        if (!methodsThatRan.containsKey(method.name) &&
-            testAnnotations.any { method.isAnnotationPresent(it) }) {
-          method.name
-        } else null
-      }
-    }
+    ): Sequence<String> =
+        generateSequence(Class.forName(className)) { it.superclass }
+            .flatMap { it.declaredMethods.asSequence() }
+            .filter { method -> !methodsThatRan.containsKey(method.name) }
+            .filter { method -> testAnnotations.any { method.isAnnotationPresent(it) } }
+            .map { it.name }
   }
 }
