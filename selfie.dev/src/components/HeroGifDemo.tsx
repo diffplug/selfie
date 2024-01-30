@@ -80,21 +80,21 @@ export function ButtonList() {
         >
           jvm
         </Button>
-      </Link>
+      </Link>{" "}
       <Link href="/js">
         <Button
           className={unPressedClasses}
         >
           js
         </Button>
-      </Link>
+      </Link>{" "}
       <Link href="/other-platforms">
         <Button
           className={unPressedClasses}
         >
           py
         </Button>
-      </Link>
+      </Link>{" "}
       <Link href="/other-platforms">
         <Button
           className={unPressedClasses}
