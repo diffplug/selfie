@@ -33,4 +33,4 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: 0a95e814ccf2b6a95d2dc3bea0a4a2b4
           projectName: selfie-kdoc
-          directory: build/dokka/html
+          directory: jvm/build/dokka/html
