@@ -44,7 +44,7 @@ export default function App({ Component, pageProps, router }: AppProps) {
         >
             {pageProps.showHeroLinks ? (pageProps.showHeroLinks === 'true' ? <Hero /> : <HeroGifDemo />) : <Navigation {...pageProps} />}
         </div>
-        <div className={clsx(["px-2", "wiede-phone:px-4"])}>
+        <div className={clsx(["px-2", "wide-phone:px-4"])}>
           <Component {...pageProps} />
         </div>
       </MDXProvider>
