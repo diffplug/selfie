@@ -50,21 +50,36 @@ class CallStack(val location: CallLocation, val restOfStack: List<CallLocation>)
 internal class FirstWrite<T>(val snapshot: T, val callStack: CallStack)
 
 /** For tracking the writes of disk snapshots literals. */
-open class WriteTracker<K : Comparable<K>, V> {
+sealed class WriteTracker<K : Comparable<K>, V> {
   internal val writes = mutableMapOf<K, FirstWrite<V>>()
   protected fun recordInternal(key: K, snapshot: V, call: CallStack, layout: SnapshotFileLayout) {
     val existing = writes[key]
     if (existing == null) {
       writes[key] = FirstWrite(snapshot, call)
     } else {
+      val howToFix =
+          when (this) {
+            is DiskWriteTracker ->
+                "You can fix this with `.toMatchDisk(String sub)` and pass a unique value for sub."
+            is InlineWriteTracker ->
+                """
+          You can fix this by doing an `if` before the assertion to separate the cases, e.g.
+            if (isWindows) {
+              expectSelfie(underTest).toBe("C:\\")
+            } else {
+              expectSelfie(underTest).toBe("bash$")
+            }
+        """
+                    .trimIndent()
+          }
       if (existing.snapshot != snapshot) {
         throw layout.fs.assertFailed(
-            "Snapshot was set to multiple values!\n  first time: ${existing.callStack.location.ideLink(layout)}\n   this time: ${call.location.ideLink(layout)}",
+            "Snapshot was set to multiple values!\n  first time: ${existing.callStack.location.ideLink(layout)}\n   this time: ${call.location.ideLink(layout)}\n$howToFix",
             existing.snapshot,
             snapshot)
       } else if (!layout.allowMultipleEquivalentWritesToOneLocation) {
         throw layout.fs.assertFailed(
-            "Snapshot was set to the same value multiple times.",
+            "Snapshot was set to the same value multiple times.\n$howToFix",
             existing.callStack.ideLink(layout),
             call.ideLink(layout))
       }
