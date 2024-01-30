@@ -4,8 +4,6 @@ import { Mascot } from "./Mascot";
 import slugify from "@sindresorhus/slugify";
 import { Button } from "./Button";
 import Link from "next/link";
-import { useRouter } from "next/router";
-import { getPathParts } from "@/lib/languageFromPath";
 
 export function HeroGifDemo() {
   return (
@@ -64,8 +62,6 @@ export function HeroGifDemo() {
 
 
 export function ButtonList() {
-  const router = useRouter();
-  const selectedLanguage = getPathParts(router.pathname).language;
   return (
     <div
       className={clsx([
@@ -80,40 +76,28 @@ export function ButtonList() {
     >
       <Link href="/jvm">
         <Button
-          className={
-            ["jvm", ""].includes(selectedLanguage)
-              ? pressedClasses
-              : unPressedClasses
-          }
+          className={unPressedClasses}
         >
           jvm
         </Button>
       </Link>
       <Link href="/js">
         <Button
-          className={
-            selectedLanguage === "js" ? pressedClasses : unPressedClasses
-          }
+          className={unPressedClasses}
         >
           js
         </Button>
       </Link>
       <Link href="/other-platforms">
         <Button
-          className={
-            selectedLanguage === "py" ? pressedClasses : unPressedClasses
-          }
+          className={unPressedClasses}
         >
           py
         </Button>
       </Link>
       <Link href="/other-platforms">
         <Button
-          className={
-            selectedLanguage === "other-platforms"
-              ? pressedClasses
-              : unPressedClasses
-          }
+          className={unPressedClasses}
         >
           ...
         </Button>
@@ -132,15 +116,6 @@ const sharedClasses = clsx([
   "desktop:w-[110px]",
   "hover:text-white",
   "hover:bg-blue",
-]);
-
-const pressedClasses = clsx([
-  "mt-[1px]",
-  "text-white",
-  "bg-blue",
-  "shadow-none",
-  "tablet:mt-[3px]",
-  sharedClasses,
 ]);
 
 const unPressedClasses = clsx([
