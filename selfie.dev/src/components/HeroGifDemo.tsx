@@ -126,8 +126,6 @@ const unPressedClasses = clsx([
   sharedClasses,
 ]);
 
-const THE_CONTEXT_WINDOW = "https://thecontextwindow.ai/p/temporarily-embarrassed-snapshots";
-
 export function IntroText() {
   return (
     <div
@@ -155,8 +153,8 @@ export function IntroText() {
         ])}
       >
         Which is <br className="tablet:hidden" />{" "}
-        <SectionLink title="literal" />, <SectionLink title="lensable" />
-        <br /> and <SectionLink title="like a filesystem" />
+        literal, lensable
+        <br /> and like a filesystem
       </p>
       <Link href="/jvm/get-started">
         <Button
@@ -190,18 +188,18 @@ export function IntroText() {
       >
         <p>
           Snapshot testing is the <br />{" "}
-          <a href={THE_CONTEXT_WINDOW} className="text-blue hover:underline cursor-pointer">fastest and most precise</a>
+          <span className="text-blue">fastest and most precise</span>
           <br />
           mechanism to{" "}
-          <a href={THE_CONTEXT_WINDOW} className="text-red hover:underline cursor-pointer">
+          <span className="text-red">
             record <br /> and specify
-          </a>{" "}
+          </span>{" "}
           the <br />
-          <a href={THE_CONTEXT_WINDOW} className="text-green hover:underline cursor-pointer">
+          <span className="text-green">
             behavior of your <br />
             system and its <br />
             components
-          </a>
+          </span>
           .
         </p>
         <p>
