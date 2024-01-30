@@ -35,30 +35,30 @@ class DuplicateWriteTest : Harness("undertest-junit5") {
 
   @Test @Order(2)
   fun cannot_write_multiple_things_to_one_snapshot() {
-    ut_mirror().linesFrom("fun shouldFail()").toFirst("}").uncomment()
-    ut_mirror().linesFrom("fun shouldPass()").toFirst("}").commentOut()
+    ut_mirrorKt().linesFrom("fun shouldFail()").toFirst("}").uncomment()
+    ut_mirrorKt().linesFrom("fun shouldPass()").toFirst("}").commentOut()
     gradlew("underTest", "-Pselfie=overwrite")!!.message shouldStartWith
         "Snapshot was set to multiple values"
   }
 
   @Test @Order(3)
   fun can_write_one_thing_multiple_times_to_one_snapshot() {
-    ut_mirror().linesFrom("fun shouldFail()").toFirst("}").commentOut()
-    ut_mirror().linesFrom("fun shouldPass()").toFirst("}").uncomment()
+    ut_mirrorKt().linesFrom("fun shouldFail()").toFirst("}").commentOut()
+    ut_mirrorKt().linesFrom("fun shouldPass()").toFirst("}").uncomment()
     gradlew("underTest", "-Pselfie=overwrite") shouldBe null
   }
 
   @Test @Order(4)
   fun can_read_one_thing_multiple_times_from_one_snapshot() {
-    ut_mirror().linesFrom("fun shouldFail()").toFirst("}").commentOut()
-    ut_mirror().linesFrom("fun shouldPass()").toFirst("}").uncomment()
+    ut_mirrorKt().linesFrom("fun shouldFail()").toFirst("}").commentOut()
+    ut_mirrorKt().linesFrom("fun shouldPass()").toFirst("}").uncomment()
     gradlew("underTest", "-Pselfie=readonly") shouldBe null
   }
 
   @Test @Order(5)
   fun writeonce_mode() {
-    ut_mirror().linesFrom("fun shouldFail()").toFirst("}").commentOut()
-    ut_mirror().linesFrom("fun shouldPass()").toFirst("}").uncomment()
+    ut_mirrorKt().linesFrom("fun shouldFail()").toFirst("}").commentOut()
+    ut_mirrorKt().linesFrom("fun shouldPass()").toFirst("}").uncomment()
     gradlew(
             "underTest",
             "-Pselfie=overwrite",

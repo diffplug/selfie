@@ -28,34 +28,34 @@ import org.junitpioneer.jupiter.DisableIfTestFails
 class InlineIntTest : Harness("undertest-junit5") {
   @Test @Order(1)
   fun toBe_TODO() {
-    ut_mirror().lineWith("expectSelfie").setContent("    expectSelfie(1234).toBe_TODO()")
+    ut_mirrorKt().lineWith("expectSelfie").setContent("    expectSelfie(1234).toBe_TODO()")
     gradleReadSSFail()
   }
 
   @Test @Order(2)
   fun toBe_writeTODO() {
-    ut_mirror().lineWith("expectSelfie").setContent("    expectSelfie(1234).toBe_TODO()")
+    ut_mirrorKt().lineWith("expectSelfie").setContent("    expectSelfie(1234).toBe_TODO()")
     gradleReadSSFail()
     gradleWriteSS()
-    ut_mirror().lineWith("expectSelfie").content() shouldBe "    expectSelfie(1234).toBe(1_234)"
+    ut_mirrorKt().lineWith("expectSelfie").content() shouldBe "    expectSelfie(1234).toBe(1_234)"
     gradleReadSS()
   }
 
   @Test @Order(3)
   fun toBe_rewriteTODO() {
-    ut_mirror().lineWith("expectSelfie").setContent("    expectSelfie(555).toBe_TODO(789)")
+    ut_mirrorKt().lineWith("expectSelfie").setContent("    expectSelfie(555).toBe_TODO(789)")
     gradleReadSSFail()
     gradleWriteSS()
-    ut_mirror().lineWith("expectSelfie").content() shouldBe "    expectSelfie(555).toBe(555)"
+    ut_mirrorKt().lineWith("expectSelfie").content() shouldBe "    expectSelfie(555).toBe(555)"
     gradleReadSS()
   }
 
   @Test @Order(4)
   fun toBe_writeLiteral() {
-    ut_mirror().lineWith("expectSelfie").setContent("    expectSelfie(7777).toBe(1_234)")
+    ut_mirrorKt().lineWith("expectSelfie").setContent("    expectSelfie(7777).toBe(1_234)")
     gradleReadSSFail()
     gradleWriteSS()
-    ut_mirror().lineWith("expectSelfie").content() shouldBe "    expectSelfie(7777).toBe(7_777)"
+    ut_mirrorKt().lineWith("expectSelfie").content() shouldBe "    expectSelfie(7777).toBe(7_777)"
     gradleReadSS()
   }
 }

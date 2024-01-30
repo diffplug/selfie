@@ -52,7 +52,7 @@ open class Harness(subproject: String) {
     }
   }
   protected fun ut_mirrorJava() = file("UT_${javaClass.simpleName}.java")
-  protected fun ut_mirror() = file("UT_${javaClass.simpleName}.kt")
+  protected fun ut_mirrorKt() = file("UT_${javaClass.simpleName}.kt")
   protected fun ut_snapshot() = file("UT_${javaClass.simpleName}.ss")
   fun file(nameOrSubpath: String): FileHarness {
     return if (nameOrSubpath.contains('/')) {

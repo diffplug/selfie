@@ -28,28 +28,28 @@ import org.junitpioneer.jupiter.DisableIfTestFails
 class InlineLongTest : Harness("undertest-junit5") {
   @Test @Order(1)
   fun toBe_TODO() {
-    ut_mirror().lineWith("expectSelfie").setContent("    expectSelfie(9876543210L).toBe_TODO()")
+    ut_mirrorKt().lineWith("expectSelfie").setContent("    expectSelfie(9876543210L).toBe_TODO()")
     gradleReadSSFail()
   }
 
   @Test @Order(2)
   fun toBe_writeTODO() {
-    ut_mirror().lineWith("expectSelfie").setContent("    expectSelfie(9876543210L).toBe_TODO()")
+    ut_mirrorKt().lineWith("expectSelfie").setContent("    expectSelfie(9876543210L).toBe_TODO()")
     gradleReadSSFail()
     gradleWriteSS()
-    ut_mirror().lineWith("expectSelfie").content() shouldBe
+    ut_mirrorKt().lineWith("expectSelfie").content() shouldBe
         "    expectSelfie(9876543210L).toBe(9_876_543_210L)"
     gradleReadSS()
   }
 
   @Test @Order(3)
   fun toBe_writeLiteral() {
-    ut_mirror()
+    ut_mirrorKt()
         .lineWith("expectSelfie")
         .setContent("    expectSelfie(9999999999L).toBe(9_876_543_210L)")
     gradleReadSSFail()
     gradleWriteSS()
-    ut_mirror().lineWith("expectSelfie").content() shouldBe
+    ut_mirrorKt().lineWith("expectSelfie").content() shouldBe
         "    expectSelfie(9999999999L).toBe(9_999_999_999L)"
     gradleReadSS()
   }

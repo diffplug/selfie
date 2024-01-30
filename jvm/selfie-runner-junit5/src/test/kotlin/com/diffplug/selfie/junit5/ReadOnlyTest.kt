@@ -27,20 +27,20 @@ import org.junitpioneer.jupiter.DisableIfTestFails
 class ReadOnlyTest : Harness("undertest-junit5") {
   @Test @Order(1)
   fun initialState() {
-    ut_mirror().lineWith("expectSelfie(").setContent("    expectSelfie(10).toBe(10)")
+    ut_mirrorKt().lineWith("expectSelfie(").setContent("    expectSelfie(10).toBe(10)")
     gradleReadSS()
   }
 
   @Test @Order(2)
   fun inlineMismatchWithComment() {
-    ut_mirror().lineWith("expectSelfie(").setContent("    expectSelfie(10).toBe(5) //SELFIEWRITE")
+    ut_mirrorKt().lineWith("expectSelfie(").setContent("    expectSelfie(10).toBe(5) //SELFIEWRITE")
     gradleReadSSFail().message shouldBe
         "Selfie is in readonly mode, so `//SELFIEWRITE` is illegal at undertest.junit5.UT_ReadOnlyTest.<unknown>(UT_ReadOnlyTest.kt:9)"
   }
 
   @Test @Order(3)
   fun inlineMatchWithComment() {
-    ut_mirror().lineWith("expectSelfie(").setContent("    expectSelfie(5).toBe(5) // selfieonce")
+    ut_mirrorKt().lineWith("expectSelfie(").setContent("    expectSelfie(5).toBe(5) // selfieonce")
     gradleReadSSFail().message shouldBe
         "Selfie is in readonly mode, so `//selfieonce` is illegal at undertest.junit5.UT_ReadOnlyTest.<unknown>(UT_ReadOnlyTest.kt:9)"
   }

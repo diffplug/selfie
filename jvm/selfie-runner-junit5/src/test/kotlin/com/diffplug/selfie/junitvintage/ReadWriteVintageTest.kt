@@ -34,8 +34,8 @@ class ReadWriteVintageTest : Harness("undertest-junit-vintage") {
 
   @Test @Order(2)
   fun writeApple() {
-    ut_mirror().lineWith("apple").uncomment()
-    ut_mirror().lineWith("orange").commentOut()
+    ut_mirrorKt().lineWith("apple").uncomment()
+    ut_mirrorKt().lineWith("orange").commentOut()
     gradleWriteSS()
     ut_snapshot()
         .assertContent(
@@ -55,8 +55,8 @@ class ReadWriteVintageTest : Harness("undertest-junit-vintage") {
 
   @Test @Order(4)
   fun assertOrangeFails() {
-    ut_mirror().lineWith("apple").commentOut()
-    ut_mirror().lineWith("orange").uncomment()
+    ut_mirrorKt().lineWith("apple").commentOut()
+    ut_mirrorKt().lineWith("orange").uncomment()
     gradleReadSSFail()
     ut_snapshot()
         .assertContent(

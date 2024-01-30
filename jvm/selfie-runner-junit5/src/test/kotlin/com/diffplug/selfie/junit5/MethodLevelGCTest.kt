@@ -29,12 +29,12 @@ class MethodLevelGCTest : Harness("undertest-junit5") {
   fun noSelfiesNoFile() {
     ut_snapshot().deleteIfExists()
     ut_snapshot().assertDoesNotExist()
-    ut_mirror().linesFrom("UT_MethodLevelGC").toLast("}").shrinkByOne().commentOut()
+    ut_mirrorKt().linesFrom("UT_MethodLevelGC").toLast("}").shrinkByOne().commentOut()
   }
 
   @Test @Order(2)
   fun firstSelfieCreatesFile() {
-    ut_mirror().linesFrom("fun one").toFirst("}").uncomment()
+    ut_mirrorKt().linesFrom("fun one").toFirst("}").uncomment()
     gradleWriteSS()
     ut_snapshot()
         .assertContent(
@@ -49,7 +49,7 @@ class MethodLevelGCTest : Harness("undertest-junit5") {
 
   @Test @Order(3)
   fun secondSelfieAppendsFile() {
-    ut_mirror().linesFrom("fun two").toFirst("}").uncomment()
+    ut_mirrorKt().linesFrom("fun two").toFirst("}").uncomment()
     gradleWriteSS()
     ut_snapshot()
         .assertContent(
@@ -66,7 +66,7 @@ class MethodLevelGCTest : Harness("undertest-junit5") {
 
   @Test @Order(4)
   fun removingSelfieShrinksFile() {
-    ut_mirror().linesFrom("fun one").toFirst("}").commentOut()
+    ut_mirrorKt().linesFrom("fun one").toFirst("}").commentOut()
     gradleWriteSS()
     ut_snapshot()
         .assertContent(
@@ -81,7 +81,7 @@ class MethodLevelGCTest : Harness("undertest-junit5") {
 
   @Test @Order(5)
   fun removingAllSelfiesDeletesFile() {
-    ut_mirror().linesFrom("fun two").toFirst("}").commentOut()
+    ut_mirrorKt().linesFrom("fun two").toFirst("}").commentOut()
     gradleWriteSS()
     ut_snapshot().assertDoesNotExist()
   }

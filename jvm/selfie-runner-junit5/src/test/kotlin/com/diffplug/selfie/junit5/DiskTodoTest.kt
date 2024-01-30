@@ -37,9 +37,9 @@ class DiskTodoTest : Harness("undertest-junit5") {
     ut_snapshot().deleteIfExists()
     ut_snapshot().assertDoesNotExist()
 
-    lineNoArg = ut_mirror().lineWith("noArg").content()
-    constantArg = ut_mirror().lineWith("constantArg").content()
-    variableArg = ut_mirror().lineWith("variableArg").content()
+    lineNoArg = ut_mirrorKt().lineWith("noArg").content()
+    constantArg = ut_mirrorKt().lineWith("constantArg").content()
+    variableArg = ut_mirrorKt().lineWith("variableArg").content()
 
     lineNoArg shouldContain "_TODO"
     constantArg shouldContain "_TODO"
@@ -49,9 +49,9 @@ class DiskTodoTest : Harness("undertest-junit5") {
   @Test @Order(2)
   fun writeRemovesTODO() {
     gradleWriteSS()
-    ut_mirror().lineWith("noArg").content() shouldBe lineNoArg.replace("_TODO", "")
-    ut_mirror().lineWith("constantArg").content() shouldBe constantArg.replace("_TODO", "")
-    ut_mirror().lineWith("variableArg").content() shouldBe variableArg.replace("_TODO", "")
+    ut_mirrorKt().lineWith("noArg").content() shouldBe lineNoArg.replace("_TODO", "")
+    ut_mirrorKt().lineWith("constantArg").content() shouldBe constantArg.replace("_TODO", "")
+    ut_mirrorKt().lineWith("variableArg").content() shouldBe variableArg.replace("_TODO", "")
   }
 
   @Test @Order(3)
@@ -61,9 +61,9 @@ class DiskTodoTest : Harness("undertest-junit5") {
 
   @Test @Order(4)
   fun ifTodoComesBackItDoesntPass() {
-    ut_mirror().lineWith("noArg").setContent(lineNoArg)
-    ut_mirror().lineWith("constantArg").setContent(constantArg)
-    ut_mirror().lineWith("variableArg").setContent(variableArg)
+    ut_mirrorKt().lineWith("noArg").setContent(lineNoArg)
+    ut_mirrorKt().lineWith("constantArg").setContent(constantArg)
+    ut_mirrorKt().lineWith("variableArg").setContent(variableArg)
     gradleReadSSFail()
   }
 

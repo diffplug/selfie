@@ -41,6 +41,6 @@ class StringLiteralsKotlinTest : Harness("undertest-junit5") {
 
   @Test @Order(4)
   fun cleanup() {
-    ut_mirror().restoreFromGit()
+    ut_mirrorKt().restoreFromGit()
   }
 }
