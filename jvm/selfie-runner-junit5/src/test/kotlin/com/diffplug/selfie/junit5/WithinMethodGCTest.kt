@@ -29,15 +29,17 @@ class WithinMethodGCTest : Harness("undertest-junit5") {
   fun noSelfiesNoFile() {
     ut_snapshot().deleteIfExists()
     ut_snapshot().assertDoesNotExist()
-    ut_mirrorKt().lineWith("leaf").setContent("    expectSelfie(\"maple\").toMatchDisk(\"leaf\")")
-    ut_mirrorKt().lineWith("abc").setContent("    expectSelfie(\"abc\").toMatchDisk()")
-    ut_mirrorKt().linesFrom("UT_WithinMethodGC").toLast("}").shrinkByOne().commentOut()
+    ut_mirrorJava()
+        .lineWith("leaf")
+        .setContent("    expectSelfie(\"maple\").toMatchDisk(\"leaf\");")
+    ut_mirrorJava().lineWith("abc").setContent("    expectSelfie(\"abc\").toMatchDisk();")
+    ut_mirrorJava().linesFrom("UT_WithinMethodGC").toLast("}").shrinkByOne().commentOut()
   }
 
   @Test @Order(2)
   fun rootOnly() {
-    ut_mirrorKt().linesFrom("fun selfie()").toFirst("}").uncomment()
-    ut_mirrorKt().lineWith("leaf").commentOut()
+    ut_mirrorJava().linesFrom("void selfie()").toFirst("}").uncomment()
+    ut_mirrorJava().lineWith("leaf").commentOut()
     gradleWriteSS()
     ut_snapshot()
         .assertContent(
@@ -52,7 +54,7 @@ class WithinMethodGCTest : Harness("undertest-junit5") {
 
   @Test @Order(3)
   fun rootAndLeaf() {
-    ut_mirrorKt().lineWith("leaf").uncomment()
+    ut_mirrorJava().lineWith("leaf").uncomment()
     gradleWriteSS()
     ut_snapshot()
         .assertContent(
@@ -69,7 +71,7 @@ class WithinMethodGCTest : Harness("undertest-junit5") {
 
   @Test @Order(4)
   fun leafOnly() {
-    ut_mirrorKt().lineWith("root").commentOut()
+    ut_mirrorJava().lineWith("root").commentOut()
     gradleWriteSS()
     ut_snapshot()
         .assertContent(
@@ -84,8 +86,8 @@ class WithinMethodGCTest : Harness("undertest-junit5") {
 
   @Test @Order(5)
   fun renameTheWholeMethod() {
-    ut_mirrorKt().lineWith("selfie2()").uncomment()
-    ut_mirrorKt().lineWith("selfie()").commentOut()
+    ut_mirrorJava().lineWith("selfie2()").uncomment()
+    ut_mirrorJava().lineWith("selfie()").commentOut()
     gradleWriteSS()
     ut_snapshot()
         .assertContent(
@@ -100,7 +102,7 @@ class WithinMethodGCTest : Harness("undertest-junit5") {
 
   @Test @Order(6)
   fun addSecondMethod() {
-    ut_mirrorKt().linesFrom("secondMethod()").toFirst("}").uncomment()
+    ut_mirrorJava().linesFrom("secondMethod()").toFirst("}").uncomment()
     gradleWriteSS()
     ut_snapshot()
         .assertContent(
@@ -118,8 +120,8 @@ class WithinMethodGCTest : Harness("undertest-junit5") {
   @Test @Order(7)
   fun runOnlyTheSecondTest() {
     runOnlyMethod = "secondMethod"
-    ut_mirrorKt().lineWith("leaf").setContent("    expectSelfie(\"oak\").toMatchDisk(\"leaf\")")
-    ut_mirrorKt().lineWith("abc").setContent("    expectSelfie(\"abc123\").toMatchDisk()")
+    ut_mirrorJava().lineWith("leaf").setContent("    expectSelfie(\"oak\").toMatchDisk(\"leaf\");")
+    ut_mirrorJava().lineWith("abc").setContent("    expectSelfie(\"abc123\").toMatchDisk();")
     gradleWriteSS()
     // set leaf to oak, and secondMethod to 123, but selfie2/lead should remain maple since we
     // aren't running it

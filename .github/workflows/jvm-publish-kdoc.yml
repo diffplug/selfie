@@ -2,7 +2,7 @@ on:
   push:
     branches: [release]
     paths:
-      - 'jvm/*'
+      - 'jvm/**'
 defaults:
   run:
     working-directory: jvm
