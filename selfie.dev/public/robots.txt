@@ -1,4 +1,4 @@
 Sitemap: https://selfie.dev/sitemap.xml
 
 User-agent: *
-Disallow: /gif-demo
+Disallow: /demo-gif

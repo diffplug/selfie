@@ -1,5 +1,5 @@
 import { Hero } from "@/components/Hero";
-import { HeroGifDemo } from "@/components/HeroGifDemo";
+import { HeroDemoGif } from "@/components/HeroDemoGif";
 import { Navigation } from "@/components/Navigation/Navigation";
 import * as mdxComponents from "@/components/mdx";
 import "@/styles/tailwind.css";
@@ -42,7 +42,7 @@ export default function App({ Component, pageProps, router }: AppProps) {
             "wide-phone:py-2",
           ])}
         >
-            {pageProps.showHeroLinks ? (pageProps.showHeroLinks === 'true' ? <Hero /> : <HeroGifDemo />) : <Navigation {...pageProps} />}
+            {pageProps.showHeroLinks ? (pageProps.showHeroLinks === 'true' ? <Hero /> : <HeroDemoGif />) : <Navigation {...pageProps} />}
         </div>
         <div className={clsx(["px-2", "wide-phone:px-4"])}>
           <Component {...pageProps} />

@@ -5,7 +5,7 @@ import slugify from "@sindresorhus/slugify";
 import { Button } from "./Button";
 import Link from "next/link";
 
-export function HeroGifDemo() {
+export function HeroDemoGif() {
   return (
     <div
       className={clsx([
