@@ -144,7 +144,7 @@ export function IntroText() {
         "desktop:top-[345px]",
       ])}
     >
-      <p
+      <div
         className={clsx([
           "text-[20px]",
           "leading-[1.25em]",
@@ -155,7 +155,7 @@ export function IntroText() {
         Which is <br className="tablet:hidden" />{" "}
         literal, lensable
         <br /> and like a filesystem
-      </p>
+      </div>
       <Link href="/jvm/get-started">
         <Button
           className={clsx([
