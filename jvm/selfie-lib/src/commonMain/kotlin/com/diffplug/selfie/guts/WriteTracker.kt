@@ -101,7 +101,7 @@ class InlineWriteTracker : WriteTracker<CallLocation, LiteralValue<*>>() {
     val file = layout.sourcePathForCall(call.location)
     if (literalValue.expected != null) {
       // if expected == null, it's a `toBe_TODO()`, so there's nothing to check
-      val content = SourceFile(layout.fs.name(file), layout.fs.fileRead(file))
+      val content = SourceFile(file.name, layout.fs.fileRead(file))
       val parsedValue =
           try {
             content.parseToBe(call.location.line).parseLiteral(literalValue.format)
@@ -139,14 +139,14 @@ class InlineWriteTracker : WriteTracker<CallLocation, LiteralValue<*>>() {
             .sorted()
 
     var file = writes.first().file
-    var content = SourceFile(layout.fs.name(file), layout.fs.fileRead(file))
+    var content = SourceFile(file.name, layout.fs.fileRead(file))
     var deltaLineNumbers = 0
     for (write in writes) {
       if (write.file != file) {
         layout.fs.fileWrite(file, content.asString)
         file = write.file
         deltaLineNumbers = 0
-        content = SourceFile(layout.fs.name(file), layout.fs.fileRead(file))
+        content = SourceFile(file.name, layout.fs.fileRead(file))
       }
       // parse the location within the file
       val line = write.line + deltaLineNumbers

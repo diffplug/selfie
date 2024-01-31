@@ -30,18 +30,24 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.util.concurrent.ConcurrentSkipListSet
 import java.util.concurrent.atomic.AtomicReference
+import kotlin.io.path.absolutePathString
+import kotlin.io.path.readText
+import kotlin.io.path.writeText
 import kotlin.streams.asSequence
 import org.opentest4j.AssertionFailedError
+fun Path.toPath(): java.nio.file.Path = java.nio.file.Path.of(absolutePath)
 
 internal object FSJava : FS {
-  override fun fileWrite(file: Path, content: String) = file.writeText(content)
-  override fun fileRead(file: Path) = file.readText()
+  override fun fileWrite(file: Path, content: String) = file.toPath().writeText(content)
+  override fun fileRead(file: Path) = file.toPath().readText()
   /** Walks the files (not directories) which are children and grandchildren of the given path. */
   override fun <T> fileWalk(file: Path, walk: (Sequence<Path>) -> T): T =
       Files.walk(file.toPath()).use {
-        walk(it.asSequence().mapNotNull { if (Files.isRegularFile(it)) it.toFile() else null })
+        walk(
+            it.asSequence().mapNotNull {
+              if (Files.isRegularFile(it)) Path.ofFile(it.absolutePathString()) else null
+            })
       }
-  override fun name(file: Path): String = file.name
   override fun assertFailed(message: String, expected: Any?, actual: Any?): Error =
       if (expected == null && actual == null) AssertionFailedError(message)
       else AssertionFailedError(message, expected, actual)
@@ -296,7 +302,7 @@ internal class Progress {
     commentTracker = null
     if (SnapshotStorageJUnit5.mode != Mode.readonly) {
       for (path in pathsWithOnce) {
-        val source = SourceFile(layout.fs.name(path), layout.fs.fileRead(path))
+        val source = SourceFile(path.name, layout.fs.fileRead(path))
         source.removeSelfieOnceComments()
         layout.fs.fileWrite(path, source.asString)
       }

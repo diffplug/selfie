@@ -40,7 +40,7 @@ actual data class CallLocation(
     if (fileName != null) {
       return fileName
     }
-    return layout.sourcePathForCallMaybe(this)?.let { layout.fs.name(it) }
+    return layout.sourcePathForCallMaybe(this)?.let { it.name }
         ?: "${clazz.substringAfterLast('.')}.class"
   }
 

@@ -18,11 +18,54 @@ package com.diffplug.selfie.guts
 import com.diffplug.selfie.Mode
 import com.diffplug.selfie.Snapshot
 
-expect class Path : Comparable<Path>
+/** A unix-style path where trailing-slash means it is a folder. */
+data class Path(val absolutePath: String) : Comparable<Path> {
+  override fun compareTo(other: Path): Int = absolutePath.compareTo(other.absolutePath)
+  val name: String
+    get() {
+      val lastSlash = absolutePath.lastIndexOf('/')
+      return if (lastSlash == -1) absolutePath else absolutePath.substring(lastSlash + 1)
+    }
+  val isFolder: Boolean
+    get() = absolutePath.endsWith("/")
+  private fun assertFolder() {
+    check(isFolder) { "Expected $this to be a folder but it doesn't end with `/`" }
+  }
+  fun resolveFile(child: String): Path {
+    assertFolder()
+    check(!child.startsWith("/")) { "Expected child to not start with a slash, but got $child" }
+    check(!child.endsWith("/")) { "Expected child to not end with a slash, but got $child" }
+    return ofFile("$absolutePath$child")
+  }
+  fun resolveFolder(child: String): Path {
+    assertFolder()
+    check(!child.startsWith("/")) { "Expected child to not start with a slash, but got $child" }
+    return ofFolder("$absolutePath$child")
+  }
+  fun relativize(child: Path): String {
+    assertFolder()
+    check(child.absolutePath.startsWith(absolutePath)) {
+      "Expected $child to start with $absolutePath"
+    }
+    return child.absolutePath.substring(absolutePath.length)
+  }
+
+  companion object {
+    /** A folder at the given path. */
+    fun ofFolder(path: String): Path {
+      val unixPath = path.replace("\\", "/")
+      return Path(if (unixPath.endsWith("/")) unixPath else "$unixPath/")
+    }
+    /** A file (NOT a folder) at the given path. */
+    fun ofFile(path: String): Path {
+      val unixPath = path.replace("\\", "/")
+      check(!unixPath.endsWith("/")) { "Expected path to not end with a slash, but got $unixPath" }
+      return Path(unixPath)
+    }
+  }
+}
 
 interface FS {
-  /** Returns the name of the given path. */
-  fun name(path: Path): String
   /** Walks the files (not directories) which are children and grandchildren of the given path. */
   fun <T> fileWalk(path: Path, walk: (Sequence<Path>) -> T): T
   fun fileRead(path: Path): String
