@@ -32,8 +32,6 @@ import org.w3c.dom.NodeList
 import org.xml.sax.InputSource
 
 open class Harness(subproject: String) {
-  // not sure why, but it doesn't work in this project
-  val onlyRunThisTest = subproject != "undertest-junit-vintage"
   val subprojectFolder: Path
 
   init {
@@ -206,45 +204,30 @@ open class Harness(subproject: String) {
         .connect()
         .use { connection ->
           try {
-            if (onlyRunThisTest) {
-              var testLauncher =
-                  connection
-                      .newTestLauncher()
-                      .setStandardError(System.err)
-                      .setStandardOutput(System.out)
-              if (runOnlyMethod == null) {
-                testLauncher =
-                    testLauncher.withTaskAndTestClasses(
-                        ":${subprojectFolder.name}:$task", listOf("UT_${javaClass.simpleName}"))
-              } else {
-                testLauncher =
-                    testLauncher.withTaskAndTestMethods(
-                        ":${subprojectFolder.name}:$task",
-                        "UT_${javaClass.simpleName}",
-                        listOf(runOnlyMethod!!))
-              }
-              testLauncher
-                  .withArguments(
-                      buildList<String> {
-                        addAll(args)
-                        add("--configuration-cache") // enabled vs disabled is 11s vs 24s
-                        add("--stacktrace")
-                      })
-                  .run()
+            var testLauncher =
+                connection
+                    .newTestLauncher()
+                    .setStandardError(System.err)
+                    .setStandardOutput(System.out)
+            if (runOnlyMethod == null) {
+              testLauncher =
+                  testLauncher.withTaskAndTestClasses(
+                      ":${subprojectFolder.name}:$task", listOf("UT_${javaClass.simpleName}"))
             } else {
-              connection
-                  .newBuild()
-                  .setStandardError(System.err)
-                  .setStandardOutput(System.out)
-                  .forTasks(":${subprojectFolder.name}:$task")
-                  .withArguments(
-                      buildList<String> {
-                        addAll(args)
-                        add("--configuration-cache") // enabled vs disabled is 11s vs 24s
-                        add("--stacktrace")
-                      })
-                  .run()
+              testLauncher =
+                  testLauncher.withTaskAndTestMethods(
+                      ":${subprojectFolder.name}:$task",
+                      "UT_${javaClass.simpleName}",
+                      listOf(runOnlyMethod!!))
             }
+            testLauncher
+                .withArguments(
+                    buildList<String> {
+                      addAll(args)
+                      add("--configuration-cache") // enabled vs disabled is 11s vs 24s
+                      add("--stacktrace")
+                    })
+                .run()
             null
           } catch (e: TestExecutionException) {
             parseBuildException(task, e)
