@@ -1,0 +1,33 @@
+plugins {
+  id 'org.jetbrains.kotlin.multiplatform'
+  id 'io.kotest.multiplatform'
+}
+repositories {
+  mavenCentral()
+}
+ext {
+  maven_name = 'selfie-runner-kotest'
+  maven_desc = 'Kotest test runner for Selfie'
+}
+
+apply from: 干.file('base/changelog.gradle')
+apply from: rootProject.file('gradle/spotless.gradle')
+apply plugin: 'java-library'
+
+kotlin {
+  jvm {
+  }
+  //  js { TODO: need to implement selfie-lib for js first
+  //    nodejs()
+  //  }
+  sourceSets {
+    commonTest {
+      dependencies {
+        project(":selfie-runner-kotest")
+        implementation("io.kotest:kotest-framework-engine:$ver_KOTEST")
+        implementation("io.kotest:kotest-assertions-core:$ver_KOTEST")
+        implementation(kotlin('test'))
+      }
+    }
+  }
+}

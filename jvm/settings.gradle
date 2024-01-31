@@ -27,6 +27,8 @@ plugins {
   id 'org.jetbrains.kotlin.multiplatform' version '1.9.22' apply false
   // https://github.com/adamko-dev/dokkatoo/releases
   id 'dev.adamko.dokkatoo-html' version '2.0.0' apply false
+  // https://plugins.gradle.org/plugin/io.kotest.multiplatform
+  id "io.kotest.multiplatform" version "5.8.0" apply false
 }
 
 blowdryerSetup {
@@ -34,10 +36,16 @@ blowdryerSetup {
   //devLocal '../blowdryer-diffplug'
 }
 
+// Core library
 include 'selfie-lib'
+// JUnit 4 & 5
 include 'selfie-runner-junit5'
 include 'undertest-junit5'
 include 'undertest-junit-vintage'
+// Kotest
+include 'selfie-runner-kotest'
+include 'undertest-kotest'
+
 if (JavaVersion.current() >= JavaVersion.VERSION_15) {
   include 'example-junit5'
 }
