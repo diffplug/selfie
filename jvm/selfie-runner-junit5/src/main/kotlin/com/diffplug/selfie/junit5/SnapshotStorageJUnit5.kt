@@ -22,10 +22,10 @@ import com.diffplug.selfie.guts.DiskWriteTracker
 import com.diffplug.selfie.guts.FS
 import com.diffplug.selfie.guts.InlineWriteTracker
 import com.diffplug.selfie.guts.LiteralValue
-import com.diffplug.selfie.guts.TypedPath
 import com.diffplug.selfie.guts.SnapshotFileLayout
 import com.diffplug.selfie.guts.SnapshotStorage
 import com.diffplug.selfie.guts.SourceFile
+import com.diffplug.selfie.guts.TypedPath
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.util.concurrent.ConcurrentSkipListSet

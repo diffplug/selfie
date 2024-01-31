@@ -17,8 +17,8 @@ package com.diffplug.selfie.junit5
 
 import com.diffplug.selfie.guts.CallLocation
 import com.diffplug.selfie.guts.FS
-import com.diffplug.selfie.guts.TypedPath
 import com.diffplug.selfie.guts.SnapshotFileLayout
+import com.diffplug.selfie.guts.TypedPath
 
 class SnapshotFileLayoutJUnit5(settings: SelfieSettingsAPI, override val fs: FS) :
     SnapshotFileLayout {
