@@ -41,11 +41,8 @@ private val testAnnotations =
 internal fun findStaleSnapshotFiles(layout: SnapshotFileLayoutJUnit5): List<String> {
   return layout.fs.fileWalk(layout.rootFolder) { walk ->
     walk
-        .filter { layout.fs.name(it).endsWith(layout.extension) }
-        .map {
-          layout.subpathToClassname(
-              layout.rootFolder.toPath().relativize(it.toPath()).toString().replace('\\', '/'))
-        }
+        .filter { it.name.endsWith(layout.extension) }
+        .map { layout.subpathToClassname(layout.rootFolder.relativize(it)) }
         .filter { !classExistsAndHasTests(it) }
         .toMutableList()
   }

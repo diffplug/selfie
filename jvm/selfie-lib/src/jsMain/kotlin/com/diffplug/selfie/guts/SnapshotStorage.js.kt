@@ -17,5 +17,3 @@ package com.diffplug.selfie.guts
 actual fun initStorage(): SnapshotStorage {
   TODO("Not yet implemented")
 }
-
-actual typealias Path = String

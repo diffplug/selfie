@@ -17,22 +17,22 @@ package com.diffplug.selfie.junit5
 
 import com.diffplug.selfie.guts.CallLocation
 import com.diffplug.selfie.guts.FS
-import com.diffplug.selfie.guts.Path
 import com.diffplug.selfie.guts.SnapshotFileLayout
+import com.diffplug.selfie.guts.TypedPath
 
 class SnapshotFileLayoutJUnit5(settings: SelfieSettingsAPI, override val fs: FS) :
     SnapshotFileLayout {
   internal var smuggledError: Throwable? =
       if (settings is SelfieSettingsSmuggleError) settings.error else null
-  override val rootFolder = settings.rootFolder
+  override val rootFolder = TypedPath.ofFolder(settings.rootFolder.absolutePath)
   private val otherSourceRoots = settings.otherSourceRoots
   override val allowMultipleEquivalentWritesToOneLocation =
       settings.allowMultipleEquivalentWritesToOneLocation
   val snapshotFolderName = settings.snapshotFolderName
-  internal val unixNewlines = inferDefaultLineEndingIsUnix(settings.rootFolder, fs)
+  internal val unixNewlines = inferDefaultLineEndingIsUnix(rootFolder, fs)
   val extension: String = ".ss"
-  private val cache = ThreadLocal<Pair<CallLocation, Path>?>()
-  override fun sourcePathForCall(call: CallLocation): Path {
+  private val cache = ThreadLocal<Pair<CallLocation, TypedPath>?>()
+  override fun sourcePathForCall(call: CallLocation): TypedPath {
     smuggledError?.let { throw it }
     val nonNull =
         sourcePathForCallMaybe(call)
@@ -40,7 +40,7 @@ class SnapshotFileLayoutJUnit5(settings: SelfieSettingsAPI, override val fs: FS)
                 "Couldn't find source file for $call, looked in $rootFolder and $otherSourceRoots, maybe there are other source roots?")
     return nonNull
   }
-  override fun sourcePathForCallMaybe(call: CallLocation): Path? {
+  override fun sourcePathForCallMaybe(call: CallLocation): TypedPath? {
     val cached = cache.get()
     if (cached?.first?.samePathAs(call) == true) {
       return cached.second
@@ -52,38 +52,34 @@ class SnapshotFileLayoutJUnit5(settings: SelfieSettingsAPI, override val fs: FS)
       path
     }
   }
-  private fun computePathForCall(call: CallLocation): Path? =
+  private fun computePathForCall(call: CallLocation): TypedPath? =
       sequence {
             yield(rootFolder)
-            yieldAll(otherSourceRoots)
+            yieldAll(otherSourceRoots.map { TypedPath.ofFolder(it.absolutePath) })
           }
           .firstNotNullOfOrNull { computePathForCall(it, call) }
-  private fun computePathForCall(folder: Path, call: CallLocation): Path? {
+  private fun computePathForCall(folder: TypedPath, call: CallLocation): TypedPath? {
     if (call.fileName != null) {
-      return fs.fileWalk(folder) { walk ->
-        walk.filter { fs.name(it) == call.fileName }.firstOrNull()
-      }
+      return fs.fileWalk(folder) { walk -> walk.filter { it.name == call.fileName }.firstOrNull() }
     }
     val fileWithoutExtension = call.clazz.substringAfterLast('.').substringBefore('$')
     val likelyExtensions = listOf("kt", "java", "scala", "groovy", "clj", "cljc")
     val possibleNames = likelyExtensions.map { "$fileWithoutExtension.$it" }.toSet()
-    return fs.fileWalk(folder) { walk ->
-      walk.filter { fs.name(it) in possibleNames }.firstOrNull()
-    }
+    return fs.fileWalk(folder) { walk -> walk.filter { it.name in possibleNames }.firstOrNull() }
   }
-  fun snapshotPathForClass(className: String): Path {
+  fun snapshotPathForClass(className: String): TypedPath {
     val lastDot = className.lastIndexOf('.')
-    val classFolder: Path
+    val classFolder: TypedPath
     val filename: String
     if (lastDot == -1) {
       classFolder = rootFolder
       filename = className + extension
     } else {
-      classFolder = rootFolder.resolve(className.substring(0, lastDot).replace('.', '/'))
+      classFolder = rootFolder.resolveFolder(className.substring(0, lastDot).replace('.', '/'))
       filename = className.substring(lastDot + 1) + extension
     }
-    val parentFolder = snapshotFolderName?.let { classFolder.resolve(it) } ?: classFolder
-    return parentFolder.resolve(filename)
+    val parentFolder = snapshotFolderName?.let { classFolder.resolveFolder(it) } ?: classFolder
+    return parentFolder.resolveFile(filename)
   }
   fun subpathToClassname(subpath: String): String {
     check(subpath.indexOf('\\') == -1)
@@ -109,7 +105,7 @@ class SnapshotFileLayoutJUnit5(settings: SelfieSettingsAPI, override val fs: FS)
      * It's pretty easy to preserve the line endings of existing snapshot files, but it's a bit
      * harder to create a fresh snapshot file with the correct line endings.
      */
-    private fun inferDefaultLineEndingIsUnix(rootFolder: Path, fs: FS): Boolean {
+    private fun inferDefaultLineEndingIsUnix(rootFolder: TypedPath, fs: FS): Boolean {
       return fs.fileWalk(rootFolder) { walk ->
         walk
             .mapNotNull {

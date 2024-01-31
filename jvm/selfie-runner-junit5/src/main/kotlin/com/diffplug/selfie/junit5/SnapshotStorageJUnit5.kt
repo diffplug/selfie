@@ -22,26 +22,32 @@ import com.diffplug.selfie.guts.DiskWriteTracker
 import com.diffplug.selfie.guts.FS
 import com.diffplug.selfie.guts.InlineWriteTracker
 import com.diffplug.selfie.guts.LiteralValue
-import com.diffplug.selfie.guts.Path
 import com.diffplug.selfie.guts.SnapshotFileLayout
 import com.diffplug.selfie.guts.SnapshotStorage
 import com.diffplug.selfie.guts.SourceFile
+import com.diffplug.selfie.guts.TypedPath
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.util.concurrent.ConcurrentSkipListSet
 import java.util.concurrent.atomic.AtomicReference
+import kotlin.io.path.absolutePathString
+import kotlin.io.path.readText
+import kotlin.io.path.writeText
 import kotlin.streams.asSequence
 import org.opentest4j.AssertionFailedError
+fun TypedPath.toPath(): java.nio.file.Path = java.nio.file.Path.of(absolutePath)
 
 internal object FSJava : FS {
-  override fun fileWrite(file: Path, content: String) = file.writeText(content)
-  override fun fileRead(file: Path) = file.readText()
+  override fun fileWrite(file: TypedPath, content: String) = file.toPath().writeText(content)
+  override fun fileRead(file: TypedPath) = file.toPath().readText()
   /** Walks the files (not directories) which are children and grandchildren of the given path. */
-  override fun <T> fileWalk(file: Path, walk: (Sequence<Path>) -> T): T =
+  override fun <T> fileWalk(file: TypedPath, walk: (Sequence<TypedPath>) -> T): T =
       Files.walk(file.toPath()).use {
-        walk(it.asSequence().mapNotNull { if (Files.isRegularFile(it)) it.toFile() else null })
+        walk(
+            it.asSequence().mapNotNull {
+              if (Files.isRegularFile(it)) TypedPath.ofFile(it.absolutePathString()) else null
+            })
       }
-  override fun name(file: Path): String = file.name
   override fun assertFailed(message: String, expected: Any?, actual: Any?): Error =
       if (expected == null && actual == null) AssertionFailedError(message)
       else AssertionFailedError(message, expected, actual)
@@ -283,20 +289,20 @@ internal class Progress {
     }
   }
 
-  private var checkForInvalidStale: AtomicReference<MutableSet<Path>?> =
+  private var checkForInvalidStale: AtomicReference<MutableSet<TypedPath>?> =
       AtomicReference(ConcurrentSkipListSet())
-  internal fun markPathAsWritten(path: Path) {
+  internal fun markPathAsWritten(typedPath: TypedPath) {
     val written =
         checkForInvalidStale.get()
             ?: throw AssertionError("Snapshot file is being written after all tests were finished.")
-    written.add(path)
+    written.add(typedPath)
   }
   fun finishedAllTests() {
     val pathsWithOnce = commentTracker!!.pathsWithOnce()
     commentTracker = null
     if (SnapshotStorageJUnit5.mode != Mode.readonly) {
       for (path in pathsWithOnce) {
-        val source = SourceFile(layout.fs.name(path), layout.fs.fileRead(path))
+        val source = SourceFile(path.name, layout.fs.fileRead(path))
         source.removeSelfieOnceComments()
         layout.fs.fileWrite(path, source.asString)
       }
@@ -315,7 +321,7 @@ internal class Progress {
     }
   }
 }
-private fun deleteFileAndParentDirIfEmpty(snapshotFile: Path) {
+private fun deleteFileAndParentDirIfEmpty(snapshotFile: TypedPath) {
   if (Files.isRegularFile(snapshotFile.toPath())) {
     Files.delete(snapshotFile.toPath())
     // if the parent folder is now empty, delete it

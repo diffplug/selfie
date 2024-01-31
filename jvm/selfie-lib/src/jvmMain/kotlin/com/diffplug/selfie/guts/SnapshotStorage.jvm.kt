@@ -23,5 +23,3 @@ actual fun initStorage(): SnapshotStorage {
         "Missing required artifact `com.diffplug.spotless:selfie-runner-junit5", e)
   }
 }
-
-actual typealias Path = java.io.File
