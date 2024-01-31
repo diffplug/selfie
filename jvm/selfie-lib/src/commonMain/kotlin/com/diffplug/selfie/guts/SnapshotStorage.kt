@@ -19,8 +19,8 @@ import com.diffplug.selfie.Mode
 import com.diffplug.selfie.Snapshot
 
 /** A unix-style path where trailing-slash means it is a folder. */
-data class Path(val absolutePath: String) : Comparable<Path> {
-  override fun compareTo(other: Path): Int = absolutePath.compareTo(other.absolutePath)
+data class TypedPath(val absolutePath: String) : Comparable<TypedPath> {
+  override fun compareTo(other: TypedPath): Int = absolutePath.compareTo(other.absolutePath)
   val name: String
     get() {
       val lastSlash = absolutePath.lastIndexOf('/')
@@ -31,18 +31,18 @@ data class Path(val absolutePath: String) : Comparable<Path> {
   private fun assertFolder() {
     check(isFolder) { "Expected $this to be a folder but it doesn't end with `/`" }
   }
-  fun resolveFile(child: String): Path {
+  fun resolveFile(child: String): TypedPath {
     assertFolder()
     check(!child.startsWith("/")) { "Expected child to not start with a slash, but got $child" }
     check(!child.endsWith("/")) { "Expected child to not end with a slash, but got $child" }
     return ofFile("$absolutePath$child")
   }
-  fun resolveFolder(child: String): Path {
+  fun resolveFolder(child: String): TypedPath {
     assertFolder()
     check(!child.startsWith("/")) { "Expected child to not start with a slash, but got $child" }
     return ofFolder("$absolutePath$child")
   }
-  fun relativize(child: Path): String {
+  fun relativize(child: TypedPath): String {
     assertFolder()
     check(child.absolutePath.startsWith(absolutePath)) {
       "Expected $child to start with $absolutePath"
@@ -52,24 +52,24 @@ data class Path(val absolutePath: String) : Comparable<Path> {
 
   companion object {
     /** A folder at the given path. */
-    fun ofFolder(path: String): Path {
+    fun ofFolder(path: String): TypedPath {
       val unixPath = path.replace("\\", "/")
-      return Path(if (unixPath.endsWith("/")) unixPath else "$unixPath/")
+      return TypedPath(if (unixPath.endsWith("/")) unixPath else "$unixPath/")
     }
     /** A file (NOT a folder) at the given path. */
-    fun ofFile(path: String): Path {
+    fun ofFile(path: String): TypedPath {
       val unixPath = path.replace("\\", "/")
       check(!unixPath.endsWith("/")) { "Expected path to not end with a slash, but got $unixPath" }
-      return Path(unixPath)
+      return TypedPath(unixPath)
     }
   }
 }
 
 interface FS {
   /** Walks the files (not directories) which are children and grandchildren of the given path. */
-  fun <T> fileWalk(path: Path, walk: (Sequence<Path>) -> T): T
-  fun fileRead(path: Path): String
-  fun fileWrite(path: Path, content: String)
+  fun <T> fileWalk(typedPath: TypedPath, walk: (Sequence<TypedPath>) -> T): T
+  fun fileRead(typedPath: TypedPath): String
+  fun fileWrite(typedPath: TypedPath, content: String)
   /** Creates an assertion failed exception to throw. */
   fun assertFailed(message: String, expected: Any? = null, actual: Any? = null): Error
 }
@@ -97,9 +97,9 @@ interface SnapshotStorage {
 expect fun initStorage(): SnapshotStorage
 
 interface SnapshotFileLayout {
-  val rootFolder: Path
+  val rootFolder: TypedPath
   val fs: FS
   val allowMultipleEquivalentWritesToOneLocation: Boolean
-  fun sourcePathForCall(call: CallLocation): Path
-  fun sourcePathForCallMaybe(call: CallLocation): Path?
+  fun sourcePathForCall(call: CallLocation): TypedPath
+  fun sourcePathForCallMaybe(call: CallLocation): TypedPath?
 }

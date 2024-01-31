@@ -120,7 +120,7 @@ class InlineWriteTracker : WriteTracker<CallLocation, LiteralValue<*>>() {
   }
   fun hasWrites(): Boolean = writes.isNotEmpty()
 
-  private class FileLineLiteral(val file: Path, val line: Int, val literal: LiteralValue<*>) :
+  private class FileLineLiteral(val file: TypedPath, val line: Int, val literal: LiteralValue<*>) :
       Comparable<FileLineLiteral> {
     override fun compareTo(other: FileLineLiteral): Int =
         compareValuesBy(this, other, { it.file }, { it.line })

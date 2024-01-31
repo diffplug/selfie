@@ -38,8 +38,8 @@ class CommentTracker {
     val needsRemoval: Boolean
       get() = this == ONCE
   }
-  private val cache = createCas(ArrayMap.empty<Path, WritableComment>())
-  fun pathsWithOnce(): Iterable<Path> =
+  private val cache = createCas(ArrayMap.empty<TypedPath, WritableComment>())
+  fun pathsWithOnce(): Iterable<TypedPath> =
       cache.get().mapNotNull { if (it.value == WritableComment.ONCE) it.key else null }
   fun hasWritableComment(call: CallStack, layout: SnapshotFileLayout): Boolean {
     val path = layout.sourcePathForCall(call.location) ?: return false
@@ -54,17 +54,17 @@ class CommentTracker {
   }
 
   companion object {
-    fun commentString(path: Path, fs: FS): Pair<String, Int> {
-      val (comment, line) = commentAndLine(path, fs)
+    fun commentString(typedPath: TypedPath, fs: FS): Pair<String, Int> {
+      val (comment, line) = commentAndLine(typedPath, fs)
       return when (comment) {
         WritableComment.NO_COMMENT -> throw UnsupportedOperationException()
         WritableComment.ONCE -> Pair("//selfieonce", line)
         WritableComment.FOREVER -> Pair("//SELFIEWRITE", line)
       }
     }
-    private fun commentAndLine(path: Path, fs: FS): Pair<WritableComment, Int> {
+    private fun commentAndLine(typedPath: TypedPath, fs: FS): Pair<WritableComment, Int> {
       // TODO: there is a bug here due to string constants, and non-C file comments
-      val content = Slice(fs.fileRead(path))
+      val content = Slice(fs.fileRead(typedPath))
       for (comment in listOf("//selfieonce", "// selfieonce", "//SELFIEWRITE", "// SELFIEWRITE")) {
         val index = content.indexOf(comment)
         if (index != -1) {

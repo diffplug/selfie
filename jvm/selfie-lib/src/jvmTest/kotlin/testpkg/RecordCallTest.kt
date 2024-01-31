@@ -17,7 +17,7 @@ package testpkg
 
 import com.diffplug.selfie.guts.CallLocation
 import com.diffplug.selfie.guts.FS
-import com.diffplug.selfie.guts.Path
+import com.diffplug.selfie.guts.TypedPath
 import com.diffplug.selfie.guts.SnapshotFileLayout
 import com.diffplug.selfie.guts.recordCall
 import io.kotest.matchers.ints.shouldBeGreaterThan
@@ -30,14 +30,14 @@ class RecordCallTest {
     val stack = recordCall(false)
     val layout =
         object : SnapshotFileLayout {
-          override val rootFolder: Path
+          override val rootFolder: TypedPath
             get() = TODO()
           override val fs: FS
             get() = TODO()
           override val allowMultipleEquivalentWritesToOneLocation: Boolean
             get() = TODO()
-          override fun sourcePathForCall(call: CallLocation) = Path("testpkg/RecordCallTest.kt")
-          override fun sourcePathForCallMaybe(call: CallLocation): Path? = sourcePathForCall(call)
+          override fun sourcePathForCall(call: CallLocation) = TypedPath("testpkg/RecordCallTest.kt")
+          override fun sourcePathForCallMaybe(call: CallLocation): TypedPath? = sourcePathForCall(call)
         }
     stack.location.ideLink(layout) shouldBe
         "testpkg.RecordCallTest.testRecordCall(RecordCallTest.kt:30)"
