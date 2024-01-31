@@ -306,17 +306,17 @@ open class Harness(subproject: String) {
     return error
   }
   fun gradleWriteSS() {
-    gradlew("underTest", "-Pselfie=overwrite")?.let {
+    gradlew("test", "-PunderTest=true", "-Pselfie=overwrite")?.let {
       throw AssertionError("Expected write snapshots to succeed, but it failed", it)
     }
   }
   fun gradleReadSS() {
-    gradlew("underTest", "-Pselfie=readonly")?.let {
+    gradlew("test", "-PunderTest=true", "-Pselfie=readonly")?.let {
       throw AssertionError("Expected read snapshots to succeed, but it failed", it)
     }
   }
   fun gradleReadSSFail(): AssertionFailedError {
-    val failure = gradlew("underTest", "-Pselfie=readonly")
+    val failure = gradlew("test", "-PunderTest=true", "-Pselfie=readonly")
     if (failure == null) {
       throw AssertionError("Expected read snapshots to fail, but it succeeded.")
     } else {
@@ -324,12 +324,12 @@ open class Harness(subproject: String) {
     }
   }
   fun gradleInteractivePass() {
-    gradlew("underTest", "-Pselfie=interactive")?.let {
+    gradlew("test", "-PunderTest=true", "-Pselfie=interactive")?.let {
       throw AssertionError("Expected interactive selfie run to succeed, but it failed.", it)
     }
   }
   fun gradleInteractiveFail(): AssertionFailedError {
-    val failure = gradlew("underTest", "-Pselfie=interactive")
+    val failure = gradlew("test", "-PunderTest=true", "-Pselfie=interactive")
     if (failure == null) {
       throw AssertionError("Expected interactive selfie run to fail, but it succeeded.")
     } else {

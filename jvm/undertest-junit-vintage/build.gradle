@@ -25,12 +25,9 @@ dependencies {
 }
 // this project is just a test environment for a different project
 test {
-  enabled = false
-}
-tasks.register('underTest', Test) {
   useJUnitPlatform()
-  testClassesDirs = testing.suites.test.sources.output.classesDirs
-  classpath = testing.suites.test.sources.runtimeClasspath
+  enabled = findProperty("underTest") == "true"
+
   testLogging.showStandardStreams = true
   // the snapshots are both output and input, for this harness best if the test just always runs
   outputs.upToDateWhen { false }
