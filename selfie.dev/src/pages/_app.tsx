@@ -30,6 +30,7 @@ export default function App({ Component, pageProps, router }: AppProps) {
           content={"https://selfie.dev/twitter-card.webp"}
         />
         {pageProps.showHeroLinks === 'false' && <meta name="robots" content="noindex" />}
+        {router.pathname === "/" && <link rel="canonical" href="https://selfie.dev/jvm" />}
       </Head>
       <MDXProvider components={mdxComponents}>
         <div
