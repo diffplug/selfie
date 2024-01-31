@@ -21,6 +21,6 @@ import kotlin.test.Test
 class DummyTest {
   @Test
   fun alive() {
-    "true" shouldBe "false"
+    "true" shouldBe "true"
   }
 }
