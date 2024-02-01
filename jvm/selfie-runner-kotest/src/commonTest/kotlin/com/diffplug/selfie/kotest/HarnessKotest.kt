@@ -24,6 +24,7 @@ import okio.Path
 import okio.Path.Companion.toPath
 
 expect val FS_SYSTEM: FileSystem
+expect val IS_WINDOWS: Boolean
 
 expect fun exec(cwd: TypedPath, vararg args: String): String
 
@@ -199,10 +200,15 @@ open class HarnessKotest() : StringSpec() {
           else -> throw IllegalArgumentException("Unknown task $task")
         }
     val argList = mutableListOf<String>()
-    argList.add("/bin/sh")
-    argList.add("-c")
+    if (IS_WINDOWS) {
+      argList.add("cmd")
+      argList.add("/c")
+    } else {
+      argList.add("/bin/sh")
+      argList.add("-c")
+    }
     argList.add(
-        "./gradlew :undertest-kotest:$actualTask --configuration-cache ${args.joinToString(" ")}")
+        "${if (IS_WINDOWS) "" else "./"}gradlew :undertest-kotest:$actualTask --configuration-cache ${args.joinToString(" ")}")
     val output =
         exec(TypedPath.ofFolder(subprojectFolder.parent.toString()), *argList.toTypedArray())
     if (output.contains("BUILD SUCCESSFUL")) {
