@@ -71,7 +71,7 @@ interface FS {
   fun fileRead(typedPath: TypedPath): String
   fun fileWrite(typedPath: TypedPath, content: String)
   /** Creates an assertion failed exception to throw. */
-  fun assertFailed(message: String, expected: Any? = null, actual: Any? = null): Error
+  fun assertFailed(message: String, expected: Any? = null, actual: Any? = null): Throwable
 }
 
 /** NOT FOR ENDUSERS. Implemented by Selfie to integrate with various test frameworks. */

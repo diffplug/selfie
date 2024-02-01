@@ -17,7 +17,10 @@ package com.diffplug.selfie.kotest
 
 import com.diffplug.selfie.guts.FS
 import com.diffplug.selfie.guts.TypedPath
-import io.kotest.assertions.AssertionFailedError
+import io.kotest.assertions.Actual
+import io.kotest.assertions.Exceptions
+import io.kotest.assertions.Expected
+import io.kotest.assertions.print.Printed
 import okio.FileSystem
 import okio.Path.Companion.toPath
 
@@ -36,19 +39,24 @@ object FSOkio : FS {
   override fun fileWrite(typedPath: TypedPath, content: String): Unit =
       FS_SYSTEM.write(typedPath.toPath()) { writeUtf8(content) }
   /** Creates an assertion failed exception to throw. */
-  override fun assertFailed(message: String, expected: Any?, actual: Any?): Error =
-      if (expected == null && actual == null) AssertionError(message, null)
+  override fun assertFailed(message: String, expected: Any?, actual: Any?): Throwable =
+      if (expected == null && actual == null) Exceptions.createAssertionError(message, null)
       else {
         val expectedStr = nullableToString(expected, "")
         val actualStr = nullableToString(actual, "")
         if (expectedStr.isEmpty() && actualStr.isEmpty() && (expected == null || actual == null)) {
+          // make sure that nulls are not ambiguous
           val onNull = "(null)"
-          AssertionFailedError(
-              message, null, nullableToString(expected, onNull), nullableToString(actual, onNull))
+          comparisonAssertion(
+              message, nullableToString(expected, onNull), nullableToString(actual, onNull))
         } else {
-          AssertionFailedError(message, null, expectedStr, actualStr)
+          comparisonAssertion(message, expectedStr, actualStr)
         }
       }
   private fun nullableToString(any: Any?, onNull: String): String =
       any?.let { it.toString() } ?: onNull
+  private fun comparisonAssertion(message: String, expected: String, actual: String): Throwable {
+    return Exceptions.createAssertionError(
+        message, null, Expected(Printed((expected))), Actual(Printed((actual))))
+  }
 }
