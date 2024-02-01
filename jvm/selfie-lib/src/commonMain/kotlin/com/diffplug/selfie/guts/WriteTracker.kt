@@ -32,6 +32,9 @@ expect class CallLocation : Comparable<CallLocation> {
    * false positives will result in incorrect behavior.
    */
   fun samePathAs(other: CallLocation): Boolean
+
+  /** Returns the likely name of the sourcecode of this file, without path or extension. */
+  fun sourceFilenameWithoutExtension(): String
 }
 
 internal expect fun recordCall(callerFileOnly: Boolean): CallStack

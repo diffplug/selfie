@@ -45,9 +45,11 @@ actual data class CallLocation(
   }
 
   /** A `toString` which an IDE will render as a clickable link. */
-  actual fun ideLink(layout: SnapshotFileLayout): String {
-    return "$clazz.$method(${findFileIfAbsent(layout)}:$line)"
-  }
+  actual fun ideLink(layout: SnapshotFileLayout): String =
+      "$clazz.$method(${findFileIfAbsent(layout)}:$line)"
+  /** Returns the likely name of the sourcecode of this file, without path or extension. */
+  actual fun sourceFilenameWithoutExtension(): String =
+      clazz.substringAfterLast('.').substringBefore('$')
 }
 
 /** Generates a CallLocation and the CallStack behind it. */

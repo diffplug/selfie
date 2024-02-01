@@ -62,7 +62,7 @@ class SnapshotFileLayoutJUnit5(settings: SelfieSettingsAPI, override val fs: FS)
     if (call.fileName != null) {
       return fs.fileWalk(folder) { walk -> walk.filter { it.name == call.fileName }.firstOrNull() }
     }
-    val fileWithoutExtension = call.clazz.substringAfterLast('.').substringBefore('$')
+    val fileWithoutExtension = call.sourceFilenameWithoutExtension()
     val likelyExtensions = listOf("kt", "java", "scala", "groovy", "clj", "cljc")
     val possibleNames = likelyExtensions.map { "$fileWithoutExtension.$it" }.toSet()
     return fs.fileWalk(folder) { walk -> walk.filter { it.name in possibleNames }.firstOrNull() }
