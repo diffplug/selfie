@@ -23,7 +23,7 @@ import org.junitpioneer.jupiter.DisableIfTestFails
 
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
 @DisableIfTestFails
-class ParameterizedTest : Harness("undertest-junit5") {
+class ParameterizedTest : HarnessJUnit() {
   @Test @Order(1)
   fun readFailsBecauseTodo() {
     ut_snapshot().deleteIfExists()

@@ -17,7 +17,7 @@ package com.diffplug.selfie.junit5
 
 import kotlin.test.Test
 
-class InlineFacetTest : Harness("undertest-junit5") {
+class InlineFacetTest : HarnessJUnit() {
   @Test
   fun readPasses() {
     gradleReadSS()

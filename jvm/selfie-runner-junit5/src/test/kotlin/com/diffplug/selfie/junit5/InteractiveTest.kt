@@ -24,7 +24,7 @@ import org.junitpioneer.jupiter.DisableIfTestFails
 
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
 @DisableIfTestFails
-class InteractiveTest : Harness("undertest-junit5") {
+class InteractiveTest : HarnessJUnit() {
   @Test @Order(1)
   fun initialState() {
     ut_snapshot().deleteIfExists()

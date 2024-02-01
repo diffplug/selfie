@@ -31,10 +31,18 @@ import org.opentest4j.AssertionFailedError
 import org.w3c.dom.NodeList
 import org.xml.sax.InputSource
 
-open class Harness(subproject: String) {
+open class HarnessJUnit() {
   val subprojectFolder: Path
 
   init {
+    val subproject =
+        if (javaClass.name.startsWith("com.diffplug.selfie.junit5")) {
+          "undertest-junit5"
+        } else if (javaClass.name.startsWith("com.diffplug.selfie.junitvintage")) {
+          "undertest-junit-vintage"
+        } else {
+          throw Error("Unexpected package for ${javaClass.name}")
+        }
     var rootFolder = FileSystem.SYSTEM.canonicalize("".toPath())
     if (!FileSystem.SYSTEM.exists(rootFolder.resolve("settings.gradle"))) {
       check(FileSystem.SYSTEM.exists(rootFolder.parent!!.resolve("settings.gradle"))) {

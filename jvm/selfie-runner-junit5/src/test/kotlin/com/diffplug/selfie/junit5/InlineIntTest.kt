@@ -25,7 +25,7 @@ import org.junitpioneer.jupiter.DisableIfTestFails
 /** Write-only test which asserts adding and removing snapshots results in same-class GC. */
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
 @DisableIfTestFails
-class InlineIntTest : Harness("undertest-junit5") {
+class InlineIntTest : HarnessJUnit() {
   @Test @Order(1)
   fun toBe_TODO() {
     ut_mirrorKt().lineWith("expectSelfie").setContent("    expectSelfie(1234).toBe_TODO()")
