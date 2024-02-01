@@ -17,9 +17,12 @@ package com.diffplug.selfie.kotest
 
 import okio.Path
 import okio.Path.Companion.toPath
-internal fun readUserDir(): String = TODO()
-internal fun readEnvironmentVariable(name: String): String? = TODO()
-internal fun instantiateSettingsAt(name: String): SelfieSettingsAPI = TODO()
+
+internal expect fun readUserDir(): String
+
+internal expect fun readEnvironmentVariable(name: String): String?
+
+internal expect fun instantiateSettingsAt(name: String): SelfieSettingsAPI
 
 /**
  * If you create a class named `SelfieSettings` in the package `selfie`, it must extend this class,
