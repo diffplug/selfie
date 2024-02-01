@@ -31,11 +31,21 @@ kotlin {
         implementation "com.squareup.okio:okio:$ver_OKIO"
       }
     }
+    jsMain {
+      dependencies {
+        implementation "com.squareup.okio:okio-nodefilesystem:$ver_OKIO"
+      }
+    }
     commonTest {
       dependencies {
         implementation("io.kotest:kotest-framework-engine:$ver_KOTEST")
         implementation("io.kotest:kotest-assertions-core:$ver_KOTEST")
         implementation(kotlin('test'))
+      }
+    }
+    jvmTest {
+      dependencies {
+        implementation "io.kotest:kotest-runner-junit5:$ver_KOTEST"
       }
     }
   }

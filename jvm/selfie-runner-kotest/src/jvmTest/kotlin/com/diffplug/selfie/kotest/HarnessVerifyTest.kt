@@ -16,11 +16,25 @@
 package com.diffplug.selfie.kotest
 
 import io.kotest.matchers.shouldBe
-import kotlin.test.Test
 
-class DummyTest {
-  @Test
-  fun alive() {
-    "true" shouldBe "true"
+class HarnessVerifyTest : HarnessKotest() {
+  private var initialContent: String = ""
+
+  init {
+
+    "initialize" {
+      ut_mirrorKt().restoreFromGit()
+      initialContent = ut_mirrorKt().linesFrom("UT_HarnessVerifyTest").toLast("}").content()
+    }
+    "runAll" { gradleInteractiveFail() }
+    "commentOutFailure" {
+      ut_mirrorKt().linesFrom("alwaysFails()").toFirst("}").commentOut()
+      gradleInteractivePass()
+    }
+    "restoreInitial" {
+      ut_mirrorKt().restoreFromGit()
+      val actualContent = ut_mirrorKt().linesFrom("UT_HarnessVerifyTest").toLast("}").content()
+      actualContent shouldBe initialContent
+    }
   }
 }
