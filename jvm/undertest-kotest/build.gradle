@@ -1,18 +1,21 @@
 plugins {
   id 'org.jetbrains.kotlin.multiplatform'
   id 'io.kotest.multiplatform'
+  id 'com.diffplug.spotless'
 }
 repositories {
   mavenCentral()
 }
-ext {
-  maven_name = 'selfie-runner-kotest'
-  maven_desc = 'Kotest test runner for Selfie'
+spotless {
+  kotlin {
+    target 'src/**/*.kt'
+    toggleOffOn()
+    licenseHeader ''
+    ktfmt()
+    replaceRegex("test one-liner", "@Test\n(\\s*)fun ", "@Test fun ")
+    replaceRegex("test harness comments", "\n(\\s)*//", "\n//")
+  }
 }
-
-apply from: 干.file('base/changelog.gradle')
-apply from: rootProject.file('gradle/spotless.gradle')
-apply plugin: 'java-library'
 
 kotlin {
   jvm {
