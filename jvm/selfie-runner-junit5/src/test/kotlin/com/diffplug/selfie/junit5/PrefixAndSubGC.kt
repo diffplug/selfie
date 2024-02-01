@@ -18,7 +18,7 @@ package com.diffplug.selfie.junit5
 import kotlin.test.Test
 import org.junit.jupiter.api.Order
 
-class PrefixAndSubGC : Harness("undertest-junit5") {
+class PrefixAndSubGC : HarnessJUnit() {
   @Test @Order(1)
   fun readSucceeds() {
     gradleReadSS()

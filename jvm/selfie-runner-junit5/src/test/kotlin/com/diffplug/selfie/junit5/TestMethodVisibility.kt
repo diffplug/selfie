@@ -23,7 +23,7 @@ import org.junitpioneer.jupiter.DisableIfTestFails
 
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
 @DisableIfTestFails
-class TestMethodVisibility : Harness("undertest-junit5") {
+class TestMethodVisibility : HarnessJUnit() {
   @Test @Order(1)
   fun writeSelfie() {
     gradleWriteSS()

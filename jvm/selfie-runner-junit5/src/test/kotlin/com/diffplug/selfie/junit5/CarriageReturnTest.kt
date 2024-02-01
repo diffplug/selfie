@@ -24,7 +24,7 @@ import org.junitpioneer.jupiter.DisableIfTestFails
 /** Verify selfie's carriage-return handling. */
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
 @DisableIfTestFails
-class CarriageReturnTest : Harness("undertest-junit5") {
+class CarriageReturnTest : HarnessJUnit() {
   @Test @Order(1)
   fun noSelfie() {
     ut_snapshot().deleteIfExists()

@@ -24,7 +24,7 @@ import org.junitpioneer.jupiter.DisableIfTestFails
 
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
 @DisableIfTestFails
-class ReadOnlyTest : Harness("undertest-junit5") {
+class ReadOnlyTest : HarnessJUnit() {
   @Test @Order(1)
   fun initialState() {
     ut_mirrorKt().lineWith("expectSelfie(").setContent("    expectSelfie(10).toBe(10)")

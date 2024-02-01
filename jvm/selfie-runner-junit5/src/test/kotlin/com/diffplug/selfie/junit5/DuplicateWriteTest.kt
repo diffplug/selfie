@@ -26,7 +26,7 @@ import org.junitpioneer.jupiter.DisableIfTestFails
 /** Simplest test for verifying read/write of a snapshot. */
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
 @DisableIfTestFails
-class DuplicateWriteTest : Harness("undertest-junit5") {
+class DuplicateWriteTest : HarnessJUnit() {
   @Test @Order(1)
   fun noSelfie() {
     ut_snapshot().deleteIfExists()

@@ -15,7 +15,7 @@
  */
 package com.diffplug.selfie.junitvintage
 
-import com.diffplug.selfie.junit5.Harness
+import com.diffplug.selfie.junit5.HarnessJUnit
 import kotlin.test.Test
 import org.junit.jupiter.api.MethodOrderer
 import org.junit.jupiter.api.Order
@@ -25,7 +25,7 @@ import org.junitpioneer.jupiter.DisableIfTestFails
 /** Simplest test for verifying read/write of a snapshot. */
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
 @DisableIfTestFails
-class ReadWriteVintageTest : Harness("undertest-junit-vintage") {
+class ReadWriteVintageTest : HarnessJUnit() {
   @Test @Order(1)
   fun noSelfie() {
     ut_snapshot().deleteIfExists()
