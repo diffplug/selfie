@@ -21,7 +21,6 @@ class HarnessVerifyTest : HarnessKotest() {
   private var initialContent: String = ""
 
   init {
-
     "initialize" {
       ut_mirrorKt().restoreFromGit()
       initialContent = ut_mirrorKt().linesFrom("UT_HarnessVerifyTest").toLast("}").content()

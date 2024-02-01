@@ -50,10 +50,14 @@ kotlin {
     }
   }
 }
-//test {
-//  useJUnitPlatform()
-////  getInputs().dir('../undertest-junit5/src/test/kotlin')
-//}
+
+jsNodeTest {
+  enabled = false // TODO: https://github.com/diffplug/selfie/issues/186
+  getInputs().dir('../undertest-kotest/src/commonTest/kotlin')
+}
+jvmTest {
+  getInputs().dir('../undertest-kotest/src/commonTest/kotlin')
+}
 
 // it all needs to get published and formatted
 apply from: 干.file('base/maven.gradle')

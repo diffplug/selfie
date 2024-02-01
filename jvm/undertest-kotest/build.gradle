@@ -34,3 +34,12 @@ kotlin {
     }
   }
 }
+tasks.named('jvmTest').configure {
+  enabled = findProperty("underTest") == "true"
+  testLogging.showStandardStreams = true
+  // the snapshots are both output and input, for this harness best if the test just always runs
+  outputs.upToDateWhen { false }
+  // defaults to 'write'
+  systemProperty 'selfie', findProperty('selfie')
+  systemProperty 'selfie.settings', findProperty('selfie.settings')
+}
