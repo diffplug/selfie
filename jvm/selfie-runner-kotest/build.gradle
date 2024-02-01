@@ -1,0 +1,64 @@
+plugins {
+  id 'org.jetbrains.kotlin.multiplatform'
+  id 'io.kotest.multiplatform'
+}
+repositories {
+  mavenCentral()
+}
+ext {
+  maven_name = 'selfie-runner-kotest'
+  maven_desc = 'Kotest test runner for Selfie'
+}
+
+apply from: 干.file('base/changelog.gradle')
+apply from: rootProject.file('gradle/spotless.gradle')
+apply plugin: 'java-library'
+
+kotlin {
+  jvm {
+    testRuns["test"].executionTask.configure {
+      useJUnitPlatform()
+    }
+  }
+  js {
+    nodejs()
+  }
+  sourceSets {
+    commonMain {
+      dependencies {
+        api project(":selfie-lib")
+        api "io.kotest:kotest-framework-engine:$ver_KOTEST"
+        implementation "com.squareup.okio:okio:$ver_OKIO"
+      }
+    }
+    jsMain {
+      dependencies {
+        implementation "com.squareup.okio:okio-nodefilesystem:$ver_OKIO"
+      }
+    }
+    commonTest {
+      dependencies {
+        implementation("io.kotest:kotest-framework-engine:$ver_KOTEST")
+        implementation("io.kotest:kotest-assertions-core:$ver_KOTEST")
+        implementation(kotlin('test'))
+      }
+    }
+    jvmTest {
+      dependencies {
+        implementation "io.kotest:kotest-runner-junit5:$ver_KOTEST"
+      }
+    }
+  }
+}
+
+jsNodeTest {
+  enabled = false // TODO: https://github.com/diffplug/selfie/issues/186
+  getInputs().dir('../undertest-kotest/src/commonTest/kotlin')
+}
+jvmTest {
+  getInputs().dir('../undertest-kotest/src/commonTest/kotlin')
+}
+
+// it all needs to get published and formatted
+apply from: 干.file('base/maven.gradle')
+apply from: 干.file('base/sonatype.gradle')

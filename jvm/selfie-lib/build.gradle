@@ -24,9 +24,8 @@ kotlin {
       })
     }
   }
-  js(IR) {
-    browser {
-    }
+  js {
+    nodejs()
   }
   sourceSets {
     commonMain {}

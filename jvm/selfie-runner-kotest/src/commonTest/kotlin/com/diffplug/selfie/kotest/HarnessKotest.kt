@@ -13,31 +13,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.diffplug.selfie.junit5
+package com.diffplug.selfie.kotest
 
+import com.diffplug.selfie.guts.TypedPath
+import io.kotest.core.spec.style.StringSpec
+import io.kotest.core.test.TestCaseOrder
 import io.kotest.matchers.shouldBe
-import java.util.regex.Matcher
-import java.util.regex.Pattern
-import javax.xml.parsers.DocumentBuilderFactory
-import javax.xml.xpath.XPathConstants
-import javax.xml.xpath.XPathFactory
 import okio.FileSystem
 import okio.Path
 import okio.Path.Companion.toPath
-import org.gradle.tooling.BuildException
-import org.gradle.tooling.GradleConnector
-import org.gradle.tooling.TestExecutionException
-import org.opentest4j.AssertionFailedError
-import org.w3c.dom.NodeList
-import org.xml.sax.InputSource
 
-open class Harness(subproject: String) {
+expect val FS_SYSTEM: FileSystem
+expect val IS_WINDOWS: Boolean
+
+expect fun exec(cwd: TypedPath, vararg args: String): String
+
+open class HarnessKotest() : StringSpec() {
+  override fun testCaseOrder(): TestCaseOrder? = TestCaseOrder.Sequential
   val subprojectFolder: Path
 
   init {
-    var rootFolder = FileSystem.SYSTEM.canonicalize("".toPath())
-    if (!FileSystem.SYSTEM.exists(rootFolder.resolve("settings.gradle"))) {
-      check(FileSystem.SYSTEM.exists(rootFolder.parent!!.resolve("settings.gradle"))) {
+    val subproject = "undertest-kotest"
+    var rootFolder = FS_SYSTEM.canonicalize("".toPath())
+    if (!FS_SYSTEM.exists(rootFolder.resolve("settings.gradle"))) {
+      check(FS_SYSTEM.exists(rootFolder.parent!!.resolve("settings.gradle"))) {
         "The root folder must contain settings.gradle, was not present in\n" +
             "  $rootFolder\n" +
             "  ${rootFolder.parent}"
@@ -45,19 +44,17 @@ open class Harness(subproject: String) {
       rootFolder = rootFolder.parent!!
     }
     subprojectFolder = rootFolder.resolve(subproject)
-    check(FileSystem.SYSTEM.exists(subprojectFolder)) {
-      "The subproject folder $subproject must exist"
-    }
+    check(FS_SYSTEM.exists(subprojectFolder)) { "The subproject folder $subproject must exist" }
   }
-  protected fun ut_mirrorJava() = file("UT_${javaClass.simpleName}.java")
-  protected fun ut_mirrorKt() = file("UT_${javaClass.simpleName}.kt")
-  protected fun ut_snapshot() = file("UT_${javaClass.simpleName}.ss")
+  private fun thisClassName(): String = this::class.simpleName!!
+  protected fun ut_mirrorKt() = file("UT_${thisClassName()}.kt")
+  protected fun ut_snapshot() = file("UT_${thisClassName()}.ss")
   fun file(nameOrSubpath: String): FileHarness {
     return if (nameOrSubpath.contains('/')) {
       FileHarness(nameOrSubpath)
     } else {
       val matches =
-          FileSystem.SYSTEM.listRecursively(subprojectFolder)
+          FS_SYSTEM.listRecursively(subprojectFolder)
               .filter { it.name == nameOrSubpath && !it.toString().contains("build") }
               .toList()
       when (matches.size) {
@@ -75,30 +72,29 @@ open class Harness(subproject: String) {
   inner class FileHarness(val subpath: String) {
     fun restoreFromGit() {
       val path = subprojectFolder.resolve(subpath)
-      Runtime.getRuntime()
-          .exec("git checkout **/${path.toFile().name}", arrayOf(), subprojectFolder.toFile())
+      exec(TypedPath.ofFolder(subprojectFolder.toString()), "git", "checkout", "**/${path.name}")
     }
     fun assertDoesNotExist() {
-      if (FileSystem.SYSTEM.exists(subprojectFolder.resolve(subpath))) {
+      if (FS_SYSTEM.exists(subprojectFolder.resolve(subpath))) {
         throw AssertionError("Expected $subpath to not exist, but it does")
       }
     }
     fun deleteIfExists() {
-      if (FileSystem.SYSTEM.exists(subprojectFolder.resolve(subpath))) {
-        FileSystem.SYSTEM.delete(subprojectFolder.resolve(subpath))
+      if (FS_SYSTEM.exists(subprojectFolder.resolve(subpath))) {
+        FS_SYSTEM.delete(subprojectFolder.resolve(subpath))
       }
     }
     fun assertContent(expected: String) {
-      FileSystem.SYSTEM.read(subprojectFolder.resolve(subpath)) {
+      FS_SYSTEM.read(subprojectFolder.resolve(subpath)) {
         val actual = readUtf8()
         actual shouldBe expected
       }
     }
     fun setContent(content: String) {
-      FileSystem.SYSTEM.write(subprojectFolder.resolve(subpath)) { writeUtf8(content) }
+      FS_SYSTEM.write(subprojectFolder.resolve(subpath)) { writeUtf8(content) }
     }
     fun linesFrom(start: String): LineRangeSelector {
-      FileSystem.SYSTEM.read(subprojectFolder.resolve(subpath)) {
+      FS_SYSTEM.read(subprojectFolder.resolve(subpath)) {
         val allLines = mutableListOf<String>()
         while (!exhausted()) {
           readUtf8Line()?.let { allLines.add(it) }
@@ -146,11 +142,12 @@ open class Harness(subproject: String) {
         val endInclusive: Int
     ) {
       init {
-        assert(startInclusive >= 0)
-        assert(endInclusive >= startInclusive)
-        assert(lines.size >= endInclusive)
+        check(startInclusive >= 0)
+        check(endInclusive >= startInclusive)
+        check(lines.size >= endInclusive)
       }
       fun shrinkByOne() = LineRange(lines, startInclusive + 1, endInclusive - 1)
+
       /** Prepend `//` to every line in this range and save it to disk. */
       fun commentOut() = mutateLinesAndWriteToDisk { lineNumber, line ->
         if (line.trim().startsWith("//")) {
@@ -163,7 +160,7 @@ open class Harness(subproject: String) {
         } else line
       }
       fun assertCommented(isCommented: Boolean) = mutateLinesAndWriteToDisk { lineNumber, line ->
-        assert(line.trim().isEmpty() || line.startsWith("//") == isCommented) {
+        check(line.trim().isEmpty() || line.startsWith("//") == isCommented) {
           "Expected L$lineNumber to ${if (isCommented) "be" else "not be"} commented, was $line"
         }
         line
@@ -172,7 +169,7 @@ open class Harness(subproject: String) {
         for (i in startInclusive..endInclusive) {
           lines[i] = mutator(i + 1, lines[i])
         }
-        FileSystem.SYSTEM.write(subprojectFolder.resolve(subpath)) {
+        FS_SYSTEM.write(subprojectFolder.resolve(subpath)) {
           for (line in lines) {
             writeUtf8(line)
             writeUtf8("\n")
@@ -181,7 +178,7 @@ open class Harness(subproject: String) {
       }
       fun content() = lines.subList(startInclusive, endInclusive + 1).joinToString("\n")
       fun setContent(mustBe: String) {
-        FileSystem.SYSTEM.write(subprojectFolder.resolve(subpath)) {
+        FS_SYSTEM.write(subprojectFolder.resolve(subpath)) {
           for (i in 0 ..< startInclusive) {
             writeUtf8(lines[i])
             writeUtf8("\n")
@@ -196,97 +193,37 @@ open class Harness(subproject: String) {
       }
     }
   }
-
-  protected var runOnlyMethod: String? = null
-  fun gradlew(task: String, vararg args: String): AssertionFailedError? {
-    return GradleConnector.newConnector()
-        .forProjectDirectory(subprojectFolder.parent!!.toFile())
-        .connect()
-        .use { connection ->
-          try {
-            var testLauncher =
-                connection
-                    .newTestLauncher()
-                    .setStandardError(System.err)
-                    .setStandardOutput(System.out)
-            if (runOnlyMethod == null) {
-              testLauncher =
-                  testLauncher.withTaskAndTestClasses(
-                      ":${subprojectFolder.name}:$task", listOf("UT_${javaClass.simpleName}"))
-            } else {
-              testLauncher =
-                  testLauncher.withTaskAndTestMethods(
-                      ":${subprojectFolder.name}:$task",
-                      "UT_${javaClass.simpleName}",
-                      listOf(runOnlyMethod!!))
-            }
-            testLauncher
-                .withArguments(
-                    buildList<String> {
-                      addAll(args)
-                      add("--configuration-cache") // enabled vs disabled is 11s vs 24s
-                      add("--stacktrace")
-                    })
-                .run()
-            null
-          } catch (e: TestExecutionException) {
-            parseBuildException(task, e)
-          } catch (e: BuildException) {
-            parseBuildException(task, e)
-          }
+  fun gradlew(task: String, vararg args: String): AssertionError? {
+    val actualTask =
+        when (task) {
+          "test" -> "jvmTest"
+          else -> throw IllegalArgumentException("Unknown task $task")
         }
-  }
-
-  /**
-   * Parse build exception from gradle by looking into <code>build</code> directory to the matching
-   * test.
-   *
-   * Parses the exception message as well as stacktrace.
-   */
-  private fun parseBuildException(task: String, e: Exception): AssertionFailedError {
-    val xpFactory = XPathFactory.newInstance()
-    val xPath = xpFactory.newXPath()
-    val failure =
-        subprojectFolder
-            .resolve("build")
-            .resolve("test-results")
-            .resolve(task)
-            .toFile()
-            .walkTopDown()
-            .filter { it.isFile && it.name.endsWith(".xml") }
-            .mapNotNull {
-              val dbFactory = DocumentBuilderFactory.newInstance()
-              val dBuilder = dbFactory.newDocumentBuilder()
-              it.inputStream().use { source -> dBuilder.parse(InputSource(source)) }
-            }
-            .mapNotNull {
-              val xpath = "/testsuite/testcase/failure"
-              val failures = xPath.evaluate(xpath, it, XPathConstants.NODESET) as NodeList
-              failures.item(0)
-            }
-            .firstOrNull()
-            ?: return AssertionFailedError("Unable to find exception: " + e.stackTraceToString())
-    val attributes = failure!!.attributes
-    val type = attributes.getNamedItem("type").nodeValue
-    val message = attributes.getNamedItem("message").nodeValue.replace("&#10;", "\n")
-    val lines = failure.textContent.replace(message, "").trim().split("\n")
-    val stacktrace: MutableList<StackTraceElement> = ArrayList()
-    val tracePattern =
-        Pattern.compile("\\s*at\\s+([\\w]+)//([\\w\\.]+)\\.([\\w]+)(\\(.*kt)?:(\\d+)\\)")
-    lines.forEach {
-      val traceMatcher: Matcher = tracePattern.matcher(it)
-      while (traceMatcher.find()) {
-        val module: String = traceMatcher.group(1)
-        val className: String = module + "//" + traceMatcher.group(2)
-        val methodName: String = traceMatcher.group(3)
-        val sourceFile: String = traceMatcher.group(4)
-        val lineNum: Int = traceMatcher.group(5).toInt()
-        stacktrace.add(StackTraceElement(className, methodName, sourceFile, lineNum))
-      }
+    val argList = mutableListOf<String>()
+    if (IS_WINDOWS) {
+      argList.add("cmd")
+      argList.add("/c")
+    } else {
+      argList.add("/bin/sh")
+      argList.add("-c")
     }
-    val error = AssertionFailedError(message.replace("$type: ", "").trim())
-    error.stackTrace = stacktrace.toTypedArray()
-    return error
+    argList.add(
+        "${if (IS_WINDOWS) "" else "./"}gradlew :undertest-kotest:$actualTask --configuration-cache ${args.joinToString(" ")}")
+    val output =
+        exec(TypedPath.ofFolder(subprojectFolder.parent.toString()), *argList.toTypedArray())
+    if (output.contains("BUILD SUCCESSFUL")) {
+      return null
+    } else {
+      val errorReport = output.indexOf("> There were failing tests. See the report at: ")
+      if (errorReport == -1) {
+        throw AssertionError("Expected to find 'There were failing tests', was:\n\n$output")
+      }
+      val pathStart = output.indexOf("file://", errorReport)
+      val newline = output.indexOf("\n", errorReport)
+      check(pathStart != -1 && newline != -1) { "pathStart=$pathStart newline=$newline" }
+      val pathStr = output.substring(pathStart + "file://".length, newline)
+      return FS_SYSTEM.read(pathStr.toPath()) { AssertionError(readUtf8()) }
+    }
   }
   fun gradleWriteSS() {
     gradlew("test", "-PunderTest=true", "-Pselfie=overwrite")?.let {
@@ -298,7 +235,7 @@ open class Harness(subproject: String) {
       throw AssertionError("Expected read snapshots to succeed, but it failed", it)
     }
   }
-  fun gradleReadSSFail(): AssertionFailedError {
+  fun gradleReadSSFail(): AssertionError {
     val failure = gradlew("test", "-PunderTest=true", "-Pselfie=readonly")
     if (failure == null) {
       throw AssertionError("Expected read snapshots to fail, but it succeeded.")
@@ -311,7 +248,7 @@ open class Harness(subproject: String) {
       throw AssertionError("Expected interactive selfie run to succeed, but it failed.", it)
     }
   }
-  fun gradleInteractiveFail(): AssertionFailedError {
+  fun gradleInteractiveFail(): AssertionError {
     val failure = gradlew("test", "-PunderTest=true", "-Pselfie=interactive")
     if (failure == null) {
       throw AssertionError("Expected interactive selfie run to fail, but it succeeded.")

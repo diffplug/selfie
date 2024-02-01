@@ -1,5 +1,6 @@
 plugins {
-  id 'org.jetbrains.kotlin.jvm'
+  id 'org.jetbrains.kotlin.multiplatform'
+  id 'io.kotest.multiplatform'
   id 'com.diffplug.spotless'
 }
 repositories {
@@ -16,18 +17,25 @@ spotless {
   }
 }
 
-dependencies {
-  testImplementation project(':selfie-runner-junit5')
-  testCompileOnly "junit:junit:4.13.2"
-  testImplementation "org.junit.jupiter:junit-jupiter-api:${ver_JUNIT_USE}"
-  testImplementation "org.junit.vintage:junit-vintage-engine:${ver_JUNIT_USE}"
-  testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+kotlin {
+  jvm {
+  }
+  //  js { TODO: need to implement selfie-lib for js first
+  //    nodejs()
+  //  }
+  sourceSets {
+    commonTest {
+      dependencies {
+        project(":selfie-runner-kotest")
+        implementation("io.kotest:kotest-framework-engine:$ver_KOTEST")
+        implementation("io.kotest:kotest-assertions-core:$ver_KOTEST")
+        implementation(kotlin('test'))
+      }
+    }
+  }
 }
-// this project is just a test environment for a different project
-test {
-  useJUnitPlatform()
+tasks.named('jvmTest').configure {
   enabled = findProperty("underTest") == "true"
-
   testLogging.showStandardStreams = true
   // the snapshots are both output and input, for this harness best if the test just always runs
   outputs.upToDateWhen { false }
