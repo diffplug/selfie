@@ -15,9 +15,7 @@
  */
 package com.diffplug.selfie.kotest
 
-import com.diffplug.selfie.guts.TypedPath
-actual val IS_WINDOWS: Boolean
-  get() = TODO("Not yet implemented")
-actual fun exec(cwd: TypedPath, vararg args: String): String {
-  TODO("Not yet implemented")
-}
+import okio.FileSystem
+
+internal actual val FS_SYSTEM: FileSystem
+  get() = okio.NodeJsFileSystem

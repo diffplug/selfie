@@ -19,11 +19,9 @@ import com.diffplug.selfie.guts.TypedPath
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.core.test.TestCaseOrder
 import io.kotest.matchers.shouldBe
-import okio.FileSystem
 import okio.Path
 import okio.Path.Companion.toPath
 
-expect val FS_SYSTEM: FileSystem
 expect val IS_WINDOWS: Boolean
 
 expect fun exec(cwd: TypedPath, vararg args: String): String
