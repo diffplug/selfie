@@ -28,6 +28,7 @@ kotlin {
       dependencies {
         api project(":selfie-lib")
         api "io.kotest:kotest-framework-engine:$ver_KOTEST"
+        api "io.kotest:kotest-assertions-shared:$ver_KOTEST"
         implementation "com.squareup.okio:okio:$ver_OKIO"
       }
     }

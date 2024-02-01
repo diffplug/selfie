@@ -19,9 +19,6 @@ import com.diffplug.selfie.guts.TypedPath
 import java.io.BufferedReader
 import java.io.File
 import java.io.InputStreamReader
-import okio.FileSystem
-actual val FS_SYSTEM: FileSystem
-  get() = FileSystem.SYSTEM
 actual val IS_WINDOWS: Boolean
   get() = System.getProperty("os.name").lowercase().contains("windows")
 actual fun exec(cwd: TypedPath, vararg args: String): String {
