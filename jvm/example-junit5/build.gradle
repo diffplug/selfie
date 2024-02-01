@@ -35,3 +35,6 @@ tasks.register('exampleAppJvm', JavaExec) {
   mainClass = 'com.example.Dev'
   args = ['dev']
 }
+tasks.withType(JavaCompile) {
+  options.encoding = 'UTF-8'
+}
