@@ -82,9 +82,9 @@ internal class WithinTestGC {
 
   companion object {
     fun findStaleSnapshotsWithin(
-        className: String,
         snapshots: ArrayMap<String, Snapshot>,
-        methods: ArrayMap<String, WithinTestGC>,
+        testsThatRan: ArrayMap<String, WithinTestGC>,
+        testsThatDidntRun: Sequence<String>
     ): List<Int> {
       val staleIndices = mutableListOf<Int>()
 
@@ -98,8 +98,8 @@ internal class WithinTestGC {
 
       // combine what we know about methods that did run with what we know about the tests that
       // didn't
-      var totalGc = methods
-      for (method in findTestMethodsThatDidntRun(className, methods)) {
+      var totalGc = testsThatRan
+      for (method in testsThatDidntRun) {
         totalGc = totalGc.plus(method, WithinTestGC().keepAll())
       }
       val gcRoots = totalGc.entries

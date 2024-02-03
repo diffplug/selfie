@@ -176,7 +176,8 @@ internal class SnapshotFileProgress(val parent: Progress, val className: String)
     }
     if (file != null) {
       val staleSnapshotIndices =
-          WithinTestGC.findStaleSnapshotsWithin(className, file!!.snapshots, tests)
+          WithinTestGC.findStaleSnapshotsWithin(
+              file!!.snapshots, tests, findTestMethodsThatDidntRun(className, tests))
       if (staleSnapshotIndices.isNotEmpty() || file!!.wasSetAtTestTime) {
         file!!.removeAllIndices(staleSnapshotIndices)
         val snapshotPath = parent.layout.snapshotPathForClass(className)
