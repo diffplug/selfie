@@ -56,6 +56,15 @@ private fun classExistsAndHasTests(key: String): Boolean {
     false
   }
 }
+internal fun findTestMethodsThatDidntRun(
+    className: String,
+    testsThatRan: ArrayMap<String, WithinTestGC>,
+): Sequence<String> =
+    generateSequence(Class.forName(className)) { it.superclass }
+        .flatMap { it.declaredMethods.asSequence() }
+        .filter { method -> !testsThatRan.containsKey(method.name) }
+        .filter { method -> testAnnotations.any { method.isAnnotationPresent(it) } }
+        .map { it.name }
 
 /** Handles garbage collection of snapshots within a single test. */
 internal class WithinTestGC {
@@ -67,8 +76,8 @@ internal class WithinTestGC {
     suffixesToKeep = null
     return this
   }
-  override fun toString() = java.util.Objects.toString(suffixesToKeep)
-  private fun succeededAndUsedNoSnapshots() = ArraySet.empty<String>() === suffixesToKeep
+  override fun toString() = suffixesToKeep?.toString() ?: "(null)"
+  fun succeededAndUsedNoSnapshots() = ArraySet.empty<String>() === suffixesToKeep
   private fun keeps(s: String): Boolean = suffixesToKeep?.contains(s) ?: true
 
   companion object {
@@ -139,30 +148,5 @@ internal class WithinTestGC {
       }
       return staleIndices
     }
-
-    /**
-     * This method is called only when a class has completed without ever touching a snapshot file.
-     */
-    fun isUnusedSnapshotFileStale(
-        className: String,
-        methods: ArrayMap<String, WithinTestGC>,
-        classLevelSuccess: Boolean
-    ): Boolean {
-      // we need the entire class to succeed in order to be sure
-      return classLevelSuccess &&
-          // we need every method to succeed and not use any snapshots
-          methods.values.all { it.succeededAndUsedNoSnapshots() } &&
-          // we need every method to run
-          findTestMethodsThatDidntRun(className, methods).none()
-    }
-    private fun findTestMethodsThatDidntRun(
-        className: String,
-        methodsThatRan: ArrayMap<String, WithinTestGC>,
-    ): Sequence<String> =
-        generateSequence(Class.forName(className)) { it.superclass }
-            .flatMap { it.declaredMethods.asSequence() }
-            .filter { method -> !methodsThatRan.containsKey(method.name) }
-            .filter { method -> testAnnotations.any { method.isAnnotationPresent(it) } }
-            .map { it.name }
   }
 }

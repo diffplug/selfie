@@ -192,7 +192,9 @@ internal class SnapshotFileProgress(val parent: Progress, val className: String)
       }
     } else {
       // we never read or wrote to the file
-      val isStale = WithinTestGC.isUnusedSnapshotFileStale(className, tests, success)
+      val everyTestInClassRan = findTestMethodsThatDidntRun(className, tests).none()
+      val isStale =
+          everyTestInClassRan && success && tests.values.all { it.succeededAndUsedNoSnapshots() }
       if (isStale) {
         val snapshotFile = parent.layout.snapshotPathForClass(className)
         deleteFileAndParentDirIfEmpty(snapshotFile)
