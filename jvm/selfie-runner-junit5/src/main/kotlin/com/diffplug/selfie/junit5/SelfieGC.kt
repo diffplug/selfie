@@ -57,24 +57,25 @@ private fun classExistsAndHasTests(key: String): Boolean {
   }
 }
 
-internal class MethodSnapshotGC {
+/** Handles garbage collection of snapshots within a single test. */
+internal class WithinTestGC {
   private var suffixesToKeep: ArraySet<String>? = ArraySet.empty()
   fun keepSuffix(suffix: String) {
     suffixesToKeep = suffixesToKeep?.plusOrThis(suffix)
   }
-  fun keepAll(): MethodSnapshotGC {
+  fun keepAll(): WithinTestGC {
     suffixesToKeep = null
     return this
   }
   override fun toString() = java.util.Objects.toString(suffixesToKeep)
-  private fun succeededAndUsedNoSnapshots() = ArraySet.empty<String>() == suffixesToKeep
+  private fun succeededAndUsedNoSnapshots() = ArraySet.empty<String>() === suffixesToKeep
   private fun keeps(s: String): Boolean = suffixesToKeep?.contains(s) ?: true
 
   companion object {
     fun findStaleSnapshotsWithin(
         className: String,
         snapshots: ArrayMap<String, Snapshot>,
-        methods: ArrayMap<String, MethodSnapshotGC>,
+        methods: ArrayMap<String, WithinTestGC>,
     ): List<Int> {
       val staleIndices = mutableListOf<Int>()
 
@@ -90,7 +91,7 @@ internal class MethodSnapshotGC {
       // didn't
       var totalGc = methods
       for (method in findTestMethodsThatDidntRun(className, methods)) {
-        totalGc = totalGc.plus(method, MethodSnapshotGC().keepAll())
+        totalGc = totalGc.plus(method, WithinTestGC().keepAll())
       }
       val gcRoots = totalGc.entries
       val keys = snapshots.keys
@@ -144,7 +145,7 @@ internal class MethodSnapshotGC {
      */
     fun isUnusedSnapshotFileStale(
         className: String,
-        methods: ArrayMap<String, MethodSnapshotGC>,
+        methods: ArrayMap<String, WithinTestGC>,
         classLevelSuccess: Boolean
     ): Boolean {
       // we need the entire class to succeed in order to be sure
@@ -156,7 +157,7 @@ internal class MethodSnapshotGC {
     }
     private fun findTestMethodsThatDidntRun(
         className: String,
-        methodsThatRan: ArrayMap<String, MethodSnapshotGC>,
+        methodsThatRan: ArrayMap<String, WithinTestGC>,
     ): Sequence<String> =
         generateSequence(Class.forName(className)) { it.superclass }
             .flatMap { it.declaredMethods.asSequence() }

@@ -29,7 +29,9 @@ class SelfieTestExecutionListener : TestExecutionListener {
     try {
       if (isRoot(testIdentifier)) return
       val (clazz, method) = parseClassMethod(testIdentifier)
-      progress.start(clazz, method, testIdentifier.isTest)
+      if (method != null && testIdentifier.isTest) {
+        progress.forClass(clazz).startTest(method)
+      }
     } catch (e: Throwable) {
       progress.layout.smuggledError = e
     }
@@ -37,7 +39,11 @@ class SelfieTestExecutionListener : TestExecutionListener {
   override fun executionSkipped(testIdentifier: TestIdentifier, reason: String) {
     try {
       val (clazz, method) = parseClassMethod(testIdentifier)
-      progress.skip(clazz, method, testIdentifier.isTest)
+      if (method == null) {
+        progress.forClass(clazz).finishedClassWithSuccess(false)
+      } else {
+        // TODO: using reflection right now, but we should probably listen to these
+      }
     } catch (e: Throwable) {
       progress.layout.smuggledError = e
     }
@@ -49,11 +55,13 @@ class SelfieTestExecutionListener : TestExecutionListener {
     try {
       if (isRoot(testIdentifier)) return
       val (clazz, method) = parseClassMethod(testIdentifier)
-      progress.finishWithSuccess(
-          clazz,
-          method,
-          testIdentifier.isTest,
-          testExecutionResult.status == TestExecutionResult.Status.SUCCESSFUL)
+      val isSuccess = testExecutionResult.status == TestExecutionResult.Status.SUCCESSFUL
+      val snapshotProgress = progress.forClass(clazz)
+      if (method != null && testIdentifier.isTest) {
+        snapshotProgress.finishedTestWithSuccess(method, isSuccess)
+      } else {
+        snapshotProgress.finishedClassWithSuccess(isSuccess)
+      }
     } catch (e: Throwable) {
       progress.layout.smuggledError = e
     }

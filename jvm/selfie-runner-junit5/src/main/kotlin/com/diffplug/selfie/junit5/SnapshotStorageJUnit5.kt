@@ -78,92 +78,95 @@ internal object SnapshotStorageJUnit5 : SnapshotStorage {
   override val fs = FSJava
   override val mode = calcMode()
   override val layout: SnapshotFileLayout
-    get() = classAndMethod().clazz.parent.layout
+    get() = fileAndTest().file.parent.layout
 
-  private class ClassMethod(val clazz: ClassProgress, val method: String)
-  private val threadCtx = ThreadLocal<ClassMethod?>()
-  private fun classAndMethod() =
+  private class FileAndTest(val file: SnapshotFileProgress, val test: String)
+  private val threadCtx = ThreadLocal<FileAndTest?>()
+  private fun fileAndTest() =
       threadCtx.get()
           ?: throw AssertionError(
               "Selfie `toMatchDisk` must be called only on the original thread.")
   override fun sourceFileHasWritableComment(call: CallStack): Boolean {
-    val cm = classAndMethod()
-    return cm.clazz.parent.commentTracker!!.hasWritableComment(call, cm.clazz.parent.layout)
+    val cm = fileAndTest()
+    return cm.file.parent.commentTracker!!.hasWritableComment(call, cm.file.parent.layout)
   }
   private fun suffix(sub: String) = if (sub == "") "" else "/$sub"
   override fun readDisk(sub: String, call: CallStack): Snapshot? {
-    val cm = classAndMethod()
+    val ft = fileAndTest()
     val suffix = suffix(sub)
-    return cm.clazz.read(cm.method, suffix)
+    return ft.file.read(ft.test, suffix)
   }
   override fun writeDisk(actual: Snapshot, sub: String, call: CallStack) {
-    val cm = classAndMethod()
+    val ft = fileAndTest()
     val suffix = suffix(sub)
-    cm.clazz.write(cm.method, suffix, actual, call, cm.clazz.parent.layout)
+    ft.file.write(ft.test, suffix, actual, call, ft.file.parent.layout)
   }
   override fun keep(subOrKeepAll: String?) {
-    val cm = classAndMethod()
+    val ft = fileAndTest()
     if (subOrKeepAll == null) {
-      cm.clazz.keep(cm.method, null)
+      ft.file.keep(ft.test, null)
     } else {
-      cm.clazz.keep(cm.method, suffix(subOrKeepAll))
+      ft.file.keep(ft.test, suffix(subOrKeepAll))
     }
   }
   override fun writeInline(literalValue: LiteralValue<*>, call: CallStack) {
     val cm =
         threadCtx.get()
             ?: throw AssertionError("Selfie `toBe` must be called only on the original thread.")
-    cm.clazz.writeInline(call, literalValue, cm.clazz.parent.layout)
+    cm.file.writeInline(call, literalValue, cm.file.parent.layout)
   }
-  internal fun start(clazz: ClassProgress, method: String) {
-    val current = threadCtx.get()
-    check(current == null) {
-      "THREAD ERROR: ${current!!.clazz.className}#${current.method} is in progress, cannot start $clazz#$method"
+  internal fun start(clazz: SnapshotFileProgress, test: String) {
+    val ft = threadCtx.get()
+    check(ft == null) {
+      "THREAD ERROR: ${ft!!.file.className}#${ft.test} is in progress, cannot start $clazz#$test"
     }
-    threadCtx.set(ClassMethod(clazz, method))
+    threadCtx.set(FileAndTest(clazz, test))
   }
-  internal fun finish(clazz: ClassProgress, method: String) {
-    val current = threadCtx.get()
-    check(current != null) {
-      "THREAD ERROR: no method is in progress, cannot finish $clazz#$method"
-    }
-    check(current.clazz == clazz && current.method == method) {
-      "THREAD ERROR: ${current.clazz.className}#${current.method} is in progress, cannot finish ${clazz.className}#$method"
+  internal fun finish(clazz: SnapshotFileProgress, test: String) {
+    val ft = threadCtx.get()
+    check(ft != null) { "THREAD ERROR: no test is in progress, cannot finish $clazz#$test" }
+    check(ft.file == clazz && ft.test == test) {
+      "THREAD ERROR: ${ft.file.className}#${ft.test} is in progress, cannot finish ${clazz.className}#$test"
     }
     threadCtx.set(null)
   }
 }
 
-/** Tracks the progress of test runs within a single class, so that snapshots can be pruned. */
-internal class ClassProgress(val parent: Progress, val className: String) {
+/**
+ * Tracks the progress of test runs within a single disk snapshot file, so that snapshots can be
+ * pruned.
+ */
+internal class SnapshotFileProgress(val parent: Progress, val className: String) {
   companion object {
-    val TERMINATED =
-        ArrayMap.empty<String, MethodSnapshotGC>().plus(" ~ f!n1shed ~ ", MethodSnapshotGC())
+    val TERMINATED = ArrayMap.empty<String, WithinTestGC>().plus(" ~ f!n1shed ~ ", WithinTestGC())
   }
   private fun assertNotTerminated() {
-    assert(methods !== TERMINATED) { "Cannot call methods on a terminated ClassProgress" }
+    assert(tests !== TERMINATED) { "Cannot call methods on a terminated ClassProgress" }
   }
 
   private var file: SnapshotFile? = null
-  private var methods = ArrayMap.empty<String, MethodSnapshotGC>()
+  private var tests = ArrayMap.empty<String, WithinTestGC>()
   private var diskWriteTracker: DiskWriteTracker? = DiskWriteTracker()
   private var inlineWriteTracker: InlineWriteTracker? = InlineWriteTracker()
-  // the methods below called by the TestExecutionListener on its runtime thread
-  @Synchronized fun startMethod(method: String, isTest: Boolean) {
+
+  /** Assigns this thread to store disk snapshots within this file with the name `test`. */
+  @Synchronized fun startTest(test: String) {
+    check(test.indexOf('/') == -1) { "Test name cannot contain '/', was $test" }
     assertNotTerminated()
-    if (isTest) {
-      SnapshotStorageJUnit5.start(this, method)
-    }
-    assert(method.indexOf('/') == -1) { "Method name cannot contain '/', was $method" }
-    methods = methods.plusOrNoOp(method, MethodSnapshotGC())
+    SnapshotStorageJUnit5.start(this, test)
+    tests = tests.plusOrNoOp(test, WithinTestGC())
   }
-  @Synchronized fun finishedMethodWithSuccess(method: String, isTest: Boolean, success: Boolean) {
+  /**
+   * Stops assigning this thread to store snapshots within this file at `test`, and if successful
+   * marks that all other snapshots of this test can be pruned. A single test can be run multiple
+   * times (as in `@ParameterizedTest`), and GC will only happen if all runs of the test are
+   * successful.
+   */
+  @Synchronized fun finishedTestWithSuccess(test: String, success: Boolean) {
     assertNotTerminated()
-    if (isTest) {
-      SnapshotStorageJUnit5.finish(this, method)
-    }
+    SnapshotStorageJUnit5.finish(this, test)
     if (!success) {
-      methods[method]!!.keepAll()
+      tests[test]!!.keepAll()
     }
   }
   @Synchronized fun finishedClassWithSuccess(success: Boolean) {
@@ -173,7 +176,7 @@ internal class ClassProgress(val parent: Progress, val className: String) {
     }
     if (file != null) {
       val staleSnapshotIndices =
-          MethodSnapshotGC.findStaleSnapshotsWithin(className, file!!.snapshots, methods)
+          WithinTestGC.findStaleSnapshotsWithin(className, file!!.snapshots, tests)
       if (staleSnapshotIndices.isNotEmpty() || file!!.wasSetAtTestTime) {
         file!!.removeAllIndices(staleSnapshotIndices)
         val snapshotPath = parent.layout.snapshotPathForClass(className)
@@ -189,48 +192,48 @@ internal class ClassProgress(val parent: Progress, val className: String) {
       }
     } else {
       // we never read or wrote to the file
-      val isStale = MethodSnapshotGC.isUnusedSnapshotFileStale(className, methods, success)
+      val isStale = WithinTestGC.isUnusedSnapshotFileStale(className, tests, success)
       if (isStale) {
         val snapshotFile = parent.layout.snapshotPathForClass(className)
         deleteFileAndParentDirIfEmpty(snapshotFile)
       }
     }
     // now that we are done, allow our contents to be GC'ed
-    methods = TERMINATED
+    tests = TERMINATED
     diskWriteTracker = null
     inlineWriteTracker = null
     file = null
   }
   // the methods below are called from the test thread for I/O on snapshots
-  @Synchronized fun keep(method: String, suffixOrAll: String?) {
+  @Synchronized fun keep(test: String, suffixOrAll: String?) {
     assertNotTerminated()
     if (suffixOrAll == null) {
-      methods[method]!!.keepAll()
+      tests[test]!!.keepAll()
     } else {
-      methods[method]!!.keepSuffix(suffixOrAll)
+      tests[test]!!.keepSuffix(suffixOrAll)
     }
   }
   @Synchronized fun writeInline(call: CallStack, literalValue: LiteralValue<*>, layout: SnapshotFileLayout) {
     inlineWriteTracker!!.record(call, literalValue, layout)
   }
   @Synchronized fun write(
-      method: String,
+      test: String,
       suffix: String,
       snapshot: Snapshot,
       callStack: CallStack,
       layout: SnapshotFileLayout
   ) {
     assertNotTerminated()
-    val key = "$method$suffix"
+    val key = "$test$suffix"
     diskWriteTracker!!.record(key, snapshot, callStack, layout)
-    methods[method]!!.keepSuffix(suffix)
+    tests[test]!!.keepSuffix(suffix)
     read().setAtTestTime(key, snapshot)
   }
-  @Synchronized fun read(method: String, suffix: String): Snapshot? {
+  @Synchronized fun read(test: String, suffix: String): Snapshot? {
     assertNotTerminated()
-    val snapshot = read().snapshots["$method$suffix"]
+    val snapshot = read().snapshots["$test$suffix"]
     if (snapshot != null) {
-      methods[method]!!.keepSuffix(suffix)
+      tests[test]!!.keepSuffix(suffix)
     }
     return snapshot
   }
@@ -258,36 +261,17 @@ internal class Progress {
   val layout = SnapshotFileLayoutJUnit5(settings, SnapshotStorageJUnit5.fs)
   var commentTracker: CommentTracker? = CommentTracker()
 
-  private var progressPerClass = ArrayMap.empty<String, ClassProgress>()
-  private fun forClass(className: String) = synchronized(this) { progressPerClass[className]!! }
-
-  // TestExecutionListener
-  fun start(className: String, method: String?, isTest: Boolean) {
-    if (method == null) {
+  private var progressPerClass = ArrayMap.empty<String, SnapshotFileProgress>()
+  fun forClass(className: String): SnapshotFileProgress =
       synchronized(this) {
-        progressPerClass = progressPerClass.plus(className, ClassProgress(this, className))
+        val existing = progressPerClass[className]
+        return if (existing != null) existing
+        else {
+          val classProgress = SnapshotFileProgress(this, className)
+          progressPerClass = progressPerClass.plus(className, classProgress)
+          classProgress
+        }
       }
-    } else {
-      forClass(className).startMethod(method, isTest)
-    }
-  }
-  fun skip(className: String, method: String?, isTest: Boolean) {
-    if (method == null) {
-      start(className, null, isTest)
-      finishWithSuccess(className, null, isTest, false)
-    } else {
-      // thanks to reflection, we don't have to rely on method skip events
-    }
-  }
-  fun finishWithSuccess(className: String, method: String?, isTest: Boolean, isSuccess: Boolean) {
-    forClass(className).let {
-      if (method != null) {
-        it.finishedMethodWithSuccess(method, isTest, isSuccess)
-      } else {
-        it.finishedClassWithSuccess(isSuccess)
-      }
-    }
-  }
 
   private var checkForInvalidStale: AtomicReference<MutableSet<TypedPath>?> =
       AtomicReference(ConcurrentSkipListSet())
