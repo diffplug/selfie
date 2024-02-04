@@ -102,4 +102,5 @@ interface SnapshotFileLayout {
   val allowMultipleEquivalentWritesToOneLocation: Boolean
   fun sourcePathForCall(call: CallLocation): TypedPath
   fun sourcePathForCallMaybe(call: CallLocation): TypedPath?
+  fun checkForSmuggledError()
 }

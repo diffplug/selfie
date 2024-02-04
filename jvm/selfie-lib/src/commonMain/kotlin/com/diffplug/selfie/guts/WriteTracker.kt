@@ -57,6 +57,7 @@ sealed class WriteTracker<K : Comparable<K>, V> {
     if (existing == null) {
       writes[key] = FirstWrite(snapshot, call)
     } else {
+      layout.checkForSmuggledError()
       val howToFix =
           when (this) {
             is DiskWriteTracker ->

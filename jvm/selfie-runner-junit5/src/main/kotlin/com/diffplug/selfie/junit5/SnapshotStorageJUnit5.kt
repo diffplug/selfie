@@ -119,7 +119,7 @@ internal object SnapshotStorageJUnit5 : SnapshotStorage {
   internal fun start(clazz: SnapshotFileProgress, test: String) {
     val ft = threadCtx.get()
     check(ft == null) {
-      "THREAD ERROR: ${ft!!.file.className}#${ft.test} is in progress, cannot start $clazz#$test"
+      "THREAD ERROR: ${ft!!.file.className}#${ft.test} is in progress, cannot start ${clazz.className}#$test"
     }
     threadCtx.set(FileAndTest(clazz, test))
   }

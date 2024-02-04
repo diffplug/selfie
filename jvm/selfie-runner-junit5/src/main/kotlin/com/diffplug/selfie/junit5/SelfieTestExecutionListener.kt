@@ -33,7 +33,7 @@ class SelfieTestExecutionListener : TestExecutionListener {
         progress.forClass(clazz).startTest(test)
       }
     } catch (e: Throwable) {
-      progress.layout.smuggledError = e
+      progress.layout.smuggledError.set(e)
     }
   }
   override fun executionSkipped(testIdentifier: TestIdentifier, reason: String) {
@@ -45,7 +45,7 @@ class SelfieTestExecutionListener : TestExecutionListener {
         // TODO: using reflection right now, but we should probably listen to these
       }
     } catch (e: Throwable) {
-      progress.layout.smuggledError = e
+      progress.layout.smuggledError.set(e)
     }
   }
   override fun executionFinished(
@@ -63,7 +63,7 @@ class SelfieTestExecutionListener : TestExecutionListener {
         snapshotProgress.finishedClassWithSuccess(isSuccess)
       }
     } catch (e: Throwable) {
-      progress.layout.smuggledError = e
+      progress.layout.smuggledError.set(e)
     }
   }
   override fun testPlanExecutionFinished(testPlan: TestPlan?) {
