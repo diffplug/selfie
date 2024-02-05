@@ -15,6 +15,7 @@
  */
 package com.diffplug.selfie.kotest
 
+import com.diffplug.selfie.Mode
 import okio.Path
 import okio.Path.Companion.toPath
 
@@ -23,6 +24,15 @@ internal expect fun readUserDir(): String
 internal expect fun readEnvironmentVariable(name: String): String?
 
 internal expect fun instantiateSettingsAt(name: String): SelfieSettingsAPI
+
+internal fun calcMode(): Mode {
+  val override = readEnvironmentVariable("selfie") ?: readEnvironmentVariable("SELFIE")
+  if (override != null) {
+    return Mode.valueOf(override.lowercase())
+  }
+  val ci = readEnvironmentVariable("ci") ?: readEnvironmentVariable("CI")
+  return if (ci?.lowercase() == "true") Mode.readonly else Mode.interactive
+}
 
 /**
  * If you create a class named `SelfieSettings` in the package `selfie`, it must extend this class,
