@@ -79,7 +79,7 @@ private constructor(
   /** Adds or replaces the given facet or subject (subject is key=""). */
   fun plusOrReplace(key: String, value: SnapshotValue): Snapshot =
       if (key.isEmpty()) Snapshot(value, facetData)
-      else Snapshot(subject, facetData.plusOrReplace(unixNewlines(key), value))
+      else Snapshot(subject, facetData.plusOrNoOpOrReplace(unixNewlines(key), value))
   /** Retrieves the given facet or subject (subject is key=""). */
   fun subjectOrFacetMaybe(key: String): SnapshotValue? =
       if (key.isEmpty()) subject else facetData[key]
@@ -160,7 +160,7 @@ class SnapshotFile {
   private val _wasSetAtTestTime = createCas(false)
   fun setAtTestTime(key: String, snapshot: Snapshot) {
     val oldSnapshots = _snapshots.get()
-    val newSnapshots = _snapshots.updateAndGet { it.plusOrReplace(key, snapshot) }
+    val newSnapshots = _snapshots.updateAndGet { it.plusOrNoOpOrReplace(key, snapshot) }
     _wasSetAtTestTime.updateAndGet { wasSetBefore -> wasSetBefore || newSnapshots !== oldSnapshots }
   }
   fun removeAllIndices(indices: List<Int>) {
