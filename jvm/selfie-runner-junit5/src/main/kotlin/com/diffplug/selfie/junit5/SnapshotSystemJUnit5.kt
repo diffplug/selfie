@@ -65,15 +65,11 @@ internal object SnapshotSystemJUnit5 : SnapshotSystem {
   override val layout = SnapshotFileLayoutJUnit5(settings, fs)
   private val commentTracker = CommentTracker()
   private val inlineWriteTracker = InlineWriteTracker()
-  private var progressPerClass = ArrayMap.empty<String, SnapshotFileProgress>()
+  private val progressPerClass = AtomicReference(ArrayMap.empty<String, SnapshotFileProgress>())
   fun forClass(className: String): SnapshotFileProgress =
-      synchronized(this) {
-        val existing = progressPerClass[className]
-        return existing
-            ?: SnapshotFileProgress(this, className).also {
-              progressPerClass = progressPerClass.plus(className, it)
-            }
-      }
+      progressPerClass
+          .updateAndGet { it.plusOrNoOp(className, SnapshotFileProgress(this, className)) }[
+              className]!!
 
   private var checkForInvalidStale: AtomicReference<MutableSet<TypedPath>?> =
       AtomicReference(ConcurrentSkipListSet())
