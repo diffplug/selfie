@@ -98,8 +98,10 @@ internal object SnapshotSystemJUnit5 : SnapshotSystem {
   private fun diskThreadLocalTyped(): DiskStorageJUnit5 =
       threadMap.get().get(Thread.currentThread().id)
           ?: throw AssertionError("See THREADING GUIDE (TODO)")
+  /** Map from threadId to a DiskStorage. */
   private val threadMap = AtomicReference(ArrayMap.empty<Long, DiskStorageJUnit5>())
-  private val idToThread = AtomicReference(ArrayMap.empty<String, Long>())
+  /** Map from a test's uniqueId to a threadId. */
+  private val uniqueidToThread = AtomicReference(ArrayMap.empty<String, Long>())
   private val missingDowns = AtomicReference(ArrayMap.empty<DiskStorageJUnit5, Int>())
   private fun missingDown(disk: DiskStorageJUnit5, delta: Int) {
     missingDowns.updateAndGet {
@@ -122,7 +124,7 @@ internal object SnapshotSystemJUnit5 : SnapshotSystem {
     val threadId = Thread.currentThread().id
     val next = DiskStorageJUnit5(file, test)
     val prevMap = threadMap.getAndUpdate { it.plusOrNoOpOrReplace(threadId, next) }
-    idToThread.getAndUpdate { it.plusOrNoOpOrReplace(uniqueId, threadId) }
+    uniqueidToThread.getAndUpdate { it.plusOrNoOpOrReplace(uniqueId, threadId) }
     val prev = prevMap[threadId]
     if (prev != null) {
       //  now:      .
@@ -134,7 +136,7 @@ internal object SnapshotSystemJUnit5 : SnapshotSystem {
   internal fun finishThreadLocal(file: SnapshotFileProgress, test: String, uniqueId: String) {
     val finishing = DiskStorageJUnit5(file, test)
     val threadId = Thread.currentThread().id
-    val prevIdToThread = idToThread.getAndUpdate { it.minusOrNoOp(uniqueId) }
+    val prevIdToThread = uniqueidToThread.getAndUpdate { it.minusOrNoOp(uniqueId) }
     val prevThreadId =
         prevIdToThread[uniqueId]
             ?: throw AssertionError(
@@ -162,21 +164,20 @@ internal object SnapshotSystemJUnit5 : SnapshotSystem {
       }
     }
   }
-  fun finishedAllTests() {
-    val errorMsg =
-        missingDowns
-            .getAndUpdate { ArrayMap.empty() }
-            .mapNotNull {
-              val unfinished = it.value
-              if (unfinished == 0) null
-              else {
-                "${it.key} started $unfinished times more than it stopped"
-              }
+  private fun missingDownsErrorMsg(): String? =
+      missingDowns
+          .getAndUpdate { ArrayMap.empty() }
+          .mapNotNull {
+            val unfinished = it.value
+            if (unfinished == 0) null
+            else {
+              "${it.key} started $unfinished times more than it stopped"
             }
-            .joinToString("\n")
-    if (errorMsg.isNotEmpty()) {
-      throw AssertionError("THREAD ERROR: $errorMsg")
-    }
+          }
+          .joinToString("\n")
+          .ifEmpty { null }
+  fun finishedAllTests() {
+    missingDownsErrorMsg()?.let { errorMsg -> throw AssertionError("THREAD ERROR: $errorMsg") }
     if (mode != Mode.readonly) {
       for (path in commentTracker.pathsWithOnce()) {
         val source = SourceFile(path.name, layout.fs.fileRead(path))
