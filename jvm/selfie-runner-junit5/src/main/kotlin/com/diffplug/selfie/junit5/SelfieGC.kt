@@ -32,6 +32,17 @@ private val testAnnotations =
             null
           }
         }
+private val testSuperclasses =
+    listOf(
+            "io.kotest.core.spec.Spec", // kotest4+
+        )
+        .mapNotNull {
+          try {
+            Class.forName(it)
+          } catch (e: ClassNotFoundException) {
+            null
+          }
+        }
 
 /**
  * Searches the whole snapshot directory, finds all the `.ss` files, and prunes any which don't have
@@ -47,12 +58,20 @@ internal fun findStaleSnapshotFiles(layout: SnapshotFileLayoutJUnit5): List<Stri
   }
 }
 private fun classExistsAndHasTests(key: String): Boolean {
-  return try {
-    generateSequence(Class.forName(key)) { it.superclass }
-        .flatMap { it.declaredMethods.asSequence() }
-        .any { method -> testAnnotations.any { method.isAnnotationPresent(it) } }
+  try {
+    val clazz = Class.forName(key)
+    val isTestClass = testSuperclasses.any { it.isAssignableFrom(clazz) }
+    if (isTestClass) {
+      return true
+    }
+    val hasTestAnnotations =
+        generateSequence(clazz) { it.superclass }
+            .flatMap { it.declaredMethods.asSequence() }
+            .any { method -> testAnnotations.any { method.isAnnotationPresent(it) } }
+    return hasTestAnnotations
   } catch (e: ClassNotFoundException) {
-    false
+    // class doesn't exist, so it's definitely stale
+    return false
   }
 }
 internal fun findTestMethodsThatDidntRun(
