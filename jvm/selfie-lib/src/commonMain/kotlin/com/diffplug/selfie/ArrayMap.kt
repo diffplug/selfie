@@ -207,6 +207,9 @@ class ArrayMap<K : Comparable<K>, V : Any>(private val data: Array<Any>) : Map<K
   }
   override fun hashCode(): Int = entries.hashCode()
   override fun toString() = this.toMutableMap().toString()
+  fun minusOrNoOp(k: K, v: V): ArrayMap<K, V> {
+    TODO()
+  }
 
   companion object {
     private val EMPTY = ArrayMap<String, Any>(arrayOf())

@@ -94,28 +94,55 @@ internal object SnapshotSystemJUnit5 : SnapshotSystem {
     inlineWriteTracker.record(call, literalValue, layout)
   }
   override suspend fun diskCoroutine(): DiskStorage = TODO()
-  private val threadCtx = ThreadLocal<DiskStorageJUnit5?>()
   override fun diskThreadLocal(): DiskStorage = diskThreadLocalTyped()
-  private fun diskThreadLocalTyped() =
-      threadCtx.get()
-          ?: throw AssertionError(
-              "Selfie `toMatchDisk` must be called only on the original thread.")
-  internal fun start(clazz: SnapshotFileProgress, test: String) {
-    val ft = threadCtx.get()
-    check(ft == null) {
-      "THREAD ERROR: ${ft!!.file.className}#${ft.test} is in progress, cannot start ${clazz.className}#$test"
-    }
-    threadCtx.set(DiskStorageJUnit5(clazz, test))
+  private fun diskThreadLocalTyped(): DiskStorageJUnit5 =
+      threadMap.get().get(Thread.currentThread().threadId())
+          ?: throw AssertionError("See THREADING GUIDE (TODO)")
+  private val threadMap = AtomicReference(ArrayMap.empty<Long, DiskStorageJUnit5>())
+  private val missingDowns = AtomicReference(ArrayMap.empty<DiskStorageJUnit5, AtomicInteger>())
+  private fun missingDown(disk: DiskStorageJUnit5, delta: Int) {
+    missingDowns.updateAndGet { it.plusOrNoOp(disk, AtomicInteger()) }.get(disk)!!.addAndGet(delta)
   }
-  internal fun finish(clazz: SnapshotFileProgress, test: String) {
-    val ft = threadCtx.get()
-    check(ft != null) { "THREAD ERROR: no test is in progress, cannot finish $clazz#$test" }
-    check(ft.file == clazz && ft.test == test) {
-      "THREAD ERROR: ${ft.file.className}#${ft.test} is in progress, cannot finish ${clazz.className}#$test"
+  internal fun startThreadLocal(file: SnapshotFileProgress, test: String) {
+    val threadId = Thread.currentThread().threadId()
+    val next = DiskStorageJUnit5(file, test)
+    val prevMap = threadMap.getAndUpdate { it.plusOrNoOpOrReplace(threadId, next) }
+    val prev = prevMap[threadId]
+    if (prev != null) {
+      //  now:      .
+      // prev: /      \
+      // next:    /     \
+      missingDown(prev, 1)
     }
-    threadCtx.set(null)
+  }
+  internal fun finishThreadLocal(file: SnapshotFileProgress, test: String) {
+    val threadId = Thread.currentThread().threadId()
+    val finishing = DiskStorageJUnit5(file, test)
+    val prevMap = threadMap.getAndUpdate { it.minusOrNoOp(threadId, finishing) }
+    val prev = prevMap[threadId]
+    if (prev == finishing) {
+      // This is the normal JUnit case, where test notifications come and go on the same thread.
+      // Easy! We have removed it from the thread map.
+    } else if (prev != finishing) {
+      // It probably started on a different thread, yikes
+      TODO()
+    }
   }
   fun finishedAllTests() {
+    val errorMsg =
+        missingDowns
+            .getAndUpdate { ArrayMap.empty() }
+            .mapNotNull {
+              val unfinished = it.value.get()
+              if (unfinished == 0) null
+              else {
+                "${it.key} started $unfinished times more than it stopped"
+              }
+            }
+            .joinToString("\n")
+    if (errorMsg.isNotEmpty()) {
+      throw AssertionError("THREAD ERROR: $errorMsg")
+    }
     if (mode != Mode.readonly) {
       for (path in commentTracker.pathsWithOnce()) {
         val source = SourceFile(path.name, layout.fs.fileRead(path))
@@ -140,7 +167,8 @@ internal object SnapshotSystemJUnit5 : SnapshotSystem {
     }
   }
 
-  private class DiskStorageJUnit5(val file: SnapshotFileProgress, val test: String) : DiskStorage {
+  private data class DiskStorageJUnit5(val file: SnapshotFileProgress, val test: String) :
+      DiskStorage, Comparable<DiskStorageJUnit5> {
     override fun readDisk(sub: String, call: CallStack): Snapshot? = file.read(test, suffix(sub))
     override fun writeDisk(actual: Snapshot, sub: String, call: CallStack) {
       file.write(test, suffix(sub), actual, call, file.system.layout)
@@ -149,6 +177,9 @@ internal object SnapshotSystemJUnit5 : SnapshotSystem {
       file.keep(test, subOrKeepAll?.let { suffix(it) })
     }
     private fun suffix(sub: String) = if (sub == "") "" else "/$sub"
+    override fun compareTo(other: DiskStorageJUnit5): Int =
+        compareValuesBy(this, other, { it.file.className }, { it.test })
+    override fun toString(): String = "${file.className}#$test"
   }
 }
 
@@ -175,7 +206,7 @@ internal class SnapshotFileProgress(val system: SnapshotSystemJUnit5, val classN
     check(test.indexOf('/') == -1) { "Test name cannot contain '/', was $test" }
     assertNotTerminated()
     tests.updateAndGet { it.plusOrNoOp(test, WithinTestGC()) }
-    system.start(this, test)
+    system.startThreadLocal(this, test)
   }
   /**
    * Stops assigning this thread to store snapshots within this file at `test`, and if successful
@@ -188,7 +219,7 @@ internal class SnapshotFileProgress(val system: SnapshotSystemJUnit5, val classN
     if (!success) {
       tests.get()[test]!!.keepAll()
     }
-    system.finish(this, test)
+    system.finishThreadLocal(this, test)
   }
   private fun finishedClassWithSuccess(success: Boolean) {
     assertNotTerminated()
