@@ -52,6 +52,11 @@ class SnapshotFileLayoutKotest(settings: SelfieSettingsAPI, override val fs: FS)
       path
     }
   }
+
+  override fun checkForSmuggledError() {
+    smuggledError?.let { throw it }
+  }
+
   private fun computePathForCall(call: CallLocation): TypedPath? =
       sequence {
             yield(rootFolder)
