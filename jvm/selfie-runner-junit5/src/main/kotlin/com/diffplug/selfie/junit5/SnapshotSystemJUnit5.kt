@@ -141,7 +141,7 @@ internal class SnapshotSystemJUnit5 : SnapshotSystem {
   private class DiskStorageJUnit5(val file: SnapshotFileProgress, val test: String) : DiskStorage {
     override fun readDisk(sub: String, call: CallStack): Snapshot? = file.read(test, suffix(sub))
     override fun writeDisk(actual: Snapshot, sub: String, call: CallStack) {
-      file.write(test, suffix(sub), actual, call, file.parent.layout)
+      file.write(test, suffix(sub), actual, call, file.system.layout)
     }
     override fun keep(subOrKeepAll: String?) {
       file.keep(test, subOrKeepAll?.let { suffix(it) })
@@ -154,7 +154,7 @@ internal class SnapshotSystemJUnit5 : SnapshotSystem {
  * Tracks the progress of test runs within a single disk snapshot file, so that snapshots can be
  * pruned.
  */
-internal class SnapshotFileProgress(val parent: SnapshotSystemJUnit5, val className: String) {
+internal class SnapshotFileProgress(val system: SnapshotSystemJUnit5, val className: String) {
   companion object {
     val TERMINATED = ArrayMap.empty<String, WithinTestGC>().plus(" ~ f!n1shed ~ ", WithinTestGC())
   }
@@ -170,7 +170,7 @@ internal class SnapshotFileProgress(val parent: SnapshotSystemJUnit5, val classN
   @Synchronized fun startTest(test: String) {
     check(test.indexOf('/') == -1) { "Test name cannot contain '/', was $test" }
     assertNotTerminated()
-    parent.start(this, test)
+    system.start(this, test)
     tests = tests.plusOrNoOp(test, WithinTestGC())
   }
   /**
@@ -181,7 +181,7 @@ internal class SnapshotFileProgress(val parent: SnapshotSystemJUnit5, val classN
    */
   @Synchronized fun finishedTestWithSuccess(test: String, success: Boolean) {
     assertNotTerminated()
-    parent.finish(this, test)
+    system.finish(this, test)
     if (!success) {
       tests[test]!!.keepAll()
     }
@@ -194,11 +194,11 @@ internal class SnapshotFileProgress(val parent: SnapshotSystemJUnit5, val classN
               file!!.snapshots, tests, findTestMethodsThatDidntRun(className, tests))
       if (staleSnapshotIndices.isNotEmpty() || file!!.wasSetAtTestTime) {
         file!!.removeAllIndices(staleSnapshotIndices)
-        val snapshotPath = parent.layout.snapshotPathForClass(className)
+        val snapshotPath = system.layout.snapshotPathForClass(className)
         if (file!!.snapshots.isEmpty()) {
           deleteFileAndParentDirIfEmpty(snapshotPath)
         } else {
-          parent.markPathAsWritten(parent.layout.snapshotPathForClass(className))
+          system.markPathAsWritten(system.layout.snapshotPathForClass(className))
           Files.createDirectories(snapshotPath.toPath().parent)
           Files.newBufferedWriter(snapshotPath.toPath(), StandardCharsets.UTF_8).use { writer ->
             file!!.serialize(writer)
@@ -211,7 +211,7 @@ internal class SnapshotFileProgress(val parent: SnapshotSystemJUnit5, val classN
       val isStale =
           everyTestInClassRan && success && tests.values.all { it.succeededAndUsedNoSnapshots() }
       if (isStale) {
-        val snapshotFile = parent.layout.snapshotPathForClass(className)
+        val snapshotFile = system.layout.snapshotPathForClass(className)
         deleteFileAndParentDirIfEmpty(snapshotFile)
       }
     }
@@ -252,13 +252,13 @@ internal class SnapshotFileProgress(val parent: SnapshotSystemJUnit5, val classN
   }
   private fun read(): SnapshotFile {
     if (file == null) {
-      val snapshotPath = parent.layout.snapshotPathForClass(className).toPath()
+      val snapshotPath = system.layout.snapshotPathForClass(className).toPath()
       file =
           if (Files.exists(snapshotPath) && Files.isRegularFile(snapshotPath)) {
             val content = Files.readAllBytes(snapshotPath)
             SnapshotFile.parse(SnapshotValueReader.of(content))
           } else {
-            SnapshotFile.createEmptyWithUnixNewlines(parent.layout.unixNewlines)
+            SnapshotFile.createEmptyWithUnixNewlines(system.layout.unixNewlines)
           }
     }
     return file!!
