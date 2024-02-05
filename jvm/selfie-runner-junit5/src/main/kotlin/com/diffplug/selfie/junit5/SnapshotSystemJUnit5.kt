@@ -96,17 +96,33 @@ internal object SnapshotSystemJUnit5 : SnapshotSystem {
   override suspend fun diskCoroutine(): DiskStorage = TODO()
   override fun diskThreadLocal(): DiskStorage = diskThreadLocalTyped()
   private fun diskThreadLocalTyped(): DiskStorageJUnit5 =
-      threadMap.get().get(Thread.currentThread().threadId())
+      threadMap.get().get(Thread.currentThread().id)
           ?: throw AssertionError("See THREADING GUIDE (TODO)")
   private val threadMap = AtomicReference(ArrayMap.empty<Long, DiskStorageJUnit5>())
-  private val missingDowns = AtomicReference(ArrayMap.empty<DiskStorageJUnit5, AtomicInteger>())
+  private val idToThread = AtomicReference(ArrayMap.empty<String, Long>())
+  private val missingDowns = AtomicReference(ArrayMap.empty<DiskStorageJUnit5, Int>())
   private fun missingDown(disk: DiskStorageJUnit5, delta: Int) {
-    missingDowns.updateAndGet { it.plusOrNoOp(disk, AtomicInteger()) }.get(disk)!!.addAndGet(delta)
+    missingDowns.updateAndGet {
+      val existing = it[disk]
+      if (existing == null) {
+        require(delta > 0)
+        it.plus(disk, delta)
+      } else {
+        val newValue = existing + delta
+        if (newValue == 0) {
+          it.minusOrNoOp(disk)
+        } else {
+          require(newValue > 0)
+          it.plusOrNoOpOrReplace(disk, newValue)
+        }
+      }
+    }
   }
-  internal fun startThreadLocal(file: SnapshotFileProgress, test: String) {
-    val threadId = Thread.currentThread().threadId()
+  internal fun startThreadLocal(file: SnapshotFileProgress, test: String, uniqueId: String) {
+    val threadId = Thread.currentThread().id
     val next = DiskStorageJUnit5(file, test)
     val prevMap = threadMap.getAndUpdate { it.plusOrNoOpOrReplace(threadId, next) }
+    idToThread.getAndUpdate { it.plusOrNoOpOrReplace(uniqueId, threadId) }
     val prev = prevMap[threadId]
     if (prev != null) {
       //  now:      .
@@ -115,17 +131,35 @@ internal object SnapshotSystemJUnit5 : SnapshotSystem {
       missingDown(prev, 1)
     }
   }
-  internal fun finishThreadLocal(file: SnapshotFileProgress, test: String) {
-    val threadId = Thread.currentThread().threadId()
+  internal fun finishThreadLocal(file: SnapshotFileProgress, test: String, uniqueId: String) {
     val finishing = DiskStorageJUnit5(file, test)
-    val prevMap = threadMap.getAndUpdate { it.minusOrNoOp(threadId, finishing) }
-    val prev = prevMap[threadId]
-    if (prev == finishing) {
-      // This is the normal JUnit case, where test notifications come and go on the same thread.
-      // Easy! We have removed it from the thread map.
-    } else if (prev != finishing) {
-      // It probably started on a different thread, yikes
-      TODO()
+    val threadId = Thread.currentThread().id
+    val prevIdToThread = idToThread.getAndUpdate { it.minusOrNoOp(uniqueId) }
+    val prevThreadId =
+        prevIdToThread[uniqueId]
+            ?: throw AssertionError(
+                "Test $finishing($uniqueId) either a) never started or b) finished more than once.")
+    if (threadId == prevThreadId) {
+      // we were notified of stop on the same thread we started on, easy
+      val prevMap = threadMap.getAndUpdate { it.minusOrNoOp(threadId, finishing) }
+      val prev = prevMap[threadId]
+      require(prev == finishing) {
+        "Test $finishing($uniqueId) is ending on the same thread it started, but we found $prev in the map unexpectedly."
+      }
+    } else {
+      // we got notified on a different thread than we started on (Kotest does this, maybe others
+      // too)
+      val prevMap = threadMap.getAndUpdate { it.minusOrNoOp(prevThreadId, finishing) }
+      val prev = prevMap[prevThreadId]
+      if (prev == finishing) {
+        // This is the normal Kotest case, where test notifications come and go on the same thread.
+        // Easy! We have removed it from the thread map.
+      } else {
+        // This is a predictable race condition, where a thread pool started a new test before
+        // we got notified that it ended. It must be in the missingDown map, which it can now
+        // decrement
+        missingDown(finishing, -1)
+      }
     }
   }
   fun finishedAllTests() {
@@ -133,7 +167,7 @@ internal object SnapshotSystemJUnit5 : SnapshotSystem {
         missingDowns
             .getAndUpdate { ArrayMap.empty() }
             .mapNotNull {
-              val unfinished = it.value.get()
+              val unfinished = it.value
               if (unfinished == 0) null
               else {
                 "${it.key} started $unfinished times more than it stopped"
@@ -202,11 +236,11 @@ internal class SnapshotFileProgress(val system: SnapshotSystemJUnit5, val classN
   private val hasFailed = AtomicBoolean(false)
 
   /** Assigns this thread to store disk snapshots within this file with the name `test`. */
-  fun startTest(test: String) {
+  fun startTest(test: String, uniqueId: String) {
     check(test.indexOf('/') == -1) { "Test name cannot contain '/', was $test" }
     assertNotTerminated()
     tests.updateAndGet { it.plusOrNoOp(test, WithinTestGC()) }
-    system.startThreadLocal(this, test)
+    system.startThreadLocal(this, test, uniqueId)
   }
   /**
    * Stops assigning this thread to store snapshots within this file at `test`, and if successful
@@ -214,12 +248,12 @@ internal class SnapshotFileProgress(val system: SnapshotSystemJUnit5, val classN
    * times (as in `@ParameterizedTest`), and GC will only happen if all runs of the test are
    * successful.
    */
-  fun finishedTestWithSuccess(test: String, success: Boolean) {
+  fun finishedTestWithSuccess(test: String, uniqueId: String, success: Boolean) {
     assertNotTerminated()
     if (!success) {
       tests.get()[test]!!.keepAll()
     }
-    system.finishThreadLocal(this, test)
+    system.finishThreadLocal(this, test, uniqueId)
   }
   private fun finishedClassWithSuccess(success: Boolean) {
     assertNotTerminated()
