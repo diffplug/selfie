@@ -23,7 +23,7 @@ enum class Mode {
   interactive,
   readonly,
   overwrite;
-  fun canWrite(isTodo: Boolean, call: CallStack, system: SnapshotSystem): Boolean =
+  internal fun canWrite(isTodo: Boolean, call: CallStack, system: SnapshotSystem): Boolean =
       when (this) {
         interactive -> isTodo || system.sourceFileHasWritableComment(call)
         readonly -> {
@@ -38,8 +38,8 @@ enum class Mode {
         }
         overwrite -> true
       }
-  fun msgSnapshotNotFound() = msg("Snapshot not found")
-  fun msgSnapshotMismatch() = msg("Snapshot mismatch")
+  internal fun msgSnapshotNotFound() = msg("Snapshot not found")
+  internal fun msgSnapshotMismatch() = msg("Snapshot mismatch")
   private fun msg(headline: String) =
       when (this) {
         interactive ->
