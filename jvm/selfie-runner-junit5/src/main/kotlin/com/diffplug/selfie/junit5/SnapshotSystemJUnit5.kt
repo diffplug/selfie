@@ -85,27 +85,25 @@ internal class SnapshotSystemJUnit5 : SnapshotSystem {
             ?: throw AssertionError("Snapshot file is being written after all tests were finished.")
     written.add(typedPath)
   }
-
-  private class FileAndTest(val file: SnapshotFileProgress, val test: String)
-  private val threadCtx = ThreadLocal<FileAndTest?>()
-  private fun fileAndTest() =
-      threadCtx.get()
-          ?: throw AssertionError(
-              "Selfie `toMatchDisk` must be called only on the original thread.")
   override fun sourceFileHasWritableComment(call: CallStack): Boolean {
     return commentTracker.hasWritableComment(call, layout)
   }
   override fun writeInline(literalValue: LiteralValue<*>, call: CallStack) {
     inlineWriteTracker.record(call, literalValue, layout)
   }
-  override fun diskThreadLocal(): DiskStorage = DiskStorageJUnit5(fileAndTest())
   override suspend fun diskCoroutine(): DiskStorage = TODO()
+  private val threadCtx = ThreadLocal<DiskStorageJUnit5?>()
+  override fun diskThreadLocal(): DiskStorage = diskThreadLocalTyped()
+  private fun diskThreadLocalTyped() =
+      threadCtx.get()
+          ?: throw AssertionError(
+              "Selfie `toMatchDisk` must be called only on the original thread.")
   internal fun start(clazz: SnapshotFileProgress, test: String) {
     val ft = threadCtx.get()
     check(ft == null) {
       "THREAD ERROR: ${ft!!.file.className}#${ft.test} is in progress, cannot start ${clazz.className}#$test"
     }
-    threadCtx.set(FileAndTest(clazz, test))
+    threadCtx.set(DiskStorageJUnit5(clazz, test))
   }
   internal fun finish(clazz: SnapshotFileProgress, test: String) {
     val ft = threadCtx.get()
@@ -140,14 +138,13 @@ internal class SnapshotSystemJUnit5 : SnapshotSystem {
     }
   }
 
-  private class DiskStorageJUnit5(val ft: FileAndTest) : DiskStorage {
-    override fun readDisk(sub: String, call: CallStack): Snapshot? =
-        ft.file.read(ft.test, suffix(sub))
+  private class DiskStorageJUnit5(val file: SnapshotFileProgress, val test: String) : DiskStorage {
+    override fun readDisk(sub: String, call: CallStack): Snapshot? = file.read(test, suffix(sub))
     override fun writeDisk(actual: Snapshot, sub: String, call: CallStack) {
-      ft.file.write(ft.test, suffix(sub), actual, call, ft.file.parent.layout)
+      file.write(test, suffix(sub), actual, call, file.parent.layout)
     }
     override fun keep(subOrKeepAll: String?) {
-      ft.file.keep(ft.test, subOrKeepAll?.let { suffix(it) })
+      file.keep(test, subOrKeepAll?.let { suffix(it) })
     }
     private fun suffix(sub: String) = if (sub == "") "" else "/$sub"
   }
