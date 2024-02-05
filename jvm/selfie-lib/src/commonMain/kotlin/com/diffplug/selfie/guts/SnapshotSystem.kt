@@ -75,7 +75,7 @@ interface FS {
 }
 
 /** NOT FOR ENDUSERS. Implemented by Selfie to integrate with various test frameworks. */
-interface SnapshotStorage {
+interface SnapshotSystem {
   val fs: FS
   val mode: Mode
   val layout: SnapshotFileLayout
@@ -94,7 +94,7 @@ interface SnapshotStorage {
   fun keep(subOrKeepAll: String?)
 }
 
-expect fun initStorage(): SnapshotStorage
+expect fun initSnapshotSystem(): SnapshotSystem
 
 interface SnapshotFileLayout {
   val rootFolder: TypedPath

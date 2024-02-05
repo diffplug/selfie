@@ -14,12 +14,6 @@
  * limitations under the License.
  */
 package com.diffplug.selfie.guts
-actual fun initStorage(): SnapshotStorage {
-  try {
-    val clazz = Class.forName("com.diffplug.selfie.junit5.SnapshotStorageJUnit5")
-    return clazz.getMethod("initStorage").invoke(null) as SnapshotStorage
-  } catch (e: ClassNotFoundException) {
-    throw IllegalStateException(
-        "Missing required artifact `com.diffplug.spotless:selfie-runner-junit5", e)
-  }
+actual fun initSnapshotSystem(): SnapshotSystem {
+  TODO("Not yet implemented")
 }

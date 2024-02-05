@@ -23,7 +23,7 @@ import com.diffplug.selfie.guts.FS
 import com.diffplug.selfie.guts.InlineWriteTracker
 import com.diffplug.selfie.guts.LiteralValue
 import com.diffplug.selfie.guts.SnapshotFileLayout
-import com.diffplug.selfie.guts.SnapshotStorage
+import com.diffplug.selfie.guts.SnapshotSystem
 import com.diffplug.selfie.guts.SourceFile
 import com.diffplug.selfie.guts.TypedPath
 import com.diffplug.selfie.guts.WithinTestGC
@@ -74,8 +74,8 @@ private fun calcMode(): Mode {
 }
 
 /** Routes between `toMatchDisk()` calls and the snapshot file / pruning machinery. */
-internal object SnapshotStorageJUnit5 : SnapshotStorage {
-  @JvmStatic fun initStorage(): SnapshotStorage = this
+internal object SnapshotSystemJUnit5 : SnapshotSystem {
+  @JvmStatic fun initStorage(): SnapshotSystem = this
   override val fs = FSJava
   override val mode = calcMode()
   override val layout: SnapshotFileLayout
@@ -154,7 +154,7 @@ internal class SnapshotFileProgress(val parent: Progress, val className: String)
   @Synchronized fun startTest(test: String) {
     check(test.indexOf('/') == -1) { "Test name cannot contain '/', was $test" }
     assertNotTerminated()
-    SnapshotStorageJUnit5.start(this, test)
+    SnapshotSystemJUnit5.start(this, test)
     tests = tests.plusOrNoOp(test, WithinTestGC())
   }
   /**
@@ -165,7 +165,7 @@ internal class SnapshotFileProgress(val parent: Progress, val className: String)
    */
   @Synchronized fun finishedTestWithSuccess(test: String, success: Boolean) {
     assertNotTerminated()
-    SnapshotStorageJUnit5.finish(this, test)
+    SnapshotSystemJUnit5.finish(this, test)
     if (!success) {
       tests[test]!!.keepAll()
     }
@@ -262,7 +262,7 @@ internal class SnapshotFileProgress(val parent: Progress, val className: String)
  */
 internal class Progress {
   val settings = SelfieSettingsAPI.initialize()
-  val layout = SnapshotFileLayoutJUnit5(settings, SnapshotStorageJUnit5.fs)
+  val layout = SnapshotFileLayoutJUnit5(settings, SnapshotSystemJUnit5.fs)
   var commentTracker: CommentTracker? = CommentTracker()
 
   private var progressPerClass = ArrayMap.empty<String, SnapshotFileProgress>()
@@ -288,7 +288,7 @@ internal class Progress {
   fun finishedAllTests() {
     val pathsWithOnce = commentTracker!!.pathsWithOnce()
     commentTracker = null
-    if (SnapshotStorageJUnit5.mode != Mode.readonly) {
+    if (SnapshotSystemJUnit5.mode != Mode.readonly) {
       for (path in pathsWithOnce) {
         val source = SourceFile(path.name, layout.fs.fileRead(path))
         source.removeSelfieOnceComments()

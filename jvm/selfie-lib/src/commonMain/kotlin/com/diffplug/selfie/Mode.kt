@@ -17,13 +17,13 @@ package com.diffplug.selfie
 
 import com.diffplug.selfie.guts.CallStack
 import com.diffplug.selfie.guts.CommentTracker
-import com.diffplug.selfie.guts.SnapshotStorage
+import com.diffplug.selfie.guts.SnapshotSystem
 
 enum class Mode {
   interactive,
   readonly,
   overwrite;
-  fun canWrite(isTodo: Boolean, call: CallStack, storage: SnapshotStorage): Boolean =
+  fun canWrite(isTodo: Boolean, call: CallStack, storage: SnapshotSystem): Boolean =
       when (this) {
         interactive -> isTodo || storage.sourceFileHasWritableComment(call)
         readonly -> {
