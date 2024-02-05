@@ -21,17 +21,17 @@ import com.diffplug.selfie.Snapshot
 
 /** Handles garbage collection of snapshots within a single test. */
 class WithinTestGC {
-  private var suffixesToKeep: ArraySet<String>? = ArraySet.empty()
+  private val suffixesToKeep: CAS<ArraySet<String>?> = createCas(ArraySet.empty())
   fun keepSuffix(suffix: String) {
-    suffixesToKeep = suffixesToKeep?.plusOrThis(suffix)
+    suffixesToKeep.updateAndGet { it?.plusOrThis(suffix) }
   }
   fun keepAll(): WithinTestGC {
-    suffixesToKeep = null
+    suffixesToKeep.updateAndGet { null }
     return this
   }
-  override fun toString() = suffixesToKeep?.toString() ?: "(null)"
-  fun succeededAndUsedNoSnapshots() = ArraySet.empty<String>() === suffixesToKeep
-  private fun keeps(s: String): Boolean = suffixesToKeep?.contains(s) ?: true
+  override fun toString() = suffixesToKeep.get()?.toString() ?: "(null)"
+  fun succeededAndUsedNoSnapshots() = suffixesToKeep.get() === ArraySet.empty<String>()
+  private fun keeps(s: String): Boolean = suffixesToKeep.get()?.contains(s) ?: true
 
   companion object {
     fun findStaleSnapshotsWithin(
