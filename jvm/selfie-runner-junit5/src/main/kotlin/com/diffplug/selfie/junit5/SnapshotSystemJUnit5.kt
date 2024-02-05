@@ -40,13 +40,13 @@ import org.opentest4j.AssertionFailedError
 fun TypedPath.toPath(): java.nio.file.Path = java.nio.file.Path.of(absolutePath)
 
 internal object FSJava : FS {
-  override fun fileWrite(file: TypedPath, content: String) = file.toPath().writeText(content)
-  override fun fileRead(file: TypedPath) = file.toPath().readText()
+  override fun fileWrite(typedPath: TypedPath, content: String) = typedPath.toPath().writeText(content)
+  override fun fileRead(typedPath: TypedPath) = typedPath.toPath().readText()
   /** Walks the files (not directories) which are children and grandchildren of the given path. */
-  override fun <T> fileWalk(file: TypedPath, walk: (Sequence<TypedPath>) -> T): T =
-      Files.walk(file.toPath()).use {
+  override fun <T> fileWalk(typedPath: TypedPath, walk: (Sequence<TypedPath>) -> T): T =
+      Files.walk(typedPath.toPath()).use { paths ->
         walk(
-            it.asSequence().mapNotNull {
+                paths.asSequence().mapNotNull {
               if (Files.isRegularFile(it)) TypedPath.ofFile(it.absolutePathString()) else null
             })
       }
@@ -62,19 +62,16 @@ internal class SnapshotSystemJUnit5 : SnapshotSystem {
   }
   override val fs = FSJava
   override val mode = calcMode()
-  val settings = SelfieSettingsAPI.initialize()
+  private val settings = SelfieSettingsAPI.initialize()
   override val layout = SnapshotFileLayoutJUnit5(settings, fs)
 
-  var commentTracker: CommentTracker? = CommentTracker()
+  private var commentTracker: CommentTracker? = CommentTracker()
   private var progressPerClass = ArrayMap.empty<String, SnapshotFileProgress>()
   fun forClass(className: String): SnapshotFileProgress =
       synchronized(this) {
         val existing = progressPerClass[className]
-        return if (existing != null) existing
-        else {
-          val classProgress = SnapshotFileProgress(this, className)
-          progressPerClass = progressPerClass.plus(className, classProgress)
-          classProgress
+        return existing ?: SnapshotFileProgress(this, className).also {
+          progressPerClass = progressPerClass.plus(className, it)
         }
       }
 
