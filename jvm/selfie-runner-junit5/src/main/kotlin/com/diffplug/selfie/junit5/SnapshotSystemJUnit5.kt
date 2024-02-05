@@ -68,10 +68,16 @@ internal object SnapshotSystemJUnit5 : SnapshotSystem {
   private val commentTracker = CommentTracker()
   private val inlineWriteTracker = InlineWriteTracker()
   private val progressPerClass = AtomicReference(ArrayMap.empty<String, SnapshotFileProgress>())
-  fun forClass(className: String): SnapshotFileProgress =
-      progressPerClass
-          .updateAndGet { it.plusOrNoOp(className, SnapshotFileProgress(this, className)) }[
-              className]!!
+  fun forClass(className: String): SnapshotFileProgress {
+    // optimize for reads
+    progressPerClass.get()[className]?.let {
+      return it
+    }
+    // sometimes we'll have to write
+    return progressPerClass
+        .updateAndGet { it.plusOrNoOp(className, SnapshotFileProgress(this, className)) }[
+            className]!!
+  }
 
   private var checkForInvalidStale: AtomicReference<MutableSet<TypedPath>?> =
       AtomicReference(ConcurrentSkipListSet())
@@ -188,8 +194,9 @@ internal class SnapshotFileProgress(val system: SnapshotSystemJUnit5, val classN
   @Synchronized
   private fun finishedClassWithSuccess(success: Boolean) {
     assertNotTerminated()
+    diskWriteTracker = null // don't need this anymore
     val tests = tests.getAndUpdate { TERMINATED }
-    require(tests !== TERMINATED) { "Snapshot $className alread terminated!" }
+    require(tests !== TERMINATED) { "Snapshot $className already terminated!" }
     if (file != null) {
       val staleSnapshotIndices =
           WithinTestGC.findStaleSnapshotsWithin(
@@ -218,7 +225,6 @@ internal class SnapshotFileProgress(val system: SnapshotSystemJUnit5, val classN
       }
     }
     // now that we are done, allow our contents to be GC'ed
-    diskWriteTracker = null
     file = null
   }
   // the methods below are called from the test thread for I/O on snapshots
