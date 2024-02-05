@@ -15,7 +15,9 @@
  */
 package com.diffplug.selfie
 
+import com.diffplug.selfie.guts.CallStack
 import com.diffplug.selfie.guts.DiskSnapshotTodo
+import com.diffplug.selfie.guts.DiskStorage
 import com.diffplug.selfie.guts.LiteralBoolean
 import com.diffplug.selfie.guts.LiteralFormat
 import com.diffplug.selfie.guts.LiteralInt
@@ -30,8 +32,30 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.jvm.JvmOverloads
 import kotlin.jvm.JvmStatic
 
+class Later internal constructor(private val disk: DiskStorage) {
+  fun <T> expectSelfie(actual: T, camera: Camera<T>) = expectSelfie(camera.snapshot(actual))
+  fun expectSelfie(actual: String) = expectSelfie(Snapshot.of(actual))
+  fun expectSelfie(actual: ByteArray) = expectSelfie(Snapshot.of(actual))
+  fun expectSelfie(actual: Snapshot) = Selfie.DiskSelfie(actual, disk)
+  fun preserveSelfiesOnDisk(vararg subsToKeep: String) {
+    if (subsToKeep.isEmpty()) {
+      disk.keep(null)
+    } else {
+      subsToKeep.forEach { disk.keep(it) }
+    }
+  }
+}
+
 object Selfie {
-  private val system: SnapshotSystem = initSnapshotSystem()
+  val system: SnapshotSystem = initSnapshotSystem()
+  private val deferredDiskStorage =
+      object : DiskStorage {
+        override fun readDisk(sub: String, call: CallStack): Snapshot? =
+            system.diskThreadLocal().readDisk(sub, call)
+        override fun writeDisk(actual: Snapshot, sub: String, call: CallStack) =
+            system.diskThreadLocal().writeDisk(actual, sub, call)
+        override fun keep(subOrKeepAll: String?) = system.diskThreadLocal().keep(subOrKeepAll)
+      }
 
   /**
    * Sometimes a selfie is environment-specific, but should not be deleted when run in a different
@@ -39,21 +63,22 @@ object Selfie {
    */
   @JvmStatic
   fun preserveSelfiesOnDisk(vararg subsToKeep: String) {
-    if (subsToKeep.isEmpty()) {
-      system.keep(null)
-    } else {
-      subsToKeep.forEach { system.keep(it) }
-    }
+    later().preserveSelfiesOnDisk(*subsToKeep)
   }
 
-  class DiskSelfie internal constructor(actual: Snapshot) : LiteralStringSelfie(actual) {
+  @JvmStatic fun later() = Later(system.diskThreadLocal())
+
+  suspend fun withinCoroutine() = Later(system.diskCoroutine())
+
+  class DiskSelfie internal constructor(actual: Snapshot, val disk: DiskStorage) :
+      LiteralStringSelfie(actual) {
     @JvmOverloads
     fun toMatchDisk(sub: String = ""): DiskSelfie {
       val call = recordCall(false)
       if (system.mode.canWrite(false, call, system)) {
-        system.writeDisk(actual, sub, call)
+        disk.writeDisk(actual, sub, call)
       } else {
-        assertEqual(system.readDisk(sub, call), actual, system)
+        assertEqual(disk.readDisk(sub, call), actual, system)
       }
       return this
     }
@@ -62,7 +87,7 @@ object Selfie {
     fun toMatchDisk_TODO(sub: String = ""): DiskSelfie {
       val call = recordCall(false)
       if (system.mode.canWrite(true, call, system)) {
-        system.writeDisk(actual, sub, call)
+        disk.writeDisk(actual, sub, call)
         system.writeInline(DiskSnapshotTodo.createLiteral(), call)
         return this
       } else {
@@ -127,11 +152,11 @@ object Selfie {
   @JvmStatic
   fun <T> expectSelfie(actual: T, camera: Camera<T>) = expectSelfie(camera.snapshot(actual))
 
-  @JvmStatic fun expectSelfie(actual: Snapshot) = DiskSelfie(actual)
+  @JvmStatic fun expectSelfie(actual: String) = expectSelfie(Snapshot.of(actual))
 
-  @JvmStatic fun expectSelfie(actual: String) = DiskSelfie(Snapshot.of(actual))
+  @JvmStatic fun expectSelfie(actual: ByteArray) = expectSelfie(Snapshot.of(actual))
 
-  @JvmStatic fun expectSelfie(actual: ByteArray) = DiskSelfie(Snapshot.of(actual))
+  @JvmStatic fun expectSelfie(actual: Snapshot) = DiskSelfie(actual, deferredDiskStorage)
 
   /** Implements the inline snapshot whenever a match fails. */
   private fun <T : Any> toBeDidntMatch(expected: T?, actual: T, format: LiteralFormat<T>): T {
