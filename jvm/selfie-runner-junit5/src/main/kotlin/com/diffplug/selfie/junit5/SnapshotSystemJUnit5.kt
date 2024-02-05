@@ -31,6 +31,8 @@ import com.diffplug.selfie.guts.WithinTestGC
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.util.concurrent.ConcurrentSkipListSet
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.io.path.absolutePathString
 import kotlin.io.path.readText
@@ -159,6 +161,8 @@ internal class SnapshotFileProgress(val system: SnapshotSystemJUnit5, val classN
   private var file: SnapshotFile? = null
   private var tests = ArrayMap.empty<String, WithinTestGC>()
   private var diskWriteTracker: DiskWriteTracker? = DiskWriteTracker()
+  private val timesStarted = AtomicInteger(0)
+  private val hasFailed = AtomicBoolean(false)
 
   /** Assigns this thread to store disk snapshots within this file with the name `test`. */
   @Synchronized fun startTest(test: String) {
@@ -180,7 +184,9 @@ internal class SnapshotFileProgress(val system: SnapshotSystemJUnit5, val classN
       tests[test]!!.keepAll()
     }
   }
-  @Synchronized fun finishedClassWithSuccess(success: Boolean) {
+
+  @Synchronized
+  private fun finishedClassWithSuccess(success: Boolean) {
     assertNotTerminated()
     if (file != null) {
       val staleSnapshotIndices =
@@ -256,6 +262,19 @@ internal class SnapshotFileProgress(val system: SnapshotSystemJUnit5, val classN
           }
     }
     return file!!
+  }
+  fun incrementContainers() {
+    assertNotTerminated()
+    timesStarted.incrementAndGet()
+  }
+  fun decrementContainersWithSuccess(success: Boolean) {
+    assertNotTerminated()
+    if (!success) {
+      hasFailed.set(true)
+    }
+    if (timesStarted.decrementAndGet() == 0) {
+      finishedClassWithSuccess(hasFailed.get())
+    }
   }
 }
 private fun deleteFileAndParentDirIfEmpty(snapshotFile: TypedPath) {

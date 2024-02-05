@@ -29,7 +29,10 @@ class SelfieTestExecutionListener : TestExecutionListener {
     try {
       if (isRoot(testIdentifier)) return
       val (clazz, test) = parseClassTest(testIdentifier)
-      if (test != null) {
+      val snapshotFile = system.forClass(clazz)
+      if (test == null) {
+        snapshotFile.incrementContainers()
+      } else {
         system.forClass(clazz).startTest(test)
       }
     } catch (e: Throwable) {
@@ -40,7 +43,8 @@ class SelfieTestExecutionListener : TestExecutionListener {
     try {
       val (clazz, test) = parseClassTest(testIdentifier)
       if (test == null) {
-        system.forClass(clazz).finishedClassWithSuccess(false)
+        system.forClass(clazz).incrementContainers()
+        system.forClass(clazz).decrementContainersWithSuccess(false)
       } else {
         // TODO: using reflection right now, but we should probably listen to these
       }
@@ -56,11 +60,11 @@ class SelfieTestExecutionListener : TestExecutionListener {
       if (isRoot(testIdentifier)) return
       val (clazz, test) = parseClassTest(testIdentifier)
       val isSuccess = testExecutionResult.status == TestExecutionResult.Status.SUCCESSFUL
-      val snapshotProgress = system.forClass(clazz)
-      if (test != null) {
-        snapshotProgress.finishedTestWithSuccess(test, isSuccess)
+      val snapshotFile = system.forClass(clazz)
+      if (test == null) {
+        snapshotFile.decrementContainersWithSuccess(isSuccess)
       } else {
-        snapshotProgress.finishedClassWithSuccess(isSuccess)
+        snapshotFile.finishedTestWithSuccess(test, isSuccess)
       }
     } catch (e: Throwable) {
       system.layout.smuggledError.set(e)
