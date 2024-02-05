@@ -40,13 +40,14 @@ import org.opentest4j.AssertionFailedError
 fun TypedPath.toPath(): java.nio.file.Path = java.nio.file.Path.of(absolutePath)
 
 internal object FSJava : FS {
-  override fun fileWrite(typedPath: TypedPath, content: String) = typedPath.toPath().writeText(content)
+  override fun fileWrite(typedPath: TypedPath, content: String) =
+      typedPath.toPath().writeText(content)
   override fun fileRead(typedPath: TypedPath) = typedPath.toPath().readText()
   /** Walks the files (not directories) which are children and grandchildren of the given path. */
   override fun <T> fileWalk(typedPath: TypedPath, walk: (Sequence<TypedPath>) -> T): T =
       Files.walk(typedPath.toPath()).use { paths ->
         walk(
-                paths.asSequence().mapNotNull {
+            paths.asSequence().mapNotNull {
               if (Files.isRegularFile(it)) TypedPath.ofFile(it.absolutePathString()) else null
             })
       }
@@ -70,9 +71,10 @@ internal class SnapshotSystemJUnit5 : SnapshotSystem {
   fun forClass(className: String): SnapshotFileProgress =
       synchronized(this) {
         val existing = progressPerClass[className]
-        return existing ?: SnapshotFileProgress(this, className).also {
-          progressPerClass = progressPerClass.plus(className, it)
-        }
+        return existing
+            ?: SnapshotFileProgress(this, className).also {
+              progressPerClass = progressPerClass.plus(className, it)
+            }
       }
 
   private var checkForInvalidStale: AtomicReference<MutableSet<TypedPath>?> =
@@ -114,10 +116,10 @@ internal class SnapshotSystemJUnit5 : SnapshotSystem {
           ?: throw AssertionError(
               "Selfie `toMatchDisk` must be called only on the original thread.")
   override fun sourceFileHasWritableComment(call: CallStack): Boolean {
-    val cm = fileAndTest()
-    return cm.file.parent.commentTracker!!.hasWritableComment(call, cm.file.parent.layout)
+    return commentTracker!!.hasWritableComment(call, layout)
   }
   override fun writeInline(literalValue: LiteralValue<*>, call: CallStack) {
+    val ft = fileAndTest()
     val cm =
         threadCtx.get()
             ?: throw AssertionError("Selfie `toBe` must be called only on the original thread.")
