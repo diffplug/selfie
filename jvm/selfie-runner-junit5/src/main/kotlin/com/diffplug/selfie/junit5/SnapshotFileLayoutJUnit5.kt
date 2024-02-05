@@ -19,11 +19,13 @@ import com.diffplug.selfie.guts.CallLocation
 import com.diffplug.selfie.guts.FS
 import com.diffplug.selfie.guts.SnapshotFileLayout
 import com.diffplug.selfie.guts.TypedPath
+import java.util.concurrent.atomic.AtomicReference
 
 class SnapshotFileLayoutJUnit5(settings: SelfieSettingsAPI, override val fs: FS) :
     SnapshotFileLayout {
-  internal var smuggledError: Throwable? =
-      if (settings is SelfieSettingsSmuggleError) settings.error else null
+  internal val smuggledError =
+      AtomicReference<Throwable?>(
+          if (settings is SelfieSettingsSmuggleError) settings.error else null)
   override val rootFolder = TypedPath.ofFolder(settings.rootFolder.absolutePath)
   private val otherSourceRoots = settings.otherSourceRoots
   override val allowMultipleEquivalentWritesToOneLocation =
@@ -33,7 +35,7 @@ class SnapshotFileLayoutJUnit5(settings: SelfieSettingsAPI, override val fs: FS)
   val extension: String = ".ss"
   private val cache = ThreadLocal<Pair<CallLocation, TypedPath>?>()
   override fun sourcePathForCall(call: CallLocation): TypedPath {
-    smuggledError?.let { throw it }
+    smuggledError.get()?.let { throw it }
     val nonNull =
         sourcePathForCallMaybe(call)
             ?: throw fs.assertFailed(
@@ -51,6 +53,9 @@ class SnapshotFileLayoutJUnit5(settings: SelfieSettingsAPI, override val fs: FS)
       cache.set(call to path)
       path
     }
+  }
+  override fun checkForSmuggledError() {
+    smuggledError.get()?.let { throw it }
   }
   private fun computePathForCall(call: CallLocation): TypedPath? =
       sequence {

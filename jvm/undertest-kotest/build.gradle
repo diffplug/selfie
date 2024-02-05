@@ -7,6 +7,7 @@ repositories {
   mavenCentral()
 }
 spotless {
+  enforceCheck false
   kotlin {
     target 'src/**/*.kt'
     toggleOffOn()

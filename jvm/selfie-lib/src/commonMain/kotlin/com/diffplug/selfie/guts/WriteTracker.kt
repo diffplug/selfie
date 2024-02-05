@@ -15,6 +15,7 @@
  */
 package com.diffplug.selfie.guts
 
+import com.diffplug.selfie.ArrayMap
 import com.diffplug.selfie.Snapshot
 
 expect class CallLocation : Comparable<CallLocation> {
@@ -54,18 +55,23 @@ internal class FirstWrite<T>(val snapshot: T, val callStack: CallStack)
 
 /** For tracking the writes of disk snapshots literals. */
 sealed class WriteTracker<K : Comparable<K>, V> {
-  internal val writes = mutableMapOf<K, FirstWrite<V>>()
+  internal val writes = createCas(ArrayMap.empty<K, FirstWrite<V>>())
   protected fun recordInternal(key: K, snapshot: V, call: CallStack, layout: SnapshotFileLayout) {
-    val existing = writes[key]
-    if (existing == null) {
-      writes[key] = FirstWrite(snapshot, call)
-    } else {
-      val howToFix =
-          when (this) {
-            is DiskWriteTracker ->
-                "You can fix this with `.toMatchDisk(String sub)` and pass a unique value for sub."
-            is InlineWriteTracker ->
-                """
+    val thisWrite = FirstWrite(snapshot, call)
+    val possiblyUnchangedMap = writes.updateAndGet { it.plusOrNoOp(key, thisWrite) }
+    val existing = possiblyUnchangedMap[key]!!
+    if (existing === thisWrite) {
+      // we were the first write
+      return
+    }
+    // we were not the first write
+    layout.checkForSmuggledError()
+    val howToFix =
+        when (this) {
+          is DiskWriteTracker ->
+              "You can fix this with `.toMatchDisk(String sub)` and pass a unique value for sub."
+          is InlineWriteTracker ->
+              """
           You can fix this by doing an `if` before the assertion to separate the cases, e.g.
             if (isWindows) {
               expectSelfie(underTest).toBe("C:\\")
@@ -73,19 +79,18 @@ sealed class WriteTracker<K : Comparable<K>, V> {
               expectSelfie(underTest).toBe("bash$")
             }
         """
-                    .trimIndent()
-          }
-      if (existing.snapshot != snapshot) {
-        throw layout.fs.assertFailed(
-            "Snapshot was set to multiple values!\n  first time: ${existing.callStack.location.ideLink(layout)}\n   this time: ${call.location.ideLink(layout)}\n$howToFix",
-            existing.snapshot,
-            snapshot)
-      } else if (!layout.allowMultipleEquivalentWritesToOneLocation) {
-        throw layout.fs.assertFailed(
-            "Snapshot was set to the same value multiple times.\n$howToFix",
-            existing.callStack.ideLink(layout),
-            call.ideLink(layout))
-      }
+                  .trimIndent()
+        }
+    if (existing.snapshot != snapshot) {
+      throw layout.fs.assertFailed(
+          "Snapshot was set to multiple values!\n  first time: ${existing.callStack.location.ideLink(layout)}\n   this time: ${call.location.ideLink(layout)}\n$howToFix",
+          existing.snapshot,
+          snapshot)
+    } else if (!layout.allowMultipleEquivalentWritesToOneLocation) {
+      throw layout.fs.assertFailed(
+          "Snapshot was set to the same value multiple times.\n$howToFix",
+          existing.callStack.ideLink(layout),
+          call.ideLink(layout))
     }
   }
 }
@@ -121,7 +126,7 @@ class InlineWriteTracker : WriteTracker<CallLocation, LiteralValue<*>>() {
       }
     }
   }
-  fun hasWrites(): Boolean = writes.isNotEmpty()
+  fun hasWrites(): Boolean = writes.get().isNotEmpty()
 
   private class FileLineLiteral(val file: TypedPath, val line: Int, val literal: LiteralValue<*>) :
       Comparable<FileLineLiteral> {
@@ -129,17 +134,20 @@ class InlineWriteTracker : WriteTracker<CallLocation, LiteralValue<*>>() {
         compareValuesBy(this, other, { it.file }, { it.line })
   }
   fun persistWrites(layout: SnapshotFileLayout) {
-    if (this.writes.isEmpty()) {
-      return
-    }
+    // global sort by filename and line, previously might have been polluted by multiple classes
+    // within a single file
     val writes =
-        this.writes
+        writes
+            .get()
             .toList()
             .map {
               FileLineLiteral(
                   layout.sourcePathForCall(it.first)!!, it.first.line, it.second.snapshot)
             }
             .sorted()
+    if (writes.isEmpty()) {
+      return
+    }
 
     var file = writes.first().file
     var content = SourceFile(file.name, layout.fs.fileRead(file))

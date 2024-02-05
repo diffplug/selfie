@@ -15,23 +15,47 @@
  */
 package com.diffplug.selfie
 
+import com.diffplug.selfie.guts.CallStack
 import com.diffplug.selfie.guts.DiskSnapshotTodo
+import com.diffplug.selfie.guts.DiskStorage
 import com.diffplug.selfie.guts.LiteralBoolean
 import com.diffplug.selfie.guts.LiteralFormat
 import com.diffplug.selfie.guts.LiteralInt
 import com.diffplug.selfie.guts.LiteralLong
 import com.diffplug.selfie.guts.LiteralString
 import com.diffplug.selfie.guts.LiteralValue
-import com.diffplug.selfie.guts.SnapshotStorage
-import com.diffplug.selfie.guts.initStorage
+import com.diffplug.selfie.guts.SnapshotSystem
+import com.diffplug.selfie.guts.initSnapshotSystem
 import com.diffplug.selfie.guts.recordCall
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.jvm.JvmOverloads
 import kotlin.jvm.JvmStatic
 
+class Later internal constructor(private val disk: DiskStorage) {
+  fun <T> expectSelfie(actual: T, camera: Camera<T>) = expectSelfie(camera.snapshot(actual))
+  fun expectSelfie(actual: String) = expectSelfie(Snapshot.of(actual))
+  fun expectSelfie(actual: ByteArray) = expectSelfie(Snapshot.of(actual))
+  fun expectSelfie(actual: Snapshot) = Selfie.DiskSelfie(actual, disk)
+  fun preserveSelfiesOnDisk(vararg subsToKeep: String) {
+    if (subsToKeep.isEmpty()) {
+      disk.keep(null)
+    } else {
+      subsToKeep.forEach { disk.keep(it) }
+    }
+  }
+}
+
 object Selfie {
-  private val storage: SnapshotStorage = initStorage()
+  private val system: SnapshotSystem = initSnapshotSystem()
+  private val deferredDiskStorage =
+      object : DiskStorage {
+        override fun readDisk(sub: String, call: CallStack): Snapshot? =
+            system.diskThreadLocal().readDisk(sub, call)
+        override fun writeDisk(actual: Snapshot, sub: String, call: CallStack) =
+            system.diskThreadLocal().writeDisk(actual, sub, call)
+        override fun keep(subOrKeepAll: String?) = system.diskThreadLocal().keep(subOrKeepAll)
+      }
 
   /**
    * Sometimes a selfie is environment-specific, but should not be deleted when run in a different
@@ -39,21 +63,22 @@ object Selfie {
    */
   @JvmStatic
   fun preserveSelfiesOnDisk(vararg subsToKeep: String) {
-    if (subsToKeep.isEmpty()) {
-      storage.keep(null)
-    } else {
-      subsToKeep.forEach { storage.keep(it) }
-    }
+    later().preserveSelfiesOnDisk(*subsToKeep)
   }
 
-  class DiskSelfie internal constructor(actual: Snapshot) : LiteralStringSelfie(actual) {
+  @JvmStatic fun later() = Later(system.diskThreadLocal())
+
+  suspend fun withinCoroutine() = Later(system.diskCoroutine())
+
+  class DiskSelfie internal constructor(actual: Snapshot, val disk: DiskStorage) :
+      LiteralStringSelfie(actual) {
     @JvmOverloads
     fun toMatchDisk(sub: String = ""): DiskSelfie {
       val call = recordCall(false)
-      if (storage.mode.canWrite(false, call, storage)) {
-        storage.writeDisk(actual, sub, call)
+      if (system.mode.canWrite(false, call, system)) {
+        disk.writeDisk(actual, sub, call)
       } else {
-        assertEqual(storage.readDisk(sub, call), actual, storage)
+        assertEqual(disk.readDisk(sub, call), actual, system)
       }
       return this
     }
@@ -61,12 +86,12 @@ object Selfie {
     @JvmOverloads
     fun toMatchDisk_TODO(sub: String = ""): DiskSelfie {
       val call = recordCall(false)
-      if (storage.mode.canWrite(true, call, storage)) {
-        storage.writeDisk(actual, sub, call)
-        storage.writeInline(DiskSnapshotTodo.createLiteral(), call)
+      if (system.mode.canWrite(true, call, system)) {
+        disk.writeDisk(actual, sub, call)
+        system.writeInline(DiskSnapshotTodo.createLiteral(), call)
         return this
       } else {
-        throw storage.fs.assertFailed("Can't call `toMatchDisk_TODO` in ${Mode.readonly} mode!")
+        throw system.fs.assertFailed("Can't call `toMatchDisk_TODO` in ${Mode.readonly} mode!")
       }
     }
   }
@@ -119,7 +144,7 @@ object Selfie {
     fun toBe_TODO(unusedArg: Any? = null) = toBeDidntMatch(null, actualString(), LiteralString)
     fun toBe(expected: String): String {
       val actualString = actualString()
-      return if (actualString == expected) storage.checkSrc(actualString)
+      return if (actualString == expected) system.checkSrc(actualString)
       else toBeDidntMatch(expected, actualString, LiteralString)
     }
   }
@@ -127,24 +152,24 @@ object Selfie {
   @JvmStatic
   fun <T> expectSelfie(actual: T, camera: Camera<T>) = expectSelfie(camera.snapshot(actual))
 
-  @JvmStatic fun expectSelfie(actual: Snapshot) = DiskSelfie(actual)
+  @JvmStatic fun expectSelfie(actual: String) = expectSelfie(Snapshot.of(actual))
 
-  @JvmStatic fun expectSelfie(actual: String) = DiskSelfie(Snapshot.of(actual))
+  @JvmStatic fun expectSelfie(actual: ByteArray) = expectSelfie(Snapshot.of(actual))
 
-  @JvmStatic fun expectSelfie(actual: ByteArray) = DiskSelfie(Snapshot.of(actual))
+  @JvmStatic fun expectSelfie(actual: Snapshot) = DiskSelfie(actual, deferredDiskStorage)
 
   /** Implements the inline snapshot whenever a match fails. */
   private fun <T : Any> toBeDidntMatch(expected: T?, actual: T, format: LiteralFormat<T>): T {
     val call = recordCall(false)
-    val writable = storage.mode.canWrite(expected == null, call, storage)
+    val writable = system.mode.canWrite(expected == null, call, system)
     if (writable) {
-      storage.writeInline(LiteralValue(expected, actual, format), call)
+      system.writeInline(LiteralValue(expected, actual, format), call)
       return actual
     } else {
       if (expected == null) {
-        throw storage.fs.assertFailed("Can't call `toBe_TODO` in ${Mode.readonly} mode!")
+        throw system.fs.assertFailed("Can't call `toBe_TODO` in ${Mode.readonly} mode!")
       } else {
-        throw storage.fs.assertFailed(storage.mode.msgSnapshotMismatch(), expected, actual)
+        throw system.fs.assertFailed(system.mode.msgSnapshotMismatch(), expected, actual)
       }
     }
   }
@@ -152,7 +177,7 @@ object Selfie {
   class IntSelfie(private val actual: Int) {
     @JvmOverloads fun toBe_TODO(unusedArg: Any? = null) = toBeDidntMatch(null, actual, LiteralInt)
     fun toBe(expected: Int) =
-        if (actual == expected) storage.checkSrc(actual)
+        if (actual == expected) system.checkSrc(actual)
         else toBeDidntMatch(expected, actual, LiteralInt)
   }
 
@@ -161,7 +186,7 @@ object Selfie {
   class LongSelfie(private val actual: Long) {
     @JvmOverloads fun toBe_TODO(unusedArg: Any? = null) = toBeDidntMatch(null, actual, LiteralLong)
     fun toBe(expected: Long) =
-        if (actual == expected) storage.checkSrc(actual)
+        if (actual == expected) system.checkSrc(actual)
         else toBeDidntMatch(expected, actual, LiteralLong)
   }
 
@@ -171,12 +196,12 @@ object Selfie {
     @JvmOverloads
     fun toBe_TODO(unusedArg: Any? = null) = toBeDidntMatch(null, actual, LiteralBoolean)
     fun toBe(expected: Boolean) =
-        if (actual == expected) storage.checkSrc(actual)
+        if (actual == expected) system.checkSrc(actual)
         else toBeDidntMatch(expected, actual, LiteralBoolean)
   }
 
   @JvmStatic fun expectSelfie(actual: Boolean) = BooleanSelfie(actual)
-  private fun assertEqual(expected: Snapshot?, actual: Snapshot, storage: SnapshotStorage) {
+  private fun assertEqual(expected: Snapshot?, actual: Snapshot, storage: SnapshotSystem) {
     when (expected) {
       null -> throw storage.fs.assertFailed(storage.mode.msgSnapshotNotFound())
       actual -> return
@@ -230,7 +255,7 @@ object Selfie {
  * Checks that the sourcecode of the given inline snapshot value doesn't have control comments when
  * in readonly mode.
  */
-private fun <T> SnapshotStorage.checkSrc(value: T): T {
+private fun <T> SnapshotSystem.checkSrc(value: T): T {
   mode.canWrite(false, recordCall(true), this)
   return value
 }

@@ -33,10 +33,9 @@ jobs:
         uses: gradle/gradle-build-action@v2
         with:
           gradle-home-cache-cleanup: true
-      - name: git fetch origin main
-        run: git fetch origin main
-      - name: gradlew build
-        run: ./gradlew build
+      - run: git fetch origin main
+      - run: ./gradlew :selfie-runner-junit5:testKotest
+      - run: ./gradlew build
       - name: junit result
         uses: mikepenz/action-junit-report@v4
         if: always() # always run even if the previous step fails

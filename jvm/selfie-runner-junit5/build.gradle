@@ -26,8 +26,22 @@ dependencies {
   testImplementation gradleTestKit()
 }
 test {
-  useJUnitPlatform()
-  getInputs().dir('../undertest-junit5/src/test/kotlin')
+  useJUnitPlatform {
+    excludeTags 'kotest'
+  }
+  getInputs().dir('../undertest-junit5/src/test')
+  getInputs().dir('../undertest-junit-vintage/src/test')
+}
+tasks.register('testKotest', Test) {
+  useJUnitPlatform {
+    includeTags 'kotest'
+  }
+  testClassesDirs = sourceSets.test.output.classesDirs
+  classpath = sourceSets.test.runtimeClasspath
+  getInputs().dir('../undertest-junit5-kotest/src/test')
+}
+tasks.named("check") {
+  dependsOn testKotest
 }
 
 // it all needs to get published and formatted

@@ -16,7 +16,7 @@ plugins {
   // https://github.com/equodev/equo-ide/blob/main/plugin-gradle/CHANGELOG.md
   id 'dev.equo.ide' version '1.7.6' apply false
   // https://github.com/gradle-nexus/publish-plugin/releases
-  id 'io.github.gradle-nexus.publish-plugin' version '2.0.0-rc-1' apply false
+  id 'io.github.gradle-nexus.publish-plugin' version '2.0.0-rc-2' apply false
   // https://plugins.gradle.org/plugin/org.jetbrains.dokka
   id 'org.jetbrains.dokka'                       version '1.9.10' apply false
   // https://plugins.gradle.org/plugin/org.jetbrains.kotlin.jvm
@@ -41,6 +41,7 @@ include 'selfie-lib'
 // JUnit 4 & 5
 include 'selfie-runner-junit5'
 include 'undertest-junit5'
+include 'undertest-junit5-kotest'
 include 'undertest-junit-vintage'
 // Kotest
 include 'selfie-runner-kotest'

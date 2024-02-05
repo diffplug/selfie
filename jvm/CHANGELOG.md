@@ -9,8 +9,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- `Selfie.later()` for making assertions off of the main thread. ([#198](https://github.com/diffplug/selfie/pull/198))
+- `Selfie.withinCoroutine()` for making assertions off of the main thread. ([#198](https://github.com/diffplug/selfie/pull/198))
+### Fixed
+- Now compatible with [`Kotest`](https://kotest.io/docs/framework/framework.html). ([#200](https://github.com/diffplug/selfie/pull/200))
 ### Changes
 - (no user-facing changes) replaced terrible platform-specific `Path` with `TypedPath`. ([#184](https://github.com/diffplug/selfie/pull/184))
+- (no user-facing changes) replaced `SnapshotStorage` with `SnapshotSystem` + `DiskStorage`. ([#198](https://github.com/diffplug/selfie/pull/198))
+- (no user-facing changes) replaced all `synchronized` with CAS. ([#199](https://github.com/diffplug/selfie/pull/199))
 
 ## [1.1.2] - 2024-01-30
 ### Fixed
