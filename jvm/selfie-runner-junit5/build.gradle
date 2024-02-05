@@ -27,7 +27,9 @@ dependencies {
 }
 test {
   useJUnitPlatform()
-  getInputs().dir('../undertest-junit5/src/test/kotlin')
+  getInputs().dir('../undertest-junit5/src/test')
+  getInputs().dir('../undertest-junit5-kotest/src/test')
+  getInputs().dir('../undertest-junit-vintage/src/test')
 }
 
 // it all needs to get published and formatted
