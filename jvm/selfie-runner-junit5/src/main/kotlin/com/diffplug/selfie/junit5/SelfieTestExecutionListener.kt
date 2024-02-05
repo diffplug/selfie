@@ -15,6 +15,7 @@
  */
 package com.diffplug.selfie.junit5
 
+import com.diffplug.selfie.Selfie
 import org.junit.platform.engine.TestExecutionResult
 import org.junit.platform.engine.support.descriptor.ClassSource
 import org.junit.platform.engine.support.descriptor.MethodSource
@@ -24,28 +25,28 @@ import org.junit.platform.launcher.TestPlan
 
 /** This is automatically registered at runtime thanks to `META-INF/services`. */
 class SelfieTestExecutionListener : TestExecutionListener {
-  private val progress = Progress()
+  private val system = Selfie.system as SnapshotSystemJUnit5
   override fun executionStarted(testIdentifier: TestIdentifier) {
     try {
       if (isRoot(testIdentifier)) return
       val (clazz, test) = parseClassTest(testIdentifier)
       if (test != null) {
-        progress.forClass(clazz).startTest(test)
+        system.forClass(clazz).startTest(test)
       }
     } catch (e: Throwable) {
-      progress.layout.smuggledError.set(e)
+      system.layout.smuggledError.set(e)
     }
   }
   override fun executionSkipped(testIdentifier: TestIdentifier, reason: String) {
     try {
       val (clazz, test) = parseClassTest(testIdentifier)
       if (test == null) {
-        progress.forClass(clazz).finishedClassWithSuccess(false)
+        system.forClass(clazz).finishedClassWithSuccess(false)
       } else {
         // TODO: using reflection right now, but we should probably listen to these
       }
     } catch (e: Throwable) {
-      progress.layout.smuggledError.set(e)
+      system.layout.smuggledError.set(e)
     }
   }
   override fun executionFinished(
@@ -56,18 +57,18 @@ class SelfieTestExecutionListener : TestExecutionListener {
       if (isRoot(testIdentifier)) return
       val (clazz, test) = parseClassTest(testIdentifier)
       val isSuccess = testExecutionResult.status == TestExecutionResult.Status.SUCCESSFUL
-      val snapshotProgress = progress.forClass(clazz)
+      val snapshotProgress = system.forClass(clazz)
       if (test != null) {
         snapshotProgress.finishedTestWithSuccess(test, isSuccess)
       } else {
         snapshotProgress.finishedClassWithSuccess(isSuccess)
       }
     } catch (e: Throwable) {
-      progress.layout.smuggledError.set(e)
+      system.layout.smuggledError.set(e)
     }
   }
   override fun testPlanExecutionFinished(testPlan: TestPlan?) {
-    progress.finishedAllTests()
+    system.finishedAllTests()
   }
   private fun isRoot(testIdentifier: TestIdentifier) = testIdentifier.parentId.isEmpty
   private fun parseClassTest(testIdentifier: TestIdentifier): Pair<String, String?> {
