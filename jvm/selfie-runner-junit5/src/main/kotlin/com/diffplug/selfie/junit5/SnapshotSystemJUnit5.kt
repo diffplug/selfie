@@ -65,8 +65,8 @@ internal class SnapshotSystemJUnit5 : SnapshotSystem {
   override val mode = calcMode()
   private val settings = SelfieSettingsAPI.initialize()
   override val layout = SnapshotFileLayoutJUnit5(settings, fs)
-
-  private var commentTracker: CommentTracker? = CommentTracker()
+  private val commentTracker = CommentTracker()
+  private val inlineWriteTracker = InlineWriteTracker()
   private var progressPerClass = ArrayMap.empty<String, SnapshotFileProgress>()
   fun forClass(className: String): SnapshotFileProgress =
       synchronized(this) {
@@ -85,29 +85,6 @@ internal class SnapshotSystemJUnit5 : SnapshotSystem {
             ?: throw AssertionError("Snapshot file is being written after all tests were finished.")
     written.add(typedPath)
   }
-  fun finishedAllTests() {
-    val pathsWithOnce = commentTracker!!.pathsWithOnce()
-    commentTracker = null
-    if (mode != Mode.readonly) {
-      for (path in pathsWithOnce) {
-        val source = SourceFile(path.name, layout.fs.fileRead(path))
-        source.removeSelfieOnceComments()
-        layout.fs.fileWrite(path, source.asString)
-      }
-    }
-    val snapshotsFilesWrittenToDisk =
-        checkForInvalidStale.getAndSet(null)
-            ?: throw AssertionError("finishedAllTests() was called more than once.")
-    for (stale in findStaleSnapshotFiles(layout)) {
-      val staleFile = layout.snapshotPathForClass(stale)
-      if (snapshotsFilesWrittenToDisk.contains(staleFile)) {
-        throw AssertionError(
-            "Selfie wrote a snapshot and then marked it stale for deletion in the same run: $staleFile\nSelfie will delete this snapshot on the next run, which is bad! Why is Selfie marking this snapshot as stale?")
-      } else {
-        deleteFileAndParentDirIfEmpty(staleFile)
-      }
-    }
-  }
 
   private class FileAndTest(val file: SnapshotFileProgress, val test: String)
   private val threadCtx = ThreadLocal<FileAndTest?>()
@@ -116,14 +93,10 @@ internal class SnapshotSystemJUnit5 : SnapshotSystem {
           ?: throw AssertionError(
               "Selfie `toMatchDisk` must be called only on the original thread.")
   override fun sourceFileHasWritableComment(call: CallStack): Boolean {
-    return commentTracker!!.hasWritableComment(call, layout)
+    return commentTracker.hasWritableComment(call, layout)
   }
   override fun writeInline(literalValue: LiteralValue<*>, call: CallStack) {
-    val ft = fileAndTest()
-    val cm =
-        threadCtx.get()
-            ?: throw AssertionError("Selfie `toBe` must be called only on the original thread.")
-    cm.file.writeInline(call, literalValue, cm.file.parent.layout)
+    inlineWriteTracker.record(call, literalValue, layout)
   }
   override fun diskThreadLocal(): DiskStorage = DiskStorageJUnit5(fileAndTest())
   override suspend fun diskCoroutine(): DiskStorage = TODO()
@@ -141,6 +114,30 @@ internal class SnapshotSystemJUnit5 : SnapshotSystem {
       "THREAD ERROR: ${ft.file.className}#${ft.test} is in progress, cannot finish ${clazz.className}#$test"
     }
     threadCtx.set(null)
+  }
+  fun finishedAllTests() {
+    if (mode != Mode.readonly) {
+      for (path in commentTracker.pathsWithOnce()) {
+        val source = SourceFile(path.name, layout.fs.fileRead(path))
+        source.removeSelfieOnceComments()
+        layout.fs.fileWrite(path, source.asString)
+      }
+      if (inlineWriteTracker.hasWrites()) {
+        inlineWriteTracker.persistWrites(layout)
+      }
+    }
+    val snapshotsFilesWrittenToDisk =
+        checkForInvalidStale.getAndSet(null)
+            ?: throw AssertionError("finishedAllTests() was called more than once.")
+    for (stale in findStaleSnapshotFiles(layout)) {
+      val staleFile = layout.snapshotPathForClass(stale)
+      if (snapshotsFilesWrittenToDisk.contains(staleFile)) {
+        throw AssertionError(
+            "Selfie wrote a snapshot and then marked it stale for deletion in the same run: $staleFile\nSelfie will delete this snapshot on the next run, which is bad! Why is Selfie marking this snapshot as stale?")
+      } else {
+        deleteFileAndParentDirIfEmpty(staleFile)
+      }
+    }
   }
 
   private class DiskStorageJUnit5(val ft: FileAndTest) : DiskStorage {
@@ -171,7 +168,6 @@ internal class SnapshotFileProgress(val parent: SnapshotSystemJUnit5, val classN
   private var file: SnapshotFile? = null
   private var tests = ArrayMap.empty<String, WithinTestGC>()
   private var diskWriteTracker: DiskWriteTracker? = DiskWriteTracker()
-  private var inlineWriteTracker: InlineWriteTracker? = InlineWriteTracker()
 
   /** Assigns this thread to store disk snapshots within this file with the name `test`. */
   @Synchronized fun startTest(test: String) {
@@ -195,9 +191,6 @@ internal class SnapshotFileProgress(val parent: SnapshotSystemJUnit5, val classN
   }
   @Synchronized fun finishedClassWithSuccess(success: Boolean) {
     assertNotTerminated()
-    if (inlineWriteTracker!!.hasWrites()) {
-      inlineWriteTracker!!.persistWrites(parent.layout)
-    }
     if (file != null) {
       val staleSnapshotIndices =
           WithinTestGC.findStaleSnapshotsWithin(
@@ -228,7 +221,6 @@ internal class SnapshotFileProgress(val parent: SnapshotSystemJUnit5, val classN
     // now that we are done, allow our contents to be GC'ed
     tests = TERMINATED
     diskWriteTracker = null
-    inlineWriteTracker = null
     file = null
   }
   // the methods below are called from the test thread for I/O on snapshots
@@ -239,9 +231,6 @@ internal class SnapshotFileProgress(val parent: SnapshotSystemJUnit5, val classN
     } else {
       tests[test]!!.keepSuffix(suffixOrAll)
     }
-  }
-  @Synchronized fun writeInline(call: CallStack, literalValue: LiteralValue<*>, layout: SnapshotFileLayout) {
-    inlineWriteTracker!!.record(call, literalValue, layout)
   }
   @Synchronized fun write(
       test: String,
