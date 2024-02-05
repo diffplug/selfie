@@ -31,6 +31,8 @@ import com.diffplug.selfie.guts.WithinTestGC
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.util.concurrent.ConcurrentSkipListSet
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.io.path.absolutePathString
 import kotlin.io.path.readText
@@ -65,15 +67,17 @@ internal object SnapshotSystemJUnit5 : SnapshotSystem {
   override val layout = SnapshotFileLayoutJUnit5(settings, fs)
   private val commentTracker = CommentTracker()
   private val inlineWriteTracker = InlineWriteTracker()
-  private var progressPerClass = ArrayMap.empty<String, SnapshotFileProgress>()
-  fun forClass(className: String): SnapshotFileProgress =
-      synchronized(this) {
-        val existing = progressPerClass[className]
-        return existing
-            ?: SnapshotFileProgress(this, className).also {
-              progressPerClass = progressPerClass.plus(className, it)
-            }
-      }
+  private val progressPerClass = AtomicReference(ArrayMap.empty<String, SnapshotFileProgress>())
+  fun forClass(className: String): SnapshotFileProgress {
+    // optimize for reads
+    progressPerClass.get()[className]?.let {
+      return it
+    }
+    // sometimes we'll have to write
+    return progressPerClass
+        .updateAndGet { it.plusOrNoOp(className, SnapshotFileProgress(this, className)) }[
+            className]!!
+  }
 
   private var checkForInvalidStale: AtomicReference<MutableSet<TypedPath>?> =
       AtomicReference(ConcurrentSkipListSet())
@@ -157,19 +161,21 @@ internal class SnapshotFileProgress(val system: SnapshotSystemJUnit5, val classN
     val TERMINATED = ArrayMap.empty<String, WithinTestGC>().plus(" ~ f!n1shed ~ ", WithinTestGC())
   }
   private fun assertNotTerminated() {
-    assert(tests !== TERMINATED) { "Cannot call methods on a terminated ClassProgress" }
+    require(tests !== TERMINATED) { "Cannot call methods on a terminated ClassProgress" }
   }
 
   private var file: SnapshotFile? = null
-  private var tests = ArrayMap.empty<String, WithinTestGC>()
+  private val tests = AtomicReference(ArrayMap.empty<String, WithinTestGC>())
   private var diskWriteTracker: DiskWriteTracker? = DiskWriteTracker()
+  private val timesStarted = AtomicInteger(0)
+  private val hasFailed = AtomicBoolean(false)
 
   /** Assigns this thread to store disk snapshots within this file with the name `test`. */
-  @Synchronized fun startTest(test: String) {
+  fun startTest(test: String) {
     check(test.indexOf('/') == -1) { "Test name cannot contain '/', was $test" }
     assertNotTerminated()
+    tests.updateAndGet { it.plusOrNoOp(test, WithinTestGC()) }
     system.start(this, test)
-    tests = tests.plusOrNoOp(test, WithinTestGC())
   }
   /**
    * Stops assigning this thread to store snapshots within this file at `test`, and if successful
@@ -177,15 +183,18 @@ internal class SnapshotFileProgress(val system: SnapshotSystemJUnit5, val classN
    * times (as in `@ParameterizedTest`), and GC will only happen if all runs of the test are
    * successful.
    */
-  @Synchronized fun finishedTestWithSuccess(test: String, success: Boolean) {
+  fun finishedTestWithSuccess(test: String, success: Boolean) {
     assertNotTerminated()
-    system.finish(this, test)
     if (!success) {
-      tests[test]!!.keepAll()
+      tests.get()[test]!!.keepAll()
     }
+    system.finish(this, test)
   }
-  @Synchronized fun finishedClassWithSuccess(success: Boolean) {
+  private fun finishedClassWithSuccess(success: Boolean) {
     assertNotTerminated()
+    diskWriteTracker = null // don't need this anymore
+    val tests = tests.getAndUpdate { TERMINATED }
+    require(tests !== TERMINATED) { "Snapshot $className already terminated!" }
     if (file != null) {
       val staleSnapshotIndices =
           WithinTestGC.findStaleSnapshotsWithin(
@@ -214,20 +223,18 @@ internal class SnapshotFileProgress(val system: SnapshotSystemJUnit5, val classN
       }
     }
     // now that we are done, allow our contents to be GC'ed
-    tests = TERMINATED
-    diskWriteTracker = null
     file = null
   }
   // the methods below are called from the test thread for I/O on snapshots
-  @Synchronized fun keep(test: String, suffixOrAll: String?) {
+  fun keep(test: String, suffixOrAll: String?) {
     assertNotTerminated()
     if (suffixOrAll == null) {
-      tests[test]!!.keepAll()
+      tests.get()[test]!!.keepAll()
     } else {
-      tests[test]!!.keepSuffix(suffixOrAll)
+      tests.get()[test]!!.keepSuffix(suffixOrAll)
     }
   }
-  @Synchronized fun write(
+  fun write(
       test: String,
       suffix: String,
       snapshot: Snapshot,
@@ -237,14 +244,14 @@ internal class SnapshotFileProgress(val system: SnapshotSystemJUnit5, val classN
     assertNotTerminated()
     val key = "$test$suffix"
     diskWriteTracker!!.record(key, snapshot, callStack, layout)
-    tests[test]!!.keepSuffix(suffix)
+    tests.get()[test]!!.keepSuffix(suffix)
     read().setAtTestTime(key, snapshot)
   }
-  @Synchronized fun read(test: String, suffix: String): Snapshot? {
+  fun read(test: String, suffix: String): Snapshot? {
     assertNotTerminated()
     val snapshot = read().snapshots["$test$suffix"]
     if (snapshot != null) {
-      tests[test]!!.keepSuffix(suffix)
+      tests.get()[test]!!.keepSuffix(suffix)
     }
     return snapshot
   }
@@ -260,6 +267,19 @@ internal class SnapshotFileProgress(val system: SnapshotSystemJUnit5, val classN
           }
     }
     return file!!
+  }
+  fun incrementContainers() {
+    assertNotTerminated()
+    timesStarted.incrementAndGet()
+  }
+  fun decrementContainersWithSuccess(success: Boolean) {
+    assertNotTerminated()
+    if (!success) {
+      hasFailed.set(true)
+    }
+    if (timesStarted.decrementAndGet() == 0) {
+      finishedClassWithSuccess(hasFailed.get())
+    }
   }
 }
 private fun deleteFileAndParentDirIfEmpty(snapshotFile: TypedPath) {
