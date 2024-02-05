@@ -19,9 +19,11 @@ import com.diffplug.selfie.junit5.HarnessJUnit
 import kotlin.test.Test
 import org.junit.jupiter.api.MethodOrderer
 import org.junit.jupiter.api.Order
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.TestMethodOrder
 import org.junitpioneer.jupiter.DisableIfTestFails
 
+@Tag("kotest")
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
 @DisableIfTestFails
 class KotestStringSpecTest : HarnessJUnit() {
@@ -31,15 +33,15 @@ class KotestStringSpecTest : HarnessJUnit() {
     ut_snapshot()
         .assertContent(
             """
-      ╔═ a ═╗
-      a
-      ╔═ b ═╗
-      b
-      ╔═ c ═╗
-      c
-      ╔═ [end of file] ═╗
+          ╔═ a ═╗
+          a
+          ╔═ b ═╗
+          b
+          ╔═ c ═╗
+          c
+          ╔═ [end of file] ═╗
 
-      """
+          """
                 .trimIndent())
     gradleReadSS()
     ut_snapshot().deleteIfExists()
