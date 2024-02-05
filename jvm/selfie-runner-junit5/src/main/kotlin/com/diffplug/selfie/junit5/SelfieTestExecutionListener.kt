@@ -33,7 +33,7 @@ class SelfieTestExecutionListener : TestExecutionListener {
       if (test == null) {
         snapshotFile.incrementContainers()
       } else {
-        system.forClass(clazz).startTest(test)
+        system.forClass(clazz).startTest(test, testIdentifier.uniqueId)
       }
     } catch (e: Throwable) {
       system.layout.smuggledError.set(e)
@@ -64,7 +64,7 @@ class SelfieTestExecutionListener : TestExecutionListener {
       if (test == null) {
         snapshotFile.decrementContainersWithSuccess(isSuccess)
       } else {
-        snapshotFile.finishedTestWithSuccess(test, isSuccess)
+        snapshotFile.finishedTestWithSuccess(test, testIdentifier.uniqueId, isSuccess)
       }
     } catch (e: Throwable) {
       system.layout.smuggledError.set(e)

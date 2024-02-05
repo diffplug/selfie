@@ -38,6 +38,8 @@ open class HarnessJUnit() {
     val subproject =
         if (javaClass.name.startsWith("com.diffplug.selfie.junit5")) {
           "undertest-junit5"
+        } else if (javaClass.name.startsWith("com.diffplug.selfie.kotest")) {
+          "undertest-junit5-kotest"
         } else if (javaClass.name.startsWith("com.diffplug.selfie.junitvintage")) {
           "undertest-junit-vintage"
         } else {
