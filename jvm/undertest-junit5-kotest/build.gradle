@@ -6,6 +6,7 @@ repositories {
   mavenCentral()
 }
 spotless {
+  enforceCheck false
   kotlin {
     target 'src/**/*.kt'
     toggleOffOn()
@@ -14,6 +15,9 @@ spotless {
     replaceRegex("test one-liner", "@Test\n(\\s*)fun ", "@Test fun ")
     replaceRegex("test harness comments", "\n(\\s)*//", "\n//")
   }
+}
+tasks.named('spotlessCheck') {
+  enabled = false
 }
 
 dependencies {
