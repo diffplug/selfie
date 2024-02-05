@@ -95,87 +95,6 @@ internal object SnapshotSystemJUnit5 : SnapshotSystem {
   }
   override suspend fun diskCoroutine(): DiskStorage = TODO()
   override fun diskThreadLocal(): DiskStorage = diskThreadLocalTyped()
-  private fun diskThreadLocalTyped(): DiskStorageJUnit5 =
-      threadMap.get().get(Thread.currentThread().id)
-          ?: throw AssertionError("See THREADING GUIDE (TODO)")
-  /** Map from threadId to a DiskStorage. */
-  private val threadMap = AtomicReference(ArrayMap.empty<Long, DiskStorageJUnit5>())
-  /** Map from a test's uniqueId to a threadId. */
-  private val uniqueidToThread = AtomicReference(ArrayMap.empty<String, Long>())
-  private val missingDowns = AtomicReference(ArrayMap.empty<DiskStorageJUnit5, Int>())
-  private fun missingDown(disk: DiskStorageJUnit5, delta: Int) {
-    missingDowns.updateAndGet {
-      val existing = it[disk]
-      if (existing == null) {
-        require(delta > 0)
-        it.plus(disk, delta)
-      } else {
-        val newValue = existing + delta
-        if (newValue == 0) {
-          it.minusOrNoOp(disk)
-        } else {
-          require(newValue > 0)
-          it.plusOrNoOpOrReplace(disk, newValue)
-        }
-      }
-    }
-  }
-  internal fun startThreadLocal(file: SnapshotFileProgress, test: String, uniqueId: String) {
-    val threadId = Thread.currentThread().id
-    val next = DiskStorageJUnit5(file, test)
-    val prevMap = threadMap.getAndUpdate { it.plusOrNoOpOrReplace(threadId, next) }
-    uniqueidToThread.getAndUpdate { it.plusOrNoOpOrReplace(uniqueId, threadId) }
-    val prev = prevMap[threadId]
-    if (prev != null) {
-      //  now:      .
-      // prev: /      \
-      // next:    /     \
-      missingDown(prev, 1)
-    }
-  }
-  internal fun finishThreadLocal(file: SnapshotFileProgress, test: String, uniqueId: String) {
-    val finishing = DiskStorageJUnit5(file, test)
-    val threadId = Thread.currentThread().id
-    val prevIdToThread = uniqueidToThread.getAndUpdate { it.minusOrNoOp(uniqueId) }
-    val prevThreadId =
-        prevIdToThread[uniqueId]
-            ?: throw AssertionError(
-                "Test $finishing($uniqueId) either a) never started or b) finished more than once.")
-    if (threadId == prevThreadId) {
-      // we were notified of stop on the same thread we started on, easy
-      val prevMap = threadMap.getAndUpdate { it.minusOrNoOp(threadId, finishing) }
-      val prev = prevMap[threadId]
-      require(prev == finishing) {
-        "Test $finishing($uniqueId) is ending on the same thread it started, but we found $prev in the map unexpectedly."
-      }
-    } else {
-      // we got notified on a different thread than we started on (Kotest does this, maybe others
-      // too)
-      val prevMap = threadMap.getAndUpdate { it.minusOrNoOp(prevThreadId, finishing) }
-      val prev = prevMap[prevThreadId]
-      if (prev == finishing) {
-        // This is the normal Kotest case, where test notifications come and go on the same thread.
-        // Easy! We have removed it from the thread map.
-      } else {
-        // This is a predictable race condition, where a thread pool started a new test before
-        // we got notified that it ended. It must be in the missingDown map, which it can now
-        // decrement
-        missingDown(finishing, -1)
-      }
-    }
-  }
-  private fun missingDownsErrorMsg(): String? =
-      missingDowns
-          .getAndUpdate { ArrayMap.empty() }
-          .mapNotNull {
-            val unfinished = it.value
-            if (unfinished == 0) null
-            else {
-              "${it.key} started $unfinished times more than it stopped"
-            }
-          }
-          .joinToString("\n")
-          .ifEmpty { null }
   fun finishedAllTests() {
     missingDownsErrorMsg()?.let { errorMsg -> throw AssertionError("THREAD ERROR: $errorMsg") }
     if (mode != Mode.readonly) {
@@ -202,20 +121,126 @@ internal object SnapshotSystemJUnit5 : SnapshotSystem {
     }
   }
 
-  private data class DiskStorageJUnit5(val file: SnapshotFileProgress, val test: String) :
-      DiskStorage, Comparable<DiskStorageJUnit5> {
-    override fun readDisk(sub: String, call: CallStack): Snapshot? = file.read(test, suffix(sub))
-    override fun writeDisk(actual: Snapshot, sub: String, call: CallStack) {
-      file.write(test, suffix(sub), actual, call, file.system.layout)
+  //////////
+  // BEGIN crazy thread locals
+  //
+  // From here down to the "END crazy thread locals" is a weird section for solving this problem:
+  // We have to tell `expectSelfie` calls which snapshot file to put their data into, and what
+  // test name to prefix their snapshots with. We do that with a threadlocal which we set when we
+  // are notified that the test will start.
+  //
+  // If a test is not started from the same thread where the framework notifies that it is starting,
+  // then we're out of luck. Not sure how we could fix that. JUnit5, JUnit-vintage, and Kotest all
+  // notify of start on the same thread as the test actually starts.
+  //
+  // JUnit5 and JUnit-vintage also notify of finish on that same thread, which makes it easy to be
+  // sure that the thread locals are managed exactly. Kotest, on the other hand, notifies of
+  // finish on a *different* thread. I think this is a workaround for some Gradle issue, and either
+  // way it makes sense because Kotest supports async testing, every test can be a `suspend fun`.
+  //
+  // Because of this, it could be that for some thread T, we get notified of a test A starting on T,
+  // and then we get notified of another test B which is starting on T, and later on we get
+  // notified that A has finished.
+  //
+  // It's also important to note that a single `DiskStorageJUnit5` may be serving multiple tests
+  // concurrently, e.g. in a `@ParameterizedTest`.
+  //
+  // To make all of this work, we have to maintain the following maps:
+  private fun diskThreadLocalTyped(): DiskStorageJUnit5 =
+      threadMap.get().get(Thread.currentThread().id)
+          ?: throw AssertionError("See THREADING GUIDE (TODO)")
+  /** Map from threadId to a DiskStorage. */
+  private val threadMap = AtomicReference(ArrayMap.empty<Long, DiskStorageJUnit5>())
+  /** Map from a test's uniqueId to a threadId. */
+  private val uniqueidToThread = AtomicReference(ArrayMap.empty<String, Long>())
+  /**
+   * Map from a `DiskStorage` to the number of `finishThreadLocal` calls we expect to happen where
+   * the storage's initiating thread has already been used by some other test.
+   */
+  private val missingFinishes = AtomicReference(ArrayMap.empty<DiskStorageJUnit5, Int>())
+  internal fun startThreadLocal(file: SnapshotFileProgress, test: String, uniqueId: String) {
+    val threadId = Thread.currentThread().id
+    val next = DiskStorageJUnit5(file, test)
+    val prevMap = threadMap.getAndUpdate { it.plusOrNoOpOrReplace(threadId, next) }
+    uniqueidToThread.getAndUpdate { it.plusOrNoOpOrReplace(uniqueId, threadId) }
+    val prev = prevMap[threadId]
+    if (prev != null) {
+      //  now:      .
+      // prev: /      \
+      // next:    /     \
+      missingFinish(prev, 1) // we expect prev will have 1 missing finish
     }
-    override fun keep(subOrKeepAll: String?) {
-      file.keep(test, subOrKeepAll?.let { suffix(it) })
-    }
-    private fun suffix(sub: String) = if (sub == "") "" else "/$sub"
-    override fun compareTo(other: DiskStorageJUnit5): Int =
-        compareValuesBy(this, other, { it.file.className }, { it.test })
-    override fun toString(): String = "${file.className}#$test"
   }
+  internal fun finishThreadLocal(file: SnapshotFileProgress, test: String, uniqueId: String) {
+    val finishing = DiskStorageJUnit5(file, test)
+    val threadId = Thread.currentThread().id
+    val prevIdToThread = uniqueidToThread.getAndUpdate { it.minusOrNoOp(uniqueId) }
+    val prevThreadId =
+        prevIdToThread[uniqueId]
+            ?: throw AssertionError(
+                "Test $finishing($uniqueId) either a) never started or b) finished more than once.")
+    if (threadId == prevThreadId) {
+      // we got notified of finish on the same thread we started on, easy
+      val prevMap = threadMap.getAndUpdate { it.minusOrNoOp(threadId, finishing) }
+      val prev = prevMap[threadId]
+      require(prev == finishing) {
+        "Test $finishing($uniqueId) is ending on the same thread it started, but we found $prev in its spot unexpectedly."
+      }
+    } else {
+      // we got notified on a different thread than we started (Kotest does this, maybe others too)
+      val prevMap = threadMap.getAndUpdate { it.minusOrNoOp(prevThreadId, finishing) }
+      val prev = prevMap[prevThreadId]
+      if (prev == finishing) {
+        // This is the normal Kotest case, where the finish notification arrived before
+        // the next test started.
+      } else {
+        // This is a predictable race condition, where a thread pool started a new test before
+        // we got notified of the previous finish. It must be in the missingFinish map, which
+        // can now be decremented
+        missingFinish(finishing, -1)
+      }
+    }
+  }
+  private fun missingFinish(disk: DiskStorageJUnit5, delta: Int) {
+    missingFinishes.updateAndGet {
+      val existing = it[disk]
+      if (existing == null) {
+        require(delta > 0)
+        it.plus(disk, delta)
+      } else {
+        val newValue = existing + delta
+        if (newValue == 0) {
+          it.minusOrNoOp(disk)
+        } else {
+          require(newValue > 0)
+          it.plusOrNoOpOrReplace(disk, newValue)
+        }
+      }
+    }
+  }
+  private fun missingDownsErrorMsg(): String? =
+      missingFinishes
+          .getAndUpdate { ArrayMap.empty() }
+          .map { "${it.key} started ${it.value} more times than it finished" }
+          .joinToString("\n")
+          .ifEmpty { null }
+  // END crazy thread locals
+  //////////
+}
+
+private data class DiskStorageJUnit5(val file: SnapshotFileProgress, val test: String) :
+    DiskStorage, Comparable<DiskStorageJUnit5> {
+  override fun readDisk(sub: String, call: CallStack): Snapshot? = file.read(test, suffix(sub))
+  override fun writeDisk(actual: Snapshot, sub: String, call: CallStack) {
+    file.write(test, suffix(sub), actual, call, file.system.layout)
+  }
+  override fun keep(subOrKeepAll: String?) {
+    file.keep(test, subOrKeepAll?.let { suffix(it) })
+  }
+  private fun suffix(sub: String) = if (sub == "") "" else "/$sub"
+  override fun compareTo(other: DiskStorageJUnit5): Int =
+      compareValuesBy(this, other, { it.file.className }, { it.test })
+  override fun toString(): String = "${file.className}#$test"
 }
 
 /**
