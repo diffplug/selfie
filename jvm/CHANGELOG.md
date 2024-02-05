@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changes
 - (no user-facing changes) replaced terrible platform-specific `Path` with `TypedPath`. ([#184](https://github.com/diffplug/selfie/pull/184))
 - (no user-facing changes) replaced `SnapshotStorage` with `SnapshotSystem` + `DiskStorage`. ([#198](https://github.com/diffplug/selfie/pull/198))
+- (no user-facing changes) replaced all `synchronized` with CAS. ([#199](https://github.com/diffplug/selfie/pull/199))
 
 ## [1.1.2] - 2024-01-30
 ### Fixed
