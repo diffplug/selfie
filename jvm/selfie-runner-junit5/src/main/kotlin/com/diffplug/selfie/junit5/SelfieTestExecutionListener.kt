@@ -15,7 +15,6 @@
  */
 package com.diffplug.selfie.junit5
 
-import com.diffplug.selfie.Selfie
 import org.junit.platform.engine.TestExecutionResult
 import org.junit.platform.engine.support.descriptor.ClassSource
 import org.junit.platform.engine.support.descriptor.MethodSource
@@ -25,7 +24,7 @@ import org.junit.platform.launcher.TestPlan
 
 /** This is automatically registered at runtime thanks to `META-INF/services`. */
 class SelfieTestExecutionListener : TestExecutionListener {
-  private val system = Selfie.system as SnapshotSystemJUnit5
+  private val system = SnapshotSystemJUnit5
   override fun executionStarted(testIdentifier: TestIdentifier) {
     try {
       if (isRoot(testIdentifier)) return

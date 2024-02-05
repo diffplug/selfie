@@ -57,10 +57,8 @@ internal object FSJava : FS {
 }
 
 /** Routes between `toMatchDisk()` calls and the snapshot file / pruning machinery. */
-internal class SnapshotSystemJUnit5 : SnapshotSystem {
-  companion object {
-    @JvmStatic fun initStorage(): SnapshotSystem = SnapshotSystemJUnit5()
-  }
+internal object SnapshotSystemJUnit5 : SnapshotSystem {
+  @JvmStatic fun initStorage(): SnapshotSystem = this
   override val fs = FSJava
   override val mode = calcMode()
   private val settings = SelfieSettingsAPI.initialize()

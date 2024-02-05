@@ -47,7 +47,7 @@ class Later internal constructor(private val disk: DiskStorage) {
 }
 
 object Selfie {
-  val system: SnapshotSystem = initSnapshotSystem()
+  private val system: SnapshotSystem = initSnapshotSystem()
   private val deferredDiskStorage =
       object : DiskStorage {
         override fun readDisk(sub: String, call: CallStack): Snapshot? =
