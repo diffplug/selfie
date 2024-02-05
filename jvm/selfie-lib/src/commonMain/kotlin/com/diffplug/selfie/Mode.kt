@@ -17,29 +17,29 @@ package com.diffplug.selfie
 
 import com.diffplug.selfie.guts.CallStack
 import com.diffplug.selfie.guts.CommentTracker
-import com.diffplug.selfie.guts.SnapshotStorage
+import com.diffplug.selfie.guts.SnapshotSystem
 
 enum class Mode {
   interactive,
   readonly,
   overwrite;
-  fun canWrite(isTodo: Boolean, call: CallStack, storage: SnapshotStorage): Boolean =
+  internal fun canWrite(isTodo: Boolean, call: CallStack, system: SnapshotSystem): Boolean =
       when (this) {
-        interactive -> isTodo || storage.sourceFileHasWritableComment(call)
+        interactive -> isTodo || system.sourceFileHasWritableComment(call)
         readonly -> {
-          if (storage.sourceFileHasWritableComment(call)) {
-            val layout = storage.layout
+          if (system.sourceFileHasWritableComment(call)) {
+            val layout = system.layout
             val path = layout.sourcePathForCall(call.location)
-            val (comment, line) = CommentTracker.commentString(path, storage.fs)
-            throw storage.fs.assertFailed(
+            val (comment, line) = CommentTracker.commentString(path, system.fs)
+            throw system.fs.assertFailed(
                 "Selfie is in readonly mode, so `$comment` is illegal at ${call.location.withLine(line).ideLink(layout)}")
           }
           false
         }
         overwrite -> true
       }
-  fun msgSnapshotNotFound() = msg("Snapshot not found")
-  fun msgSnapshotMismatch() = msg("Snapshot mismatch")
+  internal fun msgSnapshotNotFound() = msg("Snapshot not found")
+  internal fun msgSnapshotMismatch() = msg("Snapshot mismatch")
   private fun msg(headline: String) =
       when (this) {
         interactive ->

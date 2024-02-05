@@ -24,28 +24,28 @@ import org.junit.platform.launcher.TestPlan
 
 /** This is automatically registered at runtime thanks to `META-INF/services`. */
 class SelfieTestExecutionListener : TestExecutionListener {
-  private val progress = Progress()
+  private val system = SnapshotSystemJUnit5
   override fun executionStarted(testIdentifier: TestIdentifier) {
     try {
       if (isRoot(testIdentifier)) return
-      val (clazz, method) = parseClassMethod(testIdentifier)
-      if (method != null && testIdentifier.isTest) {
-        progress.forClass(clazz).startTest(method)
+      val (clazz, test) = parseClassTest(testIdentifier)
+      if (test != null) {
+        system.forClass(clazz).startTest(test)
       }
     } catch (e: Throwable) {
-      progress.layout.smuggledError = e
+      system.layout.smuggledError.set(e)
     }
   }
   override fun executionSkipped(testIdentifier: TestIdentifier, reason: String) {
     try {
-      val (clazz, method) = parseClassMethod(testIdentifier)
-      if (method == null) {
-        progress.forClass(clazz).finishedClassWithSuccess(false)
+      val (clazz, test) = parseClassTest(testIdentifier)
+      if (test == null) {
+        system.forClass(clazz).finishedClassWithSuccess(false)
       } else {
         // TODO: using reflection right now, but we should probably listen to these
       }
     } catch (e: Throwable) {
-      progress.layout.smuggledError = e
+      system.layout.smuggledError.set(e)
     }
   }
   override fun executionFinished(
@@ -54,26 +54,28 @@ class SelfieTestExecutionListener : TestExecutionListener {
   ) {
     try {
       if (isRoot(testIdentifier)) return
-      val (clazz, method) = parseClassMethod(testIdentifier)
+      val (clazz, test) = parseClassTest(testIdentifier)
       val isSuccess = testExecutionResult.status == TestExecutionResult.Status.SUCCESSFUL
-      val snapshotProgress = progress.forClass(clazz)
-      if (method != null && testIdentifier.isTest) {
-        snapshotProgress.finishedTestWithSuccess(method, isSuccess)
+      val snapshotProgress = system.forClass(clazz)
+      if (test != null) {
+        snapshotProgress.finishedTestWithSuccess(test, isSuccess)
       } else {
         snapshotProgress.finishedClassWithSuccess(isSuccess)
       }
     } catch (e: Throwable) {
-      progress.layout.smuggledError = e
+      system.layout.smuggledError.set(e)
     }
   }
   override fun testPlanExecutionFinished(testPlan: TestPlan?) {
-    progress.finishedAllTests()
+    system.finishedAllTests()
   }
   private fun isRoot(testIdentifier: TestIdentifier) = testIdentifier.parentId.isEmpty
-  private fun parseClassMethod(testIdentifier: TestIdentifier): Pair<String, String?> {
+  private fun parseClassTest(testIdentifier: TestIdentifier): Pair<String, String?> {
     return when (val source = testIdentifier.source.get()) {
-      is ClassSource -> Pair(source.className, null)
-      is MethodSource -> Pair(source.className, source.methodName)
+      is ClassSource ->
+          Pair(source.className, if (testIdentifier.isTest) testIdentifier.displayName else null)
+      is MethodSource ->
+          Pair(source.className, if (testIdentifier.isTest) source.methodName else null)
       else -> throw AssertionError("Unexpected source $source")
     }
   }

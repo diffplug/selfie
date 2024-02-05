@@ -18,12 +18,13 @@ package com.diffplug.selfie.junit5
 import com.diffplug.selfie.*
 import com.diffplug.selfie.guts.CallStack
 import com.diffplug.selfie.guts.CommentTracker
+import com.diffplug.selfie.guts.DiskStorage
 import com.diffplug.selfie.guts.DiskWriteTracker
 import com.diffplug.selfie.guts.FS
 import com.diffplug.selfie.guts.InlineWriteTracker
 import com.diffplug.selfie.guts.LiteralValue
 import com.diffplug.selfie.guts.SnapshotFileLayout
-import com.diffplug.selfie.guts.SnapshotStorage
+import com.diffplug.selfie.guts.SnapshotSystem
 import com.diffplug.selfie.guts.SourceFile
 import com.diffplug.selfie.guts.TypedPath
 import com.diffplug.selfie.guts.WithinTestGC
@@ -39,13 +40,14 @@ import org.opentest4j.AssertionFailedError
 fun TypedPath.toPath(): java.nio.file.Path = java.nio.file.Path.of(absolutePath)
 
 internal object FSJava : FS {
-  override fun fileWrite(file: TypedPath, content: String) = file.toPath().writeText(content)
-  override fun fileRead(file: TypedPath) = file.toPath().readText()
+  override fun fileWrite(typedPath: TypedPath, content: String) =
+      typedPath.toPath().writeText(content)
+  override fun fileRead(typedPath: TypedPath) = typedPath.toPath().readText()
   /** Walks the files (not directories) which are children and grandchildren of the given path. */
-  override fun <T> fileWalk(file: TypedPath, walk: (Sequence<TypedPath>) -> T): T =
-      Files.walk(file.toPath()).use {
+  override fun <T> fileWalk(typedPath: TypedPath, walk: (Sequence<TypedPath>) -> T): T =
+      Files.walk(typedPath.toPath()).use { paths ->
         walk(
-            it.asSequence().mapNotNull {
+            paths.asSequence().mapNotNull {
               if (Files.isRegularFile(it)) TypedPath.ofFile(it.absolutePathString()) else null
             })
       }
@@ -53,75 +55,53 @@ internal object FSJava : FS {
       if (expected == null && actual == null) AssertionFailedError(message)
       else AssertionFailedError(message, expected, actual)
 }
-private fun lowercaseFromEnvOrSys(key: String): String? {
-  val env = System.getenv(key)?.lowercase()
-  if (!env.isNullOrEmpty()) {
-    return env
-  }
-  val system = System.getProperty(key)?.lowercase()
-  if (!system.isNullOrEmpty()) {
-    return system
-  }
-  return null
-}
-private fun calcMode(): Mode {
-  val override = lowercaseFromEnvOrSys("selfie") ?: lowercaseFromEnvOrSys("SELFIE")
-  if (override != null) {
-    return Mode.valueOf(override)
-  }
-  val ci = lowercaseFromEnvOrSys("ci") ?: lowercaseFromEnvOrSys("CI")
-  return if (ci == "true") Mode.readonly else Mode.interactive
-}
 
 /** Routes between `toMatchDisk()` calls and the snapshot file / pruning machinery. */
-internal object SnapshotStorageJUnit5 : SnapshotStorage {
-  @JvmStatic fun initStorage(): SnapshotStorage = this
+internal object SnapshotSystemJUnit5 : SnapshotSystem {
+  @JvmStatic fun initStorage(): SnapshotSystem = this
   override val fs = FSJava
   override val mode = calcMode()
-  override val layout: SnapshotFileLayout
-    get() = fileAndTest().file.parent.layout
+  private val settings = SelfieSettingsAPI.initialize()
+  override val layout = SnapshotFileLayoutJUnit5(settings, fs)
+  private val commentTracker = CommentTracker()
+  private val inlineWriteTracker = InlineWriteTracker()
+  private var progressPerClass = ArrayMap.empty<String, SnapshotFileProgress>()
+  fun forClass(className: String): SnapshotFileProgress =
+      synchronized(this) {
+        val existing = progressPerClass[className]
+        return existing
+            ?: SnapshotFileProgress(this, className).also {
+              progressPerClass = progressPerClass.plus(className, it)
+            }
+      }
 
-  private class FileAndTest(val file: SnapshotFileProgress, val test: String)
-  private val threadCtx = ThreadLocal<FileAndTest?>()
-  private fun fileAndTest() =
+  private var checkForInvalidStale: AtomicReference<MutableSet<TypedPath>?> =
+      AtomicReference(ConcurrentSkipListSet())
+  internal fun markPathAsWritten(typedPath: TypedPath) {
+    val written =
+        checkForInvalidStale.get()
+            ?: throw AssertionError("Snapshot file is being written after all tests were finished.")
+    written.add(typedPath)
+  }
+  override fun sourceFileHasWritableComment(call: CallStack): Boolean {
+    return commentTracker.hasWritableComment(call, layout)
+  }
+  override fun writeInline(literalValue: LiteralValue<*>, call: CallStack) {
+    inlineWriteTracker.record(call, literalValue, layout)
+  }
+  override suspend fun diskCoroutine(): DiskStorage = TODO()
+  private val threadCtx = ThreadLocal<DiskStorageJUnit5?>()
+  override fun diskThreadLocal(): DiskStorage = diskThreadLocalTyped()
+  private fun diskThreadLocalTyped() =
       threadCtx.get()
           ?: throw AssertionError(
               "Selfie `toMatchDisk` must be called only on the original thread.")
-  override fun sourceFileHasWritableComment(call: CallStack): Boolean {
-    val cm = fileAndTest()
-    return cm.file.parent.commentTracker!!.hasWritableComment(call, cm.file.parent.layout)
-  }
-  private fun suffix(sub: String) = if (sub == "") "" else "/$sub"
-  override fun readDisk(sub: String, call: CallStack): Snapshot? {
-    val ft = fileAndTest()
-    val suffix = suffix(sub)
-    return ft.file.read(ft.test, suffix)
-  }
-  override fun writeDisk(actual: Snapshot, sub: String, call: CallStack) {
-    val ft = fileAndTest()
-    val suffix = suffix(sub)
-    ft.file.write(ft.test, suffix, actual, call, ft.file.parent.layout)
-  }
-  override fun keep(subOrKeepAll: String?) {
-    val ft = fileAndTest()
-    if (subOrKeepAll == null) {
-      ft.file.keep(ft.test, null)
-    } else {
-      ft.file.keep(ft.test, suffix(subOrKeepAll))
-    }
-  }
-  override fun writeInline(literalValue: LiteralValue<*>, call: CallStack) {
-    val cm =
-        threadCtx.get()
-            ?: throw AssertionError("Selfie `toBe` must be called only on the original thread.")
-    cm.file.writeInline(call, literalValue, cm.file.parent.layout)
-  }
   internal fun start(clazz: SnapshotFileProgress, test: String) {
     val ft = threadCtx.get()
     check(ft == null) {
-      "THREAD ERROR: ${ft!!.file.className}#${ft.test} is in progress, cannot start $clazz#$test"
+      "THREAD ERROR: ${ft!!.file.className}#${ft.test} is in progress, cannot start ${clazz.className}#$test"
     }
-    threadCtx.set(FileAndTest(clazz, test))
+    threadCtx.set(DiskStorageJUnit5(clazz, test))
   }
   internal fun finish(clazz: SnapshotFileProgress, test: String) {
     val ft = threadCtx.get()
@@ -131,13 +111,48 @@ internal object SnapshotStorageJUnit5 : SnapshotStorage {
     }
     threadCtx.set(null)
   }
+  fun finishedAllTests() {
+    if (mode != Mode.readonly) {
+      for (path in commentTracker.pathsWithOnce()) {
+        val source = SourceFile(path.name, layout.fs.fileRead(path))
+        source.removeSelfieOnceComments()
+        layout.fs.fileWrite(path, source.asString)
+      }
+      if (inlineWriteTracker.hasWrites()) {
+        inlineWriteTracker.persistWrites(layout)
+      }
+    }
+    val snapshotsFilesWrittenToDisk =
+        checkForInvalidStale.getAndSet(null)
+            ?: throw AssertionError("finishedAllTests() was called more than once.")
+    for (stale in findStaleSnapshotFiles(layout)) {
+      val staleFile = layout.snapshotPathForClass(stale)
+      if (snapshotsFilesWrittenToDisk.contains(staleFile)) {
+        throw AssertionError(
+            "Selfie wrote a snapshot and then marked it stale for deletion in the same run: $staleFile\nSelfie will delete this snapshot on the next run, which is bad! Why is Selfie marking this snapshot as stale?")
+      } else {
+        deleteFileAndParentDirIfEmpty(staleFile)
+      }
+    }
+  }
+
+  private class DiskStorageJUnit5(val file: SnapshotFileProgress, val test: String) : DiskStorage {
+    override fun readDisk(sub: String, call: CallStack): Snapshot? = file.read(test, suffix(sub))
+    override fun writeDisk(actual: Snapshot, sub: String, call: CallStack) {
+      file.write(test, suffix(sub), actual, call, file.system.layout)
+    }
+    override fun keep(subOrKeepAll: String?) {
+      file.keep(test, subOrKeepAll?.let { suffix(it) })
+    }
+    private fun suffix(sub: String) = if (sub == "") "" else "/$sub"
+  }
 }
 
 /**
  * Tracks the progress of test runs within a single disk snapshot file, so that snapshots can be
  * pruned.
  */
-internal class SnapshotFileProgress(val parent: Progress, val className: String) {
+internal class SnapshotFileProgress(val system: SnapshotSystemJUnit5, val className: String) {
   companion object {
     val TERMINATED = ArrayMap.empty<String, WithinTestGC>().plus(" ~ f!n1shed ~ ", WithinTestGC())
   }
@@ -148,13 +163,12 @@ internal class SnapshotFileProgress(val parent: Progress, val className: String)
   private var file: SnapshotFile? = null
   private var tests = ArrayMap.empty<String, WithinTestGC>()
   private var diskWriteTracker: DiskWriteTracker? = DiskWriteTracker()
-  private var inlineWriteTracker: InlineWriteTracker? = InlineWriteTracker()
 
   /** Assigns this thread to store disk snapshots within this file with the name `test`. */
   @Synchronized fun startTest(test: String) {
     check(test.indexOf('/') == -1) { "Test name cannot contain '/', was $test" }
     assertNotTerminated()
-    SnapshotStorageJUnit5.start(this, test)
+    system.start(this, test)
     tests = tests.plusOrNoOp(test, WithinTestGC())
   }
   /**
@@ -165,27 +179,24 @@ internal class SnapshotFileProgress(val parent: Progress, val className: String)
    */
   @Synchronized fun finishedTestWithSuccess(test: String, success: Boolean) {
     assertNotTerminated()
-    SnapshotStorageJUnit5.finish(this, test)
+    system.finish(this, test)
     if (!success) {
       tests[test]!!.keepAll()
     }
   }
   @Synchronized fun finishedClassWithSuccess(success: Boolean) {
     assertNotTerminated()
-    if (inlineWriteTracker!!.hasWrites()) {
-      inlineWriteTracker!!.persistWrites(parent.layout)
-    }
     if (file != null) {
       val staleSnapshotIndices =
           WithinTestGC.findStaleSnapshotsWithin(
               file!!.snapshots, tests, findTestMethodsThatDidntRun(className, tests))
       if (staleSnapshotIndices.isNotEmpty() || file!!.wasSetAtTestTime) {
         file!!.removeAllIndices(staleSnapshotIndices)
-        val snapshotPath = parent.layout.snapshotPathForClass(className)
+        val snapshotPath = system.layout.snapshotPathForClass(className)
         if (file!!.snapshots.isEmpty()) {
           deleteFileAndParentDirIfEmpty(snapshotPath)
         } else {
-          parent.markPathAsWritten(parent.layout.snapshotPathForClass(className))
+          system.markPathAsWritten(system.layout.snapshotPathForClass(className))
           Files.createDirectories(snapshotPath.toPath().parent)
           Files.newBufferedWriter(snapshotPath.toPath(), StandardCharsets.UTF_8).use { writer ->
             file!!.serialize(writer)
@@ -198,14 +209,13 @@ internal class SnapshotFileProgress(val parent: Progress, val className: String)
       val isStale =
           everyTestInClassRan && success && tests.values.all { it.succeededAndUsedNoSnapshots() }
       if (isStale) {
-        val snapshotFile = parent.layout.snapshotPathForClass(className)
+        val snapshotFile = system.layout.snapshotPathForClass(className)
         deleteFileAndParentDirIfEmpty(snapshotFile)
       }
     }
     // now that we are done, allow our contents to be GC'ed
     tests = TERMINATED
     diskWriteTracker = null
-    inlineWriteTracker = null
     file = null
   }
   // the methods below are called from the test thread for I/O on snapshots
@@ -216,9 +226,6 @@ internal class SnapshotFileProgress(val parent: Progress, val className: String)
     } else {
       tests[test]!!.keepSuffix(suffixOrAll)
     }
-  }
-  @Synchronized fun writeInline(call: CallStack, literalValue: LiteralValue<*>, layout: SnapshotFileLayout) {
-    inlineWriteTracker!!.record(call, literalValue, layout)
   }
   @Synchronized fun write(
       test: String,
@@ -243,70 +250,16 @@ internal class SnapshotFileProgress(val parent: Progress, val className: String)
   }
   private fun read(): SnapshotFile {
     if (file == null) {
-      val snapshotPath = parent.layout.snapshotPathForClass(className).toPath()
+      val snapshotPath = system.layout.snapshotPathForClass(className).toPath()
       file =
           if (Files.exists(snapshotPath) && Files.isRegularFile(snapshotPath)) {
             val content = Files.readAllBytes(snapshotPath)
             SnapshotFile.parse(SnapshotValueReader.of(content))
           } else {
-            SnapshotFile.createEmptyWithUnixNewlines(parent.layout.unixNewlines)
+            SnapshotFile.createEmptyWithUnixNewlines(system.layout.unixNewlines)
           }
     }
     return file!!
-  }
-}
-/**
- * Responsible for
- * - lazily determining the snapshot file layout
- * - pruning unused snapshot files
- */
-internal class Progress {
-  val settings = SelfieSettingsAPI.initialize()
-  val layout = SnapshotFileLayoutJUnit5(settings, SnapshotStorageJUnit5.fs)
-  var commentTracker: CommentTracker? = CommentTracker()
-
-  private var progressPerClass = ArrayMap.empty<String, SnapshotFileProgress>()
-  fun forClass(className: String): SnapshotFileProgress =
-      synchronized(this) {
-        val existing = progressPerClass[className]
-        return if (existing != null) existing
-        else {
-          val classProgress = SnapshotFileProgress(this, className)
-          progressPerClass = progressPerClass.plus(className, classProgress)
-          classProgress
-        }
-      }
-
-  private var checkForInvalidStale: AtomicReference<MutableSet<TypedPath>?> =
-      AtomicReference(ConcurrentSkipListSet())
-  internal fun markPathAsWritten(typedPath: TypedPath) {
-    val written =
-        checkForInvalidStale.get()
-            ?: throw AssertionError("Snapshot file is being written after all tests were finished.")
-    written.add(typedPath)
-  }
-  fun finishedAllTests() {
-    val pathsWithOnce = commentTracker!!.pathsWithOnce()
-    commentTracker = null
-    if (SnapshotStorageJUnit5.mode != Mode.readonly) {
-      for (path in pathsWithOnce) {
-        val source = SourceFile(path.name, layout.fs.fileRead(path))
-        source.removeSelfieOnceComments()
-        layout.fs.fileWrite(path, source.asString)
-      }
-    }
-    val snapshotsFilesWrittenToDisk =
-        checkForInvalidStale.getAndSet(null)
-            ?: throw AssertionError("finishedAllTests() was called more than once.")
-    for (stale in findStaleSnapshotFiles(layout)) {
-      val staleFile = layout.snapshotPathForClass(stale)
-      if (snapshotsFilesWrittenToDisk.contains(staleFile)) {
-        throw AssertionError(
-            "Selfie wrote a snapshot and then marked it stale for deletion in the same run: $staleFile\nSelfie will delete this snapshot on the next run, which is bad! Why is Selfie marking this snapshot as stale?")
-      } else {
-        deleteFileAndParentDirIfEmpty(staleFile)
-      }
-    }
   }
 }
 private fun deleteFileAndParentDirIfEmpty(snapshotFile: TypedPath) {

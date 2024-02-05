@@ -40,6 +40,7 @@ class RecordCallTest {
               TypedPath("testpkg/RecordCallTest.kt")
           override fun sourcePathForCallMaybe(call: CallLocation): TypedPath? =
               sourcePathForCall(call)
+          override fun checkForSmuggledError() = TODO()
         }
     stack.location.ideLink(layout) shouldBe
         "testpkg.RecordCallTest.testRecordCall(RecordCallTest.kt:30)"
