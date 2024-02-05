@@ -34,8 +34,7 @@ jobs:
         with:
           gradle-home-cache-cleanup: true
       - run: git fetch origin main
-      - run: ./gradlew spotlessCheck
-      - run: ./gradlew :selfie-runner-junit5:test
+      - run: ./gradlew :selfie-runner-junit5:testKotest
       - run: ./gradlew build
       - name: junit result
         uses: mikepenz/action-junit-report@v4
