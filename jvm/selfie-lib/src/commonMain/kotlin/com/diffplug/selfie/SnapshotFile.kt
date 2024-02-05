@@ -15,6 +15,7 @@
  */
 package com.diffplug.selfie
 
+import com.diffplug.selfie.guts.createCas
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.jvm.JvmStatic
@@ -137,11 +138,16 @@ class SnapshotFile {
   internal var unixNewlines = true
   // this will probably become `<String, JsonObject>` we'll cross that bridge when we get to it
   var metadata: Map.Entry<String, String>? = null
-  var snapshots = ArrayMap.empty<String, Snapshot>()
+  var snapshots: ArrayMap<String, Snapshot>
+    get() = _snapshots.get()
+    set(value) {
+      _snapshots.updateAndGet { value }
+    }
+  private val _snapshots = createCas(ArrayMap.empty<String, Snapshot>())
   fun serialize(valueWriterRaw: Appendable) {
     val valueWriter = if (unixNewlines) valueWriterRaw else ConvertToWindowsNewlines(valueWriterRaw)
     metadata?.let { writeEntry(valueWriter, "📷 ${it.key}", null, SnapshotValue.of(it.value)) }
-    snapshots.entries.forEach { entry ->
+    _snapshots.get().entries.forEach { entry ->
       writeEntry(valueWriter, entry.key, null, entry.value.subject)
       for (facet in entry.value.facets.entries) {
         writeEntry(valueWriter, entry.key, facet.key, facet.value)
@@ -149,20 +155,19 @@ class SnapshotFile {
     }
     writeEntry(valueWriter, "", "end of file", SnapshotValue.of(""))
   }
-
-  var wasSetAtTestTime: Boolean = false
+  val wasSetAtTestTime: Boolean
+    get() = _wasSetAtTestTime.get()
+  private val _wasSetAtTestTime = createCas(false)
   fun setAtTestTime(key: String, snapshot: Snapshot) {
-    val newSnapshots = snapshots.plusOrReplace(key, snapshot)
-    if (newSnapshots !== snapshots) {
-      snapshots = newSnapshots
-      wasSetAtTestTime = true
-    }
+    val oldSnapshots = _snapshots.get()
+    val newSnapshots = _snapshots.updateAndGet { it.plusOrReplace(key, snapshot) }
+    _wasSetAtTestTime.updateAndGet { wasSetBefore -> wasSetBefore || newSnapshots !== oldSnapshots }
   }
   fun removeAllIndices(indices: List<Int>) {
     if (indices.isEmpty()) {
       return
     }
-    wasSetAtTestTime = true
+    _wasSetAtTestTime.updateAndGet { true }
     snapshots = snapshots.minusSortedIndices(indices)
   }
 
