@@ -15,7 +15,27 @@
  */
 package com.diffplug.selfie.junit5
 
+import com.diffplug.selfie.Mode
 import java.io.File
+private fun lowercaseFromEnvOrSys(key: String): String? {
+  val env = System.getenv(key)?.lowercase()
+  if (!env.isNullOrEmpty()) {
+    return env
+  }
+  val system = System.getProperty(key)?.lowercase()
+  if (!system.isNullOrEmpty()) {
+    return system
+  }
+  return null
+}
+internal fun calcMode(): Mode {
+  val override = lowercaseFromEnvOrSys("selfie") ?: lowercaseFromEnvOrSys("SELFIE")
+  if (override != null) {
+    return Mode.valueOf(override)
+  }
+  val ci = lowercaseFromEnvOrSys("ci") ?: lowercaseFromEnvOrSys("CI")
+  return if (ci == "true") Mode.readonly else Mode.interactive
+}
 
 /**
  * If you create a class named `SelfieSettings` in the package `selfie`, it must extend this class,

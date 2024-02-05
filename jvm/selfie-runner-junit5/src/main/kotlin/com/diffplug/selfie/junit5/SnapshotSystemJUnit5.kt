@@ -54,25 +54,6 @@ internal object FSJava : FS {
       if (expected == null && actual == null) AssertionFailedError(message)
       else AssertionFailedError(message, expected, actual)
 }
-private fun lowercaseFromEnvOrSys(key: String): String? {
-  val env = System.getenv(key)?.lowercase()
-  if (!env.isNullOrEmpty()) {
-    return env
-  }
-  val system = System.getProperty(key)?.lowercase()
-  if (!system.isNullOrEmpty()) {
-    return system
-  }
-  return null
-}
-private fun calcMode(): Mode {
-  val override = lowercaseFromEnvOrSys("selfie") ?: lowercaseFromEnvOrSys("SELFIE")
-  if (override != null) {
-    return Mode.valueOf(override)
-  }
-  val ci = lowercaseFromEnvOrSys("ci") ?: lowercaseFromEnvOrSys("CI")
-  return if (ci == "true") Mode.readonly else Mode.interactive
-}
 
 /** Routes between `toMatchDisk()` calls and the snapshot file / pruning machinery. */
 internal class SnapshotSystemJUnit5 : SnapshotSystem {
