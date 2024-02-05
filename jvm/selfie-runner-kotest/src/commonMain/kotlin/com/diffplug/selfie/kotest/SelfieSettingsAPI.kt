@@ -24,7 +24,6 @@ internal expect fun readUserDir(): String
 internal expect fun readEnvironmentVariable(name: String): String?
 
 internal expect fun instantiateSettingsAt(name: String): SelfieSettingsAPI
-
 internal fun calcMode(): Mode {
   val override = readEnvironmentVariable("selfie") ?: readEnvironmentVariable("SELFIE")
   if (override != null) {
