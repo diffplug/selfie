@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - `Selfie.later()` for making assertions off of the main thread. ([#198](https://github.com/diffplug/selfie/pull/198))
 - `Selfie.withinCoroutine()` for making assertions off of the main thread. ([#198](https://github.com/diffplug/selfie/pull/198))
+### Fixed
+- Now compatible with [`Kotest`](https://kotest.io/docs/framework/framework.html). ([#200](https://github.com/diffplug/selfie/pull/200))
 ### Changes
 - (no user-facing changes) replaced terrible platform-specific `Path` with `TypedPath`. ([#184](https://github.com/diffplug/selfie/pull/184))
 - (no user-facing changes) replaced `SnapshotStorage` with `SnapshotSystem` + `DiskStorage`. ([#198](https://github.com/diffplug/selfie/pull/198))
