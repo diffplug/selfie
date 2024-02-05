@@ -171,11 +171,11 @@ internal class SnapshotFileProgress(val system: SnapshotSystemJUnit5, val classN
   private val hasFailed = AtomicBoolean(false)
 
   /** Assigns this thread to store disk snapshots within this file with the name `test`. */
-  @Synchronized fun startTest(test: String) {
+  fun startTest(test: String) {
     check(test.indexOf('/') == -1) { "Test name cannot contain '/', was $test" }
     assertNotTerminated()
-    system.start(this, test)
     tests.updateAndGet { it.plusOrNoOp(test, WithinTestGC()) }
+    system.start(this, test)
   }
   /**
    * Stops assigning this thread to store snapshots within this file at `test`, and if successful
@@ -183,15 +183,13 @@ internal class SnapshotFileProgress(val system: SnapshotSystemJUnit5, val classN
    * times (as in `@ParameterizedTest`), and GC will only happen if all runs of the test are
    * successful.
    */
-  @Synchronized fun finishedTestWithSuccess(test: String, success: Boolean) {
+  fun finishedTestWithSuccess(test: String, success: Boolean) {
     assertNotTerminated()
-    system.finish(this, test)
     if (!success) {
       tests.get()[test]!!.keepAll()
     }
+    system.finish(this, test)
   }
-
-  @Synchronized
   private fun finishedClassWithSuccess(success: Boolean) {
     assertNotTerminated()
     diskWriteTracker = null // don't need this anymore
@@ -228,7 +226,7 @@ internal class SnapshotFileProgress(val system: SnapshotSystemJUnit5, val classN
     file = null
   }
   // the methods below are called from the test thread for I/O on snapshots
-  @Synchronized fun keep(test: String, suffixOrAll: String?) {
+  fun keep(test: String, suffixOrAll: String?) {
     assertNotTerminated()
     if (suffixOrAll == null) {
       tests.get()[test]!!.keepAll()
@@ -236,7 +234,7 @@ internal class SnapshotFileProgress(val system: SnapshotSystemJUnit5, val classN
       tests.get()[test]!!.keepSuffix(suffixOrAll)
     }
   }
-  @Synchronized fun write(
+  fun write(
       test: String,
       suffix: String,
       snapshot: Snapshot,
@@ -249,7 +247,7 @@ internal class SnapshotFileProgress(val system: SnapshotSystemJUnit5, val classN
     tests.get()[test]!!.keepSuffix(suffix)
     read().setAtTestTime(key, snapshot)
   }
-  @Synchronized fun read(test: String, suffix: String): Snapshot? {
+  fun read(test: String, suffix: String): Snapshot? {
     assertNotTerminated()
     val snapshot = read().snapshots["$test$suffix"]
     if (snapshot != null) {
