@@ -18,6 +18,7 @@ package com.diffplug.selfie.junit5
 import com.diffplug.selfie.guts.CallLocation
 import com.diffplug.selfie.guts.FS
 import com.diffplug.selfie.guts.SnapshotFileLayout
+import com.diffplug.selfie.guts.SourcePathCache
 import com.diffplug.selfie.guts.TypedPath
 import java.util.concurrent.atomic.AtomicReference
 
@@ -33,27 +34,17 @@ class SnapshotFileLayoutJUnit5(settings: SelfieSettingsAPI, override val fs: FS)
   val snapshotFolderName = settings.snapshotFolderName
   internal val unixNewlines = inferDefaultLineEndingIsUnix(rootFolder, fs)
   val extension: String = ".ss"
-  private val cache = ThreadLocal<Pair<CallLocation, TypedPath>?>()
+  private val cache =
+      SourcePathCache(this::computePathForCall, Runtime.getRuntime().availableProcessors() * 4)
   override fun sourcePathForCall(call: CallLocation): TypedPath {
-    smuggledError.get()?.let { throw it }
+    checkForSmuggledError()
     val nonNull =
         sourcePathForCallMaybe(call)
             ?: throw fs.assertFailed(
                 "Couldn't find source file for $call, looked in $rootFolder and $otherSourceRoots, maybe there are other source roots?")
     return nonNull
   }
-  override fun sourcePathForCallMaybe(call: CallLocation): TypedPath? {
-    val cached = cache.get()
-    if (cached?.first?.samePathAs(call) == true) {
-      return cached.second
-    }
-    val path = computePathForCall(call)
-    return if (path == null) null
-    else {
-      cache.set(call to path)
-      path
-    }
-  }
+  override fun sourcePathForCallMaybe(call: CallLocation): TypedPath? = cache.get(call)
   override fun checkForSmuggledError() {
     smuggledError.get()?.let { throw it }
   }

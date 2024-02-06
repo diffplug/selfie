@@ -15,16 +15,19 @@
  */
 package com.diffplug.selfie.guts
 
-internal class ArrayBackedLRUCache<K : Any, V>(private val capacity: Int) {
+internal abstract class ArrayBackedLRUCache<K : Any, V>(private val capacity: Int) {
   private val cache: Array<Pair<K, V>?> = arrayOfNulls<Pair<K, V>?>(capacity)
-  fun put(key: K, value: V) {
-    var foundIndex = -1
+  abstract fun keyEquality(a: K, b: K): Boolean
+  private fun indexOf(key: K): Int {
     for (i in cache.indices) {
-      if (cache[i]?.first == key) {
-        foundIndex = i
-        break
+      if (cache[i]?.first?.let { keyEquality(it, key) } == true) {
+        return i
       }
     }
+    return -1
+  }
+  fun put(key: K, value: V) {
+    val foundIndex = indexOf(key)
     if (foundIndex != -1) {
       // key exists, update value and move to most recently used position
       moveToFront(foundIndex)
@@ -35,14 +38,12 @@ internal class ArrayBackedLRUCache<K : Any, V>(private val capacity: Int) {
     cache[0] = Pair(key, value)
   }
   fun get(key: K): V? {
-    for (i in cache.indices) {
-      if (cache[i]?.first == key) {
-        val value = cache[i]!!.second
-        moveToFront(i)
-        return value
-      }
+    val foundIndex = indexOf(key)
+    return if (foundIndex == -1) null
+    else {
+      moveToFront(foundIndex)
+      cache[0]!!.second
     }
-    return null
   }
   private fun moveToFront(index: Int) {
     if (index == 0) {
@@ -57,19 +58,23 @@ internal class ArrayBackedLRUCache<K : Any, V>(private val capacity: Int) {
   override fun toString() = cache.mapNotNull { it }.joinToString(" ") { (k, v) -> "$k=$v" }
 }
 
-abstract class LRUThreadSafeCache<K : Any, V>(capacity: Int) {
-  private val backingCache = ArrayBackedLRUCache<K, V>(capacity)
-  protected abstract fun compute(key: K): V
+class SourcePathCache(private val functionToCache: (CallLocation) -> TypedPath?, capacity: Int) {
   private val lock = reentrantLock()
-  fun get(key: K): V {
-    lock.withLock {
-      val value = backingCache.get(key)
-      if (value != null) {
-        return value
+  private val backingCache =
+      object : ArrayBackedLRUCache<CallLocation, TypedPath>(capacity) {
+        override fun keyEquality(a: CallLocation, b: CallLocation) = a.samePathAs(b)
       }
-      val newValue = compute(key)
-      backingCache.put(key, newValue)
-      return newValue
+  fun get(key: CallLocation): TypedPath? {
+    lock.withLock {
+      backingCache.get(key)?.let {
+        return it
+      }
+      val path = functionToCache(key)
+      return if (path == null) null
+      else {
+        backingCache.put(key, path)
+        path
+      }
     }
   }
 }
