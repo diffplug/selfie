@@ -48,25 +48,28 @@ internal class ArrayBackedLRUCache<K : Any, V>(private val capacity: Int) {
     if (index == 0) {
       return
     }
-    val temp = cache[index]
+    val newFront = cache[index]
     for (i in index downTo 1) {
       cache[i] = cache[i - 1]
     }
-    cache[0] = temp
+    cache[0] = newFront
   }
   override fun toString() = cache.mapNotNull { it }.joinToString(" ") { (k, v) -> "$k=$v" }
 }
 
-abstract class LRUCache<K : Any, V>(capacity: Int) {
+abstract class LRUThreadSafeCache<K : Any, V>(capacity: Int) {
   private val backingCache = ArrayBackedLRUCache<K, V>(capacity)
   protected abstract fun compute(key: K): V
+  private val lock = reentrantLock()
   fun get(key: K): V {
-    val value = backingCache.get(key)
-    if (value != null) {
-      return value
+    lock.withLock {
+      val value = backingCache.get(key)
+      if (value != null) {
+        return value
+      }
+      val newValue = compute(key)
+      backingCache.put(key, newValue)
+      return newValue
     }
-    val newValue = compute(key)
-    backingCache.put(key, newValue)
-    return newValue
   }
 }
