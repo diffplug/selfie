@@ -28,8 +28,6 @@ class CommentTracker {
     FOREVER;
     val writable: Boolean
       get() = this != NO_COMMENT
-    val needsRemoval: Boolean
-      get() = this == ONCE
   }
   private val cache = createCas(ArrayMap.empty<TypedPath, WritableComment>())
   fun pathsWithOnce(): Iterable<TypedPath> =
