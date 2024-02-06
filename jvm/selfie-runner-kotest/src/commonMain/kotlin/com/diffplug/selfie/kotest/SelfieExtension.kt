@@ -21,7 +21,6 @@ import io.kotest.core.extensions.TestCaseExtension
 import io.kotest.core.listeners.AfterProjectListener
 import io.kotest.core.listeners.FinalizeSpecListener
 import io.kotest.core.listeners.IgnoredSpecListener
-import io.kotest.core.listeners.PrepareSpecListener
 import io.kotest.core.source.SourceRef
 import io.kotest.core.spec.Spec
 import io.kotest.core.test.TestCase
@@ -39,24 +38,13 @@ internal class CoroutineDiskStorage(val disk: DiskStorage) : AbstractCoroutineCo
 }
 
 object SelfieExtension :
-    Extension,
-    PrepareSpecListener,
-    FinalizeSpecListener,
-    TestCaseExtension,
-    IgnoredSpecListener,
-    AfterProjectListener {
+    Extension, FinalizeSpecListener, TestCaseExtension, IgnoredSpecListener, AfterProjectListener {
   /** Called for every test method. */
   override suspend fun intercept(
       testCase: TestCase,
       execute: suspend (TestCase) -> TestResult
   ): TestResult {
-    val clazz: String =
-        when (val source = testCase.source) {
-          is SourceRef.ClassSource -> source.fqn
-          is SourceRef.FileSource -> TODO("Handle SourceRef.FileSource")
-          is SourceRef.None -> TODO("Handle SourceRef.None")
-        }
-    val file = SnapshotSystemKotest.forClass(clazz)
+    val file = snapshotFileFor(testCase)
     val testName = testCase.name.testName
     val coroutineLocal = CoroutineDiskStorage(DiskStorageKotest(file, testName))
     return withContext(currentCoroutineContext() + coroutineLocal) {
@@ -66,15 +54,23 @@ object SelfieExtension :
       result
     }
   }
-  override suspend fun prepareSpec(kclass: KClass<out Spec>) {
-    SnapshotSystemKotest.forClass(kclass.qualifiedName!!).incrementContainers()
+  private fun snapshotFileFor(testCase: TestCase): SnapshotFileProgress {
+    val clazz: String =
+        when (val source = testCase.source) {
+          is SourceRef.ClassSource -> source.fqn
+          is SourceRef.FileSource -> TODO("Handle SourceRef.FileSource")
+          is SourceRef.None -> TODO("Handle SourceRef.None")
+        }
+    return SnapshotSystemKotest.forClass(clazz)
   }
   override suspend fun finalizeSpec(
       kclass: KClass<out Spec>,
       results: Map<TestCase, TestResult>,
   ) {
-    SnapshotSystemKotest.forClass(kclass.qualifiedName!!)
-        .decrementContainersWithSuccess(results.values.all { it.isSuccess })
+    results.keys
+        .map { snapshotFileFor(it) }
+        .firstOrNull()
+        ?.let { file -> file.finishedClassWithSuccess(results.values.all { it.isSuccess }) }
   }
   override suspend fun ignoredSpec(kclass: KClass<*>, reason: String?): Unit = Unit
   override suspend fun afterProject() {

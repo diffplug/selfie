@@ -129,8 +129,6 @@ internal class SnapshotFileProgress(val system: SnapshotSystemKotest, val classN
   private var file: SnapshotFile? = null
   private val tests = atomic(ArrayMap.empty<String, WithinTestGC>())
   private var diskWriteTracker: DiskWriteTracker? = DiskWriteTracker()
-  private val timesStarted = atomic(0)
-  private val hasFailed = atomic(false)
 
   /** Assigns this thread to store disk snapshots within this file with the name `test`. */
   fun startTest(test: String) {
@@ -150,7 +148,7 @@ internal class SnapshotFileProgress(val system: SnapshotSystemKotest, val classN
       tests.get()[test]!!.keepAll()
     }
   }
-  private fun finishedClassWithSuccess(success: Boolean) {
+  fun finishedClassWithSuccess(success: Boolean) {
     assertNotTerminated()
     diskWriteTracker = null // don't need this anymore
     val tests = tests.getAndUpdate { TERMINATED }
@@ -242,19 +240,6 @@ internal class SnapshotFileProgress(val system: SnapshotSystemKotest, val classN
           }
     }
     return file!!
-  }
-  fun incrementContainers() {
-    assertNotTerminated()
-    timesStarted.updateAndGet { it + 1 }
-  }
-  fun decrementContainersWithSuccess(success: Boolean) {
-    assertNotTerminated()
-    if (!success) {
-      hasFailed.updateAndGet { true }
-    }
-    if (timesStarted.updateAndGet { it - 1 } == 0) {
-      finishedClassWithSuccess(hasFailed.get())
-    }
   }
 }
 private fun deleteFileAndParentDirIfEmpty(snapshotFile: TypedPath) {
