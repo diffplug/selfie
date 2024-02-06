@@ -22,3 +22,13 @@ expect class AtomicRef<T> {
 
 /** Replace with atomicfu when stable. */
 expect fun <T> atomic(initial: T): AtomicRef<T>
+
+expect fun reentrantLock(): ReentrantLock
+
+expect class ReentrantLock {
+  fun lock(): Unit
+  fun tryLock(): Boolean
+  fun unlock(): Unit
+}
+
+expect inline fun <T> ReentrantLock.withLock(block: () -> T): T

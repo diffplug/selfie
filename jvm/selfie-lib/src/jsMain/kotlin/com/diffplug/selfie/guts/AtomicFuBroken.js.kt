@@ -16,10 +16,20 @@
 package com.diffplug.selfie.guts
 actual fun <T> atomic(initial: T): AtomicRef<T> = AtomicRef(initial)
 
-actual class AtomicRef<T>(var value: T) {
+actual class AtomicRef<T>(private var value: T) {
   actual fun get() = value
   actual fun updateAndGet(update: (T) -> T): T {
     value = update(value)
     return value
   }
 }
+val Lock = ReentrantLock()
+actual inline fun reentrantLock() = Lock
+
+@Suppress("NOTHING_TO_INLINE")
+actual class ReentrantLock {
+  actual inline fun lock(): Unit {}
+  actual inline fun tryLock() = true
+  actual inline fun unlock(): Unit {}
+}
+actual inline fun <T> ReentrantLock.withLock(block: () -> T) = block()

@@ -23,3 +23,14 @@ actual class AtomicRef<T>(value: T) {
   actual fun get() = ref.get()
   actual fun updateAndGet(update: (T) -> T): T = ref.updateAndGet(update)
 }
+actual inline fun reentrantLock() = ReentrantLock()
+
+actual typealias ReentrantLock = java.util.concurrent.locks.ReentrantLock
+actual inline fun <T> ReentrantLock.withLock(block: () -> T): T {
+  lock()
+  try {
+    return block()
+  } finally {
+    unlock()
+  }
+}
