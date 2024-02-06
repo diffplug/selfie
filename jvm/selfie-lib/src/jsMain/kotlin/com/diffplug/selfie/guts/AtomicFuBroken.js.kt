@@ -22,6 +22,11 @@ actual class AtomicRef<T>(private var value: T) {
     value = update(value)
     return value
   }
+  actual fun getAndUpdate(update: (T) -> T): T {
+    val oldValue = value
+    value = update(value)
+    return oldValue
+  }
 }
 val Lock = ReentrantLock()
 actual inline fun reentrantLock() = Lock

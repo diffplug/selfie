@@ -18,6 +18,7 @@ package com.diffplug.selfie.guts
 expect class AtomicRef<T> {
   fun get(): T
   fun updateAndGet(update: (T) -> T): T
+  fun getAndUpdate(update: (T) -> T): T
 }
 
 /** Replace with atomicfu when stable. */

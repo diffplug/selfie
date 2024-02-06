@@ -22,6 +22,7 @@ actual class AtomicRef<T>(value: T) {
   val ref = AtomicReference(value)
   actual fun get() = ref.get()
   actual fun updateAndGet(update: (T) -> T): T = ref.updateAndGet(update)
+  actual fun getAndUpdate(update: (T) -> T) = ref.getAndUpdate(update)
 }
 actual inline fun reentrantLock() = ReentrantLock()
 
