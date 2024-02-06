@@ -15,11 +15,23 @@
  */
 package com.diffplug.selfie.guts
 actual fun initSnapshotSystem(): SnapshotSystem {
-  try {
-    val clazz = Class.forName("com.diffplug.selfie.junit5.SnapshotSystemJUnit5")
-    return clazz.getMethod("initStorage").invoke(null) as SnapshotSystem
-  } catch (e: ClassNotFoundException) {
+  val placesToLook =
+      listOf(
+          "com.diffplug.selfie.junit5.SnapshotStorageJUnit5",
+          "com.diffplug.selfie.kotest.SnapshotStorageKotest")
+  val classesThatExist =
+      placesToLook.mapNotNull {
+        try {
+          Class.forName(it)
+        } catch (e: ClassNotFoundException) {
+          null
+        }
+      }
+  if (classesThatExist.size > 1) {
+    throw IllegalStateException("Found multiple SnapshotStorage implementations: $classesThatExist")
+  } else if (classesThatExist.isEmpty()) {
     throw IllegalStateException(
-        "Missing required artifact `com.diffplug.spotless:selfie-runner-junit5", e)
+        "Missing required artifact `com.diffplug.spotless:selfie-runner-junit5 or com.diffplug.spotless:selfie-runner-kotest")
   }
+  return classesThatExist.get(0).getMethod("initStorage").invoke(null) as SnapshotSystem
 }
