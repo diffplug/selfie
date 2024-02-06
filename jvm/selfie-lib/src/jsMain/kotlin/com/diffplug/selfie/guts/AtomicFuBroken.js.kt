@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 package com.diffplug.selfie.guts
-actual fun <T> createCas(initial: T): CAS<T> = CAS(initial)
+actual fun <T> atomic(initial: T): AtomicRef<T> = AtomicRef(initial)
 
-actual class CAS<T>(var value: T) {
+actual class AtomicRef<T>(var value: T) {
   actual fun get() = value
   actual fun updateAndGet(update: (T) -> T): T {
     value = update(value)

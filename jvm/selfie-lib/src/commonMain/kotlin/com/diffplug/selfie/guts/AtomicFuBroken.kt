@@ -15,10 +15,10 @@
  */
 package com.diffplug.selfie.guts
 
-expect class CAS<T> {
+expect class AtomicRef<T> {
   fun get(): T
   fun updateAndGet(update: (T) -> T): T
 }
 
 /** Replace with atomicfu when stable. */
-expect fun <T> createCas(initial: T): CAS<T>
+expect fun <T> atomic(initial: T): AtomicRef<T>

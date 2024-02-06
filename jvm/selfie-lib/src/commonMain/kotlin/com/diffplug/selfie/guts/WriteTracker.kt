@@ -55,7 +55,7 @@ internal class FirstWrite<T>(val snapshot: T, val callStack: CallStack)
 
 /** For tracking the writes of disk snapshots literals. */
 sealed class WriteTracker<K : Comparable<K>, V> {
-  internal val writes = createCas(ArrayMap.empty<K, FirstWrite<V>>())
+  internal val writes = atomic(ArrayMap.empty<K, FirstWrite<V>>())
   protected fun recordInternal(key: K, snapshot: V, call: CallStack, layout: SnapshotFileLayout) {
     val thisWrite = FirstWrite(snapshot, call)
     val possiblyUnchangedMap = writes.updateAndGet { it.plusOrNoOp(key, thisWrite) }

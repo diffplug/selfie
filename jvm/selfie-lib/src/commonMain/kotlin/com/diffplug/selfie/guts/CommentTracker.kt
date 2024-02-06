@@ -29,7 +29,7 @@ class CommentTracker {
     val writable: Boolean
       get() = this != NO_COMMENT
   }
-  private val cache = createCas(ArrayMap.empty<TypedPath, WritableComment>())
+  private val cache = atomic(ArrayMap.empty<TypedPath, WritableComment>())
   fun pathsWithOnce(): Iterable<TypedPath> =
       cache.get().mapNotNull { if (it.value == WritableComment.ONCE) it.key else null }
   fun hasWritableComment(call: CallStack, layout: SnapshotFileLayout): Boolean {

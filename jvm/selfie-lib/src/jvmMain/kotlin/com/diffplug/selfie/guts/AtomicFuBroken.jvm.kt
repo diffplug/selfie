@@ -16,9 +16,9 @@
 package com.diffplug.selfie.guts
 
 import java.util.concurrent.atomic.AtomicReference
-actual fun <T> createCas(initial: T): CAS<T> = CAS(initial)
+actual fun <T> atomic(initial: T): AtomicRef<T> = AtomicRef(initial)
 
-actual class CAS<T>(value: T) {
+actual class AtomicRef<T>(value: T) {
   val ref = AtomicReference(value)
   actual fun get() = ref.get()
   actual fun updateAndGet(update: (T) -> T): T = ref.updateAndGet(update)

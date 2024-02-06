@@ -21,7 +21,7 @@ import com.diffplug.selfie.Snapshot
 
 /** Handles garbage collection of snapshots within a single test. */
 class WithinTestGC {
-  private val suffixesToKeep: CAS<ArraySet<String>?> = createCas(ArraySet.empty())
+  private val suffixesToKeep: AtomicRef<ArraySet<String>?> = atomic(ArraySet.empty())
   fun keepSuffix(suffix: String) {
     suffixesToKeep.updateAndGet { it?.plusOrThis(suffix) }
   }

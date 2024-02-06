@@ -15,17 +15,17 @@
  */
 package com.diffplug.selfie.kotest
 
-import com.diffplug.selfie.guts.CAS
+import com.diffplug.selfie.guts.AtomicRef
 import com.diffplug.selfie.guts.CallLocation
 import com.diffplug.selfie.guts.FS
 import com.diffplug.selfie.guts.SnapshotFileLayout
 import com.diffplug.selfie.guts.TypedPath
-import com.diffplug.selfie.guts.createCas
+import com.diffplug.selfie.guts.atomic
 
 class SnapshotFileLayoutKotest(settings: SelfieSettingsAPI, override val fs: FS) :
     SnapshotFileLayout {
-  internal var smuggledError: CAS<Throwable?> =
-      createCas(if (settings is SelfieSettingsSmuggleError) settings.error else null)
+  internal var smuggledError: AtomicRef<Throwable?> =
+      atomic(if (settings is SelfieSettingsSmuggleError) settings.error else null)
   override val rootFolder = TypedPath.ofFolder(settings.rootFolder.toString())
   private val otherSourceRoots = settings.otherSourceRoots
   override val allowMultipleEquivalentWritesToOneLocation =
