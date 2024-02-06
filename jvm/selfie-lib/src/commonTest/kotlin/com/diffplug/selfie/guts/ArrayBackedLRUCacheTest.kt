@@ -21,7 +21,10 @@ import kotlin.test.Test
 class ArrayBackedLRUCacheTest {
   @Test
   fun test() {
-    val cache = ArrayBackedLRUCache<String, Int>(3)
+    val cache =
+        object : ArrayBackedLRUCache<String, Int>(3) {
+          override fun keyEquality(a: String, b: String) = a == b
+        }
     cache.toString() shouldBe ""
     cache.put("a", 1)
     cache.toString() shouldBe "a=1"
