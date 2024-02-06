@@ -17,14 +17,6 @@ package com.diffplug.selfie.guts
 
 import com.diffplug.selfie.ArrayMap
 
-expect class CAS<T> {
-  fun get(): T
-  fun updateAndGet(update: (T) -> T): T
-}
-
-/** Replace with atomicfu when stable. */
-expect fun <T> createCas(initial: T): CAS<T>
-
 /**
  * Tracks whether a given file has a comment which allows it to be written to. Thread-safe on
  * multithreaded platforms.
