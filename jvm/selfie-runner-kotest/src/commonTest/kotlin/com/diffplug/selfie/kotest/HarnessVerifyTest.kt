@@ -25,10 +25,10 @@ class HarnessVerifyTest : HarnessKotest() {
       ut_mirrorKt().restoreFromGit()
       initialContent = ut_mirrorKt().linesFrom("UT_HarnessVerifyTest").toLast("}").content()
     }
-    "runAll" { gradleInteractiveFail() }
-    "commentOutFailure" {
-      ut_mirrorKt().linesFrom("alwaysFails()").toFirst("}").commentOut()
-      gradleInteractivePass()
+    "runAll" { gradleInteractivePass() }
+    "uncommentFailure" {
+      ut_mirrorKt().linesFrom("alwaysFails()").toFirst("}").uncomment()
+      gradleInteractiveFail()
     }
     "restoreInitial" {
       ut_mirrorKt().restoreFromGit()
