@@ -52,6 +52,9 @@ kotlin {
   }
 }
 
+tasks.named('compileTestDevelopmentExecutableKotlinJs') {
+  enabled = false // TODO: https://github.com/diffplug/selfie/issues/186
+}
 jsNodeTest {
   enabled = false // TODO: https://github.com/diffplug/selfie/issues/186
   getInputs().dir('../undertest-kotest/src/commonTest/kotlin')

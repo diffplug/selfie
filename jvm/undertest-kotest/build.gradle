@@ -27,7 +27,8 @@ kotlin {
   sourceSets {
     commonTest {
       dependencies {
-        project(":selfie-runner-kotest")
+        implementation(project(":selfie-lib"))
+        implementation(project(":selfie-runner-kotest"))
         implementation("io.kotest:kotest-framework-engine:$ver_KOTEST")
         implementation("io.kotest:kotest-assertions-core:$ver_KOTEST")
         implementation(kotlin('test'))
