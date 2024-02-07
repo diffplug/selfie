@@ -34,6 +34,7 @@ class HarnessVerifyTest : HarnessKotest() {
       ut_mirrorKt().restoreFromGit()
       val actualContent = ut_mirrorKt().linesFrom("UT_HarnessVerifyTest").toLast("}").content()
       actualContent shouldBe initialContent
+      gradleInteractivePass() // finish with a pass so CI doesn't pickup the old failure
     }
   }
 }
