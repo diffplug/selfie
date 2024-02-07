@@ -17,7 +17,7 @@ package com.diffplug.selfie.kotest
 
 class StringSpecTest : HarnessKotest() {
   init {
-    "test" {
+    test("smoke") {
       gradleWriteSS()
       ut_snapshot()
           .assertContent(

@@ -21,16 +21,16 @@ class HarnessVerifyTest : HarnessKotest() {
   private var initialContent: String = ""
 
   init {
-    "initialize" {
+    test("initialize") {
       ut_mirrorKt().restoreFromGit()
       initialContent = ut_mirrorKt().linesFrom("UT_HarnessVerifyTest").toLast("}").content()
     }
-    "runAll" { gradleInteractivePass() }
-    "uncommentFailure" {
+    test("runAll") { gradleInteractivePass() }
+    test("uncommentFailure") {
       ut_mirrorKt().linesFrom("alwaysFails()").toFirst("}").uncomment()
       gradleInteractiveFail()
     }
-    "restoreInitial" {
+    test("restoreInitial") {
       ut_mirrorKt().restoreFromGit()
       val actualContent = ut_mirrorKt().linesFrom("UT_HarnessVerifyTest").toLast("}").content()
       actualContent shouldBe initialContent
