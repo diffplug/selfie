@@ -13,5 +13,8 @@
       "matchFileNames": ["jvm/**"],
       "labels": ["jvm"]
     }
+  ],
+  "schedule": [
+    "every weekend"
   ]
 }
