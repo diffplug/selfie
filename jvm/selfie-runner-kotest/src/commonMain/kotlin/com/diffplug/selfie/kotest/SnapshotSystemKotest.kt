@@ -43,16 +43,17 @@ internal object SnapshotSystemKotest : SnapshotSystem {
   override val layout = SnapshotFileLayoutKotest(SelfieSettingsAPI.initialize(), fs)
   private val commentTracker = CommentTracker()
   private val inlineWriteTracker = InlineWriteTracker()
-  private val progressPerClass = atomic(ArrayMap.empty<String, SnapshotFileProgress>())
-  fun forClass(className: String): SnapshotFileProgress {
+  private val progressPerFile = atomic(ArrayMap.empty<String, SnapshotFileProgress>())
+  fun forClassOrFilename(classOrFilename: String): SnapshotFileProgress {
     // optimize for reads
-    progressPerClass.get()[className]?.let {
+    progressPerFile.get()[classOrFilename]?.let {
       return it
     }
     // sometimes we'll have to write
-    return progressPerClass
-        .updateAndGet { it.plusOrNoOp(className, SnapshotFileProgress(this, className)) }[
-            className]!!
+    return progressPerFile
+        .updateAndGet {
+          it.plusOrNoOp(classOrFilename, SnapshotFileProgress(this, classOrFilename))
+        }[classOrFilename]!!
   }
   private val checkForInvalidStale = atomic<ArraySet<TypedPath>?>(ArraySet.empty())
   internal fun markPathAsWritten(typedPath: TypedPath) {
@@ -87,7 +88,7 @@ internal object SnapshotSystemKotest : SnapshotSystem {
       }
     }
     for (stale in findStaleSnapshotFiles(layout)) {
-      val staleFile = layout.snapshotPathForClass(stale)
+      val staleFile = layout.snapshotPathForClassOrFilename(stale)
       if (snapshotsFilesWrittenToDisk.contains(staleFile)) {
         throw AssertionError(
             "Selfie wrote a snapshot and then marked it stale for deletion in the same run: $staleFile\nSelfie will delete this snapshot on the next run, which is bad! Why is Selfie marking this snapshot as stale?")
@@ -109,15 +110,15 @@ internal data class DiskStorageKotest(val file: SnapshotFileProgress, val test: 
   }
   private fun suffix(sub: String) = if (sub == "") "" else "/$sub"
   override fun compareTo(other: DiskStorageKotest): Int =
-      compareValuesBy(this, other, { it.file.className }, { it.test })
-  override fun toString(): String = "${file.className}#$test"
+      compareValuesBy(this, other, { it.file.classOrFilename }, { it.test })
+  override fun toString(): String = "${file.classOrFilename}#$test"
 }
 
 /**
  * Tracks the progress of test runs within a single disk snapshot file, so that snapshots can be
  * pruned.
  */
-internal class SnapshotFileProgress(val system: SnapshotSystemKotest, val className: String) {
+internal class SnapshotFileProgress(val system: SnapshotSystemKotest, val classOrFilename: String) {
   companion object {
     val TERMINATED =
         ArrayMap.empty<String, WithinTestGC>().plus(" ~ / f!n1shed / ~ ", WithinTestGC())
@@ -152,18 +153,18 @@ internal class SnapshotFileProgress(val system: SnapshotSystemKotest, val classN
     assertNotTerminated()
     diskWriteTracker = null // don't need this anymore
     val tests = tests.getAndUpdate { TERMINATED }
-    require(tests !== TERMINATED) { "Snapshot $className already terminated!" }
+    require(tests !== TERMINATED) { "Snapshot $classOrFilename already terminated!" }
     if (file != null) {
       val staleSnapshotIndices =
           WithinTestGC.findStaleSnapshotsWithin(
-              file!!.snapshots, tests, findTestMethodsThatDidntRun(className, tests))
+              file!!.snapshots, tests, findTestMethodsThatDidntRun(classOrFilename, tests))
       if (staleSnapshotIndices.isNotEmpty() || file!!.wasSetAtTestTime) {
         file!!.removeAllIndices(staleSnapshotIndices)
-        val snapshotPath = system.layout.snapshotPathForClass(className)
+        val snapshotPath = system.layout.snapshotPathForClassOrFilename(classOrFilename)
         if (file!!.snapshots.isEmpty()) {
           deleteFileAndParentDirIfEmpty(snapshotPath)
         } else {
-          system.markPathAsWritten(system.layout.snapshotPathForClass(className))
+          system.markPathAsWritten(system.layout.snapshotPathForClassOrFilename(classOrFilename))
           FS_SYSTEM.createDirectories(snapshotPath.toPath().parent!!)
           FS_SYSTEM.write(snapshotPath.toPath()) {
             val sink = this
@@ -191,11 +192,11 @@ internal class SnapshotFileProgress(val system: SnapshotSystemKotest, val classN
       }
     } else {
       // we never read or wrote to the file
-      val everyTestInClassRan = findTestMethodsThatDidntRun(className, tests).none()
+      val everyTestInClassRan = findTestMethodsThatDidntRun(classOrFilename, tests).none()
       val isStale =
           everyTestInClassRan && success && tests.values.all { it.succeededAndUsedNoSnapshots() }
       if (isStale) {
-        val snapshotFile = system.layout.snapshotPathForClass(className)
+        val snapshotFile = system.layout.snapshotPathForClassOrFilename(classOrFilename)
         deleteFileAndParentDirIfEmpty(snapshotFile)
       }
     }
@@ -234,7 +235,7 @@ internal class SnapshotFileProgress(val system: SnapshotSystemKotest, val classN
   }
   private fun read(): SnapshotFile {
     if (file == null) {
-      val snapshotPath = system.layout.snapshotPathForClass(className).toPath()
+      val snapshotPath = system.layout.snapshotPathForClassOrFilename(classOrFilename).toPath()
       file =
           if (FS_SYSTEM.metadataOrNull(snapshotPath)?.isRegularFile == true) {
             val content = FS_SYSTEM.read(snapshotPath) { readByteArray() }

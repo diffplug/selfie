@@ -55,13 +55,13 @@ object SelfieExtension :
     }
   }
   private fun snapshotFileFor(testCase: TestCase): SnapshotFileProgress {
-    val clazz: String =
+    val classOrFilename: String =
         when (val source = testCase.source) {
           is SourceRef.ClassSource -> source.fqn
-          is SourceRef.FileSource -> TODO("Handle SourceRef.FileSource")
+          is SourceRef.FileSource -> source.fileName
           is SourceRef.None -> TODO("Handle SourceRef.None")
         }
-    return SnapshotSystemKotest.forClass(clazz)
+    return SnapshotSystemKotest.forClassOrFilename(classOrFilename)
   }
   override suspend fun finalizeSpec(
       kclass: KClass<out Spec>,

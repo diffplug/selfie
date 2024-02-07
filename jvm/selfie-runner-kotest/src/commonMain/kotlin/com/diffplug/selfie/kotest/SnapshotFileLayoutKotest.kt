@@ -62,19 +62,42 @@ class SnapshotFileLayoutKotest(settings: SelfieSettingsAPI, override val fs: FS)
     val possibleNames = likelyExtensions.map { "$fileWithoutExtension.$it" }.toSet()
     return fs.fileWalk(folder) { walk -> walk.filter { it.name in possibleNames }.firstOrNull() }
   }
-  fun snapshotPathForClass(className: String): TypedPath {
-    val lastDot = className.lastIndexOf('.')
-    val classFolder: TypedPath
-    val filename: String
-    if (lastDot == -1) {
-      classFolder = rootFolder
-      filename = className + extension
+  fun snapshotPathForClassOrFilename(classNameOrFilename: String): TypedPath {
+    if (!classNameOrFilename.endsWith(".kt")) {
+      val lastDot = classNameOrFilename.lastIndexOf('.')
+      val classFolder: TypedPath
+      val ssFilename: String
+      if (lastDot == -1) {
+        classFolder = rootFolder
+        ssFilename = classNameOrFilename + extension
+      } else {
+        classFolder =
+            rootFolder.resolveFolder(classNameOrFilename.substring(0, lastDot).replace('.', '/'))
+        ssFilename = classNameOrFilename.substring(lastDot + 1) + extension
+      }
+      val ssFolder = snapshotFolderName?.let { classFolder.resolveFolder(it) } ?: classFolder
+      return ssFolder.resolveFile(ssFilename)
     } else {
-      classFolder = rootFolder.resolveFolder(className.substring(0, lastDot).replace('.', '/'))
-      filename = className.substring(lastDot + 1) + extension
+      val lastDot = classNameOrFilename.lastIndexOf(".")
+      val snapshotFileName = classNameOrFilename.substring(0, lastDot)
+      val filename = classNameOrFilename.substring(0, lastDot) + extension
+      val testSource =
+          FSOkio.fileWalk(rootFolder) { seq ->
+            val allPaths = seq.filter { it.name == classNameOrFilename }.toList()
+            if (allPaths.size > 1) {
+              throw AssertionError(
+                  "Cannot store snapshot because snapshot path is ambiguous, multiple files named $classNameOrFilename were found:\n  - ${allPaths.joinToString("\n  - ")}")
+            } else if (allPaths.isEmpty()) {
+              throw AssertionError(
+                  "Cannot store snapshot because no file named $classNameOrFilename was found")
+            } else {
+              TypedPath.ofFile(allPaths.single().absolutePath)
+            }
+          }
+      val folder = testSource.parentFolder()
+      val ssFolder = snapshotFolderName?.let { folder.resolveFolder(it) } ?: folder
+      return ssFolder.resolveFile(filename)
     }
-    val parentFolder = snapshotFolderName?.let { classFolder.resolveFolder(it) } ?: classFolder
-    return parentFolder.resolveFile(filename)
   }
 
   companion object {
