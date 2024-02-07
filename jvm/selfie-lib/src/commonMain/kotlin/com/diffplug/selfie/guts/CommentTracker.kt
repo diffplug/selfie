@@ -17,13 +17,6 @@ package com.diffplug.selfie.guts
 
 import com.diffplug.selfie.ArrayMap
 
-internal expect class CAS<T> {
-  fun get(): T
-  fun updateAndGet(update: (T) -> T): T
-}
-
-internal expect fun <T> createCas(initial: T): CAS<T>
-
 /**
  * Tracks whether a given file has a comment which allows it to be written to. Thread-safe on
  * multithreaded platforms.
@@ -35,10 +28,8 @@ class CommentTracker {
     FOREVER;
     val writable: Boolean
       get() = this != NO_COMMENT
-    val needsRemoval: Boolean
-      get() = this == ONCE
   }
-  private val cache = createCas(ArrayMap.empty<TypedPath, WritableComment>())
+  private val cache = atomic(ArrayMap.empty<TypedPath, WritableComment>())
   fun pathsWithOnce(): Iterable<TypedPath> =
       cache.get().mapNotNull { if (it.value == WritableComment.ONCE) it.key else null }
   fun hasWritableComment(call: CallStack, layout: SnapshotFileLayout): Boolean {

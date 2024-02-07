@@ -16,11 +16,22 @@
 package com.diffplug.selfie.guts
 
 import java.util.concurrent.atomic.AtomicReference
+actual fun <T> atomic(initial: T): AtomicRef<T> = AtomicRef(initial)
 
-internal actual fun <T> createCas(initial: T): CAS<T> = CAS(initial)
-
-internal actual class CAS<T>(value: T) {
+actual class AtomicRef<T>(value: T) {
   val ref = AtomicReference(value)
   actual fun get() = ref.get()
   actual fun updateAndGet(update: (T) -> T): T = ref.updateAndGet(update)
+  actual fun getAndUpdate(update: (T) -> T) = ref.getAndUpdate(update)
+}
+actual inline fun reentrantLock() = ReentrantLock()
+
+actual typealias ReentrantLock = java.util.concurrent.locks.ReentrantLock
+actual inline fun <T> ReentrantLock.withLock(block: () -> T): T {
+  lock()
+  try {
+    return block()
+  } finally {
+    unlock()
+  }
 }

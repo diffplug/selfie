@@ -15,14 +15,21 @@
  */
 package com.diffplug.selfie.guts
 
-actual data class CallLocation(actual val fileName: String?, actual val line: Int) :
-    Comparable<CallLocation> {
-  override fun compareTo(other: CallLocation) =
-      compareValuesBy(this, other, { it.fileName }, { it.line })
-  actual fun withLine(line: Int): CallLocation = TODO()
-  actual fun ideLink(layout: SnapshotFileLayout): String = TODO()
-  actual fun samePathAs(other: CallLocation): Boolean = TODO()
-  actual fun sourceFilenameWithoutExtension(): String = TODO()
+expect class AtomicRef<T> {
+  fun get(): T
+  fun updateAndGet(update: (T) -> T): T
+  fun getAndUpdate(update: (T) -> T): T
 }
 
-internal actual fun recordCall(callerFileOnly: Boolean): CallStack = TODO()
+/** Replace with atomicfu when stable. */
+expect fun <T> atomic(initial: T): AtomicRef<T>
+
+expect fun reentrantLock(): ReentrantLock
+
+expect class ReentrantLock {
+  fun lock(): Unit
+  fun tryLock(): Boolean
+  fun unlock(): Unit
+}
+
+expect inline fun <T> ReentrantLock.withLock(block: () -> T): T

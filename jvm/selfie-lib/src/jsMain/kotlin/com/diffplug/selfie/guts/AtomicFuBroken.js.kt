@@ -14,13 +14,27 @@
  * limitations under the License.
  */
 package com.diffplug.selfie.guts
+actual fun <T> atomic(initial: T): AtomicRef<T> = AtomicRef(initial)
 
-internal actual fun <T> createCas(initial: T): CAS<T> = CAS(initial)
-
-internal actual class CAS<T>(var value: T) {
+actual class AtomicRef<T>(private var value: T) {
   actual fun get() = value
   actual fun updateAndGet(update: (T) -> T): T {
     value = update(value)
     return value
   }
+  actual fun getAndUpdate(update: (T) -> T): T {
+    val oldValue = value
+    value = update(value)
+    return oldValue
+  }
 }
+val Lock = ReentrantLock()
+actual inline fun reentrantLock() = Lock
+
+@Suppress("NOTHING_TO_INLINE")
+actual class ReentrantLock {
+  actual inline fun lock(): Unit {}
+  actual inline fun tryLock() = true
+  actual inline fun unlock(): Unit {}
+}
+actual inline fun <T> ReentrantLock.withLock(block: () -> T) = block()

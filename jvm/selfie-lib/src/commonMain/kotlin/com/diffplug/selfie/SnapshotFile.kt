@@ -15,7 +15,7 @@
  */
 package com.diffplug.selfie
 
-import com.diffplug.selfie.guts.createCas
+import com.diffplug.selfie.guts.atomic
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.jvm.JvmStatic
@@ -143,7 +143,7 @@ class SnapshotFile {
     set(value) {
       _snapshots.updateAndGet { value }
     }
-  private val _snapshots = createCas(ArrayMap.empty<String, Snapshot>())
+  private val _snapshots = atomic(ArrayMap.empty<String, Snapshot>())
   fun serialize(valueWriterRaw: Appendable) {
     val valueWriter = if (unixNewlines) valueWriterRaw else ConvertToWindowsNewlines(valueWriterRaw)
     metadata?.let { writeEntry(valueWriter, "📷 ${it.key}", null, SnapshotValue.of(it.value)) }
@@ -157,7 +157,7 @@ class SnapshotFile {
   }
   val wasSetAtTestTime: Boolean
     get() = _wasSetAtTestTime.get()
-  private val _wasSetAtTestTime = createCas(false)
+  private val _wasSetAtTestTime = atomic(false)
   fun setAtTestTime(key: String, snapshot: Snapshot) {
     val oldSnapshots = _snapshots.get()
     val newSnapshots = _snapshots.updateAndGet { it.plusOrNoOpOrReplace(key, snapshot) }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024 DiffPlug
+ * Copyright (C) 2024 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,29 +13,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.diffplug.selfie.junit5
+package com.diffplug.selfie.kotest
 
+import com.diffplug.selfie.guts.AtomicRef
 import com.diffplug.selfie.guts.CallLocation
 import com.diffplug.selfie.guts.FS
 import com.diffplug.selfie.guts.SnapshotFileLayout
 import com.diffplug.selfie.guts.SourcePathCache
 import com.diffplug.selfie.guts.TypedPath
-import java.util.concurrent.atomic.AtomicReference
+import com.diffplug.selfie.guts.atomic
 
-class SnapshotFileLayoutJUnit5(settings: SelfieSettingsAPI, override val fs: FS) :
+class SnapshotFileLayoutKotest(settings: SelfieSettingsAPI, override val fs: FS) :
     SnapshotFileLayout {
-  internal val smuggledError =
-      AtomicReference<Throwable?>(
-          if (settings is SelfieSettingsSmuggleError) settings.error else null)
-  override val rootFolder = TypedPath.ofFolder(settings.rootFolder.absolutePath)
+  internal var smuggledError: AtomicRef<Throwable?> =
+      atomic(if (settings is SelfieSettingsSmuggleError) settings.error else null)
+  override val rootFolder = TypedPath.ofFolder(settings.rootFolder.toString())
   private val otherSourceRoots = settings.otherSourceRoots
   override val allowMultipleEquivalentWritesToOneLocation =
       settings.allowMultipleEquivalentWritesToOneLocation
   val snapshotFolderName = settings.snapshotFolderName
   internal val unixNewlines = inferDefaultLineEndingIsUnix(rootFolder, fs)
   val extension: String = ".ss"
-  private val cache =
-      SourcePathCache(this::computePathForCall, Runtime.getRuntime().availableProcessors() * 4)
+  private val cache = SourcePathCache(this::computePathForCall, 64)
   override fun sourcePathForCall(call: CallLocation): TypedPath {
     checkForSmuggledError()
     val nonNull =
@@ -51,7 +50,7 @@ class SnapshotFileLayoutJUnit5(settings: SelfieSettingsAPI, override val fs: FS)
   private fun computePathForCall(call: CallLocation): TypedPath? =
       sequence {
             yield(rootFolder)
-            yieldAll(otherSourceRoots.map { TypedPath.ofFolder(it.absolutePath) })
+            yieldAll(otherSourceRoots.map { TypedPath.ofFolder(it.toString()) })
           }
           .firstNotNullOfOrNull { computePathForCall(it, call) }
   private fun computePathForCall(folder: TypedPath, call: CallLocation): TypedPath? {
@@ -59,7 +58,7 @@ class SnapshotFileLayoutJUnit5(settings: SelfieSettingsAPI, override val fs: FS)
       return fs.fileWalk(folder) { walk -> walk.filter { it.name == call.fileName }.firstOrNull() }
     }
     val fileWithoutExtension = call.sourceFilenameWithoutExtension()
-    val likelyExtensions = listOf("kt", "java", "scala", "groovy", "clj", "cljc")
+    val likelyExtensions = listOf("kt", "java", "scala", "groovy", "clj", "cljc", "ts", "js")
     val possibleNames = likelyExtensions.map { "$fileWithoutExtension.$it" }.toSet()
     return fs.fileWalk(folder) { walk -> walk.filter { it.name in possibleNames }.firstOrNull() }
   }

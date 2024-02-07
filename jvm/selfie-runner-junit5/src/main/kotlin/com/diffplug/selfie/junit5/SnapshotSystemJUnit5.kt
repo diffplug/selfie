@@ -28,9 +28,9 @@ import com.diffplug.selfie.guts.SnapshotSystem
 import com.diffplug.selfie.guts.SourceFile
 import com.diffplug.selfie.guts.TypedPath
 import com.diffplug.selfie.guts.WithinTestGC
+import com.diffplug.selfie.guts.atomic
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
-import java.util.concurrent.ConcurrentSkipListSet
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
@@ -63,11 +63,10 @@ internal object SnapshotSystemJUnit5 : SnapshotSystem {
   @JvmStatic fun initStorage(): SnapshotSystem = this
   override val fs = FSJava
   override val mode = calcMode()
-  private val settings = SelfieSettingsAPI.initialize()
-  override val layout = SnapshotFileLayoutJUnit5(settings, fs)
+  override val layout = SnapshotFileLayoutJUnit5(SelfieSettingsAPI.initialize(), fs)
   private val commentTracker = CommentTracker()
   private val inlineWriteTracker = InlineWriteTracker()
-  private val progressPerClass = AtomicReference(ArrayMap.empty<String, SnapshotFileProgress>())
+  private val progressPerClass = atomic(ArrayMap.empty<String, SnapshotFileProgress>())
   fun forClass(className: String): SnapshotFileProgress {
     // optimize for reads
     progressPerClass.get()[className]?.let {
@@ -78,14 +77,13 @@ internal object SnapshotSystemJUnit5 : SnapshotSystem {
         .updateAndGet { it.plusOrNoOp(className, SnapshotFileProgress(this, className)) }[
             className]!!
   }
-
-  private var checkForInvalidStale: AtomicReference<MutableSet<TypedPath>?> =
-      AtomicReference(ConcurrentSkipListSet())
+  private val checkForInvalidStale = atomic<ArraySet<TypedPath>?>(ArraySet.empty())
   internal fun markPathAsWritten(typedPath: TypedPath) {
-    val written =
-        checkForInvalidStale.get()
-            ?: throw AssertionError("Snapshot file is being written after all tests were finished.")
-    written.add(typedPath)
+    checkForInvalidStale.updateAndGet {
+      if (it == null)
+          throw AssertionError("Snapshot file is being written after all tests were finished.")
+      it.plusOrThis(typedPath)
+    }
   }
   override fun sourceFileHasWritableComment(call: CallStack): Boolean {
     return commentTracker.hasWritableComment(call, layout)
@@ -96,6 +94,10 @@ internal object SnapshotSystemJUnit5 : SnapshotSystem {
   override suspend fun diskCoroutine(): DiskStorage = TODO()
   override fun diskThreadLocal(): DiskStorage = diskThreadLocalTyped()
   fun finishedAllTests() {
+    val snapshotsFilesWrittenToDisk =
+        checkForInvalidStale.getAndUpdate { null }
+            ?: throw AssertionError("finishedAllTests() was called more than once.")
+
     missingDownsErrorMsg()?.let { errorMsg -> throw AssertionError("THREAD ERROR: $errorMsg") }
     if (mode != Mode.readonly) {
       for (path in commentTracker.pathsWithOnce()) {
@@ -107,9 +109,6 @@ internal object SnapshotSystemJUnit5 : SnapshotSystem {
         inlineWriteTracker.persistWrites(layout)
       }
     }
-    val snapshotsFilesWrittenToDisk =
-        checkForInvalidStale.getAndSet(null)
-            ?: throw AssertionError("finishedAllTests() was called more than once.")
     for (stale in findStaleSnapshotFiles(layout)) {
       val staleFile = layout.snapshotPathForClass(stale)
       if (snapshotsFilesWrittenToDisk.contains(staleFile)) {

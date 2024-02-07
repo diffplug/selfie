@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Selfie.withinCoroutine()` for making assertions off of the main thread. ([#198](https://github.com/diffplug/selfie/pull/198))
 ### Fixed
 - Now compatible with [`Kotest`](https://kotest.io/docs/framework/framework.html). ([#200](https://github.com/diffplug/selfie/pull/200))
+- Swap thread-local cache for thread-ignorant LRU to improve performance when used with coroutines. ([#191](https://github.com/diffplug/selfie/pull/191))
 ### Changes
 - (no user-facing changes) replaced terrible platform-specific `Path` with `TypedPath`. ([#184](https://github.com/diffplug/selfie/pull/184))
 - (no user-facing changes) replaced `SnapshotStorage` with `SnapshotSystem` + `DiskStorage`. ([#198](https://github.com/diffplug/selfie/pull/198))
