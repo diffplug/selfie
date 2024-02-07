@@ -48,15 +48,10 @@ class Later internal constructor(private val disk: DiskStorage) {
 
 object SelfieSuspend {
   private suspend fun disk() = Selfie.system.diskCoroutine()
-
   suspend fun <T> expectSelfie(actual: T, camera: Camera<T>) = expectSelfie(camera.snapshot(actual))
-
   suspend fun expectSelfie(actual: String) = expectSelfie(Snapshot.of(actual))
-
   suspend fun expectSelfie(actual: ByteArray) = expectSelfie(Snapshot.of(actual))
-
   suspend fun expectSelfie(actual: Snapshot) = Selfie.DiskSelfie(actual, disk())
-
   suspend fun preserveSelfiesOnDisk(vararg subsToKeep: String) {
     val disk = disk()
     if (subsToKeep.isEmpty()) {
@@ -65,6 +60,7 @@ object SelfieSuspend {
       subsToKeep.forEach { disk.keep(it) }
     }
   }
+  suspend fun later() = Later(disk())
 }
 
 object Selfie {
@@ -88,8 +84,6 @@ object Selfie {
   }
 
   @JvmStatic fun later() = Later(system.diskThreadLocal())
-
-  suspend fun withinCoroutine() = Later(system.diskCoroutine())
 
   class DiskSelfie internal constructor(actual: Snapshot, val disk: DiskStorage) :
       LiteralStringSelfie(actual) {
