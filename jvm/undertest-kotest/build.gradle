@@ -33,14 +33,22 @@ kotlin {
         implementation(kotlin('test'))
       }
     }
+    jvmTest {
+      dependencies {
+        implementation "io.kotest:kotest-runner-junit5:$ver_KOTEST"
+      }
+    }
   }
 }
 tasks.named('jvmTest').configure {
+  useJUnitPlatform()
   enabled = findProperty("underTest") == "true"
   testLogging.showStandardStreams = true
   // the snapshots are both output and input, for this harness best if the test just always runs
   outputs.upToDateWhen { false }
   // defaults to 'write'
-  systemProperty 'selfie', findProperty('selfie')
-  systemProperty 'selfie.settings', findProperty('selfie.settings')
+  String SELFIE = findProperty('selfie')
+  if (SELFIE != null) {
+    environment['SELFIE'] = SELFIE
+  }
 }

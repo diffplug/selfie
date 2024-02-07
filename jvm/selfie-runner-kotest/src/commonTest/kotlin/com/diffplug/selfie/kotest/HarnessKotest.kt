@@ -223,18 +223,19 @@ open class HarnessKotest() : StringSpec() {
       return FS_SYSTEM.read(pathStr.toPath()) { AssertionError(readUtf8()) }
     }
   }
+  private fun testName() = "UT_${thisClassName()}"
   fun gradleWriteSS() {
-    gradlew("test", "-PunderTest=true", "-Pselfie=overwrite")?.let {
+    gradlew("test", "-PunderTest=true", "-Pselfie=overwrite", "--tests", testName())?.let {
       throw AssertionError("Expected write snapshots to succeed, but it failed", it)
     }
   }
   fun gradleReadSS() {
-    gradlew("test", "-PunderTest=true", "-Pselfie=readonly")?.let {
+    gradlew("test", "-PunderTest=true", "-Pselfie=readonly", "--tests", testName())?.let {
       throw AssertionError("Expected read snapshots to succeed, but it failed", it)
     }
   }
   fun gradleReadSSFail(): AssertionError {
-    val failure = gradlew("test", "-PunderTest=true", "-Pselfie=readonly")
+    val failure = gradlew("test", "-PunderTest=true", "-Pselfie=readonly", "--tests", testName())
     if (failure == null) {
       throw AssertionError("Expected read snapshots to fail, but it succeeded.")
     } else {
@@ -242,12 +243,12 @@ open class HarnessKotest() : StringSpec() {
     }
   }
   fun gradleInteractivePass() {
-    gradlew("test", "-PunderTest=true", "-Pselfie=interactive")?.let {
+    gradlew("test", "-PunderTest=true", "-Pselfie=interactive", "--tests", testName())?.let {
       throw AssertionError("Expected interactive selfie run to succeed, but it failed.", it)
     }
   }
   fun gradleInteractiveFail(): AssertionError {
-    val failure = gradlew("test", "-PunderTest=true", "-Pselfie=interactive")
+    val failure = gradlew("test", "-PunderTest=true", "-Pselfie=interactive", "--tests", testName())
     if (failure == null) {
       throw AssertionError("Expected interactive selfie run to fail, but it succeeded.")
     } else {
