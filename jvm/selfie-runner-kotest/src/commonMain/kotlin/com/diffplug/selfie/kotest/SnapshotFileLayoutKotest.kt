@@ -25,15 +25,15 @@ import com.diffplug.selfie.guts.atomic
 
 class SnapshotFileLayoutKotest(settings: SelfieSettingsAPI, override val fs: FS) :
     SnapshotFileLayout {
-  internal var smuggledError: AtomicRef<Throwable?> =
+  private var smuggledError: AtomicRef<Throwable?> =
       atomic(if (settings is SelfieSettingsSmuggleError) settings.error else null)
   override val rootFolder = TypedPath.ofFolder(settings.rootFolder.toString())
   private val otherSourceRoots = settings.otherSourceRoots
   override val allowMultipleEquivalentWritesToOneLocation =
       settings.allowMultipleEquivalentWritesToOneLocation
-  val snapshotFolderName = settings.snapshotFolderName
+  private val snapshotFolderName = settings.snapshotFolderName
   internal val unixNewlines = inferDefaultLineEndingIsUnix(rootFolder, fs)
-  val extension: String = ".ss"
+  private val extension: String = ".ss"
   private val cache = SourcePathCache(this::computePathForCall, 64)
   override fun sourcePathForCall(call: CallLocation): TypedPath {
     checkForSmuggledError()
@@ -75,24 +75,6 @@ class SnapshotFileLayoutKotest(settings: SelfieSettingsAPI, override val fs: FS)
     }
     val parentFolder = snapshotFolderName?.let { classFolder.resolveFolder(it) } ?: classFolder
     return parentFolder.resolveFile(filename)
-  }
-  fun subpathToClassname(subpath: String): String {
-    check(subpath.indexOf('\\') == -1)
-    val classnameWithSlashes =
-        if (snapshotFolderName == null) {
-          subpath.substring(0, subpath.length - extension.length)
-        } else {
-          val lastSlash = subpath.lastIndexOf('/')
-          val secondToLastSlash = subpath.lastIndexOf('/', lastSlash - 1)
-          check(secondToLastSlash != -1) { "Expected at least two slashes in $subpath" }
-          check(lastSlash - secondToLastSlash - 1 == snapshotFolderName.length) {
-            "Expected '$subpath' to be in a folder named '$snapshotFolderName'"
-          }
-          val simpleName = subpath.substring(lastSlash + 1, subpath.length - extension.length)
-          if (secondToLastSlash == -1) simpleName
-          else subpath.substring(0, secondToLastSlash + 1) + simpleName
-        }
-    return classnameWithSlashes.replace('/', '.')
   }
 
   companion object {

@@ -169,16 +169,20 @@ internal class SnapshotFileProgress(val system: SnapshotSystemKotest, val classN
             val sink = this
             file!!.serialize(
                 object : Appendable {
-                  override fun append(csq: CharSequence?): Appendable {
-                    csq?.let { sink.writeUtf8(it.toString()) }
+                  override fun append(value: CharSequence?): Appendable {
+                    value?.let { sink.writeUtf8(it.toString()) }
                     return this
                   }
-                  override fun append(csq: CharSequence?, start: Int, end: Int): Appendable {
-                    csq?.let { sink.writeUtf8(it.subSequence(start, end).toString()) }
+                  override fun append(
+                      value: CharSequence?,
+                      startIndex: Int,
+                      endIndex: Int
+                  ): Appendable {
+                    value?.let { sink.writeUtf8(it.subSequence(startIndex, endIndex).toString()) }
                     return this
                   }
-                  override fun append(c: Char): Appendable {
-                    sink.writeUtf8(c.toString())
+                  override fun append(value: Char): Appendable {
+                    sink.writeUtf8(value.toString())
                     return this
                   }
                 })
@@ -255,5 +259,5 @@ private fun deleteFileAndParentDirIfEmpty(snapshotFile: TypedPath) {
 internal fun findTestMethodsThatDidntRun(
     className: String,
     testsThatRan: ArrayMap<String, WithinTestGC>,
-): Sequence<String> = TODO()
-internal fun findStaleSnapshotFiles(layout: SnapshotFileLayoutKotest): List<String> = TODO()
+): Sequence<String> = sequenceOf()
+internal fun findStaleSnapshotFiles(layout: SnapshotFileLayoutKotest): List<String> = listOf()

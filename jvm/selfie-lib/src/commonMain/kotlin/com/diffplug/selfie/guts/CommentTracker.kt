@@ -33,7 +33,7 @@ class CommentTracker {
   fun pathsWithOnce(): Iterable<TypedPath> =
       cache.get().mapNotNull { if (it.value == WritableComment.ONCE) it.key else null }
   fun hasWritableComment(call: CallStack, layout: SnapshotFileLayout): Boolean {
-    val path = layout.sourcePathForCall(call.location) ?: return false
+    val path = layout.sourcePathForCall(call.location)
     val comment = cache.get()[path]
     return if (comment != null) {
       comment.writable
