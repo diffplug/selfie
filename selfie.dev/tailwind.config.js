@@ -39,7 +39,7 @@ module.exports = {
             opacity: 1,
           },
           to: {
-            opacity: 0.2,
+            opacity: 0.01,
           },
         },
         horseHeight: {
