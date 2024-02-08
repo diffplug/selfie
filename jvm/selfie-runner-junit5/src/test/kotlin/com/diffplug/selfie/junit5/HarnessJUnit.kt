@@ -209,8 +209,15 @@ open class HarnessJUnit() {
 
   protected var runOnlyMethod: String? = null
   fun gradlew(task: String, vararg args: String): AssertionFailedError? {
+    val rootProjectThisOrMaybeAHarness =
+        if (subprojectFolder.name != "undertest-junit5-kotest") {
+          subprojectFolder.parent!!.toFile()
+        } else {
+          // https://github.com/diffplug/selfie/issues/203
+          subprojectFolder.resolve("harness").toFile()
+        }
     return GradleConnector.newConnector()
-        .forProjectDirectory(subprojectFolder.parent!!.toFile())
+        .forProjectDirectory(rootProjectThisOrMaybeAHarness)
         .connect()
         .use { connection ->
           try {
