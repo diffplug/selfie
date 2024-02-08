@@ -68,8 +68,8 @@ dependencies {
 }
 tasks.test {
   useJUnitPlatform()
-  environment(properties.filter { it.key == "selfie" })
-  inputs.files(fileTree("src/test") {
+  environment(properties.filter { it.key == "selfie" }) // optional, see "Overwrite everything" below
+  inputs.files(fileTree("src/test") { // optional, improves up-to-date checking
     include("**/*.ss")
   })
 }
@@ -155,18 +155,11 @@ Selfie has three modes:
 To set the mode, you set the `selfie` or `SELFIE` environment variable or system property to either `interactive`, `readonly`, or `overwrite`. But in the vast majority of cases, it's best to leave it alone and let the defaults do their thing.
 
 ```console
-user@machine repo % ./gradlew build
-:spotlessJavaCheck FAILED
-  The following files had format violations:
-  src\main\java\com\diffplug\gradle\spotless\FormatExtension.java
-    -\t\t····if·(targets.length·==·0)·{
-    +\t\tif·(targets.length·==·0)·{
-  Run './gradlew spotlessApply' to fix these violations.
-user@machine repo % ./gradlew spotlessApply
-:spotlessApply
-BUILD SUCCESSFUL
-user@machine repo % ./gradlew build
-BUILD SUCCESSFUL
+[MAVEN]
+user@machine repo % mvn test -Dselfie=overwrite
+
+[GRADLE (only works if you followed the install instructions above re: environment)]
+user@machine repo % ./gradlew test -Pselfie=overwrite
 ```
 
 ## Beyond toString
