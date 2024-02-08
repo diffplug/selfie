@@ -1,0 +1,7 @@
+plugins {
+    id 'com.diffplug.blowdryer'
+    id 'com.diffplug.spotless-changelog'
+}
+spotlessChangelog {
+    changelogFile '../../CHANGELOG.md'
+}
