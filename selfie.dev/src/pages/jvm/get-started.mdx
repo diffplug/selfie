@@ -35,22 +35,52 @@ If you're using Maven, add the following dependency to your `pom.xml` file:
 <dependency>
     <groupId>com.diffplug.selfie</groupId>
     <artifactId>selfie-runner-junit5</artifactId>
-    <version>LATEST_VERSION</version>
+    <version>${ver_SELFIE}</version>
     <scope>test</scope>
 </dependency>
 ```
 
-Replace `LATEST_VERSION` with the [latest available version of selfie](https://github.com/diffplug/selfie/blob/main/jvm/CHANGELOG.md).
+Replace `ver_SELFIE` with the [latest available version of selfie](https://github.com/diffplug/selfie/blob/main/jvm/CHANGELOG.md).
 
 ### Gradle
 
 For Gradle users, add this to your `build.gradle` file:
 
-```groovy
-testImplementation 'com.diffplug.selfie:selfie-runner-junit5:LATEST_VERSION'
+```kotlin
+dependencies {
+  // ... other dependencies
+  testImplementation "com.diffplug.selfie:selfie-runner-junit5:$ver_SELFIE"
+}
+test {
+  useJUnitPlatform()
+  environment project.properties.subMap(["selfie"]) // optional, see "Overwrite everything" below
+  inputs.files(fileTree("src/test") { // optional, improves up-to-date checking
+    include "**/*.ss"
+  })
+}
 ```
 
-Again, replace `LATEST_VERSION` with the [latest available version of selfie](https://github.com/diffplug/selfie/blob/main/jvm/CHANGELOG.md).
+or this to `build.gradle.kts`:
+
+```kotlin
+dependencies {
+  // ... other dependencies
+  testImplementation("com.diffplug.selfie:selfie-runner-junit5:$ver_SELFIE")
+}
+tasks.test {
+  useJUnitPlatform()
+  // optional, see "Overwrite everything" below
+  systemProperties = project.properties
+    .filterKeys { it.startsWith("selfie") }
+    .mapValues { it.value.toString() }
+
+  inputs.files(fileTree("src/test") {
+    include("**/*.ss")
+  })
+}
+```
+
+Again, replace `ver_SELFIE` with the [latest available version of selfie](https://github.com/diffplug/selfie/blob/main/jvm/CHANGELOG.md).
 
 ## Quickstart
 
@@ -118,6 +148,31 @@ For example, you might have a realtime timestamp or a random port number embedde
 For this reason, it is critical that a CI server should always run in `readonly` mode. No action is needed on your part, selfie automatically puts itself into `readonly` mode if the `CI=true` environment variable is present, which is true for all popular CI systems.
 
 When in `readonly` mode, selfie not only refuses to update any snapshots, it also fails the build if `_TODO`, `//selfieonce`, or `//SELFIEWRITE` are present in the sourcecode, even if the snapshots were correct. Writing snapshots is a strictly private affair 😏.
+
+## Overwrite everything
+
+Selfie has three modes:
+
+- `interactive`, the default mode, which we discussed in the [quickstart](#quickstart)
+- `readonly`, the default mode if `CI=true`, where no snapshots can be written
+- `overwrite`, where every snapshot is overwritten, regardless of whether it is `_TODO` or not
+
+To set the mode, you set the `selfie` or `SELFIE` environment variable or system property to either `interactive`, `readonly`, or `overwrite`. But in the vast majority of cases, it's best to leave it alone and let the defaults do their thing.
+
+```console
+user@machine repo % ./gradlew build
+:spotlessJavaCheck FAILED
+  The following files had format violations:
+  src\main\java\com\diffplug\gradle\spotless\FormatExtension.java
+    -\t\t····if·(targets.length·==·0)·{
+    +\t\tif·(targets.length·==·0)·{
+  Run './gradlew spotlessApply' to fix these violations.
+user@machine repo % ./gradlew spotlessApply
+:spotlessApply
+BUILD SUCCESSFUL
+user@machine repo % ./gradlew build
+BUILD SUCCESSFUL
+```
 
 ## Beyond toString
 
