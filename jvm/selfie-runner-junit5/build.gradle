@@ -26,24 +26,11 @@ dependencies {
   testImplementation gradleTestKit()
 }
 test {
-  useJUnitPlatform {
-    excludeTags 'kotest'
-  }
+  useJUnitPlatform()
   getInputs().dir('../undertest-junit5/src/test')
   getInputs().dir('../undertest-junit-vintage/src/test')
-}
-tasks.register('testKotest', Test) {
-  useJUnitPlatform {
-    includeTags 'kotest'
-  }
-  testClassesDirs = sourceSets.test.output.classesDirs
-  classpath = sourceSets.test.runtimeClasspath
   getInputs().dir('../undertest-junit5-kotest/src/test')
 }
-tasks.named("check") {
-  dependsOn testKotest
-}
-
 // it all needs to get published and formatted
 apply from: 干.file('base/maven.gradle')
 apply from: 干.file('base/sonatype.gradle')
