@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- **Kotest support**.
+  - `selfie-runner-junit5` now works well with kotest, but you have to use `Selfie.later()` to make any assertions past the first suspend point.
+  - `selfie-runner-kotest` is a new selfie implemented in Kotlin Multiplatform.
+    - Add `com.diffplug.selfie.kotest.SelfieExtension` to individual tests or to your `AbstractProjectConfig`.
+    - Call `SelfieSuspend.expectSelfie` instead of `Selfie.expectSelfie`.
 - `Selfie.later()` for making assertions off of the main thread. ([#198](https://github.com/diffplug/selfie/pull/198))
 - `Selfie.withinCoroutine()` for making assertions off of the main thread. ([#198](https://github.com/diffplug/selfie/pull/198))
 ### Fixed

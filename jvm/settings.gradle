@@ -27,8 +27,6 @@ plugins {
   id 'org.jetbrains.kotlin.multiplatform' version '1.9.22' apply false
   // https://github.com/adamko-dev/dokkatoo/releases
   id 'dev.adamko.dokkatoo-html' version '2.0.0' apply false
-  // https://plugins.gradle.org/plugin/io.kotest.multiplatform
-  id "io.kotest.multiplatform" version "5.8.0" apply false
 }
 
 blowdryerSetup {

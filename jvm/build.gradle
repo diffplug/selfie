@@ -19,7 +19,8 @@ apply from: 干.file('base/sonatype.gradle')
 // if IntelliJ is running, then you'll also get a localhost server link
 def HAS_DOCS = [
   'selfie-lib',
-  'selfie-runner-junit5'
+  'selfie-runner-junit5',
+  'selfie-runner-kotest'
 ]
 subprojects {
   if (name in HAS_DOCS) {

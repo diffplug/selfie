@@ -100,6 +100,9 @@ open class SelfieSettingsAPI {
             "src/test/kotlin",
             "src/test/groovy",
             "src/test/scala",
+            "src/commonTest/kotlin",
+            "src/jvmTest/kotlin",
+            "src/jsTest/kotlin",
             "src/test/resources")
     internal fun initialize(): SelfieSettingsAPI {
       try {

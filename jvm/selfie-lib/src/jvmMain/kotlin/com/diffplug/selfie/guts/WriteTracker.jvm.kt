@@ -29,7 +29,7 @@ actual data class CallLocation(
   actual fun withLine(line: Int): CallLocation = CallLocation(clazz, UNKNOWN_METHOD, fileName, line)
   actual fun samePathAs(other: CallLocation): Boolean =
       clazz == other.clazz && fileName == other.fileName
-  override fun compareTo(other: CallLocation): Int =
+  actual override fun compareTo(other: CallLocation): Int =
       compareValuesBy(this, other, { it.clazz }, { it.method }, { it.fileName }, { it.line })
 
   /**

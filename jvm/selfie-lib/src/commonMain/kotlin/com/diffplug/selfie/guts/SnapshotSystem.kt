@@ -31,6 +31,11 @@ data class TypedPath(val absolutePath: String) : Comparable<TypedPath> {
   private fun assertFolder() {
     check(isFolder) { "Expected $this to be a folder but it doesn't end with `/`" }
   }
+  fun parentFolder(): TypedPath {
+    val lastIdx = absolutePath.lastIndexOf('/')
+    check(lastIdx != -1)
+    return ofFolder(absolutePath.substring(0, lastIdx + 1))
+  }
   fun resolveFile(child: String): TypedPath {
     assertFolder()
     check(!child.startsWith("/")) { "Expected child to not start with a slash, but got $child" }

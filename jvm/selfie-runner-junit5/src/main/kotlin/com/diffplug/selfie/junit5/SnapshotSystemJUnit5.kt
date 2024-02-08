@@ -91,7 +91,7 @@ internal object SnapshotSystemJUnit5 : SnapshotSystem {
   override fun writeInline(literalValue: LiteralValue<*>, call: CallStack) {
     inlineWriteTracker.record(call, literalValue, layout)
   }
-  override suspend fun diskCoroutine(): DiskStorage = TODO()
+  override suspend fun diskCoroutine(): DiskStorage = TODO("THREADING GUIDE (TODO)")
   override fun diskThreadLocal(): DiskStorage = diskThreadLocalTyped()
   fun finishedAllTests() {
     val snapshotsFilesWrittenToDisk =
@@ -147,7 +147,7 @@ internal object SnapshotSystemJUnit5 : SnapshotSystem {
   // To make all of this work, we have to maintain the following maps:
   private fun diskThreadLocalTyped(): DiskStorageJUnit5 =
       threadMap.get().get(Thread.currentThread().id)
-          ?: throw AssertionError("See THREADING GUIDE (TODO)")
+          ?: throw AssertionError("THREADING GUIDE (TODO)")
   /** Map from threadId to a DiskStorage. */
   private val threadMap = AtomicReference(ArrayMap.empty<Long, DiskStorageJUnit5>())
   /** Map from a test's uniqueId to a threadId. */
@@ -248,14 +248,15 @@ private data class DiskStorageJUnit5(val file: SnapshotFileProgress, val test: S
  */
 internal class SnapshotFileProgress(val system: SnapshotSystemJUnit5, val className: String) {
   companion object {
-    val TERMINATED = ArrayMap.empty<String, WithinTestGC>().plus(" ~ f!n1shed ~ ", WithinTestGC())
+    val TERMINATED =
+        ArrayMap.empty<String, WithinTestGC>().plus(" ~ / f!n1shed / ~ ", WithinTestGC())
   }
   private fun assertNotTerminated() {
-    require(tests !== TERMINATED) { "Cannot call methods on a terminated ClassProgress" }
+    require(tests.get() !== TERMINATED) { "Cannot call methods on a terminated ClassProgress" }
   }
 
   private var file: SnapshotFile? = null
-  private val tests = AtomicReference(ArrayMap.empty<String, WithinTestGC>())
+  private val tests = atomic(ArrayMap.empty<String, WithinTestGC>())
   private var diskWriteTracker: DiskWriteTracker? = DiskWriteTracker()
   private val timesStarted = AtomicInteger(0)
   private val hasFailed = AtomicBoolean(false)
