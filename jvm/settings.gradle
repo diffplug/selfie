@@ -45,7 +45,10 @@ include 'undertest-junit-vintage'
 include 'selfie-runner-kotest'
 include 'undertest-kotest'
 
+// examples for docs and whatsuch
 if (JavaVersion.current() >= JavaVersion.VERSION_15) {
   include 'example-junit5'
 }
+include 'example-kotest'
+
 rootProject.name = 'selfie'
