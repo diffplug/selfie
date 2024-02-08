@@ -64,16 +64,11 @@ or this to `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-  // ... other dependencies
-  testImplementation("com.diffplug.selfie:selfie-runner-junit5:$ver_SELFIE")
+  testImplementation("com.diffplug.selfie:selfie-runner-junit5:${project.properties["ver_SELFIE"]}")
 }
 tasks.test {
   useJUnitPlatform()
-  // optional, see "Overwrite everything" below
-  systemProperties = project.properties
-    .filterKeys { it.startsWith("selfie") }
-    .mapValues { it.value.toString() }
-
+  environment(properties.filter { it.key == "selfie" })
   inputs.files(fileTree("src/test") {
     include("**/*.ss")
   })
