@@ -1,5 +1,6 @@
 plugins {
   id 'org.jetbrains.kotlin.multiplatform'
+  id 'maven-publish'
 }
 repositories {
   mavenCentral()
@@ -8,11 +9,8 @@ ext {
   maven_name = 'selfie-runner-kotest'
   maven_desc = 'Kotest test runner for Selfie'
 }
-
 apply from: 干.file('base/changelog.gradle')
 apply from: rootProject.file('gradle/spotless.gradle')
-apply plugin: 'java-library'
-
 kotlin {
   jvm {
     testRuns["test"].executionTask.configure {
