@@ -19,6 +19,10 @@ dependencies {
 }
 test {
   useJUnitPlatform()
+  environment project.properties.subMap(["selfie"])
+  inputs.files(fileTree('src/test') {
+    include '**/*.ss'
+  })
 }
 apply plugin: 'com.diffplug.spotless'
 spotless {

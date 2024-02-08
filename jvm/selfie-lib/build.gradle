@@ -2,7 +2,6 @@ plugins {
   id 'org.jetbrains.kotlin.multiplatform'
   id 'maven-publish'
 }
-
 repositories {
   mavenCentral()
 }
@@ -10,7 +9,6 @@ ext {
   maven_name = 'selfie-lib'
   maven_desc = 'Core logic and parsing for Selfie'
 }
-
 apply from: 干.file('base/changelog.gradle')
 apply from: rootProject.file('gradle/spotless.gradle')
 kotlin {

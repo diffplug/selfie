@@ -35,22 +35,47 @@ If you're using Maven, add the following dependency to your `pom.xml` file:
 <dependency>
     <groupId>com.diffplug.selfie</groupId>
     <artifactId>selfie-runner-junit5</artifactId>
-    <version>LATEST_VERSION</version>
+    <version>${ver_SELFIE}</version>
     <scope>test</scope>
 </dependency>
 ```
 
-Replace `LATEST_VERSION` with the [latest available version of selfie](https://github.com/diffplug/selfie/blob/main/jvm/CHANGELOG.md).
+Replace `ver_SELFIE` with the [latest available version of selfie](https://github.com/diffplug/selfie/blob/main/jvm/CHANGELOG.md).
 
 ### Gradle
 
 For Gradle users, add this to your `build.gradle` file:
 
-```groovy
-testImplementation 'com.diffplug.selfie:selfie-runner-junit5:LATEST_VERSION'
+```kotlin
+dependencies {
+  // ... other dependencies
+  testImplementation "com.diffplug.selfie:selfie-runner-junit5:$ver_SELFIE"
+}
+test {
+  useJUnitPlatform()
+  environment project.properties.subMap(["selfie"]) // optional, see "Overwrite everything" below
+  inputs.files(fileTree("src/test") { // optional, improves up-to-date checking
+    include "**/*.ss"
+  })
+}
 ```
 
-Again, replace `LATEST_VERSION` with the [latest available version of selfie](https://github.com/diffplug/selfie/blob/main/jvm/CHANGELOG.md).
+or this to `build.gradle.kts`:
+
+```kotlin
+dependencies {
+  testImplementation("com.diffplug.selfie:selfie-runner-junit5:${project.properties["ver_SELFIE"]}")
+}
+tasks.test {
+  useJUnitPlatform()
+  environment(properties.filter { it.key == "selfie" }) // optional, see "Overwrite everything" below
+  inputs.files(fileTree("src/test") { // optional, improves up-to-date checking
+    include("**/*.ss")
+  })
+}
+```
+
+Again, replace `ver_SELFIE` with the [latest available version of selfie](https://github.com/diffplug/selfie/blob/main/jvm/CHANGELOG.md).
 
 ## Quickstart
 
@@ -119,6 +144,24 @@ For this reason, it is critical that a CI server should always run in `readonly`
 
 When in `readonly` mode, selfie not only refuses to update any snapshots, it also fails the build if `_TODO`, `//selfieonce`, or `//SELFIEWRITE` are present in the sourcecode, even if the snapshots were correct. Writing snapshots is a strictly private affair 😏.
 
+## Overwrite everything
+
+Selfie has three modes:
+
+- `interactive`, the default mode, which we discussed in the [quickstart](#quickstart)
+- `readonly`, the default mode if `CI=true`, where no snapshots can be written
+- `overwrite`, where every snapshot is overwritten, regardless of whether it is `_TODO` or not
+
+To set the mode, you set the `selfie` or `SELFIE` environment variable or system property to either `interactive`, `readonly`, or `overwrite`. But in the vast majority of cases, it's best to leave it alone and let the defaults do their thing.
+
+```console
+[MAVEN]
+user@machine repo % mvn test -Dselfie=overwrite
+
+[GRADLE (only works if you followed the install instructions above re: environment)]
+user@machine repo % ./gradlew test -Pselfie=overwrite
+```
+
 ## Beyond toString
 
 All of the examples so far have asserted on Strings. You can also do inline literal assertions on primitive values, and disk assertions on byte arrays:
@@ -151,3 +194,5 @@ Full API documentation is available at [kdoc.selfie.dev](https://kdoc.selfie.dev
   - `readonly`, default if `CI` environment variable is `true`
   - `overwrite`, all snapshots can be overwritten
 - `Camera` and `Lens` are covered in the [advanced section](/jvm/advanced).
+
+*Pull requests to improve the landing page and documentation are greatly appreciated, you can find the [source code here](https://github.com/diffplug/selfie).*
