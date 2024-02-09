@@ -17,6 +17,15 @@ package com.diffplug.selfie.guts
 
 import com.diffplug.selfie.Mode
 import com.diffplug.selfie.Snapshot
+import kotlin.coroutines.AbstractCoroutineContextElement
+import kotlin.coroutines.CoroutineContext
+
+/** Used by [com.diffplug.selfie.SelfieSuspend]. */
+class CoroutineDiskStorage(val disk: DiskStorage) : AbstractCoroutineContextElement(Key) {
+  override val key = Key
+
+  companion object Key : CoroutineContext.Key<CoroutineDiskStorage>
+}
 
 /** A unix-style path where trailing-slash means it is a folder. */
 data class TypedPath(val absolutePath: String) : Comparable<TypedPath> {

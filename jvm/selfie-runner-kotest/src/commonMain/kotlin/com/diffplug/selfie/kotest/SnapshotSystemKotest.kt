@@ -23,6 +23,7 @@ import com.diffplug.selfie.SnapshotFile
 import com.diffplug.selfie.SnapshotValueReader
 import com.diffplug.selfie.guts.CallStack
 import com.diffplug.selfie.guts.CommentTracker
+import com.diffplug.selfie.guts.CoroutineDiskStorage
 import com.diffplug.selfie.guts.DiskStorage
 import com.diffplug.selfie.guts.DiskWriteTracker
 import com.diffplug.selfie.guts.InlineWriteTracker

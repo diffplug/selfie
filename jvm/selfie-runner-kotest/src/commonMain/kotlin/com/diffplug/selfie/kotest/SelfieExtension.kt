@@ -15,7 +15,7 @@
  */
 package com.diffplug.selfie.kotest
 
-import com.diffplug.selfie.guts.DiskStorage
+import com.diffplug.selfie.guts.CoroutineDiskStorage
 import io.kotest.core.extensions.Extension
 import io.kotest.core.extensions.TestCaseExtension
 import io.kotest.core.listeners.AfterProjectListener
@@ -25,17 +25,9 @@ import io.kotest.core.source.SourceRef
 import io.kotest.core.spec.Spec
 import io.kotest.core.test.TestCase
 import io.kotest.core.test.TestResult
-import kotlin.coroutines.AbstractCoroutineContextElement
-import kotlin.coroutines.CoroutineContext
 import kotlin.reflect.KClass
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.withContext
-
-internal class CoroutineDiskStorage(val disk: DiskStorage) : AbstractCoroutineContextElement(Key) {
-  override val key = Key
-
-  companion object Key : CoroutineContext.Key<CoroutineDiskStorage>
-}
 
 object SelfieExtension :
     Extension, FinalizeSpecListener, TestCaseExtension, IgnoredSpecListener, AfterProjectListener {
