@@ -16,6 +16,7 @@
 package com.diffplug.selfie
 
 import com.diffplug.selfie.guts.CallStack
+import com.diffplug.selfie.guts.CoroutineDiskStorage
 import com.diffplug.selfie.guts.DiskSnapshotTodo
 import com.diffplug.selfie.guts.DiskStorage
 import com.diffplug.selfie.guts.LiteralBoolean
@@ -27,6 +28,7 @@ import com.diffplug.selfie.guts.LiteralValue
 import com.diffplug.selfie.guts.SnapshotSystem
 import com.diffplug.selfie.guts.initSnapshotSystem
 import com.diffplug.selfie.guts.recordCall
+import kotlin.coroutines.CoroutineContext
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.jvm.JvmOverloads
@@ -44,23 +46,7 @@ class Later internal constructor(private val disk: DiskStorage) {
       subsToKeep.forEach { disk.keep(it) }
     }
   }
-}
-
-object SelfieSuspend {
-  private suspend fun disk() = Selfie.system.diskCoroutine()
-  suspend fun <T> expectSelfie(actual: T, camera: Camera<T>) = expectSelfie(camera.snapshot(actual))
-  suspend fun expectSelfie(actual: String) = expectSelfie(Snapshot.of(actual))
-  suspend fun expectSelfie(actual: ByteArray) = expectSelfie(Snapshot.of(actual))
-  suspend fun expectSelfie(actual: Snapshot) = Selfie.DiskSelfie(actual, disk())
-  suspend fun preserveSelfiesOnDisk(vararg subsToKeep: String) {
-    val disk = disk()
-    if (subsToKeep.isEmpty()) {
-      disk.keep(null)
-    } else {
-      subsToKeep.forEach { disk.keep(it) }
-    }
-  }
-  suspend fun later() = Later(disk())
+  fun coroutineContextElement(): CoroutineContext.Element = CoroutineDiskStorage(disk)
 }
 
 object Selfie {
