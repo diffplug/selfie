@@ -16,7 +16,6 @@
 package com.diffplug.selfie
 
 import com.diffplug.selfie.guts.CallStack
-import com.diffplug.selfie.guts.CoroutineDiskStorage
 import com.diffplug.selfie.guts.DiskSnapshotTodo
 import com.diffplug.selfie.guts.DiskStorage
 import com.diffplug.selfie.guts.LiteralBoolean
@@ -28,7 +27,6 @@ import com.diffplug.selfie.guts.LiteralValue
 import com.diffplug.selfie.guts.SnapshotSystem
 import com.diffplug.selfie.guts.initSnapshotSystem
 import com.diffplug.selfie.guts.recordCall
-import kotlin.coroutines.CoroutineContext
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.jvm.JvmOverloads
@@ -46,7 +44,6 @@ class Later internal constructor(private val disk: DiskStorage) {
       subsToKeep.forEach { disk.keep(it) }
     }
   }
-  fun coroutineContextElement(): CoroutineContext.Element = CoroutineDiskStorage(disk)
 }
 
 object Selfie {
