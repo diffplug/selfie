@@ -185,7 +185,8 @@ internal object SnapshotSystemJUnit5 : SnapshotSystem {
         "Test $finishing($uniqueId) is ending on the same thread it started, but we found $prev in its spot unexpectedly."
       }
     } else {
-      // we got notified on a different thread than we started (Kotest does this, maybe others too)
+      // we got notified on a different thread than we started (Kotest does this, maybe others
+      // too)
       val prevMap = threadMap.getAndUpdate { it.minusOrNoOp(prevThreadId, finishing) }
       val prev = prevMap[prevThreadId]
       if (prev == finishing) {
@@ -261,11 +262,11 @@ internal class SnapshotFileProgress(val system: SnapshotSystemJUnit5, val classN
   private val hasFailed = AtomicBoolean(false)
 
   /** Assigns this thread to store disk snapshots within this file with the name `test`. */
-  fun startTest(test: String, uniqueId: String) {
+  fun startTest(test: String, uniqueId: String?) {
     check(test.indexOf('/') == -1) { "Test name cannot contain '/', was $test" }
     assertNotTerminated()
     tests.updateAndGet { it.plusOrNoOp(test, WithinTestGC()) }
-    system.startThreadLocal(this, test, uniqueId)
+    uniqueId?.let { system.startThreadLocal(this, test, uniqueId) }
   }
   /**
    * Stops assigning this thread to store snapshots within this file at `test`, and if successful
@@ -273,12 +274,12 @@ internal class SnapshotFileProgress(val system: SnapshotSystemJUnit5, val classN
    * times (as in `@ParameterizedTest`), and GC will only happen if all runs of the test are
    * successful.
    */
-  fun finishedTestWithSuccess(test: String, uniqueId: String, success: Boolean) {
+  fun finishedTestWithSuccess(test: String, uniqueId: String?, success: Boolean) {
     assertNotTerminated()
     if (!success) {
       tests.get()[test]!!.keepAll()
     }
-    system.finishThreadLocal(this, test, uniqueId)
+    uniqueId?.let { system.finishThreadLocal(this, test, uniqueId) }
   }
   private fun finishedClassWithSuccess(success: Boolean) {
     assertNotTerminated()
