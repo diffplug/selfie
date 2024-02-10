@@ -15,8 +15,12 @@
  */
 package com.diffplug.selfie
 
+import com.diffplug.selfie.guts.CoroutineDiskStorage
+import kotlin.coroutines.coroutineContext
+
 object SelfieSuspend {
-  private suspend fun disk() = Selfie.system.diskCoroutine()
+  private suspend fun disk() =
+      coroutineContext[CoroutineDiskStorage.Key]?.disk ?: TODO("THREADING GUIDE (TODO)")
   suspend fun <T> expectSelfie(actual: T, camera: Camera<T>) = expectSelfie(camera.snapshot(actual))
   suspend fun expectSelfie(actual: String) = expectSelfie(Snapshot.of(actual))
   suspend fun expectSelfie(actual: ByteArray) = expectSelfie(Snapshot.of(actual))

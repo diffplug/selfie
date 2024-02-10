@@ -99,8 +99,6 @@ interface SnapshotSystem {
   fun writeInline(literalValue: LiteralValue<*>, call: CallStack)
   /** Returns the DiskStorage for the test associated with this thread, else error. */
   fun diskThreadLocal(): DiskStorage
-  /** Returns the DiskStorage for the test associated with this coroutine, else error. */
-  suspend fun diskCoroutine(): DiskStorage
 }
 
 /** Represents the disk storage for a specific test. */

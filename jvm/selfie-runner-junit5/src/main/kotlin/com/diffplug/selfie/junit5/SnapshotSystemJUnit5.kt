@@ -91,7 +91,6 @@ internal object SnapshotSystemJUnit5 : SnapshotSystem {
   override fun writeInline(literalValue: LiteralValue<*>, call: CallStack) {
     inlineWriteTracker.record(call, literalValue, layout)
   }
-  override suspend fun diskCoroutine(): DiskStorage = TODO("THREADING GUIDE (TODO)")
   override fun diskThreadLocal(): DiskStorage = diskThreadLocalTyped()
   fun finishedAllTests() {
     val snapshotsFilesWrittenToDisk =
@@ -227,7 +226,7 @@ internal object SnapshotSystemJUnit5 : SnapshotSystem {
   //////////
 }
 
-private data class DiskStorageJUnit5(val file: SnapshotFileProgress, val test: String) :
+internal data class DiskStorageJUnit5(val file: SnapshotFileProgress, val test: String) :
     DiskStorage, Comparable<DiskStorageJUnit5> {
   override fun readDisk(sub: String, call: CallStack): Snapshot? = file.read(test, suffix(sub))
   override fun writeDisk(actual: Snapshot, sub: String, call: CallStack) {
