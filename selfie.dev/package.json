@@ -37,7 +37,7 @@
     "zustand": "^4.3.2"
   },
   "devDependencies": {
-    "@types/node": "20.11.16",
+    "@types/node": "20.11.17",
     "eslint": "8.56.0",
     "eslint-config-next": "14.1.0",
     "prettier": "^3.0.0",
