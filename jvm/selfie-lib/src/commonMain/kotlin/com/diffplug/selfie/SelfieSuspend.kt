@@ -33,5 +33,5 @@ object SelfieSuspend {
       subsToKeep.forEach { disk.keep(it) }
     }
   }
-  suspend fun later() = Later(disk())
+  suspend fun bind() = SelfieBound(disk())
 }

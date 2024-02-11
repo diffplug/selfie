@@ -32,7 +32,7 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.jvm.JvmOverloads
 import kotlin.jvm.JvmStatic
 
-class Later internal constructor(private val disk: DiskStorage) {
+class SelfieBound internal constructor(private val disk: DiskStorage) {
   fun <T> expectSelfie(actual: T, camera: Camera<T>) = expectSelfie(camera.snapshot(actual))
   fun expectSelfie(actual: String) = expectSelfie(Snapshot.of(actual))
   fun expectSelfie(actual: ByteArray) = expectSelfie(Snapshot.of(actual))
@@ -63,10 +63,10 @@ object Selfie {
    */
   @JvmStatic
   fun preserveSelfiesOnDisk(vararg subsToKeep: String) {
-    later().preserveSelfiesOnDisk(*subsToKeep)
+    bind().preserveSelfiesOnDisk(*subsToKeep)
   }
 
-  @JvmStatic fun later() = Later(system.diskThreadLocal())
+  @JvmStatic fun bind() = SelfieBound(system.diskThreadLocal())
 
   class DiskSelfie internal constructor(actual: Snapshot, val disk: DiskStorage) :
       LiteralStringSelfie(actual) {
