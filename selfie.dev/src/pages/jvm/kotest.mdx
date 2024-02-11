@@ -1,0 +1,98 @@
+import { DocsImage } from "@/components/DocsImage";
+
+export const title = "Selfie Snapshot Testing | Kotest";
+export const description = "Selfie works great with Kotest and Kotlin coroutines.";
+export const imageUrl = "https://selfie.dev/kotest.webp";
+
+<DocsImage imgAbsoluteUrl={imageUrl} />
+
+Everything in the regular JVM [get started](./get-started) applies to Kotest as well. This page covers additional features which are specific to Kotest.
+
+Selfie has two artifacts which can run Kotest tests.
+
+- `com.diffplug.selfie:selfie-runner-junit5`
+  - Works with regular JUnit tests and also Kotest tests.
+  - JVM only
+- `com.difplug.selfie:selfie-runner-kotest`
+  - Cannot run JUnit tests, only Kotest.
+  - Written in Kotlin Multiplatform ([only JVM implemented so far, [PRs for other platforms welcome](TODO))
+
+You must choose only one, you'll get an error if both are on the classpath. You'll need to add the `SelfieExtension` to your classpath like so:
+
+```kotlin
+import com.diffplug.selfie.junit5.SelfieExtension // selfie-runner-junit5
+import com.diffplug.selfie.kotest.SelfieExtension // selfie-runner-kotest
+import io.kotest.core.config.AbstractProjectConfig
+
+class ProjectConfig : AbstractProjectConfig() {
+  override fun extensions() = listOf(SelfieExtension(this))
+}
+```
+
+## Selfie vs SelfieSuspend
+
+In a regular JUnit 5 test, you call `Selfie.expectSelfie(...)`, like so
+
+```kotlin
+import com.diffplug.selfie.Selfie.expectSelfie
+class TestClass {
+  @Test fun testMethod() {
+    expectSelfie(something).toMatchDisk()
+  }
+}
+```
+
+Every Kotest test is a `suspend fun`, not a regular `fun`. You **must** use `SelfieSuspend` instead of `Selfie`.
+
+```kotlin
+import com.diffplug.selfie.SelfieSuspend.expectSelfie
+class TestSpec : FunSpec({
+  test("testMethod") {
+    expectSelfie(something).toMatchDisk()
+  }
+})
+```
+
+If you use `Selfie` instead of `SelfieSuspend` you'll get a runtime error reminding you to use `SelfieSuspend` instead.
+
+## Threading details
+
+Inline `toBe` snapshots don't need to know what test is currently running. But a `toMatchDisk` snapshot  needs to know which test is running so that it can put the correct name into the snapshot file.
+
+For a JUnit test, `selfie-runner-junit5` uses a `ThreadLocal` to pass information about the currently running test. If you want to take a snapshot on a different thread, you can save that information and use it on any thread using `Selfie.later()`.
+
+```kotlin
+import com.diffplug.selfie.Selfie
+class TestClass {
+  @Test fun testMethod() {
+    val boundSelfie = Selfie.bind()
+    new Thread() {
+        @Override fun run() {
+            boundSelfie.expectSelfie(something()).toMatchDisk()
+        }
+    }
+  }
+}
+```
+
+For a Kotest test, both test runners (`selfie-runner-junit5` and `selfie-runner-kotest`) store information about the running test in the coroutine context. This is why you must use `SelfieSuspend` instead of `Selfie`.
+
+If for some reason you want to take a snapshot outside of the coroutine, that is possible.
+
+```kotlin
+import com.diffplug.selfie.SelfieSuspend
+class TestSpec : FunSpec({
+  test("testMethod") {
+    val boundSelfie = SelfieSuspend.bind()
+    new Thread() {
+        @Override fun run() {
+            boundSelfie.expectSelfie(something()).toMatchDisk()
+        }
+    }
+  }
+})
+```
+
+This issue of using `Selfie` or `SelfieSuspend` only matters for disk snapshots. So there is a chance for confusion where you might be using inline snapshots (`.toBe`) without any problem. Then you switch to disk snapshots (`.toMatchDisk`) and get an error telling you to switch from `Selfie` to `SelfieSuspend`. The explanation is why.
+
+*Pull requests to improve the landing page and documentation are greatly appreciated, you can find the [source code here](https://github.com/diffplug/selfie).*
