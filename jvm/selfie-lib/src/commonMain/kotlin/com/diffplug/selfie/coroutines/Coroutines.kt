@@ -27,7 +27,20 @@ import kotlin.coroutines.coroutineContext
  * details, see the [threading details](http://localhost:3000/jvm/kotest#threading-details).
  */
 private suspend fun disk() =
-    coroutineContext[CoroutineDiskStorage]?.disk ?: TODO("THREADING GUIDE (TODO)")
+    coroutineContext[CoroutineDiskStorage]?.disk
+        ?: throw IllegalStateException(
+            """
+      No Kotest test is in progress on this coroutine.
+      If this is a Kotest test, make sure you added `SelfieExtension` to your `AbstractProjectConfig`:
+        +class MyProjectConfig : AbstractProjectConfig() {
+        +  override fun extensions() = listOf(SelfieExtension(this))
+        +}
+      If this is a JUnit test, make the following change:
+        -import com.diffplug.selfie.coroutines.expectSelfie
+        +import com.diffplug.selfie.Selfie.expectSelfie
+      For more info https://selfie.dev/jvm/kotest#selfie-and-coroutines
+    """
+                .trimIndent())
 suspend fun <T> expectSelfie(actual: T, camera: Camera<T>) = expectSelfie(camera.snapshot(actual))
 suspend fun expectSelfie(actual: String) = expectSelfie(Snapshot.of(actual))
 suspend fun expectSelfie(actual: ByteArray) = expectSelfie(Snapshot.of(actual))
