@@ -32,25 +32,6 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.jvm.JvmOverloads
 import kotlin.jvm.JvmStatic
 
-/**
- * Used for creating snapshots which are independent of the thread or coroutine on which the test
- * started. See the [threading details](http://localhost:3000/jvm/kotest#threading-details) for more
- * info.
- */
-class SelfieBound internal constructor(private val disk: DiskStorage) {
-  fun <T> expectSelfie(actual: T, camera: Camera<T>) = expectSelfie(camera.snapshot(actual))
-  fun expectSelfie(actual: String) = expectSelfie(Snapshot.of(actual))
-  fun expectSelfie(actual: ByteArray) = expectSelfie(Snapshot.of(actual))
-  fun expectSelfie(actual: Snapshot) = Selfie.DiskSelfie(actual, disk)
-  fun preserveSelfiesOnDisk(vararg subsToKeep: String) {
-    if (subsToKeep.isEmpty()) {
-      disk.keep(null)
-    } else {
-      subsToKeep.forEach { disk.keep(it) }
-    }
-  }
-}
-
 /** Static methods for creating snapshots. */
 object Selfie {
   internal val system: SnapshotSystem = initSnapshotSystem()
@@ -69,14 +50,13 @@ object Selfie {
    */
   @JvmStatic
   fun preserveSelfiesOnDisk(vararg subsToKeep: String) {
-    bind().preserveSelfiesOnDisk(*subsToKeep)
+    val disk = system.diskThreadLocal()
+    if (subsToKeep.isEmpty()) {
+      disk.keep(null)
+    } else {
+      subsToKeep.forEach { disk.keep(it) }
+    }
   }
-
-  /**
-   * Used to bind to the currently executing test so that you can create disk selfies in other
-   * threads and coroutines if you want.
-   */
-  @JvmStatic fun bind() = SelfieBound(system.diskThreadLocal())
 
   class DiskSelfie internal constructor(actual: Snapshot, val disk: DiskStorage) :
       LiteralStringSelfie(actual) {
