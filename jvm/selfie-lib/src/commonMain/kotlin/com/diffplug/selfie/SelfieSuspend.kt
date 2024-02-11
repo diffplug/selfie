@@ -18,6 +18,11 @@ package com.diffplug.selfie
 import com.diffplug.selfie.guts.CoroutineDiskStorage
 import kotlin.coroutines.coroutineContext
 
+/**
+ * Whenever Selfie is called from within a coroutine, you should use `SelfieSuspend` instead of
+ * `Selfie`. If you want more details, see the
+ * [threading details](http://localhost:3000/jvm/kotest#threading-details).
+ */
 object SelfieSuspend {
   private suspend fun disk() =
       coroutineContext[CoroutineDiskStorage.Key]?.disk ?: TODO("THREADING GUIDE (TODO)")
@@ -33,5 +38,10 @@ object SelfieSuspend {
       subsToKeep.forEach { disk.keep(it) }
     }
   }
+
+  /**
+   * Used to bind to the currently executing test so that you can create disk selfies in other
+   * threads and coroutines if you want.
+   */
   suspend fun bind() = SelfieBound(disk())
 }
