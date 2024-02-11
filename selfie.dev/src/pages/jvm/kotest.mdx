@@ -15,9 +15,9 @@ Selfie has two artifacts which can run Kotest tests.
   - JVM only
 - `com.difplug.selfie:selfie-runner-kotest`
   - Cannot run JUnit tests, only Kotest.
-  - Written in Kotlin Multiplatform ([only JVM implemented so far, [PRs for other platforms welcome](TODO))
+  - Written in Kotlin Multiplatform (only JVM implemented so far, [PRs for other platforms welcome](TODO))
 
-You must choose only one, you'll get an error if both are on the classpath. You'll need to add the `SelfieExtension` to your classpath like so:
+You must choose only one, you'll get an error if both are on the classpath. You'll need to add the `SelfieExtension` to your `AbstractProjectConfig` like so:
 
 ```kotlin
 import com.diffplug.selfie.junit5.SelfieExtension // selfie-runner-junit5
@@ -59,7 +59,7 @@ If you use `Selfie` instead of `SelfieSuspend` you'll get a runtime error remind
 
 Inline `toBe` snapshots don't need to know what test is currently running. But a `toMatchDisk` snapshot  needs to know which test is running so that it can put the correct name into the snapshot file.
 
-For a JUnit test, `selfie-runner-junit5` uses a `ThreadLocal` to pass information about the currently running test. If you want to take a snapshot on a different thread, you can save that information and use it on any thread using `Selfie.later()`.
+For a JUnit test, `selfie-runner-junit5` uses a `ThreadLocal` to pass information about the currently running test. If you want to take a snapshot on a different thread, you can save that information and use it on any thread using `Selfie.bind()`, which returns a `SelfieBound` from which you can take snapshots in any thread or coroutine.
 
 ```kotlin
 import com.diffplug.selfie.Selfie
@@ -77,7 +77,7 @@ class TestClass {
 
 For a Kotest test, both test runners (`selfie-runner-junit5` and `selfie-runner-kotest`) store information about the running test in the coroutine context. This is why you must use `SelfieSuspend` instead of `Selfie`.
 
-If for some reason you want to take a snapshot outside of the coroutine, that is possible.
+If for some reason you want to take a snapshot outside of the coroutine, that is possible using the same `bind` method, this time time starting from `SelfieSuspend` instead of `Selfie`.
 
 ```kotlin
 import com.diffplug.selfie.SelfieSuspend
@@ -93,6 +93,6 @@ class TestSpec : FunSpec({
 })
 ```
 
-This issue of using `Selfie` or `SelfieSuspend` only matters for disk snapshots. So there is a chance for confusion where you might be using inline snapshots (`.toBe`) without any problem. Then you switch to disk snapshots (`.toMatchDisk`) and get an error telling you to switch from `Selfie` to `SelfieSuspend`. The explanation is why.
+This issue of using `Selfie` or `SelfieSuspend` only matters for disk snapshots. So there is a chance for confusion where you might be using inline `toBe` snapshots without any problem. Then you try `toMatchDisk` snapshots and get an error telling you to switch from `Selfie` to `SelfieSuspend`. Not a problem, just switch to `SelfieSuspend` and you'll be good to go.
 
 *Pull requests to improve the landing page and documentation are greatly appreciated, you can find the [source code here](https://github.com/diffplug/selfie).*
