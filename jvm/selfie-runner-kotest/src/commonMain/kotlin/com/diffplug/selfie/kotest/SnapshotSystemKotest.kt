@@ -68,7 +68,16 @@ internal object SnapshotSystemKotest : SnapshotSystem {
   override fun writeInline(literalValue: LiteralValue<*>, call: CallStack) {
     inlineWriteTracker.record(call, literalValue, layout)
   }
-  override fun diskThreadLocal(): DiskStorage = TODO("THREADING GUIDE (TODO)")
+  override fun diskThreadLocal(): DiskStorage =
+      throw fs.assertFailed(
+          """
+    Kotest tests must use the `suspend` versions of the `expectSelfie` function.
+    You can fix this by making the following change:
+      -import com.diffplug.selfie.Selfie.expectSelfie
+      +import com.diffplug.selfie.coroutines.expectSelfie
+    For more info https://selfie.dev/jvm/kotest#selfie-and-coroutines
+  """
+              .trimIndent())
   fun finishedAllTests() {
     val snapshotsFilesWrittenToDisk =
         checkForInvalidStale.getAndUpdate { null }

@@ -90,7 +90,6 @@ internal object SnapshotSystemJUnit5 : SnapshotSystem {
   override fun writeInline(literalValue: LiteralValue<*>, call: CallStack) {
     inlineWriteTracker.record(call, literalValue, layout)
   }
-  override fun diskThreadLocal(): DiskStorage = diskThreadLocalTyped()
   fun finishedAllTests() {
     val snapshotsFilesWrittenToDisk =
         checkForInvalidStale.getAndUpdate { null }
@@ -117,8 +116,16 @@ internal object SnapshotSystemJUnit5 : SnapshotSystem {
     }
   }
   private val threadCtx = ThreadLocal<DiskStorageJUnit5>()
-  private fun diskThreadLocalTyped() =
-      threadCtx.get() ?: throw AssertionError("THREADING GUIDE (TODO)")
+  override fun diskThreadLocal(): DiskStorage =
+      threadCtx.get()
+          ?: throw fs.assertFailed(
+              """
+        No JUnit test is in progress on this thread. If this is a Kotest test, make the following change:
+          -import com.diffplug.selfie.Selfie.expectSelfie
+          +import com.diffplug.selfie.coroutines.expectSelfie
+        For more info https://selfie.dev/jvm/kotest#selfie-and-coroutines
+      """
+                  .trimIndent())
   internal fun startThreadLocal(clazz: SnapshotFileProgress, test: String) {
     val ft = threadCtx.get()
     check(ft == null) {
