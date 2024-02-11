@@ -1,6 +1,6 @@
 package undertest.junit5
 
-import com.diffplug.selfie.SelfieSuspend.expectSelfie
+import com.diffplug.selfie.coroutines.expectSelfie
 import io.kotest.core.spec.style.FunSpec
 import kotlinx.coroutines.delay
 
