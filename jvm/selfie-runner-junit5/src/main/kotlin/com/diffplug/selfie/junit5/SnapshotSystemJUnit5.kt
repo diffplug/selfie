@@ -33,7 +33,6 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.atomic.AtomicReference
 import kotlin.io.path.absolutePathString
 import kotlin.io.path.readText
 import kotlin.io.path.writeText
@@ -97,7 +96,6 @@ internal object SnapshotSystemJUnit5 : SnapshotSystem {
         checkForInvalidStale.getAndUpdate { null }
             ?: throw AssertionError("finishedAllTests() was called more than once.")
 
-    missingDownsErrorMsg()?.let { errorMsg -> throw AssertionError("THREAD ERROR: $errorMsg") }
     if (mode != Mode.readonly) {
       for (path in commentTracker.pathsWithOnce()) {
         val source = SourceFile(path.name, layout.fs.fileRead(path))
@@ -118,113 +116,24 @@ internal object SnapshotSystemJUnit5 : SnapshotSystem {
       }
     }
   }
-
-  //////////
-  // BEGIN crazy thread locals
-  //
-  // From here down to the "END crazy thread locals" is a weird section for solving this problem:
-  // We have to tell `expectSelfie` calls which snapshot file to put their data into, and what
-  // test name to prefix their snapshots with. We do that with a threadlocal which we set when we
-  // are notified that the test will start.
-  //
-  // If a test is not started from the same thread where the framework notifies that it is starting,
-  // then we're out of luck. Not sure how we could fix that. JUnit5, JUnit-vintage, and Kotest all
-  // notify of start on the same thread as the test actually starts.
-  //
-  // JUnit5 and JUnit-vintage also notify of finish on that same thread, which makes it easy to be
-  // sure that the thread locals are managed exactly. Kotest, on the other hand, notifies of
-  // finish on a *different* thread. I think this is a workaround for some Gradle issue, and either
-  // way it makes sense because Kotest supports async testing, every test can be a `suspend fun`.
-  //
-  // Because of this, it could be that for some thread T, we get notified of a test A starting on T,
-  // and then we get notified of another test B which is starting on T, and later on we get
-  // notified that A has finished.
-  //
-  // It's also important to note that a single `DiskStorageJUnit5` may be serving multiple tests
-  // concurrently, e.g. in a `@ParameterizedTest`.
-  //
-  // To make all of this work, we have to maintain the following maps:
-  private fun diskThreadLocalTyped(): DiskStorageJUnit5 =
-      threadMap.get().get(Thread.currentThread().id)
-          ?: throw AssertionError("THREADING GUIDE (TODO)")
-  /** Map from threadId to a DiskStorage. */
-  private val threadMap = AtomicReference(ArrayMap.empty<Long, DiskStorageJUnit5>())
-  /** Map from a test's uniqueId to a threadId. */
-  private val uniqueidToThread = AtomicReference(ArrayMap.empty<String, Long>())
-  /**
-   * Map from a `DiskStorage` to the number of `finishThreadLocal` calls we expect to happen where
-   * the storage's initiating thread has already been used by some other test.
-   */
-  private val missingFinishes = AtomicReference(ArrayMap.empty<DiskStorageJUnit5, Int>())
-  internal fun startThreadLocal(file: SnapshotFileProgress, test: String, uniqueId: String) {
-    val threadId = Thread.currentThread().id
-    val next = DiskStorageJUnit5(file, test)
-    val prevMap = threadMap.getAndUpdate { it.plusOrNoOpOrReplace(threadId, next) }
-    uniqueidToThread.getAndUpdate { it.plusOrNoOpOrReplace(uniqueId, threadId) }
-    val prev = prevMap[threadId]
-    if (prev != null) {
-      //  now:      .
-      // prev: /      \
-      // next:    /     \
-      missingFinish(prev, 1) // we expect prev will have 1 missing finish
+  private val threadCtx = ThreadLocal<DiskStorageJUnit5>()
+  private fun diskThreadLocalTyped() =
+      threadCtx.get() ?: throw AssertionError("THREADING GUIDE (TODO)")
+  internal fun startThreadLocal(clazz: SnapshotFileProgress, test: String) {
+    val ft = threadCtx.get()
+    check(ft == null) {
+      "THREAD ERROR: ${ft!!.file.className}#${ft.test} is in progress, cannot start ${clazz.className}#$test"
     }
+    threadCtx.set(DiskStorageJUnit5(clazz, test))
   }
-  internal fun finishThreadLocal(file: SnapshotFileProgress, test: String, uniqueId: String) {
-    val finishing = DiskStorageJUnit5(file, test)
-    val threadId = Thread.currentThread().id
-    val prevIdToThread = uniqueidToThread.getAndUpdate { it.minusOrNoOp(uniqueId) }
-    val prevThreadId =
-        prevIdToThread[uniqueId]
-            ?: throw AssertionError(
-                "Test $finishing($uniqueId) either a) never started or b) finished more than once.")
-    if (threadId == prevThreadId) {
-      // we got notified of finish on the same thread we started on, easy
-      val prevMap = threadMap.getAndUpdate { it.minusOrNoOp(threadId, finishing) }
-      val prev = prevMap[threadId]
-      require(prev == finishing) {
-        "Test $finishing($uniqueId) is ending on the same thread it started, but we found $prev in its spot unexpectedly."
-      }
-    } else {
-      // we got notified on a different thread than we started (Kotest does this, maybe others
-      // too)
-      val prevMap = threadMap.getAndUpdate { it.minusOrNoOp(prevThreadId, finishing) }
-      val prev = prevMap[prevThreadId]
-      if (prev == finishing) {
-        // This is the normal Kotest case, where the finish notification arrived before
-        // the next test started.
-      } else {
-        // This is a predictable race condition, where a thread pool started a new test before
-        // we got notified of the previous finish. It must be in the missingFinish map, which
-        // can now be decremented
-        missingFinish(finishing, -1)
-      }
+  internal fun finishThreadLocal(clazz: SnapshotFileProgress, test: String) {
+    val ft = threadCtx.get()
+    check(ft != null) { "THREAD ERROR: no test is in progress, cannot finish $clazz#$test" }
+    check(ft.file == clazz && ft.test == test) {
+      "THREAD ERROR: ${ft.file.className}#${ft.test} is in progress, cannot finish ${clazz.className}#$test"
     }
+    threadCtx.set(null)
   }
-  private fun missingFinish(disk: DiskStorageJUnit5, delta: Int) {
-    missingFinishes.updateAndGet {
-      val existing = it[disk]
-      if (existing == null) {
-        require(delta > 0)
-        it.plus(disk, delta)
-      } else {
-        val newValue = existing + delta
-        if (newValue == 0) {
-          it.minusOrNoOp(disk)
-        } else {
-          require(newValue > 0)
-          it.plusOrNoOpOrReplace(disk, newValue)
-        }
-      }
-    }
-  }
-  private fun missingDownsErrorMsg(): String? =
-      missingFinishes
-          .getAndUpdate { ArrayMap.empty() }
-          .map { "${it.key} started ${it.value} more times than it finished" }
-          .joinToString("\n")
-          .ifEmpty { null }
-  // END crazy thread locals
-  //////////
 }
 
 internal data class DiskStorageJUnit5(val file: SnapshotFileProgress, val test: String) :
@@ -262,11 +171,13 @@ internal class SnapshotFileProgress(val system: SnapshotSystemJUnit5, val classN
   private val hasFailed = AtomicBoolean(false)
 
   /** Assigns this thread to store disk snapshots within this file with the name `test`. */
-  fun startTest(test: String, uniqueId: String?) {
+  fun startTest(test: String, usesThreadLocal: Boolean) {
     check(test.indexOf('/') == -1) { "Test name cannot contain '/', was $test" }
     assertNotTerminated()
     tests.updateAndGet { it.plusOrNoOp(test, WithinTestGC()) }
-    uniqueId?.let { system.startThreadLocal(this, test, uniqueId) }
+    if (usesThreadLocal) {
+      system.startThreadLocal(this, test)
+    }
   }
   /**
    * Stops assigning this thread to store snapshots within this file at `test`, and if successful
@@ -274,12 +185,14 @@ internal class SnapshotFileProgress(val system: SnapshotSystemJUnit5, val classN
    * times (as in `@ParameterizedTest`), and GC will only happen if all runs of the test are
    * successful.
    */
-  fun finishedTestWithSuccess(test: String, uniqueId: String?, success: Boolean) {
+  fun finishedTestWithSuccess(test: String, usesThreadLocal: Boolean, success: Boolean) {
     assertNotTerminated()
     if (!success) {
       tests.get()[test]!!.keepAll()
     }
-    uniqueId?.let { system.finishThreadLocal(this, test, uniqueId) }
+    if (usesThreadLocal) {
+      system.finishThreadLocal(this, test)
+    }
   }
   private fun finishedClassWithSuccess(success: Boolean) {
     assertNotTerminated()

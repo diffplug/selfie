@@ -41,9 +41,9 @@ class SelfieExtension(projectConfig: AbstractProjectConfig) :
     val file = SnapshotSystemJUnit5.forClass(testCase.spec::class.java.name)
     val coroutineLocal = CoroutineDiskStorage(DiskStorageJUnit5(file, testCase.name.testName))
     return withContext(currentCoroutineContext() + coroutineLocal) {
-      file.startTest(testCase.name.testName, null)
+      file.startTest(testCase.name.testName, false)
       val result = execute(testCase)
-      file.finishedTestWithSuccess(testCase.name.testName, null, result.isSuccess)
+      file.finishedTestWithSuccess(testCase.name.testName, false, result.isSuccess)
       result
     }
   }
