@@ -27,7 +27,7 @@ class SelfieTestExecutionListener : TestExecutionListener {
   private val system = SnapshotSystemJUnit5
   override fun executionStarted(testIdentifier: TestIdentifier) {
     try {
-      if (isRoot(testIdentifier)) return
+      if (isRootOrKotest(testIdentifier)) return
       val (clazz, test) = parseClassTest(testIdentifier)
       val snapshotFile = system.forClass(clazz)
       if (test == null) {
@@ -57,7 +57,7 @@ class SelfieTestExecutionListener : TestExecutionListener {
       testExecutionResult: TestExecutionResult
   ) {
     try {
-      if (isRoot(testIdentifier)) return
+      if (isRootOrKotest(testIdentifier)) return
       val (clazz, test) = parseClassTest(testIdentifier)
       val isSuccess = testExecutionResult.status == TestExecutionResult.Status.SUCCESSFUL
       val snapshotFile = system.forClass(clazz)
@@ -73,7 +73,8 @@ class SelfieTestExecutionListener : TestExecutionListener {
   override fun testPlanExecutionFinished(testPlan: TestPlan?) {
     system.finishedAllTests()
   }
-  private fun isRoot(testIdentifier: TestIdentifier) = testIdentifier.parentId.isEmpty
+  private fun isRootOrKotest(testIdentifier: TestIdentifier) =
+      testIdentifier.parentId.isEmpty || testIdentifier.uniqueId.startsWith("[engine:kotest]")
   private fun parseClassTest(testIdentifier: TestIdentifier): Pair<String, String?> {
     return when (val source = testIdentifier.source.get()) {
       is ClassSource ->

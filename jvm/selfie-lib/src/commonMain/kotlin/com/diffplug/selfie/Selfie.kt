@@ -46,23 +46,6 @@ class Later internal constructor(private val disk: DiskStorage) {
   }
 }
 
-object SelfieSuspend {
-  private suspend fun disk() = Selfie.system.diskCoroutine()
-  suspend fun <T> expectSelfie(actual: T, camera: Camera<T>) = expectSelfie(camera.snapshot(actual))
-  suspend fun expectSelfie(actual: String) = expectSelfie(Snapshot.of(actual))
-  suspend fun expectSelfie(actual: ByteArray) = expectSelfie(Snapshot.of(actual))
-  suspend fun expectSelfie(actual: Snapshot) = Selfie.DiskSelfie(actual, disk())
-  suspend fun preserveSelfiesOnDisk(vararg subsToKeep: String) {
-    val disk = disk()
-    if (subsToKeep.isEmpty()) {
-      disk.keep(null)
-    } else {
-      subsToKeep.forEach { disk.keep(it) }
-    }
-  }
-  suspend fun later() = Later(disk())
-}
-
 object Selfie {
   internal val system: SnapshotSystem = initSnapshotSystem()
   private val deferredDiskStorage =

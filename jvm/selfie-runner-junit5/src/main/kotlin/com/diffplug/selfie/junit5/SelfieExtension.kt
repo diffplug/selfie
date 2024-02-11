@@ -13,15 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.diffplug.selfie.kotest
+package com.diffplug.selfie.junit5
 
 import com.diffplug.selfie.guts.CoroutineDiskStorage
+import io.kotest.core.config.AbstractProjectConfig
 import io.kotest.core.extensions.Extension
 import io.kotest.core.extensions.TestCaseExtension
 import io.kotest.core.listeners.AfterProjectListener
+import io.kotest.core.listeners.BeforeSpecListener
 import io.kotest.core.listeners.FinalizeSpecListener
-import io.kotest.core.listeners.IgnoredSpecListener
-import io.kotest.core.source.SourceRef
 import io.kotest.core.spec.Spec
 import io.kotest.core.test.TestCase
 import io.kotest.core.test.TestResult
@@ -29,43 +29,40 @@ import kotlin.reflect.KClass
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.withContext
 
-object SelfieExtension :
-    Extension, FinalizeSpecListener, TestCaseExtension, IgnoredSpecListener, AfterProjectListener {
-  /** Called for every test method. */
+class SelfieExtension(projectConfig: AbstractProjectConfig) :
+    Extension, BeforeSpecListener, TestCaseExtension, FinalizeSpecListener, AfterProjectListener {
+  override suspend fun beforeSpec(spec: Spec) {
+    SnapshotSystemJUnit5.forClass(spec.javaClass.name).incrementContainers()
+  }
   override suspend fun intercept(
       testCase: TestCase,
       execute: suspend (TestCase) -> TestResult
   ): TestResult {
-    val file = snapshotFileFor(testCase)
-    val testName = testCase.name.testName
-    val coroutineLocal = CoroutineDiskStorage(DiskStorageKotest(file, testName))
+    val file = SnapshotSystemJUnit5.forClass(testCase.spec::class.java.name)
+    val coroutineLocal = CoroutineDiskStorage(DiskStorageJUnit5(file, testCase.name.testName))
     return withContext(currentCoroutineContext() + coroutineLocal) {
-      file.startTest(testName)
+      file.startTest(testCase.name.testName, null)
       val result = execute(testCase)
-      file.finishedTestWithSuccess(testName, result.isSuccess)
+      file.finishedTestWithSuccess(testCase.name.testName, null, result.isSuccess)
       result
     }
-  }
-  private fun snapshotFileFor(testCase: TestCase): SnapshotFileProgress {
-    val classOrFilename: String =
-        when (val source = testCase.source) {
-          is SourceRef.ClassSource -> source.fqn
-          is SourceRef.FileSource -> source.fileName
-          is SourceRef.None -> TODO("Handle SourceRef.None")
-        }
-    return SnapshotSystemKotest.forClassOrFilename(classOrFilename)
   }
   override suspend fun finalizeSpec(
       kclass: KClass<out Spec>,
       results: Map<TestCase, TestResult>,
   ) {
-    results.keys
-        .map { snapshotFileFor(it) }
-        .firstOrNull()
-        ?.let { file -> file.finishedClassWithSuccess(results.values.all { it.isSuccess }) }
+    SnapshotSystemJUnit5.forClass(kclass.java.name)
+        .decrementContainersWithSuccess(results.values.all { it.isSuccess })
   }
-  override suspend fun ignoredSpec(kclass: KClass<*>, reason: String?): Unit = Unit
+  /**
+   * If you run from the CLI, `SelfieTestExecutionListener` will run and so will `afterProject`
+   * below If you run using the Kotest IDE plugin
+   * - if you run a whole spec, `SelfieTestExecutionListener` will run and so will `afterProject`
+   *   below
+   * - if you run a single test, `SelfieTestExecutionListener` will not run, but `afterProject`
+   *   below will
+   */
   override suspend fun afterProject() {
-    SnapshotSystemKotest.finishedAllTests()
+    SnapshotSystemJUnit5.finishedAllTests()
   }
 }

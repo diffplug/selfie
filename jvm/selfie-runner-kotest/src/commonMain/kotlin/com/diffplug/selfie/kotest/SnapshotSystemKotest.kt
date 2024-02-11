@@ -33,7 +33,6 @@ import com.diffplug.selfie.guts.SourceFile
 import com.diffplug.selfie.guts.TypedPath
 import com.diffplug.selfie.guts.WithinTestGC
 import com.diffplug.selfie.guts.atomic
-import kotlin.coroutines.coroutineContext
 import kotlin.jvm.JvmStatic
 
 internal object SnapshotSystemKotest : SnapshotSystem {
@@ -69,8 +68,6 @@ internal object SnapshotSystemKotest : SnapshotSystem {
   override fun writeInline(literalValue: LiteralValue<*>, call: CallStack) {
     inlineWriteTracker.record(call, literalValue, layout)
   }
-  override suspend fun diskCoroutine(): DiskStorage =
-      coroutineContext[CoroutineDiskStorage.Key]?.disk ?: TODO("THREADING GUIDE (TODO)")
   override fun diskThreadLocal(): DiskStorage = TODO("THREADING GUIDE (TODO)")
   fun finishedAllTests() {
     val snapshotsFilesWrittenToDisk =
