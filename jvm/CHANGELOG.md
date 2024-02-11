@@ -11,19 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 - **Kotest support**.
-  - `selfie-runner-junit5` now works well with kotest, but you have to use `Selfie.later()` to make any assertions past the first suspend point.
-  - `selfie-runner-kotest` is a new selfie implemented in Kotlin Multiplatform.
-    - Add `com.diffplug.selfie.kotest.SelfieExtension` to individual tests or to your `AbstractProjectConfig`.
-    - Call `SelfieSuspend.expectSelfie` instead of `Selfie.expectSelfie`.
-- `Selfie.later()` for making assertions off of the main thread. ([#198](https://github.com/diffplug/selfie/pull/198))
-- `Selfie.withinCoroutine()` for making assertions off of the main thread. ([#198](https://github.com/diffplug/selfie/pull/198))
+  - add `SelfieExtension` to your `AbstractProjectConfig`.
+  - instead of calling `Selfie.expectSelfie`, call `com.diffplug.selfie.coroutines.expectSelfie`.
+  - `selfie-runner-junit5` supports snapshots in regular JUnit tests and Kotest tests in the same project.
+  - `selfie-runner-kotest` is a new selfie implemented in Kotlin Multiplatform, but doesn't support snapshots within regular JUnit tests.
 ### Fixed
-- Now compatible with [`Kotest`](https://kotest.io/docs/framework/framework.html). ([#200](https://github.com/diffplug/selfie/pull/200))
 - Swap thread-local cache for thread-ignorant LRU to improve performance when used with coroutines. ([#191](https://github.com/diffplug/selfie/pull/191))
 ### Changes
 - (no user-facing changes) replaced terrible platform-specific `Path` with `TypedPath`. ([#184](https://github.com/diffplug/selfie/pull/184))
 - (no user-facing changes) replaced `SnapshotStorage` with `SnapshotSystem` + `DiskStorage`. ([#198](https://github.com/diffplug/selfie/pull/198))
-- (no user-facing changes) replaced all `synchronized` with CAS. ([#199](https://github.com/diffplug/selfie/pull/199))
+- (no user-facing changes) replaced most `synchronized` with CAS. ([#199](https://github.com/diffplug/selfie/pull/199))
 
 ## [1.1.2] - 2024-01-30
 ### Fixed

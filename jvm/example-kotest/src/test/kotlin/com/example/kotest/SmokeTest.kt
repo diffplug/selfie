@@ -1,7 +1,7 @@
 package com.example.kotest
 
 import io.kotest.core.spec.style.FunSpec
-import com.diffplug.selfie.SelfieSuspend.expectSelfie
+import com.diffplug.selfie.coroutines.expectSelfie
 
 class SmokeTest : FunSpec() {
     init {
