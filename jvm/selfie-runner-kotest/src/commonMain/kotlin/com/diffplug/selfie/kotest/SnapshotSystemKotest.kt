@@ -78,7 +78,7 @@ internal object SnapshotSystemKotest : SnapshotSystem {
     For more info https://selfie.dev/jvm/kotest#selfie-and-coroutines
   """
               .trimIndent())
-  fun finishedAllTests() {
+  internal fun finishedAllTests() {
     val snapshotsFilesWrittenToDisk =
         checkForInvalidStale.getAndUpdate { null }
             ?: throw AssertionError("finishedAllTests() was called more than once.")

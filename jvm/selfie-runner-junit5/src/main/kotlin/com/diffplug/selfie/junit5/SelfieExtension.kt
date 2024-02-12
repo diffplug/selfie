@@ -51,18 +51,23 @@ class SelfieExtension(projectConfig: AbstractProjectConfig) :
       kclass: KClass<out Spec>,
       results: Map<TestCase, TestResult>,
   ) {
+    val file = SnapshotSystemJUnit5.forClass(kclass.java.name)
+    results.entries.forEach {
+      if (it.value.isIgnored) {
+        file.startTest(it.key.name.testName, false)
+        file.finishedTestWithSuccess(it.key.name.testName, false, false)
+      }
+    }
     SnapshotSystemJUnit5.forClass(kclass.java.name)
         .decrementContainersWithSuccess(results.values.all { it.isSuccess })
   }
-  /**
-   * If you run from the CLI, `SelfieTestExecutionListener` will run and so will `afterProject`
-   * below If you run using the Kotest IDE plugin
-   * - if you run a whole spec, `SelfieTestExecutionListener` will run and so will `afterProject`
-   *   below
-   * - if you run a single test, `SelfieTestExecutionListener` will not run, but `afterProject`
-   *   below will
-   */
   override suspend fun afterProject() {
-    SnapshotSystemJUnit5.finishedAllTests()
+    // If you run from the CLI, `SelfieTestExecutionListener` will run and so will `afterProject`
+    // below If you run using the Kotest IDE plugin
+    // - entire spec -> `SelfieTestExecutionListener` will run and so will `afterProject`
+    // - single test -> `SelfieTestExecutionListener` will not run, but `afterProject` will
+    if (!SnapshotSystemJUnit5.testListenerRunning.get()) {
+      SnapshotSystemJUnit5.finishedAllTests()
+    }
   }
 }
