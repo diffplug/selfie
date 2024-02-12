@@ -51,6 +51,13 @@ class SelfieExtension(projectConfig: AbstractProjectConfig) :
       kclass: KClass<out Spec>,
       results: Map<TestCase, TestResult>,
   ) {
+    val file = SnapshotSystemJUnit5.forClass(kclass.java.name)
+    results.entries.forEach {
+      if (it.value.isIgnored) {
+        file.startTest(it.key.name.testName, false)
+        file.finishedTestWithSuccess(it.key.name.testName, false, false)
+      }
+    }
     SnapshotSystemJUnit5.forClass(kclass.java.name)
         .decrementContainersWithSuccess(results.values.all { it.isSuccess })
   }
