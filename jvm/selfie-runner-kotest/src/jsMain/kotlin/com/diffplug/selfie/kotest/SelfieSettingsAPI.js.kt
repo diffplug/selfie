@@ -18,5 +18,3 @@ package com.diffplug.selfie.kotest
 internal actual fun readUserDir(): String = TODO()
 
 internal actual fun readEnvironmentVariable(name: String): String? = TODO()
-
-internal actual fun instantiateSettingsAt(name: String): SelfieSettingsAPI = TODO()

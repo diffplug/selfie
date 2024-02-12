@@ -22,8 +22,6 @@ import okio.Path.Companion.toPath
 internal expect fun readUserDir(): String
 
 internal expect fun readEnvironmentVariable(name: String): String?
-
-internal expect fun instantiateSettingsAt(name: String): SelfieSettingsAPI
 internal fun calcMode(): Mode {
   val override = readEnvironmentVariable("selfie") ?: readEnvironmentVariable("SELFIE")
   if (override != null) {
@@ -104,27 +102,6 @@ open class SelfieSettingsAPI {
             "src/jvmTest/kotlin",
             "src/jsTest/kotlin",
             "src/test/resources")
-    internal fun initialize(): SelfieSettingsAPI {
-      try {
-        val settings = readEnvironmentVariable("SELFIE_SETTINGS")
-        if (settings != null && settings.isNotBlank()) {
-          try {
-            return instantiateSettingsAt(settings)
-          } catch (e: Throwable) {
-            throw Error(
-                "The system property selfie.settings was set to $settings, but that class could not be found.",
-                e)
-          }
-        }
-        try {
-          return instantiateSettingsAt("selfie.SelfieSettings")
-        } catch (e: Throwable) {
-          return SelfieSettingsAPI()
-        }
-      } catch (e: Throwable) {
-        return SelfieSettingsSmuggleError(e)
-      }
-    }
   }
 }
 
