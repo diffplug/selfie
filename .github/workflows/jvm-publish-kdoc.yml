@@ -1,6 +1,6 @@
 on:
   push:
-    branches: [release]
+    branches: [main]
     paths:
       - 'jvm/**'
 defaults:
