@@ -6,9 +6,18 @@ export const imageUrl = "https://selfie.dev/kotest.webp";
 
 <DocsImage imgAbsoluteUrl={imageUrl} />
 
-## Using Selfie with Kotest
+## Using Selfie with Kotest tldr
 
-Everything in the regular JVM [get started](./get-started) applies to Kotest as well. This page covers additional features which are specific to Kotest.
+- follow the regular JVM [get started](./get-started) instructions
+- add `SelfieExtension(projectConfig)` to your `AbstractProjectConfig`
+- make the following swap:
+  ```diff
+  -import com.diffplug.selfie.Selfie.expectSelfie
+  +import com.diffplug.selfie.coroutines.expectSelfie
+  ```
+And you're good to go!
+
+### Detailed setup
 
 Selfie has two artifacts which can run Kotest tests.
 
