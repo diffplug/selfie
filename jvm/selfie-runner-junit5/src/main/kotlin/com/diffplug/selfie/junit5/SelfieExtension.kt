@@ -64,8 +64,8 @@ class SelfieExtension(projectConfig: AbstractProjectConfig) :
   override suspend fun afterProject() {
     // If you run from the CLI, `SelfieTestExecutionListener` will run and so will `afterProject`
     // below If you run using the Kotest IDE plugin
-    // - if you run a whole spec, `SelfieTestExecutionListener` will run and so will `afterProject`
-    // - if you run a single test, `SelfieTestExecutionListener` will not run, but `afterProject` will
+    // - entire spec -> `SelfieTestExecutionListener` will run and so will `afterProject`
+    // - single test -> `SelfieTestExecutionListener` will not run, but `afterProject` will
     if (!SnapshotSystemJUnit5.testListenerRunning.get()) {
       SnapshotSystemJUnit5.finishedAllTests()
     }
