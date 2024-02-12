@@ -32,10 +32,11 @@ internal fun calcMode(): Mode {
 }
 
 /**
- * If you create a class named `SelfieSettings` in the package `selfie`, it must extend this class,
- * and you can override the methods below to customize various behaviors of selfie. You can also put
- * the settings class somewhere else if you set the `selfie.settings` system property to the fully
- * qualified name of the class you want selfie to use.
+ * To change the default settings, you must pass an instance of this class to the [SelfieExtension]
+ * in its constructor. The magic class
+ * [`selfie.SelfieSettings`](https://kdoc.selfie.dev/selfie-runner-junit5/com.diffplug.selfie.junit5/-selfie-settings-a-p-i/)
+ * that `selfie-runner-junit5` uses does not work with the multiplatform in `selfie-runner-kotest`
+ * - you have to pass the settings explicitly.
  */
 open class SelfieSettingsAPI {
   /**
