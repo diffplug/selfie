@@ -29,6 +29,10 @@ import kotlin.reflect.KClass
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.withContext
 
+/**
+ * Add this to your [AbstractProjectConfig], see [here](https://selfie.dev/jvm/kotest) for
+ * high-level docs.
+ */
 class SelfieExtension(projectConfig: AbstractProjectConfig) :
     Extension, TestCaseExtension, FinalizeSpecListener, AfterProjectListener {
   private fun snapshotFileFor(testCase: TestCase): SnapshotFileProgress {

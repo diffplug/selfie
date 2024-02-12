@@ -4,17 +4,20 @@ Changelog for the selfie JVM libraries.
 - [`com.diffplug.selfie:selfie-lib:VERSION`](https://central.sonatype.com/artifact/com.diffplug.selfie/selfie-lib)
 - [`com.diffplug.selfie:selfie-runner-junit5:VERSION`](https://central.sonatype.com/artifact/com.diffplug.selfie/selfie-runner-junit5)
   - can be used with JUnit4 via [junit-vintage](https://junit.org/junit5/docs/current/user-guide/#migrating-from-junit4)
-
+  - works with Kotest JVM
+- [`com.diffplug.selfie:selfie-runner-kotest:VERSION`](https://central.sonatype.com/artifact/com.diffplug.selfie/selfie-runner-kotest)
+  - written in Kotlin Multiplatform
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 ### Added
 - **Kotest support**.
-  - add `SelfieExtension` to your `AbstractProjectConfig`.
-  - instead of calling `Selfie.expectSelfie`, call `com.diffplug.selfie.coroutines.expectSelfie`.
+  - Add `SelfieExtension` to your `AbstractProjectConfig`.
+  - Instead of calling `Selfie.expectSelfie`, call `com.diffplug.selfie.coroutines.expectSelfie`.
   - `selfie-runner-junit5` supports snapshots in regular JUnit tests and Kotest tests in the same project.
   - `selfie-runner-kotest` is a new selfie implemented in Kotlin Multiplatform, but doesn't support snapshots within regular JUnit tests.
+  - Full docs at https://selfie.dev/jvm/kotest.
 ### Fixed
 - Swap thread-local cache for thread-ignorant LRU to improve performance when used with coroutines. ([#191](https://github.com/diffplug/selfie/pull/191))
 ### Changes
