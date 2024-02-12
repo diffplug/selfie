@@ -128,4 +128,4 @@ open class SelfieSettingsAPI {
   }
 }
 
-class SelfieSettingsSmuggleError(val error: Throwable) : SelfieSettingsAPI() {}
+internal class SelfieSettingsSmuggleError(val error: Throwable) : SelfieSettingsAPI() {}

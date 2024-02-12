@@ -38,7 +38,7 @@ import kotlin.io.path.readText
 import kotlin.io.path.writeText
 import kotlin.streams.asSequence
 import org.opentest4j.AssertionFailedError
-fun TypedPath.toPath(): java.nio.file.Path = java.nio.file.Path.of(absolutePath)
+internal fun TypedPath.toPath(): java.nio.file.Path = java.nio.file.Path.of(absolutePath)
 
 internal object FSJava : FS {
   override fun fileWrite(typedPath: TypedPath, content: String) =
