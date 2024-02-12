@@ -61,15 +61,13 @@ class SelfieExtension(projectConfig: AbstractProjectConfig) :
     SnapshotSystemJUnit5.forClass(kclass.java.name)
         .decrementContainersWithSuccess(results.values.all { it.isSuccess })
   }
-  /**
-   * If you run from the CLI, `SelfieTestExecutionListener` will run and so will `afterProject`
-   * below If you run using the Kotest IDE plugin
-   * - if you run a whole spec, `SelfieTestExecutionListener` will run and so will `afterProject`
-   *   below
-   * - if you run a single test, `SelfieTestExecutionListener` will not run, but `afterProject`
-   *   below will
-   */
   override suspend fun afterProject() {
-    SnapshotSystemJUnit5.finishedAllTests()
+    // If you run from the CLI, `SelfieTestExecutionListener` will run and so will `afterProject`
+    // below If you run using the Kotest IDE plugin
+    // - if you run a whole spec, `SelfieTestExecutionListener` will run and so will `afterProject`
+    // - if you run a single test, `SelfieTestExecutionListener` will not run, but `afterProject` will
+    if (!SnapshotSystemJUnit5.testListenerRunning.get()) {
+      SnapshotSystemJUnit5.finishedAllTests()
+    }
   }
 }

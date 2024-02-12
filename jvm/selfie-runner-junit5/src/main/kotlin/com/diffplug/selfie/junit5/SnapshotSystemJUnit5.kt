@@ -90,6 +90,7 @@ internal object SnapshotSystemJUnit5 : SnapshotSystem {
   override fun writeInline(literalValue: LiteralValue<*>, call: CallStack) {
     inlineWriteTracker.record(call, literalValue, layout)
   }
+  internal val testListenerRunning = AtomicBoolean(false)
   fun finishedAllTests() {
     val snapshotsFilesWrittenToDisk =
         checkForInvalidStale.getAndUpdate { null }
