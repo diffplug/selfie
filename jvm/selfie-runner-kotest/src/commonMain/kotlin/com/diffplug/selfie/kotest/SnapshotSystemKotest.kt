@@ -33,13 +33,11 @@ import com.diffplug.selfie.guts.SourceFile
 import com.diffplug.selfie.guts.TypedPath
 import com.diffplug.selfie.guts.WithinTestGC
 import com.diffplug.selfie.guts.atomic
-import kotlin.jvm.JvmStatic
 
-internal object SnapshotSystemKotest : SnapshotSystem {
-  @JvmStatic fun initStorage(): SnapshotSystem = this
+internal class SnapshotSystemKotest(settings: SelfieSettingsAPI) : SnapshotSystem {
   override val fs = FSOkio
   override val mode = calcMode()
-  override val layout = SnapshotFileLayoutKotest(SelfieSettingsAPI.initialize(), fs)
+  override val layout = SnapshotFileLayoutKotest(settings, fs)
   private val commentTracker = CommentTracker()
   private val inlineWriteTracker = InlineWriteTracker()
   private val progressPerFile = atomic(ArrayMap.empty<String, SnapshotFileProgress>())

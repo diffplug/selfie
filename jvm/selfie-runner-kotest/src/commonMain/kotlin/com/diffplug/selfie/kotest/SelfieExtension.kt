@@ -16,6 +16,8 @@
 package com.diffplug.selfie.kotest
 
 import com.diffplug.selfie.guts.CoroutineDiskStorage
+import com.diffplug.selfie.guts.SnapshotSystem
+import com.diffplug.selfie.guts.atomic
 import io.kotest.core.config.AbstractProjectConfig
 import io.kotest.core.extensions.Extension
 import io.kotest.core.extensions.TestCaseExtension
@@ -25,6 +27,7 @@ import io.kotest.core.source.SourceRef
 import io.kotest.core.spec.Spec
 import io.kotest.core.test.TestCase
 import io.kotest.core.test.TestResult
+import kotlin.jvm.JvmStatic
 import kotlin.reflect.KClass
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.withContext
@@ -33,8 +36,28 @@ import kotlinx.coroutines.withContext
  * Add this to your [AbstractProjectConfig], see [here](https://selfie.dev/jvm/kotest) for
  * high-level docs.
  */
-class SelfieExtension(projectConfig: AbstractProjectConfig) :
-    Extension, TestCaseExtension, FinalizeSpecListener, AfterProjectListener {
+class SelfieExtension(
+    projectConfig: AbstractProjectConfig,
+    settingsAPI: SelfieSettingsAPI = SelfieSettingsAPI()
+) : Extension, TestCaseExtension, FinalizeSpecListener, AfterProjectListener {
+  private val system = SnapshotSystemKotest(settingsAPI)
+
+  companion object {
+    private val snapshotSystem = atomic(null as SnapshotSystem?)
+
+    @JvmStatic
+    fun initStorage(): SnapshotSystem =
+        snapshotSystem.get()
+            ?: throw IllegalStateException(
+                "SelfieExtension wasn't added to the AbstractProjectConfig")
+  }
+
+  init {
+    snapshotSystem.updateAndGet {
+      require(it == null) { "SnapshotSystemKotest should only be initialized once" }
+      system
+    }
+  }
   private fun snapshotFileFor(testCase: TestCase): SnapshotFileProgress {
     val classOrFilename: String =
         when (val source = testCase.source) {
@@ -42,7 +65,7 @@ class SelfieExtension(projectConfig: AbstractProjectConfig) :
           is SourceRef.FileSource -> source.fileName
           is SourceRef.None -> TODO("Handle SourceRef.None")
         }
-    return SnapshotSystemKotest.forClassOrFilename(classOrFilename)
+    return system.forClassOrFilename(classOrFilename)
   }
   /** Called for every test method. */
   override suspend fun intercept(
@@ -73,6 +96,6 @@ class SelfieExtension(projectConfig: AbstractProjectConfig) :
     file.finishedClassWithSuccess(results.entries.all { it.value.isSuccess })
   }
   override suspend fun afterProject() {
-    SnapshotSystemKotest.finishedAllTests()
+    system.finishedAllTests()
   }
 }
