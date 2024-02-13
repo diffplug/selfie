@@ -21,7 +21,6 @@ import com.diffplug.selfie.Roundtrip
 import com.diffplug.selfie.RoundtripJson
 import com.diffplug.selfie.Selfie
 import com.diffplug.selfie.Snapshot
-import com.diffplug.selfie.guts.CallStack
 import com.diffplug.selfie.guts.CoroutineDiskStorage
 import com.diffplug.selfie.guts.DiskSnapshotTodo
 import com.diffplug.selfie.guts.DiskStorage
@@ -78,14 +77,13 @@ class StringMemoSuspend<T>(
     private val generator: suspend () -> T
 ) {
   suspend fun toMatchDisk(sub: String = ""): T {
-    val call = recordCall(false)
-    return toMatchDiskImpl(sub, call, false)
+    return toMatchDiskImpl(sub, false)
   }
   suspend fun toMatchDisk_TODO(sub: String = ""): T {
-    val call = recordCall(false)
-    return toMatchDiskImpl(sub, call, true)
+    return toMatchDiskImpl(sub, true)
   }
-  private suspend fun toMatchDiskImpl(sub: String, call: CallStack, isTodo: Boolean): T {
+  private suspend fun toMatchDiskImpl(sub: String, isTodo: Boolean): T {
+    val call = recordCall(false)
     if (Selfie.system.mode.canWrite(isTodo, call, Selfie.system)) {
       val actual = generator()
       disk.writeDisk(Snapshot.of(roundtrip.serialize(actual)), sub, call)
@@ -110,14 +108,13 @@ class StringMemoSuspend<T>(
     }
   }
   suspend fun toBe_TODO(unusedArg: Any? = null): T {
-    val call = recordCall(false)
-    return toBeImpl(call, null)
+    return toBeImpl(null)
   }
   suspend fun toBe(expected: String): T {
-    val call = recordCall(false)
-    return toBeImpl(call, expected)
+    return toBeImpl(expected)
   }
-  private suspend fun toBeImpl(call: CallStack, snapshot: String?): T {
+  private suspend fun toBeImpl(snapshot: String?): T {
+    val call = recordCall(false)
     val writable = Selfie.system.mode.canWrite(snapshot == null, call, Selfie.system)
     if (writable) {
       val actual = generator()
