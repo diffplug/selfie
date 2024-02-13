@@ -85,7 +85,6 @@ class StringMemoSuspend<T>(
     val call = recordCall(false)
     return toMatchDiskImpl(sub, call, true)
   }
-
   private suspend fun toMatchDiskImpl(sub: String, call: CallStack, isTodo: Boolean): T {
     if (Selfie.system.mode.canWrite(isTodo, call, Selfie.system)) {
       val actual = generator()
@@ -112,15 +111,25 @@ class StringMemoSuspend<T>(
   }
   suspend fun toBe_TODO(unusedArg: Any? = null): T {
     val call = recordCall(false)
-    val writable = Selfie.system.mode.canWrite(true, call, Selfie.system)
+    return toBeImpl(call, null)
+  }
+  suspend fun toBe(expected: String): T {
+    val call = recordCall(false)
+    return toBeImpl(call, expected)
+  }
+  private suspend fun toBeImpl(call: CallStack, snapshot: String?): T {
+    val writable = Selfie.system.mode.canWrite(snapshot == null, call, Selfie.system)
     if (writable) {
       val actual = generator()
       Selfie.system.writeInline(
-          LiteralValue(null, roundtrip.serialize(actual), LiteralString), call)
+          LiteralValue(snapshot, roundtrip.serialize(actual), LiteralString), call)
       return actual
     } else {
-      throw Selfie.system.fs.assertFailed("Can't call `toBe_TODO` in ${Mode.readonly} mode!")
+      if (snapshot == null) {
+        throw Selfie.system.fs.assertFailed("Can't call `toBe_TODO` in ${Mode.readonly} mode!")
+      } else {
+        return roundtrip.parse(snapshot)
+      }
     }
   }
-  fun toBe(expected: String): T = roundtrip.parse(expected)
 }
