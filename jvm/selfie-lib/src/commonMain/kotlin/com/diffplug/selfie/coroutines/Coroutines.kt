@@ -18,6 +18,7 @@ package com.diffplug.selfie.coroutines
 import com.diffplug.selfie.Camera
 import com.diffplug.selfie.Mode
 import com.diffplug.selfie.Roundtrip
+import com.diffplug.selfie.RoundtripJson
 import com.diffplug.selfie.Selfie
 import com.diffplug.selfie.Snapshot
 import com.diffplug.selfie.guts.CoroutineDiskStorage
@@ -63,6 +64,12 @@ suspend fun preserveSelfiesOnDisk(vararg subsToKeep: String) {
 suspend fun memoize(toMemoize: suspend () -> String) = memoize(Roundtrip.identity(), toMemoize)
 suspend fun <T> memoize(roundtrip: Roundtrip<T, String>, toMemoize: suspend () -> T) =
     StringMemoSuspend<T>(disk(), roundtrip, toMemoize)
+/**
+ * Memoizes any type which is marked with `@kotlinx.serialization.Serializable` as pretty-printed
+ * json.
+ */
+suspend inline fun <reified T> memoizeAsJson(noinline toMemoize: suspend () -> T) =
+    memoize(RoundtripJson.of<T>(), toMemoize)
 
 class StringMemoSuspend<T>(
     private val disk: DiskStorage,
