@@ -1,6 +1,6 @@
 package undertest.junit5
 
-import com.diffplug.selfie.Selfie.expectSelfie
+import com.diffplug.selfie.coroutines.expectSelfie
 import io.kotest.core.spec.style.FunSpec
 
 class UT_KotestFunSpecTest :

@@ -1,0 +1,77 @@
+import { DocsImage } from "@/components/DocsImage";
+
+export const title = "Selfie Snapshot Testing | Kotest";
+export const description = "Selfie works great with Kotest and Kotlin coroutines.";
+export const imageUrl = "https://selfie.dev/kotest.webp";
+
+<DocsImage imgAbsoluteUrl={imageUrl} />
+
+## Using Selfie with Kotest tldr
+
+- follow the regular JVM [get started](./get-started) instructions
+- add `SelfieExtension(projectConfig)` to your `AbstractProjectConfig`
+- make the following swap:
+  ```diff
+  -import com.diffplug.selfie.Selfie.expectSelfie
+  +import com.diffplug.selfie.coroutines.expectSelfie
+  ```
+And you're good to go!
+
+### Detailed setup
+
+Selfie has two artifacts which can run Kotest tests.
+
+- `com.diffplug.selfie:selfie-runner-junit5`
+  - Works with regular JUnit tests and also Kotest tests.
+  - JVM only
+- `com.difplug.selfie:selfie-runner-kotest`
+  - Cannot run JUnit tests, only Kotest.
+  - Written in Kotlin Multiplatform (only JVM implemented so far, [PRs for other platforms welcome](https://github.com/diffplug/selfie/issues/186))
+
+You must choose only one, you'll get an error if both are on the classpath. You'll need to add the `SelfieExtension` to your `AbstractProjectConfig` like so:
+
+```kotlin
+import com.diffplug.selfie.junit5.SelfieExtension // selfie-runner-junit5
+import com.diffplug.selfie.kotest.SelfieExtension // selfie-runner-kotest
+import io.kotest.core.config.AbstractProjectConfig
+
+class ProjectConfig : AbstractProjectConfig() {
+  override fun extensions() = listOf(SelfieExtension(this))
+}
+```
+
+## Selfie and coroutines
+
+In a regular JUnit 5 test, you call `Selfie.expectSelfie(...)`, like so
+
+```kotlin
+import com.diffplug.selfie.Selfie.expectSelfie
+class TestClass {
+  @Test fun testMethod() {
+    expectSelfie(something).toMatchDisk()
+  }
+}
+```
+
+Every Kotest test is a `suspend fun`, not a regular `fun`. You **must** use the functions in the `coroutines` package instead of `Selfie`.
+
+```kotlin
+import com.diffplug.selfie.coroutines.expectSelfie
+class TestSpec : FunSpec({
+  test("testMethod") {
+    expectSelfie(something).toMatchDisk()
+  }
+})
+```
+
+If you use `Selfie` instead of `coroutines` you'll get a runtime error reminding you to use the `coroutines` function instead.
+
+### Threading implementation details
+
+Inline literal `toBe` snapshots don't need to know what test is currently running. But a `toMatchDisk` snapshot needs to know which test is running so that it can put the correct name into the snapshot file.
+
+For a JUnit test, `selfie-runner-junit5` uses a `ThreadLocal` to pass information about the currently running test. For a Kotest test using either runner, `selfie-runner-junit5` or `selfie-runner-kotest`, the information is stored in the coroutine context, which can only be accessed from a `suspend fun`. This is why you must use `coroutines.expectSelfie` instead of `Selfie.expectSelfie`.
+
+This issue only matters for disk snapshots. This creates a chance for confusion where you might be using inline literal `toBe` snapshots without any problem. Then you try `toMatchDisk` snapshots and get an error telling you to switch from `Selfie.expectSelfie` to `coroutines.expectSelfie`. This is expected, just make the switch and you'll be good to go.
+
+*Pull requests to improve the landing page and documentation are greatly appreciated, you can find the [source code here](https://github.com/diffplug/selfie).*

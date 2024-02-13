@@ -33,14 +33,11 @@ import com.diffplug.selfie.guts.SourceFile
 import com.diffplug.selfie.guts.TypedPath
 import com.diffplug.selfie.guts.WithinTestGC
 import com.diffplug.selfie.guts.atomic
-import kotlin.coroutines.coroutineContext
-import kotlin.jvm.JvmStatic
 
-internal object SnapshotSystemKotest : SnapshotSystem {
-  @JvmStatic fun initStorage(): SnapshotSystem = this
+internal class SnapshotSystemKotest(settings: SelfieSettingsAPI) : SnapshotSystem {
   override val fs = FSOkio
   override val mode = calcMode()
-  override val layout = SnapshotFileLayoutKotest(SelfieSettingsAPI.initialize(), fs)
+  override val layout = SnapshotFileLayoutKotest(settings, fs)
   private val commentTracker = CommentTracker()
   private val inlineWriteTracker = InlineWriteTracker()
   private val progressPerFile = atomic(ArrayMap.empty<String, SnapshotFileProgress>())
@@ -69,10 +66,17 @@ internal object SnapshotSystemKotest : SnapshotSystem {
   override fun writeInline(literalValue: LiteralValue<*>, call: CallStack) {
     inlineWriteTracker.record(call, literalValue, layout)
   }
-  override suspend fun diskCoroutine(): DiskStorage =
-      coroutineContext[CoroutineDiskStorage.Key]?.disk ?: TODO("THREADING GUIDE (TODO)")
-  override fun diskThreadLocal(): DiskStorage = TODO("THREADING GUIDE (TODO)")
-  fun finishedAllTests() {
+  override fun diskThreadLocal(): DiskStorage =
+      throw fs.assertFailed(
+          """
+    Kotest tests must use the `suspend` versions of the `expectSelfie` function.
+    You can fix this by making the following change:
+      -import com.diffplug.selfie.Selfie.expectSelfie
+      +import com.diffplug.selfie.coroutines.expectSelfie
+    For more info https://selfie.dev/jvm/kotest#selfie-and-coroutines
+  """
+              .trimIndent())
+  internal fun finishedAllTests() {
     val snapshotsFilesWrittenToDisk =
         checkForInvalidStale.getAndUpdate { null }
             ?: throw AssertionError("finishedAllTests() was called more than once.")

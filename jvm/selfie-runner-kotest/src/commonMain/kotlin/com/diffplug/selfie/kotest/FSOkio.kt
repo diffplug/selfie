@@ -25,9 +25,9 @@ import okio.FileSystem
 import okio.Path.Companion.toPath
 
 expect internal val FS_SYSTEM: FileSystem
-fun TypedPath.toPath(): okio.Path = absolutePath.toPath()
+internal fun TypedPath.toPath(): okio.Path = absolutePath.toPath()
 
-object FSOkio : FS {
+internal object FSOkio : FS {
   /** Walks the files (not directories) which are children and grandchildren of the given path. */
   override fun <T> fileWalk(typedPath: TypedPath, walk: (Sequence<TypedPath>) -> T): T =
       walk(

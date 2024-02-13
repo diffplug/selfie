@@ -17,6 +17,15 @@ package com.diffplug.selfie.guts
 
 import com.diffplug.selfie.Mode
 import com.diffplug.selfie.Snapshot
+import kotlin.coroutines.AbstractCoroutineContextElement
+import kotlin.coroutines.CoroutineContext
+
+/** Used by [com.diffplug.selfie.SelfieSuspend]. */
+class CoroutineDiskStorage(val disk: DiskStorage) : AbstractCoroutineContextElement(Key) {
+  override val key = Key
+
+  companion object Key : CoroutineContext.Key<CoroutineDiskStorage>
+}
 
 /** A unix-style path where trailing-slash means it is a folder. */
 data class TypedPath(val absolutePath: String) : Comparable<TypedPath> {
@@ -90,8 +99,6 @@ interface SnapshotSystem {
   fun writeInline(literalValue: LiteralValue<*>, call: CallStack)
   /** Returns the DiskStorage for the test associated with this thread, else error. */
   fun diskThreadLocal(): DiskStorage
-  /** Returns the DiskStorage for the test associated with this coroutine, else error. */
-  suspend fun diskCoroutine(): DiskStorage
 }
 
 /** Represents the disk storage for a specific test. */

@@ -32,37 +32,7 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.jvm.JvmOverloads
 import kotlin.jvm.JvmStatic
 
-class Later internal constructor(private val disk: DiskStorage) {
-  fun <T> expectSelfie(actual: T, camera: Camera<T>) = expectSelfie(camera.snapshot(actual))
-  fun expectSelfie(actual: String) = expectSelfie(Snapshot.of(actual))
-  fun expectSelfie(actual: ByteArray) = expectSelfie(Snapshot.of(actual))
-  fun expectSelfie(actual: Snapshot) = Selfie.DiskSelfie(actual, disk)
-  fun preserveSelfiesOnDisk(vararg subsToKeep: String) {
-    if (subsToKeep.isEmpty()) {
-      disk.keep(null)
-    } else {
-      subsToKeep.forEach { disk.keep(it) }
-    }
-  }
-}
-
-object SelfieSuspend {
-  private suspend fun disk() = Selfie.system.diskCoroutine()
-  suspend fun <T> expectSelfie(actual: T, camera: Camera<T>) = expectSelfie(camera.snapshot(actual))
-  suspend fun expectSelfie(actual: String) = expectSelfie(Snapshot.of(actual))
-  suspend fun expectSelfie(actual: ByteArray) = expectSelfie(Snapshot.of(actual))
-  suspend fun expectSelfie(actual: Snapshot) = Selfie.DiskSelfie(actual, disk())
-  suspend fun preserveSelfiesOnDisk(vararg subsToKeep: String) {
-    val disk = disk()
-    if (subsToKeep.isEmpty()) {
-      disk.keep(null)
-    } else {
-      subsToKeep.forEach { disk.keep(it) }
-    }
-  }
-  suspend fun later() = Later(disk())
-}
-
+/** Static methods for creating snapshots. */
 object Selfie {
   internal val system: SnapshotSystem = initSnapshotSystem()
   private val deferredDiskStorage =
@@ -80,10 +50,13 @@ object Selfie {
    */
   @JvmStatic
   fun preserveSelfiesOnDisk(vararg subsToKeep: String) {
-    later().preserveSelfiesOnDisk(*subsToKeep)
+    val disk = system.diskThreadLocal()
+    if (subsToKeep.isEmpty()) {
+      disk.keep(null)
+    } else {
+      subsToKeep.forEach { disk.keep(it) }
+    }
   }
-
-  @JvmStatic fun later() = Later(system.diskThreadLocal())
 
   class DiskSelfie internal constructor(actual: Snapshot, val disk: DiskStorage) :
       LiteralStringSelfie(actual) {

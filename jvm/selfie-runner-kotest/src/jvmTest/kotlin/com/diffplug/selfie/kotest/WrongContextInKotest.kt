@@ -15,6 +15,8 @@
  */
 package com.diffplug.selfie.kotest
 
-internal actual fun readUserDir(): String = TODO()
-
-internal actual fun readEnvironmentVariable(name: String): String? = TODO()
+class WrongContextInKotest : HarnessKotest() {
+  init {
+    test("error message") { gradleReadSS() }
+  }
+}

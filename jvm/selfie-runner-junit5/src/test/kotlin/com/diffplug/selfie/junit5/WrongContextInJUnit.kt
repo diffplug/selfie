@@ -13,8 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.diffplug.selfie.kotest
+package com.diffplug.selfie.junit5
 
-internal actual fun readUserDir(): String = TODO()
+import kotlin.test.Test
 
-internal actual fun readEnvironmentVariable(name: String): String? = TODO()
+class WrongContextInJUnit : HarnessJUnit() {
+  @Test
+  fun errorMsg() {
+    gradleReadSS()
+  }
+}

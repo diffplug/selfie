@@ -1,10 +1,10 @@
-import { GetStarted } from "@/components/GetStarted";
+import { DocsImage } from "@/components/DocsImage";
 
 export const title = "Selfie JVM Snapshot Testing | Get started";
 export const description = "Zero-config inline and disk snapshots for Java, Kotlin, and more. Add a single dependency to your Gradle or Maven build and you're all set.";
 export const imageUrl = "https://selfie.dev/get-started.webp";
 
-<GetStarted />
+<DocsImage imgAbsoluteUrl={imageUrl} />
 
 To start snapshot testing in Java or any JVM language, all you need is to add a [single dependency](https://central.sonatype.com/artifact/com.diffplug.selfie/selfie-runner-junit5).
 
@@ -16,6 +16,7 @@ Selfie snapshot testing works with the following JVM test runners:
 
 - JUnit5
 - JUnit4 through junit-vintage
+- [Kotest (with JUnit5 or Kotlin Multiplatform)](./kotest)
 - PRs welcome for other test runners
 
 Disk snapshots can be used with any JVM language, but inline literal snapshots only work if the test code is written in:
@@ -75,7 +76,7 @@ tasks.test {
 }
 ```
 
-Again, replace `ver_SELFIE` with the [latest available version of selfie](https://github.com/diffplug/selfie/blob/main/jvm/CHANGELOG.md).
+Replace `ver_SELFIE` with the [latest available version of selfie](https://github.com/diffplug/selfie/blob/main/jvm/CHANGELOG.md).
 
 ## Quickstart
 
@@ -177,7 +178,7 @@ But the real power of selfie is asserting on arbitrary objects using **facets**,
 
 ## Reference
 
-Full API documentation is available at [kdoc.selfie.dev](https://kdoc.selfie.dev/).
+Full API documentation is available at [kdoc.selfie.dev](https://kdoc.selfie.dev/). For details on threading, see [threading details](/jvm/kotest#selfie-and-coroutines).
 
 - `.toBe_TODO()` or `.toBe_TODO(argumentIsIgnored)`
   - creates or updates an inline literal snapshot

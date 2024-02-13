@@ -15,6 +15,12 @@
  */
 package com.diffplug.selfie.kotest
 
-internal actual fun readUserDir(): String = TODO()
+import com.diffplug.selfie.junit5.HarnessJUnit
+import kotlin.test.Test
 
-internal actual fun readEnvironmentVariable(name: String): String? = TODO()
+class WrongContextInJUnitKotest : HarnessJUnit() {
+  @Test
+  fun errorMsg() {
+    gradleReadSS()
+  }
+}

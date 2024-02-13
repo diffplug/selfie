@@ -16,6 +16,7 @@ dependencies {
   api project(':selfie-lib')
   implementation 'org.junit.platform:junit-platform-launcher:1.0.0'
   compileOnly "org.junit.jupiter:junit-jupiter-api:5.0.0"
+  compileOnly "io.kotest:kotest-framework-engine:$ver_KOTEST"
 
   testImplementation "com.squareup.okio:okio:$ver_OKIO"
   testImplementation "org.jetbrains.kotlin:kotlin-test-junit5:$ver_KOTLIN_TEST"

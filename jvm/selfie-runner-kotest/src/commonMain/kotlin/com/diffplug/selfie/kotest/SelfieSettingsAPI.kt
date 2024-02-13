@@ -22,8 +22,6 @@ import okio.Path.Companion.toPath
 internal expect fun readUserDir(): String
 
 internal expect fun readEnvironmentVariable(name: String): String?
-
-internal expect fun instantiateSettingsAt(name: String): SelfieSettingsAPI
 internal fun calcMode(): Mode {
   val override = readEnvironmentVariable("selfie") ?: readEnvironmentVariable("SELFIE")
   if (override != null) {
@@ -34,10 +32,11 @@ internal fun calcMode(): Mode {
 }
 
 /**
- * If you create a class named `SelfieSettings` in the package `selfie`, it must extend this class,
- * and you can override the methods below to customize various behaviors of selfie. You can also put
- * the settings class somewhere else if you set the `selfie.settings` system property to the fully
- * qualified name of the class you want selfie to use.
+ * To change the default settings, you must pass an instance of this class to the [SelfieExtension]
+ * in its constructor. The magic class
+ * [`selfie.SelfieSettings`](https://kdoc.selfie.dev/selfie-runner-junit5/com.diffplug.selfie.junit5/-selfie-settings-a-p-i/)
+ * that `selfie-runner-junit5` uses does not work with the multiplatform in `selfie-runner-kotest`
+ * - you have to pass the settings explicitly.
  */
 open class SelfieSettingsAPI {
   /**
@@ -104,28 +103,7 @@ open class SelfieSettingsAPI {
             "src/jvmTest/kotlin",
             "src/jsTest/kotlin",
             "src/test/resources")
-    internal fun initialize(): SelfieSettingsAPI {
-      try {
-        val settings = readEnvironmentVariable("SELFIE_SETTINGS")
-        if (settings != null && settings.isNotBlank()) {
-          try {
-            return instantiateSettingsAt(settings)
-          } catch (e: Throwable) {
-            throw Error(
-                "The system property selfie.settings was set to $settings, but that class could not be found.",
-                e)
-          }
-        }
-        try {
-          return instantiateSettingsAt("selfie.SelfieSettings")
-        } catch (e: Throwable) {
-          return SelfieSettingsAPI()
-        }
-      } catch (e: Throwable) {
-        return SelfieSettingsSmuggleError(e)
-      }
-    }
   }
 }
 
-class SelfieSettingsSmuggleError(val error: Throwable) : SelfieSettingsAPI() {}
+internal class SelfieSettingsSmuggleError(val error: Throwable) : SelfieSettingsAPI() {}

@@ -18,18 +18,3 @@ package com.diffplug.selfie.kotest
 internal actual fun readUserDir(): String = System.getProperty("user.dir")
 
 internal actual fun readEnvironmentVariable(name: String): String? = System.getenv(name)
-
-internal actual fun instantiateSettingsAt(name: String): SelfieSettingsAPI {
-  val clazz =
-      try {
-        Class.forName(name)
-      } catch (e: ClassNotFoundException) {
-        throw e
-      }
-  try {
-    return clazz.getDeclaredConstructor().newInstance() as SelfieSettingsAPI
-  } catch (e: InstantiationException) {
-    throw AssertionError(
-        "Unable to instantiate ${clazz.name}, is it abstract? Does it require arguments?", e)
-  }
-}

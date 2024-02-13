@@ -18,7 +18,7 @@ actual fun initSnapshotSystem(): SnapshotSystem {
   val placesToLook =
       listOf(
           "com.diffplug.selfie.junit5.SnapshotSystemJUnit5",
-          "com.diffplug.selfie.kotest.SnapshotSystemKotest")
+          "com.diffplug.selfie.kotest.SelfieExtension")
   val classesThatExist =
       placesToLook.mapNotNull {
         try {

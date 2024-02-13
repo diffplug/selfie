@@ -27,13 +27,14 @@ class SelfieTestExecutionListener : TestExecutionListener {
   private val system = SnapshotSystemJUnit5
   override fun executionStarted(testIdentifier: TestIdentifier) {
     try {
-      if (isRoot(testIdentifier)) return
+      system.testListenerRunning.set(true)
+      if (isRootOrKotest(testIdentifier)) return
       val (clazz, test) = parseClassTest(testIdentifier)
       val snapshotFile = system.forClass(clazz)
       if (test == null) {
         snapshotFile.incrementContainers()
       } else {
-        system.forClass(clazz).startTest(test, testIdentifier.uniqueId)
+        system.forClass(clazz).startTest(test, true)
       }
     } catch (e: Throwable) {
       system.layout.smuggledError.set(e)
@@ -57,14 +58,14 @@ class SelfieTestExecutionListener : TestExecutionListener {
       testExecutionResult: TestExecutionResult
   ) {
     try {
-      if (isRoot(testIdentifier)) return
+      if (isRootOrKotest(testIdentifier)) return
       val (clazz, test) = parseClassTest(testIdentifier)
       val isSuccess = testExecutionResult.status == TestExecutionResult.Status.SUCCESSFUL
       val snapshotFile = system.forClass(clazz)
       if (test == null) {
         snapshotFile.decrementContainersWithSuccess(isSuccess)
       } else {
-        snapshotFile.finishedTestWithSuccess(test, testIdentifier.uniqueId, isSuccess)
+        snapshotFile.finishedTestWithSuccess(test, true, isSuccess)
       }
     } catch (e: Throwable) {
       system.layout.smuggledError.set(e)
@@ -73,7 +74,8 @@ class SelfieTestExecutionListener : TestExecutionListener {
   override fun testPlanExecutionFinished(testPlan: TestPlan?) {
     system.finishedAllTests()
   }
-  private fun isRoot(testIdentifier: TestIdentifier) = testIdentifier.parentId.isEmpty
+  private fun isRootOrKotest(testIdentifier: TestIdentifier) =
+      testIdentifier.parentId.isEmpty || testIdentifier.uniqueId.startsWith("[engine:kotest]")
   private fun parseClassTest(testIdentifier: TestIdentifier): Pair<String, String?> {
     return when (val source = testIdentifier.source.get()) {
       is ClassSource ->

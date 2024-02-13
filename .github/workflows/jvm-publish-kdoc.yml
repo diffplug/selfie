@@ -1,6 +1,6 @@
 on:
   push:
-    branches: [release]
+    branches: [main]
     paths:
       - 'jvm/**'
 defaults:
@@ -22,7 +22,7 @@ jobs:
           distribution: "temurin"
           java-version: 17
       - name: Gradle caching
-        uses: gradle/gradle-build-action@v2
+        uses: gradle/actions/setup-gradle@v3
         with:
           gradle-home-cache-cleanup: true
       - name: Build

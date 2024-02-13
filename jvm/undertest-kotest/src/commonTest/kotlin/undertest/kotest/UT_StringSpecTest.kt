@@ -1,6 +1,6 @@
 package undertest.kotest
 
-import com.diffplug.selfie.SelfieSuspend.expectSelfie
+import com.diffplug.selfie.coroutines.expectSelfie
 import io.kotest.core.spec.style.StringSpec
 
 class UT_StringSpecTest :

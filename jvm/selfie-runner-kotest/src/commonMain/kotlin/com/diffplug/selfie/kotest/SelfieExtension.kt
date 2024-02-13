@@ -15,30 +15,58 @@
  */
 package com.diffplug.selfie.kotest
 
-import com.diffplug.selfie.guts.DiskStorage
+import com.diffplug.selfie.guts.CoroutineDiskStorage
+import com.diffplug.selfie.guts.SnapshotSystem
+import com.diffplug.selfie.guts.atomic
+import io.kotest.core.config.AbstractProjectConfig
 import io.kotest.core.extensions.Extension
 import io.kotest.core.extensions.TestCaseExtension
 import io.kotest.core.listeners.AfterProjectListener
 import io.kotest.core.listeners.FinalizeSpecListener
-import io.kotest.core.listeners.IgnoredSpecListener
 import io.kotest.core.source.SourceRef
 import io.kotest.core.spec.Spec
 import io.kotest.core.test.TestCase
 import io.kotest.core.test.TestResult
-import kotlin.coroutines.AbstractCoroutineContextElement
-import kotlin.coroutines.CoroutineContext
+import kotlin.jvm.JvmStatic
 import kotlin.reflect.KClass
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.withContext
 
-internal class CoroutineDiskStorage(val disk: DiskStorage) : AbstractCoroutineContextElement(Key) {
-  override val key = Key
+/**
+ * Add this to your [AbstractProjectConfig], see [here](https://selfie.dev/jvm/kotest) for
+ * high-level docs.
+ */
+class SelfieExtension(
+    projectConfig: AbstractProjectConfig,
+    settingsAPI: SelfieSettingsAPI = SelfieSettingsAPI()
+) : Extension, TestCaseExtension, FinalizeSpecListener, AfterProjectListener {
+  private val system = SnapshotSystemKotest(settingsAPI)
 
-  companion object Key : CoroutineContext.Key<CoroutineDiskStorage>
-}
+  companion object {
+    private val snapshotSystem = atomic(null as SnapshotSystem?)
 
-object SelfieExtension :
-    Extension, FinalizeSpecListener, TestCaseExtension, IgnoredSpecListener, AfterProjectListener {
+    @JvmStatic
+    fun initStorage(): SnapshotSystem =
+        snapshotSystem.get()
+            ?: throw IllegalStateException(
+                "SelfieExtension wasn't added to the AbstractProjectConfig")
+  }
+
+  init {
+    snapshotSystem.updateAndGet {
+      require(it == null) { "SnapshotSystemKotest should only be initialized once" }
+      system
+    }
+  }
+  private fun snapshotFileFor(testCase: TestCase): SnapshotFileProgress {
+    val classOrFilename: String =
+        when (val source = testCase.source) {
+          is SourceRef.ClassSource -> source.fqn
+          is SourceRef.FileSource -> source.fileName
+          is SourceRef.None -> TODO("Handle SourceRef.None")
+        }
+    return system.forClassOrFilename(classOrFilename)
+  }
   /** Called for every test method. */
   override suspend fun intercept(
       testCase: TestCase,
@@ -54,26 +82,20 @@ object SelfieExtension :
       result
     }
   }
-  private fun snapshotFileFor(testCase: TestCase): SnapshotFileProgress {
-    val classOrFilename: String =
-        when (val source = testCase.source) {
-          is SourceRef.ClassSource -> source.fqn
-          is SourceRef.FileSource -> source.fileName
-          is SourceRef.None -> TODO("Handle SourceRef.None")
-        }
-    return SnapshotSystemKotest.forClassOrFilename(classOrFilename)
-  }
   override suspend fun finalizeSpec(
       kclass: KClass<out Spec>,
       results: Map<TestCase, TestResult>,
   ) {
-    results.keys
-        .map { snapshotFileFor(it) }
-        .firstOrNull()
-        ?.let { file -> file.finishedClassWithSuccess(results.values.all { it.isSuccess }) }
+    val file = results.keys.map { snapshotFileFor(it) }.firstOrNull() ?: return
+    results.entries.forEach {
+      if (it.value.isIgnored) {
+        file.startTest(it.key.name.testName)
+        file.finishedTestWithSuccess(it.key.name.testName, false)
+      }
+    }
+    file.finishedClassWithSuccess(results.entries.all { it.value.isSuccess })
   }
-  override suspend fun ignoredSpec(kclass: KClass<*>, reason: String?): Unit = Unit
   override suspend fun afterProject() {
-    SnapshotSystemKotest.finishedAllTests()
+    system.finishedAllTests()
   }
 }
