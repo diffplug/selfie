@@ -21,6 +21,7 @@ import com.diffplug.selfie.Roundtrip
 import com.diffplug.selfie.RoundtripJson
 import com.diffplug.selfie.Selfie
 import com.diffplug.selfie.Snapshot
+import com.diffplug.selfie.guts.CallStack
 import com.diffplug.selfie.guts.CoroutineDiskStorage
 import com.diffplug.selfie.guts.DiskSnapshotTodo
 import com.diffplug.selfie.guts.DiskStorage
@@ -78,30 +79,35 @@ class StringMemoSuspend<T>(
 ) {
   suspend fun toMatchDisk(sub: String = ""): T {
     val call = recordCall(false)
-    if (Selfie.system.mode.canWrite(false, call, Selfie.system)) {
-      val actual = generator()
-      disk.writeDisk(Snapshot.of(roundtrip.serialize(actual)), sub, call)
-      return actual
-    } else {
-      val snapshot =
-          disk.readDisk(sub, call)
-              ?: throw Selfie.system.fs.assertFailed(Selfie.system.mode.msgSnapshotNotFound())
-      if (snapshot.subject.isBinary || snapshot.facets.isNotEmpty()) {
-        throw Selfie.system.fs.assertFailed(
-            "Expected a string subject with no facets, got ${snapshot}")
-      }
-      return roundtrip.parse(snapshot.subject.valueString())
-    }
+    return toMatchDiskImpl(sub, call, false)
   }
   suspend fun toMatchDisk_TODO(sub: String = ""): T {
     val call = recordCall(false)
-    if (Selfie.system.mode.canWrite(true, call, Selfie.system)) {
+    return toMatchDiskImpl(sub, call, true)
+  }
+
+  private suspend fun toMatchDiskImpl(sub: String, call: CallStack, isTodo: Boolean): T {
+    if (Selfie.system.mode.canWrite(isTodo, call, Selfie.system)) {
       val actual = generator()
       disk.writeDisk(Snapshot.of(roundtrip.serialize(actual)), sub, call)
-      Selfie.system.writeInline(DiskSnapshotTodo.createLiteral(), call)
+      if (isTodo) {
+        Selfie.system.writeInline(DiskSnapshotTodo.createLiteral(), call)
+      }
       return actual
     } else {
-      throw Selfie.system.fs.assertFailed("Can't call `toMatchDisk_TODO` in ${Mode.readonly} mode!")
+      if (isTodo) {
+        throw Selfie.system.fs.assertFailed(
+            "Can't call `toMatchDisk_TODO` in ${Mode.readonly} mode!")
+      } else {
+        val snapshot =
+            disk.readDisk(sub, call)
+                ?: throw Selfie.system.fs.assertFailed(Selfie.system.mode.msgSnapshotNotFound())
+        if (snapshot.subject.isBinary || snapshot.facets.isNotEmpty()) {
+          throw Selfie.system.fs.assertFailed(
+              "Expected a string subject with no facets, got ${snapshot}")
+        }
+        return roundtrip.parse(snapshot.subject.valueString())
+      }
     }
   }
   suspend fun toBe_TODO(unusedArg: Any? = null): T {
