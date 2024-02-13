@@ -247,3 +247,17 @@ private fun <T> SnapshotSystem.checkSrc(value: T): T {
   mode.canWrite(false, recordCall(true), this)
   return value
 }
+
+interface Roundtrip<T, SerializedForm> {
+  fun serialize(value: T): SerializedForm
+  fun parse(serialized: SerializedForm): T
+
+  companion object {
+    fun <T : Any> identity(): Roundtrip<T, T> = IDENTITY as Roundtrip<T, T>
+    private val IDENTITY =
+        object : Roundtrip<Any, Any> {
+          override fun serialize(value: Any): Any = value
+          override fun parse(serialized: Any): Any = serialized
+        }
+  }
+}

@@ -16,9 +16,16 @@
 package com.diffplug.selfie.coroutines
 
 import com.diffplug.selfie.Camera
+import com.diffplug.selfie.Mode
+import com.diffplug.selfie.Roundtrip
 import com.diffplug.selfie.Selfie
 import com.diffplug.selfie.Snapshot
 import com.diffplug.selfie.guts.CoroutineDiskStorage
+import com.diffplug.selfie.guts.DiskSnapshotTodo
+import com.diffplug.selfie.guts.DiskStorage
+import com.diffplug.selfie.guts.LiteralString
+import com.diffplug.selfie.guts.LiteralValue
+import com.diffplug.selfie.guts.recordCall
 import kotlin.coroutines.coroutineContext
 
 /**
@@ -52,4 +59,55 @@ suspend fun preserveSelfiesOnDisk(vararg subsToKeep: String) {
   } else {
     subsToKeep.forEach { disk.keep(it) }
   }
+}
+suspend fun memoize(toMemoize: suspend () -> String) = memoize(Roundtrip.identity(), toMemoize)
+suspend fun <T> memoize(roundtrip: Roundtrip<T, String>, toMemoize: suspend () -> T) =
+    StringMemoSuspend<T>(disk(), roundtrip, toMemoize)
+
+class StringMemoSuspend<T>(
+    private val disk: DiskStorage,
+    private val roundtrip: Roundtrip<T, String>,
+    private val generator: suspend () -> T
+) {
+  suspend fun toMatchDisk(sub: String = ""): T {
+    val call = recordCall(false)
+    if (Selfie.system.mode.canWrite(false, call, Selfie.system)) {
+      val actual = generator()
+      disk.writeDisk(Snapshot.of(roundtrip.serialize(actual)), sub, call)
+      return actual
+    } else {
+      val snapshot =
+          disk.readDisk(sub, call)
+              ?: throw Selfie.system.fs.assertFailed(Selfie.system.mode.msgSnapshotNotFound())
+      if (snapshot.subject.isBinary || snapshot.facets.isNotEmpty()) {
+        throw Selfie.system.fs.assertFailed(
+            "Expected a string subject with no facets, got ${snapshot}")
+      }
+      return roundtrip.parse(snapshot.subject.valueString())
+    }
+  }
+  suspend fun toMatchDisk_TODO(sub: String = ""): T {
+    val call = recordCall(false)
+    if (Selfie.system.mode.canWrite(true, call, Selfie.system)) {
+      val actual = generator()
+      disk.writeDisk(Snapshot.of(roundtrip.serialize(actual)), sub, call)
+      Selfie.system.writeInline(DiskSnapshotTodo.createLiteral(), call)
+      return actual
+    } else {
+      throw Selfie.system.fs.assertFailed("Can't call `toMatchDisk_TODO` in ${Mode.readonly} mode!")
+    }
+  }
+  suspend fun toBe_TODO(unusedArg: Any? = null): T {
+    val call = recordCall(false)
+    val writable = Selfie.system.mode.canWrite(true, call, Selfie.system)
+    if (writable) {
+      val actual = generator()
+      Selfie.system.writeInline(
+          LiteralValue(null, roundtrip.serialize(actual), LiteralString), call)
+      return actual
+    } else {
+      throw Selfie.system.fs.assertFailed("Can't call `toBe_TODO` in ${Mode.readonly} mode!")
+    }
+  }
+  fun toBe(expected: String): T = roundtrip.parse(expected)
 }
