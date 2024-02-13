@@ -82,8 +82,11 @@ data class TypedPath(val absolutePath: String) : Comparable<TypedPath> {
 interface FS {
   /** Walks the files (not directories) which are children and grandchildren of the given path. */
   fun <T> fileWalk(typedPath: TypedPath, walk: (Sequence<TypedPath>) -> T): T
-  fun fileRead(typedPath: TypedPath): String
-  fun fileWrite(typedPath: TypedPath, content: String)
+  fun fileRead(typedPath: TypedPath) = fileReadBinary(typedPath).decodeToString()
+  fun fileWrite(typedPath: TypedPath, content: String) =
+      fileWriteBinary(typedPath, content.encodeToByteArray())
+  fun fileReadBinary(typedPath: TypedPath): ByteArray
+  fun fileWriteBinary(typedPath: TypedPath, content: ByteArray)
   /** Creates an assertion failed exception to throw. */
   fun assertFailed(message: String, expected: Any? = null, actual: Any? = null): Throwable
 }
