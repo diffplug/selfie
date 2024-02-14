@@ -240,7 +240,9 @@ object Selfie {
   }
 
   // memoize
-  fun memoize(toMemoize: () -> String) = memoize(Roundtrip.identity(), toMemoize)
+  @JvmStatic fun memoize(toMemoize: () -> String) = memoize(Roundtrip.identity(), toMemoize)
+
+  @JvmStatic
   fun <T> memoize(roundtrip: Roundtrip<T, String>, toMemoize: () -> T) =
       StringMemo(deferredDiskStorage, roundtrip, toMemoize)
   /**
@@ -307,7 +309,11 @@ object Selfie {
       }
     }
   }
+
+  @JvmStatic
   fun memoizeBinary(toMemoize: () -> ByteArray) = memoizeBinary(Roundtrip.identity(), toMemoize)
+
+  @JvmStatic
   fun <T> memoizeBinary(roundtrip: Roundtrip<T, ByteArray>, toMemoize: () -> T) =
       BinaryMemo<T>(deferredDiskStorage, roundtrip, toMemoize)
 

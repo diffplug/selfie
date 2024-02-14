@@ -16,24 +16,11 @@
 package com.diffplug.selfie.guts
 
 import com.diffplug.selfie.Roundtrip
+import com.diffplug.selfie.SerializableRoundtrip
 import com.diffplug.selfie.coroutines.BinaryMemoSuspend
 import com.diffplug.selfie.coroutines.memoizeBinary
-import java.io.ByteArrayOutputStream
-import java.io.ObjectOutputStream
 import java.io.Serializable
 
-private object SerializableRoundtrip : Roundtrip<Serializable, ByteArray> {
-  override fun serialize(value: Serializable): ByteArray {
-    val output = ByteArrayOutputStream()
-    ObjectOutputStream(output).use { it.writeObject(value) }
-    return output.toByteArray()
-  }
-  override fun parse(serialized: ByteArray): Serializable {
-    return java.io.ObjectInputStream(serialized.inputStream()).use {
-      it.readObject() as Serializable
-    }
-  }
-}
 /** Memoizes any [java.io.Serializable] type as a binary blob. */
 suspend fun <T : Serializable> memoizeBinarySerializable(
     toMemoize: suspend () -> T
