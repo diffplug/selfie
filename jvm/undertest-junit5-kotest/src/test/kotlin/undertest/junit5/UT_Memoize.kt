@@ -19,6 +19,6 @@ ${' '} "author": "Dr. Seuss"
       }
       test("nanoTimeTest") {
 // easy way to test if it's memoizing or running every time
-        memoize { System.nanoTime().toString() }.toBe_TODO()
+        memoize { System.nanoTime().toString() }.toBe("1338445312094375")
       }
     })
