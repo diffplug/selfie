@@ -331,14 +331,15 @@ internal object LiteralBoolean : LiteralFormat<Boolean>() {
   }
 }
 
-internal object DiskSnapshotTodo : LiteralFormat<Unit>() {
-  override fun encode(value: Unit, language: Language) = throw UnsupportedOperationException()
-  override fun parse(str: String, language: Language) = throw UnsupportedOperationException()
-  fun createLiteral() = LiteralValue(null, Unit, DiskSnapshotTodo)
+enum class TodoKind {
+  toMatchDisk,
+  toBeFile,
+  toBeBase64;
+  fun createLiteral() = LiteralValue(null, this, TodoLiteral)
 }
 
-internal object ToBeFileTodo : LiteralFormat<Unit>() {
-  override fun encode(value: Unit, language: Language) = throw UnsupportedOperationException()
+internal object TodoLiteral : LiteralFormat<TodoKind>() {
+  override fun encode(value: TodoKind, language: Language) = throw UnsupportedOperationException()
   override fun parse(str: String, language: Language) = throw UnsupportedOperationException()
-  fun createLiteral() = LiteralValue(null, Unit, ToBeFileTodo)
+  fun createLiteral(kind: TodoKind) = LiteralValue(null, kind, TodoLiteral)
 }

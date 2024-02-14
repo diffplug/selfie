@@ -15,7 +15,6 @@
  */
 package com.diffplug.selfie
 
-import com.diffplug.selfie.guts.DiskSnapshotTodo
 import com.diffplug.selfie.guts.DiskStorage
 import com.diffplug.selfie.guts.LiteralBoolean
 import com.diffplug.selfie.guts.LiteralFormat
@@ -24,7 +23,7 @@ import com.diffplug.selfie.guts.LiteralLong
 import com.diffplug.selfie.guts.LiteralString
 import com.diffplug.selfie.guts.LiteralValue
 import com.diffplug.selfie.guts.SnapshotSystem
-import com.diffplug.selfie.guts.ToBeFileTodo
+import com.diffplug.selfie.guts.TodoKind
 import com.diffplug.selfie.guts.recordCall
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
@@ -50,7 +49,7 @@ internal constructor(protected val actual: Snapshot, protected val disk: DiskSto
     val call = recordCall(false)
     if (Selfie.system.mode.canWrite(true, call, Selfie.system)) {
       disk.writeDisk(actual, sub, call)
-      Selfie.system.writeInline(DiskSnapshotTodo.createLiteral(), call)
+      Selfie.system.writeInline(TodoKind.toMatchDisk.createLiteral(), call)
       return this
     } else {
       throw Selfie.system.fs.assertFailed("Can't call `toMatchDisk_TODO` in ${Mode.readonly} mode!")
@@ -77,6 +76,9 @@ interface StringFacet : FluentFacet {
 }
 
 interface BinaryFacet : FluentFacet {
+  fun toBeBase64(expected: String): ByteArray
+  fun toBeBase64_TODO(unusedArg: Any?): ByteArray = toBeBase64_TODO()
+  fun toBeBase64_TODO(): ByteArray
   fun toBeFile(subpath: String): ByteArray
   fun toBeFile_TODO(subpath: String): ByteArray
 }
@@ -96,6 +98,12 @@ class BinarySelfie(actual: Snapshot, disk: DiskStorage, private val onlyFacet: S
     super.toMatchDisk_TODO(sub)
     return this
   }
+  override fun toBeBase64(expected: String): ByteArray {
+    TODO("Not yet implemented")
+  }
+  override fun toBeBase64_TODO(): ByteArray {
+    TODO("Not yet implemented")
+  }
   override fun toBeFile_TODO(subpath: String): ByteArray {
     return toBeFileImpl(subpath, true)
   }
@@ -109,7 +117,7 @@ class BinarySelfie(actual: Snapshot, disk: DiskStorage, private val onlyFacet: S
     val actual = actual.subjectOrFacet(onlyFacet).valueBinary()
     if (writable) {
       if (isTodo) {
-        Selfie.system.writeInline(ToBeFileTodo.createLiteral(), call)
+        Selfie.system.writeInline(TodoKind.toBeFile.createLiteral(), call)
       }
       Selfie.system.fs.fileWriteBinary(resolvePath(subpath), actual)
       return actual
