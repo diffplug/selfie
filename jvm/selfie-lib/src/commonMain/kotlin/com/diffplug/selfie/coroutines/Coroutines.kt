@@ -130,3 +130,70 @@ class StringMemoSuspend<T>(
     }
   }
 }
+suspend fun memoizeBinary(toMemoize: suspend () -> ByteArray) =
+    memoizeBinary(Roundtrip.identity(), toMemoize)
+suspend fun <T> memoizeBinary(roundtrip: Roundtrip<T, ByteArray>, toMemoize: suspend () -> T) =
+    BinaryMemoSuspend<T>(disk(), roundtrip, toMemoize)
+
+class BinaryMemoSuspend<T>(
+    private val disk: DiskStorage,
+    private val roundtrip: Roundtrip<T, ByteArray>,
+    private val generator: suspend () -> T
+) {
+  suspend fun toMatchDisk(sub: String = ""): T {
+    return toMatchDiskImpl(sub, false)
+  }
+  suspend fun toMatchDisk_TODO(sub: String = ""): T {
+    return toMatchDiskImpl(sub, true)
+  }
+  private suspend fun toMatchDiskImpl(sub: String, isTodo: Boolean): T {
+    val call = recordCall(false)
+    if (Selfie.system.mode.canWrite(isTodo, call, Selfie.system)) {
+      val actual = generator()
+      disk.writeDisk(Snapshot.of(roundtrip.serialize(actual)), sub, call)
+      if (isTodo) {
+        Selfie.system.writeInline(DiskSnapshotTodo.createLiteral(), call)
+      }
+      return actual
+    } else {
+      if (isTodo) {
+        throw Selfie.system.fs.assertFailed(
+            "Can't call `toMatchDisk_TODO` in ${Mode.readonly} mode!")
+      } else {
+        val snapshot =
+            disk.readDisk(sub, call)
+                ?: throw Selfie.system.fs.assertFailed(Selfie.system.mode.msgSnapshotNotFound())
+        if (!snapshot.subject.isBinary || snapshot.facets.isNotEmpty()) {
+          throw Selfie.system.fs.assertFailed(
+              "Expected a binary subject with no facets, got ${snapshot}")
+        }
+        return roundtrip.parse(snapshot.subject.valueBinary())
+      }
+    }
+  }
+  private fun resolvePath(subpath: String) = Selfie.system.layout.rootFolder.resolveFile(subpath)
+  suspend fun toBeFile_TODO(subpath: String): T {
+    return toBeFileImpl(subpath, true)
+  }
+  suspend fun toBeFile(subpath: String): T {
+    return toBeFileImpl(subpath, false)
+  }
+  private suspend fun toBeFileImpl(subpath: String, isTodo: Boolean): T {
+    val call = recordCall(false)
+    val writable = Selfie.system.mode.canWrite(isTodo, call, Selfie.system)
+    if (writable) {
+      val actual = generator()
+      if (isTodo) {
+        Selfie.system.writeInline(DiskSnapshotTodo.createLiteral(), call)
+      }
+      Selfie.system.fs.fileWriteBinary(resolvePath(subpath), roundtrip.serialize(actual))
+      return actual
+    } else {
+      if (isTodo) {
+        throw Selfie.system.fs.assertFailed("Can't call `toBeFile_TODO` in ${Mode.readonly} mode!")
+      } else {
+        return roundtrip.parse(Selfie.system.fs.fileReadBinary(resolvePath(subpath)))
+      }
+    }
+  }
+}
