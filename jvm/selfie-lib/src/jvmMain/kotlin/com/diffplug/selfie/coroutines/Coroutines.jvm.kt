@@ -13,15 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.diffplug.selfie.guts
+package com.diffplug.selfie.coroutines
 
 import com.diffplug.selfie.Roundtrip
 import com.diffplug.selfie.SerializableRoundtrip
-import com.diffplug.selfie.coroutines.BinaryMemoSuspend
-import com.diffplug.selfie.coroutines.memoizeBinary
 import java.io.Serializable
 
 /** Memoizes any [java.io.Serializable] type as a binary blob. */
 suspend fun <T : Serializable> memoizeBinarySerializable(
     toMemoize: suspend () -> T
-): BinaryMemoSuspend<T> = memoizeBinary(SerializableRoundtrip as Roundtrip<T, ByteArray>, toMemoize)
+): MemoBinarySuspend<T> = memoizeBinary(SerializableRoundtrip as Roundtrip<T, ByteArray>, toMemoize)

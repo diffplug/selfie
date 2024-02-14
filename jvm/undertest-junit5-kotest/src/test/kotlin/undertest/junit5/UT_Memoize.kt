@@ -2,7 +2,7 @@ package undertest.junit5
 
 import com.diffplug.selfie.coroutines.memoize
 import com.diffplug.selfie.coroutines.memoizeAsJson
-import com.diffplug.selfie.guts.memoizeBinarySerializable
+import com.diffplug.selfie.coroutines.memoizeBinarySerializable
 import io.kotest.core.spec.style.FunSpec
 
 class UT_Memoize :
