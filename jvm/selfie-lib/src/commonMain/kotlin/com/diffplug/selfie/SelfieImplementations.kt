@@ -106,11 +106,16 @@ class BinarySelfie(actual: Snapshot, disk: DiskStorage, private val onlyFacet: S
     toBeDidntMatch(null, actualString(), LiteralString)
     return actualBytes()
   }
+
+  @OptIn(ExperimentalEncodingApi::class)
   override fun toBeBase64(expected: String): ByteArray {
-    val actualString = actualString()
-    if (actualString == expected) Selfie.system.checkSrc(actualString)
-    toBeDidntMatch(expected, actualString, LiteralString)
-    return actualBytes()
+    val expectedBytes = Base64.Mime.decode(expected)
+    val actualBytes = actualBytes()
+    return if (expectedBytes.contentEquals(actualBytes)) Selfie.system.checkSrc(actualBytes)
+    else {
+      toBeDidntMatch(expected, actualString(), LiteralString)
+      return actualBytes()
+    }
   }
   override fun toBeFile_TODO(subpath: String): ByteArray {
     return toBeFileImpl(subpath, true)
