@@ -20,8 +20,12 @@ import com.diffplug.selfie.Roundtrip
 import com.diffplug.selfie.Selfie
 import com.diffplug.selfie.Snapshot
 import com.diffplug.selfie.guts.DiskStorage
+import com.diffplug.selfie.guts.LiteralString
+import com.diffplug.selfie.guts.LiteralValue
 import com.diffplug.selfie.guts.TodoStub
 import com.diffplug.selfie.guts.recordCall
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 
 class MemoBinarySuspend<T>(
     private val disk: DiskStorage,
@@ -81,6 +85,30 @@ class MemoBinarySuspend<T>(
         throw Selfie.system.fs.assertFailed("Can't call `toBeFile_TODO` in ${Mode.readonly} mode!")
       } else {
         return roundtrip.parse(Selfie.system.fs.fileReadBinary(resolvePath(subpath)))
+      }
+    }
+  }
+  suspend fun toBeBase64_TODO(unusedArg: Any? = null): T {
+    return toBeBase64Impl(null)
+  }
+  suspend fun toBeBase64(snapshot: String): T {
+    return toBeBase64Impl(snapshot)
+  }
+
+  @OptIn(ExperimentalEncodingApi::class)
+  private suspend fun toBeBase64Impl(snapshot: String?): T {
+    val call = recordCall(false)
+    val writable = Selfie.system.mode.canWrite(snapshot == null, call, Selfie.system)
+    if (writable) {
+      val actual = generator()
+      val base64 = Base64.Mime.encode(roundtrip.serialize(actual)).replace("\r", "")
+      Selfie.system.writeInline(LiteralValue(snapshot, base64, LiteralString), call)
+      return actual
+    } else {
+      if (snapshot == null) {
+        throw Selfie.system.fs.assertFailed("Can't call `toBe_TODO` in ${Mode.readonly} mode!")
+      } else {
+        return roundtrip.parse(Base64.Mime.decode(snapshot))
       }
     }
   }

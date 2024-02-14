@@ -9,6 +9,7 @@ class UT_Memoize :
     FunSpec({
       test("java.io.Serializable") {
         memoizeBinarySerializable { Book("Harry Potter", "J.K. Rowling") }.toBeFile_TODO("Book.bin")
+        memoizeBinarySerializable { Book("Moby Dick", "Herman Melville") }.toBeBase64_TODO()
       }
       test("kotlinx.serialization.Serializable") {
         memoizeAsJson { Book("Cat in the Hat", "Dr. Seuss") }
