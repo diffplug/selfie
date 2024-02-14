@@ -105,18 +105,17 @@ class SourceFile(filename: String, content: String) {
     val slice = findOnLine(find, lineOneIndexed)
     contentSlice = Slice(slice.replaceSelfWith(replace))
   }
-  private fun first(slice: Slice, a: String, b: String): String {
-    val aIndex = slice.indexOf(a)
-    val bIndex = slice.indexOf(b)
-    return if (aIndex == -1 && bIndex == -1)
-        throw AssertionError(
-            "Expected to find `$a` or `$b` on line ${slice.baseLineAtOffset(0)}, but there was only `${slice}`")
-    else if (aIndex == -1) b else if (bIndex == -1) a else if (aIndex < bIndex) a else b
-  }
-  fun parseToBeLike(lineOneIndexed: Int, a: String, b: String): ToBeLiteral {
+  fun parseToBeLike(lineOneIndexed: Int): ToBeLiteral {
     val lineContent = contentSlice.unixLine(lineOneIndexed)
-    val dotFunOpenParen = first(lineContent, a, b).replace("_TODO", "")
-    val dotFunctionCallInPlace = lineContent.indexOf(dotFunOpenParen)
+    val firstToBeLike =
+        TO_BE_LIKES.mapNotNull {
+              val idx = lineContent.indexOf(it)
+              if (idx == -1) null else idx to it
+            }
+            .minBy { it.first }
+            .second
+    val dotFunOpenParen = firstToBeLike.replace("_TODO", "")
+    val dotFunctionCallInPlace = lineContent.indexOf(firstToBeLike)
     if (dotFunctionCallInPlace == -1) {
       throw AssertionError(
           "Expected to find `$dotFunOpenParen)` on line $lineOneIndexed, but there was only `${lineContent}`")
@@ -190,3 +189,4 @@ class SourceFile(filename: String, content: String) {
         contentSlice.subSequence(argStart, endArg))
   }
 }
+private val TO_BE_LIKES = listOf(".toBe(", ".toBe_TODO(", ".toBeBase64(", ".toBeBase64_TODO(")

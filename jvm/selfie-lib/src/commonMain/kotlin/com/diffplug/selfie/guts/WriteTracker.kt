@@ -113,9 +113,7 @@ class InlineWriteTracker : WriteTracker<CallLocation, LiteralValue<*>>() {
       val content = SourceFile(file.name, layout.fs.fileRead(file))
       val parsedValue =
           try {
-            content
-                .parseToBeLike(call.location.line, ".toBe(", ".toBeBase64(")
-                .parseLiteral(literalValue.format)
+            content.parseToBeLike(call.location.line).parseLiteral(literalValue.format)
           } catch (e: Exception) {
             throw AssertionError(
                 "Error while parsing the literal at ${call.location.ideLink(layout)}. Please report this error at https://github.com/diffplug/selfie",
@@ -168,13 +166,7 @@ class InlineWriteTracker : WriteTracker<CallLocation, LiteralValue<*>>() {
         val kind = write.literal.actual as TodoKind
         content.replaceOnLine(line, ".${kind.name}_TODO(", ".${kind.name}(")
       } else {
-        val toBe =
-            if (write.literal.expected == null) {
-              content.parseToBeLike(line, ".toBe_TODO(", ".toBeBase64_TODO(")
-            } else {
-              content.parseToBeLike(line, ".toBe(", ".toBeBase64(")
-            }
-        deltaLineNumbers += toBe.setLiteralAndGetNewlineDelta(write.literal)
+        deltaLineNumbers += content.parseToBeLike(line).setLiteralAndGetNewlineDelta(write.literal)
       }
     }
     layout.fs.fileWrite(file, content.asString)
