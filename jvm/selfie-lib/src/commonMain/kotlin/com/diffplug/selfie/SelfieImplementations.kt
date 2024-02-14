@@ -23,7 +23,7 @@ import com.diffplug.selfie.guts.LiteralLong
 import com.diffplug.selfie.guts.LiteralString
 import com.diffplug.selfie.guts.LiteralValue
 import com.diffplug.selfie.guts.SnapshotSystem
-import com.diffplug.selfie.guts.TodoKind
+import com.diffplug.selfie.guts.TodoStub
 import com.diffplug.selfie.guts.recordCall
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
@@ -49,7 +49,7 @@ internal constructor(protected val actual: Snapshot, protected val disk: DiskSto
     val call = recordCall(false)
     if (Selfie.system.mode.canWrite(true, call, Selfie.system)) {
       disk.writeDisk(actual, sub, call)
-      Selfie.system.writeInline(TodoKind.toMatchDisk.createLiteral(), call)
+      Selfie.system.writeInline(TodoStub.toMatchDisk.createLiteral(), call)
       return this
     } else {
       throw Selfie.system.fs.assertFailed("Can't call `toMatchDisk_TODO` in ${Mode.readonly} mode!")
@@ -125,7 +125,7 @@ class BinarySelfie(actual: Snapshot, disk: DiskStorage, private val onlyFacet: S
     val actualBytes = actualBytes()
     if (writable) {
       if (isTodo) {
-        Selfie.system.writeInline(TodoKind.toBeFile.createLiteral(), call)
+        Selfie.system.writeInline(TodoStub.toBeFile.createLiteral(), call)
       }
       Selfie.system.fs.fileWriteBinary(resolvePath(subpath), actualBytes)
       return actualBytes

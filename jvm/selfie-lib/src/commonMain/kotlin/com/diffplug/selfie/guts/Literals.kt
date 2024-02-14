@@ -331,15 +331,15 @@ internal object LiteralBoolean : LiteralFormat<Boolean>() {
   }
 }
 
-enum class TodoKind {
+/** Some kinds of _TODO don't change the argument at all. */
+enum class TodoStub {
   toMatchDisk,
-  toBeFile,
-  toBeBase64;
-  fun createLiteral() = LiteralValue(null, this, TodoLiteral)
+  toBeFile;
+  fun createLiteral() = LiteralValue(null, this, LiteralTodoStub)
 }
 
-internal object TodoLiteral : LiteralFormat<TodoKind>() {
-  override fun encode(value: TodoKind, language: Language) = throw UnsupportedOperationException()
+internal object LiteralTodoStub : LiteralFormat<TodoStub>() {
+  override fun encode(value: TodoStub, language: Language) = throw UnsupportedOperationException()
   override fun parse(str: String, language: Language) = throw UnsupportedOperationException()
-  fun createLiteral(kind: TodoKind) = LiteralValue(null, kind, TodoLiteral)
+  fun createLiteral(kind: TodoStub) = LiteralValue(null, kind, LiteralTodoStub)
 }

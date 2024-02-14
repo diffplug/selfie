@@ -22,7 +22,7 @@ import com.diffplug.selfie.Snapshot
 import com.diffplug.selfie.guts.DiskStorage
 import com.diffplug.selfie.guts.LiteralString
 import com.diffplug.selfie.guts.LiteralValue
-import com.diffplug.selfie.guts.TodoKind
+import com.diffplug.selfie.guts.TodoStub
 import com.diffplug.selfie.guts.recordCall
 
 class MemoStringSuspend<T>(
@@ -42,7 +42,7 @@ class MemoStringSuspend<T>(
       val actual = generator()
       disk.writeDisk(Snapshot.of(roundtrip.serialize(actual)), sub, call)
       if (isTodo) {
-        Selfie.system.writeInline(TodoKind.toMatchDisk.createLiteral(), call)
+        Selfie.system.writeInline(TodoStub.toMatchDisk.createLiteral(), call)
       }
       return actual
     } else {

@@ -162,8 +162,8 @@ class InlineWriteTracker : WriteTracker<CallLocation, LiteralValue<*>>() {
       }
       // parse the location within the file
       val line = write.line + deltaLineNumbers
-      if (write.literal.format == TodoLiteral) {
-        val kind = write.literal.actual as TodoKind
+      if (write.literal.format == LiteralTodoStub) {
+        val kind = write.literal.actual as TodoStub
         content.replaceOnLine(line, ".${kind.name}_TODO(", ".${kind.name}(")
       } else {
         deltaLineNumbers += content.parseToBeLike(line).setLiteralAndGetNewlineDelta(write.literal)

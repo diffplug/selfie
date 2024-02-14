@@ -18,7 +18,7 @@ package com.diffplug.selfie
 import com.diffplug.selfie.guts.DiskStorage
 import com.diffplug.selfie.guts.LiteralString
 import com.diffplug.selfie.guts.LiteralValue
-import com.diffplug.selfie.guts.TodoKind
+import com.diffplug.selfie.guts.TodoStub
 import com.diffplug.selfie.guts.recordCall
 
 class MemoString<T>(
@@ -38,7 +38,7 @@ class MemoString<T>(
       val actual = generator()
       disk.writeDisk(Snapshot.of(roundtrip.serialize(actual)), sub, call)
       if (isTodo) {
-        Selfie.system.writeInline(TodoKind.toMatchDisk.createLiteral(), call)
+        Selfie.system.writeInline(TodoStub.toMatchDisk.createLiteral(), call)
       }
       return actual
     } else {

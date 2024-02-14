@@ -20,7 +20,7 @@ import com.diffplug.selfie.Roundtrip
 import com.diffplug.selfie.Selfie
 import com.diffplug.selfie.Snapshot
 import com.diffplug.selfie.guts.DiskStorage
-import com.diffplug.selfie.guts.TodoKind
+import com.diffplug.selfie.guts.TodoStub
 import com.diffplug.selfie.guts.recordCall
 
 class MemoBinarySuspend<T>(
@@ -40,7 +40,7 @@ class MemoBinarySuspend<T>(
       val actual = generator()
       disk.writeDisk(Snapshot.of(roundtrip.serialize(actual)), sub, call)
       if (isTodo) {
-        Selfie.system.writeInline(TodoKind.toMatchDisk.createLiteral(), call)
+        Selfie.system.writeInline(TodoStub.toMatchDisk.createLiteral(), call)
       }
       return actual
     } else {
@@ -72,7 +72,7 @@ class MemoBinarySuspend<T>(
     if (writable) {
       val actual = generator()
       if (isTodo) {
-        Selfie.system.writeInline(TodoKind.toBeFile.createLiteral(), call)
+        Selfie.system.writeInline(TodoStub.toBeFile.createLiteral(), call)
       }
       Selfie.system.fs.fileWriteBinary(resolvePath(subpath), roundtrip.serialize(actual))
       return actual
