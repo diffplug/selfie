@@ -90,6 +90,7 @@ class BinarySelfie(actual: Snapshot, disk: DiskStorage, private val onlyFacet: S
       "The facet $onlyFacet was not found in the snapshot, or it was not a binary facet."
     }
   }
+  private fun actualBytes() = actual.subjectOrFacet(onlyFacet).valueBinary()
   override fun toMatchDisk(sub: String): BinarySelfie {
     super.toMatchDisk(sub)
     return this
@@ -98,11 +99,18 @@ class BinarySelfie(actual: Snapshot, disk: DiskStorage, private val onlyFacet: S
     super.toMatchDisk_TODO(sub)
     return this
   }
-  override fun toBeBase64(expected: String): ByteArray {
-    TODO("Not yet implemented")
-  }
+
+  @OptIn(ExperimentalEncodingApi::class)
+  private fun actualString(): String = Base64.Mime.encode(actualBytes()).replace("\r", "")
   override fun toBeBase64_TODO(): ByteArray {
-    TODO("Not yet implemented")
+    toBeDidntMatch(null, actualString(), LiteralString)
+    return actualBytes()
+  }
+  override fun toBeBase64(expected: String): ByteArray {
+    val actualString = actualString()
+    if (actualString == expected) Selfie.system.checkSrc(actualString)
+    toBeDidntMatch(expected, actualString, LiteralString)
+    return actualBytes()
   }
   override fun toBeFile_TODO(subpath: String): ByteArray {
     return toBeFileImpl(subpath, true)
@@ -114,23 +122,23 @@ class BinarySelfie(actual: Snapshot, disk: DiskStorage, private val onlyFacet: S
   private fun toBeFileImpl(subpath: String, isTodo: Boolean): ByteArray {
     val call = recordCall(false)
     val writable = Selfie.system.mode.canWrite(isTodo, call, Selfie.system)
-    val actual = actual.subjectOrFacet(onlyFacet).valueBinary()
+    val actualBytes = actualBytes()
     if (writable) {
       if (isTodo) {
         Selfie.system.writeInline(TodoKind.toBeFile.createLiteral(), call)
       }
-      Selfie.system.fs.fileWriteBinary(resolvePath(subpath), actual)
-      return actual
+      Selfie.system.fs.fileWriteBinary(resolvePath(subpath), actualBytes)
+      return actualBytes
     } else {
       if (isTodo) {
         throw Selfie.system.fs.assertFailed("Can't call `toBeFile_TODO` in ${Mode.readonly} mode!")
       } else {
         val expected = Selfie.system.fs.fileReadBinary(resolvePath(subpath))
-        if (expected.contentEquals(actual)) {
-          return actual
+        if (expected.contentEquals(actualBytes)) {
+          return actualBytes
         } else {
           throw Selfie.system.fs.assertFailed(
-              Selfie.system.mode.msgSnapshotMismatch(), expected, actual)
+              Selfie.system.mode.msgSnapshotMismatch(), expected, actualBytes)
         }
       }
     }
