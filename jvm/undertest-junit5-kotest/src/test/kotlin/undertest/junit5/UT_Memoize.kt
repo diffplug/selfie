@@ -7,10 +7,6 @@ import io.kotest.core.spec.style.FunSpec
 
 class UT_Memoize :
     FunSpec({
-      test("nanoTime") {
-// easy way to test if it's memoizing or running every time
-        memoize { System.nanoTime().toString() }.toBe_TODO()
-      }
       test("java.io.Serializable") {
         memoizeBinarySerializable { Book("Harry Potter", "J.K. Rowling") }.toBeFile("Book.bin")
       }
@@ -20,5 +16,9 @@ class UT_Memoize :
 ${' '} "title": "Cat in the Hat",
 ${' '} "author": "Dr. Seuss"
 }""")
+      }
+      test("nanoTime") {
+// easy way to test if it's memoizing or running every time
+        memoize { System.nanoTime().toString() }.toBe_TODO()
       }
     })
