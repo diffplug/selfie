@@ -17,7 +17,7 @@ ${' '} "title": "Cat in the Hat",
 ${' '} "author": "Dr. Seuss"
 }""")
       }
-      test("nanoTime") {
+      test("nanoTimeTest") {
 // easy way to test if it's memoizing or running every time
         memoize { System.nanoTime().toString() }.toBe_TODO()
       }
