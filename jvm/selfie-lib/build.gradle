@@ -26,11 +26,16 @@ kotlin {
     nodejs()
   }
   sourceSets {
-    commonMain {}
+    commonMain {
+      dependencies {
+        compileOnly("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")
+      }
+    }
     commonTest {
       dependencies {
         implementation kotlin('test')
         implementation("io.kotest:kotest-assertions-core:$ver_KOTEST")
+        implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")
       }
     }
   }

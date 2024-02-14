@@ -98,9 +98,11 @@ class SourceFile(filename: String, content: String) {
     }
     return lineContent.subSequence(idx, idx + toFind.length)
   }
-  fun replaceToMatchDisk_TODO(lineOneIndexed: Int) {
-    val slice = findOnLine(".toMatchDisk_TODO(", lineOneIndexed)
-    contentSlice = Slice(slice.replaceSelfWith(".toMatchDisk("))
+  fun replaceOnLine(lineOneIndexed: Int, find: String, replace: String) {
+    check(find.indexOf('\n') == -1)
+    check(replace.indexOf('\n') == -1)
+    val slice = findOnLine(find, lineOneIndexed)
+    contentSlice = Slice(slice.replaceSelfWith(replace))
   }
   fun parseToBe_TODO(lineOneIndexed: Int): ToBeLiteral {
     return parseToBeLike(".toBe_TODO(", lineOneIndexed)

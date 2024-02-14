@@ -34,10 +34,10 @@ internal object FSOkio : FS {
           FS_SYSTEM.listRecursively(typedPath.toPath()).mapNotNull {
             if (FS_SYSTEM.metadata(it).isRegularFile) TypedPath.ofFile(it.toString()) else null
           })
-  override fun fileRead(typedPath: TypedPath): String =
-      FS_SYSTEM.read(typedPath.toPath()) { readUtf8() }
-  override fun fileWrite(typedPath: TypedPath, content: String): Unit =
-      FS_SYSTEM.write(typedPath.toPath()) { writeUtf8(content) }
+  override fun fileReadBinary(typedPath: TypedPath): ByteArray =
+      FS_SYSTEM.read(typedPath.toPath()) { readByteArray() }
+  override fun fileWriteBinary(typedPath: TypedPath, content: ByteArray): Unit =
+      FS_SYSTEM.write(typedPath.toPath()) { write(content) }
   /** Creates an assertion failed exception to throw. */
   override fun assertFailed(message: String, expected: Any?, actual: Any?): Throwable =
       if (expected == null && actual == null) Exceptions.createAssertionError(message, null)

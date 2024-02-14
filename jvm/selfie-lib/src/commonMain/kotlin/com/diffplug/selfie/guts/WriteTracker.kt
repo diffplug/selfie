@@ -163,7 +163,9 @@ class InlineWriteTracker : WriteTracker<CallLocation, LiteralValue<*>>() {
       // parse the location within the file
       val line = write.line + deltaLineNumbers
       if (write.literal.format == DiskSnapshotTodo) {
-        content.replaceToMatchDisk_TODO(line)
+        content.replaceOnLine(line, ".toMatchDisk_TODO(", ".toMatchDisk(")
+      } else if (write.literal.format == ToBeFileTodo) {
+        content.replaceOnLine(line, ".toBeFile_TODO(", ".toBeFile(")
       } else {
         val toBe =
             if (write.literal.expected == null) {

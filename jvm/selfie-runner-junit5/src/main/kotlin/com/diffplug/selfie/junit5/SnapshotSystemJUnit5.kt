@@ -34,16 +34,16 @@ import java.nio.file.Files
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.io.path.absolutePathString
-import kotlin.io.path.readText
-import kotlin.io.path.writeText
+import kotlin.io.path.readBytes
+import kotlin.io.path.writeBytes
 import kotlin.streams.asSequence
 import org.opentest4j.AssertionFailedError
 internal fun TypedPath.toPath(): java.nio.file.Path = java.nio.file.Path.of(absolutePath)
 
 internal object FSJava : FS {
-  override fun fileWrite(typedPath: TypedPath, content: String) =
-      typedPath.toPath().writeText(content)
-  override fun fileRead(typedPath: TypedPath) = typedPath.toPath().readText()
+  override fun fileWriteBinary(typedPath: TypedPath, content: ByteArray) =
+      typedPath.toPath().writeBytes(content)
+  override fun fileReadBinary(typedPath: TypedPath) = typedPath.toPath().readBytes()
   /** Walks the files (not directories) which are children and grandchildren of the given path. */
   override fun <T> fileWalk(typedPath: TypedPath, walk: (Sequence<TypedPath>) -> T): T =
       Files.walk(typedPath.toPath()).use { paths ->

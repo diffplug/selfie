@@ -1,5 +1,6 @@
 plugins {
   id 'org.jetbrains.kotlin.jvm'
+  id 'org.jetbrains.kotlin.plugin.serialization'
   id 'com.diffplug.spotless'
 }
 repositories {
@@ -21,6 +22,7 @@ tasks.named('spotlessCheck') {
 }
 
 dependencies {
+  implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2"
   testImplementation project(':selfie-runner-junit5')
   testImplementation "io.kotest:kotest-runner-junit5:$ver_KOTEST"
   testImplementation "org.junit.jupiter:junit-jupiter:$ver_JUNIT_USE"

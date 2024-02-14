@@ -237,6 +237,25 @@ object Selfie {
       writer.toString()
     }
   }
+
+  @JvmStatic fun memoize(toMemoize: () -> String) = memoize(Roundtrip.identity(), toMemoize)
+
+  @JvmStatic
+  fun <T> memoize(roundtrip: Roundtrip<T, String>, toMemoize: () -> T) =
+      MemoString(deferredDiskStorage, roundtrip, toMemoize)
+  /**
+   * Memoizes any type which is marked with `@kotlinx.serialization.Serializable` as pretty-printed
+   * json.
+   */
+  inline fun <reified T> memoizeAsJson(noinline toMemoize: () -> T) =
+      memoize(RoundtripJson.of<T>(), toMemoize)
+
+  @JvmStatic
+  fun memoizeBinary(toMemoize: () -> ByteArray) = memoizeBinary(Roundtrip.identity(), toMemoize)
+
+  @JvmStatic
+  fun <T> memoizeBinary(roundtrip: Roundtrip<T, ByteArray>, toMemoize: () -> T) =
+      MemoBinary<T>(deferredDiskStorage, roundtrip, toMemoize)
 }
 
 /**

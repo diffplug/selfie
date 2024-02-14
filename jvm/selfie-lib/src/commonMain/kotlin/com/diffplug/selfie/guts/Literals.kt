@@ -336,3 +336,9 @@ internal object DiskSnapshotTodo : LiteralFormat<Unit>() {
   override fun parse(str: String, language: Language) = throw UnsupportedOperationException()
   fun createLiteral() = LiteralValue(null, Unit, DiskSnapshotTodo)
 }
+
+internal object ToBeFileTodo : LiteralFormat<Unit>() {
+  override fun encode(value: Unit, language: Language) = throw UnsupportedOperationException()
+  override fun parse(str: String, language: Language) = throw UnsupportedOperationException()
+  fun createLiteral() = LiteralValue(null, Unit, ToBeFileTodo)
+}
