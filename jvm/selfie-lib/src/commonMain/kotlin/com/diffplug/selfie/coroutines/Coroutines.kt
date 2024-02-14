@@ -26,6 +26,7 @@ import com.diffplug.selfie.guts.DiskSnapshotTodo
 import com.diffplug.selfie.guts.DiskStorage
 import com.diffplug.selfie.guts.LiteralString
 import com.diffplug.selfie.guts.LiteralValue
+import com.diffplug.selfie.guts.ToBeFileTodo
 import com.diffplug.selfie.guts.recordCall
 import kotlin.coroutines.coroutineContext
 
@@ -184,7 +185,7 @@ class BinaryMemoSuspend<T>(
     if (writable) {
       val actual = generator()
       if (isTodo) {
-        Selfie.system.writeInline(DiskSnapshotTodo.createLiteral(), call)
+        Selfie.system.writeInline(ToBeFileTodo.createLiteral(), call)
       }
       Selfie.system.fs.fileWriteBinary(resolvePath(subpath), roundtrip.serialize(actual))
       return actual

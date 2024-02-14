@@ -25,6 +25,7 @@ import com.diffplug.selfie.guts.LiteralLong
 import com.diffplug.selfie.guts.LiteralString
 import com.diffplug.selfie.guts.LiteralValue
 import com.diffplug.selfie.guts.SnapshotSystem
+import com.diffplug.selfie.guts.ToBeFileTodo
 import com.diffplug.selfie.guts.initSnapshotSystem
 import com.diffplug.selfie.guts.recordCall
 import kotlin.io.encoding.Base64
@@ -358,7 +359,7 @@ object Selfie {
       if (writable) {
         val actual = generator()
         if (isTodo) {
-          system.writeInline(DiskSnapshotTodo.createLiteral(), call)
+          system.writeInline(ToBeFileTodo.createLiteral(), call)
         }
         system.fs.fileWriteBinary(resolvePath(subpath), roundtrip.serialize(actual))
         return actual
