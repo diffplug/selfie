@@ -25,7 +25,6 @@ import com.diffplug.selfie.guts.LiteralLong
 import com.diffplug.selfie.guts.LiteralString
 import com.diffplug.selfie.guts.LiteralValue
 import com.diffplug.selfie.guts.SnapshotSystem
-import com.diffplug.selfie.guts.ToBeFileTodo
 import com.diffplug.selfie.guts.initSnapshotSystem
 import com.diffplug.selfie.guts.recordCall
 import kotlin.io.encoding.Base64
@@ -239,12 +238,11 @@ object Selfie {
     }
   }
 
-  // memoize
   @JvmStatic fun memoize(toMemoize: () -> String) = memoize(Roundtrip.identity(), toMemoize)
 
   @JvmStatic
   fun <T> memoize(roundtrip: Roundtrip<T, String>, toMemoize: () -> T) =
-      StringMemo(deferredDiskStorage, roundtrip, toMemoize)
+      MemoString(deferredDiskStorage, roundtrip, toMemoize)
   /**
    * Memoizes any type which is marked with `@kotlinx.serialization.Serializable` as pretty-printed
    * json.
@@ -252,132 +250,12 @@ object Selfie {
   inline fun <reified T> memoizeAsJson(noinline toMemoize: () -> T) =
       memoize(RoundtripJson.of<T>(), toMemoize)
 
-  class StringMemo<T>(
-      private val disk: DiskStorage,
-      private val roundtrip: Roundtrip<T, String>,
-      private val generator: () -> T
-  ) {
-    fun toMatchDisk(sub: String = ""): T {
-      return toMatchDiskImpl(sub, false)
-    }
-    fun toMatchDisk_TODO(sub: String = ""): T {
-      return toMatchDiskImpl(sub, true)
-    }
-    private fun toMatchDiskImpl(sub: String, isTodo: Boolean): T {
-      val call = recordCall(false)
-      if (system.mode.canWrite(isTodo, call, system)) {
-        val actual = generator()
-        disk.writeDisk(Snapshot.of(roundtrip.serialize(actual)), sub, call)
-        if (isTodo) {
-          system.writeInline(DiskSnapshotTodo.createLiteral(), call)
-        }
-        return actual
-      } else {
-        if (isTodo) {
-          throw system.fs.assertFailed("Can't call `toMatchDisk_TODO` in ${Mode.readonly} mode!")
-        } else {
-          val snapshot =
-              disk.readDisk(sub, call)
-                  ?: throw system.fs.assertFailed(system.mode.msgSnapshotNotFound())
-          if (snapshot.subject.isBinary || snapshot.facets.isNotEmpty()) {
-            throw system.fs.assertFailed(
-                "Expected a string subject with no facets, got ${snapshot}")
-          }
-          return roundtrip.parse(snapshot.subject.valueString())
-        }
-      }
-    }
-    fun toBe_TODO(unusedArg: Any? = null): T {
-      return toBeImpl(null)
-    }
-    fun toBe(expected: String): T {
-      return toBeImpl(expected)
-    }
-    private fun toBeImpl(snapshot: String?): T {
-      val call = recordCall(false)
-      val writable = system.mode.canWrite(snapshot == null, call, system)
-      if (writable) {
-        val actual = generator()
-        system.writeInline(LiteralValue(snapshot, roundtrip.serialize(actual), LiteralString), call)
-        return actual
-      } else {
-        if (snapshot == null) {
-          throw system.fs.assertFailed("Can't call `toBe_TODO` in ${Mode.readonly} mode!")
-        } else {
-          return roundtrip.parse(snapshot)
-        }
-      }
-    }
-  }
-
   @JvmStatic
   fun memoizeBinary(toMemoize: () -> ByteArray) = memoizeBinary(Roundtrip.identity(), toMemoize)
 
   @JvmStatic
   fun <T> memoizeBinary(roundtrip: Roundtrip<T, ByteArray>, toMemoize: () -> T) =
-      BinaryMemo<T>(deferredDiskStorage, roundtrip, toMemoize)
-
-  class BinaryMemo<T>(
-      private val disk: DiskStorage,
-      private val roundtrip: Roundtrip<T, ByteArray>,
-      private val generator: () -> T
-  ) {
-    fun toMatchDisk(sub: String = ""): T {
-      return toMatchDiskImpl(sub, false)
-    }
-    fun toMatchDisk_TODO(sub: String = ""): T {
-      return toMatchDiskImpl(sub, true)
-    }
-    private fun toMatchDiskImpl(sub: String, isTodo: Boolean): T {
-      val call = recordCall(false)
-      if (system.mode.canWrite(isTodo, call, system)) {
-        val actual = generator()
-        disk.writeDisk(Snapshot.of(roundtrip.serialize(actual)), sub, call)
-        if (isTodo) {
-          system.writeInline(DiskSnapshotTodo.createLiteral(), call)
-        }
-        return actual
-      } else {
-        if (isTodo) {
-          throw system.fs.assertFailed("Can't call `toMatchDisk_TODO` in ${Mode.readonly} mode!")
-        } else {
-          val snapshot =
-              disk.readDisk(sub, call)
-                  ?: throw system.fs.assertFailed(system.mode.msgSnapshotNotFound())
-          if (!snapshot.subject.isBinary || snapshot.facets.isNotEmpty()) {
-            throw system.fs.assertFailed(
-                "Expected a binary subject with no facets, got ${snapshot}")
-          }
-          return roundtrip.parse(snapshot.subject.valueBinary())
-        }
-      }
-    }
-    private fun resolvePath(subpath: String) = system.layout.rootFolder.resolveFile(subpath)
-    fun toBeFile_TODO(subpath: String): T {
-      return toBeFileImpl(subpath, true)
-    }
-    fun toBeFile(subpath: String): T {
-      return toBeFileImpl(subpath, false)
-    }
-    private fun toBeFileImpl(subpath: String, isTodo: Boolean): T {
-      val call = recordCall(false)
-      val writable = system.mode.canWrite(isTodo, call, system)
-      if (writable) {
-        val actual = generator()
-        if (isTodo) {
-          system.writeInline(ToBeFileTodo.createLiteral(), call)
-        }
-        system.fs.fileWriteBinary(resolvePath(subpath), roundtrip.serialize(actual))
-        return actual
-      } else {
-        if (isTodo) {
-          throw system.fs.assertFailed("Can't call `toBeFile_TODO` in ${Mode.readonly} mode!")
-        } else {
-          return roundtrip.parse(system.fs.fileReadBinary(resolvePath(subpath)))
-        }
-      }
-    }
-  }
+      MemoBinary<T>(deferredDiskStorage, roundtrip, toMemoize)
 }
 
 /**
