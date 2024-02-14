@@ -31,7 +31,7 @@ dependencies {
 // this project is just a test environment for a different project
 test {
   useJUnitPlatform()
-  //enabled = findProperty("underTest") == "true"
+  enabled = findProperty("underTest") == "true"
 
   testLogging.showStandardStreams = true
   // the snapshots are both output and input, for this harness best if the test just always runs
