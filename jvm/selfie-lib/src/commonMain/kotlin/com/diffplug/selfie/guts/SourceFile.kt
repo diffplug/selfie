@@ -107,19 +107,16 @@ class SourceFile(filename: String, content: String) {
   }
   fun parseToBeLike(lineOneIndexed: Int): ToBeLiteral {
     val lineContent = contentSlice.unixLine(lineOneIndexed)
-    val firstToBeLike =
+    val dotFunOpenParen =
         TO_BE_LIKES.mapNotNull {
               val idx = lineContent.indexOf(it)
               if (idx == -1) null else idx to it
             }
-            .minBy { it.first }
-            .second
-    val dotFunOpenParen = firstToBeLike.replace("_TODO", "")
-    val dotFunctionCallInPlace = lineContent.indexOf(firstToBeLike)
-    if (dotFunctionCallInPlace == -1) {
-      throw AssertionError(
-          "Expected to find `$dotFunOpenParen)` on line $lineOneIndexed, but there was only `${lineContent}`")
-    }
+            .minByOrNull { it.first }
+            ?.second
+            ?: throw AssertionError(
+                "Expected to find inline assertion on line $lineOneIndexed, but there was only `${lineContent}`")
+    val dotFunctionCallInPlace = lineContent.indexOf(dotFunOpenParen)
     val dotFunctionCall = dotFunctionCallInPlace + lineContent.startIndex
     var argStart = dotFunctionCall + dotFunOpenParen.length
     if (contentSlice.length == argStart) {
@@ -184,7 +181,7 @@ class SourceFile(filename: String, content: String) {
       }
     }
     return ToBeLiteral(
-        dotFunOpenParen,
+        dotFunOpenParen.replace("_TODO", ""),
         contentSlice.subSequence(dotFunctionCall, endParen + 1),
         contentSlice.subSequence(argStart, endArg))
   }
