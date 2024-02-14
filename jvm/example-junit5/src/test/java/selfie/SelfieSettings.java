@@ -2,6 +2,7 @@ package selfie;
 
 import com.diffplug.selfie.Camera;
 import com.diffplug.selfie.CompoundLens;
+import com.diffplug.selfie.DiskSelfie;
 import com.diffplug.selfie.Lens;
 import com.diffplug.selfie.Selfie;
 import com.diffplug.selfie.Snapshot;
@@ -32,11 +33,11 @@ public class SelfieSettings extends SelfieSettingsAPI {
             "metadata", "subject=" + email.subject + "\nto=" + email.to + "\nfrom=" + email.from);
   }
 
-  public static Selfie.DiskSelfie expectSelfie(EmailDev email) {
+  public static DiskSelfie expectSelfie(EmailDev email) {
     return Selfie.expectSelfie(email, EMAIL_CAMERA);
   }
 
-  public static Selfie.DiskSelfie expectSelfie(Response response) {
+  public static DiskSelfie expectSelfie(Response response) {
     return Selfie.expectSelfie(response, RESPONSE_CAMERA.withLens(htmlClean));
   }
 
