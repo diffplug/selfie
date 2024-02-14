@@ -42,6 +42,7 @@ class SourceFile(filename: String, content: String) {
    */
   inner class ToBeLiteral
   internal constructor(
+      internal val dotFunOpenParen: String,
       internal val functionCallPlusArg: Slice,
       internal val arg: Slice,
   ) {
@@ -72,7 +73,7 @@ class SourceFile(filename: String, content: String) {
       }
       val existingNewlines = functionCallPlusArg.count { it == '\n' }
       val newNewlines = encoded.count { it == '\n' }
-      contentSlice = Slice(functionCallPlusArg.replaceSelfWith(".toBe($encoded)"))
+      contentSlice = Slice(functionCallPlusArg.replaceSelfWith("${dotFunOpenParen}${encoded})"))
       return newNewlines - existingNewlines
     }
 
@@ -104,30 +105,33 @@ class SourceFile(filename: String, content: String) {
     val slice = findOnLine(find, lineOneIndexed)
     contentSlice = Slice(slice.replaceSelfWith(replace))
   }
-  fun parseToBe_TODO(lineOneIndexed: Int): ToBeLiteral {
-    return parseToBeLike(".toBe_TODO(", lineOneIndexed)
+  private fun first(slice: Slice, a: String, b: String): String {
+    val aIndex = slice.indexOf(a)
+    val bIndex = slice.indexOf(b)
+    return if (aIndex == -1 && bIndex == -1)
+        throw AssertionError(
+            "Expected to find `$a` or `$b` on line ${slice.baseLineAtOffset(0)}, but there was only `${slice}`")
+    else if (aIndex == -1) b else if (bIndex == -1) a else if (aIndex < bIndex) a else b
   }
-  fun parseToBe(lineOneIndexed: Int): ToBeLiteral {
-    return parseToBeLike(".toBe(", lineOneIndexed)
-  }
-  private fun parseToBeLike(prefix: String, lineOneIndexed: Int): ToBeLiteral {
+  fun parseToBeLike(lineOneIndexed: Int, a: String, b: String): ToBeLiteral {
     val lineContent = contentSlice.unixLine(lineOneIndexed)
-    val dotFunctionCallInPlace = lineContent.indexOf(prefix)
+    val dotFunOpenParen = first(lineContent, a, b).replace("_TODO", "")
+    val dotFunctionCallInPlace = lineContent.indexOf(dotFunOpenParen)
     if (dotFunctionCallInPlace == -1) {
       throw AssertionError(
-          "Expected to find `$prefix)` on line $lineOneIndexed, but there was only `${lineContent}`")
+          "Expected to find `$dotFunOpenParen)` on line $lineOneIndexed, but there was only `${lineContent}`")
     }
     val dotFunctionCall = dotFunctionCallInPlace + lineContent.startIndex
-    var argStart = dotFunctionCall + prefix.length
+    var argStart = dotFunctionCall + dotFunOpenParen.length
     if (contentSlice.length == argStart) {
       throw AssertionError(
-          "Appears to be an unclosed function call `$prefix)` on line $lineOneIndexed")
+          "Appears to be an unclosed function call `$dotFunOpenParen)` on line $lineOneIndexed")
     }
     while (contentSlice[argStart].isWhitespace()) {
       ++argStart
       if (contentSlice.length == argStart) {
         throw AssertionError(
-            "Appears to be an unclosed function call `$prefix)` on line $lineOneIndexed")
+            "Appears to be an unclosed function call `$dotFunOpenParen)` on line $lineOneIndexed")
       }
     }
 
@@ -172,15 +176,16 @@ class SourceFile(filename: String, content: String) {
     while (contentSlice[endParen] != ')') {
       if (!contentSlice[endParen].isWhitespace()) {
         throw AssertionError(
-            "Non-primitive literal in `$prefix)` starting at line $lineOneIndexed: error for character `${contentSlice[endParen]}` on line ${contentSlice.baseLineAtOffset(endParen)}")
+            "Non-primitive literal in `$dotFunOpenParen)` starting at line $lineOneIndexed: error for character `${contentSlice[endParen]}` on line ${contentSlice.baseLineAtOffset(endParen)}")
       }
       ++endParen
       if (endParen == contentSlice.length) {
         throw AssertionError(
-            "Appears to be an unclosed function call `$prefix)` starting at line $lineOneIndexed")
+            "Appears to be an unclosed function call `$dotFunOpenParen)` starting at line $lineOneIndexed")
       }
     }
     return ToBeLiteral(
+        dotFunOpenParen,
         contentSlice.subSequence(dotFunctionCall, endParen + 1),
         contentSlice.subSequence(argStart, endArg))
   }

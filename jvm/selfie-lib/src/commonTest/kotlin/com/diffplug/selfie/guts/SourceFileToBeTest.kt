@@ -94,11 +94,13 @@ class SourceFileToBeTest {
     val arg = argRaw.replace('\'', '"')
     val parsed = SourceFile("UnderTest.java", source)
     if (source.contains(".toBe_TODO(")) {
-      parsed.parseToBe_TODO(1).functionCallPlusArg.toString() shouldBe functionCallPlusArg
-      parsed.parseToBe_TODO(1).arg.toString() shouldBe arg
+      parsed.parseToBeLike(1, ".toBe_TODO(", "UNUSED").functionCallPlusArg.toString() shouldBe
+          functionCallPlusArg
+      parsed.parseToBeLike(1, ".toBe_TODO(", "UNUSED").arg.toString() shouldBe arg
     } else {
-      parsed.parseToBe(1).functionCallPlusArg.toString() shouldBe functionCallPlusArg
-      parsed.parseToBe(1).arg.toString() shouldBe arg
+      parsed.parseToBeLike(1, ".toBe(", "UNUSED").functionCallPlusArg.toString() shouldBe
+          functionCallPlusArg
+      parsed.parseToBeLike(1, ".toBe(", "UNUSED").arg.toString() shouldBe arg
     }
   }
 }
