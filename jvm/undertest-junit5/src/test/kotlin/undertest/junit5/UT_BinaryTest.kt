@@ -9,7 +9,7 @@ class UT_BinaryTest {
   }
 
   @Test fun emptyInline() {
-    expectSelfie(byteArrayOf()).toBe_TODO()
+    expectSelfie(byteArrayOf()).toBeBase64_TODO()
   }
 
   @Test fun bigishOnDisk() {
@@ -17,6 +17,6 @@ class UT_BinaryTest {
   }
 
   @Test fun bigishInline() {
-    expectSelfie(ByteArray(256) { it.toByte() }).toBe_TODO()
+    expectSelfie(ByteArray(256) { it.toByte() }).toBeBase64_TODO()
   }
 }

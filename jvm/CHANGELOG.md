@@ -15,11 +15,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Memoization** ([#219](https://github.com/diffplug/selfie/pull/219) implements [#215](https://github.com/diffplug/selfie/issues/215))
   - like `expectSelfie`, all are available as `Selfie.memoize` or as `suspend fun` in `com.diffplug.selfie.coroutines`. 
 ```kotlin
-val cachedResult: ByteArray = Selfie.memoizeBinary { dalleJpeg() }.toBePath("example.jpg")
+val cachedResult: ByteArray = Selfie.memoizeBinary { dalleJpeg() }.toBeFile("example.jpg")
 val cachedResult: String    = Selfie.memoize { someString() }.toBe("what it was earlier")
 val cachedResult: T         = Selfie.memoizeAsJson { anyKotlinxSerializable() }.toBe("""{"key": "value"}""")
 val cachedResult: T         = Selfie.memoizeBinarySerializable { anyJavaIoSerializable() }.toMatchDisk()
 ```
+- `toBeBase64` and `toBeFile` for true binary comparison of binary snapshots and facets. ([#224](https://github.com/diffplug/selfie/pull/224))
+### Changed
+- **BREAKING** reordered a class hierarchy for better binary support. ([#221](https://github.com/diffplug/selfie/issues/221))
+  - most users won't need to make any changes at all
+  - only exception is that `expectSelfie(byte[]).toBe` is now a compile error, must do `toBeBase64`
 
 ## [1.2.0] - 2024-02-12
 ### Added

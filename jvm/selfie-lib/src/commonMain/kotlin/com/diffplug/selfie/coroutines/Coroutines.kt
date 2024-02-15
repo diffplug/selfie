@@ -15,11 +15,12 @@
  */
 package com.diffplug.selfie.coroutines
 
+import com.diffplug.selfie.BinarySelfie
 import com.diffplug.selfie.Camera
-import com.diffplug.selfie.DiskSelfie
 import com.diffplug.selfie.Roundtrip
 import com.diffplug.selfie.RoundtripJson
 import com.diffplug.selfie.Snapshot
+import com.diffplug.selfie.StringSelfie
 import com.diffplug.selfie.guts.CoroutineDiskStorage
 import kotlin.coroutines.coroutineContext
 
@@ -45,8 +46,8 @@ private suspend fun disk() =
                 .trimIndent())
 suspend fun <T> expectSelfie(actual: T, camera: Camera<T>) = expectSelfie(camera.snapshot(actual))
 suspend fun expectSelfie(actual: String) = expectSelfie(Snapshot.of(actual))
-suspend fun expectSelfie(actual: ByteArray) = expectSelfie(Snapshot.of(actual))
-suspend fun expectSelfie(actual: Snapshot) = DiskSelfie(actual, disk())
+suspend fun expectSelfie(actual: ByteArray) = BinarySelfie(Snapshot.of(actual), disk(), "")
+suspend fun expectSelfie(actual: Snapshot) = StringSelfie(actual, disk())
 suspend fun preserveSelfiesOnDisk(vararg subsToKeep: String) {
   val disk = disk()
   if (subsToKeep.isEmpty()) {

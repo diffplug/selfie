@@ -15,7 +15,6 @@
  */
 package com.diffplug.selfie
 
-import com.diffplug.selfie.guts.DiskSnapshotTodo
 import com.diffplug.selfie.guts.DiskStorage
 import com.diffplug.selfie.guts.LiteralBoolean
 import com.diffplug.selfie.guts.LiteralFormat
@@ -24,16 +23,138 @@ import com.diffplug.selfie.guts.LiteralLong
 import com.diffplug.selfie.guts.LiteralString
 import com.diffplug.selfie.guts.LiteralValue
 import com.diffplug.selfie.guts.SnapshotSystem
+import com.diffplug.selfie.guts.TodoStub
 import com.diffplug.selfie.guts.recordCall
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.jvm.JvmOverloads
 
-open class LiteralStringSelfie
-internal constructor(
-    protected val actual: Snapshot,
+/** A selfie which can be stored into a selfie-managed file. */
+open class DiskSelfie
+internal constructor(protected val actual: Snapshot, protected val disk: DiskStorage) :
+    FluentFacet {
+  @JvmOverloads
+  open fun toMatchDisk(sub: String = ""): DiskSelfie {
+    val call = recordCall(false)
+    if (Selfie.system.mode.canWrite(false, call, Selfie.system)) {
+      disk.writeDisk(actual, sub, call)
+    } else {
+      assertEqual(disk.readDisk(sub, call), actual, Selfie.system)
+    }
+    return this
+  }
+
+  @JvmOverloads
+  open fun toMatchDisk_TODO(sub: String = ""): DiskSelfie {
+    val call = recordCall(false)
+    if (Selfie.system.mode.canWrite(true, call, Selfie.system)) {
+      disk.writeDisk(actual, sub, call)
+      Selfie.system.writeInline(TodoStub.toMatchDisk.createLiteral(), call)
+      return this
+    } else {
+      throw Selfie.system.fs.assertFailed("Can't call `toMatchDisk_TODO` in ${Mode.readonly} mode!")
+    }
+  }
+  override fun facet(facet: String): StringFacet = StringSelfie(actual, disk, listOf(facet))
+  override fun facets(vararg facets: String): StringFacet =
+      StringSelfie(actual, disk, facets.toList())
+  override fun facetBinary(facet: String) = BinarySelfie(actual, disk, facet)
+}
+
+interface FluentFacet {
+  /** Extract a single facet from a snapshot in order to do an inline snapshot. */
+  fun facet(facet: String): StringFacet
+  /** Extract multiple facets from a snapshot in order to do an inline snapshot. */
+  fun facets(vararg facets: String): StringFacet
+  fun facetBinary(facet: String): BinaryFacet
+}
+
+interface StringFacet : FluentFacet {
+  fun toBe(expected: String): String
+  fun toBe_TODO(unusedArg: Any?): String = toBe_TODO()
+  fun toBe_TODO(): String
+}
+
+interface BinaryFacet : FluentFacet {
+  fun toBeBase64(expected: String): ByteArray
+  fun toBeBase64_TODO(unusedArg: Any?): ByteArray = toBeBase64_TODO()
+  fun toBeBase64_TODO(): ByteArray
+  fun toBeFile(subpath: String): ByteArray
+  fun toBeFile_TODO(subpath: String): ByteArray
+}
+
+class BinarySelfie(actual: Snapshot, disk: DiskStorage, private val onlyFacet: String) :
+    DiskSelfie(actual, disk), BinaryFacet {
+  init {
+    check(actual.subjectOrFacetMaybe(onlyFacet)?.isBinary == true) {
+      "The facet $onlyFacet was not found in the snapshot, or it was not a binary facet."
+    }
+  }
+  private fun actualBytes() = actual.subjectOrFacet(onlyFacet).valueBinary()
+  override fun toMatchDisk(sub: String): BinarySelfie {
+    super.toMatchDisk(sub)
+    return this
+  }
+  override fun toMatchDisk_TODO(sub: String): BinarySelfie {
+    super.toMatchDisk_TODO(sub)
+    return this
+  }
+
+  @OptIn(ExperimentalEncodingApi::class)
+  private fun actualString(): String = Base64.Mime.encode(actualBytes()).replace("\r", "")
+  override fun toBeBase64_TODO(): ByteArray {
+    toBeDidntMatch(null, actualString(), LiteralString)
+    return actualBytes()
+  }
+
+  @OptIn(ExperimentalEncodingApi::class)
+  override fun toBeBase64(expected: String): ByteArray {
+    val expectedBytes = Base64.Mime.decode(expected)
+    val actualBytes = actualBytes()
+    return if (expectedBytes.contentEquals(actualBytes)) Selfie.system.checkSrc(actualBytes)
+    else {
+      toBeDidntMatch(expected, actualString(), LiteralString)
+      return actualBytes()
+    }
+  }
+  override fun toBeFile_TODO(subpath: String): ByteArray {
+    return toBeFileImpl(subpath, true)
+  }
+  override fun toBeFile(subpath: String): ByteArray {
+    return toBeFileImpl(subpath, false)
+  }
+  private fun resolvePath(subpath: String) = Selfie.system.layout.rootFolder.resolveFile(subpath)
+  private fun toBeFileImpl(subpath: String, isTodo: Boolean): ByteArray {
+    val call = recordCall(false)
+    val writable = Selfie.system.mode.canWrite(isTodo, call, Selfie.system)
+    val actualBytes = actualBytes()
+    if (writable) {
+      if (isTodo) {
+        Selfie.system.writeInline(TodoStub.toBeFile.createLiteral(), call)
+      }
+      Selfie.system.fs.fileWriteBinary(resolvePath(subpath), actualBytes)
+      return actualBytes
+    } else {
+      if (isTodo) {
+        throw Selfie.system.fs.assertFailed("Can't call `toBeFile_TODO` in ${Mode.readonly} mode!")
+      } else {
+        val expected = Selfie.system.fs.fileReadBinary(resolvePath(subpath))
+        if (expected.contentEquals(actualBytes)) {
+          return actualBytes
+        } else {
+          throw Selfie.system.fs.assertFailed(
+              Selfie.system.mode.msgSnapshotMismatch(), expected, actualBytes)
+        }
+      }
+    }
+  }
+}
+
+class StringSelfie(
+    actual: Snapshot,
+    disk: DiskStorage,
     private val onlyFacets: Collection<String>? = null
-) {
+) : DiskSelfie(actual, disk), StringFacet {
   init {
     if (onlyFacets != null) {
       check(onlyFacets.all { it == "" || actual.facets.containsKey(it) }) {
@@ -47,10 +168,14 @@ internal constructor(
       }
     }
   }
-  /** Extract a single facet from a snapshot in order to do an inline snapshot. */
-  fun facet(facet: String) = LiteralStringSelfie(actual, listOf(facet))
-  /** Extract a multiple facets from a snapshot in order to do an inline snapshot. */
-  fun facets(vararg facets: String) = LiteralStringSelfie(actual, facets.toList())
+  override fun toMatchDisk(sub: String): StringSelfie {
+    super.toMatchDisk(sub)
+    return this
+  }
+  override fun toMatchDisk_TODO(sub: String): StringSelfie {
+    super.toMatchDisk_TODO(sub)
+    return this
+  }
 
   @OptIn(ExperimentalEncodingApi::class)
   private fun actualString(): String {
@@ -70,39 +195,11 @@ internal constructor(
               })
     }
   }
-
-  @JvmOverloads
-  fun toBe_TODO(unusedArg: Any? = null) = toBeDidntMatch(null, actualString(), LiteralString)
-  fun toBe(expected: String): String {
+  override fun toBe_TODO(): String = toBeDidntMatch(null, actualString(), LiteralString)
+  override fun toBe(expected: String): String {
     val actualString = actualString()
     return if (actualString == expected) Selfie.system.checkSrc(actualString)
     else toBeDidntMatch(expected, actualString, LiteralString)
-  }
-}
-
-class DiskSelfie internal constructor(actual: Snapshot, val disk: DiskStorage) :
-    LiteralStringSelfie(actual) {
-  @JvmOverloads
-  fun toMatchDisk(sub: String = ""): DiskSelfie {
-    val call = recordCall(false)
-    if (Selfie.system.mode.canWrite(false, call, Selfie.system)) {
-      disk.writeDisk(actual, sub, call)
-    } else {
-      assertEqual(disk.readDisk(sub, call), actual, Selfie.system)
-    }
-    return this
-  }
-
-  @JvmOverloads
-  fun toMatchDisk_TODO(sub: String = ""): DiskSelfie {
-    val call = recordCall(false)
-    if (Selfie.system.mode.canWrite(true, call, Selfie.system)) {
-      disk.writeDisk(actual, sub, call)
-      Selfie.system.writeInline(DiskSnapshotTodo.createLiteral(), call)
-      return this
-    } else {
-      throw Selfie.system.fs.assertFailed("Can't call `toMatchDisk_TODO` in ${Mode.readonly} mode!")
-    }
   }
 }
 

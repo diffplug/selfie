@@ -49,9 +49,11 @@ object Selfie {
 
   @JvmStatic
   fun <T> expectSelfie(actual: T, camera: Camera<T>) = expectSelfie(camera.snapshot(actual))
+
+  @JvmStatic
+  fun expectSelfie(actual: ByteArray) = BinarySelfie(Snapshot.of(actual), deferredDiskStorage, "")
   @JvmStatic fun expectSelfie(actual: String) = expectSelfie(Snapshot.of(actual))
-  @JvmStatic fun expectSelfie(actual: ByteArray) = expectSelfie(Snapshot.of(actual))
-  @JvmStatic fun expectSelfie(actual: Snapshot) = DiskSelfie(actual, deferredDiskStorage)
+  @JvmStatic fun expectSelfie(actual: Snapshot) = StringSelfie(actual, deferredDiskStorage)
   @JvmStatic fun expectSelfie(actual: Long) = LongSelfie(actual)
   @JvmStatic fun expectSelfie(actual: Int) = IntSelfie(actual)
   @JvmStatic fun expectSelfie(actual: Boolean) = BooleanSelfie(actual)

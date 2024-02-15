@@ -42,6 +42,7 @@ class SourceFile(filename: String, content: String) {
    */
   inner class ToBeLiteral
   internal constructor(
+      internal val dotFunOpenParen: String,
       internal val functionCallPlusArg: Slice,
       internal val arg: Slice,
   ) {
@@ -72,7 +73,7 @@ class SourceFile(filename: String, content: String) {
       }
       val existingNewlines = functionCallPlusArg.count { it == '\n' }
       val newNewlines = encoded.count { it == '\n' }
-      contentSlice = Slice(functionCallPlusArg.replaceSelfWith(".toBe($encoded)"))
+      contentSlice = Slice(functionCallPlusArg.replaceSelfWith("${dotFunOpenParen}${encoded})"))
       return newNewlines - existingNewlines
     }
 
@@ -104,30 +105,29 @@ class SourceFile(filename: String, content: String) {
     val slice = findOnLine(find, lineOneIndexed)
     contentSlice = Slice(slice.replaceSelfWith(replace))
   }
-  fun parseToBe_TODO(lineOneIndexed: Int): ToBeLiteral {
-    return parseToBeLike(".toBe_TODO(", lineOneIndexed)
-  }
-  fun parseToBe(lineOneIndexed: Int): ToBeLiteral {
-    return parseToBeLike(".toBe(", lineOneIndexed)
-  }
-  private fun parseToBeLike(prefix: String, lineOneIndexed: Int): ToBeLiteral {
+  fun parseToBeLike(lineOneIndexed: Int): ToBeLiteral {
     val lineContent = contentSlice.unixLine(lineOneIndexed)
-    val dotFunctionCallInPlace = lineContent.indexOf(prefix)
-    if (dotFunctionCallInPlace == -1) {
-      throw AssertionError(
-          "Expected to find `$prefix)` on line $lineOneIndexed, but there was only `${lineContent}`")
-    }
+    val dotFunOpenParen =
+        TO_BE_LIKES.mapNotNull {
+              val idx = lineContent.indexOf(it)
+              if (idx == -1) null else idx to it
+            }
+            .minByOrNull { it.first }
+            ?.second
+            ?: throw AssertionError(
+                "Expected to find inline assertion on line $lineOneIndexed, but there was only `${lineContent}`")
+    val dotFunctionCallInPlace = lineContent.indexOf(dotFunOpenParen)
     val dotFunctionCall = dotFunctionCallInPlace + lineContent.startIndex
-    var argStart = dotFunctionCall + prefix.length
+    var argStart = dotFunctionCall + dotFunOpenParen.length
     if (contentSlice.length == argStart) {
       throw AssertionError(
-          "Appears to be an unclosed function call `$prefix)` on line $lineOneIndexed")
+          "Appears to be an unclosed function call `$dotFunOpenParen)` on line $lineOneIndexed")
     }
     while (contentSlice[argStart].isWhitespace()) {
       ++argStart
       if (contentSlice.length == argStart) {
         throw AssertionError(
-            "Appears to be an unclosed function call `$prefix)` on line $lineOneIndexed")
+            "Appears to be an unclosed function call `$dotFunOpenParen)` on line $lineOneIndexed")
       }
     }
 
@@ -172,16 +172,18 @@ class SourceFile(filename: String, content: String) {
     while (contentSlice[endParen] != ')') {
       if (!contentSlice[endParen].isWhitespace()) {
         throw AssertionError(
-            "Non-primitive literal in `$prefix)` starting at line $lineOneIndexed: error for character `${contentSlice[endParen]}` on line ${contentSlice.baseLineAtOffset(endParen)}")
+            "Non-primitive literal in `$dotFunOpenParen)` starting at line $lineOneIndexed: error for character `${contentSlice[endParen]}` on line ${contentSlice.baseLineAtOffset(endParen)}")
       }
       ++endParen
       if (endParen == contentSlice.length) {
         throw AssertionError(
-            "Appears to be an unclosed function call `$prefix)` starting at line $lineOneIndexed")
+            "Appears to be an unclosed function call `$dotFunOpenParen)` starting at line $lineOneIndexed")
       }
     }
     return ToBeLiteral(
+        dotFunOpenParen.replace("_TODO", ""),
         contentSlice.subSequence(dotFunctionCall, endParen + 1),
         contentSlice.subSequence(argStart, endArg))
   }
 }
+private val TO_BE_LIKES = listOf(".toBe(", ".toBe_TODO(", ".toBeBase64(", ".toBeBase64_TODO(")

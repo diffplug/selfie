@@ -15,10 +15,13 @@
  */
 package com.diffplug.selfie
 
-import com.diffplug.selfie.guts.DiskSnapshotTodo
 import com.diffplug.selfie.guts.DiskStorage
-import com.diffplug.selfie.guts.ToBeFileTodo
+import com.diffplug.selfie.guts.LiteralString
+import com.diffplug.selfie.guts.LiteralValue
+import com.diffplug.selfie.guts.TodoStub
 import com.diffplug.selfie.guts.recordCall
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 
 class MemoBinary<T>(
     private val disk: DiskStorage,
@@ -37,7 +40,7 @@ class MemoBinary<T>(
       val actual = generator()
       disk.writeDisk(Snapshot.of(roundtrip.serialize(actual)), sub, call)
       if (isTodo) {
-        Selfie.system.writeInline(DiskSnapshotTodo.createLiteral(), call)
+        Selfie.system.writeInline(TodoStub.toMatchDisk.createLiteral(), call)
       }
       return actual
     } else {
@@ -69,7 +72,7 @@ class MemoBinary<T>(
     if (writable) {
       val actual = generator()
       if (isTodo) {
-        Selfie.system.writeInline(ToBeFileTodo.createLiteral(), call)
+        Selfie.system.writeInline(TodoStub.toBeFile.createLiteral(), call)
       }
       Selfie.system.fs.fileWriteBinary(resolvePath(subpath), roundtrip.serialize(actual))
       return actual
@@ -78,6 +81,30 @@ class MemoBinary<T>(
         throw Selfie.system.fs.assertFailed("Can't call `toBeFile_TODO` in ${Mode.readonly} mode!")
       } else {
         return roundtrip.parse(Selfie.system.fs.fileReadBinary(resolvePath(subpath)))
+      }
+    }
+  }
+  fun toBeBase64_TODO(unusedArg: Any? = null): T {
+    return toBeBase64Impl(null)
+  }
+  fun toBeBase64(snapshot: String): T {
+    return toBeBase64Impl(snapshot)
+  }
+
+  @OptIn(ExperimentalEncodingApi::class)
+  private fun toBeBase64Impl(snapshot: String?): T {
+    val call = recordCall(false)
+    val writable = Selfie.system.mode.canWrite(snapshot == null, call, Selfie.system)
+    if (writable) {
+      val actual = generator()
+      val base64 = Base64.Mime.encode(roundtrip.serialize(actual)).replace("\r", "")
+      Selfie.system.writeInline(LiteralValue(snapshot, base64, LiteralString), call)
+      return actual
+    } else {
+      if (snapshot == null) {
+        throw Selfie.system.fs.assertFailed("Can't call `toBe_TODO` in ${Mode.readonly} mode!")
+      } else {
+        return roundtrip.parse(Base64.Mime.decode(snapshot))
       }
     }
   }
