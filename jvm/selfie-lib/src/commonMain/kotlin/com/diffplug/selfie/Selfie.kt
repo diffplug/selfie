@@ -57,22 +57,23 @@ object Selfie {
   @JvmStatic fun expectSelfie(actual: Long) = LongSelfie(actual)
   @JvmStatic fun expectSelfie(actual: Int) = IntSelfie(actual)
   @JvmStatic fun expectSelfie(actual: Boolean) = BooleanSelfie(actual)
-  @JvmStatic fun memoize(toMemoize: () -> String) = memoize(Roundtrip.identity(), toMemoize)
+  @JvmStatic fun lazySelfie(toMemoize: () -> String) = lazySelfie(Roundtrip.identity(), toMemoize)
 
   @JvmStatic
-  fun <T> memoize(roundtrip: Roundtrip<T, String>, toMemoize: () -> T) =
+  fun <T> lazySelfie(roundtrip: Roundtrip<T, String>, toMemoize: () -> T) =
       LazySelfie(deferredDiskStorage, roundtrip, toMemoize)
   /**
    * Memoizes any type which is marked with `@kotlinx.serialization.Serializable` as pretty-printed
    * json.
    */
-  inline fun <reified T> memoizeAsJson(noinline toMemoize: () -> T) =
-      memoize(RoundtripJson.of<T>(), toMemoize)
+  inline fun <reified T> lazySelfieJson(noinline toMemoize: () -> T) =
+      lazySelfie(RoundtripJson.of<T>(), toMemoize)
 
   @JvmStatic
-  fun memoizeBinary(toMemoize: () -> ByteArray) = memoizeBinary(Roundtrip.identity(), toMemoize)
+  fun lazySelfieBinary(toMemoize: () -> ByteArray) =
+      lazySelfieBinary(Roundtrip.identity(), toMemoize)
 
   @JvmStatic
-  fun <T> memoizeBinary(roundtrip: Roundtrip<T, ByteArray>, toMemoize: () -> T) =
+  fun <T> lazySelfieBinary(roundtrip: Roundtrip<T, ByteArray>, toMemoize: () -> T) =
       LazySelfieBinary<T>(deferredDiskStorage, roundtrip, toMemoize)
 }

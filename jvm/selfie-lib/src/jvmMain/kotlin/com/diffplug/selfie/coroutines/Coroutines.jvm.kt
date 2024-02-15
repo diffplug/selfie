@@ -20,7 +20,7 @@ import com.diffplug.selfie.SerializableRoundtrip
 import java.io.Serializable
 
 /** Memoizes any [java.io.Serializable] type as a binary blob. */
-suspend fun <T : Serializable> memoizeBinarySerializable(
+suspend fun <T : Serializable> lazySelfieBinarySerializable(
     toMemoize: suspend () -> T
 ): LazySelfieBinarySuspend<T> =
-    memoizeBinary(SerializableRoundtrip as Roundtrip<T, ByteArray>, toMemoize)
+    lazySelfieBinary(SerializableRoundtrip as Roundtrip<T, ByteArray>, toMemoize)
