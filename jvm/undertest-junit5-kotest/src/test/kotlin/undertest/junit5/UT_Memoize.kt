@@ -1,7 +1,7 @@
 package undertest.junit5
 
 import com.diffplug.selfie.coroutines.lazySelfie
-import com.diffplug.selfie.coroutines.lazySelfieBinarySerializable
+import com.diffplug.selfie.coroutines.cacheSelfieBinarySerializable
 import com.diffplug.selfie.coroutines.lazySelfieJson
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
@@ -9,10 +9,10 @@ import io.kotest.matchers.shouldBe
 class UT_Memoize :
     FunSpec({
       test("java.io.Serializable") {
-        lazySelfieBinarySerializable { Book("Harry Potter", "J.K. Rowling") }
+        cacheSelfieBinarySerializable { Book("Harry Potter", "J.K. Rowling") }
             .toBeFile_TODO("Book.bin")
             .run { title shouldBe "Harry Potter" }
-        lazySelfieBinarySerializable { Book("Moby Dick", "Herman Melville") }
+        cacheSelfieBinarySerializable { Book("Moby Dick", "Herman Melville") }
             .toBeBase64_TODO()
             .run { title shouldBe "Moby Dick" }
       }

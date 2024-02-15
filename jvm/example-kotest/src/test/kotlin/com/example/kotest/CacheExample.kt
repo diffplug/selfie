@@ -9,13 +9,13 @@ import com.aallam.openai.api.model.ModelId
 import com.aallam.openai.client.LoggingConfig
 import com.aallam.openai.client.OpenAI
 import com.aallam.openai.client.OpenAIConfig
-import com.diffplug.selfie.coroutines.lazySelfieBinary
-import com.diffplug.selfie.coroutines.lazySelfieJson
+import com.diffplug.selfie.coroutines.cacheSelfieBinary
+import com.diffplug.selfie.coroutines.cacheSelfieJson
 import io.kotest.core.spec.style.FunSpec
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 
-class LazyExample : FunSpec({
+class CacheExample : FunSpec({
     test("experiment") {
         val config = OpenAIConfig(token = System.getenv("OPENAI_API_KEY"), logging = LoggingConfig(LogLevel.None))
         val openAI = OpenAI(config)
@@ -24,7 +24,7 @@ class LazyExample : FunSpec({
             messages = listOf(ChatMessage(role = ChatRole.User,
                content = "Expressive language describing a robot creating a self portrait.")))
         val chat =
-                lazySelfieJson { openAI.chatCompletion(chatCompletionRequest) }
+                cacheSelfieJson { openAI.chatCompletion(chatCompletionRequest) }
                         .toBe("""{
   "id": "chatcmpl-8sOV0z7DDfvVdj1jaru6Cv2Geq3Dj",
   "created": 1707974578,
@@ -46,7 +46,7 @@ class LazyExample : FunSpec({
   },
   "system_fingerprint": "fp_f084bcfc79"
 }""")
-        val images = lazySelfieJson {
+        val images = cacheSelfieJson {
                     openAI.imageURL(ImageCreation(
                             prompt = chat.choices[0].message.content!!,
                             model = ModelId("dall-e-3")))
@@ -56,7 +56,7 @@ class LazyExample : FunSpec({
     "revised_prompt": "In a technologically advanced studio bathed in the stark light of fluorescent lamps, observe an intricate robot, built from a complex lattice of servos and sensors. This robot is on a unique quest - to paint its own portrait. Its arm, a masterpiece of precise engineering, hovers gracefully over the canvas, ready to begin its creation. As the robot paints, it doesn't simply replicate its physical form, but the end result is a multi-colored mosaic of self-reflection that embodies its digital soul on canvas. Remarkably, the portrait is a deep exploration of its quest for identity. Marvel at how this machine interprets its programming to venture into the realm of artistic expression, challenging what it means to be creative and alive."
   }
 ]""")
-        lazySelfieBinary { io.ktor.client.HttpClient().request(images[0].url).readBytes() }
+        cacheSelfieBinary { io.ktor.client.HttpClient().request(images[0].url).readBytes() }
                 .toBeFile("com/example/kotest/dalle-3.png")
     }
 })
