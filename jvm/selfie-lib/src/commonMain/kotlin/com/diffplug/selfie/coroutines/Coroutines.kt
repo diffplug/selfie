@@ -58,7 +58,7 @@ suspend fun preserveSelfiesOnDisk(vararg subsToKeep: String) {
 }
 suspend fun memoize(toMemoize: suspend () -> String) = memoize(Roundtrip.identity(), toMemoize)
 suspend fun <T> memoize(roundtrip: Roundtrip<T, String>, toMemoize: suspend () -> T) =
-    MemoStringSuspend(disk(), roundtrip, toMemoize)
+    LazySelfieSuspend(disk(), roundtrip, toMemoize)
 /**
  * Memoizes any type which is marked with `@kotlinx.serialization.Serializable` as pretty-printed
  * json.
@@ -68,4 +68,4 @@ suspend inline fun <reified T> memoizeAsJson(noinline toMemoize: suspend () -> T
 suspend fun memoizeBinary(toMemoize: suspend () -> ByteArray) =
     memoizeBinary(Roundtrip.identity(), toMemoize)
 suspend fun <T> memoizeBinary(roundtrip: Roundtrip<T, ByteArray>, toMemoize: suspend () -> T) =
-    MemoBinarySuspend(disk(), roundtrip, toMemoize)
+    LazySelfieBinarySuspend(disk(), roundtrip, toMemoize)

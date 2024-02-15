@@ -22,4 +22,5 @@ import java.io.Serializable
 /** Memoizes any [java.io.Serializable] type as a binary blob. */
 suspend fun <T : Serializable> memoizeBinarySerializable(
     toMemoize: suspend () -> T
-): MemoBinarySuspend<T> = memoizeBinary(SerializableRoundtrip as Roundtrip<T, ByteArray>, toMemoize)
+): LazySelfieBinarySuspend<T> =
+    memoizeBinary(SerializableRoundtrip as Roundtrip<T, ByteArray>, toMemoize)

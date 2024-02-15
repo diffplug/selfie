@@ -18,7 +18,7 @@ package com.diffplug.selfie
 import java.io.ByteArrayOutputStream
 import java.io.ObjectOutputStream
 import java.io.Serializable
-fun <T : Serializable> Selfie.memoizeBinarySerializable(toMemoize: () -> T): MemoBinary<T> =
+fun <T : Serializable> Selfie.memoizeBinarySerializable(toMemoize: () -> T): LazySelfieBinary<T> =
     memoizeBinary(SerializableRoundtrip as Roundtrip<T, ByteArray>, toMemoize)
 
 internal object SerializableRoundtrip : Roundtrip<Serializable, ByteArray> {

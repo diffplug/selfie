@@ -61,7 +61,7 @@ object Selfie {
 
   @JvmStatic
   fun <T> memoize(roundtrip: Roundtrip<T, String>, toMemoize: () -> T) =
-      MemoString(deferredDiskStorage, roundtrip, toMemoize)
+      LazySelfie(deferredDiskStorage, roundtrip, toMemoize)
   /**
    * Memoizes any type which is marked with `@kotlinx.serialization.Serializable` as pretty-printed
    * json.
@@ -74,5 +74,5 @@ object Selfie {
 
   @JvmStatic
   fun <T> memoizeBinary(roundtrip: Roundtrip<T, ByteArray>, toMemoize: () -> T) =
-      MemoBinary<T>(deferredDiskStorage, roundtrip, toMemoize)
+      LazySelfieBinary<T>(deferredDiskStorage, roundtrip, toMemoize)
 }

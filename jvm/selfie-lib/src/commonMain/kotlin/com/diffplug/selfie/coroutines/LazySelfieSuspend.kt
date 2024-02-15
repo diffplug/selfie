@@ -13,26 +13,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.diffplug.selfie
+package com.diffplug.selfie.coroutines
 
+import com.diffplug.selfie.Mode
+import com.diffplug.selfie.Roundtrip
+import com.diffplug.selfie.Selfie
+import com.diffplug.selfie.Snapshot
 import com.diffplug.selfie.guts.DiskStorage
 import com.diffplug.selfie.guts.LiteralString
 import com.diffplug.selfie.guts.LiteralValue
 import com.diffplug.selfie.guts.TodoStub
 import com.diffplug.selfie.guts.recordCall
 
-class MemoString<T>(
+class LazySelfieSuspend<T>(
     private val disk: DiskStorage,
     private val roundtrip: Roundtrip<T, String>,
-    private val generator: () -> T
+    private val generator: suspend () -> T
 ) {
-  fun toMatchDisk(sub: String = ""): T {
+  suspend fun toMatchDisk(sub: String = ""): T {
     return toMatchDiskImpl(sub, false)
   }
-  fun toMatchDisk_TODO(sub: String = ""): T {
+  suspend fun toMatchDisk_TODO(sub: String = ""): T {
     return toMatchDiskImpl(sub, true)
   }
-  private fun toMatchDiskImpl(sub: String, isTodo: Boolean): T {
+  private suspend fun toMatchDiskImpl(sub: String, isTodo: Boolean): T {
     val call = recordCall(false)
     if (Selfie.system.mode.canWrite(isTodo, call, Selfie.system)) {
       val actual = generator()
@@ -57,13 +61,13 @@ class MemoString<T>(
       }
     }
   }
-  fun toBe_TODO(unusedArg: Any? = null): T {
+  suspend fun toBe_TODO(unusedArg: Any? = null): T {
     return toBeImpl(null)
   }
-  fun toBe(expected: String): T {
+  suspend fun toBe(expected: String): T {
     return toBeImpl(expected)
   }
-  private fun toBeImpl(snapshot: String?): T {
+  private suspend fun toBeImpl(snapshot: String?): T {
     val call = recordCall(false)
     val writable = Selfie.system.mode.canWrite(snapshot == null, call, Selfie.system)
     if (writable) {
