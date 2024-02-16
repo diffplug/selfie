@@ -1,7 +1,7 @@
 package undertest.junit5
 
-import com.diffplug.selfie.coroutines.lazySelfie
 import com.diffplug.selfie.coroutines.cacheSelfieBinarySerializable
+import com.diffplug.selfie.coroutines.lazySelfie
 import com.diffplug.selfie.coroutines.lazySelfieJson
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
