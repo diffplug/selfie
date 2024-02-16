@@ -1,1 +1,1 @@
-from .ned import fizzbuzz
+from .ned import fizzbuzz as fizzbuzz
