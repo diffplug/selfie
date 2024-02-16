@@ -1,0 +1,1 @@
+from .ned import fizzbuzz
