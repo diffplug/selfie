@@ -27,6 +27,6 @@ jobs:
           python-version-file: 'python/selfie-lib/pyproject.toml'
           cache: 'poetry'
       - run: poetry install
-      - run: poetry run pytest
+      - run: poetry run pytest -vv
       - run: poetry run pyright
       - run: poetry run ruff check
