@@ -21,7 +21,7 @@ import com.diffplug.selfie.guts.LiteralValue
 import com.diffplug.selfie.guts.TodoStub
 import com.diffplug.selfie.guts.recordCall
 
-class MemoString<T>(
+class CacheSelfie<T>(
     private val disk: DiskStorage,
     private val roundtrip: Roundtrip<T, String>,
     private val generator: () -> T

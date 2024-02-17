@@ -56,16 +56,17 @@ suspend fun preserveSelfiesOnDisk(vararg subsToKeep: String) {
     subsToKeep.forEach { disk.keep(it) }
   }
 }
-suspend fun memoize(toMemoize: suspend () -> String) = memoize(Roundtrip.identity(), toMemoize)
-suspend fun <T> memoize(roundtrip: Roundtrip<T, String>, toMemoize: suspend () -> T) =
-    MemoStringSuspend(disk(), roundtrip, toMemoize)
+suspend fun cacheSelfie(toMemoize: suspend () -> String) =
+    cacheSelfie(Roundtrip.identity(), toMemoize)
+suspend fun <T> cacheSelfie(roundtrip: Roundtrip<T, String>, toMemoize: suspend () -> T) =
+    CacheSelfieSuspend(disk(), roundtrip, toMemoize)
 /**
  * Memoizes any type which is marked with `@kotlinx.serialization.Serializable` as pretty-printed
  * json.
  */
-suspend inline fun <reified T> memoizeAsJson(noinline toMemoize: suspend () -> T) =
-    memoize(RoundtripJson.of<T>(), toMemoize)
-suspend fun memoizeBinary(toMemoize: suspend () -> ByteArray) =
-    memoizeBinary(Roundtrip.identity(), toMemoize)
-suspend fun <T> memoizeBinary(roundtrip: Roundtrip<T, ByteArray>, toMemoize: suspend () -> T) =
-    MemoBinarySuspend(disk(), roundtrip, toMemoize)
+suspend inline fun <reified T> cacheSelfieJson(noinline toMemoize: suspend () -> T) =
+    cacheSelfie(RoundtripJson.of<T>(), toMemoize)
+suspend fun cacheSelfieBinary(toMemoize: suspend () -> ByteArray) =
+    cacheSelfieBinary(Roundtrip.identity(), toMemoize)
+suspend fun <T> cacheSelfieBinary(roundtrip: Roundtrip<T, ByteArray>, toMemoize: suspend () -> T) =
+    CacheSelfieBinarySuspend(disk(), roundtrip, toMemoize)

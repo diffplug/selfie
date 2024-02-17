@@ -23,7 +23,7 @@ import com.diffplug.selfie.guts.recordCall
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
-class MemoBinary<T>(
+class CacheSelfieBinary<T>(
     private val disk: DiskStorage,
     private val roundtrip: Roundtrip<T, ByteArray>,
     private val generator: () -> T

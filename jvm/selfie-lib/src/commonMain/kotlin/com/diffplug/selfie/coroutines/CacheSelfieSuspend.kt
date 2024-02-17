@@ -25,7 +25,7 @@ import com.diffplug.selfie.guts.LiteralValue
 import com.diffplug.selfie.guts.TodoStub
 import com.diffplug.selfie.guts.recordCall
 
-class MemoStringSuspend<T>(
+class CacheSelfieSuspend<T>(
     private val disk: DiskStorage,
     private val roundtrip: Roundtrip<T, String>,
     private val generator: suspend () -> T
