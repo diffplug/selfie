@@ -39,7 +39,7 @@ class LiteralLongTest {
     encode(9876543210, "9_876_543_210L")
   }
   private fun encode(value: Long, expected: String) {
-    val actual = LiteralLong.encode(value, Language.JAVA)
+    val actual = LiteralLong.encode(value, Language.JAVA, EscapeLeadingWhitespace.ALWAYS)
     actual shouldBe expected
   }
 

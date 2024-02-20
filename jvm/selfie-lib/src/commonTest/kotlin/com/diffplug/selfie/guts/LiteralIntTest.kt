@@ -38,7 +38,7 @@ class LiteralIntTest {
     encode(10010, "10_010")
   }
   private fun encode(value: Int, expected: String) {
-    val actual = LiteralInt.encode(value, Language.JAVA)
+    val actual = LiteralInt.encode(value, Language.JAVA, EscapeLeadingWhitespace.ALWAYS)
     actual shouldBe expected
   }
 
