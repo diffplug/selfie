@@ -15,11 +15,17 @@
  */
 package com.diffplug.selfie.guts
 
-enum class EscapeLeadingWhitespace {
+internal enum class EscapeLeadingWhitespace {
   ALWAYS,
   NEVER,
   ONLY_ON_SPACE,
   ONLY_ON_TAB;
+  fun escapeLine(line: String, space: String, tab: String): String =
+      if (line.startsWith(" ")) {
+        if (this == ALWAYS || this == ONLY_ON_SPACE) "$space${line.drop(1)}" else line
+      } else if (line.startsWith("\t")) {
+        if (this == ALWAYS || this == ONLY_ON_TAB) "$tab${line.drop(1)}" else line
+      } else line
 
   companion object {
     private val leadingWhitespaceRegex = "^\\s+".toRegex()
