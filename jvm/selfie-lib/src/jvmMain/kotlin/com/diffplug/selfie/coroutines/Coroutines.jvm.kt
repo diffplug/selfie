@@ -21,6 +21,6 @@ import java.io.Serializable
 
 /** Memoizes any [java.io.Serializable] type as a binary blob. */
 suspend fun <T : Serializable> cacheSelfieBinarySerializable(
-    toMemoize: suspend () -> T
+    toCache: suspend () -> T
 ): CacheSelfieBinarySuspend<T> =
-    cacheSelfieBinary(SerializableRoundtrip as Roundtrip<T, ByteArray>, toMemoize)
+    cacheSelfieBinary(SerializableRoundtrip as Roundtrip<T, ByteArray>, toCache)

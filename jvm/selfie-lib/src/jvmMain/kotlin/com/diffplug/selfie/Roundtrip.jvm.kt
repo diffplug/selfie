@@ -19,9 +19,9 @@ import java.io.ByteArrayOutputStream
 import java.io.ObjectOutputStream
 import java.io.Serializable
 fun <T : Serializable> Selfie.cacheSelfieBinarySerializable(
-    toMemoize: Cacheable<T>
+    toCache: Cacheable<T>
 ): CacheSelfieBinary<T> =
-    cacheSelfieBinary(SerializableRoundtrip as Roundtrip<T, ByteArray>, toMemoize)
+    cacheSelfieBinary(SerializableRoundtrip as Roundtrip<T, ByteArray>, toCache)
 
 internal object SerializableRoundtrip : Roundtrip<Serializable, ByteArray> {
   override fun serialize(value: Serializable): ByteArray {
