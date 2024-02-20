@@ -19,7 +19,7 @@ import java.io.ByteArrayOutputStream
 import java.io.ObjectOutputStream
 import java.io.Serializable
 fun <T : Serializable> Selfie.cacheSelfieBinarySerializable(
-    toMemoize: () -> T
+    toMemoize: Cacheable<T>
 ): CacheSelfieBinary<T> =
     cacheSelfieBinary(SerializableRoundtrip as Roundtrip<T, ByteArray>, toMemoize)
 

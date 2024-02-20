@@ -24,7 +24,7 @@ import com.diffplug.selfie.guts.recordCall
 class CacheSelfie<T>(
     private val disk: DiskStorage,
     private val roundtrip: Roundtrip<T, String>,
-    private val generator: () -> T
+    private val generator: Cacheable<T>
 ) {
   fun toMatchDisk(sub: String = ""): T {
     return toMatchDiskImpl(sub, false)
@@ -35,7 +35,7 @@ class CacheSelfie<T>(
   private fun toMatchDiskImpl(sub: String, isTodo: Boolean): T {
     val call = recordCall(false)
     if (Selfie.system.mode.canWrite(isTodo, call, Selfie.system)) {
-      val actual = generator()
+      val actual = generator.get()
       disk.writeDisk(Snapshot.of(roundtrip.serialize(actual)), sub, call)
       if (isTodo) {
         Selfie.system.writeInline(TodoStub.toMatchDisk.createLiteral(), call)
@@ -67,7 +67,7 @@ class CacheSelfie<T>(
     val call = recordCall(false)
     val writable = Selfie.system.mode.canWrite(snapshot == null, call, Selfie.system)
     if (writable) {
-      val actual = generator()
+      val actual = generator.get()
       Selfie.system.writeInline(
           LiteralValue(snapshot, roundtrip.serialize(actual), LiteralString), call)
       return actual

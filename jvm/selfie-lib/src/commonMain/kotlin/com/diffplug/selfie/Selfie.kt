@@ -21,6 +21,11 @@ import com.diffplug.selfie.guts.SnapshotSystem
 import com.diffplug.selfie.guts.initSnapshotSystem
 import kotlin.jvm.JvmStatic
 
+/** A getter which may or may not be run. */
+fun interface Cacheable<T> {
+  @Throws(Throwable::class) fun get(): T
+}
+
 /** Static methods for creating snapshots. */
 object Selfie {
   internal val system: SnapshotSystem = initSnapshotSystem()
@@ -57,10 +62,12 @@ object Selfie {
   @JvmStatic fun expectSelfie(actual: Long) = LongSelfie(actual)
   @JvmStatic fun expectSelfie(actual: Int) = IntSelfie(actual)
   @JvmStatic fun expectSelfie(actual: Boolean) = BooleanSelfie(actual)
-  @JvmStatic fun cacheSelfie(toMemoize: () -> String) = cacheSelfie(Roundtrip.identity(), toMemoize)
 
   @JvmStatic
-  fun <T> cacheSelfie(roundtrip: Roundtrip<T, String>, toMemoize: () -> T) =
+  fun cacheSelfie(toMemoize: Cacheable<String>) = cacheSelfie(Roundtrip.identity(), toMemoize)
+
+  @JvmStatic
+  fun <T> cacheSelfie(roundtrip: Roundtrip<T, String>, toMemoize: Cacheable<T>) =
       CacheSelfie(deferredDiskStorage, roundtrip, toMemoize)
   /**
    * Memoizes any type which is marked with `@kotlinx.serialization.Serializable` as pretty-printed
@@ -70,10 +77,10 @@ object Selfie {
       cacheSelfie(RoundtripJson.of<T>(), toMemoize)
 
   @JvmStatic
-  fun cacheSelfieBinary(toMemoize: () -> ByteArray) =
+  fun cacheSelfieBinary(toMemoize: Cacheable<ByteArray>) =
       cacheSelfieBinary(Roundtrip.identity(), toMemoize)
 
   @JvmStatic
-  fun <T> cacheSelfieBinary(roundtrip: Roundtrip<T, ByteArray>, toMemoize: () -> T) =
+  fun <T> cacheSelfieBinary(roundtrip: Roundtrip<T, ByteArray>, toMemoize: Cacheable<T>) =
       CacheSelfieBinary<T>(deferredDiskStorage, roundtrip, toMemoize)
 }
