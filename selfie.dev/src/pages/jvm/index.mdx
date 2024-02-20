@@ -139,4 +139,26 @@ interface Camera<T> {
 
 See the [facets section](/jvm/facets) for more details on how you can use Selfie for snapshot testing with Java, Kotlin, or any JVM language.
 
+<NavHeading text="cacheable" popout="/jvm/cache" />
+
+Sometimes a test has a component which is slow, expensive, or non-deterministic. In cases like this, it can be useful to save the result of a previous execution of the API call, and use that as a mock for future tests.
+
+```java
+var client = ExpensiveAiService();
+var chatResponse = cacheSelfie(() -> {
+  return client.chat("What's your favorite number today?");
+}).toBe("Since it's March 14, my favorite number is π")
+// build other stuff with the chat response
+```
+
+You can cache simple strings, but you can also cache typed API objects, binary data, or anything else you can serialize to a string or a byte array.
+
+```java
+var imageBytes = cacheSelfieBinary(() -> {
+  return client.generateImage("A robot making a self portrait");
+}).toBeFile("selfie.png")
+```
+
+For more information on how to use `cacheSelfie`, see the [cache example](/jvm/cache).
+
 <FooterCTA />
