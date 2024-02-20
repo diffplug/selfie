@@ -10,7 +10,7 @@ dependencies {
   testImplementation("com.aallam.openai:openai-client")
   testImplementation("io.ktor:ktor-client-okhttp")
   // json
-  testImplementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
+  testImplementation("org.jetbrains.kotlinx:kotlinx-serialization-json:${project.properties["ver_KOTLIN_SERIALIZATION"]}")
   // add kotest and its runner
   testImplementation(project(":selfie-runner-kotest"))
   testImplementation("io.kotest:kotest-runner-junit5:${project.properties["ver_KOTEST"]}")
