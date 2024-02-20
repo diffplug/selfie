@@ -56,8 +56,7 @@ suspend fun preserveSelfiesOnDisk(vararg subsToKeep: String) {
     subsToKeep.forEach { disk.keep(it) }
   }
 }
-suspend fun cacheSelfie(toCache: suspend () -> String) =
-    cacheSelfie(Roundtrip.identity(), toCache)
+suspend fun cacheSelfie(toCache: suspend () -> String) = cacheSelfie(Roundtrip.identity(), toCache)
 suspend fun <T> cacheSelfie(roundtrip: Roundtrip<T, String>, toCache: suspend () -> T) =
     CacheSelfieSuspend(disk(), roundtrip, toCache)
 /**
