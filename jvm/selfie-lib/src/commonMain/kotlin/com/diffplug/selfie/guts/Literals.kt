@@ -48,7 +48,7 @@ abstract class LiteralFormat<T : Any> {
   internal abstract fun encode(
       value: T,
       language: Language,
-      escapeLeadingWhitespace: EscapeLeadingWhitespace
+      encodingPolicy: EscapeLeadingWhitespace
   ): String
   internal abstract fun parse(str: String, language: Language): T
 }
@@ -82,7 +82,7 @@ internal object LiteralInt : LiteralFormat<Int>() {
   override fun encode(
       value: Int,
       language: Language,
-      escapeLeadingWhitespace: EscapeLeadingWhitespace
+      encodingPolicy: EscapeLeadingWhitespace
   ): String {
     return encodeUnderscores(StringBuilder(), value.toLong(), language).toString()
   }
@@ -95,7 +95,7 @@ internal object LiteralLong : LiteralFormat<Long>() {
   override fun encode(
       value: Long,
       language: Language,
-      escapeLeadingWhitespace: EscapeLeadingWhitespace
+      encodingPolicy: EscapeLeadingWhitespace
   ): String {
     val buffer = encodeUnderscores(StringBuilder(), value, language)
     buffer.append('L')
@@ -118,7 +118,7 @@ internal object LiteralString : LiteralFormat<String>() {
   override fun encode(
       value: String,
       language: Language,
-      escapeLeadingWhitespace: EscapeLeadingWhitespace
+      encodingPolicy: EscapeLeadingWhitespace
   ): String =
       if (value.indexOf('\n') == -1)
           when (language) {
@@ -137,8 +137,8 @@ internal object LiteralString : LiteralFormat<String>() {
             // https://github.com/diffplug/selfie/issues/105
             Language.GROOVY,
             Language.JAVA_PRE15 -> encodeSingleJava(value)
-            Language.JAVA -> encodeMultiJava(value, escapeLeadingWhitespace)
-            Language.KOTLIN -> encodeMultiKotlin(value, escapeLeadingWhitespace)
+            Language.JAVA -> encodeMultiJava(value, encodingPolicy)
+            Language.KOTLIN -> encodeMultiKotlin(value, encodingPolicy)
           }
   override fun parse(str: String, language: Language): String =
       if (!str.startsWith(TRIPLE_QUOTE))
@@ -330,7 +330,7 @@ internal object LiteralBoolean : LiteralFormat<Boolean>() {
   override fun encode(
       value: Boolean,
       language: Language,
-      escapeLeadingWhitespace: EscapeLeadingWhitespace
+      encodingPolicy: EscapeLeadingWhitespace
   ): String {
     return value.toString()
   }
@@ -350,7 +350,7 @@ internal object LiteralTodoStub : LiteralFormat<TodoStub>() {
   override fun encode(
       value: TodoStub,
       language: Language,
-      escapeLeadingWhitespace: EscapeLeadingWhitespace
+      encodingPolicy: EscapeLeadingWhitespace
   ) = throw UnsupportedOperationException()
   override fun parse(str: String, language: Language) = throw UnsupportedOperationException()
   fun createLiteral(kind: TodoStub) = LiteralValue(null, kind, LiteralTodoStub)
