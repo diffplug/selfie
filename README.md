@@ -22,9 +22,10 @@ JVM only for now, [python](https://github.com/diffplug/selfie/issues/170) is in 
 
 - [Installation](https://selfie.dev/jvm/get-started#installation)
 - [Quickstart](https://selfie.dev/jvm/get-started#quickstart)
-- [Advanced usage](https://selfie.dev/jvm/advanced)
+- [Facets](https://selfie.dev/jvm/facets)
+- [Caching / memoizing](https://selfie.dev/jvm/cache)
+- [Why selfie](https://selfie.dev/jvm)
 - [API reference](https://kdoc.selfie.dev/)
-
 
 ## Contributing
 

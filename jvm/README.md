@@ -1,7 +1,8 @@
 # Selfie snapshot testing for Java, Kotlin, and the JVM
 
 - [Quickstart](https://selfie.dev/jvm/get-started)
-- [Advanced](https://selfie.dev/jvm/advanced)
+- [Facets](https://selfie.dev/jvm/facets)
+- [Caching / memoizing](https://selfie.dev/jvm/cache)
 - [Why selfie](https://selfie.dev/jvm)
 
 ## Contributing
