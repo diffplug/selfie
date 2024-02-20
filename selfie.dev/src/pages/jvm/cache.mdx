@@ -6,7 +6,7 @@ export const imageUrl = "https://selfie.dev/cache.webp";
 
 <DocsImage imgAbsoluteUrl={imageUrl} />
 
-*Generative AI example available [here](https://github.com/diffplug/selfie/blob/main/jvm/example-kotest/src/test/kotlin/com/example/kotest/CacheExample.kt).*
+*`cacheSelfie` helps you build fast deterministic tests even if they contain slow non-deterministic components. A generative AI example is available [here](https://github.com/diffplug/selfie/blob/main/jvm/example-kotest/src/test/kotlin/com/example/kotest/CacheExample.kt).*
 
 To use `expectSelfie`, you pass a *value* that you want to snapshot.
 
@@ -23,8 +23,6 @@ cacheSelfie(() -> customer.firstName).toBe("Fred")
 When selfie is in read mode, it can ignore the function and just return the value within the `toBe` call. When selfie is in write mode, it calls the function and sets the snapshot to that result.
 
 You control whether a given value is being read or written using the `_TODO`, `//selfieonce`, `//SELFIEWRITE` mechanism described in the [quickstart](./get-started#quickstart).
-If you're familiar with Jupyter or IPython, it has the same benefits and hazards as the "cell-based" execution model ([todo: can we do better than this?](https://github.com/diffplug/selfie/issues/237)).
-
 
 ## Benefits and hazards
 
@@ -37,7 +35,9 @@ var brittleAssumption = cacheSelfie(() -> expensiveOperation()).toBe("sand")
 buildStuffOn(brittleAssumption)
 ```
 
-Perhaps the `toBe` snapshot was recorded a year ago, and the `expensiveOperation` has changed since then. Perhaps someone manually edited the recorded snapshot, and `expensiveOperation` has never returned a value anything like that snapshot. ***The function being cached is not being tested.***
+Perhaps the `toBe` snapshot was recorded a year ago, and the `expensiveOperation` has changed since then. Perhaps someone manually edited the recorded snapshot, and `expensiveOperation` has never returned a value anything like the snapshot. ***The function being cached is not being tested.***
+
+If you have a test with multiple `cacheSelfie` calls, avoid using `_TODO`. You can have a situation where you recorded the ending of a test, and then later changed the beginning with `_TODO`. The ending won't update itself automatically ([yet](https://github.com/diffplug/selfie/issues/237)), so you might cache an inconsistent state. You can avoid this problem by only using `//selfieonce` and `//SELFIEWRITE`.
 
 ## Strings and binary
 
