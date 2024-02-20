@@ -207,22 +207,6 @@ class ArrayMap<K : Comparable<K>, V : Any>(private val data: Array<Any>) : Map<K
   }
   override fun hashCode(): Int = entries.hashCode()
   override fun toString() = this.toMutableMap().toString()
-  fun minusOrNoOp(key: K, value: V): ArrayMap<K, V> {
-    val idxExisting = dataAsKeys.binarySearch(key)
-    if (idxExisting >= 0) {
-      val existingValue = data[idxExisting * 2 + 1] as V
-      if (value == existingValue) {
-        return minusSortedIndices(listOf(idxExisting))
-      }
-    }
-    return this
-  }
-  fun minusOrNoOp(key: K): ArrayMap<K, V> {
-    val idxExisting = dataAsKeys.binarySearch(key)
-    return if (idxExisting >= 0) {
-      minusSortedIndices(listOf(idxExisting))
-    } else this
-  }
 
   companion object {
     private val EMPTY = ArrayMap<String, Any>(arrayOf())
