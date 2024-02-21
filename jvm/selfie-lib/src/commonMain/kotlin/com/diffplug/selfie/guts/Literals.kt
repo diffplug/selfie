@@ -220,7 +220,7 @@ internal object LiteralString : LiteralFormat<String>() {
   fun encodeMultiJava(arg: String, escapeLeadingWhitespace: EscapeLeadingWhitespace): String {
     val escapeBackslashes = arg.replace("\\", "\\\\")
     val escapeTripleQuotes = escapeBackslashes.replace(TRIPLE_QUOTE, "\\\"\\\"\\\"")
-    val protectWhitespace =
+    var protectWhitespace =
         escapeTripleQuotes.lines().joinToString("\n") { line ->
           val protectTrailingWhitespace =
               if (line.endsWith(" ")) {
@@ -230,6 +230,27 @@ internal object LiteralString : LiteralFormat<String>() {
               } else line
           escapeLeadingWhitespace.escapeLine(protectTrailingWhitespace, "\\s", "\\t")
         }
+    val commonPrefix =
+        protectWhitespace
+            .lines()
+            .mapNotNull { line ->
+              if (line.isNotBlank()) line.takeWhile { it.isWhitespace() } else null
+            }
+            .minOrNull() ?: ""
+    if (commonPrefix.isNotEmpty()) {
+      val lines = protectWhitespace.lines()
+      val last = lines.last()
+      protectWhitespace =
+          lines.joinToString("\n") { line ->
+            if (line === last) {
+              if (line.startsWith(" ")) "\\s${line.drop(1)}"
+              else if (line.startsWith("\t")) "\\t${line.drop(1)}"
+              else
+                  throw UnsupportedOperationException(
+                      "How did it end up with a common whitespace prefix?")
+            } else line
+          }
+    }
     return "$TRIPLE_QUOTE\n$protectWhitespace$TRIPLE_QUOTE"
   }
   private val charLiteralRegex = """\$\{'(\\?.)'\}""".toRegex()
