@@ -1,0 +1,32 @@
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - 'python/**'
+defaults:
+  run:
+    working-directory: python/selfie-lib
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - run: pipx install poetry
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: 'python/selfie-lib/pyproject.toml'
+          cache: 'poetry'
+      - run: poetry install
+      - run: poetry run pytest -vv
+      - run: poetry run pyright
+      - run: poetry run ruff check
