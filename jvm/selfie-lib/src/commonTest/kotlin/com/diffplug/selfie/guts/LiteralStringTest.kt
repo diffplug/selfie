@@ -49,7 +49,7 @@ class LiteralStringTest {
     encodeMultiJava("  leading\ntrailing  ", "'''\n" + "\\s leading\n" + "trailing \\s'''")
   }
   private fun encodeMultiJava(value: String, expected: String) {
-    val actual = LiteralString.encodeMultiJava(value)
+    val actual = LiteralString.encodeMultiJava(value, EscapeLeadingWhitespace.ALWAYS)
     actual shouldBe expected.replace("'", "\"")
   }
   private val KOTLIN_DOLLAR = "s{'s'}".replace('s', '$')
@@ -60,7 +60,7 @@ class LiteralStringTest {
     encodeMultiKotlin("$", "```$KOTLIN_DOLLAR```")
   }
   private fun encodeMultiKotlin(value: String, expected: String) {
-    val actual = LiteralString.encodeMultiKotlin(value)
+    val actual = LiteralString.encodeMultiKotlin(value, EscapeLeadingWhitespace.ALWAYS)
     actual shouldBe expected.replace("`", "\"")
   }
 

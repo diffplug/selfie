@@ -25,7 +25,7 @@ class LiteralBooleanTest {
     encode(false, "false")
   }
   private fun encode(value: Boolean, expected: String) {
-    val actual = LiteralBoolean.encode(value, Language.JAVA)
+    val actual = LiteralBoolean.encode(value, Language.JAVA, EscapeLeadingWhitespace.ALWAYS)
     actual shouldBe expected
   }
 

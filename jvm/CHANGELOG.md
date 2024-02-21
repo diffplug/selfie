@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 - **Memoization** ([#219](https://github.com/diffplug/selfie/pull/219) implements [#215](https://github.com/diffplug/selfie/issues/215))
-  - like `expectSelfie`, all are available as `Selfie.memoize` or as `suspend fun` in `com.diffplug.selfie.coroutines`. 
+  - like `expectSelfie`, all are available as `Selfie.cacheSelfie` or as `suspend fun` in `com.diffplug.selfie.coroutines`. 
 ```kotlin
 val cachedResult: ByteArray = Selfie.cacheSelfieBinary { dalleJpeg() }.toBeFile("example.jpg")
 val cachedResult: String    = Selfie.cacheSelfie { someString() }.toBe("what it was earlier")
@@ -21,6 +21,8 @@ val cachedResult: T         = Selfie.cacheSelfieJson { anyKotlinxSerializable() 
 val cachedResult: T         = Selfie.cacheSelfieBinarySerializable { anyJavaIoSerializable() }.toMatchDisk()
 ```
 - `toBeBase64` and `toBeFile` for true binary comparison of binary snapshots and facets. ([#224](https://github.com/diffplug/selfie/pull/224))
+- spaces in multiline string literals aren't always escaped. ([#220](https://github.com/diffplug/selfie/issues/220))
+  - if the leading spaces in the string literal match the file's existing indentation
 ### Changed
 - **BREAKING** reordered a class hierarchy for better binary support. ([#221](https://github.com/diffplug/selfie/issues/221))
   - most users won't need to make any changes at all
