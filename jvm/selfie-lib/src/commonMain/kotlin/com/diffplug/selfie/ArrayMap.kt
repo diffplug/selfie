@@ -137,9 +137,6 @@ class ArrayMap<K : Comparable<K>, V : Any>(private val data: Array<Any>) : Map<K
       return insert(idxInsert, key, newValue)
     }
   }
-
-  @Deprecated("Use plusOrNoOpOrReplace instead", ReplaceWith("plusOrNoOpOrReplace(key, newValue)"))
-  fun plusOrReplace(key: K, newValue: V) = plusOrNoOpOrReplace(key, newValue)
   private fun insert(idxInsert: Int, key: K, value: V): ArrayMap<K, V> {
     return when (data.size) {
       0 -> ArrayMap(arrayOf(key, value))
