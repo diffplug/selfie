@@ -1,48 +1,48 @@
+from io import StringIO, BufferedReader, TextIOWrapper
+import io
 
-from typing import Optional, BinaryIO
-from io import StringIO, BufferedReader
-
-class LineTerminatorReader:
-    def __init__(self, reader: BufferedReader):
-        self.reader = reader
+class LineTerminatorReader(BufferedReader):
+    def __init__(self, reader):
+        super().__init__(reader)
         self.unix_newlines = True
 
-    def read(self, size: int = -1) -> str:
-        result = self.reader.read(size)
-        self.unix_newlines = '\r' not in result
-        return result
+    def read(self, size=-1):
+        chunk = super().read(size)
+        if '\r' in chunk:
+            self.unix_newlines = False
+        return chunk
 
-    def read_line(self) -> Optional[str]:
-        line = self.reader.readline()
-        if line == '':
-            return None
-        self.unix_newlines = '\r' not in line
-        return line
+    def read_line(self):
+        line = super().readline()
+        if '\r' in line:
+            self.unix_newlines = False
+        return line.rstrip('\n').rstrip('\r')
 
-    def unix_newlines(self) -> bool:
+    def unix_newlines(self):
         return self.unix_newlines
 
 class LineReader:
-    def __init__(self, reader: BufferedReader):
+    def __init__(self, reader):
         self.reader = LineTerminatorReader(reader)
         self.line_number = 0
 
     @classmethod
-    def for_string(cls, content: str) -> 'LineReader':
+    def for_string(cls, content):
         return cls(StringIO(content))
 
     @classmethod
-    def for_binary(cls, content: bytes) -> 'LineReader':
-        return cls(BufferedReader(content))
+    def for_binary(cls, content):
+        return cls(TextIOWrapper(io.BytesIO(content), encoding='utf-8'))
 
-    def get_line_number(self) -> int:
+    def get_line_number(self):
         return self.line_number
 
-    def read_line(self) -> Optional[str]:
+    def read_line(self):
         line = self.reader.read_line()
-        if line is not None:
+        if line:
             self.line_number += 1
         return line
 
-    def unix_newlines(self) -> bool:
+    def unix_newlines(self):
         return self.reader.unix_newlines()
+
