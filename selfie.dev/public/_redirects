@@ -1,4 +1,4 @@
-/advanced /facets 301
+/jvm/advanced /jvm/facets 301
 /js https://github.com/diffplug/selfie/issues/84
 /js/* https://github.com/diffplug/selfie/issues/84
 /py https://github.com/diffplug/selfie/issues/85
