@@ -21,7 +21,9 @@ import com.diffplug.selfie.Roundtrip
 import com.diffplug.selfie.RoundtripJson
 import com.diffplug.selfie.Snapshot
 import com.diffplug.selfie.StringSelfie
+import com.diffplug.selfie.guts.CallStack
 import com.diffplug.selfie.guts.CoroutineDiskStorage
+import com.diffplug.selfie.guts.DiskStorage
 import kotlin.coroutines.coroutineContext
 
 /**
@@ -29,21 +31,28 @@ import kotlin.coroutines.coroutineContext
  * `com.diffplug.selfie.coroutines` instead of `com.diffplug.selfie.Selfie`. If you want more
  * details, see the [threading details](http://localhost:3000/jvm/kotest#threading-details).
  */
-private suspend fun disk() =
-    coroutineContext[CoroutineDiskStorage]?.disk
-        ?: throw IllegalStateException(
-            """
-      No Kotest test is in progress on this coroutine.
-      If this is a Kotest test, make sure you added `SelfieExtension` to your `AbstractProjectConfig`:
-        +class MyProjectConfig : AbstractProjectConfig() {
-        +  override fun extensions() = listOf(SelfieExtension(this))
-        +}
-      If this is a JUnit test, make the following change:
-        -import com.diffplug.selfie.coroutines.expectSelfie
-        +import com.diffplug.selfie.Selfie.expectSelfie
-      For more info https://selfie.dev/jvm/kotest#selfie-and-coroutines
+private suspend fun disk(): DiskStorage =
+    coroutineContext[CoroutineDiskStorage]?.disk ?: DiskStorageError
+
+private const val WRONG_COROUTINE =
     """
-                .trimIndent())
+No Kotest test is in progress on this coroutine.
+If this is a Kotest test, make sure you added `SelfieExtension` to your `AbstractProjectConfig`:
+  +class MyProjectConfig : AbstractProjectConfig() {
+  +  override fun extensions() = listOf(SelfieExtension(this))
+  +}
+If this is a JUnit test, make the following change:
+  -import com.diffplug.selfie.coroutines.expectSelfie
+  +import com.diffplug.selfie.Selfie.expectSelfie
+For more info https://selfie.dev/jvm/kotest#selfie-and-coroutines
+"""
+
+private object DiskStorageError : DiskStorage {
+  override fun readDisk(sub: String, call: CallStack) = throw IllegalStateException(WRONG_COROUTINE)
+  override fun writeDisk(actual: Snapshot, sub: String, call: CallStack) =
+      throw IllegalStateException(WRONG_COROUTINE)
+  override fun keep(subOrKeepAll: String?) = throw IllegalStateException(WRONG_COROUTINE)
+}
 suspend fun <T> expectSelfie(actual: T, camera: Camera<T>) = expectSelfie(camera.snapshot(actual))
 suspend fun expectSelfie(actual: String) = expectSelfie(Snapshot.of(actual))
 suspend fun expectSelfie(actual: ByteArray) = BinarySelfie(Snapshot.of(actual), disk(), "")
