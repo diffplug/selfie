@@ -11,6 +11,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- The `coroutines` methods used to eagerly throw an exception if they were ever called from anywhere besides a Kotest method. Now they wait until `toMatchDisk()` is called, because they can work just fine anywhere if you use `toBe`. ([#247](https://github.com/diffplug/selfie/pull/247))
 
 ## [2.0.0] - 2024-02-21
 ### Added
