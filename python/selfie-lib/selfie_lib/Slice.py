@@ -1,5 +1,5 @@
-from typing import Optional  
-from typing import Union
+from typing import Optional    # noqa: F401
+from typing import Union  # noqa: F401
 from collections import Counter
 
 class Slice:
