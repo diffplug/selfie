@@ -1,4 +1,6 @@
 from typing import Optional
+from typing import Union
+
 class Slice:
     """Represents a slice of a base string from startIndex to endIndex."""
 
@@ -31,13 +33,17 @@ class Slice:
     def __str__(self):  # type: () -> str
         return self.base[self.startIndex:self.endIndex]
 
-    def sameAs(self, other):  # type: (str) -> bool
-        if len(self) != len(other):
-            return False
-        for i in range(len(self)):
-            if self[i] != other[i]:
+    def sameAs(self, other):  # type: (Union['Slice', str]) -> bool
+        if isinstance(other, Slice):
+            return str(self) == str(other)
+        elif isinstance(other, str):
+            if len(self) != len(other):
                 return False
-        return True
+            for i in range(len(self)):
+                if self[i] != other[i]:
+                    return False
+            return True
+        return False
 
     def indexOf(self, lookingFor, startOffset=0):  # type: (str, int) -> int
         result = self.base.find(lookingFor, self.startIndex + startOffset, self.endIndex)
