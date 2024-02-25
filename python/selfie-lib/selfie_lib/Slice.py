@@ -1,5 +1,6 @@
-from typing import Optional
+from typing import Optional  
 from typing import Union
+from collections import Counter
 
 class Slice:
     """Represents a slice of a base string from startIndex to endIndex."""
@@ -10,7 +11,7 @@ class Slice:
         self.endIndex = endIndex if endIndex is not None else len(base)
 
         assert 0 <= self.startIndex <= self.endIndex <= len(base), "Invalid start or end index"
-
+    
     def __len__(self):  # type: () -> int
         return self.endIndex - self.startIndex
 
@@ -74,6 +75,9 @@ class Slice:
 
     def replaceSelfWith(self, s):  # type: (str) -> str
         return self.base[:self.startIndex] + s + self.base[self.endIndex:]
-
+    
+    def count(self, char):  
+        return Counter(self.base[self.startIndex:self.endIndex])[char]
+    
     def baseLineAtOffset(self, index):  # type: (int) -> int
         return 1 + Slice(self.base, 0, index).count('\n')
