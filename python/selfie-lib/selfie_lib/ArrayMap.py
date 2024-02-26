@@ -1,10 +1,6 @@
 from collections.abc import Set, Sequence, Iterator, Mapping
-from typing import TypeVar, List
+from typing import List
 from functools import cmp_to_key
-
-T = TypeVar('T')
-K = TypeVar('K')
-V = TypeVar('V')
 
 class ListBackedSet(Set[T], Sequence[T]):
     def __getitem__(self, index: int) -> T:
