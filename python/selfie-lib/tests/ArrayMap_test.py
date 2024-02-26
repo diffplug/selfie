@@ -81,3 +81,45 @@ def test_multi():
     assertTriple(triple, "1", "one", "2", "two", "3", "three")
     triple = ArrayMap.empty().plus("3", "three").plus("1", "one").plus("2", "two")
     assertTriple(triple, "1", "one", "2", "two", "3", "three")
+
+def test_minus_sorted_indices():
+    initial_map = ArrayMap.empty().plus("1", "one").plus("2", "two").plus("3", "three").plus("4", "four")
+    modified_map = initial_map.minus_sorted_indices([1, 3])
+    assert len(modified_map) == 2
+    assert list(modified_map.keys()) == ["1", "3"]
+    assert list(modified_map.values()) == ["one", "three"]
+    with pytest.raises(KeyError):
+        _ = modified_map["2"]
+    with pytest.raises(KeyError):
+        _ = modified_map["4"]
+    assert modified_map == {"1": "one", "3": "three"}
+
+def test_plus_with_existing_keys():
+    map_with_duplicates = ArrayMap.empty().plus("a", "alpha").plus("b", "beta")
+    with pytest.raises(ValueError):
+        map_with_duplicates.plus("a", "new alpha")
+    updated_map = map_with_duplicates.plus("c", "gamma")
+    assert len(updated_map) == 3
+    assert updated_map["a"] == "alpha"
+    assert updated_map["b"] == "beta"
+    assert updated_map["c"] == "gamma"
+    modified_map = map_with_duplicates.minus_sorted_indices([0]).plus("a", "updated alpha")
+    assert len(modified_map) == 2
+    assert modified_map["a"] == "updated alpha"
+    assert modified_map["b"] == "beta"
+
+def test_map_length():
+    map = ArrayMap.empty()
+    assert len(map) == 0, "Length should be 0 for an empty map"
+    map = map.plus("key1", "value1")
+    assert len(map) == 1, "Length should be 1 after adding one item"
+    map = map.plus("key2", "value2")
+    assert len(map) == 2, "Length should be 2 after adding another item"
+    map = map.plus("key3", "value3")
+    assert len(map) == 3, "Length should be 3 after adding a third item"
+    map = map.minus_sorted_indices([1])
+    assert len(map) == 2, "Length should be 2 after removing one item"
+    map = map.minus_sorted_indices([0]) 
+    assert len(map) == 1, "Length should be 1 after removing another item"
+    map = map.minus_sorted_indices([0])  
+    assert len(map) == 0, "Length should be 0 after removing all items"
