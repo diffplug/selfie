@@ -1,38 +1,37 @@
 from collections.abc import Set, Sequence, Iterator, Mapping
-from typing import List
+from typing import List, TypeVar, Union, overload, Sequence as TypeSequence
 from functools import cmp_to_key
 
+T = TypeVar('T')
+K = TypeVar('K')
+V = TypeVar('V')
+
 class ListBackedSet(Set[T], Sequence[T]):
-    def __getitem__(self, index: int) -> T:
-        # This method should be implemented by the subclass.
-        raise NotImplementedError
+    def __init__(self):
+        self._list: List[T] = []
+
+    @overload
+    def __getitem__(self, index: int) -> T: ...
+    
+    @overload
+    def __getitem__(self, index: slice) -> TypeSequence[T]: ...
+
+    def __getitem__(self, index: Union[int, slice]) -> Union[T, TypeSequence[T]]:
+        if isinstance(index, int):
+            return self._list[index]
+        elif isinstance(index, slice):
+            return self._list[index]
+        else:
+            raise TypeError("Index must be int or slice")
 
     def __len__(self) -> int:
-        # This should also be implemented by the subclass to return the number of items.
-        raise NotImplementedError
+        return len(self._list)
 
     def __iter__(self) -> Iterator[T]:
-        return self.ListBackedSetIterator(self)
-
-    class ListBackedSetIterator(Iterator[T]):
-        def __init__(self, list_backed_set: 'ListBackedSet[T]'):
-            self.list_backed_set = list_backed_set
-            self.index = 0
-
-        def __next__(self) -> T:
-            if self.index < len(self.list_backed_set):
-                result = self.list_backed_set[self.index]
-                self.index += 1
-                return result
-            else:
-                raise StopIteration
+        return iter(self._list)
 
     def __contains__(self, item: object) -> bool:
-        # Efficient implementation of __contains__ should be provided by subclass if needed.
-        for i in self:
-            if i == item:
-                return True
-        return False
+        return item in self._list
 
 class ArraySet(ListBackedSet[K]):
     def __init__(self, data: list):
@@ -46,7 +45,6 @@ class ArraySet(ListBackedSet[K]):
             self.data.sort()
 
     def string_slash_first_comparator(self, a, b):
-        # Define sorting where '/' is considered the lowest key
         if a == '/':
             return -1
         elif b == '/':
@@ -57,35 +55,37 @@ class ArraySet(ListBackedSet[K]):
     def __len__(self):
         return len(self.data)
 
-    def __getitem__(self, index: int) -> K:
-        return self.data[index]
+    @overload
+    def __getitem__(self, index: int) -> K: ...
 
-    def __contains__(self, item: K) -> bool:
-        # Implementing binary search for efficiency
-        left, right = 0, len(self.data) - 1
-        while left <= right:
-            mid = (left + right) // 2
-            if self.data[mid] == item:
-                return True
-            elif self.data[mid] < item:
-                left = mid + 1
-            else:
-                right = mid - 1
-        return False
+    @overload
+    def __getitem__(self, index: slice) -> 'ArraySet[K]': ...
+
+    def __getitem__(self, index: Union[int, slice]) -> Union[K, 'ArraySet[K]']:
+        if isinstance(index, int):
+            return self.data[index]
+        elif isinstance(index, slice):
+            sliced_data = self.data[index]
+            return ArraySet(sliced_data)
+        else:
+            raise TypeError("Index must be int or slice")
+
+    def __contains__(self, item: object) -> bool:
+        if not isinstance(item, type(self.data[0])):
+            return False
+        return super().__contains__(item)
 
     def plus_or_this(self, key: K) -> 'ArraySet[K]':
-        # Binary search to find the appropriate index or confirm existence
         left, right = 0, len(self.data) - 1
         while left <= right:
             mid = (left + right) // 2
             if self.data[mid] == key:
-                return self  # Key already exists
+                return self 
             elif self.data[mid] < key:
                 left = mid + 1
             else:
                 right = mid - 1
 
-        # Key does not exist, insert in the sorted position
         new_data = self.data[:left] + [key] + self.data[left:]
         return ArraySet(new_data)
 
