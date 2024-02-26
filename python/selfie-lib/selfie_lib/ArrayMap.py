@@ -3,8 +3,14 @@ from typing import List, TypeVar, Union, overload, Sequence as TypeSequence
 from functools import cmp_to_key
 
 T = TypeVar('T')
-K = TypeVar('K')
 V = TypeVar('V')
+K = TypeVar('K', bound='Comparable')
+
+class Comparable:
+    def __lt__(self, other: 'Comparable') -> bool: ...
+    def __le__(self, other: 'Comparable') -> bool: ...
+    def __gt__(self, other: 'Comparable') -> bool: ...
+    def __ge__(self, other: 'Comparable') -> bool: ...
 
 class ListBackedSet(Set[T], Sequence[T]):
     def __init__(self):
@@ -34,7 +40,7 @@ class ListBackedSet(Set[T], Sequence[T]):
         return item in self._list
 
 class ArraySet(ListBackedSet[K]):
-    def __init__(self, data: list):
+    def __init__(self, data: List[K]):
         self.data = data
         self.sort_data()
 
