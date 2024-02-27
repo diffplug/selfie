@@ -1,58 +1,54 @@
-from typing import Optional, Union
-from io import TextIOWrapper, StringIO, BytesIO, BufferedReader
+import io
 
-class LineTerminatorReader:
-    """
-    Reads from an underlying buffer and detects Unix-style newlines.
-    """
-    def __init__(self, reader: Union[TextIOWrapper, BufferedReader, StringIO, BytesIO]) -> None:
-        # Wrap the reader appropriately based on its type
-        if isinstance(reader, (StringIO, BytesIO)):
-            self.reader: Union[StringIO, BytesIO] = reader
-        elif isinstance(reader, (TextIOWrapper, BufferedReader)):
-            self.reader = reader
-        else:
-            raise ValueError("Unsupported reader type")
-        self.unix_newlines: bool = True
+class LineTerminatorAware(io.BufferedReader):
+    def __init__(self, buffer):
+        super().__init__(buffer)
+        self.first_line = self.readline()
+        self.unix_newlines = True
 
-    def read(self, size: int = -1) -> str:
-        chunk: str = self.reader.read(size)
-        if '\r' in chunk:
-            self.unix_newlines = False
-        return chunk
-
-    def readline(self) -> Optional[str]:
-        line: str = self.reader.readline()
-        if '\r' in line:
-            self.unix_newlines = False
-        return line.strip('\r\n')
-
-    def unix_newlines(self) -> bool:
-        return self.unix_newlines
+    def readline(self, *args, **kwargs):
+        if self.first_line is not None:
+            result = self.first_line
+            self.first_line = None
+            return result
+        return super().readline(*args, **kwargs)
 
 class LineReader:
-    """
-    Facilitates reading lines from a string or binary content, detecting newline style.
-    """
-    def __init__(self, source: Union[str, bytes]) -> None:
-        if isinstance(source, str):
-            reader = StringIO(source)
-        elif isinstance(source, bytes):
-            reader = BytesIO(source)
-        else:
-            raise ValueError("Source must be either 'str' or 'bytes'.")
-        self.terminator_reader: LineTerminatorReader = LineTerminatorReader(reader)
+    def __init__(self, reader):
+        self.reader = LineTerminatorAware(LineTerminatorReader(reader))
 
     @classmethod
-    def for_string(cls, content: str) -> 'LineReader':
-        return cls(content)
+    def for_string(cls, content):
+        return cls(io.StringIO(content))
 
     @classmethod
-    def for_binary(cls, content: bytes) -> 'LineReader':
-        return cls(content)
+    def for_binary(cls, content):
+        return cls(io.BytesIO(content).read().decode('utf-8'))
 
-    def read_line(self) -> Optional[str]:
-        return self.terminator_reader.readline()
+    def get_line_number(self):
+        # Python's io module does not track line numbers directly.
+        # This functionality would need to be implemented manually if required.
+        pass
 
-    def unix_newlines(self) -> bool:
-        return self.terminator_reader.unix_newlines()
+    def read_line(self):
+        return self.reader.readline()
+
+    def unix_newlines(self):
+        return self.reader.unix_newlines
+
+class LineTerminatorReader(io.StringIO):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.unix_newlines = True
+
+    def read(self, *args, **kwargs):
+        result = super().read(*args, **kwargs)
+        if '\r' in result:
+            self.unix_newlines = False
+        return result
+
+    def readline(self, *args, **kwargs):
+        line = super().readline(*args, **kwargs)
+        if '\r' in line:
+            self.unix_newlines = False
+        return line
