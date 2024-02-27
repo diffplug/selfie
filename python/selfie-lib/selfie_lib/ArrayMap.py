@@ -41,16 +41,16 @@ class ListBackedSet(Set[T], Sequence[T]):
 
 class ArraySet(ListBackedSet[K]):
     def __init__(self, data: List[K]):
-        self.data = data
-        self.sort_data()
+        self.__data = data 
+        self.__sort_data() 
 
-    def sort_data(self):
-        if self.data and isinstance(self.data[0], str):
-            self.data.sort(key=cmp_to_key(self.string_slash_first_comparator))
+    def __sort_data(self):
+        if self.__data and isinstance(self.__data[0], str):
+            self.__data.sort(key=cmp_to_key(self.__string_slash_first_comparator))
         else:
-            self.data.sort()
+            self.__data.sort()
 
-    def string_slash_first_comparator(self, a, b):
+    def __string_slash_first_comparator(self, a, b):
         if a == '/':
             return -1
         elif b == '/':
@@ -59,7 +59,7 @@ class ArraySet(ListBackedSet[K]):
             return (a > b) - (a < b)
 
     def __len__(self):
-        return len(self.data)
+        return len(self.__data)
 
     @overload
     def __getitem__(self, index: int) -> K: ...
@@ -69,30 +69,30 @@ class ArraySet(ListBackedSet[K]):
 
     def __getitem__(self, index: Union[int, slice]) -> Union[K, 'ArraySet[K]']:
         if isinstance(index, int):
-            return self.data[index]
+            return self.__data[index]
         elif isinstance(index, slice):
-            sliced_data = self.data[index]
+            sliced_data = self.__data[index]
             return ArraySet(sliced_data)
         else:
             raise TypeError("Index must be int or slice")
 
     def __contains__(self, item: object) -> bool:
-        if not isinstance(item, type(self.data[0])):
+        if not isinstance(item, type(self.__data[0])):
             return False
-        return super().__contains__(item)
+        return item in self.__data 
 
     def plus_or_this(self, key: K) -> 'ArraySet[K]':
-        left, right = 0, len(self.data) - 1
+        left, right = 0, len(self.__data) - 1
         while left <= right:
             mid = (left + right) // 2
-            if self.data[mid] == key:
-                return self 
-            elif self.data[mid] < key:
+            if self.__data[mid] == key:
+                return self
+            elif self.__data[mid] < key:
                 left = mid + 1
             else:
                 right = mid - 1
 
-        new_data = self.data[:left] + [key] + self.data[left:]
+        new_data = self.__data[:left] + [key] + self.__data[left:]
         return ArraySet(new_data)
 
 class ArrayMap(Mapping[K, V]):
