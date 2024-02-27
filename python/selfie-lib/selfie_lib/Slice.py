@@ -1,29 +1,30 @@
-from typing import Optional    # noqa: F401
-from typing import Union  # noqa: F401
+from typing import Optional  
+from typing import Union  
 from collections import Counter
 
 class Slice:
     """Represents a slice of a base string from startIndex to endIndex."""
 
-    def __init__(self, base, startIndex=0, endIndex=None):  # type: (str, int, Optional[int]) -> None
+    def __init__(self, base: str, startIndex: int = 0, endIndex: Optional[int] = None) -> None:
+        self.base = base
         self.base = base
         self.startIndex = startIndex
         self.endIndex = endIndex if endIndex is not None else len(base)
 
         assert 0 <= self.startIndex <= self.endIndex <= len(base), "Invalid start or end index"
     
-    def __len__(self):  # type: () -> int
+    def __len__(self) -> int:
         return self.endIndex - self.startIndex
 
-    def __getitem__(self, index):  # type: (int) -> str
+    def __getitem__(self, index: int) -> str:
         if not (0 <= index < len(self)):
             raise IndexError("Index out of range")
         return self.base[self.startIndex + index]
 
-    def subSequence(self, start, end):  # type: (int, int) -> 'Slice'
+    def subSequence(self, start: int, end: int) -> 'Slice':
         return Slice(self.base, self.startIndex + start, self.startIndex + end)
 
-    def trim(self):  # type: () -> 'Slice'
+    def trim(self) -> 'Slice':
         start, end = 0, len(self)
         while start < end and self[start].isspace():
             start += 1
@@ -31,10 +32,10 @@ class Slice:
             end -= 1
         return self.subSequence(start, end) if start > 0 or end < len(self) else self
 
-    def __str__(self):  # type: () -> str
+    def __str__(self) -> str:
         return self.base[self.startIndex:self.endIndex]
 
-    def sameAs(self, other):  # type: (Union['Slice', str]) -> bool
+    def sameAs(self, other: Union['Slice', str]) -> bool:
         if isinstance(other, Slice):
             return str(self) == str(other)
         elif isinstance(other, str):
@@ -46,11 +47,11 @@ class Slice:
             return True
         return False
 
-    def indexOf(self, lookingFor, startOffset=0):  # type: (str, int) -> int
+    def indexOf(self, lookingFor: str, startOffset: int = 0) -> int:
         result = self.base.find(lookingFor, self.startIndex + startOffset, self.endIndex)
         return -1 if result == -1 else result - self.startIndex
 
-    def unixLine(self, count):  # type: (int) -> 'Slice'
+    def unixLine(self, count: int) -> 'Slice':
         assert count > 0, "Count must be positive"
         lineStart = 0
         for i in range(1, count):
@@ -60,24 +61,24 @@ class Slice:
         lineEnd = self.indexOf('\n', lineStart)
         return Slice(self.base, self.startIndex + lineStart, self.endIndex if lineEnd == -1 else self.startIndex + lineEnd)
 
-    def __eq__(self, other):  # type: (object) -> bool
+    def __eq__(self, other: object) -> bool:
         if self is other:
             return True
         if isinstance(other, Slice):
             return self.sameAs(other)
         return False
 
-    def __hash__(self):  # type: () -> int
+    def __hash__(self) -> int:
         h = 0
         for i in range(len(self)):
             h = 31 * h + ord(self[i])
         return h
 
-    def replaceSelfWith(self, s):  # type: (str) -> str
+    def replaceSelfWith(self, s: str) -> str:
         return self.base[:self.startIndex] + s + self.base[self.endIndex:]
     
-    def count(self, char):  
+    def count(self, char: str) -> int:
         return Counter(self.base[self.startIndex:self.endIndex])[char]
     
-    def baseLineAtOffset(self, index):  # type: (int) -> int
+    def baseLineAtOffset(self, index: int) -> int:
         return 1 + Slice(self.base, 0, index).count('\n')
