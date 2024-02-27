@@ -1,59 +1,58 @@
 from typing import Optional, Union
-import io
+from io import TextIOWrapper, StringIO, BytesIO, BufferedReader
 
-class LineTerminatorReader(io.BufferedReader):
-    """Overrides read operations to detect carriage returns."""
-    def __init__(self, reader: io.TextIOWrapper) -> None:
-        super().__init__(reader.buffer)
-        self._unix_newlines = True
+class LineTerminatorReader:
+    """
+    Reads from an underlying buffer and detects Unix-style newlines.
+    """
+    def __init__(self, reader: Union[TextIOWrapper, BufferedReader, StringIO, BytesIO]) -> None:
+        # Wrap the reader appropriately based on its type
+        if isinstance(reader, (StringIO, BytesIO)):
+            self.reader: Union[StringIO, BytesIO] = reader
+        elif isinstance(reader, (TextIOWrapper, BufferedReader)):
+            self.reader = reader
+        else:
+            raise ValueError("Unsupported reader type")
+        self.unix_newlines: bool = True
 
-    def read(self, size: int = -1) -> bytes:
-        chunk = super().read(size)
-        if b'\r' in chunk:
-            self._unix_newlines = False
+    def read(self, size: int = -1) -> str:
+        chunk: str = self.reader.read(size)
+        if '\r' in chunk:
+            self.unix_newlines = False
         return chunk
 
+    def readline(self) -> Optional[str]:
+        line: str = self.reader.readline()
+        if '\r' in line:
+            self.unix_newlines = False
+        return line.strip('\r\n')
+
     def unix_newlines(self) -> bool:
-        """Check if the newlines are Unix style."""
-        return self._unix_newlines
-
-class LineTerminatorAware(io.TextIOWrapper):
-    """Keeps track of the first line to determine newline style."""
-    def __init__(self, reader: LineTerminatorReader) -> None:
-        super().__init__(reader, encoding='utf-8')
-        self._first_line: Optional[str] = self.readline()
-
-    def readline(self, limit: int = -1) -> str:
-        if self._first_line is not None:
-            result, self._first_line = self._first_line, None
-            return result
-        return super().readline(limit)
+        return self.unix_newlines
 
 class LineReader:
-    """A reader that is aware of line terminators and line numbers."""
-    def __init__(self, reader: Union[io.StringIO, io.BufferedReader]) -> None:
-        self._reader = LineTerminatorAware(LineTerminatorReader(reader))
+    """
+    Facilitates reading lines from a string or binary content, detecting newline style.
+    """
+    def __init__(self, source: Union[str, bytes]) -> None:
+        if isinstance(source, str):
+            reader = StringIO(source)
+        elif isinstance(source, bytes):
+            reader = BytesIO(source)
+        else:
+            raise ValueError("Source must be either 'str' or 'bytes'.")
+        self.terminator_reader: LineTerminatorReader = LineTerminatorReader(reader)
 
-    @staticmethod
-    def for_string(content: str) -> 'LineReader':
-        """Create a LineReader for string content."""
-        return LineReader(io.StringIO(content))
+    @classmethod
+    def for_string(cls, content: str) -> 'LineReader':
+        return cls(content)
 
-    @staticmethod
-    def for_binary(content: bytes) -> 'LineReader':
-        """Create a LineReader for binary content."""
-        return LineReader(io.BufferedReader(io.BytesIO(content)))
-
-    def get_line_number(self) -> int:
-        """Get the current line number."""
-        # Assuming a way to track line numbers or using a wrapper that does.
-        # This is a placeholder as Python's io does not provide a direct lineno attribute.
-        return 0
+    @classmethod
+    def for_binary(cls, content: bytes) -> 'LineReader':
+        return cls(content)
 
     def read_line(self) -> Optional[str]:
-        """Read the next line from the reader."""
-        return self._reader.readline()
+        return self.terminator_reader.readline()
 
     def unix_newlines(self) -> bool:
-        """Check if the reader uses Unix newlines."""
-        return self._reader.unix_newlines()
+        return self.terminator_reader.unix_newlines()
