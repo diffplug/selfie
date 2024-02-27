@@ -1,8 +1,5 @@
 from selfie_lib import LineReader
 
-# Assuming the LineReader class is defined as previously translated
-# Adjustments may be needed if the LineReader implementation differs
-
 def test_should_find_unix_separator_from_binary():
     reader = LineReader.for_binary(b"This is a new line\n")
     assert reader.unix_newlines() == True
@@ -20,12 +17,12 @@ def test_should_find_unix_separator_from_string():
 
 def test_should_find_windows_separator_from_string():
     reader = LineReader.for_string("This is a new line\r\n")
-    assert reader.unix_newlines() is False
+    assert reader.unix_newlines() == False
     assert reader.read_line() == "This is a new line"
 
 def test_should_get_unix_line_separator_when_there_is_none():
     reader = LineReader.for_binary(b"This is a new line")
-    assert reader.unix_newlines() is True
+    assert reader.unix_newlines() == True
     assert reader.read_line() == "This is a new line"
 
 def test_should_read_next_line_without_problem():
