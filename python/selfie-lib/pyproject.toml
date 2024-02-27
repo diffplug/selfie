@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "selfie-lib"
+version = "0.1.0"
+description = "Infrastructure for creating selfie-compatible test runner plugins."
+authors = ["Ned Twigg <ned.twigg@diffplug.com>"]
+license = "Apache-2.0"
+readme = "../README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.2.1"
+pyright = "^1.1.350"
+pytest = "^8.0.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
