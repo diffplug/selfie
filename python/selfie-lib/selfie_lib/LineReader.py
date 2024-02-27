@@ -1,48 +1,43 @@
+from typing import Optional, Union
 import io
 
-class LineTerminatorAware:
-    def __init__(self, reader):
-        self.reader = reader
-        self.line_number = 0
-        self.unix_newlines = True
-        self.first_line = self.reader.readline()
-        if '\r' in self.first_line:
-            self.unix_newlines = False
-
-    def read_line(self):
-        if self.first_line:
-            line = self.first_line
-            self.first_line = None
-            self.line_number += 1
-            return line
-        line = self.reader.readline()
-        if line:
-            if '\r' in line:
-                self.unix_newlines = False
-            self.line_number += 1
-        return line
-
-    def unix_newlines(self):
-        return self.unix_newlines
-
-
 class LineReader:
-    def __init__(self, reader):
-        self.reader = LineTerminatorAware(reader)
+    """A line reader that is aware of line numbers and can detect Unix-style newlines."""
 
-    @classmethod
-    def for_string(cls, content):
-        return cls(io.StringIO(content))
+    def __init__(self, source: Union[str, bytes]) -> None:
+        # Initialize the reader based on the type of source (string or bytes)
+        if isinstance(source, bytes):
+            self._reader = io.BufferedReader(io.BytesIO(source))
+        else:
+            self._reader = io.StringIO(source)
+        self._line_number = 0
+        self._unix_newlines = True
 
-    @classmethod
-    def for_binary(cls, content):
-        return cls(io.BytesIO(content).read().decode('utf-8'))
+    def read_line(self) -> Optional[str]:
+        """Reads the next line from the source."""
+        line = self._reader.readline()
+        if line:
+            self._line_number += 1
+            # Check for Unix newlines (only '\n' should be present)
+            if '\r' in line:
+                self._unix_newlines = False
+            return line
+        return None
 
-    def get_line_number(self):
-        return self.reader.line_number
+    def get_line_number(self):  # type: () -> int
+        """Returns the current line number."""
+        return self._line_number
 
-    def read_line(self):
-        return self.reader.read_line()
+    def unix_newlines(self):  # type: () -> bool
+        """Checks if the read lines contain only Unix-style newlines."""
+        return self._unix_newlines
 
-    def unix_newlines(self):
-        return self.reader.unix_newlines()
+    @staticmethod
+    def for_string(content: str):  # type: (str) -> LineReader
+        """Creates a LineReader for a string."""
+        return LineReader(content)
+
+    @staticmethod
+    def for_binary(content: bytes):  # type: (bytes) -> LineReader
+        """Creates a LineReader for binary content."""
+        return LineReader(content)
