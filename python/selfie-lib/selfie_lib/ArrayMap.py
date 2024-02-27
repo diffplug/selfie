@@ -62,7 +62,8 @@ class ArraySet(ListBackedSet[K]):
         return len(self.__data)
 
     @overload
-    def __getitem__(self, index: int) -> K: ...
+    def __getitem__(self, index: int) -> K: 
+        return self.__data[index]
 
     @overload
     def __getitem__(self, index: slice) -> 'ArraySet[K]': ...
