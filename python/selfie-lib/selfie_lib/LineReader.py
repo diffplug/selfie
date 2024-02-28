@@ -8,7 +8,7 @@ class LineReader:
         self.buffer = io.BytesIO(content)
         self.uses_unix_newlines = self.detect_newline_type()
 
-    def detect_newline_type(self) -> bool:
+    def __detect_newline_type(self) -> bool:
         first_line = self.buffer.readline()
         # Reset buffer after checking the first line
         self.buffer.seek(0)
