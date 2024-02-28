@@ -1,17 +1,10 @@
 from collections.abc import Set, Sequence, Iterator, Mapping
 from typing import List, TypeVar
-from functools import cmp_to_key
 from abc import ABC, abstractmethod
 
 T = TypeVar('T')
 V = TypeVar('V')
-K = TypeVar('K', bound='Comparable')
-
-class Comparable(ABC):
-    def __lt__(self, other: 'Comparable') -> bool: ...
-    def __le__(self, other: 'Comparable') -> bool: ...
-    def __gt__(self, other: 'Comparable') -> bool: ...
-    def __ge__(self, other: 'Comparable') -> bool: ...
+K = TypeVar('K')
 
 class ListBackedSet(Set[T], Sequence[T], ABC):
     @abstractmethod
@@ -36,18 +29,7 @@ class ArraySet(ListBackedSet[K]):
         self.__sort_data()
 
     def __sort_data(self):
-        if self.__data and isinstance(self.__data[0], Comparable):
-            self.__data.sort(key=cmp_to_key(self.__string_slash_first_comparator))
-        else:
-            self.__data.sort()
-
-    def __string_slash_first_comparator(self, a: K, b: K) -> int:
-        if a == '/':
-            return -1
-        elif b == '/':
-            return 1
-        else:
-            return (a > b) - (a < b)
+        self.__data.sort()
 
     def __len__(self) -> int:
         return len(self.__data)
