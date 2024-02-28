@@ -1,21 +1,17 @@
 from collections.abc import Set, Sequence, Iterator, Mapping
-from typing import List, TypeVar
-from abc import ABC, abstractmethod
+from typing import List, TypeVar, Union
+from abc import abstractmethod
 
 T = TypeVar('T')
 V = TypeVar('V')
 K = TypeVar('K')
 
-class ListBackedSet(Set[T], Sequence[T], ABC):
+class ListBackedSet(Set[T], Sequence[T]):
     @abstractmethod
     def __len__(self) -> int: ...
 
     @abstractmethod
-    def __getitem__(self, index: int) -> T: ...
-
-    def __iter__(self) -> Iterator[T]:
-        for i in range(len(self)):
-            yield self[i]
+    def __getitem__(self, index: Union[int, slice]) -> Union[T, Sequence[T]]: ...
 
     def __contains__(self, item: object) -> bool:
         for i in range(len(self)):
@@ -30,8 +26,13 @@ class ArraySet(ListBackedSet[K]):
     def __len__(self) -> int:
         return len(self.__data)
 
-    def __getitem__(self, index: int) -> K:
-        return self.__data[index]
+    def __getitem__(self, index: Union[int, slice]) -> Union[K, List[K]]:
+        if isinstance(index, int):
+            return self.__data[index]
+        elif isinstance(index, slice):
+            return self.__data[index]
+        else:
+            raise TypeError("Invalid argument type.")
 
 class ArrayMap(Mapping[K, V]):
     def __init__(self, data: list):
