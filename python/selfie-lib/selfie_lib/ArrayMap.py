@@ -23,7 +23,12 @@ class ArraySet(ListBackedSet[K]):
     __empty_set = None
 
     def __init__(self, data: List[K]):
-        self.__data = data
+        self.__data = []
+        for item in data:
+            self.plusOrThis(item)
+
+    def __iter__(self) -> Iterator[K]:
+        return iter(self.__data)
 
     @classmethod
     def empty(cls) -> 'ArraySet[K]':
@@ -41,11 +46,18 @@ class ArraySet(ListBackedSet[K]):
             return self.__data[index]
         else:
             raise TypeError("Invalid argument type.")
-        
+
     def plusOrThis(self, element: K) -> 'ArraySet[K]':
-        if element not in self.__data:
-            self.__data.append(element)
-        return self
+        new_data = []
+        added = False
+        for item in self.__data:
+            if not added and element < item:
+                new_data.append(element)
+                added = True
+            new_data.append(item)
+        if not added:
+            new_data.append(element)
+        return ArraySet(new_data)
 
 class ArrayMap(Mapping[K, V]):
     __empty_map = None
