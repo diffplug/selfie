@@ -26,10 +26,6 @@ class ListBackedSet(Set[T], Sequence[T], ABC):
 class ArraySet(ListBackedSet[K]):
     def __init__(self, data: List[K]):
         self.__data = data
-        self.__sort_data()
-
-    def __sort_data(self):
-        self.__data.sort()
 
     def __len__(self) -> int:
         return len(self.__data)
