@@ -25,7 +25,7 @@ class ArraySet(ListBackedSet[K]):
     def __init__(self, data: List[K]):
         self.__data = []
         for item in data:
-            self.plusOrThis(item)
+            self.__plusOrThis(item)
 
     def __iter__(self) -> Iterator[K]:
         return iter(self.__data)
@@ -47,7 +47,7 @@ class ArraySet(ListBackedSet[K]):
         else:
             raise TypeError("Invalid argument type.")
 
-    def plusOrThis(self, element: K) -> 'ArraySet[K]':
+    def __plusOrThis(self, element: K) -> 'ArraySet[K]':
         new_data = []
         added = False
         for item in self.__data:
