@@ -1,4 +1,4 @@
-from collections.abc import Set, Sequence, Iterator, Mapping
+from collections.abc import Set, Iterator, Mapping
 from typing import List, TypeVar, Union
 from abc import abstractmethod
 
@@ -6,12 +6,12 @@ T = TypeVar('T')
 V = TypeVar('V')
 K = TypeVar('K')
 
-class ListBackedSet(Set[T], Sequence[T]):
+class ListBackedSet(Set[T]):
     @abstractmethod
     def __len__(self) -> int: ...
 
     @abstractmethod
-    def __getitem__(self, index: Union[int, slice]) -> Union[T, Sequence[T]]: ...
+    def __getitem__(self, index: Union[int, slice]) -> Union[T, List[T]]: ...
 
     def __contains__(self, item: object) -> bool:
         for i in range(len(self)):
