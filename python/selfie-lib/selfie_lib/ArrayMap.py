@@ -1,12 +1,12 @@
 from collections.abc import Set, Iterator, Mapping
 from typing import List, TypeVar, Union
-from abc import abstractmethod
+from abc import abstractmethod, ABC
 
 T = TypeVar('T')
 V = TypeVar('V')
 K = TypeVar('K')
 
-class ListBackedSet(Set[T]):
+class ListBackedSet(Set[T], ABC):
     @abstractmethod
     def __len__(self) -> int: ...
 
@@ -20,8 +20,16 @@ class ListBackedSet(Set[T]):
         return False
 
 class ArraySet(ListBackedSet[K]):
+    __empty_set = None
+
     def __init__(self, data: List[K]):
         self.__data = data
+
+    @classmethod
+    def empty(cls) -> 'ArraySet[K]':
+        if cls.__empty_set is None:
+            cls.__empty_set = cls([])
+        return cls.__empty_set
 
     def __len__(self) -> int:
         return len(self.__data)
@@ -33,32 +41,41 @@ class ArraySet(ListBackedSet[K]):
             return self.__data[index]
         else:
             raise TypeError("Invalid argument type.")
+        
+    def plusOrThis(self, element: K) -> 'ArraySet[K]':
+        if element not in self.__data:
+            self.__data.append(element)
+        return self
 
 class ArrayMap(Mapping[K, V]):
+    __empty_map = None
+
     def __init__(self, data: list):
-        self.data = data
+        self.__data = data
 
     @classmethod
-    def empty(cls):
-        return cls([])
+    def empty(cls) -> 'ArrayMap[K, V]':
+        if cls.__empty_map is None:
+            cls.__empty_map = cls([])
+        return cls.__empty_map
 
     def __getitem__(self, key: K) -> V:
-        index = self._binary_search_key(key)
+        index = self.__binary_search_key(key)
         if index >= 0:
-            return self.data[2 * index + 1]
+            return self.__data[2 * index + 1]
         raise KeyError(key)
 
     def __iter__(self) -> Iterator[K]:
-        return (self.data[i] for i in range(0, len(self.data), 2))
+        return (self.__data[i] for i in range(0, len(self.__data), 2))
 
     def __len__(self) -> int:
-        return len(self.data) // 2
+        return len(self.__data) // 2
 
-    def _binary_search_key(self, key: K) -> int:
-        low, high = 0, (len(self.data) // 2) - 1
+    def __binary_search_key(self, key: K) -> int: 
+        low, high = 0, (len(self.__data) // 2) - 1
         while low <= high:
             mid = (low + high) // 2
-            mid_key = self.data[2 * mid]
+            mid_key = self.__data[2 * mid]
             if mid_key < key:
                 low = mid + 1
             elif mid_key > key:
@@ -68,11 +85,11 @@ class ArrayMap(Mapping[K, V]):
         return -(low + 1)
 
     def plus(self, key: K, value: V) -> 'ArrayMap[K, V]':
-        index = self._binary_search_key(key)
+        index = self.__binary_search_key(key) 
         if index >= 0:
             raise ValueError("Key already exists")
         insert_at = -(index + 1)
-        new_data = self.data[:]
+        new_data = self.__data[:]
         new_data[insert_at * 2:insert_at * 2] = [key, value]
         return ArrayMap(new_data)
 
@@ -80,7 +97,7 @@ class ArrayMap(Mapping[K, V]):
         if not indicesToRemove:
             return self
         newData = []
-        for i in range(0, len(self.data), 2):
+        for i in range(0, len(self.__data), 2):
             if i // 2 not in indicesToRemove:
-                newData.extend(self.data[i:i + 2])
+                newData.extend(self.__data[i:i + 2])
         return ArrayMap(newData)
