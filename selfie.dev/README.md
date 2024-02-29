@@ -6,7 +6,8 @@ To develop locally, run `npm run dev` and you'll get a local dev server with hot
 
 - JVM homepage, `/jvm` -> [`src/pages/jvm/index.mdx`](src/pages/jvm/index.mdx)
 - JVM get started, `/jvm/get-started` -> [`src/pages/jvm/get-started.mdx`](src/pages/jvm/get-started.mdx)
-- JVM advanced, `/jvm/advanced` edit [`src/pages/jvm/advanced.mdx`](src/pages/jvm/advanced.mdx)
+- JVM facets, `/jvm/facets` edit [`src/pages/jvm/facets.mdx`](src/pages/jvm/facets.mdx)
+- JVM cache, `/jvm/cache` edit [`src/pages/jvm/cache.mdx`](src/pages/jvm/cache.mdx)
 
 ### Deeper interventions
 

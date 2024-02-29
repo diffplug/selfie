@@ -23,10 +23,10 @@ import com.diffplug.selfie.guts.recordCall
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
-class MemoBinary<T>(
+class CacheSelfieBinary<T>(
     private val disk: DiskStorage,
     private val roundtrip: Roundtrip<T, ByteArray>,
-    private val generator: () -> T
+    private val generator: Cacheable<T>
 ) {
   fun toMatchDisk(sub: String = ""): T {
     return toMatchDiskImpl(sub, false)
@@ -37,7 +37,7 @@ class MemoBinary<T>(
   private fun toMatchDiskImpl(sub: String, isTodo: Boolean): T {
     val call = recordCall(false)
     if (Selfie.system.mode.canWrite(isTodo, call, Selfie.system)) {
-      val actual = generator()
+      val actual = generator.get()
       disk.writeDisk(Snapshot.of(roundtrip.serialize(actual)), sub, call)
       if (isTodo) {
         Selfie.system.writeInline(TodoStub.toMatchDisk.createLiteral(), call)
@@ -70,7 +70,7 @@ class MemoBinary<T>(
     val call = recordCall(false)
     val writable = Selfie.system.mode.canWrite(isTodo, call, Selfie.system)
     if (writable) {
-      val actual = generator()
+      val actual = generator.get()
       if (isTodo) {
         Selfie.system.writeInline(TodoStub.toBeFile.createLiteral(), call)
       }
@@ -96,7 +96,7 @@ class MemoBinary<T>(
     val call = recordCall(false)
     val writable = Selfie.system.mode.canWrite(snapshot == null, call, Selfie.system)
     if (writable) {
-      val actual = generator()
+      val actual = generator.get()
       val base64 = Base64.Mime.encode(roundtrip.serialize(actual)).replace("\r", "")
       Selfie.system.writeInline(LiteralValue(snapshot, base64, LiteralString), call)
       return actual

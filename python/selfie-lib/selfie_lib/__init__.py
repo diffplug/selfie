@@ -1,2 +1,3 @@
-from .ned import fizzbuzz as fizzbuzz
-from .harvir import silly_addition as silly_addition
+from .LineReader import LineReader as LineReader
+from .Slice import Slice as Slice
+

@@ -9,7 +9,7 @@ export type LanguageSlug = keyof typeof languageSlugsToLabels;
 
 export type PathParts = {
   language: LanguageSlug;
-  subpath: "" | "get-started" | "advanced";
+  subpath: "" | "get-started" | "facets" | "cache";
   is404: boolean;
 };
 

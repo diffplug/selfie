@@ -45,7 +45,11 @@ enum class Language {
 class LiteralValue<T : Any>(val expected: T?, val actual: T, val format: LiteralFormat<T>)
 
 abstract class LiteralFormat<T : Any> {
-  internal abstract fun encode(value: T, language: Language): String
+  internal abstract fun encode(
+      value: T,
+      language: Language,
+      encodingPolicy: EscapeLeadingWhitespace
+  ): String
   internal abstract fun parse(str: String, language: Language): T
 }
 
@@ -75,7 +79,11 @@ private fun encodeUnderscores(
 }
 
 internal object LiteralInt : LiteralFormat<Int>() {
-  override fun encode(value: Int, language: Language): String {
+  override fun encode(
+      value: Int,
+      language: Language,
+      encodingPolicy: EscapeLeadingWhitespace
+  ): String {
     return encodeUnderscores(StringBuilder(), value.toLong(), language).toString()
   }
   override fun parse(str: String, language: Language): Int {
@@ -84,7 +92,11 @@ internal object LiteralInt : LiteralFormat<Int>() {
 }
 
 internal object LiteralLong : LiteralFormat<Long>() {
-  override fun encode(value: Long, language: Language): String {
+  override fun encode(
+      value: Long,
+      language: Language,
+      encodingPolicy: EscapeLeadingWhitespace
+  ): String {
     val buffer = encodeUnderscores(StringBuilder(), value, language)
     buffer.append('L')
     return buffer.toString()
@@ -103,7 +115,11 @@ private const val KOTLIN_DOLLAR = "\${'\$'}"
 private const val KOTLIN_DOLLARQUOTE = "\${'\"'}"
 
 internal object LiteralString : LiteralFormat<String>() {
-  override fun encode(value: String, language: Language): String =
+  override fun encode(
+      value: String,
+      language: Language,
+      encodingPolicy: EscapeLeadingWhitespace
+  ): String =
       if (value.indexOf('\n') == -1)
           when (language) {
             Language.SCALA, // scala only does $ substitution for s" and f" strings
@@ -121,8 +137,8 @@ internal object LiteralString : LiteralFormat<String>() {
             // https://github.com/diffplug/selfie/issues/105
             Language.GROOVY,
             Language.JAVA_PRE15 -> encodeSingleJava(value)
-            Language.JAVA -> encodeMultiJava(value)
-            Language.KOTLIN -> encodeMultiKotlin(value)
+            Language.JAVA -> encodeMultiJava(value, encodingPolicy)
+            Language.KOTLIN -> encodeMultiKotlin(value, encodingPolicy)
           }
   override fun parse(str: String, language: Language): String =
       if (!str.startsWith(TRIPLE_QUOTE))
@@ -184,7 +200,7 @@ internal object LiteralString : LiteralFormat<String>() {
     val toUnescape = if (removeDollars) inlineDollars(source) else source
     return unescapeJava(toUnescape)
   }
-  fun encodeMultiKotlin(arg: String): String {
+  fun encodeMultiKotlin(arg: String, escapeLeadingWhitespace: EscapeLeadingWhitespace): String {
     val escapeDollars = arg.replace("$", KOTLIN_DOLLAR)
     val escapeTripleQuotes =
         escapeDollars.replace(
@@ -197,20 +213,14 @@ internal object LiteralString : LiteralFormat<String>() {
               } else if (line.endsWith("\t")) {
                 line.dropLast(1) + "\${'\\t'}"
               } else line
-          val protectLeadingWhitespace =
-              if (protectTrailingWhitespace.startsWith(" ")) {
-                "\${' '}" + protectTrailingWhitespace.drop(1)
-              } else if (protectTrailingWhitespace.startsWith("\t")) {
-                "\${'\\t'}" + protectTrailingWhitespace.drop(1)
-              } else protectTrailingWhitespace
-          protectLeadingWhitespace
+          escapeLeadingWhitespace.escapeLine(protectTrailingWhitespace, "\${' '}", "\${'\\t'}")
         }
     return "$TRIPLE_QUOTE$protectWhitespace$TRIPLE_QUOTE"
   }
-  fun encodeMultiJava(arg: String): String {
+  fun encodeMultiJava(arg: String, escapeLeadingWhitespace: EscapeLeadingWhitespace): String {
     val escapeBackslashes = arg.replace("\\", "\\\\")
     val escapeTripleQuotes = escapeBackslashes.replace(TRIPLE_QUOTE, "\\\"\\\"\\\"")
-    val protectWhitespace =
+    var protectWhitespace =
         escapeTripleQuotes.lines().joinToString("\n") { line ->
           val protectTrailingWhitespace =
               if (line.endsWith(" ")) {
@@ -218,14 +228,29 @@ internal object LiteralString : LiteralFormat<String>() {
               } else if (line.endsWith("\t")) {
                 line.dropLast(1) + "\\t"
               } else line
-          val protectLeadingWhitespace =
-              if (protectTrailingWhitespace.startsWith(" ")) {
-                "\\s" + protectTrailingWhitespace.drop(1)
-              } else if (protectTrailingWhitespace.startsWith("\t")) {
-                "\\t" + protectTrailingWhitespace.drop(1)
-              } else protectTrailingWhitespace
-          protectLeadingWhitespace
+          escapeLeadingWhitespace.escapeLine(protectTrailingWhitespace, "\\s", "\\t")
         }
+    val commonPrefix =
+        protectWhitespace
+            .lines()
+            .mapNotNull { line ->
+              if (line.isNotBlank()) line.takeWhile { it.isWhitespace() } else null
+            }
+            .minOrNull() ?: ""
+    if (commonPrefix.isNotEmpty()) {
+      val lines = protectWhitespace.lines()
+      val last = lines.last()
+      protectWhitespace =
+          lines.joinToString("\n") { line ->
+            if (line === last) {
+              if (line.startsWith(" ")) "\\s${line.drop(1)}"
+              else if (line.startsWith("\t")) "\\t${line.drop(1)}"
+              else
+                  throw UnsupportedOperationException(
+                      "How did it end up with a common whitespace prefix?")
+            } else line
+          }
+    }
     return "$TRIPLE_QUOTE\n$protectWhitespace$TRIPLE_QUOTE"
   }
   private val charLiteralRegex = """\$\{'(\\?.)'\}""".toRegex()
@@ -323,7 +348,11 @@ internal object LiteralString : LiteralFormat<String>() {
 }
 
 internal object LiteralBoolean : LiteralFormat<Boolean>() {
-  override fun encode(value: Boolean, language: Language): String {
+  override fun encode(
+      value: Boolean,
+      language: Language,
+      encodingPolicy: EscapeLeadingWhitespace
+  ): String {
     return value.toString()
   }
   override fun parse(str: String, language: Language): Boolean {
@@ -339,7 +368,11 @@ enum class TodoStub {
 }
 
 internal object LiteralTodoStub : LiteralFormat<TodoStub>() {
-  override fun encode(value: TodoStub, language: Language) = throw UnsupportedOperationException()
+  override fun encode(
+      value: TodoStub,
+      language: Language,
+      encodingPolicy: EscapeLeadingWhitespace
+  ) = throw UnsupportedOperationException()
   override fun parse(str: String, language: Language) = throw UnsupportedOperationException()
   fun createLiteral(kind: TodoStub) = LiteralValue(null, kind, LiteralTodoStub)
 }

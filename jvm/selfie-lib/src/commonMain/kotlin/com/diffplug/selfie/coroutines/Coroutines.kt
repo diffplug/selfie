@@ -21,7 +21,9 @@ import com.diffplug.selfie.Roundtrip
 import com.diffplug.selfie.RoundtripJson
 import com.diffplug.selfie.Snapshot
 import com.diffplug.selfie.StringSelfie
+import com.diffplug.selfie.guts.CallStack
 import com.diffplug.selfie.guts.CoroutineDiskStorage
+import com.diffplug.selfie.guts.DiskStorage
 import kotlin.coroutines.coroutineContext
 
 /**
@@ -29,21 +31,26 @@ import kotlin.coroutines.coroutineContext
  * `com.diffplug.selfie.coroutines` instead of `com.diffplug.selfie.Selfie`. If you want more
  * details, see the [threading details](http://localhost:3000/jvm/kotest#threading-details).
  */
-private suspend fun disk() =
-    coroutineContext[CoroutineDiskStorage]?.disk
-        ?: throw IllegalStateException(
-            """
-      No Kotest test is in progress on this coroutine.
-      If this is a Kotest test, make sure you added `SelfieExtension` to your `AbstractProjectConfig`:
-        +class MyProjectConfig : AbstractProjectConfig() {
-        +  override fun extensions() = listOf(SelfieExtension(this))
-        +}
-      If this is a JUnit test, make the following change:
-        -import com.diffplug.selfie.coroutines.expectSelfie
-        +import com.diffplug.selfie.Selfie.expectSelfie
-      For more info https://selfie.dev/jvm/kotest#selfie-and-coroutines
-    """
-                .trimIndent())
+private suspend fun disk(): DiskStorage =
+    coroutineContext[CoroutineDiskStorage]?.disk ?: DiskStorageError
+
+private const val WRONG_COROUTINE =
+    """No Kotest test is in progress on this coroutine.
+If this is a Kotest test, make sure you added `SelfieExtension` to your `AbstractProjectConfig`:
+  +class MyProjectConfig : AbstractProjectConfig() {
+  +  override fun extensions() = listOf(SelfieExtension(this))
+  +}
+If this is a JUnit test, make the following change:
+  -import com.diffplug.selfie.coroutines.expectSelfie
+  +import com.diffplug.selfie.Selfie.expectSelfie
+For more info https://selfie.dev/jvm/kotest#selfie-and-coroutines"""
+
+private object DiskStorageError : DiskStorage {
+  override fun readDisk(sub: String, call: CallStack) = throw IllegalStateException(WRONG_COROUTINE)
+  override fun writeDisk(actual: Snapshot, sub: String, call: CallStack) =
+      throw IllegalStateException(WRONG_COROUTINE)
+  override fun keep(subOrKeepAll: String?) = throw IllegalStateException(WRONG_COROUTINE)
+}
 suspend fun <T> expectSelfie(actual: T, camera: Camera<T>) = expectSelfie(camera.snapshot(actual))
 suspend fun expectSelfie(actual: String) = expectSelfie(Snapshot.of(actual))
 suspend fun expectSelfie(actual: ByteArray) = BinarySelfie(Snapshot.of(actual), disk(), "")
@@ -56,16 +63,16 @@ suspend fun preserveSelfiesOnDisk(vararg subsToKeep: String) {
     subsToKeep.forEach { disk.keep(it) }
   }
 }
-suspend fun memoize(toMemoize: suspend () -> String) = memoize(Roundtrip.identity(), toMemoize)
-suspend fun <T> memoize(roundtrip: Roundtrip<T, String>, toMemoize: suspend () -> T) =
-    MemoStringSuspend(disk(), roundtrip, toMemoize)
+suspend fun cacheSelfie(toCache: suspend () -> String) = cacheSelfie(Roundtrip.identity(), toCache)
+suspend fun <T> cacheSelfie(roundtrip: Roundtrip<T, String>, toCache: suspend () -> T) =
+    CacheSelfieSuspend(disk(), roundtrip, toCache)
 /**
  * Memoizes any type which is marked with `@kotlinx.serialization.Serializable` as pretty-printed
  * json.
  */
-suspend inline fun <reified T> memoizeAsJson(noinline toMemoize: suspend () -> T) =
-    memoize(RoundtripJson.of<T>(), toMemoize)
-suspend fun memoizeBinary(toMemoize: suspend () -> ByteArray) =
-    memoizeBinary(Roundtrip.identity(), toMemoize)
-suspend fun <T> memoizeBinary(roundtrip: Roundtrip<T, ByteArray>, toMemoize: suspend () -> T) =
-    MemoBinarySuspend(disk(), roundtrip, toMemoize)
+suspend inline fun <reified T> cacheSelfieJson(noinline toCache: suspend () -> T) =
+    cacheSelfie(RoundtripJson.of<T>(), toCache)
+suspend fun cacheSelfieBinary(toCache: suspend () -> ByteArray) =
+    cacheSelfieBinary(Roundtrip.identity(), toCache)
+suspend fun <T> cacheSelfieBinary(roundtrip: Roundtrip<T, ByteArray>, toCache: suspend () -> T) =
+    CacheSelfieBinarySuspend(disk(), roundtrip, toCache)

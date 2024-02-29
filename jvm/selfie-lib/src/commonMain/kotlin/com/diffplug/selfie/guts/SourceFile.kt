@@ -28,6 +28,8 @@ class SourceFile(filename: String, content: String) {
   private val unixNewlines = content.indexOf('\r') == -1
   private var contentSlice = Slice(content.efficientReplace("\r\n", "\n"))
   private val language = Language.fromFilename(filename)
+  private val escapeLeadingWhitespace =
+      EscapeLeadingWhitespace.appropriateFor(contentSlice.toString())
 
   /**
    * Returns the content of the file, possibly modified by
@@ -51,7 +53,8 @@ class SourceFile(filename: String, content: String) {
      * change in newline count.
      */
     fun <T : Any> setLiteralAndGetNewlineDelta(literalValue: LiteralValue<T>): Int {
-      val encoded = literalValue.format.encode(literalValue.actual, language)
+      val encoded =
+          literalValue.format.encode(literalValue.actual, language, escapeLeadingWhitespace)
       val roundTripped = literalValue.format.parse(encoded, language) // sanity check
       if (roundTripped != literalValue.actual) {
         throw Error(

@@ -22,9 +22,14 @@ const subNavButtonList: SubNavButton[] = [
     isPressed: (subpathName) => subpathName === "get-started",
   },
   {
-    text: "advanced",
-    hrefSubpath: "/advanced",
-    isPressed: (subpathName) => subpathName === "advanced",
+    text: "facets",
+    hrefSubpath: "/facets",
+    isPressed: (subpathName) => subpathName === "facets",
+  },
+  {
+    text: "cache",
+    hrefSubpath: "/cache",
+    isPressed: (subpathName) => subpathName === "cache",
   },
 ];
 
