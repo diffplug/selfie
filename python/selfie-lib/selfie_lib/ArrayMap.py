@@ -20,11 +20,18 @@ class ListBackedSet(Set[T], ABC):
         return False
 
 class ArraySet(ListBackedSet[K]):
-    def __init__(self, data: List[K]):
-        self.__data = []
-        for item in data:
-            self.plusOrThis(item)
+    __data: List[K]
 
+    def __init__(self, data: List[K]):
+        raise NotImplementedError("Use ArraySet.empty() instead")
+
+    @classmethod
+    def __create(cls, data: List[K]) -> 'ArraySet[K]':
+        # Create a new instance without calling __init__
+        instance = super().__new__(cls)
+        instance.__data = data
+        return instance
+    
     def __iter__(self) -> Iterator[K]:
         return iter(self.__data)
 
@@ -46,16 +53,14 @@ class ArraySet(ListBackedSet[K]):
             raise TypeError("Invalid argument type.")
 
     def plusOrThis(self, element: K) -> 'ArraySet[K]':
-        new_data = []
-        added = False
-        for item in self.__data:
-            if not added and element < item:
-                new_data.append(element)
-                added = True
-            new_data.append(item)
-        if not added:
+        if element in self.__data:
+            return self
+        else:
+            new_data = self.__data[:]
             new_data.append(element)
-        return ArraySet(new_data)
+            new_data.sort() # type: ignore[reportOperatorIssue]
+            return ArraySet.__create(new_data)
+
 
 class ArrayMap(Mapping[K, V]):
     def __init__(self, data: list):
