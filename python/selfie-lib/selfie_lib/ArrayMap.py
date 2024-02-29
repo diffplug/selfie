@@ -53,6 +53,7 @@ class ArraySet(ListBackedSet[K]):
             raise TypeError("Invalid argument type.")
 
     def plusOrThis(self, element: K) -> 'ArraySet[K]':
+        # TODO: use binary search, and also special sort order for strings
         if element in self.__data:
             return self
         else:
@@ -64,7 +65,7 @@ class ArraySet(ListBackedSet[K]):
 
 class ArrayMap(Mapping[K, V]):
     def __init__(self, data: list):
-        # TODO: hide this constructor
+        # TODO: hide this constructor as done in ArraySet
         self.__data = data
 
     @classmethod
@@ -86,6 +87,7 @@ class ArrayMap(Mapping[K, V]):
         return len(self.__data) // 2
 
     def __binary_search_key(self, key: K) -> int: 
+        # TODO: special sort order for strings
         low, high = 0, (len(self.__data) // 2) - 1
         while low <= high:
             mid = (low + high) // 2
