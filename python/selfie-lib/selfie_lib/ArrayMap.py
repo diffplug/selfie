@@ -20,8 +20,6 @@ class ListBackedSet(Set[T], ABC):
         return False
 
 class ArraySet(ListBackedSet[K]):
-    __empty_set = None
-
     def __init__(self, data: List[K]):
         self.__data = []
         for item in data:
@@ -32,9 +30,9 @@ class ArraySet(ListBackedSet[K]):
 
     @classmethod
     def empty(cls) -> 'ArraySet[K]':
-        if cls.__empty_set is None:
-            cls.__empty_set = cls([])
-        return cls.__empty_set
+        if not hasattr(cls, '__EMPTY'):
+            cls.__EMPTY = cls([])
+        return cls.__EMPTY
 
     def __len__(self) -> int:
         return len(self.__data)
@@ -60,16 +58,14 @@ class ArraySet(ListBackedSet[K]):
         return ArraySet(new_data)
 
 class ArrayMap(Mapping[K, V]):
-    __empty_map = None
-
     def __init__(self, data: list):
         self.__data = data
 
     @classmethod
     def empty(cls) -> 'ArrayMap[K, V]':
-        if cls.__empty_map is None:
-            cls.__empty_map = cls([])
-        return cls.__empty_map
+        if not hasattr(cls, '__EMPTY'):
+            cls.__EMPTY = cls([])
+        return cls.__EMPTY
 
     def __getitem__(self, key: K) -> V:
         index = self.__binary_search_key(key)
