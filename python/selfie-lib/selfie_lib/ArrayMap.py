@@ -64,6 +64,7 @@ class ArraySet(ListBackedSet[K]):
 
 class ArrayMap(Mapping[K, V]):
     def __init__(self, data: list):
+        # TODO: hide this constructor
         self.__data = data
 
     @classmethod
