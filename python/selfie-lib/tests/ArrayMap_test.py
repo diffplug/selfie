@@ -1,6 +1,7 @@
 import pytest
 from selfie_lib.ArrayMap import ArrayMap
 
+
 def assertEmpty(map):
     assert len(map) == 0
     assert list(map.keys()) == []
@@ -10,6 +11,7 @@ def assertEmpty(map):
         _ = map["key"]
     assert map == {}
     assert map == ArrayMap.empty()
+
 
 def assertSingle(map, key, value):
     assert len(map) == 1
@@ -21,6 +23,7 @@ def assertSingle(map, key, value):
         _ = map[key + "blah"]
     assert map == {key: value}
     assert map == ArrayMap.empty().plus(key, value)
+
 
 def assertDouble(map, key1, value1, key2, value2):
     assert len(map) == 2
@@ -36,6 +39,7 @@ def assertDouble(map, key1, value1, key2, value2):
     assert map == ArrayMap.empty().plus(key1, value1).plus(key2, value2)
     assert map == ArrayMap.empty().plus(key2, value2).plus(key1, value1)
 
+
 def assertTriple(map, key1, value1, key2, value2, key3, value3):
     assert len(map) == 3
     assert set(map.keys()) == {key1, key2, key3}
@@ -47,16 +51,21 @@ def assertTriple(map, key1, value1, key2, value2, key3, value3):
     with pytest.raises(KeyError):
         _ = map[key1 + "blah"]
     assert map == {key1: value1, key2: value2, key3: value3}
-    assert map == ArrayMap.empty().plus(key1, value1).plus(key2, value2).plus(key3, value3)
+    assert map == ArrayMap.empty().plus(key1, value1).plus(key2, value2).plus(
+        key3, value3
+    )
+
 
 def test_empty():
     assertEmpty(ArrayMap.empty())
+
 
 def test_single():
     empty = ArrayMap.empty()
     single = empty.plus("one", "1")
     assertEmpty(empty)
     assertSingle(single, "one", "1")
+
 
 def test_double():
     empty = ArrayMap.empty()
@@ -71,9 +80,11 @@ def test_double():
         single.plus("one", "2")
     assert str(context.value) == "Key already exists"
 
+
 def test_triple():
     triple = ArrayMap.empty().plus("1", "one").plus("2", "two").plus("3", "three")
     assertTriple(triple, "1", "one", "2", "two", "3", "three")
+
 
 def test_multi():
     test_triple()  # Calling another test function directly is unusual but works
@@ -82,8 +93,15 @@ def test_multi():
     triple = ArrayMap.empty().plus("3", "three").plus("1", "one").plus("2", "two")
     assertTriple(triple, "1", "one", "2", "two", "3", "three")
 
+
 def test_minus_sorted_indices():
-    initial_map = ArrayMap.empty().plus("1", "one").plus("2", "two").plus("3", "three").plus("4", "four")
+    initial_map = (
+        ArrayMap.empty()
+        .plus("1", "one")
+        .plus("2", "two")
+        .plus("3", "three")
+        .plus("4", "four")
+    )
     modified_map = initial_map.minus_sorted_indices([1, 3])
     assert len(modified_map) == 2
     assert list(modified_map.keys()) == ["1", "3"]
@@ -94,6 +112,7 @@ def test_minus_sorted_indices():
         _ = modified_map["4"]
     assert modified_map == {"1": "one", "3": "three"}
 
+
 def test_plus_with_existing_keys():
     map_with_duplicates = ArrayMap.empty().plus("a", "alpha").plus("b", "beta")
     with pytest.raises(ValueError):
@@ -103,10 +122,13 @@ def test_plus_with_existing_keys():
     assert updated_map["a"] == "alpha"
     assert updated_map["b"] == "beta"
     assert updated_map["c"] == "gamma"
-    modified_map = map_with_duplicates.minus_sorted_indices([0]).plus("a", "updated alpha")
+    modified_map = map_with_duplicates.minus_sorted_indices([0]).plus(
+        "a", "updated alpha"
+    )
     assert len(modified_map) == 2
     assert modified_map["a"] == "updated alpha"
     assert modified_map["b"] == "beta"
+
 
 def test_map_length():
     map = ArrayMap.empty()
@@ -119,7 +141,7 @@ def test_map_length():
     assert len(map) == 3, "Length should be 3 after adding a third item"
     map = map.minus_sorted_indices([1])
     assert len(map) == 2, "Length should be 2 after removing one item"
-    map = map.minus_sorted_indices([0]) 
+    map = map.minus_sorted_indices([0])
     assert len(map) == 1, "Length should be 1 after removing another item"
-    map = map.minus_sorted_indices([0])  
+    map = map.minus_sorted_indices([0])
     assert len(map) == 0, "Length should be 0 after removing all items"

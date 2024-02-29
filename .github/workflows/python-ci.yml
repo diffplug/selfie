@@ -3,7 +3,7 @@ on:
     branches: [main]
   pull_request:
     paths:
-      - 'python/**'
+      - "python/**"
 defaults:
   run:
     working-directory: python/selfie-lib
@@ -24,9 +24,9 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version-file: 'python/selfie-lib/pyproject.toml'
-          cache: 'poetry'
+          python-version-file: "python/selfie-lib/pyproject.toml"
+          cache: "poetry"
       - run: poetry install
       - run: poetry run pytest -vv
       - run: poetry run pyright
-      - run: poetry run ruff check
+      - run: poetry run ruff format --check
