@@ -1,16 +1,23 @@
+from functools import total_ordering
+
+
+@total_ordering
 class TypedPath:
     def __init__(self, absolute_path: str):
         self.absolute_path = absolute_path
-        self.name = self._get_name()
-        self.is_folder = self.absolute_path.endswith("/")
 
-    def _get_name(self) -> str:
+    @property
+    def name(self) -> str:
         if self.absolute_path.endswith("/"):
             path = self.absolute_path[:-1]
         else:
             path = self.absolute_path
         last_slash = path.rfind("/")
         return path[last_slash + 1 :]
+
+    @property
+    def is_folder(self) -> bool:
+        return self.absolute_path.endswith("/")
 
     def assert_folder(self) -> None:
         if not self.is_folder:
