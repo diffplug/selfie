@@ -8,7 +8,7 @@ dependencies {
   implementation 'io.jooby:jooby:3.0.8'
   implementation 'io.jooby:jooby-netty:3.0.7'
   implementation 'jakarta.mail:jakarta.mail-api:2.1.2'
-  testImplementation 'io.jooby:jooby-test:3.0.7'
+  testImplementation 'io.jooby:jooby-test:3.0.8'
   testImplementation "org.junit.jupiter:junit-jupiter:$ver_JUNIT_USE"
   testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
   testImplementation 'io.rest-assured:rest-assured:5.4.0'
