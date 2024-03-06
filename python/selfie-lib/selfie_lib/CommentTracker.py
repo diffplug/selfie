@@ -1,6 +1,5 @@
 from typing import Dict, Iterable, Tuple
 from enum import Enum, auto
-from collections import defaultdict
 import threading
 from selfie_lib.TypedPath import TypedPath
 from selfie_lib.Slice import Slice
@@ -17,12 +16,6 @@ class SnapshotFileLayout:
         raise NotImplementedError("sourcePathForCall is not implemented")
 
 
-class FS:
-    def fileRead(self, typedPath: "TypedPath") -> str:
-        # Placeholder return or raise NotImplementedError
-        raise NotImplementedError("fileRead is not implemented")
-
-
 class WritableComment(Enum):
     NO_COMMENT = auto()
     ONCE = auto()
@@ -35,9 +28,7 @@ class WritableComment(Enum):
 
 class CommentTracker:
     def __init__(self):
-        self.cache: Dict[TypedPath, WritableComment] = defaultdict(
-            lambda: WritableComment.NO_COMMENT
-        )
+        self.cache: Dict[TypedPath, WritableComment] = {}
         self.lock = threading.Lock()
 
     def pathsWithOnce(self) -> Iterable[TypedPath]:
@@ -48,23 +39,23 @@ class CommentTracker:
                 if comment == WritableComment.ONCE
             ]
 
-    # def hasWritableComment(self, call: CallStack, layout: SnapshotFileLayout) -> bool:
-    def hasWritableComment(
-        self, call: CallStack, layout: SnapshotFileLayout, fs: FS
-    ) -> bool:
+    def hasWritableComment(self, call: CallStack, layout: SnapshotFileLayout) -> bool:
         path = layout.sourcePathForCall(call)
         with self.lock:
-            comment = self.cache.get(path)
-            if comment and comment.writable:
-                return True
+            if path in self.cache:
+                comment = self.cache[path]
+                if comment.writable:
+                    return True
+                else:
+                    return False
             else:
-                new_comment, _ = self.commentAndLine(path, fs)
+                new_comment, _ = self.__commentAndLine(path)
                 self.cache[path] = new_comment
                 return new_comment.writable
 
     @staticmethod
-    def commentString(typedPath: TypedPath, fs: FS) -> Tuple[str, int]:
-        comment, line = CommentTracker.commentAndLine(typedPath, fs)
+    def commentString(typedPath: TypedPath) -> Tuple[str, int]:
+        comment, line = CommentTracker.__commentAndLine(typedPath)
         if comment == WritableComment.NO_COMMENT:
             raise ValueError("No writable comment found")
         elif comment == WritableComment.ONCE:
@@ -75,8 +66,9 @@ class CommentTracker:
             raise ValueError("Invalid comment type")
 
     @staticmethod
-    def commentAndLine(typedPath: TypedPath, fs: FS) -> Tuple[WritableComment, int]:
-        content = Slice(fs.fileRead(typedPath))
+    def __commentAndLine(typedPath: TypedPath) -> Tuple[WritableComment, int]:
+        with open(typedPath.absolute_path, "r") as file:
+            content = Slice(file.read())
         for comment_str in [
             "//selfieonce",
             "// selfieonce",
