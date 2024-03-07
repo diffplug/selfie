@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.1] - 2024-02-24
+### Fixed
+- The `coroutines` methods used to eagerly throw an exception if they were ever called from anywhere besides a Kotest method. Now they wait until `toMatchDisk()` is called, because they can work just fine anywhere if you use `toBe`. ([#247](https://github.com/diffplug/selfie/pull/247))
+
 ## [2.0.0] - 2024-02-21
 ### Added
 - **Memoization** ([#219](https://github.com/diffplug/selfie/pull/219) implements [#215](https://github.com/diffplug/selfie/issues/215))
