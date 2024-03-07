@@ -1,5 +1,5 @@
-from Literals import Language
-from EscapeLeadingWhitespace import EscapeLeadingWhitespace
+from .Literals import Language
+from .EscapeLeadingWhitespace import EscapeLeadingWhitespace
 
 
 class SourceFile:
@@ -77,7 +77,7 @@ class SourceFile:
             (it for it in TO_BE_LIKES if it in line_content), key=line_content.find
         )
         dot_function_call_in_place = line_content.find(dot_fun_open_paren)
-        dot_function_call = dot_function_call_in_place + line_content.start
+        dot_function_call = dot_function_call_in_place
         arg_start = dot_function_call + len(dot_fun_open_paren)
         if len(self.content_slice) == arg_start:
             raise AssertionError(
