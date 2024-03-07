@@ -1,18 +1,29 @@
-from typing import List
+from typing import List, Optional
+
 
 class PerCharacterEscaper:
-    def __init__(self, escape_code_point: int, escaped_code_points: List[int], escaped_by_code_points: List[int]):
+    def __init__(
+        self,
+        escape_code_point: int,
+        escaped_code_points: List[int],
+        escaped_by_code_points: List[int],
+    ):
         self.__escape_code_point = escape_code_point
         self.__escaped_code_points = escaped_code_points
         self.__escaped_by_code_points = escaped_by_code_points
 
-    def __first_offset_needing_escape(self, input_string: str, escape_code_point: int = None) -> int:
+    def __first_offset_needing_escape(
+        self, input_string: str, escape_code_point: Optional[int] = None
+    ) -> int:
+        if escape_code_point is None:
+            escape_code_point = self.__escape_code_point
         length = len(input_string)
         for offset in range(length):
             codepoint = ord(input_string[offset])
-            if escape_code_point is None:
-                escape_code_point = self.__escape_code_point
-            if codepoint == escape_code_point or codepoint in self.__escaped_code_points:
+            if (
+                codepoint == escape_code_point
+                or codepoint in self.__escaped_code_points
+            ):
                 return offset
         return -1
 
@@ -34,10 +45,16 @@ class PerCharacterEscaper:
             return "".join(result)
 
     def unescape(self, input_string: str) -> str:
-        if input_string.endswith(chr(self.__escape_code_point)) and not input_string.endswith(chr(self.__escape_code_point) * 2):
-            raise ValueError(f"Escape character '{chr(self.__escape_code_point)}' can't be the last character in a string.")
+        if input_string.endswith(
+            chr(self.__escape_code_point)
+        ) and not input_string.endswith(chr(self.__escape_code_point) * 2):
+            raise ValueError(
+                f"Escape character '{chr(self.__escape_code_point)}' can't be the last character in a string."
+            )
 
-        no_escapes = self.__first_offset_needing_escape(input_string, self.__escape_code_point)
+        no_escapes = self.__first_offset_needing_escape(
+            input_string, self.__escape_code_point
+        )
         if no_escapes == -1:
             return input_string
         else:
@@ -49,7 +66,9 @@ class PerCharacterEscaper:
                     skip_next = False
                     continue
                 codepoint = ord(input_string[i])
-                if codepoint == self.__escape_code_point and (i + 1) < len(input_string):
+                if codepoint == self.__escape_code_point and (i + 1) < len(
+                    input_string
+                ):
                     next_codepoint = ord(input_string[i + 1])
                     if next_codepoint in self.__escaped_by_code_points:
                         idx = self.__escaped_by_code_points.index(next_codepoint)
@@ -62,7 +81,6 @@ class PerCharacterEscaper:
                     result.append(chr(codepoint))
             return "".join(result)
 
-
     @classmethod
     def self_escape(cls, escape_policy):
         code_points = [ord(c) for c in escape_policy]
@@ -73,7 +91,9 @@ class PerCharacterEscaper:
     def specified_escape(cls, escape_policy):
         code_points = [ord(c) for c in escape_policy]
         if len(code_points) % 2 != 0:
-            raise ValueError("Escape policy string must have an even number of characters.")
+            raise ValueError(
+                "Escape policy string must have an even number of characters."
+            )
         escape_code_point = code_points[0]
         escaped_code_points = code_points[0::2]
         escaped_by_code_points = code_points[1::2]
