@@ -1,8 +1,11 @@
-class Language:
+from enum import Enum
+
+
+class Language(Enum):
     PYTHON = "PYTHON"
 
     @classmethod
-    def from_filename(cls, filename: str) -> str:
+    def from_filename(cls, filename: str) -> "Language":
         extension = filename.rsplit(".", 1)[-1]
         if extension == "py":
             return cls.PYTHON
