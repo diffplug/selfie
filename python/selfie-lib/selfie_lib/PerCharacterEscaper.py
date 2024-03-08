@@ -41,43 +41,40 @@ class PerCharacterEscaper:
             return "".join(result)
 
     def unescape(self, input_string: str) -> str:
-        if not input_string:
-            return input_string
+        if input_string.endswith(
+            chr(self.__escape_code_point)
+        ) and not input_string.endswith(chr(self.__escape_code_point) * 2):
+            raise ValueError(
+                "Escape character '{}' can't be the last character in a string.".format(
+                    chr(self.__escape_code_point)
+                )
+            )
 
-        result = []
-        i = 0
-
-        while i < len(input_string):
-            if ord(input_string[i]) == self.__escape_code_point:
-                if i + 1 < len(input_string):
-                    next_char = input_string[i + 1]
-                    next_codepoint = ord(next_char)
-
-                    if next_codepoint == self.__escape_code_point:
-                        result.append(chr(next_codepoint))
-                        i += 2
-                    else:
-                        try:
-                            idx = self.__escaped_by_code_points.index(next_codepoint)
-                            result.append(chr(self.__escaped_code_points[idx]))
-                            i += 2
-                            continue
-                        except ValueError:
-                            result.append(next_char)
-                            i += 2
-                else:
-                    raise ValueError(
-                        f"Escape character '{chr(self.__escape_code_point)}' can't be the last character in a string."
-                    )
-            else:
-                result.append(input_string[i])
-                i += 1
-
-        processed_string = "".join(result)
-        if processed_string == input_string:
+        no_escapes = self.__first_offset_needing_escape(input_string)
+        if no_escapes == -1:
             return input_string
         else:
-            return processed_string
+            result = [input_string[:no_escapes]]
+            skip_next = False
+            for i in range(no_escapes, len(input_string)):
+                if skip_next:
+                    skip_next = False
+                    continue
+                codepoint = ord(input_string[i])
+                if codepoint == self.__escape_code_point and (i + 1) < len(
+                    input_string
+                ):
+                    next_codepoint = ord(input_string[i + 1])
+                    if next_codepoint in self.__escaped_by_code_points:
+                        idx = self.__escaped_by_code_points.index(next_codepoint)
+                        result.append(chr(self.__escaped_code_points[idx]))
+                        skip_next = True
+                    else:
+                        result.append(input_string[i + 1])
+                        skip_next = True
+                else:
+                    result.append(chr(codepoint))
+            return "".join(result)
 
     @classmethod
     def self_escape(cls, escape_policy):
