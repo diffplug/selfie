@@ -1,5 +1,5 @@
 from .Slice import Slice
-from .Literals import Language
+from .Literals import Language, LiteralFormat, LiteralValue
 from .EscapeLeadingWhitespace import EscapeLeadingWhitespace
 from typing import Any
 
@@ -8,9 +8,9 @@ class SourceFile:
     TRIPLE_QUOTE = '"""'
 
     def __init__(self, filename: str, content: str) -> None:
-        self.unix_newlines = "\r" not in content
-        self.content_slice = Slice(content).__str__().replace("\r\n", "\n")
-        self.language = Language.from_filename(filename)
+        self.unix_newlines: bool = "\r" not in content
+        self.content_slice: Slice = Slice(content.replace("\r\n", "\n"))
+        self.language: Language = Language.from_filename(filename)
         self.escape_leading_whitespace = EscapeLeadingWhitespace.appropriate_for(
             self.content_slice.__str__()
         )
@@ -25,13 +25,18 @@ class SourceFile:
 
     class ToBeLiteral:
         def __init__(
-            self, dot_fun_open_paren: str, function_call_plus_arg: Slice, arg: Slice
+            self,
+            dot_fun_open_paren: str,
+            function_call_plus_arg: Slice,
+            arg: Slice,
+            language: Language,
+            escape_leading_whitespace: EscapeLeadingWhitespace,
         ) -> None:
             self.dot_fun_open_paren = dot_fun_open_paren
             self.function_call_plus_arg = function_call_plus_arg
             self.arg = arg
-            self.language = Language
-            self.escape_leading_whitespace = EscapeLeadingWhitespace
+            self.language = language
+            self.escape_leading_whitespace = escape_leading_whitespace
 
         def set_literal_and_get_newline_delta(self, literal_value: LiteralValue) -> int:
             encoded = literal_value.format.encode(
@@ -61,30 +66,35 @@ class SourceFile:
             return literal_format.parse(self.arg.__str__(), self.language)
 
     def remove_selfie_once_comments(self) -> None:
-        self.content_slice = self.content_slice.replace("//selfieonce", "").replace(
+        content_str = self.content_slice.__str__()
+        updated_content = content_str.replace("//selfieonce", "").replace(
             "// selfieonce", ""
         )
+        self.content_slice = Slice(updated_content)
 
     def find_on_line(self, to_find: str, line_one_indexed: int) -> Slice:
         line_content = self.content_slice.unixLine(line_one_indexed)
-        idx = line_content.find(to_find)
+        idx = line_content.indexOf(to_find)
         if idx == -1:
             raise AssertionError(
                 f"Expected to find `{to_find}` on line {line_one_indexed}, "
                 f"but there was only `{line_content}`"
             )
-        return line_content[idx : idx + len(to_find)]
+        start_index = idx
+        end_index = idx + len(to_find)
+        return line_content.subSequence(start_index, end_index)
 
     def replace_on_line(self, line_one_indexed: int, find: str, replace: str) -> None:
         assert "\n" not in find
         assert "\n" not in replace
-        slice_ = self.find_on_line(find, line_one_indexed)
-        self.content_slice = slice_.replaceSelfWith(replace)
+        line_content = self.content_slice.unixLine(line_one_indexed).__str__()
+        new_content = line_content.replace(find, replace)
+        self.content_slice = Slice(self.content_slice.replaceSelfWith(new_content))
 
     def parse_to_be_like(self, line_one_indexed: int) -> ToBeLiteral:
         line_content = self.content_slice.unixLine(line_one_indexed)
         dot_fun_open_paren = min(
-            (line_content.find(t) for t in TO_BE_LIKES if t in line_content),
+            ((line_content.indexOf(t), t) for t in TO_BE_LIKES if t in line_content),
             key=lambda x: x[0] if x[0] != -1 else float("inf"),
         )
         dot_fun_open_paren = (
@@ -95,8 +105,8 @@ class SourceFile:
                 f"Expected to find inline assertion on line {line_one_indexed}, "
                 f"but there was only `{line_content}`"
             )
-        dot_function_call_in_place = line_content.find(dot_fun_open_paren)
-        dot_function_call = dot_function_call_in_place + line_content.start_index
+        dot_function_call_in_place = line_content.indexOf(dot_fun_open_paren)
+        dot_function_call = dot_function_call_in_place + line_content.startIndex
         arg_start = dot_function_call + len(dot_fun_open_paren)
         if self.content_slice.__len__ == arg_start:
             raise AssertionError(
@@ -114,8 +124,8 @@ class SourceFile:
         end_arg = -1
         end_paren = 0
         if self.content_slice[arg_start] == '"':
-            if self.content_slice[arg_start:].startswith(self.TRIPLE_QUOTE):
-                end_arg = self.content_slice.find(
+            if self.content_slice[arg_start].startswith(self.TRIPLE_QUOTE):
+                end_arg = self.content_slice.indexOf(
                     self.TRIPLE_QUOTE, arg_start + len(self.TRIPLE_QUOTE)
                 )
                 if end_arg == -1:
@@ -170,6 +180,8 @@ class SourceFile:
             dot_fun_open_paren.replace("_TODO", ""),
             self.content_slice.subSequence(dot_function_call, end_paren + 1),
             self.content_slice.subSequence(arg_start, end_arg),
+            self.language,
+            self.escape_leading_whitespace,
         )
 
 
