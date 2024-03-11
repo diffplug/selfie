@@ -1,8 +1,10 @@
 from typing import List, Optional
 from selfie_lib.CommentTracker import SnapshotFileLayout
 import inspect
+from functools import total_ordering
 
 
+@total_ordering
 class CallLocation:
     def __init__(self, file_name: Optional[str], line: int):
         self._file_name = file_name
