@@ -109,14 +109,14 @@ class SourceFile:
         dot_function_call = dot_function_call_in_place + line_content.startIndex
         arg_start = dot_function_call + len(dot_fun_open_paren)
 
-        if self.content_slice.__len__ == arg_start:
+        if self.content_slice.__len__() == arg_start:
             raise AssertionError(
                 f"Appears to be an unclosed function call `{dot_fun_open_paren}` "
                 f"on line {line_one_indexed}"
             )
         while self.content_slice[arg_start].isspace():
             arg_start += 1
-            if self.content_slice.__len__ == arg_start:
+            if self.content_slice.__len__() == arg_start:
                 raise AssertionError(
                     f"Appears to be an unclosed function call `{dot_fun_open_paren}` "
                     f"on line {line_one_indexed}"
@@ -144,7 +144,7 @@ class SourceFile:
                     or self.content_slice[end_arg - 1] == "\\"
                 ):
                     end_arg += 1
-                    if end_arg == self.content_slice.__len__:
+                    if end_arg == self.content_slice.__len__():
                         raise AssertionError(
                             f'Appears to be an unclosed string literal `"` '
                             f"on line {line_one_indexed}"
@@ -157,7 +157,7 @@ class SourceFile:
                 if self.content_slice[end_arg] == ")":
                     break
                 end_arg += 1
-                if end_arg == self.content_slice.__len__:
+                if end_arg == self.content_slice.__len__():
                     raise AssertionError(
                         f"Appears to be an unclosed numeric literal "
                         f"on line {line_one_indexed}"
@@ -172,7 +172,7 @@ class SourceFile:
                     f"{self.content_slice.baseLineAtOffset(end_paren)}"
                 )
             end_paren += 1
-            if end_paren == self.content_slice.__len__:
+            if end_paren == self.content_slice.__len__():
                 raise AssertionError(
                     f"Appears to be an unclosed function call `{dot_fun_open_paren}` "
                     f"starting at line {line_one_indexed}"
