@@ -8,19 +8,19 @@ class SourceFile:
     TRIPLE_QUOTE = '"""'
 
     def __init__(self, filename: str, content: str) -> None:
-        self.unix_newlines: bool = "\r" not in content
-        self.content_slice: Slice = Slice(content.replace("\r\n", "\n"))
-        self.language: Language = Language.from_filename(filename)
-        self.escape_leading_whitespace = EscapeLeadingWhitespace.appropriate_for(
+        self.__unix_newlines: bool = "\r" not in content
+        self.__content_slice: Slice = Slice(content.replace("\r\n", "\n"))
+        self.__language: Language = Language.from_filename(filename)
+        self.__escape_leading_whitespace = EscapeLeadingWhitespace.appropriate_for(
             self.content_slice.__str__()
         )
 
     @property
     def as_string(self) -> str:
         return (
-            self.content_slice.__str__()
-            if self.unix_newlines
-            else self.content_slice.__str__().replace("\n", "\r\n")
+            self.__content_slice.__str__()
+            if self.__unix_newlines
+            else self.__content_slice.__str__().replace("\n", "\r\n")
         )
 
     class ToBeLiteral:
@@ -32,17 +32,17 @@ class SourceFile:
             language: Language,
             escape_leading_whitespace: EscapeLeadingWhitespace,
         ) -> None:
-            self.dot_fun_open_paren = dot_fun_open_paren
-            self.function_call_plus_arg = function_call_plus_arg
-            self.arg = arg
-            self.language = language
-            self.escape_leading_whitespace = escape_leading_whitespace
+            self.__dot_fun_open_paren = dot_fun_open_paren
+            self.__function_call_plus_arg = function_call_plus_arg
+            self.__arg = arg
+            self.__language = language
+            self.__escape_leading_whitespace = escape_leading_whitespace
 
         def set_literal_and_get_newline_delta(self, literal_value: LiteralValue) -> int:
             encoded = literal_value.format.encode(
-                literal_value.actual, self.language, self.escape_leading_whitespace
+                literal_value.actual, self.__language, self.__escape_leading_whitespace
             )
-            round_tripped = literal_value.format.parse(encoded, self.language)
+            round_tripped = literal_value.format.parse(encoded, self.__language)
             if round_tripped != literal_value.actual:
                 raise ValueError(
                     f"There is an error in {literal_value.format.__class__.__name__}, "
@@ -55,15 +55,15 @@ class SourceFile:
                     f"ENCODED ORIGINAL\n{encoded}\n"
                     f"```\n"
                 )
-            existing_newlines = self.function_call_plus_arg.count("\n")
+            existing_newlines = self.__function_call_plus_arg.count("\n")
             new_newlines = encoded.count("\n")
-            self.content_slice = self.function_call_plus_arg.replaceSelfWith(
-                f"{self.dot_fun_open_paren}{encoded})"
+            self.content_slice = self.__function_call_plus_arg.replaceSelfWith(
+                f"{self.__dot_fun_open_paren}{encoded})"
             )
             return new_newlines - existing_newlines
 
         def parse_literal(self, literal_format: LiteralFormat) -> Any:
-            return literal_format.parse(self.arg.__str__(), self.language)
+            return literal_format.parse(self.__arg.__str__(), self.__language)
 
     def find_on_line(self, to_find: str, line_one_indexed: int) -> Slice:
         line_content = self.content_slice.unixLine(line_one_indexed)
@@ -174,8 +174,8 @@ class SourceFile:
             dot_fun_open_paren.replace("_TODO", ""),
             self.content_slice.subSequence(dot_function_call, end_paren + 1),
             self.content_slice.subSequence(arg_start, end_arg),
-            self.language,
-            self.escape_leading_whitespace,
+            self.__language,
+            self.__escape_leading_whitespace,
         )
 
 
