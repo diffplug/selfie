@@ -47,14 +47,13 @@ class LiteralBoolean(LiteralFormat[bool]):
     ) -> str:
         return str(value)
 
+    def __to_boolean_strict(self, string: str) -> bool:
+        if string.lower() == "true":
+            return True
+        elif string.lower() == "false":
+            return False
+        else:
+            raise ValueError("String is not a valid boolean representation: " + string)
+
     def parse(self, string: str, language: Language) -> bool:
-        return to_boolean_strict(string)
-
-
-def to_boolean_strict(string: str) -> bool:
-    if string.lower() == "true":
-        return True
-    elif string.lower() == "false":
-        return False
-    else:
-        raise ValueError("String is not a valid boolean representation: " + string)
+        return self.__to_boolean_strict(string)
