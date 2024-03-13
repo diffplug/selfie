@@ -65,13 +65,6 @@ class SourceFile:
         def parse_literal(self, literal_format: LiteralFormat) -> Any:
             return literal_format.parse(self.arg.__str__(), self.language)
 
-    def remove_selfie_once_comments(self) -> None:
-        content_str = self.content_slice.__str__()
-        updated_content = content_str.replace("//selfieonce", "").replace(
-            "// selfieonce", ""
-        )
-        self.content_slice = Slice(updated_content)
-
     def find_on_line(self, to_find: str, line_one_indexed: int) -> Slice:
         line_content = self.content_slice.unixLine(line_one_indexed)
         idx = line_content.indexOf(to_find)
