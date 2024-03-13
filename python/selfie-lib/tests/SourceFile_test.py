@@ -30,12 +30,33 @@ def test_multi_line_string():
 def test_error_unclosed():
     source_file = SourceFile("UnderTest.py", ".toBe(")
     assert_raises_error(
-        source_file, 'Appears to be an unclosed string literal `"` on line 1'
+        source_file, "Appears to be an unclosed function call `.toBe()` on line 1"
+    )
+
+    source_file = SourceFile("UnderTest.py", ".toBe(  \n ")
+    assert_raises_error(
+        source_file, "Appears to be an unclosed function call `.toBe()` on line 1"
+    )
+
+    source_file = SourceFile("UnderTest.py", ".toBe_TODO(")
+    assert_raises_error(
+        source_file, "Appears to be an unclosed function call `.toBe_TODO()` on line 1"
+    )
+
+    source_file = SourceFile("UnderTest.py", ".toBe_TODO(  \n ")
+    assert_raises_error(
+        source_file, "Appears to be an unclosed function call `.toBe_TODO()` on line 1"
     )
 
     source_file = SourceFile("UnderTest.py", ".toBe_TODO(')")
     assert_raises_error(
         source_file, 'Appears to be an unclosed string literal `"` on line 1'
+    )
+
+    source_file = SourceFile("UnderTest.py", ".toBe_TODO(''')")
+    assert_raises_error(
+        source_file,
+        'Appears to be an unclosed multiline string literal `"""` on line 1',
     )
 
 
