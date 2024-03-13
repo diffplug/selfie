@@ -93,21 +93,22 @@ class SourceFile:
 
     def parse_to_be_like(self, line_one_indexed: int) -> ToBeLiteral:
         line_content = self.content_slice.unixLine(line_one_indexed)
-        dot_fun_open_paren = min(
-            ((line_content.indexOf(t), t) for t in TO_BE_LIKES if t in line_content),
-            key=lambda x: x[0] if x[0] != -1 else float("inf"),
-        )
-        dot_fun_open_paren = (
-            dot_fun_open_paren[1] if dot_fun_open_paren[0] != -1 else None
-        )
+        dot_fun_open_paren = None
+
+        for to_be_like in TO_BE_LIKES:
+            idx = line_content.indexOf(to_be_like)
+            if idx != -1:
+                dot_fun_open_paren = to_be_like
+                break
         if dot_fun_open_paren is None:
             raise AssertionError(
-                f"Expected to find inline assertion on line {line_one_indexed}, "
-                f"but there was only `{line_content}`"
+                f"Expected to find inline assertion on line {line_one_indexed}, but there was only `{line_content}`"
             )
+
         dot_function_call_in_place = line_content.indexOf(dot_fun_open_paren)
         dot_function_call = dot_function_call_in_place + line_content.startIndex
         arg_start = dot_function_call + len(dot_fun_open_paren)
+
         if self.content_slice.__len__ == arg_start:
             raise AssertionError(
                 f"Appears to be an unclosed function call `{dot_fun_open_paren}` "
