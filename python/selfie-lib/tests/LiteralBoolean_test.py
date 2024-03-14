@@ -1,17 +1,25 @@
+from selfie_lib.Literals import LiteralBoolean, Language
+from selfie_lib.EscapeLeadingWhitespace import EscapeLeadingWhitespace
+
+
 def _encode(value: bool, expected: str):
-    actual = "true" if value else "false"
+    literal_boolean = LiteralBoolean()
+    actual = literal_boolean.encode(
+        value, Language.PYTHON, EscapeLeadingWhitespace.NEVER
+    )
     assert actual == expected, f"Expected: {expected}, Got: {actual}"
 
 
 def _decode(value: str, expected: bool):
-    actual = value.lower() == "true"
+    literal_boolean = LiteralBoolean()
+    actual = literal_boolean.parse(value, Language.PYTHON)
     assert actual == expected, f"Expected: {expected}, Got: {actual}"
 
 
 class TestLiteralBoolean:
     def test_encode(self):
-        _encode(True, "true")
-        _encode(False, "false")
+        _encode(True, "True")
+        _encode(False, "False")
 
     def test_decode(self):
         _decode("true", True)
