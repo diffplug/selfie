@@ -1,175 +1,90 @@
 from selfie_lib import SourceFile
 
 
-def test_todo():
-    source_file = SourceFile("UnderTest.py", ".toBe_TODO()")
-    assert str(source_file.parse_to_be_like(1).function_call_plus_arg) == ".toBe_TODO()"
-    assert str(source_file.parse_to_be_like(1).arg) == ""
-
-    source_file = SourceFile("UnderTest.py", "  .toBe_TODO()  ")
-    assert str(source_file.parse_to_be_like(1).function_call_plus_arg) == ".toBe_TODO()"
-    assert str(source_file.parse_to_be_like(1).arg) == ""
-
-    source_file = SourceFile("UnderTest.py", "  .toBe_TODO( )  ")
-    assert (
-        str(source_file.parse_to_be_like(1).function_call_plus_arg) == ".toBe_TODO( )"
-    )
-    assert str(source_file.parse_to_be_like(1).arg) == ""
-
-    source_file = SourceFile("UnderTest.py", "  .toBe_TODO( \n )  ")
-    assert (
-        str(source_file.parse_to_be_like(1).function_call_plus_arg)
-        == ".toBe_TODO( \n )"
-    )
-    assert str(source_file.parse_to_be_like(1).arg) == ""
+def python_test(source_raw, function_call_plus_arg_raw, arg_raw=""):
+    source = source_raw.replace("'", '"')
+    function_call_plus_arg = function_call_plus_arg_raw.replace("'", '"')
+    arg = arg_raw.replace("'", '"')
+    parsed = SourceFile("UnderTest.py", source)
+    to_be_literal = parsed.parse_to_be_like(1)
+    assert to_be_literal._get_function_call_plus_arg() == function_call_plus_arg
+    assert to_be_literal._get_arg() == arg
 
 
-def test_numeric():
-    source_file = SourceFile("UnderTest.py", ".toBe(7)")
-    assert str(source_file.parse_to_be_like(1).function_call_plus_arg) == ".toBe(7)"
-    assert str(source_file.parse_to_be_like(1).arg) == "7"
-
-    source_file = SourceFile("UnderTest.py", "  .toBe(7)")
-    assert str(source_file.parse_to_be_like(1).function_call_plus_arg) == ".toBe(7)"
-    assert str(source_file.parse_to_be_like(1).arg) == "7"
-
-    source_file = SourceFile("UnderTest.py", ".toBe(7)  ")
-    assert str(source_file.parse_to_be_like(1).function_call_plus_arg) == ".toBe(7)"
-    assert str(source_file.parse_to_be_like(1).arg) == "7"
-
-    source_file = SourceFile("UnderTest.py", "  .toBe(7)  ")
-    assert str(source_file.parse_to_be_like(1).function_call_plus_arg) == ".toBe(7)"
-    assert str(source_file.parse_to_be_like(1).arg) == "7"
-
-    source_file = SourceFile("UnderTest.py", "  .toBe( 7 )  ")
-    assert str(source_file.parse_to_be_like(1).function_call_plus_arg) == ".toBe( 7 )"
-    assert str(source_file.parse_to_be_like(1).arg) == "7"
-
-    source_file = SourceFile("UnderTest.py", "  .toBe(\n7)  ")
-    assert str(source_file.parse_to_be_like(1).function_call_plus_arg) == ".toBe(\n7)"
-    assert str(source_file.parse_to_be_like(1).arg) == "7"
-
-    source_file = SourceFile("UnderTest.py", "  .toBe(7\n)  ")
-    assert str(source_file.parse_to_be_like(1).function_call_plus_arg) == ".toBe(7\n)"
-    assert str(source_file.parse_to_be_like(1).arg) == "7"
-
-
-def test_single_line_string():
-    source_file = SourceFile("UnderTest.py", ".toBe('7')")
-    assert str(source_file.parse_to_be_like(1).function_call_plus_arg) == ".toBe('7')"
-    assert str(source_file.parse_to_be_like(1).arg) == "'7'"
-
-    source_file = SourceFile("UnderTest.py", ".toBe('')")
-    assert str(source_file.parse_to_be_like(1).function_call_plus_arg) == ".toBe('')"
-    assert str(source_file.parse_to_be_like(1).arg) == "''"
-
-    source_file = SourceFile("UnderTest.py", ".toBe( '' )")
-    assert str(source_file.parse_to_be_like(1).function_call_plus_arg) == ".toBe( '' )"
-    assert str(source_file.parse_to_be_like(1).arg) == "''"
-
-    source_file = SourceFile("UnderTest.py", ".toBe( \n '' \n )")
-    assert (
-        str(source_file.parse_to_be_like(1).function_call_plus_arg)
-        == ".toBe( \n '' \n )"
-    )
-    assert str(source_file.parse_to_be_like(1).arg) == "''"
-
-    source_file = SourceFile("UnderTest.py", ".toBe( \n '78' \n )")
-    assert (
-        str(source_file.parse_to_be_like(1).function_call_plus_arg)
-        == ".toBe( \n '78' \n )"
-    )
-    assert str(source_file.parse_to_be_like(1).arg) == "'78'"
-
-    source_file = SourceFile("UnderTest.py", ".toBe('\\'')")
-    assert str(source_file.parse_to_be_like(1).function_call_plus_arg) == ".toBe('\\'')"
-    assert str(source_file.parse_to_be_like(1).arg) == "'\\''"
-
-
-def test_multi_line_string():
-    source_file = SourceFile("UnderTest.py", ".toBe('''7''')")
-    assert (
-        str(source_file.parse_to_be_like(1).function_call_plus_arg) == ".toBe('''7''')"
-    )
-    assert str(source_file.parse_to_be_like(1).arg) == "'''7'''"
-
-    source_file = SourceFile("UnderTest.py", ".toBe('''7''')")
-    assert (
-        str(source_file.parse_to_be_like(1).function_call_plus_arg) == ".toBe('''7''')"
-    )
-    assert str(source_file.parse_to_be_like(1).arg) == "'''7'''"
-
-    # source_file = SourceFile("UnderTest.py", ".toBe('''\n7\n''')")
-    # assert (
-    #     str(source_file.parse_to_be_like(1).function_call_plus_arg)
-    #     == ".toBe('''\n7\n''')"
-    # )
-    # assert str(source_file.parse_to_be_like(1).arg) == "'''\n7\n'''"
-
-    # source_file = SourceFile("UnderTest.py", ".toBe(''' ' '' ' ''')")
-    # assert (
-    #     str(source_file.parse_to_be_like(1).function_call_plus_arg)
-    #     == ".toBe(''' ' '' ' ''')"
-    # )
-    # assert str(source_file.parse_to_be_like(1).arg) == "''' ' '' ' '''"
-
-
-def test_error_unclosed():
-    source_file = SourceFile("UnderTest.py", ".toBe(")
-    assert_raises_error(
-        source_file, "Appears to be an unclosed function call `.toBe(` on line 1"
-    )
-
-    source_file = SourceFile("UnderTest.py", ".toBe(  \n ")
-    assert_raises_error(
-        source_file, "Appears to be an unclosed function call `.toBe(` on line 1"
-    )
-
-    source_file = SourceFile("UnderTest.py", ".toBe_TODO(")
-    assert_raises_error(
-        source_file, "Appears to be an unclosed function call `.toBe_TODO(` on line 1"
-    )
-
-    source_file = SourceFile("UnderTest.py", ".toBe_TODO(  \n ")
-    assert_raises_error(
-        source_file, "Appears to be an unclosed function call `.toBe_TODO(` on line 1"
-    )
-
-    # source_file = SourceFile("UnderTest.py", ".toBe_TODO(')")
-    # assert_raises_error(
-    #     source_file, 'Appears to be an unclosed string literal `"` on line 1'
-    # )
-
-    # source_file = SourceFile("UnderTest.py", ".toBe_TODO(''')")
-    # assert_raises_error(
-    #     source_file,
-    #     'Appears to be an unclosed multiline string literal `"""` on line 1',
-    # )
-
-
-def test_error_non_primitive():
-    source_file = SourceFile("UnderTest.py", ".toBe(1 + 1)")
-    assert_raises_error(
-        source_file,
-        "Non-primitive literal in `.toBe(` starting at line 1: error for character `+` on line 1",
-    )
-
-    source_file = SourceFile("UnderTest.py", ".toBe('1' + '1')")
-    assert_raises_error(
-        source_file,
-        "Non-primitive literal in `.toBe(` starting at line 1: error for character `+` on line 1",
-    )
-
-    source_file = SourceFile("UnderTest.py", ".toBe('''1''' + '''1''')")
-    assert_raises_error(
-        source_file,
-        "Non-primitive literal in `.toBe(` starting at line 1: error for character `+` on line 1",
-    )
-
-
-def assert_raises_error(source_file, error_msg):
+def python_test_error(source_raw, error_msg):
     try:
-        source_file.parse_to_be_like(1)
-        assert False, "Expected an AssertionError, but none was raised."
+        python_test(source_raw, "unusedArg")
     except AssertionError as e:
         assert str(e) == error_msg
+
+
+def todo():
+    python_test(".toBe_TODO()", ".toBe_TODO()", "")
+    python_test("  .toBe_TODO()  ", ".toBe_TODO()", "")
+    python_test("  .toBe_TODO( )  ", ".toBe_TODO( )", "")
+    python_test("  .toBe_TODO( \n )  ", ".toBe_TODO( \n )", "")
+
+
+def numeric():
+    python_test(".toBe(7)", ".toBe(7)", "7")
+    python_test("  .toBe(7)", ".toBe(7)", "7")
+    python_test(".toBe(7)  ", ".toBe(7)", "7")
+    python_test("  .toBe(7)  ", ".toBe(7)", "7")
+    python_test("  .toBe( 7 )  ", ".toBe( 7 )", "7")
+    python_test("  .toBe(\n7)  ", ".toBe(\n7)", "7")
+    python_test("  .toBe(7\n)  ", ".toBe(7\n)", "7")
+
+
+def single_line_string():
+    python_test(".toBe('7')", "'7'")
+    python_test(".toBe('')", "''")
+    python_test(".toBe( '' )", "''")
+    python_test(".toBe( \n '' \n )", "''")
+    python_test(".toBe( \n '78' \n )", "'78'")
+    python_test(".toBe('\\'')", "'\\''")
+
+
+def multi_line_string():
+    python_test(".toBe('''7''')", "'''7'''")
+    python_test(".toBe(''' 7 ''')", "''' 7 '''")
+    python_test(".toBe('''\n7\n''')", "'''\n7\n'''")
+    python_test(".toBe(''' ' '' ' ''')", "''' ' '' ' '''")
+
+
+def error_unclosed():
+    python_test_error(
+        ".toBe(", "Appears to be an unclosed function call `.toBe()` on line 1"
+    )
+    python_test_error(
+        ".toBe(  \n ", "Appears to be an unclosed function call `.toBe()` on line 1"
+    )
+    python_test_error(
+        ".toBe_TODO(",
+        "Appears to be an unclosed function call `.toBe_TODO()` on line 1",
+    )
+    python_test_error(
+        ".toBe_TODO(  \n ",
+        "Appears to be an unclosed function call `.toBe_TODO()` on line 1",
+    )
+    python_test_error(
+        ".toBe_TODO(')", 'Appears to be an unclosed string literal `"` on line 1'
+    )
+    python_test_error(
+        ".toBe_TODO(''')",
+        'Appears to be an unclosed multiline string literal `"""` on line 1',
+    )
+
+
+def error_non_primitive():
+    python_test_error(
+        ".toBe(1 + 1)",
+        "Non-primitive literal in `.toBe()` starting at line 1: error for character `+` on line 1",
+    )
+    python_test_error(
+        ".toBe('1' + '1')",
+        "Non-primitive literal in `.toBe()` starting at line 1: error for character `+` on line 1",
+    )
+    python_test_error(
+        ".toBe('''1''' + '''1''')",
+        "Non-primitive literal in `.toBe()` starting at line 1: error for character `+` on line 1",
+    )
