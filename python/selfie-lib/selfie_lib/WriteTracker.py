@@ -56,6 +56,17 @@ class CallStack:
         ]
         return "\n".join(links)
 
+    def __eq__(self, other):
+        if not isinstance(other, CallStack):
+            return NotImplemented
+        return (
+            self.location == other.location
+            and self.rest_of_stack == other.rest_of_stack
+        )
+
+    def __hash__(self):
+        return hash((self.location, tuple(self.rest_of_stack)))
+
 
 def recordCall(callerFileOnly: bool = False) -> CallStack:
     stack_frames = inspect.stack()[1:]
