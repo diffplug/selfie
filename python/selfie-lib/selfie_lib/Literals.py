@@ -2,6 +2,7 @@ from enum import Enum, auto
 from typing import Protocol, TypeVar
 from abc import abstractmethod
 from .EscapeLeadingWhitespace import EscapeLeadingWhitespace
+import io
 
 T = TypeVar("T")
 
@@ -39,6 +40,35 @@ class LiteralFormat(Protocol[T]):
 
 MAX_RAW_NUMBER = 1000
 PADDING_SIZE = len(str(MAX_RAW_NUMBER)) - 1
+
+
+class LiteralInt(LiteralFormat[int]):
+    def _encode_underscores(
+        self, buffer: io.StringIO, value: int, language: Language
+    ) -> io.StringIO:
+        if value >= MAX_RAW_NUMBER:
+            mod = value % MAX_RAW_NUMBER
+            left_padding = PADDING_SIZE - len(str(mod))
+            self._encode_underscores(buffer, value // MAX_RAW_NUMBER, language)
+            buffer.write("_")
+            buffer.write("0" * left_padding)
+            buffer.write(str(mod))
+            return buffer
+        elif value < 0:
+            buffer.write("-")
+            self._encode_underscores(buffer, abs(value), language)
+            return buffer
+        else:
+            buffer.write(str(value))
+            return buffer
+
+    def encode(
+        self, value: int, language: Language, encoding_policy: EscapeLeadingWhitespace
+    ) -> str:
+        return self._encode_underscores(io.StringIO(), value, language).getvalue()
+
+    def parse(self, string: str, language: Language) -> int:
+        return int(string.replace("_", ""))
 
 
 class LiteralBoolean(LiteralFormat[bool]):
