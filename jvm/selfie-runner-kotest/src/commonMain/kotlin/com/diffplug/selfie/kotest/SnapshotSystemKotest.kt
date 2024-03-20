@@ -30,6 +30,7 @@ import com.diffplug.selfie.guts.LiteralValue
 import com.diffplug.selfie.guts.SnapshotFileLayout
 import com.diffplug.selfie.guts.SnapshotSystem
 import com.diffplug.selfie.guts.SourceFile
+import com.diffplug.selfie.guts.ToBeFileWriteTracker
 import com.diffplug.selfie.guts.TypedPath
 import com.diffplug.selfie.guts.WithinTestGC
 import com.diffplug.selfie.guts.atomic
@@ -40,6 +41,7 @@ internal class SnapshotSystemKotest(settings: SelfieSettingsAPI) : SnapshotSyste
   override val layout = SnapshotFileLayoutKotest(settings, fs)
   private val commentTracker = CommentTracker()
   private val inlineWriteTracker = InlineWriteTracker()
+  private val toBeFileWriteTracker = ToBeFileWriteTracker()
   private val progressPerFile = atomic(ArrayMap.empty<String, SnapshotFileProgress>())
   fun forClassOrFilename(classOrFilename: String): SnapshotFileProgress {
     // optimize for reads
@@ -65,6 +67,9 @@ internal class SnapshotSystemKotest(settings: SelfieSettingsAPI) : SnapshotSyste
   }
   override fun writeInline(literalValue: LiteralValue<*>, call: CallStack) {
     inlineWriteTracker.record(call, literalValue, layout)
+  }
+  override fun writeToBeFile(path: TypedPath, data: ByteArray, call: CallStack) {
+    toBeFileWriteTracker.writeToDisk(path, data, call, layout)
   }
   override fun diskThreadLocal(): DiskStorage =
       throw fs.assertFailed(

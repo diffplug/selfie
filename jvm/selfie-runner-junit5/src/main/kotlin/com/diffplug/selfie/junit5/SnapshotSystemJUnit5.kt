@@ -26,6 +26,7 @@ import com.diffplug.selfie.guts.LiteralValue
 import com.diffplug.selfie.guts.SnapshotFileLayout
 import com.diffplug.selfie.guts.SnapshotSystem
 import com.diffplug.selfie.guts.SourceFile
+import com.diffplug.selfie.guts.ToBeFileWriteTracker
 import com.diffplug.selfie.guts.TypedPath
 import com.diffplug.selfie.guts.WithinTestGC
 import com.diffplug.selfie.guts.atomic
@@ -41,6 +42,7 @@ import org.opentest4j.AssertionFailedError
 internal fun TypedPath.toPath(): java.nio.file.Path = java.nio.file.Path.of(absolutePath)
 
 internal object FSJava : FS {
+  override fun fileExists(typedPath: TypedPath): Boolean = Files.isRegularFile(typedPath.toPath())
   override fun fileWriteBinary(typedPath: TypedPath, content: ByteArray) =
       typedPath.toPath().writeBytes(content)
   override fun fileReadBinary(typedPath: TypedPath) = typedPath.toPath().readBytes()
@@ -65,6 +67,7 @@ internal object SnapshotSystemJUnit5 : SnapshotSystem {
   override val layout = SnapshotFileLayoutJUnit5(SelfieSettingsAPI.initialize(), fs)
   private val commentTracker = CommentTracker()
   private val inlineWriteTracker = InlineWriteTracker()
+  private val toBeFileWriteTracker = ToBeFileWriteTracker()
   private val progressPerClass = atomic(ArrayMap.empty<String, SnapshotFileProgress>())
   fun forClass(className: String): SnapshotFileProgress {
     // optimize for reads
@@ -89,6 +92,9 @@ internal object SnapshotSystemJUnit5 : SnapshotSystem {
   }
   override fun writeInline(literalValue: LiteralValue<*>, call: CallStack) {
     inlineWriteTracker.record(call, literalValue, layout)
+  }
+  override fun writeToBeFile(path: TypedPath, data: ByteArray, call: CallStack) {
+    toBeFileWriteTracker.writeToDisk(path, data, call, layout)
   }
   internal val testListenerRunning = AtomicBoolean(false)
   fun finishedAllTests() {
