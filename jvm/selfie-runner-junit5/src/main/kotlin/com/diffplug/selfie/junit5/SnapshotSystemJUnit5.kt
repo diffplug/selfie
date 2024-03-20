@@ -41,6 +41,7 @@ import org.opentest4j.AssertionFailedError
 internal fun TypedPath.toPath(): java.nio.file.Path = java.nio.file.Path.of(absolutePath)
 
 internal object FSJava : FS {
+  override fun fileExists(typedPath: TypedPath): Boolean = Files.isRegularFile(typedPath.toPath())
   override fun fileWriteBinary(typedPath: TypedPath, content: ByteArray) =
       typedPath.toPath().writeBytes(content)
   override fun fileReadBinary(typedPath: TypedPath) = typedPath.toPath().readBytes()

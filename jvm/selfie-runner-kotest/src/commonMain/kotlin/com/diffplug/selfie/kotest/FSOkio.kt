@@ -28,6 +28,8 @@ expect internal val FS_SYSTEM: FileSystem
 internal fun TypedPath.toPath(): okio.Path = absolutePath.toPath()
 
 internal object FSOkio : FS {
+  override fun fileExists(typedPath: TypedPath): Boolean =
+      FS_SYSTEM.metadataOrNull(typedPath.toPath())?.isRegularFile ?: false
   /** Walks the files (not directories) which are children and grandchildren of the given path. */
   override fun <T> fileWalk(typedPath: TypedPath, walk: (Sequence<TypedPath>) -> T): T =
       walk(

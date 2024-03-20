@@ -84,7 +84,12 @@ class CacheSelfieBinarySuspend<T>(
       if (isTodo) {
         throw Selfie.system.fs.assertFailed("Can't call `toBeFile_TODO` in ${Mode.readonly} mode!")
       } else {
-        return roundtrip.parse(Selfie.system.fs.fileReadBinary(resolvePath(subpath)))
+        val path = resolvePath(subpath)
+        if (!Selfie.system.fs.fileExists(path)) {
+          throw Selfie.system.fs.assertFailed(
+              Selfie.system.mode.msgSnapshotNotFoundNoSuchFile(path))
+        }
+        return roundtrip.parse(Selfie.system.fs.fileReadBinary(path))
       }
     }
   }

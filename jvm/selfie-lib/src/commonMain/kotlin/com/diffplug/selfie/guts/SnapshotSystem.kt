@@ -80,6 +80,11 @@ data class TypedPath(val absolutePath: String) : Comparable<TypedPath> {
 }
 
 interface FS {
+  /**
+   * Returns true if the given path exists *and is a file*, false if it doesn't or if it is a
+   * folder.
+   */
+  fun fileExists(typedPath: TypedPath): Boolean
   /** Walks the files (not directories) which are children and grandchildren of the given path. */
   fun <T> fileWalk(typedPath: TypedPath, walk: (Sequence<TypedPath>) -> T): T
   fun fileRead(typedPath: TypedPath) = fileReadBinary(typedPath).decodeToString()
