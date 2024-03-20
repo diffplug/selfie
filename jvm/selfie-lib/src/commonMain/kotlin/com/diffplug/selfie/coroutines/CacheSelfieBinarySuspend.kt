@@ -78,7 +78,7 @@ class CacheSelfieBinarySuspend<T>(
       if (isTodo) {
         Selfie.system.writeInline(TodoStub.toBeFile.createLiteral(), call)
       }
-      Selfie.system.fs.fileWriteBinary(resolvePath(subpath), roundtrip.serialize(actual))
+      Selfie.system.writeToBeFile(resolvePath(subpath), roundtrip.serialize(actual), call)
       return actual
     } else {
       if (isTodo) {

@@ -105,6 +105,8 @@ interface SnapshotSystem {
   fun sourceFileHasWritableComment(call: CallStack): Boolean
   /** Indicates that the following value should be written into test sourcecode. */
   fun writeInline(literalValue: LiteralValue<*>, call: CallStack)
+  /** Writes the given bytes to the given file, checking for duplicate writes. */
+  fun writeToBeFile(path: TypedPath, data: ByteArray, call: CallStack)
   /** Returns the DiskStorage for the test associated with this thread, else error. */
   fun diskThreadLocal(): DiskStorage
 }

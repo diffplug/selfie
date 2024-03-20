@@ -132,7 +132,7 @@ class BinarySelfie(actual: Snapshot, disk: DiskStorage, private val onlyFacet: S
       if (isTodo) {
         Selfie.system.writeInline(TodoStub.toBeFile.createLiteral(), call)
       }
-      Selfie.system.fs.fileWriteBinary(resolvePath(subpath), actualBytes)
+      Selfie.system.writeToBeFile(resolvePath(subpath), actualBytes, call)
       return actualBytes
     } else {
       if (isTodo) {
