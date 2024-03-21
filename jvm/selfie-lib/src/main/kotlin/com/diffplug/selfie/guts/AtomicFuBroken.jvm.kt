@@ -14,27 +14,24 @@
  * limitations under the License.
  */
 package com.diffplug.selfie.guts
+
+import java.util.concurrent.atomic.AtomicReference
 actual fun <T> atomic(initial: T): AtomicRef<T> = AtomicRef(initial)
 
-actual class AtomicRef<T>(private var value: T) {
-  actual fun get() = value
-  actual fun updateAndGet(update: (T) -> T): T {
-    value = update(value)
-    return value
-  }
-  actual fun getAndUpdate(update: (T) -> T): T {
-    val oldValue = value
-    value = update(value)
-    return oldValue
-  }
+actual class AtomicRef<T>(value: T) {
+  val ref = AtomicReference(value)
+  actual fun get() = ref.get()
+  actual fun updateAndGet(update: (T) -> T): T = ref.updateAndGet(update)
+  actual fun getAndUpdate(update: (T) -> T) = ref.getAndUpdate(update)
 }
-val Lock = ReentrantLock()
-actual inline fun reentrantLock() = Lock
+actual inline fun reentrantLock() = com.diffplug.selfie.guts.ReentrantLock()
 
-@Suppress("NOTHING_TO_INLINE")
-actual class ReentrantLock {
-  actual inline fun lock(): Unit {}
-  actual inline fun tryLock() = true
-  actual inline fun unlock(): Unit {}
+actual typealias ReentrantLock = java.util.concurrent.locks.ReentrantLock
+actual inline fun <T> ReentrantLock.withLock(block: () -> T): T {
+  lock()
+  try {
+    return block()
+  } finally {
+    unlock()
+  }
 }
-actual inline fun <T> ReentrantLock.withLock(block: () -> T) = block()

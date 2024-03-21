@@ -17,7 +17,6 @@ package com.diffplug.selfie
 
 import java.io.ByteArrayOutputStream
 import java.io.ObjectOutputStream
-import java.io.Serializable
 fun <T : Serializable> Selfie.cacheSelfieBinarySerializable(
     toCache: Cacheable<T>
 ): CacheSelfieBinary<T> =

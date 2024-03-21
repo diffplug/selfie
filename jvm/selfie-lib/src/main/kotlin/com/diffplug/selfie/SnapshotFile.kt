@@ -102,9 +102,7 @@ private constructor(
 
   companion object {
     @JvmStatic fun of(binary: ByteArray) = of(SnapshotValue.of(binary))
-
     @JvmStatic fun of(string: String) = of(SnapshotValue.of(string))
-
     @JvmStatic fun of(subject: SnapshotValue) = Snapshot(subject, ArrayMap.empty())
 
     /**

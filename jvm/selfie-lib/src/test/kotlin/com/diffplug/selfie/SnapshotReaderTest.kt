@@ -67,7 +67,7 @@ class SnapshotReaderTest {
         Snapshot.of("Apple").plusFacet("color", "sad".toByteArray()).plusFacet("crisp", "yes")
     reader.peekKey() shouldBe "Orange"
     reader.peekKey() shouldBe "Orange"
-    reader.nextSnapshot() shouldBe Snapshot.of("sad".toByteArray())
+    reader.nextSnapshot() shouldBe Snapshot.Companion.of("sad".toByteArray())
     reader.peekKey() shouldBe null
   }
 }
