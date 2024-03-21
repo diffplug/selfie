@@ -1,5 +1,5 @@
 plugins {
-  id 'org.jetbrains.kotlin.multiplatform'
+  id 'org.jetbrains.kotlin.jvm'
   id 'maven-publish'
 }
 repositories {
@@ -11,39 +11,22 @@ ext {
 }
 apply from: 干.file('base/changelog.gradle')
 apply from: rootProject.file('gradle/spotless.gradle')
-kotlin {
-  jvm {
-    testRuns["test"].executionTask.configure {
-      useJUnitPlatform()
-    }
-    compilations.main {
-      compilerOptions.configure((org.gradle.api.Action) {
-        it.setFreeCompilerArgs(['-Xjvm-default=all'])
-      })
-    }
-  }
-  js {
-    nodejs()
-  }
-  sourceSets {
-    commonMain {
-      dependencies {
-        compileOnly("org.jetbrains.kotlinx:kotlinx-serialization-json:$ver_KOTLIN_SERIALIZATION")
-      }
-    }
-    commonTest {
-      dependencies {
-        implementation kotlin('test')
-        implementation("io.kotest:kotest-assertions-core:$ver_KOTEST")
-        implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:$ver_KOTLIN_SERIALIZATION")
-      }
-    }
+
+tasks.withType(Test) {
+  useJUnitPlatform()
+}
+
+compileKotlin {
+  kotlinOptions {
+    freeCompilerArgs = ['-Xjvm-default=all']
   }
 }
 
-// the normal `test` task doesn't work for multiplatform projects
-tasks.create('test') {
-  dependsOn('jvmTest')
+dependencies {
+  compileOnly "org.jetbrains.kotlinx:kotlinx-serialization-json:$ver_KOTLIN_SERIALIZATION"
+  //testImplementation kotlin('test')
+  testImplementation "io.kotest:kotest-assertions-core:$ver_KOTEST"
+  testImplementation "org.jetbrains.kotlinx:kotlinx-serialization-json:$ver_KOTLIN_SERIALIZATION"
 }
 
 // it all needs to get published and formatted
