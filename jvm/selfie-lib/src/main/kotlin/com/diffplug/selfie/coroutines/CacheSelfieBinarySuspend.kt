@@ -18,12 +18,14 @@ package com.diffplug.selfie.coroutines
 import com.diffplug.selfie.Mode
 import com.diffplug.selfie.Roundtrip
 import com.diffplug.selfie.Selfie
+import com.diffplug.selfie.SerializableRoundtrip
 import com.diffplug.selfie.Snapshot
 import com.diffplug.selfie.guts.DiskStorage
 import com.diffplug.selfie.guts.LiteralString
 import com.diffplug.selfie.guts.LiteralValue
 import com.diffplug.selfie.guts.TodoStub
 import com.diffplug.selfie.guts.recordCall
+import java.io.Serializable
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
@@ -118,3 +120,9 @@ class CacheSelfieBinarySuspend<T>(
     }
   }
 }
+
+/** Memoizes any [java.io.Serializable] type as a binary blob. */
+suspend fun <T : Serializable> cacheSelfieBinarySerializable(
+    toCache: suspend () -> T
+): CacheSelfieBinarySuspend<T> =
+    cacheSelfieBinary(SerializableRoundtrip as Roundtrip<T, ByteArray>, toCache)
