@@ -16,8 +16,14 @@
 package com.diffplug.selfie.guts
 
 import kotlin.math.abs
-
-internal expect fun jreVersion(): Int
+internal fun jreVersion(): Int {
+  val versionStr = System.getProperty("java.version")
+  return if (versionStr.startsWith("1.")) {
+    if (versionStr.startsWith("1.8")) 8 else throw Error("Unsupported java version: $versionStr")
+  } else {
+    versionStr.substringBefore('.').toInt()
+  }
+}
 
 enum class Language {
   JAVA,
