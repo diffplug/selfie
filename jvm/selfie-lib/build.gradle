@@ -12,7 +12,7 @@ ext {
 apply from: 干.file('base/changelog.gradle')
 apply from: rootProject.file('gradle/spotless.gradle')
 
-tasks.withType(Test) {
+test {
   useJUnitPlatform()
 }
 
@@ -27,6 +27,7 @@ dependencies {
   //testImplementation kotlin('test')
   testImplementation "io.kotest:kotest-assertions-core:$ver_KOTEST"
   testImplementation "org.jetbrains.kotlinx:kotlinx-serialization-json:$ver_KOTLIN_SERIALIZATION"
+  testImplementation "org.jetbrains.kotlin:kotlin-test"
 }
 
 // it all needs to get published and formatted
