@@ -60,8 +60,6 @@ private fun <T : Comparable<T>> ListBackedSet<T>.binarySearch(element: T): Int {
   } else list.binarySearch(element)
 }
 
-internal expect fun <K, V> entry(key: K, value: V): Map.Entry<K, V>
-
 /**
  * An immutable, sorted, array-backed map - if keys are [String], they have a special sort order
  * where `/` is the lowest key.
@@ -186,7 +184,7 @@ class ArrayMap<K : Comparable<K>, V : Any>(private val data: Array<Any>) : Map<K
           override fun get(index: Int): Map.Entry<K, V> {
             val key = data[index * 2] as K
             val value = data[index * 2 + 1] as V
-            return entry(key, value)
+            return java.util.Map.entry(key, value)
           }
         }
   override val size: Int
