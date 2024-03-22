@@ -17,29 +17,61 @@ package com.diffplug.selfie.guts
 
 import com.diffplug.selfie.ArrayMap
 import com.diffplug.selfie.Snapshot
+import java.util.stream.Collectors
 
-expect class CallLocation : Comparable<CallLocation> {
-  val fileName: String?
-  val line: Int
-  /** Returns a new CallLocation at the given line. */
-  fun withLine(line: Int): CallLocation
-  /** Returns a string which an IDE can render as a hyperlink. */
-  fun ideLink(layout: SnapshotFileLayout): String
+private const val UNKNOWN_METHOD = "<unknown>"
+
+/** Represents the line at which user code called into Selfie. */
+data class CallLocation(
+    val clazz: String,
+    val method: String,
+    val fileName: String?,
+    val line: Int
+) : Comparable<CallLocation> {
+  fun withLine(line: Int): CallLocation = CallLocation(clazz, UNKNOWN_METHOD, fileName, line)
+  fun samePathAs(other: CallLocation): Boolean = clazz == other.clazz && fileName == other.fileName
+  override fun compareTo(other: CallLocation): Int =
+      compareValuesBy(this, other, { it.clazz }, { it.method }, { it.fileName }, { it.line })
+
   /**
-   * Computing the exact path using [SnapshotFileLayout.sourcePathForCall] is expensive, so it can
-   * be helpful to cache these.
-   *
-   * If this method always returns false, that would be okay but slow. False negatives are okay,
-   * false positives will result in incorrect behavior.
+   * If the runtime didn't give us the filename, guess it from the class, and try to find the source
+   * file by walking the CWD. If we don't find it, report it as a `.class` file.
    */
-  fun samePathAs(other: CallLocation): Boolean
+  private fun findFileIfAbsent(layout: SnapshotFileLayout): String {
+    if (fileName != null) {
+      return fileName
+    }
+    return layout.sourcePathForCallMaybe(this)?.let { it.name }
+        ?: "${clazz.substringAfterLast('.')}.class"
+  }
 
+  /** A `toString` which an IDE will render as a clickable link. */
+  fun ideLink(layout: SnapshotFileLayout): String =
+      "$clazz.$method(${findFileIfAbsent(layout)}:$line)"
   /** Returns the likely name of the sourcecode of this file, without path or extension. */
-  fun sourceFilenameWithoutExtension(): String
-  override fun compareTo(other: CallLocation): Int
+  fun sourceFilenameWithoutExtension(): String = clazz.substringAfterLast('.').substringBefore('$')
 }
 
-internal expect fun recordCall(callerFileOnly: Boolean): CallStack
+/** Generates a CallLocation and the CallStack behind it. */
+internal fun recordCall(callerFileOnly: Boolean): CallStack =
+    StackWalker.getInstance().walk { frames ->
+      val framesWithDrop = frames.dropWhile { it.className.startsWith("com.diffplug.selfie") }
+      if (callerFileOnly) {
+        val caller =
+            framesWithDrop
+                .limit(1)
+                .map { CallLocation(it.className, UNKNOWN_METHOD, it.fileName, -1) }
+                .findFirst()
+                .get()
+        CallStack(caller, emptyList())
+      } else {
+        val fullStack =
+            framesWithDrop
+                .map { CallLocation(it.className, it.methodName, it.fileName, it.lineNumber) }
+                .collect(Collectors.toList())
+        CallStack(fullStack.get(0), fullStack.subList(1, fullStack.size))
+      }
+    }
 
 /** Represents the callstack above a given CallLocation. */
 class CallStack(val location: CallLocation, val restOfStack: List<CallLocation>) {
