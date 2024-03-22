@@ -15,6 +15,9 @@
  */
 package com.diffplug.selfie
 
+import java.io.ByteArrayOutputStream
+import java.io.ObjectOutputStream
+
 interface Roundtrip<T, SerializedForm> {
   fun serialize(value: T): SerializedForm
   fun parse(serialized: SerializedForm): T
@@ -42,5 +45,22 @@ class RoundtripJson<T>(private val strategy: kotlinx.serialization.KSerializer<T
 
   companion object {
     inline fun <reified T> of() = RoundtripJson<T>(kotlinx.serialization.serializer())
+  }
+}
+fun <T : java.io.Serializable> Selfie.cacheSelfieBinarySerializable(
+    toCache: Cacheable<T>
+): CacheSelfieBinary<T> =
+    cacheSelfieBinary(SerializableRoundtrip as Roundtrip<T, ByteArray>, toCache)
+
+internal object SerializableRoundtrip : Roundtrip<java.io.Serializable, ByteArray> {
+  override fun serialize(value: java.io.Serializable): ByteArray {
+    val output = ByteArrayOutputStream()
+    ObjectOutputStream(output).use { it.writeObject(value) }
+    return output.toByteArray()
+  }
+  override fun parse(serialized: ByteArray): java.io.Serializable {
+    return java.io.ObjectInputStream(serialized.inputStream()).use {
+      it.readObject() as java.io.Serializable
+    }
   }
 }
