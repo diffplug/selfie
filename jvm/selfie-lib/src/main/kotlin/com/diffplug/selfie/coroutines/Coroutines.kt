@@ -17,14 +17,24 @@ package com.diffplug.selfie.coroutines
 
 import com.diffplug.selfie.BinarySelfie
 import com.diffplug.selfie.Camera
+import com.diffplug.selfie.Mode
 import com.diffplug.selfie.Roundtrip
 import com.diffplug.selfie.RoundtripJson
+import com.diffplug.selfie.Selfie
+import com.diffplug.selfie.SerializableRoundtrip
 import com.diffplug.selfie.Snapshot
 import com.diffplug.selfie.StringSelfie
 import com.diffplug.selfie.guts.CallStack
 import com.diffplug.selfie.guts.CoroutineDiskStorage
 import com.diffplug.selfie.guts.DiskStorage
+import com.diffplug.selfie.guts.LiteralString
+import com.diffplug.selfie.guts.LiteralValue
+import com.diffplug.selfie.guts.TodoStub
+import com.diffplug.selfie.guts.recordCall
+import java.io.Serializable
 import kotlin.coroutines.coroutineContext
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 
 /**
  * Whenever Selfie is called from within a coroutine, you should use
@@ -76,3 +86,161 @@ suspend fun cacheSelfieBinary(toCache: suspend () -> ByteArray) =
     cacheSelfieBinary(Roundtrip.identity(), toCache)
 suspend fun <T> cacheSelfieBinary(roundtrip: Roundtrip<T, ByteArray>, toCache: suspend () -> T) =
     CacheSelfieBinarySuspend(disk(), roundtrip, toCache)
+
+class CacheSelfieSuspend<T>(
+    private val disk: DiskStorage,
+    private val roundtrip: Roundtrip<T, String>,
+    private val generator: suspend () -> T
+) {
+  suspend fun toMatchDisk(sub: String = ""): T {
+    return toMatchDiskImpl(sub, false)
+  }
+  suspend fun toMatchDisk_TODO(sub: String = ""): T {
+    return toMatchDiskImpl(sub, true)
+  }
+  private suspend fun toMatchDiskImpl(sub: String, isTodo: Boolean): T {
+    val call = recordCall(false)
+    if (Selfie.system.mode.canWrite(isTodo, call, Selfie.system)) {
+      val actual = generator()
+      disk.writeDisk(Snapshot.of(roundtrip.serialize(actual)), sub, call)
+      if (isTodo) {
+        Selfie.system.writeInline(TodoStub.toMatchDisk.createLiteral(), call)
+      }
+      return actual
+    } else {
+      if (isTodo) {
+        throw Selfie.system.fs.assertFailed(
+            "Can't call `toMatchDisk_TODO` in ${Mode.readonly} mode!")
+      } else {
+        val snapshot =
+            disk.readDisk(sub, call)
+                ?: throw Selfie.system.fs.assertFailed(Selfie.system.mode.msgSnapshotNotFound())
+        if (snapshot.subject.isBinary || snapshot.facets.isNotEmpty()) {
+          throw Selfie.system.fs.assertFailed(
+              "Expected a string subject with no facets, got ${snapshot}")
+        }
+        return roundtrip.parse(snapshot.subject.valueString())
+      }
+    }
+  }
+  suspend fun toBe_TODO(unusedArg: Any? = null): T {
+    return toBeImpl(null)
+  }
+  suspend fun toBe(expected: String): T {
+    return toBeImpl(expected)
+  }
+  private suspend fun toBeImpl(snapshot: String?): T {
+    val call = recordCall(false)
+    val writable = Selfie.system.mode.canWrite(snapshot == null, call, Selfie.system)
+    if (writable) {
+      val actual = generator()
+      Selfie.system.writeInline(
+          LiteralValue(snapshot, roundtrip.serialize(actual), LiteralString), call)
+      return actual
+    } else {
+      if (snapshot == null) {
+        throw Selfie.system.fs.assertFailed("Can't call `toBe_TODO` in ${Mode.readonly} mode!")
+      } else {
+        return roundtrip.parse(snapshot)
+      }
+    }
+  }
+}
+
+class CacheSelfieBinarySuspend<T>(
+    private val disk: DiskStorage,
+    private val roundtrip: Roundtrip<T, ByteArray>,
+    private val generator: suspend () -> T
+) {
+  suspend fun toMatchDisk(sub: String = ""): T {
+    return toMatchDiskImpl(sub, false)
+  }
+  suspend fun toMatchDisk_TODO(sub: String = ""): T {
+    return toMatchDiskImpl(sub, true)
+  }
+  private suspend fun toMatchDiskImpl(sub: String, isTodo: Boolean): T {
+    val call = recordCall(false)
+    if (Selfie.system.mode.canWrite(isTodo, call, Selfie.system)) {
+      val actual = generator()
+      disk.writeDisk(Snapshot.of(roundtrip.serialize(actual)), sub, call)
+      if (isTodo) {
+        Selfie.system.writeInline(TodoStub.toMatchDisk.createLiteral(), call)
+      }
+      return actual
+    } else {
+      if (isTodo) {
+        throw Selfie.system.fs.assertFailed(
+            "Can't call `toMatchDisk_TODO` in ${Mode.readonly} mode!")
+      } else {
+        val snapshot =
+            disk.readDisk(sub, call)
+                ?: throw Selfie.system.fs.assertFailed(Selfie.system.mode.msgSnapshotNotFound())
+        if (!snapshot.subject.isBinary || snapshot.facets.isNotEmpty()) {
+          throw Selfie.system.fs.assertFailed(
+              "Expected a binary subject with no facets, got ${snapshot}")
+        }
+        return roundtrip.parse(snapshot.subject.valueBinary())
+      }
+    }
+  }
+  private fun resolvePath(subpath: String) = Selfie.system.layout.rootFolder.resolveFile(subpath)
+  suspend fun toBeFile_TODO(subpath: String): T {
+    return toBeFileImpl(subpath, true)
+  }
+  suspend fun toBeFile(subpath: String): T {
+    return toBeFileImpl(subpath, false)
+  }
+  private suspend fun toBeFileImpl(subpath: String, isTodo: Boolean): T {
+    val call = recordCall(false)
+    val writable = Selfie.system.mode.canWrite(isTodo, call, Selfie.system)
+    if (writable) {
+      val actual = generator()
+      if (isTodo) {
+        Selfie.system.writeInline(TodoStub.toBeFile.createLiteral(), call)
+      }
+      Selfie.system.writeToBeFile(resolvePath(subpath), roundtrip.serialize(actual), call)
+      return actual
+    } else {
+      if (isTodo) {
+        throw Selfie.system.fs.assertFailed("Can't call `toBeFile_TODO` in ${Mode.readonly} mode!")
+      } else {
+        val path = resolvePath(subpath)
+        if (!Selfie.system.fs.fileExists(path)) {
+          throw Selfie.system.fs.assertFailed(
+              Selfie.system.mode.msgSnapshotNotFoundNoSuchFile(path))
+        }
+        return roundtrip.parse(Selfie.system.fs.fileReadBinary(path))
+      }
+    }
+  }
+  suspend fun toBeBase64_TODO(unusedArg: Any? = null): T {
+    return toBeBase64Impl(null)
+  }
+  suspend fun toBeBase64(snapshot: String): T {
+    return toBeBase64Impl(snapshot)
+  }
+
+  @OptIn(ExperimentalEncodingApi::class)
+  private suspend fun toBeBase64Impl(snapshot: String?): T {
+    val call = recordCall(false)
+    val writable = Selfie.system.mode.canWrite(snapshot == null, call, Selfie.system)
+    if (writable) {
+      val actual = generator()
+      val base64 = Base64.Mime.encode(roundtrip.serialize(actual)).replace("\r", "")
+      Selfie.system.writeInline(LiteralValue(snapshot, base64, LiteralString), call)
+      return actual
+    } else {
+      if (snapshot == null) {
+        throw Selfie.system.fs.assertFailed("Can't call `toBe_TODO` in ${Mode.readonly} mode!")
+      } else {
+        return roundtrip.parse(Base64.Mime.decode(snapshot))
+      }
+    }
+  }
+}
+
+/** Memoizes any [java.io.Serializable] type as a binary blob. */
+suspend fun <T : Serializable> cacheSelfieBinarySerializable(
+    toCache: suspend () -> T
+): CacheSelfieBinarySuspend<T> =
+    cacheSelfieBinary(SerializableRoundtrip as Roundtrip<T, ByteArray>, toCache)
