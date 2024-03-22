@@ -123,8 +123,34 @@ interface DiskStorage {
    */
   fun keep(subOrKeepAll: String?)
 }
-
-expect fun initSnapshotSystem(): SnapshotSystem
+fun initSnapshotSystem(): SnapshotSystem {
+  val placesToLook =
+      listOf(
+          "com.diffplug.selfie.junit5.SnapshotSystemJUnit5",
+          "com.diffplug.selfie.kotest.SelfieExtension")
+  val classesThatExist =
+      placesToLook.mapNotNull {
+        try {
+          Class.forName(it)
+        } catch (e: ClassNotFoundException) {
+          null
+        }
+      }
+  if (classesThatExist.size > 1) {
+    throw IllegalStateException(
+        """
+        Found multiple SnapshotStorage implementations: $classesThatExist
+        Only one of these should be on your classpath, not both:
+        - com.diffplug.spotless:selfie-runner-junit5
+        - com.diffplug.spotless:selfie-runner-kotest
+        """
+            .trimIndent())
+  } else if (classesThatExist.isEmpty()) {
+    throw IllegalStateException(
+        "Missing required artifact `com.diffplug.spotless:selfie-runner-junit5 or com.diffplug.spotless:selfie-runner-kotest")
+  }
+  return classesThatExist.get(0).getMethod("initStorage").invoke(null) as SnapshotSystem
+}
 
 interface SnapshotFileLayout {
   val rootFolder: TypedPath
