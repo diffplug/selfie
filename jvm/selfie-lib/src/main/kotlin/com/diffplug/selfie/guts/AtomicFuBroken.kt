@@ -15,21 +15,23 @@
  */
 package com.diffplug.selfie.guts
 
-expect class AtomicRef<T> {
-  fun get(): T
-  fun updateAndGet(update: (T) -> T): T
-  fun getAndUpdate(update: (T) -> T): T
+import java.util.concurrent.atomic.AtomicReference
+fun <T> atomic(initial: T): AtomicRef<T> = AtomicRef(initial)
+
+class AtomicRef<T>(value: T) {
+  val ref = AtomicReference(value)
+  fun get() = ref.get()
+  fun updateAndGet(update: (T) -> T): T = ref.updateAndGet(update)
+  fun getAndUpdate(update: (T) -> T) = ref.getAndUpdate(update)
 }
+fun reentrantLock() = com.diffplug.selfie.guts.ReentrantLock()
 
-/** Replace with atomicfu when stable. */
-expect fun <T> atomic(initial: T): AtomicRef<T>
-
-expect fun reentrantLock(): ReentrantLock
-
-expect class ReentrantLock {
-  fun lock(): Unit
-  fun tryLock(): Boolean
-  fun unlock(): Unit
+typealias ReentrantLock = java.util.concurrent.locks.ReentrantLock
+inline fun <T> ReentrantLock.withLock(block: () -> T): T {
+  lock()
+  try {
+    return block()
+  } finally {
+    unlock()
+  }
 }
-
-expect inline fun <T> ReentrantLock.withLock(block: () -> T): T
