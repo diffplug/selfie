@@ -17,6 +17,7 @@ package com.diffplug.selfie
 
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
+import java.util.Map.entry
 import kotlin.test.Test
 import kotlin.test.assertFails
 

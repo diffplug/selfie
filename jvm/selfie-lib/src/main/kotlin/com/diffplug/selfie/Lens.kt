@@ -72,7 +72,10 @@ open class CompoundLens : Lens {
     Snapshot.ofEntries(
         snapshot.allEntries().mapNotNull { e ->
           if (e.value.isBinary) e
-          else perString.apply(e.value.valueString())?.let { entry(e.key, SnapshotValue.of(it)) }
+          else
+              perString.apply(e.value.valueString())?.let {
+                java.util.Map.entry(e.key, SnapshotValue.of(it))
+              }
         })
   }
   fun setFacetFrom(target: String, source: String, function: StringOptionalFunction) =

@@ -16,6 +16,7 @@
 package com.diffplug.selfie
 
 import io.kotest.matchers.shouldBe
+import java.util.Map.entry
 import kotlin.test.Test
 
 class SnapshotFileTest {
