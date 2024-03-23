@@ -1,9 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <LangVersion>8.0</LangVersion>
     <TargetFramework>netstandard2.0</TargetFramework>
     <RootNamespace>DiffPlug.Selfie.Lib</RootNamespace>
-    <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
 
     <IsPackable>false</IsPackable>
@@ -17,9 +17,4 @@
     <PackageReference Include="NUnit.Analyzers" Version="3.9.0" />
     <PackageReference Include="NUnit3TestAdapter" Version="4.5.0" />
   </ItemGroup>
-
-  <ItemGroup>
-    <Using Include="NUnit.Framework" />
-  </ItemGroup>
-
 </Project>
