@@ -1,13 +1,10 @@
 using NUnit.Framework;
 
-namespace DiffPlug.Selfie.Guts.Tests
-{
+namespace DiffPlug.Selfie.Guts.Tests {
   [TestFixture]
-  public class SliceTest
-  {
+  public class SliceTest {
     [Test]
-    public void UnixLine()
-    {
+    public void UnixLine() {
       var singleLine = new Slice("A single line");
       Assert.That(singleLine.UnixLine(1).ToString(), Is.EqualTo("A single line"));
 
