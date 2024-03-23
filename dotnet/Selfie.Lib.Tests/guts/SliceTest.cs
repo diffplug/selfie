@@ -6,7 +6,7 @@ public class SliceTest {
   [Test]
   public void UnixLine() {
     var singleLine = new Slice("A single line");
-    Assert.That(singleLine.UnixLine(1).ToString(), Is.EqualTo("A single lineXXX"));
+    Assert.That(singleLine.UnixLine(1).ToString(), Is.EqualTo("A single line"));
 
     var oneTwoThree = new Slice("\nI am the first\nI, the second\n\nFOURTH\n");
     Assert.That(oneTwoThree.UnixLine(1).ToString(), Is.EqualTo(""));
