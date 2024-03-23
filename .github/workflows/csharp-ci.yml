@@ -26,3 +26,4 @@ jobs:
         uses: actions/setup-dotnet@v4
       - run: dotnet format --verify-no-changes ./Selfie.sln
       - run: dotnet build
+      - run: dotnet test
