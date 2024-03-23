@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <LangVersion>10.0</LangVersion>
+    <LangVersion>11.0</LangVersion>
     <TargetFramework>net8.0</TargetFramework>
     <RootNamespace>DiffPlug.Selfie.Lib</RootNamespace>
     <Nullable>enable</Nullable>
