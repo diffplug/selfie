@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <LangVersion>8.0</LangVersion>
-    <TargetFramework>netstandard2.0</TargetFramework>
+    <TargetFramework>net6.0</TargetFramework>
     <RootNamespace>DiffPlug.Selfie.Lib</RootNamespace>
     <Nullable>enable</Nullable>
 
