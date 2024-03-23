@@ -1,6 +1,6 @@
 using NUnit.Framework;
 
-namespace DiffPlug.Selfie.Guts.Tests; 
+namespace DiffPlug.Selfie.Guts.Tests;
 [TestFixture]
 public class SliceTest {
   [Test]
