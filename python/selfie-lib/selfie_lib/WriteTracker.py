@@ -1,8 +1,12 @@
-from typing import List, Optional, Generic, TypeVar, Dict
-from selfie_lib.CommentTracker import SnapshotFileLayout
+from typing import List, Optional, Generic, TypeVar, Dict, cast
 from abc import ABC, abstractmethod
 import inspect, threading
 from functools import total_ordering
+
+from selfie_lib.CommentTracker import SnapshotFileLayout
+from selfie_lib.SourceFile import SourceFile
+from selfie_lib.Literals import LiteralValue
+
 
 T = TypeVar("T")
 U = TypeVar("U")
@@ -132,3 +136,34 @@ class WriteTracker(ABC, Generic[T, U]):
 class DiskWriteTracker(WriteTracker[T, U]):
     def record(self, key: T, snapshot: U, call: CallStack, layout: SnapshotFileLayout):
         super().recordInternal(key, snapshot, call, layout)
+
+
+class InlineWriteTracker(WriteTracker[CallLocation, LiteralValue]):
+    def record(
+        self,
+        key: CallLocation,
+        snapshot: LiteralValue,
+        call: CallStack,
+        layout: SnapshotFileLayout,
+    ):
+        super().recordInternal(key, snapshot, call, layout)
+
+        file = layout.sourcePathForCall(key)
+        if snapshot.expected is not None:
+            content = SourceFile(file.name, layout.fs.file_read(file))
+            try:
+                snapshot = cast(LiteralValue, snapshot)
+                parsed_value = content.parse_to_be_like(key.line).parse_literal(
+                    snapshot.format
+                )
+            except Exception as e:
+                raise AssertionError(
+                    f"Error while parsing the literal at {key.ide_link(layout)}. Please report this error at https://github.com/diffplug/selfie",
+                    e,
+                )
+            if parsed_value != snapshot.expected:
+                raise layout.fs.assert_failed(
+                    f"Selfie cannot modify the literal at {key.ide_link(layout)} because Selfie has a parsing bug. Please report this error at https://github.com/diffplug/selfie",
+                    snapshot.expected,
+                    parsed_value,
+                )
