@@ -3,7 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 
-abstract class ListBackedSet<T> : ISet<T> {
+public abstract class ListBackedSet<T> : ISet<T> {
   public abstract T this[int index] { get; }
   public abstract int Count { get; }
   public bool IsReadOnly => false;
@@ -75,7 +75,7 @@ abstract class ListBackedSet<T> : ISet<T> {
   void ICollection<T>.Add(T item) => Add(item);
 
   private static IComparer<T> GetComparer(T element) =>
-      typeof(T) == typeof(string) ? (IComparer<T>)StringComparer : Comparer<T>.Default;
+      typeof(T) == typeof(string) ? (IComparer<T>)new StringComparer() : Comparer<T>.Default;
 
   private class StringComparer : IComparer<string> {
     public int Compare(string? x, string? y) => CompareStringsWithSlashFirst(x, y);
@@ -108,7 +108,7 @@ abstract class ListBackedSet<T> : ISet<T> {
   }
 }
 
-internal class ArrayMap<TKey, TValue> : IDictionary<TKey, TValue>
+public class ArrayMap<TKey, TValue> : IDictionary<TKey, TValue>
     where TKey : notnull, IComparable<TKey> {
   private readonly object[] _data;
 
@@ -152,18 +152,18 @@ internal class ArrayMap<TKey, TValue> : IDictionary<TKey, TValue>
   public ArrayMap<TKey, TValue> Plus(TKey key, TValue value) {
     var next = PlusOrNoOp(key, value);
     if (next == this) {
-      throw new ArgumentException($"Key already exists: {key}", nameof(key));
+      throw new ArgumentException($"Key already exists: {key}");
     }
     return next;
   }
 
   public ArrayMap<TKey, TValue> PlusOrNoOp(TKey key, TValue value) {
-    var index = Keys.IndexOf(key);
+    var index = KeysList.IndexOf(key);
     return index >= 0 ? this : Insert(~index, key, value);
   }
 
   public ArrayMap<TKey, TValue> PlusOrNoOpOrReplace(TKey key, TValue newValue) {
-    var index = Keys.IndexOf(key);
+    var index = KeysList.IndexOf(key);
     if (index >= 0) {
       var existingValue = _data[index * 2 + 1];
       return existingValue == null && newValue == null || existingValue?.Equals(newValue) == true
@@ -205,7 +205,8 @@ internal class ArrayMap<TKey, TValue> : IDictionary<TKey, TValue>
   }
 
 
-  public ICollection<TKey> Keys => new ArrayMapKeySet(_data);
+  public ListBackedSet<TKey> KeysList => new ArrayMapKeySet(_data);
+  public ICollection<TKey> Keys => KeysList;
   public ICollection<TValue> Values => new ArrayMapValueCollection(_data);
 
   public int Count => _data.Length / 2;
@@ -213,15 +214,15 @@ internal class ArrayMap<TKey, TValue> : IDictionary<TKey, TValue>
 
   public TValue this[TKey key] {
     get {
-      var index = Keys.IndexOf(key);
+      var index = KeysList.IndexOf(key);
       return index >= 0 ? (TValue)_data[index * 2 + 1]! : throw new KeyNotFoundException(key.ToString());
     }
     set => throw new NotSupportedException();
   }
 
-  public bool ContainsKey(TKey key) => Keys.IndexOf(key) >= 0;
+  public bool ContainsKey(TKey key) => KeysList.IndexOf(key) >= 0;
   public bool TryGetValue(TKey key, out TValue value) {
-    var index = Keys.IndexOf(key);
+    var index = KeysList.IndexOf(key);
     if (index >= 0) {
       value = (TValue)_data[index * 2 + 1]!;
       return true;
@@ -335,10 +336,10 @@ internal class ArrayMap<TKey, TValue> : IDictionary<TKey, TValue>
     public void Clear() => throw new NotSupportedException();
   }
 
-  public static ArrayMap<TKey, TValue> Empty => EmptyImpl;
-
   private static readonly ArrayMap<TKey, TValue> EmptyImpl =
       new(Array.Empty<object>());
+
+  public static ArrayMap<TKey, TValue> Empty { get; } = EmptyImpl;
 
   public static ArrayMap<TKey, TValue> Of(params KeyValuePair<TKey, TValue>[] pairs) {
     if (pairs.Length <= 1) {
