@@ -1,17 +1,15 @@
-# import base64
+import base64
 
 from abc import ABC, abstractmethod
 from typing import Union
-# from .PerCharacterEscaper import PerCharacterEscaper
+from .PerCharacterEscaper import PerCharacterEscaper
+from .ParseException import ParseException
+from .LineReader import LineReader
+
 
 def unix_newlines(string: str) -> str:
     return string.replace("\r\n", "\n")
 
-class ParseException(Exception):
-    def __init__(self, line_number, message):
-        super().__init__(f"L{line_number}:{message}")
-        self.line_number = line_number
-        self.message = message
 
 class SnapshotValue(ABC):
     @property
@@ -27,13 +25,14 @@ class SnapshotValue(ABC):
         pass
 
     @staticmethod
-    def of(value: Union[bytes, str]) -> 'SnapshotValue':
+    def of(value: Union[bytes, str]) -> "SnapshotValue":
         if isinstance(value, bytes):
             return SnapshotValueBinary(value)
         elif isinstance(value, str):
             return SnapshotValueString(unix_newlines(value))
         else:
             raise TypeError("Value must be either bytes or str")
+
 
 class SnapshotValueBinary(SnapshotValue):
     def __init__(self, value: bytes):
@@ -45,6 +44,7 @@ class SnapshotValueBinary(SnapshotValue):
     def value_string(self) -> str:
         raise NotImplementedError("This is a binary value.")
 
+
 class SnapshotValueString(SnapshotValue):
     def __init__(self, value: str):
         self._value = value
@@ -55,94 +55,97 @@ class SnapshotValueString(SnapshotValue):
     def value_string(self) -> str:
         return self._value
 
+
 class SnapshotValueReader:
-    KEY_FIRST_CHAR = '╔'
+    KEY_FIRST_CHAR = "╔"
     KEY_START = "╔═ "
     KEY_END = " ═╗"
     FLAG_BASE64 = " ═╗ base64"
-    
-    def __init__(self, content):
-        self.content = content.split("\n")
-        self.current_line = 0  
+    name_esc = PerCharacterEscaper.specified_escape(r"\\[(])\nn\tt╔┌╗┐═─")
+    body_esc = PerCharacterEscaper.self_escape("\uD801\uDF43\uD801\uDF41")
 
-    @classmethod
-    def of(cls, content):
-        return cls(content)
-    
-    def peekKey(self):
-        # Temporarily save the current state
-        temp_line = self.current_line
+    def __init__(self, line_reader):
+        self.line_reader = line_reader
+        self.line = None
+        self.unix_newlines = self.line_reader.unix_newlines()
 
-        # Attempt to read the next key
-        key = self.nextKey()
+    def peek_key(self):
+        return self.next_key()
 
-        # Restore the original state
-        self.current_line = temp_line
-        return key
+    def next_value(self):
+        # Validate key
+        self.next_key()
+        is_base64 = self.FLAG_BASE64 in self.next_line()
+        self.reset_line()
 
-    def nextValue(self):
-        value_lines = []
-        while True:
-            # Peek at the next line without advancing self.current_line
-            next_line = self.content[self.current_line] if self.current_line < len(self.content) else None
-            
-            # Check if the next line starts a new key
-            if next_line is None or self._is_start_of_new_key(next_line):
-                break  # Found the start of a new key or reached the end of content
+        # Read value
+        buffer = []
 
-            # Since it's not a new key, read the line to include it in the value
-            value_lines.append(self._read_line())
+        def consumer(line):
+            # Check for special condition and append to buffer accordingly
+            if len(line) >= 2 and ord(line[0]) == 0xD801 and ord(line[1]) == 0xDF41:
+                buffer.append(self.KEY_FIRST_CHAR)
+                buffer.append(line[2:])
+            else:
+                buffer.append(line)
+            buffer.append("\n")
 
-        value_string = "\n".join(value_lines).strip()
-        return SnapshotValue.of(value_string) 
+        self.scan_value(consumer)
 
-    def _is_start_of_new_key(self, line):
-        # Simplified key start detection; might need more robust logic for complex cases
-        return line.startswith("╔═ ") and " ═╗" in line
+        raw_string = "".join(buffer).rstrip("\n")
 
-
+        # Decode or unescape value
+        if is_base64:
+            decoded_bytes = base64.b64decode(raw_string)
+            return SnapshotValue.of(decoded_bytes)
+        else:
+            return SnapshotValue.of(self.body_esc.unescape(raw_string))
 
     def skip_value(self):
         self.next_key()
         self.reset_line()
-        self.scan_value(lambda _: None)
+        self.scan_value(lambda line: None)
 
     def scan_value(self, consumer):
-        next_line = self.next_line()
-        while next_line and not next_line.startswith(self.KEY_FIRST_CHAR):
-            self.reset_line()
-            consumer(next_line)
+        while True:
             next_line = self.next_line()
+            if not next_line or next_line.startswith(self.KEY_FIRST_CHAR):
+                break
+            consumer(next_line)
 
-    def nextKey(self):
-        line = self.nextLine()
+    def next_key(self):
+        line = self.next_line()
         if line is None:
             return None
-        if not line.startswith(self.KEY_START):
-            raise ParseException(self.current_line, "Expected to start with '╔═ '")
-        if not line.endswith(self.KEY_END):
-            raise ParseException(self.current_line, "Expected to contain ' ═╗'")
-
-        key = line[len(self.KEY_START): -len(self.KEY_END)]
-        if key.startswith(" "):
-            raise ParseException(self.current_line, "Leading spaces are disallowed: '{}'".format(key))
-        if key.endswith(" "):
-            raise ParseException(self.current_line, "Trailing spaces are disallowed: '{}'".format(key))
-        
-        return self.per_character_escaper.unescape(key) 
-
+        start_index = line.find(self.KEY_START)
+        end_index = line.find(self.KEY_END)
+        if start_index == -1:
+            raise ParseException(
+                self.line_reader, f"Expected to start with '{self.KEY_START}'"
+            )
+        if end_index == -1:
+            raise ParseException(
+                self.line_reader, f"Expected to contain '{self.KEY_END}'"
+            )
+        key = line[start_index + len(self.KEY_START) : end_index]
+        if key.startswith(" ") or key.endswith(" "):
+            space_type = "Leading" if key.startswith(" ") else "Trailing"
+            raise ParseException(
+                self.line_reader, f"{space_type} spaces are disallowed: '{key}'"
+            )
+        return self.name_esc.unescape(key) if self.name_esc else key
 
     def next_line(self):
-        if self.line is None:
-            self.line = self.line_reader.read_line()
-        return self.line
+        line = self.line_reader.read_line()
+        return line.rstrip("\r\n") if line else None
 
     def reset_line(self):
         self.line = None
 
-    def processLine(self, line):
-        # Process a single line, adjusting for special characters or encoding
-        if len(line) >= 2 and line[0] == '\uD801' and line[1] == '\uDF41':  # Using Python's Unicode representation
-            return self.KEY_FIRST_CHAR + line[2:] + '\n'
-        else:
-            return line + '\n'
+    @classmethod
+    def of(cls, content):
+        return cls(LineReader.for_string(content))
+
+    @classmethod
+    def of_binary(cls, content):
+        return cls(LineReader.for_binary(content))
