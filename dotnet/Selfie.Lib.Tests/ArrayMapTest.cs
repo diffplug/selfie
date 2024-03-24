@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace com.diffplug.selfie;
+namespace DiffPlug.Selfie.Lib.Tests;
 
 [TestFixture]
 public class ArrayMapTest {

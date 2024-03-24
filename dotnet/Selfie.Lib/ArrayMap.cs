@@ -3,6 +3,8 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 
+namespace DiffPlug.Selfie.Lib;
+
 public abstract class ListBackedSet<T> : ISet<T> {
   public abstract T this[int index] { get; }
   public abstract int Count { get; }

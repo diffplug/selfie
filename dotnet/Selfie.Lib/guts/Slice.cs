@@ -3,7 +3,7 @@ using System.Runtime.CompilerServices;
 
 [assembly: InternalsVisibleTo("Selfie.Lib.Tests")]
 
-namespace DiffPlug.Selfie.Guts;
+namespace DiffPlug.Selfie.Lib.Guts;
 internal class Slice {
   private string Base { get; }
   private int StartIndex { get; }
