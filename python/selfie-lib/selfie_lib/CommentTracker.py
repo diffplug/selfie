@@ -4,44 +4,8 @@ from enum import Enum, auto
 import threading
 
 from selfie_lib.Slice import Slice
-
 from selfie_lib.TypedPath import TypedPath
-
-T = TypeVar("T")
-
-
-class FS(ABC):
-    @abstractmethod
-    def file_walk(self, typed_path, walk: Callable[[Sequence["TypedPath"]], T]) -> T:
-        pass
-
-    @abstractmethod
-    def file_read(self, typed_path) -> str:
-        return self.file_read_binary(typed_path).decode()
-
-    @abstractmethod
-    def file_write(self, typed_path, content: str):
-        self.file_write_binary(typed_path, content.encode())
-
-    @abstractmethod
-    def file_read_binary(self, typed_path) -> bytes:
-        pass
-
-    @abstractmethod
-    def file_write_binary(self, typed_path, content: bytes):
-        pass
-
-    @abstractmethod
-    def assert_failed(self, message: str, expected=None, actual=None) -> Exception:
-        pass
-
-
-class SnapshotFileLayout:
-    def __init__(self, fs: FS):
-        self.fs = fs
-
-    def sourcePathForCall(self, location) -> "TypedPath":
-        raise NotImplementedError("sourcePathForCall is not implemented")
+from selfie_lib.WriteTracker import CallStack, SnapshotFileLayout
 
 
 class WritableComment(Enum):
@@ -67,10 +31,8 @@ class CommentTracker:
                 if comment == WritableComment.ONCE
             ]
 
-    def hasWritableComment(self, call, layout):
-        from selfie_lib.WriteTracker import CallStack
-
-        path = layout.sourcePathForCall(call.location)
+    def hasWritableComment(self, call: CallStack, layout: SnapshotFileLayout) -> bool:
+        path = layout.sourcePathForCall(call)
         with self.lock:
             if path in self.cache:
                 comment = self.cache[path]
