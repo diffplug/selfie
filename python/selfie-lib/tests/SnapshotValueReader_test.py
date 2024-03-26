@@ -27,7 +27,9 @@ Line 2
 """
         )
         assert reader.peek_key() == "00_empty"
+        assert reader.peek_key() == "00_empty"
         assert reader.next_value().value_string() == ""
+        assert reader.peek_key() == "01_singleLineString"
         assert reader.peek_key() == "01_singleLineString"
         assert reader.next_value().value_string() == "this is one line"
         assert reader.peek_key() == "01a_singleLineLeadingSpace"
@@ -73,27 +75,25 @@ Line 2
 
     def test_escape_characters_in_name(self):
         reader = SnapshotValueReader.of(
-            """
-            ╔═ test with \\(square brackets\\) in name ═╗
-            ╔═ test with \\\\backslash\\\\ in name ═╗
-            ╔═ test with\\nnewline\\nin name ═╗
-            ╔═ test with \\ttab\\t in name ═╗
-            ╔═ test with \\┌\\─ ascii art \\─\\┐ in name ═╗
-        """.strip()
+            """╔═ test with \\(square brackets\\) in name ═╗
+╔═ test with \\\\backslash\\\\ in name ═╗
+╔═ test with\\nnewline\\nin name ═╗
+╔═ test with \\ttab\\t in name ═╗
+╔═ test with \\┌\\─ ascii art \\─\\┐ in name ═╗"""
         )
-        assert reader.peek_key() == "test with (square brackets) in name"
+        assert reader.peek_key() == "test with [square brackets] in name"
         assert reader.next_value().value_string() == ""
         assert reader.peek_key() == "test with \\backslash\\ in name"
         assert reader.next_value().value_string() == ""
-        assert reader.peek_key().strip() == "test with\nnewline\nin name"
+        assert reader.peek_key() == "test with\nnewline\nin name"
         assert reader.next_value().value_string() == ""
         assert reader.peek_key() == "test with \ttab\t in name"
         assert reader.next_value().value_string() == ""
         assert reader.peek_key() == "test with ╔═ ascii art ═╗ in name"
         assert reader.next_value().value_string() == ""
 
-    def assert_key_value_with_skip(self, key, expected_value):
-        reader = SnapshotValueReader.of(self)
+    def assert_key_value_with_skip(self, test_content, key, expected_value):
+        reader = SnapshotValueReader.of(test_content)
         while reader.peek_key() != key:
             reader.skip_value()
         assert reader.peek_key() == key
@@ -102,15 +102,13 @@ Line 2
             reader.skip_value()
 
     def test_skip_values(self):
-        test_content = """
-            ╔═ 00_empty ═╗
-            ╔═ 01_singleLineString ═╗
-            this is one line
-            ╔═ 02_multiLineStringTrimmed ═╗
-            Line 1
-            Line 2
-            ╔═ 05_notSureHowKotlinMultilineWorks ═╗
-        """.strip()
+        test_content = """╔═ 00_empty ═╗
+╔═ 01_singleLineString ═╗
+this is one line
+╔═ 02_multiLineStringTrimmed ═╗
+Line 1
+Line 2
+╔═ 05_notSureHowKotlinMultilineWorks ═╗"""
         self.assert_key_value_with_skip(test_content, "00_empty", "")
         self.assert_key_value_with_skip(
             test_content, "01_singleLineString", "this is one line"
@@ -119,11 +117,10 @@ Line 2
             test_content, "02_multiLineStringTrimmed", "Line 1\nLine 2"
         )
 
-    def test_binary():
-        reader = SnapshotValueReader(
+    def test_binary(self):
+        reader = SnapshotValueReader.of(
             """╔═ Apple ═╗ base64 length 3 bytes
-    c2Fk
-    """
+c2Fk"""
         )
         assert reader.peek_key() == "Apple"
-        assert reader.next_value() == b"sad"
+        assert reader.next_value().value_binary() == b"sad"
