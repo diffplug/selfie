@@ -1,6 +1,7 @@
 import base64
 
 from abc import ABC, abstractmethod
+from operator import ne
 from typing import Union
 from .PerCharacterEscaper import PerCharacterEscaper
 from .ParseException import ParseException
@@ -64,19 +65,22 @@ class SnapshotValueReader:
     name_esc = PerCharacterEscaper.specified_escape(r"\\[(])\nn\tt╔┌╗┐═─")
     body_esc = PerCharacterEscaper.self_escape("\uD801\uDF43\uD801\uDF41")
 
-    def __init__(self, line_reader):
+    def __init__(self, line_reader: LineReader):
         self.line_reader = line_reader
-        self.line = None
+        self.line: str | None = None
         self.unix_newlines = self.line_reader.unix_newlines()
 
-    def peek_key(self):
-        return self.next_key()
+    def peek_key(self) -> str | None:
+        return self.__next_key()
 
-    def next_value(self):
+    def next_value(self) -> SnapshotValue:
         # Validate key
-        self.next_key()
-        is_base64 = self.FLAG_BASE64 in self.next_line()
-        self.reset_line()
+        self.__next_key()
+        nextLineCheckForBase64 = self.__next_line()
+        if nextLineCheckForBase64 is None:
+            raise ParseException(self.line_reader, "Expected to validate key")
+        is_base64 = self.FLAG_BASE64 in nextLineCheckForBase64
+        self.__reset_line()
 
         # Read value
         buffer = []
@@ -90,9 +94,9 @@ class SnapshotValueReader:
                 buffer.append(line)
             buffer.append("\n")
 
-        self.scan_value(consumer)
+        self.__scan_value(consumer)
 
-        raw_string = "".join(buffer).rstrip("\n")
+        raw_string = "" if buffer.__len__() == 0 else ("".join(buffer))[:-1]
 
         # Decode or unescape value
         if is_base64:
@@ -102,19 +106,23 @@ class SnapshotValueReader:
             return SnapshotValue.of(self.body_esc.unescape(raw_string))
 
     def skip_value(self):
-        self.next_key()
-        self.reset_line()
-        self.scan_value(lambda line: None)
+        self.__next_key()
+        self.__reset_line()
+        self.__scan_value(lambda line: None)
 
-    def scan_value(self, consumer):
-        while True:
-            next_line = self.next_line()
-            if not next_line or next_line.startswith(self.KEY_FIRST_CHAR):
-                break
-            consumer(next_line)
+    def __scan_value(self, consumer):
+        nextLine = self.__next_line()
+        while (
+            nextLine is not None
+            and nextLine.find(SnapshotValueReader.KEY_FIRST_CHAR) != 0
+        ):
+            debug = nextLine.find(SnapshotValueReader.KEY_FIRST_CHAR) != 0
+            self.__reset_line()
+            consumer(nextLine)
+            nextLine = self.__next_line()
 
-    def next_key(self):
-        line = self.next_line()
+    def __next_key(self):
+        line = self.__next_line()
         if line is None:
             return None
         start_index = line.find(self.KEY_START)
@@ -133,13 +141,14 @@ class SnapshotValueReader:
             raise ParseException(
                 self.line_reader, f"{space_type} spaces are disallowed: '{key}'"
             )
-        return self.name_esc.unescape(key) if self.name_esc else key
+        return self.name_esc.unescape(key)
 
-    def next_line(self):
-        line = self.line_reader.read_line()
-        return line.rstrip("\r\n") if line else None
+    def __next_line(self):
+        if self.line is None:
+            self.line = self.line_reader.read_line()
+        return self.line
 
-    def reset_line(self):
+    def __reset_line(self):
         self.line = None
 
     @classmethod
