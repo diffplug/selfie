@@ -1,7 +1,6 @@
 import base64
 
 from abc import ABC, abstractmethod
-from operator import ne
 from typing import Union
 from .PerCharacterEscaper import PerCharacterEscaper
 from .ParseException import ParseException
@@ -116,7 +115,6 @@ class SnapshotValueReader:
             nextLine is not None
             and nextLine.find(SnapshotValueReader.KEY_FIRST_CHAR) != 0
         ):
-            debug = nextLine.find(SnapshotValueReader.KEY_FIRST_CHAR) != 0
             self.__reset_line()
             consumer(nextLine)
             nextLine = self.__next_line()
