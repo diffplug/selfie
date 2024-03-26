@@ -12,6 +12,16 @@
     {
       "matchFileNames": ["jvm/**"],
       "labels": ["jvm"]
+    },
+    {
+      "matchFileNames": ["python/**"],
+      "labels": ["py"]
+    },
+    {
+      "groupName": "jooby",
+      "matchPackagePrefixes": [
+        "io.jooby:"
+      ]
     }
   ],
   "schedule": [

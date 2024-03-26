@@ -132,13 +132,18 @@ class BinarySelfie(actual: Snapshot, disk: DiskStorage, private val onlyFacet: S
       if (isTodo) {
         Selfie.system.writeInline(TodoStub.toBeFile.createLiteral(), call)
       }
-      Selfie.system.fs.fileWriteBinary(resolvePath(subpath), actualBytes)
+      Selfie.system.writeToBeFile(resolvePath(subpath), actualBytes, call)
       return actualBytes
     } else {
       if (isTodo) {
         throw Selfie.system.fs.assertFailed("Can't call `toBeFile_TODO` in ${Mode.readonly} mode!")
       } else {
-        val expected = Selfie.system.fs.fileReadBinary(resolvePath(subpath))
+        val path = resolvePath(subpath)
+        if (!Selfie.system.fs.fileExists(path)) {
+          throw Selfie.system.fs.assertFailed(
+              Selfie.system.mode.msgSnapshotNotFoundNoSuchFile(path))
+        }
+        val expected = Selfie.system.fs.fileReadBinary(path)
         if (expected.contentEquals(actualBytes)) {
           return actualBytes
         } else {

@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.2] - 2024-03-20
+### Fixed
+- `toBeFile` now checks for duplicate writes and throws a more helpful error message if the file doesn't exist. ([#277](https://github.com/diffplug/selfie/pull/277))
+
 ## [2.0.1] - 2024-02-24
 ### Fixed
 - The `coroutines` methods used to eagerly throw an exception if they were ever called from anywhere besides a Kotest method. Now they wait until `toMatchDisk()` is called, because they can work just fine anywhere if you use `toBe`. ([#247](https://github.com/diffplug/selfie/pull/247))

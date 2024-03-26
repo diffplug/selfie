@@ -18,6 +18,7 @@ package com.diffplug.selfie
 import com.diffplug.selfie.guts.CallStack
 import com.diffplug.selfie.guts.CommentTracker
 import com.diffplug.selfie.guts.SnapshotSystem
+import com.diffplug.selfie.guts.TypedPath
 
 enum class Mode {
   interactive,
@@ -39,6 +40,8 @@ enum class Mode {
         overwrite -> true
       }
   internal fun msgSnapshotNotFound() = msg("Snapshot not found")
+  internal fun msgSnapshotNotFoundNoSuchFile(file: TypedPath) =
+      msg("Snapshot not found: no such file $file")
   internal fun msgSnapshotMismatch() = msg("Snapshot mismatch")
   private fun msg(headline: String) =
       when (this) {

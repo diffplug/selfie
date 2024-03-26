@@ -80,7 +80,8 @@ sealed class WriteTracker<K : Comparable<K>, V> {
               expectSelfie(underTest).toBe("bash$")
             }
         """
-                  .trimIndent()
+          is ToBeFileWriteTracker ->
+              "You can fix this with `.toBeFile(String filename)` and pass a unique filename for each code path."
         }
     if (existing.snapshot != snapshot) {
       throw layout.fs.assertFailed(
@@ -100,6 +101,46 @@ class DiskWriteTracker : WriteTracker<String, Snapshot>() {
   fun record(key: String, snapshot: Snapshot, call: CallStack, layout: SnapshotFileLayout) {
     recordInternal(key, snapshot, call, layout)
   }
+}
+
+class ToBeFileWriteTracker : WriteTracker<TypedPath, ToBeFileLazyBytes>() {
+  fun writeToDisk(
+      key: TypedPath,
+      snapshot: ByteArray,
+      call: CallStack,
+      layout: SnapshotFileLayout
+  ) {
+    val lazyBytes = ToBeFileLazyBytes(key, layout, snapshot)
+    recordInternal(key, lazyBytes, call, layout)
+    // recordInternal will throw an exception on a duplicate write, so we can safely write to disk
+    lazyBytes.writeToDisk()
+    // and because we are doing duplicate checks, `ToBeFileLazyBytes` can allow its in-memory
+    // data to be garbage collected, because it can safely read from disk in the future
+  }
+}
+
+class ToBeFileLazyBytes(val location: TypedPath, val layout: SnapshotFileLayout, data: ByteArray) {
+  /** When constructed, we always have the data. */
+  var data: ByteArray? = data
+  /**
+   * Shortly after being construted, this data is written to disk, and we can stop holding it in
+   * memory.
+   */
+  internal fun writeToDisk() {
+    data?.let { layout.fs.fileWriteBinary(location, it) }
+        ?: throw IllegalStateException("Data has already been written to disk!")
+    data = null
+  }
+  /**
+   * If we need to read our data, we do it from memory if it's still there, or from disk if it
+   * isn't.
+   */
+  private fun readData(): ByteArray = data ?: layout.fs.fileReadBinary(location)
+  /** We calculate equality based on this data. */
+  override fun equals(other: Any?): Boolean =
+      if (this === other) true
+      else if (other is ToBeFileLazyBytes) readData().contentEquals(other.readData()) else false
+  override fun hashCode(): Int = readData().contentHashCode()
 }
 
 class InlineWriteTracker : WriteTracker<CallLocation, LiteralValue<*>>() {
