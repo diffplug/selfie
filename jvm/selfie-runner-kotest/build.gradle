@@ -17,9 +17,6 @@ kotlin {
       useJUnitPlatform()
     }
   }
-  js {
-    nodejs()
-  }
   sourceSets {
     commonMain {
       dependencies {
@@ -27,11 +24,6 @@ kotlin {
         api "io.kotest:kotest-framework-engine:$ver_KOTEST"
         api "io.kotest:kotest-assertions-shared:$ver_KOTEST"
         implementation "com.squareup.okio:okio:$ver_OKIO"
-      }
-    }
-    jsMain {
-      dependencies {
-        implementation "com.squareup.okio:okio-nodefilesystem:$ver_OKIO"
       }
     }
     commonTest {
@@ -49,13 +41,6 @@ kotlin {
   }
 }
 
-tasks.named('compileTestDevelopmentExecutableKotlinJs') {
-  enabled = false // TODO: https://github.com/diffplug/selfie/issues/186
-}
-jsNodeTest {
-  enabled = false // TODO: https://github.com/diffplug/selfie/issues/186
-  getInputs().dir('../undertest-kotest/src/commonTest/kotlin')
-}
 jvmTest {
   getInputs().dir('../undertest-kotest/src/commonTest/kotlin')
 }
