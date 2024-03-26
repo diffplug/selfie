@@ -23,12 +23,14 @@ class LineReader:
     def unix_newlines(self) -> bool:
         return self.__uses_unix_newlines
 
-    def read_line(self) -> str:
+    def read_line(self) -> str | None:
         line_bytes = self.__buffer.readline()
-        if line_bytes:
+        if line_bytes == b"":
+            return None
+        else:
             self.__line_count += 1  # Increment line count for each line read
-        line = line_bytes.decode("utf-8")
-        return line.rstrip("\r\n" if not self.__uses_unix_newlines else "\n")
+            line = line_bytes.decode("utf-8")
+            return line.rstrip("\r\n" if not self.__uses_unix_newlines else "\n")
 
     # Method to get the current line number
     def get_line_number(self) -> int:
