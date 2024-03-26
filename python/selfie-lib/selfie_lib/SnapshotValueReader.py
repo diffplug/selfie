@@ -62,7 +62,7 @@ class SnapshotValueReader:
     KEY_END = " ═╗"
     FLAG_BASE64 = " ═╗ base64"
     name_esc = PerCharacterEscaper.specified_escape("\\\\[(])\nn\tt╔┌╗┐═─")
-    body_esc = PerCharacterEscaper.self_escape("\uD801\uDF43\uD801\uDF41")
+    body_esc = PerCharacterEscaper.self_escape("\ud801\udf43\ud801\udf41")
 
     def __init__(self, line_reader: LineReader):
         self.line_reader = line_reader
