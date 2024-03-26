@@ -5,27 +5,26 @@ from selfie_lib import SnapshotValueReader, ParseException
 class TestSnapshotValueReader:
     def test_no_escaping_needed(self):
         reader = SnapshotValueReader.of(
-            """
-            ╔═ 00_empty ═╗
-            ╔═ 01_singleLineString ═╗
-            this is one line
-            ╔═ 01a_singleLineLeadingSpace ═╗
-             the leading space is significant
-            ╔═ 01b_singleLineTrailingSpace ═╗
-            the trailing space is significant
-            ╔═ 02_multiLineStringTrimmed ═╗
-            Line 1
-            Line 2
-            ╔═ 03_multiLineStringTrailingNewline ═╗
-            Line 1
-            Line 2
+            """╔═ 00_empty ═╗
+╔═ 01_singleLineString ═╗
+this is one line
+╔═ 01a_singleLineLeadingSpace ═╗
+ the leading space is significant
+╔═ 01b_singleLineTrailingSpace ═╗
+the trailing space is significant 
+╔═ 02_multiLineStringTrimmed ═╗
+Line 1
+Line 2
+╔═ 03_multiLineStringTrailingNewline ═╗
+Line 1
+Line 2
 
-            ╔═ 04_multiLineStringLeadingNewline ═╗
+╔═ 04_multiLineStringLeadingNewline ═╗
 
-            Line 1
-            Line 2
-            ╔═ 05_notSureHowKotlinMultilineWorks ═╗
-        """.strip()
+Line 1
+Line 2
+╔═ 05_notSureHowPythonMultilineWorks ═╗
+"""
         )
         assert reader.peek_key() == "00_empty"
         assert reader.next_value().value_string() == ""
@@ -43,7 +42,7 @@ class TestSnapshotValueReader:
         assert reader.next_value().value_string() == "Line 1\nLine 2\n"
         assert reader.peek_key() == "04_multiLineStringLeadingNewline"
         assert reader.next_value().value_string() == "\nLine 1\nLine 2"
-        assert reader.peek_key() == "05_notSureHowKotlinMultilineWorks"
+        assert reader.peek_key() == "05_notSureHowPythonMultilineWorks"
         assert reader.next_value().value_string() == ""
 
     def test_invalid_names(self):
