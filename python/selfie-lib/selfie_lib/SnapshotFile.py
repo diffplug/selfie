@@ -8,8 +8,6 @@ from .ParseException import ParseException
 from .SnapshotReader import SnapshotReader
 from .SnapshotValueReader import SnapshotValueReader
 
-
-
 class SnapshotFile:
     HEADER_PREFIX = "📷 "
     END_OF_FILE = "[end of file]"
@@ -77,8 +75,7 @@ class SnapshotFile:
         else:
             # For string values, applying specific escape logic and then replacing "\n╔" with a special sequence
             text_data = value.value_string()
-            # Assuming body_escape function handles the escaping as in SnapshotValueReader.bodyEsc.escape
-            escaped = body_escape(text_data).replace("\n╔", "\n\uDF41")
+            escaped = SnapshotValueReader.bodyEsc(text_data).replace("\n╔", "\n\uDF41")
             value_writer.write(escaped)
         value_writer.write("\n")
 

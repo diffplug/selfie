@@ -1,64 +1,78 @@
 from .SnapshotValue import SnapshotValue
+from collections import OrderedDict
 
 class Snapshot:
-    def __init__(self, subject, facet_data=None):
-        if facet_data is None:
-            facet_data = {}
-        self.subject = subject
+    def __init__(self, subject, facet_data):
+        self._subject = subject
         self._facet_data = facet_data
 
     @property
     def facets(self):
-        return self._facet_data
+        return OrderedDict(sorted(self._facet_data.items()))
 
     def plus_facet(self, key, value):
+        if isinstance(value, bytes):
+            value = SnapshotValue.of(value)
+        elif isinstance(value, str):
+            value = SnapshotValue.of(value)
+        return self._plus_facet(key, value)
+
+    def _plus_facet(self, key, value):
         if not key:
             raise ValueError("The empty string is reserved for the subject.")
-        new_facet_data = self._facet_data.copy()
-        new_facet_data[self._unix_newlines(key)] = SnapshotValue.of(value)
-        return Snapshot(self.subject, new_facet_data)
+        facet_data = dict(self._facet_data)
+        facet_data[self._unix_newlines(key)] = value
+        return Snapshot(self._subject, facet_data)
 
     def plus_or_replace(self, key, value):
         if not key:
             return Snapshot(value, self._facet_data)
-        new_facet_data = self._facet_data.copy()
-        new_facet_data[self._unix_newlines(key)] = value
-        return Snapshot(self.subject, new_facet_data)
+        facet_data = dict(self._facet_data)
+        facet_data[self._unix_newlines(key)] = value
+        return Snapshot(self._subject, facet_data)
 
     def subject_or_facet_maybe(self, key):
         if not key:
-            return self.subject
+            return self._subject
         return self._facet_data.get(key)
 
     def subject_or_facet(self, key):
-        result = self.subject_or_facet_maybe(key)
-        if result is None:
+        value = self.subject_or_facet_maybe(key)
+        if value is None:
             raise KeyError(f"'{key}' not found in {list(self._facet_data.keys())}")
-        return result
+        return value
 
     def all_entries(self):
-        return {**{"": self.subject}, **self._facet_data}
+        entries = [("", self._subject)]
+        entries.extend(self._facet_data.items())
+        return entries
 
     def __str__(self):
-        return f"[{self.subject} {self._facet_data}]"
+        return f"[{self._subject} {self._facet_data}]"
 
     @staticmethod
-    def _unix_newlines(key):
-        return key.replace("\r\n", "\n")
+    def of(binary):
+        return Snapshot(SnapshotValue.of(binary), {})
 
-    @classmethod
-    def of(cls, value):
-        return cls(SnapshotValue.of(value))
+    @staticmethod
+    def of(string):
+        return Snapshot(SnapshotValue.of(string), {})
 
-    @classmethod
-    def of_entries(cls, entries):
-        root = None
-        facets = {}
+    @staticmethod
+    def of_entries(entries):
+        subject = None
+        facet_data = {}
         for key, value in entries:
             if not key:
-                if root is not None:
-                    raise ValueError("Duplicate root snapshot.")
-                root = value
+                if subject is not None:
+                    raise ValueError(f"Duplicate root snapshot.\n first: {subject}\nsecond: {value}")
+                subject = value
             else:
-                facets[key] = value
-        return cls(root or SnapshotValue.of(""), facets)
+                facet_data[key] = value
+        if subject is None:
+            subject = SnapshotValue.of("")
+        return Snapshot(subject, facet_data)
+
+    @staticmethod
+    def _unix_newlines(string):
+        return string.replace("\\r\\n", "\\n")

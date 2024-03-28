@@ -5,16 +5,16 @@ class TestSnapshotReader:
     def test_facet(self):
         reader = SnapshotReader(
             SnapshotValueReader.of(
-                """
-                ╔═ Apple ═╗
-                Apple
-                ╔═ Apple[color] ═╗
-                green
-                ╔═ Apple[crisp] ═╗
-                yes
-                ╔═ Orange ═╗
-                Orange
-                """.strip()
+"""
+╔═ Apple ═╗
+Apple
+╔═ Apple[color] ═╗
+green
+╔═ Apple[crisp] ═╗
+yes
+╔═ Orange ═╗
+Orange
+""".strip()
             )
         )
         assert reader.peek_key() == "Apple"

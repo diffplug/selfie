@@ -1,9 +1,11 @@
 from abc import ABC, abstractmethod
 from typing import Union
+# from .SnapshotValueBinary import SnapshotValueBinary
+# from .SnapshotValueString import SnapshotValueString
 
 def unix_newlines(string: str) -> str:
     return string.replace("\r\n", "\n")
-
+    
 class SnapshotValue(ABC):
     @property
     def is_binary(self) -> bool:
@@ -25,6 +27,7 @@ class SnapshotValue(ABC):
             return SnapshotValueString(unix_newlines(value))
         else:
             raise TypeError("Value must be either bytes or str")
+        
 
 class SnapshotValueBinary(SnapshotValue):
     def __init__(self, value: bytes):
@@ -36,6 +39,7 @@ class SnapshotValueBinary(SnapshotValue):
     def value_string(self) -> str:
         raise NotImplementedError("This is a binary value.")
     
+
 class SnapshotValueString(SnapshotValue):
     def __init__(self, value: str):
         self._value = value

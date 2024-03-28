@@ -1,6 +1,4 @@
 from .Snapshot import Snapshot
-from .SnapshotFile import SnapshotFile
-
 
 class SnapshotReader:
     def __init__(self, value_reader):
@@ -8,7 +6,7 @@ class SnapshotReader:
 
     def peek_key(self):
         next_key = self.value_reader.peek_key()
-        if next_key is None or next_key == SnapshotFile.END_OF_FILE:
+        if next_key is None or next_key == "[end of file]":
             return None
         if '[' in next_key:
             raise ValueError(f"Missing root snapshot, square brackets not allowed: '{next_key}'")
@@ -22,7 +20,7 @@ class SnapshotReader:
             if next_key is None:
                 return snapshot
             facet_idx = next_key.find('[')
-            if facet_idx == -1 or (facet_idx == 0 and next_key == SnapshotFile.END_OF_FILE):
+            if facet_idx == -1 or (facet_idx == 0 and next_key == "[end of file]"):
                 return snapshot
             facet_root = next_key[:facet_idx]
             if facet_root != root_name:
