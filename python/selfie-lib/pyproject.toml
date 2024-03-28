@@ -2,7 +2,7 @@
 name = "selfie-lib"
 version = "0.1.0"
 description = "Infrastructure for creating selfie-compatible test runner plugins."
-authors = ["Ned Twigg <ned.twigg@diffplug.com>"]
+authors = ["Selina Delgado <sdelgado411@gmail.com>","Harvir Sahota <hsahota2312@gmail.com>","Ned Twigg <ned.twigg@diffplug.com>","Edwin Ye <EdwinYeDeveloper@gmail.com>"]
 license = "Apache-2.0"
 readme = "../README.md"
 
