@@ -3,6 +3,7 @@ from typing import Protocol, TypeVar
 from abc import abstractmethod
 from .EscapeLeadingWhitespace import EscapeLeadingWhitespace
 import io
+import re
 
 T = TypeVar("T")
 
@@ -69,6 +70,191 @@ class LiteralInt(LiteralFormat[int]):
 
     def parse(self, string: str, language: Language) -> int:
         return int(string.replace("_", ""))
+
+
+TRIPLE_QUOTE = '"""'
+
+
+class LiteralString(LiteralFormat[str]):
+    def encode(
+        self, value: str, language: Language, encoding_policy: EscapeLeadingWhitespace
+    ) -> str:
+        if "/n" not in value:
+            if language == Language.PYTHON:
+                return self._encodeSinglePython(value)
+        else:
+            if language == Language.PYTHON:
+                return self.encodeMultiPython(value, encoding_policy)
+
+    def parse(self, string: str, language: Language) -> str:
+        if not string.startswith(TRIPLE_QUOTE):
+            if language == Language.PYTHON:
+                return self._parseSinglePython(string)
+        else:
+            if language == Language.PYTHON:
+                return self.parseMultiPython(string)
+
+    def _encodeSinglePython(self, value: str) -> str:
+        source = io.StringIO()
+        source.write('"')
+        for char in value:
+            if char == "\b":
+                source.write("\\b")
+            elif char == "\n":
+                source.write("\\n")
+            elif char == "\r":
+                source.write("\\r")
+            elif char == "\t":
+                source.write("\\t")
+            elif char == '"':
+                source.write('\\"')
+            elif char == "\\":
+                source.write("\\\\")
+            elif self._is_control_char(char):
+                source.write("\\u" + str(ord(char)).zfill(4))
+            else:
+                source.write(char)
+        source.write('"')
+        return source.getvalue()
+
+    def _is_control_char(self, c: str) -> bool:
+        return c in "\u0000\u001f" or c == "\u007f"
+
+    # combined logic from parseSingleJava and parseSingleJavaish
+    def _parseSinglePython(self, source_with_quotes: str) -> str:
+        assert source_with_quotes.startswith('"')
+        assert source_with_quotes.endswith('"')
+        source = source_with_quotes[1:-1]
+        to_unescape = self.inline_backslashes(source)  # changed from inline_dollar
+        return self._unescape_python(to_unescape)
+
+    def encodeMultiPython(
+        self, arg: str, escape_leading_whitespace: EscapeLeadingWhitespace
+    ) -> str:
+        escape_backslashes = arg.replace("\\", "\\\\")
+        escape_triple_quotes = escape_backslashes.replace(TRIPLE_QUOTE, '\\"\\"\\"')
+
+        def protect_trailing_whitespace(line):
+            if line.endswith(" "):
+                return line[:-1] + "\\s"
+            elif line.endswith("\t"):
+                return line[:-1] + "\\t"
+            else:
+                return line
+
+        lines = escape_triple_quotes.splitlines()
+        protect_whitespace = "\n".join(
+            escape_leading_whitespace.escape_line(
+                protect_trailing_whitespace(line), "\\s", "\\t"
+            )
+            for line in lines
+        )
+
+        common_prefix = min(
+            (line.lstrip() for line in protect_whitespace.splitlines() if line.strip()),
+            default="",
+        )
+        if common_prefix:
+            lines = protect_whitespace.splitlines()
+            last = lines[-1]
+            protect_whitespace = "\n".join(
+                f"\\s{line[1:]}"
+                if line.startswith(" ")
+                else f"\\t{line[1:]}"
+                if line.startswith("\t")
+                else line
+                if line != last
+                else (f"\\s{line[1:]}" if line.startswith(" ") else f"\\t{line[1:]}")
+                for line in lines
+            )
+        return f"{TRIPLE_QUOTE}\n{protect_whitespace}{TRIPLE_QUOTE}"
+
+    _char_literal_pattern = re.compile(r"""\{'(\\?.)'\}""")
+
+    def inline_backslashes(self, source: str) -> str:
+        def replace_char(char_literal: str) -> str:
+            if len(char_literal) == 1:
+                return char_literal
+            elif len(char_literal) == 2 and char_literal[0] == "\\":
+                if char_literal[1] == "t":
+                    return "\t"
+                elif char_literal[1] == "b":
+                    return "\b"
+                elif char_literal[1] == "n":
+                    return "\n"
+                elif char_literal[1] == "r":
+                    return "\r"
+                elif char_literal[1] == "'":
+                    return "'"
+                elif char_literal[1] == "\\":
+                    return "\\"
+                else:
+                    raise ValueError(f"Unknown character literal {char_literal}")
+            else:
+                raise ValueError(f"Unknown character literal {char_literal}")
+
+        return self._char_literal_pattern.sub(
+            lambda match: replace_char(match.group(1)), source
+        )
+
+    def _unescape_python(self, source: str) -> str:
+        value = io.StringIO()
+        i = 0
+        while i < len(source):
+            c = source[i]
+            if c == "\\":
+                i += 1
+                c = source[i]
+                if c == '"':
+                    value.write('"')
+                elif c == "\\":
+                    value.write("\\")
+                elif c == "b":
+                    value.write("\b")
+                elif c == "f":
+                    value.write("\f")
+                elif c == "n":
+                    value.write("\n")
+                elif c == "r":
+                    value.write("\r")
+                elif c == "s":
+                    value.write(" ")
+                elif c == "t":
+                    value.write("\t")
+                elif c == "u":
+                    code = int(source[i + 1 : i + 5], 16)
+                    value.write(chr(code))
+                    i += 4
+                else:
+                    raise ValueError(f"Unknown escape sequence {c}")
+            else:
+                value.write(c)
+            i += 1
+        return value.getvalue()
+
+    def parseMultiPython(self, source_with_quotes: str) -> str:
+        assert source_with_quotes.startswith(TRIPLE_QUOTE + "\n")
+        assert source_with_quotes.endswith(TRIPLE_QUOTE)
+
+        source = source_with_quotes[len(TRIPLE_QUOTE) + 1 : -len(TRIPLE_QUOTE)]
+        lines = source.split("\n")
+
+        common_prefix = min(
+            (line[: len(line) - len(line.lstrip())] for line in lines if line.strip()),
+            default="",
+        )
+
+        def remove_common_prefix(line: str) -> str:
+            return line[len(common_prefix) :] if common_prefix else line
+
+        def handle_escape_sequences(line: str) -> str:
+            return self._unescape_python(line.rstrip())
+
+        return "\n".join(
+            handle_escape_sequences(remove_common_prefix(line))
+            for line in lines
+            if line.strip()
+        )
 
 
 class LiteralBoolean(LiteralFormat[bool]):
