@@ -51,12 +51,15 @@ class Snapshot:
         return f"[{self._subject} {self._facet_data}]"
 
     @staticmethod
-    def of(binary):
-        return Snapshot(SnapshotValue.of(binary), {})
-
-    @staticmethod
-    def of(string):
-        return Snapshot(SnapshotValue.of(string), {})
+    def of(data):
+        if isinstance(data, bytes):
+            # Handling binary data
+            return Snapshot(SnapshotValue.of(data), {})
+        elif isinstance(data, str):
+            # Handling string data
+            return Snapshot(SnapshotValue.of(data), {})
+        else:
+            raise TypeError("Data must be either binary or string")
 
     @staticmethod
     def of_entries(entries):

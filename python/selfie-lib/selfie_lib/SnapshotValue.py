@@ -20,13 +20,15 @@ class SnapshotValue(ABC):
         pass
 
     @staticmethod
-    def of(value: Union[bytes, str]) -> "SnapshotValue":
-        if isinstance(value, bytes):
-            return SnapshotValueBinary(value)
-        elif isinstance(value, str):
-            return SnapshotValueString(unix_newlines(value))
+    def of(cls, data):
+        if isinstance(data, bytes):
+            return cls(SnapshotValue.of(data), {})
+        elif isinstance(data, str):
+            return cls(SnapshotValue.of(data), {})
+        elif isinstance(data, SnapshotValue):
+            return cls(data, {})
         else:
-            raise TypeError("Value must be either bytes or str")
+            raise TypeError("Unsupported type for Snapshot creation")
         
 
 class SnapshotValueBinary(SnapshotValue):
