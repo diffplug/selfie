@@ -4,9 +4,6 @@ on:
   pull_request:
     paths:
       - "python/**"
-defaults:
-  run:
-    working-directory: python/selfie-lib
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -27,6 +24,18 @@ jobs:
           python-version-file: "python/selfie-lib/pyproject.toml"
           cache: "poetry"
       - run: poetry install
+        working-directory: python/selfie-lib
       - run: poetry run pytest -vv
+        working-directory: python/selfie-lib
       - run: poetry run pyright
+        working-directory: python/selfie-lib
       - run: poetry run ruff format --check
+        working-directory: python/selfie-lib
+      - run: poetry install
+        working-directory: python/selfie-runner-pytest
+      - run: poetry run pytest -vv
+        working-directory: python/selfie-runner-pytest
+      - run: poetry run pyright
+        working-directory: python/selfie-runner-pytest
+      - run: poetry run ruff format --check
+        working-directory: python/selfie-runner-pytest
