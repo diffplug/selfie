@@ -1,9 +1,5 @@
 from .SnapshotValue import SnapshotValue
 from collections import OrderedDict
-import logging
-
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
 
 
 class Snapshot:
