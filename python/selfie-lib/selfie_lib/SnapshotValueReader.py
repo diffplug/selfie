@@ -4,8 +4,10 @@ from .ParseException import ParseException
 from .LineReader import LineReader
 from .SnapshotValue import SnapshotValue
 
+
 def unix_newlines(string: str) -> str:
     return string.replace("\r\n", "\n")
+
 
 class SnapshotValueReader:
     KEY_FIRST_CHAR = "╔"

@@ -1,11 +1,12 @@
 from base64 import b64decode
 from selfie_lib import SnapshotValueReader, Snapshot, SnapshotReader
 
+
 class TestSnapshotReader:
     def test_facet(self):
         reader = SnapshotReader(
             SnapshotValueReader.of(
-"""
+                """
 ╔═ Apple ═╗
 Apple
 ╔═ Apple[color] ═╗
@@ -19,7 +20,9 @@ Orange
         )
         assert reader.peek_key() == "Apple"
         assert reader.peek_key() == "Apple"
-        apple_snapshot = Snapshot.of("Apple").plus_facet("color", "green").plus_facet("crisp", "yes")
+        apple_snapshot = (
+            Snapshot.of("Apple").plus_facet("color", "green").plus_facet("crisp", "yes")
+        )
         assert reader.next_snapshot() == apple_snapshot
         assert reader.peek_key() == "Orange"
         assert reader.peek_key() == "Orange"
@@ -30,20 +33,24 @@ Orange
         reader = SnapshotReader(
             SnapshotValueReader.of(
                 """
-                ╔═ Apple ═╗
-                Apple
-                ╔═ Apple[color] ═╗ base64 length 3 bytes
-                c2Fk
-                ╔═ Apple[crisp] ═╗
-                yes
-                ╔═ Orange ═╗ base64 length 3 bytes
-                c2Fk
-                """.strip()
+╔═ Apple ═╗
+Apple
+╔═ Apple[color] ═╗ base64 length 3 bytes
+c2Fk
+╔═ Apple[crisp] ═╗
+yes
+╔═ Orange ═╗ base64 length 3 bytes
+c2Fk
+""".strip()
             )
         )
         assert reader.peek_key() == "Apple"
         assert reader.peek_key() == "Apple"
-        apple_snapshot = Snapshot.of("Apple").plus_facet("color", b64decode("c2Fk")).plus_facet("crisp", "yes")
+        apple_snapshot = (
+            Snapshot.of("Apple")
+            .plus_facet("color", b64decode("c2Fk"))
+            .plus_facet("crisp", "yes")
+        )
         assert reader.next_snapshot() == apple_snapshot
         assert reader.peek_key() == "Orange"
         assert reader.peek_key() == "Orange"

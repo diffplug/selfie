@@ -1,5 +1,10 @@
 from .SnapshotValue import SnapshotValue
 from collections import OrderedDict
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
 
 class Snapshot:
     def __init__(self, subject, facet_data):
@@ -9,6 +14,14 @@ class Snapshot:
     @property
     def facets(self):
         return OrderedDict(sorted(self._facet_data.items()))
+
+    def __eq__(self, other):
+        if not isinstance(other, Snapshot):
+            return NotImplemented
+        return self._subject == other._subject and self._facet_data == other._facet_data
+
+    def __hash__(self):
+        return hash((self._subject, frozenset(self._facet_data.items())))
 
     def plus_facet(self, key, value):
         if isinstance(value, bytes):
@@ -47,7 +60,7 @@ class Snapshot:
         entries.extend(self._facet_data.items())
         return entries
 
-    def __str__(self):
+    def __bytes__(self):
         return f"[{self._subject} {self._facet_data}]"
 
     @staticmethod
@@ -58,8 +71,10 @@ class Snapshot:
         elif isinstance(data, str):
             # Handling string data
             return Snapshot(SnapshotValue.of(data), {})
+        elif isinstance(data, SnapshotValue):
+            return Snapshot(data, {})
         else:
-            raise TypeError("Data must be either binary or string")
+            raise TypeError("Data must be either binary or string" + data)
 
     @staticmethod
     def of_entries(entries):
@@ -68,7 +83,9 @@ class Snapshot:
         for key, value in entries:
             if not key:
                 if subject is not None:
-                    raise ValueError(f"Duplicate root snapshot.\n first: {subject}\nsecond: {value}")
+                    raise ValueError(
+                        f"Duplicate root snapshot.\n first: {subject}\nsecond: {value}"
+                    )
                 subject = value
             else:
                 facet_data[key] = value
