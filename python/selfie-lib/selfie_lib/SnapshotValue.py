@@ -1,7 +1,4 @@
 from abc import ABC, abstractmethod
-from typing import Union
-# from .SnapshotValueBinary import SnapshotValueBinary
-# from .SnapshotValueString import SnapshotValueString
 
 
 def unix_newlines(string: str) -> str:
@@ -43,17 +40,6 @@ class SnapshotValueBinary(SnapshotValue):
     def value_string(self) -> str:
         raise NotImplementedError("This is a binary value.")
 
-    # def __bytes__(self):
-    #     return self._value
-
-    # def __repr__ (self):
-    #     return self.__bytes__()
-
-    # def __eq__(self, other):
-    #     if not isinstance(other, SnapshotValueBinary):
-    #         return False
-    #     return self._value == other._value
-
     def __eq__(self, other):
         if isinstance(other, SnapshotValueBinary):
             return self.value_binary() == other.value_binary()
@@ -72,17 +58,6 @@ class SnapshotValueString(SnapshotValue):
 
     def value_string(self) -> str:
         return self._value
-
-    # def __str__(self):
-    #     return self._value
-
-    # def __repr__ (self):
-    #     return self.__str__()
-
-    # def __eq__(self, other):
-    #     if not isinstance(other, SnapshotValueString):
-    #         return False
-    #     return self._value == other._value
 
     def __eq__(self, other):
         if isinstance(other, SnapshotValueString):
