@@ -1,43 +1,25 @@
-[build-system]
-requires = [
-  "setuptools>=61.0.0",
-]
-build-backend = "setuptools.build_meta"
-
-[project.urls]
-Repository = "https://github.com/diffplug/selfie"
-[project]
+[tool.poetry]
 name = "pytest-selfie"
-description = "A pytest plugin for selfie snapshot testing."
 version = "0.1.0"
-readme = "README.rst"
-requires-python = ">=3.8"
-authors = [
-    { name = "Selina Delgado", email = "sdelgado411@gmail.com" },
-    { name = "Harvir Sahota", email = "hsahota2312@gmail.com" },
-    { name = "Ned Twigg", email = "ned.twigg@diffplug.com" },
-    { name = "Edwin Ye", email = "EdwinYeDeveloper@gmail.com" },
-]
-maintainers = [
-    { name = "Selina Delgado", email = "sdelgado411@gmail.com" },
-    { name = "Harvir Sahota", email = "hsahota2312@gmail.com" },
-    { name = "Ned Twigg", email = "ned.twigg@diffplug.com" },
-    { name = "Edwin Ye", email = "EdwinYeDeveloper@gmail.com" },
-]
-license = {file = "../../LICENSE"}
-classifiers = [
-    "Framework :: Pytest",
-    "Development Status :: 4 - Beta",
-    "Intended Audience :: Developers",
-    "Topic :: Software Development :: Testing",
-    "Operating System :: OS Independent",
-    "Programming Language :: Python",
-    "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3 :: Only",
-    "License :: OSI Approved :: Apache Software License",
-]
-dependencies = [
-    "pytest>=6.2.0",
-]
+description = "A pytest plugin for selfie snapshot testing."
+authors = ["Selina Delgado <sdelgado411@gmail.com>","Harvir Sahota <hsahota2312@gmail.com>","Ned Twigg <ned.twigg@diffplug.com>","Edwin Ye <EdwinYeDeveloper@gmail.com>"]
+license = "Apache-2.0"
+readme = "../README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+pytest = "^8.0.0"
+tox = "^4.0.0"
+selfie-lib = { path = "../selfie-lib", develop = true }
+
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.3.0"
+pyright = "^1.1.350"
+pytest = "^8.0.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
 [project.entry-points.pytest11]
-django = "pytest_pytest_selfie.plugin"
+pytest_selfie = "pytest_selfie.plugin"
