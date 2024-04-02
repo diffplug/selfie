@@ -3,64 +3,53 @@ pytest-selfie
 =============
 
 .. image:: https://img.shields.io/pypi/v/pytest-selfie.svg
-    :target: https://pypi.org/project/pytest-selfie
-    :alt: PyPI version
+:target: https://pypi.org/project/pytest-selfie
+:alt: PyPI version
 
 .. image:: https://img.shields.io/pypi/pyversions/pytest-selfie.svg
-    :target: https://pypi.org/project/pytest-selfie
-    :alt: Python versions
+:target: https://pypi.org/project/pytest-selfie
+:alt: Python versions
 
 .. image:: https://github.com/nedtwigg/pytest-selfie/actions/workflows/main.yml/badge.svg
-    :target: https://github.com/nedtwigg/pytest-selfie/actions/workflows/main.yml
-    :alt: See Build Status on GitHub Actions
+:target: https://github.com/nedtwigg/pytest-selfie/actions/workflows/main.yml
+:alt: See Build Status on GitHub Actions
 
 A pytest plugin for selfie snapshot testing.
 
-----
+---
 
 This `pytest`_ plugin was generated with `Cookiecutter`_ along with `@hackebrot`_'s `cookiecutter-pytest-plugin`_ template.
 
+## Features
 
-Features
---------
+- TODO
 
-* TODO
+## Requirements
 
+- TODO
 
-Requirements
-------------
-
-* TODO
-
-
-Installation
-------------
+## Installation
 
 You can install "pytest-selfie" via `pip`_ from `PyPI`_::
 
     $ pip install pytest-selfie
 
+## Usage
 
-Usage
------
+- TODO
 
-* TODO
+## Contributing
 
-Contributing
-------------
-Contributions are very welcome. Tests can be run with `tox`_, please ensure
+Contributions are very welcome. Tests can be run with `tox`\_, please ensure
 the coverage at least stays the same before you submit a pull request.
 
-License
--------
+## License
 
-Distributed under the terms of the `Apache Software License 2.0`_ license, "pytest-selfie" is free and open source software
+Distributed under the terms of the `Apache Software License 2.0`\_ license, "pytest-selfie" is free and open source software
 
+## Issues
 
-Issues
-------
-
-If you encounter any problems, please `file an issue`_ along with a detailed description.
+If you encounter any problems, please `file an issue`\_ along with a detailed description.
 
 .. _`Cookiecutter`: https://github.com/audreyr/cookiecutter
 .. _`@hackebrot`: https://github.com/hackebrot
