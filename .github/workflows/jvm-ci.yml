@@ -3,7 +3,7 @@ on:
     branches: [main]
   pull_request:
     paths:
-      - 'jvm/**'
+      - "jvm/**"
 defaults:
   run:
     working-directory: jvm
@@ -34,10 +34,10 @@ jobs:
         with:
           gradle-home-cache-cleanup: true
       - run: git fetch origin main
-      - run: ./gradlew build
+      - run: ./gradlew build --no-configuration-cache
       - name: junit result
         uses: mikepenz/action-junit-report@v4
         if: always() # always run even if the previous step fails
         with:
           check_name: JUnit ${{ matrix.jre }} ${{ matrix.os }}
-          report_paths: 'jvm/*/build/test-results/*/TEST-*.xml'
+          report_paths: "jvm/*/build/test-results/*/TEST-*.xml"
