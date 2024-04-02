@@ -41,3 +41,11 @@ jobs:
         working-directory: python/pytest-selfie
       - run: poetry run ruff format --check
         working-directory: python/pytest-selfie
+      - run: poetry install
+        working-directory: python/example-pytest-selfie
+      - run: poetry run pytest -vv
+        working-directory: python/example-pytest-selfie
+      - run: poetry run pyright
+        working-directory: python/example-pytest-selfie
+      - run: poetry run ruff format --check
+        working-directory: python/example-pytest-selfie
