@@ -136,7 +136,7 @@ class LiteralString(LiteralFormat[str]):
 
         def protect_trailing_whitespace(line):
             if line.endswith(" "):
-                return line[:-1] + "\\s"
+                return line[:-1] + "\x20"
             elif line.endswith("\t"):
                 return line[:-1] + "\\t"
             else:
@@ -145,28 +145,11 @@ class LiteralString(LiteralFormat[str]):
         lines = escape_triple_quotes.splitlines()
         protect_whitespace = "\n".join(
             escape_leading_whitespace.escape_line(
-                protect_trailing_whitespace(line), "\\s", "\\t"
+                protect_trailing_whitespace(line), "\x20", "\\t"
             )
             for line in lines
         )
 
-        common_prefix = min(
-            (line.lstrip() for line in protect_whitespace.splitlines() if line.strip()),
-            default="",
-        )
-        if common_prefix:
-            lines = protect_whitespace.splitlines()
-            last = lines[-1]
-            protect_whitespace = "\n".join(
-                f"\\s{line[1:]}"
-                if line.startswith(" ")
-                else f"\\t{line[1:]}"
-                if line.startswith("\t")
-                else line
-                if line != last
-                else (f"\\s{line[1:]}" if line.startswith(" ") else f"\\t{line[1:]}")
-                for line in lines
-            )
         return f"{TRIPLE_QUOTE}\n{protect_whitespace}{TRIPLE_QUOTE}"
 
     _char_literal_pattern = re.compile(r"""\{'(\\?.)'\}""")
