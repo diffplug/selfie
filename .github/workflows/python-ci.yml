@@ -35,6 +35,8 @@ jobs:
         working-directory: python/pytest-selfie
       - run: poetry run pytest -vv
         working-directory: python/pytest-selfie
+      - run: poetry run tox -e py
+        working-directory: python/pytest-selfie
       - run: poetry run pyright
         working-directory: python/pytest-selfie
       - run: poetry run ruff format --check
