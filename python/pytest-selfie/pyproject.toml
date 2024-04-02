@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "selfie-runner-pytest"
+name = "pytest-selfie"
 version = "0.1.0"
 description = "A pytest plugin for selfie snapshot testing."
 authors = ["Selina Delgado <sdelgado411@gmail.com>","Harvir Sahota <hsahota2312@gmail.com>","Ned Twigg <ned.twigg@diffplug.com>","Edwin Ye <EdwinYeDeveloper@gmail.com>"]

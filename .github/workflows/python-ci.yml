@@ -32,10 +32,10 @@ jobs:
       - run: poetry run ruff format --check
         working-directory: python/selfie-lib
       - run: poetry install
-        working-directory: python/selfie-runner-pytest
+        working-directory: python/pytest-selfie
       - run: poetry run pytest -vv
-        working-directory: python/selfie-runner-pytest
+        working-directory: python/pytest-selfie
       - run: poetry run pyright
-        working-directory: python/selfie-runner-pytest
+        working-directory: python/pytest-selfie
       - run: poetry run ruff format --check
-        working-directory: python/selfie-runner-pytest
+        working-directory: python/pytest-selfie
