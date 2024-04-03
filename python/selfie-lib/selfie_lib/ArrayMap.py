@@ -1,5 +1,5 @@
 from collections.abc import Set, Iterator, Mapping
-from typing import List, TypeVar, Union, Any, Callable, Optional, Generator
+from typing import List, TypeVar, Union, Any
 from abc import abstractmethod, ABC
 
 T = TypeVar("T")
@@ -7,35 +7,32 @@ V = TypeVar("V")
 K = TypeVar("K")
 
 
-class BinarySearchUtil:
-    @staticmethod
-    def binary_search(
-        data, item, compare_func: Optional[Callable[[Any, Any], int]] = None
-    ) -> int:
-        low, high = 0, len(data) - 1
-        while low <= high:
-            mid = (low + high) // 2
-            mid_val = data[mid] if not isinstance(data, ListBackedSet) else data[mid]
-            comparison = (
-                compare_func(mid_val, item)
-                if compare_func
-                else (mid_val > item) - (mid_val < item)
-            )
+def _compare_normal(a, b) -> int:
+    if a == b:
+        return 0
+    elif a < b:
+        return -1
+    else:
+        return 1
 
-            if comparison < 0:
-                low = mid + 1
-            elif comparison > 0:
-                high = mid - 1
-            else:
-                return mid  # item found
-        return -(low + 1)  # item not found
+def _compare_string_slash_first(a: str, b: str) -> int:
+    return _compare_normal(a.replace("/", "\0"), b.replace("/", "\0"))
 
-    @staticmethod
-    def default_compare(a: Any, b: Any) -> int:
-        """Default comparison function for binary search, with special handling for strings."""
-        if isinstance(a, str) and isinstance(b, str):
-            a, b = a.replace("/", "\0"), b.replace("/", "\0")
-        return (a > b) - (a < b)
+def _binary_search(data, item) -> int:
+    compare_func = _compare_string_slash_first if isinstance(item, str) else _compare_normal
+    low, high = 0, len(data) - 1
+    while low <= high:
+        mid = (low + high) // 2
+        mid_val = data[mid]
+        comparison = compare_func(mid_val, item)
+
+        if comparison < 0:
+            low = mid + 1
+        elif comparison > 0:
+            high = mid - 1
+        else:
+            return mid  # item found
+    return -(low + 1)  # item not found
 
 
 class ListBackedSet(Set[T], ABC):
@@ -52,7 +49,7 @@ class ListBackedSet(Set[T], ABC):
         return self._binary_search(item) >= 0
 
     def _binary_search(self, item: Any) -> int:
-        return BinarySearchUtil.binary_search(self, item)
+        return _binary_search(self, item)
 
 
 class ArraySet(ListBackedSet[K]):
@@ -125,7 +122,7 @@ class ArrayMap(Mapping[K, V]):
 
     def _binary_search_key(self, key: K) -> int:
         keys = [self.__data[i] for i in range(0, len(self.__data), 2)]
-        return BinarySearchUtil.binary_search(keys, key)
+        return _binary_search(keys, key)
 
     def plus(self, key: K, value: V) -> "ArrayMap[K, V]":
         index = self._binary_search_key(key)
