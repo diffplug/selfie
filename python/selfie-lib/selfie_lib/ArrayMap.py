@@ -15,11 +15,15 @@ def _compare_normal(a, b) -> int:
     else:
         return 1
 
+
 def _compare_string_slash_first(a: str, b: str) -> int:
     return _compare_normal(a.replace("/", "\0"), b.replace("/", "\0"))
 
+
 def _binary_search(data, item) -> int:
-    compare_func = _compare_string_slash_first if isinstance(item, str) else _compare_normal
+    compare_func = (
+        _compare_string_slash_first if isinstance(item, str) else _compare_normal
+    )
     low, high = 0, len(data) - 1
     while low <= high:
         mid = (low + high) // 2
