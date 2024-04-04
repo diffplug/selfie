@@ -1,40 +1,28 @@
 from threading import Lock
 from collections import OrderedDict
 from base64 import b64encode
-from typing import Optional, Dict
+from typing import Type, Optional, Dict, List,TypeVar, ClassVar
 from .Snapshot import Snapshot
 from .SnapshotReader import SnapshotReader
 from .ParseException import ParseException
 from .IllegalArgumentException import IllegalArgumentException
+from .SnapshotValue import SnapshotValue
+from .SnapshotValueReader import SnapshotValueReader
 
+TSnapshotFile = TypeVar("TSnapshotFile", bound="SnapshotFile")
 
 class SnapshotFile:
-    HEADER_PREFIX = "📷 "
-    END_OF_FILE = "[end of file]"
+    HEADER_PREFIX: ClassVar[str]  = "📷 "
+    END_OF_FILE: ClassVar[str] = "[end of file]"
 
     def __init__(self):
-        self.unix_newlines = True
+        self.unix_newlines: bool = True
         self.metadata: Optional[Dict[str, str]] = None
-        self._snapshots = OrderedDict()
-        self._lock = Lock()
-        self.was_set_at_test_time = False
+        self._snapshots: OrderedDict[str, Snapshot]  = OrderedDict()
+        self._lock: Lock = Lock()
+        self.was_set_at_test_time: bool = False
 
-    # def serialize(self, value_writer):
-    #     # Serialize metadata
-    #     if self.metadata:
-    #         for key, value in self.metadata.items():
-    #             value_writer.append(f"╔═ 📷 {key} ═╗\n{value}\n")
-
-    #     # Serialize snapshots and their facets
-    #     for key, snapshot in self._snapshots.items():
-    #         value_writer.append(f"╔═ {key} ═╗\n{snapshot._subject}\n")
-    #         for facet_key, facet_value in snapshot.facets.items():
-    #             value_writer.append(f"╔═ {key}[{facet_key}] ═╗\n{facet_value}\n")
-
-    #     # End of file
-    #     value_writer.append(f"╔═ {self.END_OF_FILE} ═╗\n")
-        
-    def serialize(self, value_writer): 
+    def serialize(self, value_writer: List[str]) -> None: 
         # Serialize metadata
         if self.metadata:
             for key, value in self.metadata.items():
@@ -56,7 +44,7 @@ class SnapshotFile:
 
 
     @staticmethod
-    def write_entry(value_writer, key, facet, value, newline_char):
+    def write_entry(value_writer: List[str], key: str, facet: Optional[str], value: SnapshotValue, newline_char: str) -> None:
         entry_line = f"╔═ {key}"
         if facet:
             entry_line += f"[{facet}]"
@@ -72,14 +60,14 @@ class SnapshotFile:
 
         value_writer.append(entry_line)
 
-    def set_at_test_time(self, key: str, snapshot: "Snapshot"):
+    def set_at_test_time(self, key: str, snapshot: Snapshot) -> None:
         with self._lock:
             old_snapshots = self._snapshots.copy()
             self._snapshots[key] = snapshot
             if old_snapshots != self._snapshots:
                 self.was_set_at_test_time = True
 
-    def remove_all_indices(self, indices):
+    def remove_all_indices(self, indices: List[int]) -> None:
         with self._lock:
             if not indices:
                 return
@@ -95,17 +83,17 @@ class SnapshotFile:
         self.was_set_at_test_time = True
 
     @classmethod
-    def parse(cls, value_reader):
+    def parse(cls: Type[TSnapshotFile], value_reader: SnapshotValueReader) -> "SnapshotFile":
         try:
             result = cls()
             result.unix_newlines = value_reader.unix_newlines
 
-            reader = SnapshotReader(value_reader)
+            reader: SnapshotReader  = SnapshotReader(value_reader)
 
-            peek_key = reader.peek_key()
+            peek_key: Optional[str] = reader.peek_key()
             if peek_key and peek_key.startswith(cls.HEADER_PREFIX):
-                metadata_name = peek_key[len(cls.HEADER_PREFIX) :]
-                metadata_value = value_reader.next_value().value_string()
+                metadata_name: str = peek_key[len(cls.HEADER_PREFIX) :]
+                metadata_value: str = value_reader.next_value().value_string()
                 result.metadata = {metadata_name: metadata_value}
 
             while True:
@@ -120,7 +108,7 @@ class SnapshotFile:
             raise ParseException(value_reader.line_reader, str(e))
 
     @classmethod
-    def create_empty_with_unix_newlines(cls, unix_newlines: bool) -> "SnapshotFile":
+    def create_empty_with_unix_newlines(cls: Type[TSnapshotFile], unix_newlines: bool) -> "SnapshotFile":
         result = cls()
         result.unix_newlines = unix_newlines
         return result
