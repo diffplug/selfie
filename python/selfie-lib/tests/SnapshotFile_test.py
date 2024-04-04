@@ -67,6 +67,5 @@ yes
 Orange
 ╔═ [end of file] ═╗
 """
-    
 
     assert "".join(buffer) == expected_output

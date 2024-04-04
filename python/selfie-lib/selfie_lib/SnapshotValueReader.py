@@ -104,10 +104,9 @@ class SnapshotValueReader:
         self.line = None
 
     @classmethod
-    def of(cls, content:str) -> 'SnapshotValueReader':
+    def of(cls, content: str) -> "SnapshotValueReader":
         return cls(LineReader.for_string(content))
 
     @classmethod
-    def of_binary(cls, content: bytes) -> 'SnapshotValueReader':
+    def of_binary(cls, content: bytes) -> "SnapshotValueReader":
         return cls(LineReader.for_binary(content))
-

@@ -9,7 +9,9 @@ class Snapshot:
     _subject: SnapshotValue
     _facet_data: Dict[str, SnapshotValue]
 
-    def __init__(self, subject: SnapshotValue, facet_data: Dict[str, SnapshotValue]) -> None:
+    def __init__(
+        self, subject: SnapshotValue, facet_data: Dict[str, SnapshotValue]
+    ) -> None:
         self._subject = subject
         self._facet_data = facet_data
 
@@ -25,7 +27,9 @@ class Snapshot:
     def __hash__(self) -> int:
         return hash((self._subject, frozenset(self._facet_data.items())))
 
-    def plus_facet(self, key: str, value: Union[bytes, str, SnapshotValue]) -> 'Snapshot':
+    def plus_facet(
+        self, key: str, value: Union[bytes, str, SnapshotValue]
+    ) -> "Snapshot":
         """
         Add a facet with the given key and value to the snapshot.
         The value can be bytes, a string, or a SnapshotValue.
@@ -34,14 +38,14 @@ class Snapshot:
         if isinstance(value, bytes):
             value = SnapshotValueBinary(value)
         elif isinstance(value, str):
-            value = SnapshotValueString(value) 
+            value = SnapshotValueString(value)
         elif not isinstance(value, SnapshotValue):
             raise TypeError("Value must be either bytes, str, or SnapshotValue")
 
         # Now we can safely pass a SnapshotValue instance to _plus_facet
         return self._plus_facet(key, value)
 
-    def _plus_facet(self, key: str, value: SnapshotValue) -> 'Snapshot':
+    def _plus_facet(self, key: str, value: SnapshotValue) -> "Snapshot":
         """
         The actual implementation to add a facet. This method should only be called
         with a SnapshotValue instance as value.
@@ -52,7 +56,7 @@ class Snapshot:
         facet_data[key] = value  # Here, value is guaranteed to be a SnapshotValue
         return Snapshot(self._subject, facet_data)
 
-    def plus_or_replace(self, key: str, value: SnapshotValue) -> 'Snapshot':
+    def plus_or_replace(self, key: str, value: SnapshotValue) -> "Snapshot":
         if not key:
             return Snapshot(value, self._facet_data)
         facet_data: Dict[str, SnapshotValue] = dict(self._facet_data)
@@ -71,12 +75,12 @@ class Snapshot:
         return value
 
     def all_entries(self) -> Dict[str, SnapshotValue]:
-        entries: Dict[str, SnapshotValue] = {"" : self._subject}
+        entries: Dict[str, SnapshotValue] = {"": self._subject}
         entries.update(self._facet_data)
         return entries
 
     @staticmethod
-    def of(data: Union[bytes, str, SnapshotValue]) -> 'Snapshot':
+    def of(data: Union[bytes, str, SnapshotValue]) -> "Snapshot":
         if isinstance(data, (bytes, str)):
             data = SnapshotValue.of(data)
         if not isinstance(data, SnapshotValue):
@@ -84,7 +88,7 @@ class Snapshot:
         return Snapshot(data, {})
 
     @staticmethod
-    def of_entries(entries: Dict[str, SnapshotValue]) -> 'Snapshot':
+    def of_entries(entries: Dict[str, SnapshotValue]) -> "Snapshot":
         subject: Optional[SnapshotValue] = None
         facet_data: Dict[str, SnapshotValue] = {}
         for key, value in entries.items():
@@ -94,7 +98,9 @@ class Snapshot:
                 subject = value
             else:
                 facet_data[key] = value
-        return Snapshot(subject if subject is not None else SnapshotValue.of(""), facet_data)
+        return Snapshot(
+            subject if subject is not None else SnapshotValue.of(""), facet_data
+        )
 
     @staticmethod
     def _unix_newlines(string: str) -> str:

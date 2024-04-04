@@ -77,16 +77,18 @@ class PerCharacterEscaper:
             return "".join(result)
 
     @classmethod
-    def self_escape(cls, escape_policy: str) -> 'PerCharacterEscaper':
+    def self_escape(cls, escape_policy: str) -> "PerCharacterEscaper":
         code_points: List[int] = [ord(c) for c in escape_policy]
         escape_code_point: int = code_points[0]
         return cls(escape_code_point, code_points, code_points)
 
     @classmethod
-    def specified_escape(cls, escape_policy: str) -> 'PerCharacterEscaper':
+    def specified_escape(cls, escape_policy: str) -> "PerCharacterEscaper":
         code_points: List[int] = [ord(c) for c in escape_policy]
         if len(code_points) % 2 != 0:
-            raise ValueError("Escape policy string must have an even number of characters.")
+            raise ValueError(
+                "Escape policy string must have an even number of characters."
+            )
         escape_code_point: int = code_points[0]
         escaped_code_points: List[int] = code_points[0::2]
         escaped_by_code_points: List[int] = code_points[1::2]

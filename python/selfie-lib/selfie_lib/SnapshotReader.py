@@ -2,6 +2,7 @@ from typing import Optional
 from .Snapshot import Snapshot
 from .SnapshotValueReader import SnapshotValueReader
 
+
 class SnapshotReader:
     def __init__(self, value_reader: SnapshotValueReader) -> None:
         self.value_reader: SnapshotValueReader = value_reader
@@ -11,7 +12,9 @@ class SnapshotReader:
         if next_key is None or next_key == "[end of file]":
             return None
         if "[" in next_key:
-            raise ValueError(f"Missing root snapshot, square brackets not allowed: '{next_key}'")
+            raise ValueError(
+                f"Missing root snapshot, square brackets not allowed: '{next_key}'"
+            )
         return next_key
 
     def next_snapshot(self) -> Snapshot:
@@ -26,11 +29,13 @@ class SnapshotReader:
                 return snapshot
             facet_root: str = next_key[:facet_idx]
             if facet_root != root_name:
-                raise ValueError(f"Expected '{next_key}' to come after '{facet_root}', not '{root_name}'")
+                raise ValueError(
+                    f"Expected '{next_key}' to come after '{facet_root}', not '{root_name}'"
+                )
             facet_end_idx: int = next_key.find("]", facet_idx + 1)
             if facet_end_idx == -1:
                 raise ValueError(f"Missing ] in {next_key}")
-            facet_name: str = next_key[facet_idx + 1:facet_end_idx]
+            facet_name: str = next_key[facet_idx + 1 : facet_end_idx]
             snapshot = snapshot.plus_facet(facet_name, self.value_reader.next_value())
 
     def skip_snapshot(self) -> None:
