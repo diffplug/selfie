@@ -1,18 +1,20 @@
 [tool.poetry]
-name = "selfie-lib"
+name = "example-pytest-selfie"
 version = "0.1.0"
-description = "Infrastructure for creating selfie-compatible test runner plugins."
+description = "An example project for using the pytest plugin for selfie snapshot testing."
 authors = ["Selina Delgado <sdelgado411@gmail.com>","Harvir Sahota <hsahota2312@gmail.com>","Ned Twigg <ned.twigg@diffplug.com>","Edwin Ye <EdwinYeDeveloper@gmail.com>"]
 license = "Apache-2.0"
-readme = "../README.md"
 
 [tool.poetry.dependencies]
 python = "^3.12"
+openai = "^1.0.0"
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.3.0"
 pyright = "^1.1.350"
 pytest = "^8.0.0"
+selfie-lib = { path = "../selfie-lib", develop = true }
+pytest-selfie = { path = "../pytest-selfie", develop = true }
 
 [build-system]
 requires = ["poetry-core"]

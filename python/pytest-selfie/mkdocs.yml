@@ -1,0 +1,10 @@
+site_name: pytest-selfie
+site_description: A pytest plugin for selfie snapshot testing.
+site_author: Ned Twigg
+
+theme: readthedocs
+
+repo_url: https://github.com/nedtwigg/pytest-selfie
+
+pages:
+- Home: index.md

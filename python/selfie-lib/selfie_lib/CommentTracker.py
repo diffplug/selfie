@@ -1,19 +1,11 @@
-from typing import Dict, Iterable, Tuple
+from typing import Dict, Iterable, Tuple, Sequence, TypeVar, Callable
+from abc import ABC, abstractmethod
 from enum import Enum, auto
 import threading
-from selfie_lib.TypedPath import TypedPath
+
 from selfie_lib.Slice import Slice
-
-
-# Placeholder implementations for CallStack, SnapshotFileLayout, and FS
-class CallStack:
-    pass
-
-
-class SnapshotFileLayout:
-    def sourcePathForCall(self, location) -> "TypedPath":
-        # Placeholder return or raise NotImplementedError
-        raise NotImplementedError("sourcePathForCall is not implemented")
+from selfie_lib.TypedPath import TypedPath
+from selfie_lib.WriteTracker import CallStack, SnapshotFileLayout
 
 
 class WritableComment(Enum):
