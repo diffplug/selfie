@@ -79,20 +79,26 @@ class LiteralString(LiteralFormat[str]):
     def encode(
         self, value: str, language: Language, encoding_policy: EscapeLeadingWhitespace
     ) -> str:
-        if "/n" not in value:
-            if language == Language.PYTHON:
+        if language == Language.PYTHON:
+            if "/n" not in value:
                 return self._encodeSinglePython(value)
-        else:
-            if language == Language.PYTHON:
+            else:
                 return self.encodeMultiPython(value, encoding_policy)
+        else:
+            raise NotImplementedError(
+                "Encoding for language {} is not implemented.".format(language)
+            )
 
     def parse(self, string: str, language: Language) -> str:
-        if not string.startswith(TRIPLE_QUOTE):
-            if language == Language.PYTHON:
+        if language == Language.PYTHON:
+            if not string.startswith(TRIPLE_QUOTE):
                 return self._parseSinglePython(string)
-        else:
-            if language == Language.PYTHON:
+            else:
                 return self.parseMultiPython(string)
+        else:
+            raise NotImplementedError(
+                "Encoding for language {} is not implemented.".format(language)
+            )
 
     def _encodeSinglePython(self, value: str) -> str:
         source = io.StringIO()
@@ -136,7 +142,7 @@ class LiteralString(LiteralFormat[str]):
 
         def protect_trailing_whitespace(line):
             if line.endswith(" "):
-                return line[:-1] + "\x20"
+                return line[:-1] + "\u0020"
             elif line.endswith("\t"):
                 return line[:-1] + "\\t"
             else:
@@ -145,7 +151,7 @@ class LiteralString(LiteralFormat[str]):
         lines = escape_triple_quotes.splitlines()
         protect_whitespace = "\n".join(
             escape_leading_whitespace.escape_line(
-                protect_trailing_whitespace(line), "\x20", "\\t"
+                protect_trailing_whitespace(line), "\u0020", "\\t"
             )
             for line in lines
         )

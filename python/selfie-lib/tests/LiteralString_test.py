@@ -32,7 +32,7 @@ class TestLiteralString:
             ("\\", "'''\n\\\\'''"),
             (
                 "  leading\ntrailing  ",
-                "'''\n" + "\x20 leading\n" + "trailing \x20'''",
+                "'''\n" + "\u0020 leading\n" + "trailing \u0020'''",
             ),
         ],
     )
