@@ -109,3 +109,4 @@ class SnapshotValueReader:
     @classmethod
     def of_binary(cls, content):
         return cls(LineReader.for_binary(content))
+
