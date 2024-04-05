@@ -1,7 +1,7 @@
 from tracemalloc import Snapshot
-from SelfieImplementations import StringSelfie
-from Snapshot import Snapshot
-from SnapshotSystem import _selfieSystem
+from .SelfieImplementations import StringSelfie
+from .Snapshot import Snapshot
+from .SnapshotSystem import _selfieSystem
 
 
 def expectSelfie(actual: str) -> "StringSelfie":

@@ -1,6 +1,6 @@
 from socketserver import ThreadingUnixStreamServer
-from Snapshot import Snapshot
-from SnapshotSystem import DiskStorage
+from .Snapshot import Snapshot
+from .SnapshotSystem import DiskStorage
 
 
 class FluentFacet:

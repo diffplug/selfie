@@ -1,5 +1,14 @@
 from typing import Optional, Tuple
+from selfie_lib import _initSelfieSystem, SnapshotSystem
 import pytest
+
+
+class PytestSnapshotSystem(SnapshotSystem):
+    def finishedAllTests(self):
+        pass
+
+
+pytestSystem = PytestSnapshotSystem()
 
 
 def pytest_addoption(parser):
@@ -22,14 +31,12 @@ def bar(request):
 
 @pytest.hookimpl
 def pytest_sessionstart(session: pytest.Session):
-    print("SELFIE SESSION STARTED")
-    pass
+    _initSelfieSystem(pytestSystem)
 
 
 @pytest.hookimpl
 def pytest_sessionfinish(session: pytest.Session, exitstatus):
-    print("SELFIE SESSION FINISHED")
-    pass
+    pytestSystem.finishedAllTests()
 
 
 @pytest.hookimpl(hookwrapper=True)

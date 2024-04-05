@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Callable, Sequence
-from TypedPath import TypedPath
+from .TypedPath import TypedPath
 
 
 class FS(ABC):
@@ -38,8 +38,8 @@ class SnapshotSystem:
     def __init__(self):
         pass
 
-    def diskThreadLocal() -> "DiskStorage":
-        raise NotImplementedError()
+    def diskThreadLocal(self) -> "DiskStorage":
+        return DiskStorage()
 
 
 selfieSystem = None
