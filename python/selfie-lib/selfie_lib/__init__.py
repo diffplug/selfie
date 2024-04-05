@@ -7,6 +7,6 @@ from .ParseException import ParseException as ParseException
 from .SnapshotReader import SnapshotReader as SnapshotReader
 from .Snapshot import Snapshot as Snapshot
 from .SnapshotValue import SnapshotValue as SnapshotValue
-from .TypedPath import TypedPath as TypedPath
 from .SnapshotSystem import SnapshotSystem as SnapshotSystem
 from .SnapshotSystem import _initSelfieSystem as _initSelfieSystem
+from .TypedPath import TypedPath as TypedPath
