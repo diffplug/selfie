@@ -1,6 +1,7 @@
-from typing import List, Optional, Generic, TypeVar, Dict, cast, Callable, Sequence
+from typing import List, Optional, Generic, TypeVar, Dict, cast
 from abc import ABC, abstractmethod
-import inspect, threading
+import inspect
+import threading
 from functools import total_ordering
 
 from selfie_lib.SourceFile import SourceFile
@@ -10,30 +11,6 @@ from selfie_lib.TypedPath import TypedPath
 
 T = TypeVar("T")
 U = TypeVar("U")
-
-
-class FS(ABC):
-    @abstractmethod
-    def file_walk(self, typed_path, walk: Callable[[Sequence["TypedPath"]], T]) -> T:
-        pass
-
-    def file_read(self, typed_path) -> str:
-        return self.file_read_binary(typed_path).decode()
-
-    def file_write(self, typed_path, content: str):
-        self.file_write_binary(typed_path, content.encode())
-
-    @abstractmethod
-    def file_read_binary(self, typed_path) -> bytes:
-        pass
-
-    @abstractmethod
-    def file_write_binary(self, typed_path, content: bytes):
-        pass
-
-    @abstractmethod
-    def assert_failed(self, message: str, expected=None, actual=None) -> Exception:
-        pass
 
 
 class SnapshotFileLayout:
