@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Callable, Sequence, Optional
 from .TypedPath import TypedPath
 from .Snapshot import Snapshot
-from .SnapshotFile import SnapshotFile 
+from .SnapshotFile import SnapshotFile
 from .Literals import LiteralValue
 
 
@@ -31,7 +31,7 @@ class FS(ABC):
 
 
 class DiskStorage(ABC):
-    from.WriteTracker import CallStack
+    from .WriteTracker import CallStack
 
     @abstractmethod
     def read_disk(self, sub: str, call: CallStack) -> Optional[Snapshot]:
@@ -47,7 +47,7 @@ class DiskStorage(ABC):
 
 
 class SnapshotSystem(ABC):
-    from.WriteTracker import CallStack
+    from .WriteTracker import CallStack
 
     @property
     @abstractmethod
