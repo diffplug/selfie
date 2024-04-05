@@ -1,10 +1,11 @@
 from abc import ABC, abstractmethod
 from typing import Callable, Sequence
+from TypedPath import TypedPath
 
 
 class FS(ABC):
     @abstractmethod
-    def file_walk(self, typed_path, walk: Callable[[Sequence["TypedPath"]], T]) -> T:
+    def file_walk[T](self, typed_path, walk: Callable[[Sequence["TypedPath"]], T]) -> T:
         pass
 
     def file_read(self, typed_path) -> str:
