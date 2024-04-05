@@ -1,6 +1,9 @@
 from abc import ABC, abstractmethod
-from typing import Callable, Sequence
+from typing import Callable, Sequence, Optional
 from .TypedPath import TypedPath
+from .Snapshot import Snapshot
+from .SnapshotFile import SnapshotFile 
+from .Literals import LiteralValue
 
 
 class FS(ABC):
@@ -27,19 +30,51 @@ class FS(ABC):
         pass
 
 
-# TODO: port DiskStorage into Python, it will be all @abstractmethod just like FS
-class DiskStorage:
-    def __init__(self):
+class DiskStorage(ABC):
+    from.WriteTracker import CallStack
+
+    @abstractmethod
+    def read_disk(self, sub: str, call: CallStack) -> Optional[Snapshot]:
+        pass
+
+    @abstractmethod
+    def write_disk(self, actual: Snapshot, sub: str, call: CallStack):
+        pass
+
+    @abstractmethod
+    def keep(self, sub_or_keep_all: Optional[str]):
         pass
 
 
-# TODO: port SnapshotSystem into Python, it will be all @abstractmethod just like FS
-class SnapshotSystem:
-    def __init__(self):
+class SnapshotSystem(ABC):
+    from.WriteTracker import CallStack
+
+    @property
+    @abstractmethod
+    def fs(self) -> FS:
         pass
 
-    def diskThreadLocal(self) -> "DiskStorage":
-        return DiskStorage()
+    @property
+    @abstractmethod
+    def mode(self) -> str:  # Adjust the type if Mode is an Enum or a specific class
+        pass
+
+    @property
+    @abstractmethod
+    def layout(self) -> SnapshotFile:
+        pass
+
+    @abstractmethod
+    def source_file_has_writable_comment(self, call: CallStack) -> bool:
+        pass
+
+    @abstractmethod
+    def write_inline(self, literal_value: LiteralValue, call: CallStack):
+        pass
+
+    @abstractmethod
+    def diskThreadLocal(self) -> DiskStorage:
+        pass
 
 
 selfieSystem = None
