@@ -23,8 +23,6 @@ class TestLiteralString:
         actual = literal_string._encodeSinglePython(value)
         assert actual == expected.replace("`", '"')
 
-    # Failing due to EscapeLeadingWhitespace always being NEVER
-    # and not an Always option like in the original test case
     @pytest.mark.parametrize(
         "value, expected",
         [
@@ -32,7 +30,7 @@ class TestLiteralString:
             ("\\", "'''\n\\\\'''"),
             (
                 "  leading\ntrailing  ",
-                "'''\n" + "\u0020 leading\n" + "trailing \u0020'''",
+                "'''\n" + "  leading\n" + "trailing \\u0020'''",
             ),
         ],
     )

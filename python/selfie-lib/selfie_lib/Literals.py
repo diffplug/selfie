@@ -142,7 +142,7 @@ class LiteralString(LiteralFormat[str]):
 
         def protect_trailing_whitespace(line):
             if line.endswith(" "):
-                return line[:-1] + "\u0020"
+                return line[:-1] + "\\u0020"
             elif line.endswith("\t"):
                 return line[:-1] + "\\t"
             else:
@@ -151,7 +151,7 @@ class LiteralString(LiteralFormat[str]):
         lines = escape_triple_quotes.splitlines()
         protect_whitespace = "\n".join(
             escape_leading_whitespace.escape_line(
-                protect_trailing_whitespace(line), "\u0020", "\\t"
+                protect_trailing_whitespace(line), "\\u0020", "\\t"
             )
             for line in lines
         )
