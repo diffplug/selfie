@@ -9,4 +9,10 @@ from .Snapshot import Snapshot as Snapshot
 from .SnapshotValue import SnapshotValue as SnapshotValue
 from .SnapshotSystem import SnapshotSystem as SnapshotSystem
 from .SnapshotSystem import _initSelfieSystem as _initSelfieSystem
+from .SnapshotSystem import FS as FS
+from .SnapshotSystem import DiskStorage as DiskStorage
+from .SnapshotSystem import SnapshotFile as SnapshotFile
 from .TypedPath import TypedPath as TypedPath
+from .WriteTracker import CallStack as CallStack
+from .WriteTracker import recordCall as recordCall
+from .Literals import LiteralValue as LiteralValue
