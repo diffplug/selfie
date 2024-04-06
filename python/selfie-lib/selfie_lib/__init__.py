@@ -12,6 +12,7 @@ from .SnapshotSystem import _initSelfieSystem as _initSelfieSystem
 from .SnapshotSystem import FS as FS
 from .SnapshotSystem import DiskStorage as DiskStorage
 from .SnapshotSystem import SnapshotFile as SnapshotFile
+from .SnapshotSystem import _selfieSystem as _selfieSystem
 from .TypedPath import TypedPath as TypedPath
 from .WriteTracker import CallStack as CallStack
 from .WriteTracker import recordCall as recordCall

@@ -3,6 +3,12 @@ from selfie_lib import _initSelfieSystem, SnapshotSystem
 from selfie_lib import FS, SnapshotFile, DiskStorage, CallStack, LiteralValue, recordCall
 import pytest
 
+class Mode:
+    def __init__(self, can_write: bool):
+        self._can_write = can_write
+
+    def can_write(self, write: bool, call):
+        return self._can_write
 
 class FSImplementation(FS):
     def file_walk(self, typed_path, walk):
@@ -34,20 +40,23 @@ class SnapshotFileLayoutImplementation(SnapshotFile):
     pass
 
 class PytestSnapshotSystem(SnapshotSystem):
-    def finishedAllTests(self):
-        pass
+    def __init__(self):
+        self._mode = Mode(can_write=True)
+
+    @property
+    def mode(self) -> Mode:
+        return self._mode
 
     @property
     def fs(self) -> FS:
         return FSImplementation()
 
     @property
-    def mode(self) -> str:
-        return "test_mode"
-
-    @property
     def layout(self) -> SnapshotFile:
         return SnapshotFileLayoutImplementation()
+
+    def diskThreadLocal(self) -> DiskStorage:
+        return DiskStorageImplementation()
 
     def source_file_has_writable_comment(self, call: CallStack) -> bool:
         return True
@@ -55,8 +64,8 @@ class PytestSnapshotSystem(SnapshotSystem):
     def write_inline(self, literal_value: LiteralValue, call: CallStack):
         pass
 
-    def diskThreadLocal(self) -> DiskStorage:
-        return DiskStorageImplementation()
+    def finishedAllTests(self):
+        pass
 
 pytestSystem = PytestSnapshotSystem()
 

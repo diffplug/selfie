@@ -1,6 +1,6 @@
 from socketserver import ThreadingUnixStreamServer
 from .Snapshot import Snapshot
-from .SnapshotSystem import DiskStorage, SnapshotSystem
+from .SnapshotSystem import DiskStorage, SnapshotSystem, _selfieSystem
 from .WriteTracker import recordCall
 
 
@@ -61,21 +61,3 @@ class StringSelfie(DiskSelfie):
             return self._expected  
         else:
             raise _selfieSystem().fs.assert_failed("Can't call `toBe_TODO` in readonly mode!")
-    
-
-selfieSystem = None 
-
-
-def _initSelfieSystem(system: SnapshotSystem):
-    global selfieSystem
-    if selfieSystem is not None:
-        raise Exception("Selfie system already initialized")
-    selfieSystem = system
-
-
-def _selfieSystem() -> "SnapshotSystem":
-    if selfieSystem is None:
-        raise Exception(
-            "Selfie system not initialized, make sure that `pytest-selfie` is installed and that you are running tests with `pytest`."
-        )
-    return selfieSystem
