@@ -1,14 +1,8 @@
 from typing import Optional, Tuple
 from selfie_lib import _initSelfieSystem, SnapshotSystem
-from selfie_lib import FS, SnapshotFile, DiskStorage, CallStack, LiteralValue, recordCall
+from selfie_lib import FS, SnapshotFile, DiskStorage, CallStack, LiteralValue, recordCall, Mode
 import pytest
 
-class Mode:
-    def __init__(self, can_write: bool):
-        self._can_write = can_write
-
-    def can_write(self, write: bool, call):
-        return self._can_write
 
 class FSImplementation(FS):
     def file_walk(self, typed_path, walk):
