@@ -74,7 +74,8 @@ def _initSelfieSystem(system: SnapshotSystem):
 
 
 def _selfieSystem() -> "SnapshotSystem":
-    global selfieSystem 
     if selfieSystem is None:
-        raise Exception("Selfie system not initialized")
+        raise Exception(
+            "Selfie system not initialized, make sure that `pytest-selfie` is installed and that you are running tests with `pytest`."
+        )
     return selfieSystem
