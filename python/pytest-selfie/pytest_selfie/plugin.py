@@ -78,11 +78,13 @@ def bar(request):
 
 @pytest.hookimpl
 def pytest_sessionstart(session: pytest.Session):
+    print("SELFIE SESSION STARTED")
     global pytestSystem
     _initSelfieSystem(pytestSystem)
 
 @pytest.hookimpl
 def pytest_sessionfinish(session: pytest.Session, exitstatus):
+    print("SELFIE SESSION FINISHED")
     pytestSystem.finishedAllTests()
 
 @pytest.hookimpl(hookwrapper=True)
