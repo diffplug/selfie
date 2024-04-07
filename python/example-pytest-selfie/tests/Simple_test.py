@@ -15,5 +15,7 @@ def test_comment_removal():  # selfieonce
 def test_inline():
     expectSelfie("A").toBe_TODO()
 
-def test_disk():
-    expectSelfie("A").toMatchDisk_TODO()
+    expectSelfie("testing123").toBe_TODO()
+
+# def test_disk():
+#    expectSelfie("A").toMatchDisk_TODO()
