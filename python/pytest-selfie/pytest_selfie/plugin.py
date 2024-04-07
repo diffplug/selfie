@@ -114,11 +114,15 @@ def replace_todo_in_test_file(test_id):
     matches = re.finditer(pattern, test_code, re.DOTALL)
 
     new_test_code = test_code
+
     for match in matches:
         expected_value = match.group(1)  # Capture the exact argument
         toBe_placeholder = f"toBe_TODO()"
         replacement_string = f"toBe('{expected_value}')"
         new_test_code = new_test_code.replace(toBe_placeholder, replacement_string, 1)
+
+    # Remove #selfieonce after all replacements
+    new_test_code = new_test_code.replace("#selfieonce", "")
 
     if test_code != new_test_code:
         full_file_path.write_text(new_test_code)
