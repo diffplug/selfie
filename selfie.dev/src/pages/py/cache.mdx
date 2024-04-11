@@ -13,7 +13,10 @@ export const imageUrl = "https://selfie.dev/cache.webp";
 
 **_THIS IS BROKEN. [WE ARE WORKING ON THIS](https://github.com/diffplug/selfie/issues/302)._**
 
-_`cacheSelfie` helps you build fast deterministic tests even if they contain slow non-deterministic components. A generative AI example is available [here](https://github.com/diffplug/selfie/tree/main/python/example-pytest-selfie)._
+**TODO: CacheSelfie is currently being implemented!**
+`cacheSelfie` helps you build fast deterministic tests even if they contain slow non-deterministic components. A generative AI example is available [here](https://github.com/diffplug/selfie/issues/319)
+
+**TODO: We don't currently have an example of cache selfie for python [yet](https://github.com/diffplug/selfie/issues/319)**.
 
 To use `expectSelfie`, you pass a _value_ that you want to snapshot.
 
@@ -62,7 +65,7 @@ The `toMatchDisk` method is nice because Selfie will garbage-collect the snapsho
 
 ## Roundtripping typed data
 
-{/* Python doesn't have Roundtrip, make an implementation? */}
+**TODO: We don't have Roundtrip in the Python, are we going to implement this? [PRs welcomed](https://github.com/diffplug/selfie)!**
 
 Oftentimes you want to snapshot something besides just a string or binary. For that there is:
 
@@ -77,6 +80,8 @@ T cacheSelfieBinary<T>(Roundtrip<T, byte[]> roundtrip, () -> someT())
 
 But you don't have to implement `Roundtrip` yourself.
 
+**TODO: Change once correct example is made**
+
 If you're using the `@kotlinx.serialization.Serializable` framework (where you annotate model classes with `@Serializable`), then you can use `cacheSelfieJson(() -> T)` and selfie will use Kotlin's built-in json serialization to implement the roundtrip.
 
 If you're using Java's `java.io.Serializable` (where model classes must implement `Serializable`) then you can use `cacheSelfieBinarySerializable(() -> T)` and selfie will use Java's built-in binary serialization mechanism to implement the roundtrip.
@@ -85,9 +90,11 @@ And of course, you can also write your own `Roundtrip` implementation, it's only
 
 ## Example
 
-{/* To be changed once we have an example for python */}
+**TODO: We don't currently have an example of cache selfie for Python [yet](https://github.com/diffplug/selfie/issues/319)**.
 
-Excerpted from [here](https://github.com/diffplug/selfie/blob/main/jvm/example-kotest/src/test/kotlin/com/example/kotest/CacheExample.kt):
+Excerpted from [here](https://github.com/diffplug/selfie/issues/319)
+
+**TODO: We need a [Python implementation](https://github.com/diffplug/selfie/issues/319)**:
 
 ```kotlin
 val chatCompletionRequest = ChatCompletionRequest(
@@ -128,7 +135,8 @@ cacheSelfieBinary { HttpClient().request(images[0].url).readBytes() }
   .toBeFile("com/example/kotest/dalle-3.png")
 ```
 
-{/* To be changed once we have an example for python */}
+**TODO: Update once example is done**
+
 Since we used `toBeFile`, we can open `com/example/kotest/dalle-3.png` in Mac Preview / Windows Explorer.
 
 <img alt="Robot self portrait" src="/dalle-3.webp" width="400px" />
