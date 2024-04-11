@@ -99,7 +99,7 @@ def update_test_files(session):
         if getattr(test, 'todo_replace', None):
             replace_todo_in_test_file(test.nodeid, test.todo_replace['expected'])
 
-def replace_todo_in_test_file(test_id):
+def replace_todo_in_test_file(test_id, expected=None):
     file_path, test_name = test_id.split("::")
     full_file_path = Path(file_path).resolve()
 
@@ -109,17 +109,18 @@ def replace_todo_in_test_file(test_id):
 
     test_code = full_file_path.read_text()
 
-    # Regex designed to capture multiline string arguments
-    pattern = r"expectSelfie\(\s*\"(.*?)\"\s*\)\.toBe_TODO\(\)"
-    matches = re.finditer(pattern, test_code, re.DOTALL)
+    # Regex designed to capture multiline string arguments for both toBe and toMatchDisk
+    todo_pattern = r"expectSelfie\(\s*\"(.*?)\"\s*\)\.(toBe|toMatchDisk)_TODO\(\)"
+    todo_matches = re.finditer(todo_pattern, test_code, re.DOTALL)
 
     new_test_code = test_code
 
-    for match in matches:
-        expected_value = match.group(1)  # Capture the exact argument
-        toBe_placeholder = f"toBe_TODO()"
-        replacement_string = f"toBe('{expected_value}')"
-        new_test_code = new_test_code.replace(toBe_placeholder, replacement_string, 1)
+    for match in todo_matches:
+        actual_value = match.group(1)  # Capture the exact argument
+        method = match.group(2)  # 'toBe' or 'toMatchDisk'
+        todo_placeholder = f"{method}_TODO()"
+        replacement_string = f"{method}('{actual_value}')"
+        new_test_code = new_test_code.replace(todo_placeholder, replacement_string, 1)
 
     # Remove #selfieonce after all replacements
     new_test_code = new_test_code.replace("#selfieonce", "")
@@ -129,6 +130,8 @@ def replace_todo_in_test_file(test_id):
         print(f"Updated test code in {full_file_path}")
     else:
         print("No changes made to the test code.")
+
+
 
 @pytest.hookimpl(hookwrapper=True)
 def pytest_pyfunc_call(pyfuncitem):

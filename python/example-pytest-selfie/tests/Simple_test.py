@@ -17,5 +17,5 @@ def test_inline():
 
     expectSelfie("testing123").toBe_TODO()
 
-# def test_disk():
-#    expectSelfie("A").toMatchDisk_TODO()
+def test_disk():
+    expectSelfie("A").toMatchDisk_TODO()
