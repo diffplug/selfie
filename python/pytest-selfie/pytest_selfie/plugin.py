@@ -120,6 +120,12 @@ def replace_todo_in_test_file(test_id, replacement_text=None):
     test_code = full_file_path.read_text()
     new_test_code = test_code
 
+    # Check if the file contains #selfieonce 
+    selfie_once_present = '#selfieonce' in new_test_code
+    if selfie_once_present:
+        # Remove the #selfieonce comment
+        new_test_code = new_test_code.replace('#selfieonce', '', 1)
+
     # Handling toBe_TODO() replacements 
     pattern_to_be = re.compile(r'expectSelfie\(\s*\"(.*?)\"\s*\)\.toBe_TODO\(\)', re.DOTALL)
     new_test_code = pattern_to_be.sub(lambda m: f"expectSelfie(\"{m.group(1)}\").toBe('{m.group(1)}')", new_test_code)
