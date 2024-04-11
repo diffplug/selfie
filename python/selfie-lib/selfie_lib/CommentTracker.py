@@ -3,9 +3,9 @@ from abc import ABC, abstractmethod
 from enum import Enum, auto
 import threading
 
-from selfie_lib.Slice import Slice
-from selfie_lib.TypedPath import TypedPath
-from selfie_lib.WriteTracker import CallStack, SnapshotFileLayout
+from .Slice import Slice
+from .TypedPath import TypedPath
+from .WriteTracker import CallStack, SnapshotFileLayout
 
 
 class WritableComment(Enum):

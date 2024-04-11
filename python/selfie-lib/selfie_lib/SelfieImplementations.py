@@ -26,22 +26,21 @@ class DiskSelfie(FluentFacet):
 
     def toMatchDisk(self, sub="") -> "DiskSelfie":
         call = recordCall()
-        if _selfieSystem().mode.can_write(False, call):
-            self._disk.write_disk(self._actual, sub, call)
+        snapshot_system = _selfieSystem()
+        if snapshot_system.mode.can_write(False, call):
+            snapshot_system.diskThreadLocal().write_disk(self._actual, sub, call)
         else:
-            expected = self._disk.read_disk(sub, call)
+            expected = snapshot_system.diskThreadLocal().read_disk(sub, call)
             if expected != self._actual:
-                print(
-                    f"ERROR: Disk snapshot mismatch! Expected '{expected}', got '{self._actual}'"
-                )
-                raise _selfieSystem().fs.assert_failed(
+                raise snapshot_system.fs.assert_failed(
                     "Snapshot mismatch!", expected, self._actual
                 )
         return self
 
     def toMatchDisk_TODO(self, sub="") -> "DiskSelfie":
         call = recordCall()
-        if _selfieSystem().mode.can_write(True, call):
+        snapshot_system = _selfieSystem()
+        if snapshot_system.mode.can_write(True, call):
             self._disk.write_disk(self._actual, sub, call)
             actual_snapshot_value = self._actual.subject_or_facet_maybe(sub)
             actual_value = (
@@ -49,16 +48,14 @@ class DiskSelfie(FluentFacet):
                 if not actual_snapshot_value.is_binary
                 else "binary data"
             )
-
             literal_value = LiteralValue(
                 expected=None,
                 actual=f"TODO: Expected '{self._expected}', got '{actual_value}'",
                 format=LiteralString(),
             )
-            _selfieSystem().write_inline(literal_value, call)
-            print(f"TODO: Expected '{self._expected}', got '{actual_value}'")
+            snapshot_system.write_inline(literal_value, call)
         else:
-            raise _selfieSystem().fs.assert_failed(
+            raise snapshot_system.fs.assert_failed(
                 "Can't call `toMatchDisk_TODO` in readonly mode!"
             )
         return self
@@ -66,39 +63,31 @@ class DiskSelfie(FluentFacet):
 
 class StringSelfie(DiskSelfie):
     def __init__(self, actual: Snapshot, disk: DiskStorage, expected: str):
-        super().__init__(actual, disk)
-        self._expected = expected
+        super().__init__(actual, disk, expected)
 
     def toBe(self, expected: str) -> str:
         result = self._expected
         if result != expected:
-            print(f"ERROR: Expected '{expected}', got '{result}'")
             raise _selfieSystem().fs.assert_failed(
                 "Expected value does not match!", expected, result
             )
-        print(f"PASSED: Expected and got '{result}'")
         return result
 
     def toBe_TODO(self) -> str:
         call = recordCall()
-        if _selfieSystem().mode.can_write(True, call):
-            actual_snapshot_value = self._actual.subject_or_facet_maybe(
-                ""
-            )  # Retrieve the SnapshotValue object
-            if actual_snapshot_value.is_binary:
-                actual_value = "binary data"  # Placeholder for binary data
-            else:
-                actual_value = actual_snapshot_value.value_string()
-
+        snapshot_system = _selfieSystem()
+        if snapshot_system.mode.can_write(True, call):
+            actual_snapshot_value = self._actual.subject_or_facet_maybe("")
+            actual_value = actual_snapshot_value.value_string() if not actual_snapshot_value.is_binary else "binary data"
             literal_value = LiteralValue(
                 expected=None,
                 actual=f"TODO: Expected '{self._expected}', got '{actual_value}'",
                 format=LiteralString(),
             )
-            _selfieSystem().write_inline(literal_value, call)
-            print(f"TODO: Expected '{self._expected}', got '{actual_value}'")
-            return self._expected
+            snapshot_system.write_inline(literal_value, call)
         else:
-            raise _selfieSystem().fs.assert_failed(
+            raise snapshot_system.fs.assert_failed(
                 "Can't call `toBe_TODO` in readonly mode!"
             )
+        return self._expected
+    

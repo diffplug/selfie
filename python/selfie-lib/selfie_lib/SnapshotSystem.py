@@ -4,6 +4,10 @@ from .TypedPath import TypedPath
 from .Snapshot import Snapshot
 from .SnapshotFile import SnapshotFile
 from .Literals import LiteralValue
+from .CommentTracker import CommentTracker
+from .WriteTracker import CallStack, CallLocation, InlineWriteTracker
+from .SnapshotReader import SnapshotReader
+from .SnapshotValueReader import SnapshotValueReader
 
 
 class Mode:
@@ -16,7 +20,7 @@ class Mode:
 
 class FS(ABC):
     @abstractmethod
-    def file_walk[T](self, typed_path, walk: Callable[[Sequence["TypedPath"]], T]) -> T:
+    def file_walk[T](self, typed_path, walk: Callable[[Sequence[TypedPath]], T]) -> T:
         pass
 
     def file_read(self, typed_path) -> str:
@@ -39,8 +43,6 @@ class FS(ABC):
 
 
 class DiskStorage(ABC):
-    from .WriteTracker import CallStack
-
     @abstractmethod
     def read_disk(self, sub: str, call: CallStack) -> Optional[Snapshot]:
         pass
@@ -55,7 +57,9 @@ class DiskStorage(ABC):
 
 
 class SnapshotSystem(ABC):
-    from .WriteTracker import CallStack
+    def __init__(self):
+        self._comment_tracker = CommentTracker()
+        self._inline_write_tracker = InlineWriteTracker()
 
     @property
     @abstractmethod
@@ -72,17 +76,32 @@ class SnapshotSystem(ABC):
     def layout(self) -> SnapshotFile:
         pass
 
-    @abstractmethod
     def source_file_has_writable_comment(self, call: CallStack) -> bool:
-        pass
+        return self._comment_tracker.hasWritableComment(call, self.layout)
 
-    @abstractmethod
     def write_inline(self, literal_value: LiteralValue, call: CallStack):
-        pass
+        call_location = CallLocation(call.location.file_name, call.location.line)
+        self._inline_write_tracker.record(call_location, literal_value, call, self.layout)
 
     @abstractmethod
     def diskThreadLocal(self) -> DiskStorage:
         pass
+
+    def read_snapshot_from_disk(self, file_path: TypedPath) -> Optional[Snapshot]:
+        try:
+            content = self.fs.file_read_binary(file_path)
+            value_reader = SnapshotValueReader.of_binary(content)
+            snapshot_reader = SnapshotReader(value_reader)
+            return snapshot_reader.next_snapshot()
+        except Exception as e:
+            raise self.fs.assert_failed(f"Failed to read snapshot from {file_path.absolute_path}: {str(e)}")
+
+    def write_snapshot_to_disk(self, snapshot: Snapshot, file_path: TypedPath):
+        try:
+            serialized_data = snapshot.serialize()
+            self.fs.file_write_binary(file_path, serialized_data)
+        except Exception as e:
+            raise self.fs.assert_failed(f"Failed to write snapshot to {file_path.absolute_path}: {str(e)}")
 
 
 selfieSystem = None

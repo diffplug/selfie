@@ -4,9 +4,9 @@ import inspect
 import threading
 from functools import total_ordering
 
-from selfie_lib.SourceFile import SourceFile
-from selfie_lib.Literals import LiteralValue
-from selfie_lib.TypedPath import TypedPath
+from .SourceFile import SourceFile
+from .Literals import LiteralValue
+from .TypedPath import TypedPath
 from .SnapshotSystem import FS
 
 

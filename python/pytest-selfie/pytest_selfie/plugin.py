@@ -1,6 +1,6 @@
 from typing import Optional, Tuple
 from selfie_lib import _initSelfieSystem, SnapshotSystem
-from selfie_lib import FS, SnapshotFile, DiskStorage, CallStack, LiteralValue, recordCall, Mode
+from selfie_lib import FS, SnapshotFile, DiskStorage, CallStack, LiteralValue, Mode
 from pathlib import Path
 import pytest
 import re
@@ -22,20 +22,14 @@ class FSImplementation(FS):
 
 class DiskStorageImplementation(DiskStorage):
     def read_disk(self, sub: str, call: CallStack) -> Optional[SnapshotFile]:
-        return None
+        print(f"Reading from disk: sub={sub}")
+        return None 
 
     def write_disk(self, actual: SnapshotFile, sub: str, call: CallStack):
-        pass
+        print(f"Writing to disk: {actual} at {sub}")
 
     def keep(self, sub_or_keep_all: Optional[str]):
-        pass
-
-    def recordCall(self, callerFileOnly: bool = False) -> CallStack:
-        return recordCall(callerFileOnly)
-
-
-class SnapshotFileLayoutImplementation(SnapshotFile):
-    pass
+        print(f"Keeping snapshot for: {sub_or_keep_all}")
 
 
 class PytestSnapshotSystem(SnapshotSystem):
@@ -48,11 +42,11 @@ class PytestSnapshotSystem(SnapshotSystem):
 
     @property
     def fs(self) -> FS:
-        return FSImplementation()
+        return FSImplementation()  
 
     @property
     def layout(self) -> SnapshotFile:
-        return SnapshotFileLayoutImplementation()
+        return SnapshotFile()  
 
     def diskThreadLocal(self) -> DiskStorage:
         return DiskStorageImplementation()
