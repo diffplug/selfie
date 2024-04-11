@@ -1,47 +1,31 @@
 import { DocsImage } from "@/components/DocsImage";
 
 export const title = "Selfie Python Snapshot Testing | Get started";
-export const description = "Zero-config inline and disk snapshots for Python. Add a single dependency and you're all set.";
+export const description =
+  "Zero-config inline and disk snapshots for Python. Add a single dependency and you're all set.";
 export const imageUrl = "https://selfie.dev/get-started.webp";
 
 <DocsImage imgAbsoluteUrl={imageUrl} />
 
 TODO: adapt this to Python
 
-To start snapshot testing in Java or any JVM language, all you need is to add a [single dependency](https://central.sonatype.com/artifact/com.diffplug.selfie/selfie-runner-junit5).
+To start snapshot testing in Python, all you need is to add a [single dependency](https://central.sonatype.com/artifact/com.diffplug.selfie/selfie-runner-junit5).
 
 ## Installation
 
 ### Requirements
 
-Selfie snapshot testing works with the following JVM test runners:
+Selfie snapshot testing works with the following Python test runners:
 
-- JUnit5
-- JUnit4 through junit-vintage
-- [Kotest (with JUnit5 or Kotlin Multiplatform)](./kotest)
+- Pytest
 - PRs welcome for other test runners
 
-Disk snapshots can be used with any JVM language, but inline literal snapshots only work if the test code is written in:
+Both disk and inline snapshots can be used with Python test code.
 
-- java (8+ is okay, but 15+ is recommended)
-- kotlin
-- groovy
-- scala
+### Poetry
 
-Adding support for other languages is [straightforward](https://github.com/diffplug/selfie/blob/main/jvm/selfie-lib/src/commonMain/kotlin/com/diffplug/selfie/guts/Literals.kt), PRs are welcome!
-
-### Maven
-
-If you're using Maven, add the following dependency to your `pom.xml` file:
-
-```xml
-<dependency>
-    <groupId>com.diffplug.selfie</groupId>
-    <artifactId>selfie-runner-junit5</artifactId>
-    <version>${ver_SELFIE}</version>
-    <scope>test</scope>
-</dependency>
-```
+Dependencies are managed using [poetry](https://python-poetry.org/docs/#installing-with-the-official-installer),
+then just cd into `selfie-lib` and `run poetry install`.
 
 Replace `ver_SELFIE` with the [latest available version of selfie](https://github.com/diffplug/selfie/blob/main/jvm/CHANGELOG.md).
 
@@ -82,24 +66,24 @@ Replace `ver_SELFIE` with the [latest available version of selfie](https://githu
 
 ## Quickstart
 
-*If you haven't seen the [GIF on our GitHub](https://github.com/diffplug/selfie), you might want to watch that first (give us a ⭐ while you're at it 😉).*
+_If you haven't seen the [GIF on our GitHub](https://github.com/diffplug/selfie), you might want to watch that first (give us a ⭐ while you're at it 😉)._
 
 Let's say we have the following test code:
 
-```java
-expectSelfie(List.of(1, 2, 3).toString()).toBe_TODO();
+```python
+expectSelfie(str([1, 2, 3])).toBe_TODO()
 ```
 
 If you run this test, selfie will rewrite your sourcecode to be this:
 
-```java
-expectSelfie(List.of(1, 2, 3).toString()).toBe("[1, 2, 3]");
+```python
+expectSelfie(str([1, 2, 3])).toBe("[1, 2, 3]")
 ```
 
 Now, let's change the code to this:
 
-```java
-expectSelfie("oops").toBe("[1, 2, 3]");
+```python
+expectSelfie("oops").toBe("[1, 2, 3]")
 ```
 
 When we run the test, we will get a failure, and the failure message will be:
@@ -123,17 +107,17 @@ As you can see, we have three options:
 
 To store a snapshot on disk, swap `toBe` for `toMatchDisk`:
 
-```java
-expectSelfie(List.of(1, 2, 3).toString()).toMatchDisk_TODO();
+```python
+expectSelfie(str([1, 2, 3])).toMatchDisk_TODO()
 ```
 
 This will create a file called `SomethingOrOther.ss` in the same directory as your test. It will also rewrite the test source to:
 
-```java
-expectSelfie(List.of(1, 2, 3).toString()).toMatchDisk();
+```python
+expectSelfie(str([1, 2, 3])).toMatchDisk()
 ```
 
-Just like inline literal snapshots, you can use  `_TODO`, `//selfieonce`, and `//SELFIEWRITE` to control how the snapshots are written and updated. You don't have to use `_TODO` if you have the `//selfieonce` or `//SELFIEWRITE` comments in your file.
+Just like inline literal snapshots, you can use `_TODO`, `//selfieonce`, and `//SELFIEWRITE` to control how the snapshots are written and updated. You don't have to use `_TODO` if you have the `//selfieonce` or `//SELFIEWRITE` comments in your file.
 
 If you want the disk snapshots to live in a different folder, set `snapshotFolderName` using [SelfieSettings](https://kdoc.selfie.dev/selfie-runner-junit5/com.diffplug.selfie.junit5/-selfie-settings-a-p-i/).
 
@@ -169,18 +153,17 @@ user@machine repo % ./gradlew test -Pselfie=overwrite
 
 All of the examples so far have asserted on Strings. You can also do inline literal assertions on primitive values, and disk assertions on byte arrays:
 
-```java 
-expectSelfie(10/4).toBe(2);
-expectSelfie((10/4) == 2).toBe(true);
-expectSelfie(TimeUnit.DAYS.toMillis(365*1_000_000L)).toBe(31_536_000_000_000_000L);
-expectSelfie(new byte[100]).toMatchDisk();
+```python
+expectSelfie(10/4).toBe(2.5)
+expectSelfie((10/4) == 2.5).toBe(true)
+expectSelfie(bytearray(100)).toMatchDisk()
 ```
 
-But the real power of selfie is asserting on arbitrary objects using **facets**, which are covered in the [advanced section](/jvm/facets).
+But the real power of selfie is asserting on arbitrary objects using **facets**, which are covered in the [advanced section](/py/facets).
 
 ## Reference
 
-Full API documentation is available at [kdoc.selfie.dev](https://kdoc.selfie.dev/). For details on threading, see [threading details](/jvm/kotest#selfie-and-coroutines).
+Full API documentation is available at [pydoc.selfie.dev](https://pydoc.selfie.dev).
 
 - `.toBe_TODO()` or `.toBe_TODO(argumentIsIgnored)`
   - creates or updates an inline literal snapshot
@@ -196,6 +179,6 @@ Full API documentation is available at [kdoc.selfie.dev](https://kdoc.selfie.dev
   - `interactive`, default
   - `readonly`, default if `CI` environment variable is `true`
   - `overwrite`, all snapshots can be overwritten
-- `Camera` and `Lens` are covered in the [advanced section](/jvm/facets).
+- `Camera` and `Lens` are covered in the [advanced section](/py/facets).
 
-*Pull requests to improve the landing page and documentation are greatly appreciated, you can find the [source code here](https://github.com/diffplug/selfie).*
+_Pull requests to improve the landing page and documentation are greatly appreciated, you can find the [source code here](https://github.com/diffplug/selfie)._
