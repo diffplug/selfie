@@ -4,8 +4,6 @@ from .TypedPath import TypedPath
 from .Snapshot import Snapshot
 from .SnapshotFile import SnapshotFile
 from .Literals import LiteralValue
-from .CommentTracker import CommentTracker
-from .WriteTracker import CallStack, CallLocation, InlineWriteTracker
 from .SnapshotReader import SnapshotReader
 from .SnapshotValueReader import SnapshotValueReader
 
@@ -43,6 +41,7 @@ class FS(ABC):
 
 
 class DiskStorage(ABC):
+    from .WriteTracker import CallStack
     @abstractmethod
     def read_disk(self, sub: str, call: CallStack) -> Optional[Snapshot]:
         pass
@@ -57,7 +56,10 @@ class DiskStorage(ABC):
 
 
 class SnapshotSystem(ABC):
+    from .WriteTracker import CallStack, CallLocation
     def __init__(self):
+        from .CommentTracker import CommentTracker
+        from .WriteTracker import InlineWriteTracker
         self._comment_tracker = CommentTracker()
         self._inline_write_tracker = InlineWriteTracker()
 

@@ -16,6 +16,7 @@ from .SnapshotSystem import _selfieSystem as _selfieSystem
 from .SnapshotSystem import Mode as Mode
 from .TypedPath import TypedPath as TypedPath
 from .WriteTracker import CallStack as CallStack
+from .WriteTracker import CallLocation as CallLocation
 from .WriteTracker import recordCall as recordCall
 from .WriteTracker import SnapshotFileLayout as SnapshotFileLayout
 from .Literals import LiteralValue as LiteralValue
