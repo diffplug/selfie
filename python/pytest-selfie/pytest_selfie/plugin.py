@@ -19,6 +19,7 @@ class FSImplementation(FS):
     def assert_failed(self, message: str, expected=None, actual=None) -> Exception:
         raise Exception(message)
 
+
 class DiskStorageImplementation(DiskStorage):
     def read_disk(self, sub: str, call: CallStack) -> Optional[SnapshotFile]:
         return None
@@ -32,8 +33,10 @@ class DiskStorageImplementation(DiskStorage):
     def recordCall(self, callerFileOnly: bool = False) -> CallStack:
         return recordCall(callerFileOnly)
 
+
 class SnapshotFileLayoutImplementation(SnapshotFile):
     pass
+
 
 class PytestSnapshotSystem(SnapshotSystem):
     def __init__(self):
@@ -63,7 +66,9 @@ class PytestSnapshotSystem(SnapshotSystem):
     def finishedAllTests(self):
         pass
 
+
 pytestSystem = PytestSnapshotSystem()
+
 
 def pytest_addoption(parser):
     group = parser.getgroup("selfie")
@@ -77,9 +82,11 @@ def pytest_addoption(parser):
 
     parser.addini("HELLO", "Dummy pytest.ini setting")
 
+
 @pytest.fixture
 def bar(request):
     return request.config.option.dest_foo
+
 
 @pytest.hookimpl
 def pytest_sessionstart(session: pytest.Session):
@@ -88,18 +95,21 @@ def pytest_sessionstart(session: pytest.Session):
     global pytestSystem
     _initSelfieSystem(pytestSystem)
 
+
 @pytest.hookimpl
 def pytest_sessionfinish(session: pytest.Session, exitstatus):
     print("SELFIE SESSION FINISHED")
     update_test_files(session)
     pytestSystem.finishedAllTests()
 
+
 def update_test_files(session):
     for test in session.items:
         if getattr(test, 'todo_replace', None):
             replace_todo_in_test_file(test.nodeid, test.todo_replace['expected'])
 
-def replace_todo_in_test_file(test_id, expected=None):
+
+def replace_todo_in_test_file(test_id, replacement_text=None):
     file_path, test_name = test_id.split("::")
     full_file_path = Path(file_path).resolve()
 
@@ -108,29 +118,41 @@ def replace_todo_in_test_file(test_id, expected=None):
         return
 
     test_code = full_file_path.read_text()
-
-    # Regex designed to capture multiline string arguments for both toBe and toMatchDisk
-    todo_pattern = r"expectSelfie\(\s*\"(.*?)\"\s*\)\.(toBe|toMatchDisk)_TODO\(\)"
-    todo_matches = re.finditer(todo_pattern, test_code, re.DOTALL)
-
     new_test_code = test_code
 
-    for match in todo_matches:
-        actual_value = match.group(1)  # Capture the exact argument
-        method = match.group(2)  # 'toBe' or 'toMatchDisk'
-        todo_placeholder = f"{method}_TODO()"
-        replacement_string = f"{method}('{actual_value}')"
-        new_test_code = new_test_code.replace(todo_placeholder, replacement_string, 1)
+    # Handling toBe_TODO() replacements 
+    pattern_to_be = re.compile(r'expectSelfie\(\s*\"(.*?)\"\s*\)\.toBe_TODO\(\)', re.DOTALL)
+    new_test_code = pattern_to_be.sub(lambda m: f"expectSelfie(\"{m.group(1)}\").toBe('{m.group(1)}')", new_test_code)
 
-    # Remove #selfieonce after all replacements
-    new_test_code = new_test_code.replace("#selfieonce", "")
+    # Handling toMatchDisk_TODO() replacements
+    test_disk_start = new_test_code.find('def test_disk():')
+    test_disk_end = new_test_code.find('def ', test_disk_start + 1)
+    test_disk_code = new_test_code[test_disk_start:test_disk_end] if test_disk_end != -1 else new_test_code[test_disk_start:]
+
+    pattern_to_match_disk = re.compile(r'expectSelfie\(\s*\"(.*?)\"\s*\)\.toMatchDisk_TODO\(\)', re.DOTALL)
+    snapshot_file_path = full_file_path.parent / "SomethingOrOther.ss"
+
+    # Extract and write the matched content to file 
+    with snapshot_file_path.open("w") as snapshot_file:
+        def write_snapshot(match):
+            selfie_value = match.group(1)
+            snapshot_content = f'expectSelfie("{selfie_value}").toMatchDisk("{selfie_value}")'
+            snapshot_file.write(snapshot_content + "\n")
+            return f'expectSelfie("{selfie_value}").toMatchDisk()'
+
+        test_disk_code = pattern_to_match_disk.sub(write_snapshot, test_disk_code)
+
+    # Update the test code for the 'test_disk' method
+    if test_disk_end != -1:
+        new_test_code = new_test_code[:test_disk_start] + test_disk_code + new_test_code[test_disk_end:]
+    else:
+        new_test_code = new_test_code[:test_disk_start] + test_disk_code
 
     if test_code != new_test_code:
         full_file_path.write_text(new_test_code)
         print(f"Updated test code in {full_file_path}")
     else:
         print("No changes made to the test code.")
-
 
 
 @pytest.hookimpl(hookwrapper=True)
