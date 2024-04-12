@@ -8,7 +8,7 @@ from selfie_lib.Selfie import expectSelfie
 
 
 def test_comment_removal():  # selfieonce
-    expectSelfie("nothing happens").toBe_TODO 
+    expectSelfie("nothing happens").toBe_TODO() 
 
 
 def test_inline():
