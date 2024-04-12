@@ -43,11 +43,14 @@ class DiskSelfie(FluentFacet):
         if snapshot_system.mode.can_write(True, call):
             self._disk.write_disk(self._actual, sub, call)
             actual_snapshot_value = self._actual.subject_or_facet_maybe(sub)
-            actual_value = (
-                actual_snapshot_value.value_string()
-                if not actual_snapshot_value.is_binary
-                else "binary data"
-            )
+            if actual_snapshot_value is None:
+                actual_value = "None"
+            else:
+                actual_value = (
+                    actual_snapshot_value.value_string()
+                    if not actual_snapshot_value.is_binary
+                    else "binary data"
+                )
             literal_value = LiteralValue(
                 expected=None,
                 actual=f"TODO: Expected '{self._expected}', got '{actual_value}'",
@@ -78,7 +81,14 @@ class StringSelfie(DiskSelfie):
         snapshot_system = _selfieSystem()
         if snapshot_system.mode.can_write(True, call):
             actual_snapshot_value = self._actual.subject_or_facet_maybe("")
-            actual_value = actual_snapshot_value.value_string() if not actual_snapshot_value.is_binary else "binary data"
+            if actual_snapshot_value is None:
+                actual_value = "None"
+            else:
+                actual_value = (
+                    actual_snapshot_value.value_string()
+                    if not actual_snapshot_value.is_binary
+                    else "binary data"
+                )
             literal_value = LiteralValue(
                 expected=None,
                 actual=f"TODO: Expected '{self._expected}', got '{actual_value}'",
@@ -90,4 +100,3 @@ class StringSelfie(DiskSelfie):
                 "Can't call `toBe_TODO` in readonly mode!"
             )
         return self._expected
-    

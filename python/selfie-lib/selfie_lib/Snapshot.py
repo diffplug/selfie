@@ -1,94 +1,70 @@
-from .SnapshotValue import SnapshotValue
-from collections import OrderedDict
+from typing import Union
+from .SnapshotValue import SnapshotValue, SnapshotValueBinary, SnapshotValueString
+from .ArrayMap import ArrayMap
 
 
 class Snapshot:
-    def __init__(self, subject, facet_data):
+    def __init__(
+        self,
+        subject: SnapshotValue,
+        facet_data: Union[ArrayMap[str, SnapshotValue], None] = None,
+    ) -> None:
         self._subject = subject
-        self._facet_data = facet_data
+        self._facet_data = facet_data if facet_data is not None else ArrayMap.empty()
 
     @property
-    def facets(self):
-        return OrderedDict(sorted(self._facet_data.items()))
+    def facets(self) -> ArrayMap[str, SnapshotValue]:
+        return self._facet_data
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         if not isinstance(other, Snapshot):
             return NotImplemented
         return self._subject == other._subject and self._facet_data == other._facet_data
 
-    def __hash__(self):
-        return hash((self._subject, frozenset(self._facet_data.items())))
+    def __hash__(self) -> int:
+        return hash((self._subject, tuple(self._facet_data.items())))
 
-    def plus_facet(self, key, value):
+    def plus_facet(
+        self, key: str, value: Union[bytes, str, SnapshotValue]
+    ) -> "Snapshot":
         if isinstance(value, bytes):
-            value = SnapshotValue.of(value)
+            value = SnapshotValueBinary(value)
         elif isinstance(value, str):
-            value = SnapshotValue.of(value)
-        return self._plus_facet(key, value)
+            value = SnapshotValueString(value)
+        elif not isinstance(value, SnapshotValue):
+            raise TypeError("Value must be either bytes, str, or SnapshotValue")
+        new_facet_data = self._facet_data.plus(key, value)
+        return Snapshot(self._subject, new_facet_data)
 
-    def _plus_facet(self, key, value):
-        if not key:
-            raise ValueError("The empty string is reserved for the subject.")
-        facet_data = dict(self._facet_data)
-        facet_data[self._unix_newlines(key)] = value
-        return Snapshot(self._subject, facet_data)
-
-    def plus_or_replace(self, key, value):
+    def plus_or_replace(self, key: str, value: SnapshotValue) -> "Snapshot":
         if not key:
             return Snapshot(value, self._facet_data)
-        facet_data = dict(self._facet_data)
-        facet_data[self._unix_newlines(key)] = value
-        return Snapshot(self._subject, facet_data)
+        return Snapshot(self._subject, self._facet_data.plus(key, value))
 
-    def subject_or_facet_maybe(self, key):
-        if not key:
-            return self._subject
-        return self._facet_data.get(key)
+    def subject_or_facet_maybe(self, key: str) -> Union[SnapshotValue, None]:
+        try:
+            return self._facet_data[key]
+        except KeyError:
+            return None if key else self._subject
 
-    def subject_or_facet(self, key):
+    def subject_or_facet(self, key: str) -> SnapshotValue:
         value = self.subject_or_facet_maybe(key)
         if value is None:
-            raise KeyError(f"'{key}' not found in {list(self._facet_data.keys())}")
+            raise KeyError(f"'{key}' not found")
         return value
 
-    def all_entries(self):
-        entries = [("", self._subject)]
-        entries.extend(self._facet_data.items())
-        return entries
-
-    def __bytes__(self):
-        return f"[{self._subject} {self._facet_data}]"
+    @staticmethod
+    def of(data: Union[bytes, str, SnapshotValue]) -> "Snapshot":
+        if not isinstance(data, SnapshotValue):
+            data = SnapshotValue.of(data)
+        return Snapshot(data, ArrayMap.empty())
 
     @staticmethod
-    def of(data):
-        if isinstance(data, bytes):
-            # Handling binary data
-            return Snapshot(SnapshotValue.of(data), {})
-        elif isinstance(data, str):
-            # Handling string data
-            return Snapshot(SnapshotValue.of(data), {})
-        elif isinstance(data, SnapshotValue):
-            return Snapshot(data, {})
-        else:
-            raise TypeError("Data must be either binary or string" + data)
+    def of_entries(entries: Union[ArrayMap[str, SnapshotValue], None]) -> "Snapshot":
+        subject = entries.get("") if entries else None
+        facet_data = entries if entries else ArrayMap.empty()
+        return Snapshot(subject if subject else SnapshotValue.of(""), facet_data)
 
     @staticmethod
-    def of_entries(entries):
-        subject = None
-        facet_data = {}
-        for key, value in entries:
-            if not key:
-                if subject is not None:
-                    raise ValueError(
-                        f"Duplicate root snapshot.\n first: {subject}\nsecond: {value}"
-                    )
-                subject = value
-            else:
-                facet_data[key] = value
-        if subject is None:
-            subject = SnapshotValue.of("")
-        return Snapshot(subject, facet_data)
-
-    @staticmethod
-    def _unix_newlines(string):
+    def _unix_newlines(string: str) -> str:
         return string.replace("\\r\\n", "\\n")

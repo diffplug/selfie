@@ -77,7 +77,7 @@ class CallStack:
 
     def __hash__(self):
         return hash((self.location, tuple(self.rest_of_stack)))
-    
+
 
 class SnapshotFileLayout:
     def __init__(self, fs: FS):
@@ -87,7 +87,7 @@ class SnapshotFileLayout:
         file_path = call.location.file_name
         if not file_path:
             raise ValueError("No file path available in CallLocation.")
-        return TypedPath(Path(file_path))
+        return TypedPath(str(Path(file_path)))
 
 
 def recordCall(callerFileOnly: bool = False) -> CallStack:
@@ -162,7 +162,9 @@ class InlineWriteTracker(WriteTracker[CallLocation, LiteralValue]):
     ):
         super().recordInternal(key, snapshot, call, layout)
 
-        file = layout.sourcePathForCall(key)
+        call_stack_from_location = CallStack(key, [])
+        file = layout.sourcePathForCall(call_stack_from_location)
+
         if snapshot.expected is not None:
             content = SourceFile(file.name, layout.fs.file_read(file))
             try:

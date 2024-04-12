@@ -42,6 +42,7 @@ class FS(ABC):
 
 class DiskStorage(ABC):
     from .WriteTracker import CallStack
+
     @abstractmethod
     def read_disk(self, sub: str, call: CallStack) -> Optional[Snapshot]:
         pass
@@ -57,9 +58,11 @@ class DiskStorage(ABC):
 
 class SnapshotSystem(ABC):
     from .WriteTracker import CallStack, SnapshotFileLayout
+
     def __init__(self):
         from .CommentTracker import CommentTracker
         from .WriteTracker import InlineWriteTracker
+
         self._comment_tracker = CommentTracker()
         self._inline_write_tracker = InlineWriteTracker()
 
@@ -83,8 +86,11 @@ class SnapshotSystem(ABC):
 
     def write_inline(self, literal_value: LiteralValue, call: CallStack):
         from .WriteTracker import CallLocation
+
         call_location = CallLocation(call.location.file_name, call.location.line)
-        self._inline_write_tracker.record(call_location, literal_value, call, self.layout)
+        self._inline_write_tracker.record(
+            call_location, literal_value, call, self.layout
+        )
 
     @abstractmethod
     def diskThreadLocal(self) -> DiskStorage:
@@ -97,15 +103,27 @@ class SnapshotSystem(ABC):
             snapshot_reader = SnapshotReader(value_reader)
             return snapshot_reader.next_snapshot()
         except Exception as e:
-            raise self.fs.assert_failed(f"Failed to read snapshot from {file_path.absolute_path}: {str(e)}")
+            raise self.fs.assert_failed(
+                f"Failed to read snapshot from {file_path.absolute_path}: {str(e)}"
+            )
 
     def write_snapshot_to_disk(self, snapshot: Snapshot, file_path: TypedPath):
         try:
-            # placeholder
-            serialized_data = snapshot.serialize()
-            self.fs.file_write_binary(file_path, serialized_data)
+            # Create a SnapshotFile object that will contain the snapshot
+            snapshot_file = SnapshotFile.create_empty_with_unix_newlines(True)
+            snapshot_file.set_at_test_time("default", snapshot)
+
+            # Serialize the SnapshotFile object
+            serialized_data = []
+            snapshot_file.serialize(serialized_data)
+
+            # Write serialized data to disk as binary
+            serialized_str = "\n".join(serialized_data)
+            self.fs.file_write_binary(file_path, serialized_str.encode())
         except Exception as e:
-            raise self.fs.assert_failed(f"Failed to write snapshot to {file_path.absolute_path}: {str(e)}")
+            raise self.fs.assert_failed(
+                f"Failed to write snapshot to {file_path.absolute_path}: {str(e)}"
+            )
 
 
 selfieSystem = None
