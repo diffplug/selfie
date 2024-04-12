@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from typing import Union, Type
 
 
 def unix_newlines(string: str) -> str:
@@ -20,7 +19,7 @@ class SnapshotValue(ABC):
         pass
 
     @staticmethod
-    def of(data: Union[bytes, str, "SnapshotValue"]) -> "SnapshotValue":
+    def of(data):
         if isinstance(data, bytes):
             return SnapshotValueBinary(data)
         elif isinstance(data, str):
@@ -41,12 +40,12 @@ class SnapshotValueBinary(SnapshotValue):
     def value_string(self) -> str:
         raise NotImplementedError("This is a binary value.")
 
-    def __eq__(self, other: object) -> bool:
+    def __eq__(self, other):
         if isinstance(other, SnapshotValueBinary):
             return self.value_binary() == other.value_binary()
         return False
 
-    def __hash__(self) -> int:
+    def __hash__(self):
         return hash(self._value)
 
 
@@ -60,10 +59,10 @@ class SnapshotValueString(SnapshotValue):
     def value_string(self) -> str:
         return self._value
 
-    def __eq__(self, other: object) -> bool:
+    def __eq__(self, other):
         if isinstance(other, SnapshotValueString):
             return self.value_string() == other.value_string()
         return False
 
-    def __hash__(self) -> int:
+    def __hash__(self):
         return hash(self._value)
