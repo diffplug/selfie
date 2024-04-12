@@ -56,7 +56,7 @@ class DiskStorage(ABC):
 
 
 class SnapshotSystem(ABC):
-    from .WriteTracker import CallStack
+    from .WriteTracker import CallStack, SnapshotFileLayout
     def __init__(self):
         from .CommentTracker import CommentTracker
         from .WriteTracker import InlineWriteTracker
@@ -75,7 +75,7 @@ class SnapshotSystem(ABC):
 
     @property
     @abstractmethod
-    def layout(self) -> SnapshotFile:
+    def layout(self) -> SnapshotFileLayout:
         pass
 
     def source_file_has_writable_comment(self, call: CallStack) -> bool:

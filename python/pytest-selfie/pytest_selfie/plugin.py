@@ -1,6 +1,7 @@
 from typing import Optional, Tuple
-from selfie_lib import _initSelfieSystem, SnapshotSystem
-from selfie_lib import FS, SnapshotFile, DiskStorage, CallStack, LiteralValue, Mode
+from selfie_lib import _initSelfieSystem, SnapshotSystem, TypedPath, recordCall
+from selfie_lib import FS, SnapshotFile, SnapshotFileLayout, DiskStorage, CallStack, LiteralValue, Mode
+from selfie_lib.CommentTracker import CommentTracker
 from pathlib import Path
 import pytest
 import re
@@ -35,6 +36,7 @@ class DiskStorageImplementation(DiskStorage):
 class PytestSnapshotSystem(SnapshotSystem):
     def __init__(self):
         self._mode = Mode(can_write=True)
+        self._comment_tracker = CommentTracker()
 
     @property
     def mode(self) -> Mode:
@@ -45,14 +47,15 @@ class PytestSnapshotSystem(SnapshotSystem):
         return FSImplementation()  
 
     @property
-    def layout(self) -> SnapshotFile:
-        return SnapshotFile()  
+    def layout(self) -> SnapshotFileLayout:
+        return SnapshotFileLayout(self.fs)  
 
     def diskThreadLocal(self) -> DiskStorage:
         return DiskStorageImplementation()
 
     def source_file_has_writable_comment(self, call: CallStack) -> bool:
-        return True
+        layout = self.layout.sourcePathForCall(call)
+        return self.comment_tracker.hasWritableComment(call, layout)
 
     def write_inline(self, literal_value: LiteralValue, call: CallStack):
         pass
@@ -114,11 +117,17 @@ def replace_todo_in_test_file(test_id, replacement_text=None):
     test_code = full_file_path.read_text()
     new_test_code = test_code
 
-    # Check if the file contains #selfieonce 
-    selfie_once_present = '#selfieonce' in new_test_code
-    if selfie_once_present:
-        # Remove the #selfieonce comment
-        new_test_code = new_test_code.replace('#selfieonce', '', 1)
+    # Creating CallStack for the current context using recordCall
+    call_stack = recordCall()
+    layout = pytestSystem.layout
+
+    # Using CommentTracker to check for writable comments
+    if pytestSystem._comment_tracker.hasWritableComment(call_stack, layout):
+        # Extracting the comment and its line number
+        typed_path = TypedPath(full_file_path)
+        comment_str, line_number = CommentTracker.commentString(typed_path)
+        # Removing the selfieonce comment
+        test_code = test_code.replace(comment_str, '', 1)
 
     # Handling toBe_TODO() replacements 
     pattern_to_be = re.compile(r'expectSelfie\(\s*\"(.*?)\"\s*\)\.toBe_TODO\(\)', re.DOTALL)

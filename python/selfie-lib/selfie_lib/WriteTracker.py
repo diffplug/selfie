@@ -84,8 +84,10 @@ class SnapshotFileLayout:
         self.fs = fs
 
     def sourcePathForCall(self, call: CallStack) -> TypedPath:
-        location = call.location  
-        return TypedPath(Path(location))
+        file_path = call.location.file_name
+        if not file_path:
+            raise ValueError("No file path available in CallLocation.")
+        return TypedPath(Path(file_path))
 
 
 def recordCall(callerFileOnly: bool = False) -> CallStack:
