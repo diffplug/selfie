@@ -6,7 +6,7 @@ repositories {
 }
 dependencies {
   // import Kotlin API client BOM
-  testImplementation(platform("com.aallam.openai:openai-client-bom:3.7.0"))
+  testImplementation(platform("com.aallam.openai:openai-client-bom:3.7.1"))
   testImplementation("com.aallam.openai:openai-client")
   testImplementation("io.ktor:ktor-client-okhttp")
   // json

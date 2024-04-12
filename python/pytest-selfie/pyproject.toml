@@ -10,7 +10,7 @@ readme = "README.md"
 python = "^3.12"
 pytest = "^8.0.0"
 tox = "^4.0.0"
-selfie-lib = { path = "../selfie-lib", develop = true }
+selfie-lib = "0.1.0"
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.3.0"
