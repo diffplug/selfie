@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import List, Optional, Generic, TypeVar, Dict, cast
 from abc import ABC, abstractmethod
 import inspect
@@ -12,14 +13,6 @@ from .SnapshotSystem import FS
 
 T = TypeVar("T")
 U = TypeVar("U")
-
-
-class SnapshotFileLayout:
-    def __init__(self, fs: FS):
-        self.fs = fs
-
-    def sourcePathForCall(self, location) -> "TypedPath":
-        raise NotImplementedError("sourcePathForCall is not implemented")
 
 
 @total_ordering
@@ -84,6 +77,15 @@ class CallStack:
 
     def __hash__(self):
         return hash((self.location, tuple(self.rest_of_stack)))
+    
+
+class SnapshotFileLayout:
+    def __init__(self, fs: FS):
+        self.fs = fs
+
+    def sourcePathForCall(self, call: CallStack) -> TypedPath:
+        location = call.location  
+        return TypedPath(Path(location))
 
 
 def recordCall(callerFileOnly: bool = False) -> CallStack:
