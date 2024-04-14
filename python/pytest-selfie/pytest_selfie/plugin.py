@@ -123,9 +123,10 @@ def replace_todo_in_test_file(test_id, replacement_text=None):
 
     # Using CommentTracker to check for writable comments
     if pytestSystem._comment_tracker.hasWritableComment(call_stack, layout):
-        # Extracting the comment and its line number
+        print(f"Checking for writable comment in file: {full_file_path}")
         typed_path = TypedPath(full_file_path)
         comment_str, line_number = CommentTracker.commentString(typed_path)
+        print(f"Found '#selfieonce' comment at line {line_number}")
         # Removing the selfieonce comment
         test_code = test_code.replace(comment_str, '', 1)
 
