@@ -114,22 +114,24 @@ def replace_todo_in_test_file(test_id, replacement_text=None):
         print(f"File not found: {full_file_path}")
         return
 
+    # Read and split file content into lines
     test_code = full_file_path.read_text()
-    new_test_code = test_code
-
-    # Creating CallStack for the current context using recordCall
-    call_stack = recordCall()
-    layout = pytestSystem.layout
+    new_test_code = test_code.splitlines()  
 
     # Using CommentTracker to check for writable comments
-    if pytestSystem._comment_tracker.hasWritableComment(call_stack, layout):
+    if pytestSystem._comment_tracker.hasWritableComment(recordCall(), pytestSystem.layout):
         print(f"Checking for writable comment in file: {full_file_path}")
         typed_path = TypedPath(full_file_path)
         comment_str, line_number = CommentTracker.commentString(typed_path)
         print(f"Found '#selfieonce' comment at line {line_number}")
-        # Removing the selfieonce comment
-        test_code = test_code.replace(comment_str, '', 1)
 
+        # Remove the selfieonce comment
+        line_content = new_test_code[line_number - 1]
+        new_test_code[line_number - 1] = line_content.split('#', 1)[0].rstrip() 
+
+    # Rejoin lines into a single string
+    new_test_code = "\n".join(new_test_code)  
+        
     # Handling toBe_TODO() replacements 
     pattern_to_be = re.compile(r'expectSelfie\(\s*\"(.*?)\"\s*\)\.toBe_TODO\(\)', re.DOTALL)
     new_test_code = pattern_to_be.sub(lambda m: f"expectSelfie(\"{m.group(1)}\").toBe('{m.group(1)}')", new_test_code)
