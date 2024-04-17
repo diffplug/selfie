@@ -10,7 +10,7 @@ class Snapshot:
         facet_data: ArrayMap[str, SnapshotValue] = ArrayMap.empty(),
     ):
         self._subject = subject
-        self._facet_data = facet_data if facet_data is not None else ArrayMap.empty()
+        self._facet_data = facet_data
 
     @property
     def facets(self) -> ArrayMap[str, SnapshotValue]:

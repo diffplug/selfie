@@ -4,3 +4,7 @@ build/
 bin/
 .DS_Store
 __pycache__/
+dist/
+python/html/
+python/latex/
+node_modules/

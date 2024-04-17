@@ -1,0 +1,5 @@
+{
+  "devDependencies": {
+    "@jothepro/doxygen-awesome-css": "github:jothepro/doxygen-awesome-css#v2.3.2"
+  }
+}

@@ -1,9 +1,11 @@
+from typing import Optional
 from .Snapshot import Snapshot
+from .SnapshotValueReader import SnapshotValueReader
 
 
 class SnapshotReader:
-    def __init__(self, value_reader):
-        self.value_reader = value_reader
+    def __init__(self, value_reader: SnapshotValueReader) -> None:
+        self.value_reader: SnapshotValueReader = value_reader
 
     def peek_key(self) -> Optional[str]:
         next_key = self.value_reader.peek_key()
@@ -11,9 +13,9 @@ class SnapshotReader:
             return None
         return next_key
 
-    def next_snapshot(self):
-        root_name = self.peek_key()
-        snapshot = Snapshot.of(self.value_reader.next_value())
+    def next_snapshot(self) -> Snapshot:
+        root_name: Optional[str] = self.peek_key()
+        snapshot: Snapshot = Snapshot.of(self.value_reader.next_value())
         while True:
             next_key: Optional[str] = self.value_reader.peek_key()
             if next_key is None or next_key == "[end of file]":
@@ -33,13 +35,13 @@ class SnapshotReader:
                     break
         return snapshot
 
-    def skip_snapshot(self):
-        root_name = self.peek_key()
+    def skip_snapshot(self) -> None:
+        root_name: Optional[str] = self.peek_key()
         if root_name is None:
             raise ValueError("No snapshot to skip")
         self.value_reader.skip_value()
         while True:
-            next_key = self.peek_key()
+            next_key: Optional[str] = self.peek_key()
             if next_key is None or not next_key.startswith(f"{root_name}["):
                 break
             self.value_reader.skip_value()
