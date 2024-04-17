@@ -1,28 +1,32 @@
 import { DocsImage } from "@/components/DocsImage";
 
 export const title = "Selfie Python Snapshot Testing | Caching";
-export const description = "A snapshot can be used as a cache from which an expensive or non-deterministic operation can be read.";
+export const description =
+  "A snapshot can be used as a cache from which an expensive or non-deterministic operation can be read.";
 export const imageUrl = "https://selfie.dev/cache.webp";
 
 <DocsImage imgAbsoluteUrl={imageUrl} />
 
-***THIS IS BROKEN. [WE ARE WORKING ON THIS](https://github.com/diffplug/selfie/issues/302).***
+**_THIS IS BROKEN. [WE ARE WORKING ON THIS](https://github.com/diffplug/selfie/issues/302)._**
 
-***THIS IS BROKEN. [WE ARE WORKING ON THIS](https://github.com/diffplug/selfie/issues/302).***
+**_THIS IS BROKEN. [WE ARE WORKING ON THIS](https://github.com/diffplug/selfie/issues/302)._**
 
-***THIS IS BROKEN. [WE ARE WORKING ON THIS](https://github.com/diffplug/selfie/issues/302).***
+**_THIS IS BROKEN. [WE ARE WORKING ON THIS](https://github.com/diffplug/selfie/issues/302)._**
 
-*`cacheSelfie` helps you build fast deterministic tests even if they contain slow non-deterministic components. A generative AI example is available [here](https://github.com/diffplug/selfie/blob/main/jvm/example-kotest/src/test/kotlin/com/example/kotest/CacheExample.kt).*
+**TODO: CacheSelfie is currently being implemented!**
+`cacheSelfie` helps you build fast deterministic tests even if they contain slow non-deterministic components. A generative AI example is available [here](https://github.com/diffplug/selfie/issues/319)
 
-To use `expectSelfie`, you pass a *value* that you want to snapshot.
+**TODO: We don't currently have an example of cache selfie for python [yet](https://github.com/diffplug/selfie/issues/319)**.
 
-```java
+To use `expectSelfie`, you pass a _value_ that you want to snapshot.
+
+```python
 expectSelfie(customer.firstName).toBe("Fred")
 ```
 
-To use `cacheSelfie`, you pass a ***function** that **returns a value*** to snapshot.
+To use `cacheSelfie`, you pass a **\*function** that **returns a value\*** to snapshot.
 
-```java
+```python
 cacheSelfie(() -> customer.firstName).toBe("Fred")
 ```
 
@@ -34,32 +38,34 @@ You control whether a given value is being read or written using the `_TODO`, `/
 
 In the examples above, we aren't doing anything with the return value, which is usually a mistake. The benefit of `cacheSelfie` is that we can take an expensive non-deterministic operation, and build a cheap deterministic test on top of the cached value.
 
-The hazard is that the cached result *is not testing the function call anymore*. It is just a convenient way to generate sample data for testing *other* parts of the system.
+The hazard is that the cached result _is not testing the function call anymore_. It is just a convenient way to generate sample data for testing _other_ parts of the system.
 
-```java
+```python
 var brittleAssumption = cacheSelfie(() -> expensiveOperation()).toBe("sand")
 buildStuffOn(brittleAssumption)
 ```
 
-Perhaps the `toBe` snapshot was recorded a year ago, and the `expensiveOperation` has changed since then. Perhaps someone manually edited the recorded snapshot, and `expensiveOperation` has never returned a value anything like the snapshot. ***The function being cached is not being tested.***
+Perhaps the `toBe` snapshot was recorded a year ago, and the `expensiveOperation` has changed since then. Perhaps someone manually edited the recorded snapshot, and `expensiveOperation` has never returned a value anything like the snapshot. **_The function being cached is not being tested._**
 
-If you have a test with multiple `cacheSelfie` calls, avoid using `_TODO`. You can have a situation where you recorded the ending of a test, and then later changed the beginning with `_TODO`. The ending won't update itself automatically ([yet](https://github.com/diffplug/selfie/issues/237)), so you might cache an inconsistent state. You can avoid this problem by only using `//selfieonce` and `//SELFIEWRITE`.
+If you have a test with multiple `cacheSelfie` calls, avoid using `_TODO`. You can have a situation where you recorded the ending of a test, and then later changed the beginning with `_TODO`. The ending won't update itself automatically, so you might cache an inconsistent state. You can avoid this problem by only using `//selfieonce` and `//SELFIEWRITE`.
 
 ## Strings and binary
 
 You have these choices for specifying the data in a snapshot:
 
-```java
+```python
 cacheSelfie(() -> "string").toBe("string")
 cacheSelfie(() -> "string").toMatchDisk()
-cacheSelfieBinary(() -> new byte[3]).toBeBase64("AAAA")
-cacheSelfieBinary(() -> new byte[3]).toBeFile("pkg/someFile.ext")
-cacheSelfieBinary(() -> new byte[3]).toMatchDisk()
+cacheSelfieBinary(() -> bytearray[3]).toBeBase64("AAAA")
+cacheSelfieBinary(() -> bytearray[3]).toBeFile("pkg/someFile.ext")
+cacheSelfieBinary(() -> bytearray[3]).toMatchDisk()
 ```
 
 The `toMatchDisk` method is nice because Selfie will garbage-collect the snapshot if it isn't being used, you can "set it and forget it". `toBe` is nice to read inline with the code, and `toBeFile` is nice because you can open the result in external programs.
 
 ## Roundtripping typed data
+
+**TODO: We don't have Roundtrip in the Python, are we going to implement this? [PRs welcomed](https://github.com/diffplug/selfie)!**
 
 Oftentimes you want to snapshot something besides just a string or binary. For that there is:
 
@@ -74,6 +80,8 @@ T cacheSelfieBinary<T>(Roundtrip<T, byte[]> roundtrip, () -> someT())
 
 But you don't have to implement `Roundtrip` yourself.
 
+**TODO: Change once correct example is made**
+
 If you're using the `@kotlinx.serialization.Serializable` framework (where you annotate model classes with `@Serializable`), then you can use `cacheSelfieJson(() -> T)` and selfie will use Kotlin's built-in json serialization to implement the roundtrip.
 
 If you're using Java's `java.io.Serializable` (where model classes must implement `Serializable`) then you can use `cacheSelfieBinarySerializable(() -> T)` and selfie will use Java's built-in binary serialization mechanism to implement the roundtrip.
@@ -82,7 +90,11 @@ And of course, you can also write your own `Roundtrip` implementation, it's only
 
 ## Example
 
-Excerpted from [here](https://github.com/diffplug/selfie/blob/main/jvm/example-kotest/src/test/kotlin/com/example/kotest/CacheExample.kt):
+**TODO: We don't currently have an example of cache selfie for Python [yet](https://github.com/diffplug/selfie/issues/319)**.
+
+Excerpted from [here](https://github.com/diffplug/selfie/issues/319)
+
+**TODO: We need a [Python implementation](https://github.com/diffplug/selfie/issues/319)**:
 
 ```kotlin
 val chatCompletionRequest = ChatCompletionRequest(
@@ -123,8 +135,10 @@ cacheSelfieBinary { HttpClient().request(images[0].url).readBytes() }
   .toBeFile("com/example/kotest/dalle-3.png")
 ```
 
+**TODO: Update once example is done**
+
 Since we used `toBeFile`, we can open `com/example/kotest/dalle-3.png` in Mac Preview / Windows Explorer.
 
-<img alt="Robot self portrait" src="/dalle-3.webp" width="400px"/>
+<img alt="Robot self portrait" src="/dalle-3.webp" width="400px" />
 
-*Pull requests to improve the landing page and documentation are greatly appreciated, you can find the [source code here](https://github.com/diffplug/selfie).*
+_Pull requests to improve the landing page and documentation are greatly appreciated, you can find the [source code here](https://github.com/diffplug/selfie)._
