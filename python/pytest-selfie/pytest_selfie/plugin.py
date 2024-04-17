@@ -1,6 +1,18 @@
-from typing import Optional, Tuple
-from selfie_lib import _initSelfieSystem, SnapshotSystem, TypedPath, recordCall
-from selfie_lib import FS, SnapshotFile, SnapshotFileLayout, DiskStorage, CallStack, LiteralValue, Mode
+from typing import Optional
+from selfie_lib import (
+    Snapshot,
+    _initSelfieSystem,
+    SnapshotSystem,
+    TypedPath,
+    recordCall,
+    FS,
+    SnapshotFile,
+    SnapshotFileLayout,
+    DiskStorage,
+    CallStack,
+    LiteralValue,
+    Mode,
+)
 from selfie_lib.CommentTracker import CommentTracker
 from pathlib import Path
 import pytest
@@ -22,11 +34,11 @@ class FSImplementation(FS):
 
 
 class DiskStorageImplementation(DiskStorage):
-    def read_disk(self, sub: str, call: CallStack) -> Optional[SnapshotFile]:
+    def read_disk(self, sub: str, call: CallStack) -> Optional[Snapshot]:
         print(f"Reading from disk: sub={sub}")
-        return None 
+        return None
 
-    def write_disk(self, actual: SnapshotFile, sub: str, call: CallStack):
+    def write_disk(self, actual: Snapshot, sub: str, call: CallStack):
         print(f"Writing to disk: {actual} at {sub}")
 
     def keep(self, sub_or_keep_all: Optional[str]):
@@ -44,11 +56,11 @@ class PytestSnapshotSystem(SnapshotSystem):
 
     @property
     def fs(self) -> FS:
-        return FSImplementation()  
+        return FSImplementation()
 
     @property
     def layout(self) -> SnapshotFileLayout:
-        return SnapshotFileLayout(self.fs)  
+        return SnapshotFileLayout(self.fs)
 
     def diskThreadLocal(self) -> DiskStorage:
         return DiskStorageImplementation()
@@ -102,8 +114,8 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus):
 
 def update_test_files(session):
     for test in session.items:
-        if getattr(test, 'todo_replace', None):
-            replace_todo_in_test_file(test.nodeid, test.todo_replace['expected'])
+        if getattr(test, "todo_replace", None):
+            replace_todo_in_test_file(test.nodeid, test.todo_replace["expected"])
 
 
 def replace_todo_in_test_file(test_id, replacement_text=None):
@@ -116,10 +128,12 @@ def replace_todo_in_test_file(test_id, replacement_text=None):
 
     # Read and split file content into lines
     test_code = full_file_path.read_text()
-    new_test_code = test_code.splitlines()  
+    new_test_code = test_code.splitlines()
 
     # Using CommentTracker to check for writable comments
-    if pytestSystem._comment_tracker.hasWritableComment(recordCall(), pytestSystem.layout):
+    if pytestSystem._comment_tracker.hasWritableComment(
+        recordCall(), pytestSystem.layout
+    ):
         print(f"Checking for writable comment in file: {full_file_path}")
         typed_path = TypedPath(full_file_path)
         comment_str, line_number = CommentTracker.commentString(typed_path)
@@ -127,28 +141,41 @@ def replace_todo_in_test_file(test_id, replacement_text=None):
 
         # Remove the selfieonce comment
         line_content = new_test_code[line_number - 1]
-        new_test_code[line_number - 1] = line_content.split('#', 1)[0].rstrip() 
+        new_test_code[line_number - 1] = line_content.split("#", 1)[0].rstrip()
 
     # Rejoin lines into a single string
-    new_test_code = "\n".join(new_test_code)  
-        
-    # Handling toBe_TODO() replacements 
-    pattern_to_be = re.compile(r'expectSelfie\(\s*\"(.*?)\"\s*\)\.toBe_TODO\(\)', re.DOTALL)
-    new_test_code = pattern_to_be.sub(lambda m: f"expectSelfie(\"{m.group(1)}\").toBe('{m.group(1)}')", new_test_code)
+    new_test_code = "\n".join(new_test_code)
+
+    # Handling toBe_TODO() replacements
+    pattern_to_be = re.compile(
+        r"expectSelfie\(\s*\"(.*?)\"\s*\)\.toBe_TODO\(\)", re.DOTALL
+    )
+    new_test_code = pattern_to_be.sub(
+        lambda m: f"expectSelfie(\"{m.group(1)}\").toBe('{m.group(1)}')", new_test_code
+    )
 
     # Handling toMatchDisk_TODO() replacements
-    test_disk_start = new_test_code.find('def test_disk():')
-    test_disk_end = new_test_code.find('def ', test_disk_start + 1)
-    test_disk_code = new_test_code[test_disk_start:test_disk_end] if test_disk_end != -1 else new_test_code[test_disk_start:]
+    test_disk_start = new_test_code.find("def test_disk():")
+    test_disk_end = new_test_code.find("def ", test_disk_start + 1)
+    test_disk_code = (
+        new_test_code[test_disk_start:test_disk_end]
+        if test_disk_end != -1
+        else new_test_code[test_disk_start:]
+    )
 
-    pattern_to_match_disk = re.compile(r'expectSelfie\(\s*\"(.*?)\"\s*\)\.toMatchDisk_TODO\(\)', re.DOTALL)
+    pattern_to_match_disk = re.compile(
+        r"expectSelfie\(\s*\"(.*?)\"\s*\)\.toMatchDisk_TODO\(\)", re.DOTALL
+    )
     snapshot_file_path = full_file_path.parent / "SomethingOrOther.ss"
 
-    # Extract and write the matched content to file 
+    # Extract and write the matched content to file
     with snapshot_file_path.open("w") as snapshot_file:
+
         def write_snapshot(match):
             selfie_value = match.group(1)
-            snapshot_content = f'expectSelfie("{selfie_value}").toMatchDisk("{selfie_value}")'
+            snapshot_content = (
+                f'expectSelfie("{selfie_value}").toMatchDisk("{selfie_value}")'
+            )
             snapshot_file.write(snapshot_content + "\n")
             return f'expectSelfie("{selfie_value}").toMatchDisk()'
 
@@ -156,7 +183,11 @@ def replace_todo_in_test_file(test_id, replacement_text=None):
 
     # Update the test code for the 'test_disk' method
     if test_disk_end != -1:
-        new_test_code = new_test_code[:test_disk_start] + test_disk_code + new_test_code[test_disk_end:]
+        new_test_code = (
+            new_test_code[:test_disk_start]
+            + test_disk_code
+            + new_test_code[test_disk_end:]
+        )
     else:
         new_test_code = new_test_code[:test_disk_start] + test_disk_code
 
@@ -179,7 +210,7 @@ def pytest_pyfunc_call(pyfuncitem):
     # Store expected result if TODO was used and test passed
     if "TODO" in pyfuncitem.name and outcome.excinfo is None:
         expected_result = result
-        pyfuncitem.todo_replace = {'expected': expected_result}
+        pyfuncitem.todo_replace = {"expected": expected_result}
         replace_todo_in_test_file(pyfuncitem.nodeid, expected_result)
 
     print(f"SELFIE end test {pyfuncitem.nodeid} with {result}")
