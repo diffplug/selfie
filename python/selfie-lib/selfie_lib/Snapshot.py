@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Union, Iterable, Dict
 from .SnapshotValue import SnapshotValue, SnapshotValueBinary, SnapshotValueString
 from .ArrayMap import ArrayMap
 
@@ -7,8 +7,8 @@ class Snapshot:
     def __init__(
         self,
         subject: SnapshotValue,
-        facet_data: Union[ArrayMap[str, SnapshotValue], None] = None,
-    ) -> None:
+        facet_data: ArrayMap[str, SnapshotValue] = ArrayMap.empty(),
+    ):
         self._subject = subject
         self._facet_data = facet_data if facet_data is not None else ArrayMap.empty()
 
@@ -27,30 +27,18 @@ class Snapshot:
     def plus_facet(
         self, key: str, value: Union[bytes, str, SnapshotValue]
     ) -> "Snapshot":
-        if isinstance(value, bytes):
-            value = SnapshotValueBinary(value)
-        elif isinstance(value, str):
-            value = SnapshotValueString(value)
-        elif not isinstance(value, SnapshotValue):
-            raise TypeError("Value must be either bytes, str, or SnapshotValue")
-        new_facet_data = self._facet_data.plus(key, value)
+        if key == "":
+            raise ValueError("The empty string is reserved for the subject.")
+        new_facet_data = self._facet_data.plus(key, SnapshotValue.of(value))
         return Snapshot(self._subject, new_facet_data)
 
-    def plus_or_replace(self, key: str, value: SnapshotValue) -> "Snapshot":
-        if not key:
-            return Snapshot(value, self._facet_data)
-        return Snapshot(self._subject, self._facet_data.plus(key, value))
-
     def subject_or_facet_maybe(self, key: str) -> Union[SnapshotValue, None]:
-        try:
-            return self._facet_data[key]
-        except KeyError:
-            return None if key else self._subject
+        return self._subject if key == "" else self._facet_data.get(key)
 
     def subject_or_facet(self, key: str) -> SnapshotValue:
         value = self.subject_or_facet_maybe(key)
         if value is None:
-            raise KeyError(f"'{key}' not found")
+            raise KeyError(f"'{key}' not found in snapshot.")
         return value
 
     @staticmethod
@@ -60,10 +48,18 @@ class Snapshot:
         return Snapshot(data, ArrayMap.empty())
 
     @staticmethod
-    def of_entries(entries: Union[ArrayMap[str, SnapshotValue], None]) -> "Snapshot":
-        subject = entries.get("") if entries else None
-        facet_data = entries if entries else ArrayMap.empty()
-        return Snapshot(subject if subject else SnapshotValue.of(""), facet_data)
+    def of_entries(entries: Iterable[Dict[str, SnapshotValue]]) -> "Snapshot":
+        root = None
+        facets = ArrayMap.empty()
+        for entry in entries:
+            key, value = entry["key"], entry["value"]
+            if key == "":
+                if root is not None:
+                    raise ValueError("Duplicate root snapshot detected")
+                root = value
+            else:
+                facets = facets.plus(key, value)
+        return Snapshot(root if root else SnapshotValue.of(""), facets)
 
     @staticmethod
     def _unix_newlines(string: str) -> str:
