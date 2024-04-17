@@ -1,47 +1,18 @@
-from typing import List, Optional, Generic, TypeVar, Dict, cast, Callable, Sequence
+from pathlib import Path
+from typing import List, Optional, Generic, TypeVar, Dict, cast
 from abc import ABC, abstractmethod
-import inspect, threading
+import inspect
+import threading
 from functools import total_ordering
 
-from selfie_lib.SourceFile import SourceFile
-from selfie_lib.Literals import LiteralValue
-from selfie_lib.TypedPath import TypedPath
+from .SourceFile import SourceFile
+from .Literals import LiteralValue
+from .TypedPath import TypedPath
+from .SnapshotSystem import FS
 
 
 T = TypeVar("T")
 U = TypeVar("U")
-
-
-class FS(ABC):
-    @abstractmethod
-    def file_walk(self, typed_path, walk: Callable[[Sequence["TypedPath"]], T]) -> T:
-        pass
-
-    def file_read(self, typed_path) -> str:
-        return self.file_read_binary(typed_path).decode()
-
-    def file_write(self, typed_path, content: str):
-        self.file_write_binary(typed_path, content.encode())
-
-    @abstractmethod
-    def file_read_binary(self, typed_path) -> bytes:
-        pass
-
-    @abstractmethod
-    def file_write_binary(self, typed_path, content: bytes):
-        pass
-
-    @abstractmethod
-    def assert_failed(self, message: str, expected=None, actual=None) -> Exception:
-        pass
-
-
-class SnapshotFileLayout:
-    def __init__(self, fs: FS):
-        self.fs = fs
-
-    def sourcePathForCall(self, location) -> "TypedPath":
-        raise NotImplementedError("sourcePathForCall is not implemented")
 
 
 @total_ordering
@@ -106,6 +77,17 @@ class CallStack:
 
     def __hash__(self):
         return hash((self.location, tuple(self.rest_of_stack)))
+
+
+class SnapshotFileLayout:
+    def __init__(self, fs: FS):
+        self.fs = fs
+
+    def sourcePathForCall(self, call: CallStack) -> TypedPath:
+        file_path = call.location.file_name
+        if not file_path:
+            raise ValueError("No file path available in CallLocation.")
+        return TypedPath(str(Path(file_path)))
 
 
 def recordCall(callerFileOnly: bool = False) -> CallStack:
@@ -180,7 +162,9 @@ class InlineWriteTracker(WriteTracker[CallLocation, LiteralValue]):
     ):
         super().recordInternal(key, snapshot, call, layout)
 
-        file = layout.sourcePathForCall(key)
+        call_stack_from_location = CallStack(key, [])
+        file = layout.sourcePathForCall(call_stack_from_location)
+
         if snapshot.expected is not None:
             content = SourceFile(file.name, layout.fs.file_read(file))
             try:

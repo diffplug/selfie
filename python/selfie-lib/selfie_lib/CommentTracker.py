@@ -3,9 +3,9 @@ from abc import ABC, abstractmethod
 from enum import Enum, auto
 import threading
 
-from selfie_lib.Slice import Slice
-from selfie_lib.TypedPath import TypedPath
-from selfie_lib.WriteTracker import CallStack, SnapshotFileLayout
+from .Slice import Slice
+from .TypedPath import TypedPath
+from .WriteTracker import CallStack, SnapshotFileLayout
 
 
 class WritableComment(Enum):
@@ -51,9 +51,9 @@ class CommentTracker:
         if comment == WritableComment.NO_COMMENT:
             raise ValueError("No writable comment found")
         elif comment == WritableComment.ONCE:
-            return ("//selfieonce", line)
+            return ("#selfieonce", line)
         elif comment == WritableComment.FOREVER:
-            return ("//SELFIEWRITE", line)
+            return ("#SELFIEWRITE", line)
         else:
             raise ValueError("Invalid comment type")
 
@@ -62,10 +62,10 @@ class CommentTracker:
         with open(typedPath.absolute_path, "r") as file:
             content = Slice(file.read())
         for comment_str in [
-            "//selfieonce",
-            "// selfieonce",
-            "//SELFIEWRITE",
-            "// SELFIEWRITE",
+            "# selfieonce",
+            "#selfieonce",
+            "# SELFIEWRITE",
+            "#SELFIEWRITE",
         ]:
             index = content.indexOf(comment_str)
             if index != -1:
