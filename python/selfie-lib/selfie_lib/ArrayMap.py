@@ -146,9 +146,11 @@ class ArrayMap(Mapping[K, V]):
             del new_data[index]
         return ArrayMap.__create(new_data)
 
-    def plus_or_replace(self, key: K, value: V) -> "ArrayMap[K, V]":
+    def plus_or_noop_or_replace(self, key: K, value: V) -> "ArrayMap[K, V]":
         index = self._binary_search_key(key)
         if index >= 0:
+            if (self.__data[2 * index + 1]) == value:
+                return self
             # Replace existing value
             new_data = self.__data[:]
             new_data[2 * index + 1] = value  # Update the value at the correct position
