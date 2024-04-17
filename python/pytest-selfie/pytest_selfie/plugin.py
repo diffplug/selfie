@@ -1,4 +1,5 @@
 from typing import Optional
+from pytest_selfie.SelfieSettingsAPI import calc_mode
 from selfie_lib import (
     Snapshot,
     _initSelfieSystem,
@@ -6,7 +7,6 @@ from selfie_lib import (
     TypedPath,
     recordCall,
     FS,
-    SnapshotFile,
     SnapshotFileLayout,
     DiskStorage,
     CallStack,
@@ -47,7 +47,7 @@ class DiskStorageImplementation(DiskStorage):
 
 class PytestSnapshotSystem(SnapshotSystem):
     def __init__(self):
-        self._mode = Mode(can_write=True)
+        self._mode = calc_mode()
         self._comment_tracker = CommentTracker()
 
     @property

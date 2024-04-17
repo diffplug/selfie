@@ -1,6 +1,23 @@
 import os
 from pathlib import Path
 from typing import Optional
+from selfie_lib import Mode
+
+
+def calc_mode():
+    override = os.getenv("selfie") or os.getenv("SELFIE")
+    if override:
+        # Convert the mode to lowercase and match it with the Mode enum
+        try:
+            return Mode[override.lower()]
+        except KeyError:
+            raise ValueError(f"No such mode: {override}")
+
+    ci = os.getenv("ci") or os.getenv("CI")
+    if ci and ci.lower() == "true":
+        return Mode.readonly
+    else:
+        return Mode.interactive
 
 
 class SelfieSettingsAPI:
