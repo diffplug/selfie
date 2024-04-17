@@ -29,13 +29,7 @@ class Snapshot:
     ) -> "Snapshot":
         if key == "":
             raise ValueError("The empty string is reserved for the subject.")
-        if isinstance(value, bytes):
-            value = SnapshotValueBinary(value)
-        elif isinstance(value, str):
-            value = SnapshotValueString(value)
-        elif not isinstance(value, SnapshotValue):
-            raise TypeError("Value must be either bytes, str, or SnapshotValue")
-        new_facet_data = self._facet_data.plus_or_replace(key, value)
+        new_facet_data = self._facet_data.plus(key, SnapshotValue.of(value))
         return Snapshot(self._subject, new_facet_data)
 
     def subject_or_facet_maybe(self, key: str) -> Union[SnapshotValue, None]:
