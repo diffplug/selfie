@@ -66,8 +66,7 @@ class PytestSnapshotSystem(SnapshotSystem):
         return DiskStorageImplementation()
 
     def source_file_has_writable_comment(self, call: CallStack) -> bool:
-        layout = self.layout.sourcePathForCall(call)
-        return self.comment_tracker.hasWritableComment(call, layout)
+        return self._comment_tracker.hasWritableComment(call, self.layout)
 
     def write_inline(self, literal_value: LiteralValue, call: CallStack):
         pass
@@ -135,7 +134,7 @@ def replace_todo_in_test_file(test_id, replacement_text=None):
         recordCall(), pytestSystem.layout
     ):
         print(f"Checking for writable comment in file: {full_file_path}")
-        typed_path = TypedPath(full_file_path)
+        typed_path = TypedPath.of_file(full_file_path.absolute().__str__())
         comment_str, line_number = CommentTracker.commentString(typed_path)
         print(f"Found '#selfieonce' comment at line {line_number}")
 
