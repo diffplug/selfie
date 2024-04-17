@@ -38,23 +38,18 @@ Orange
 
 def test_write():
     underTest = SnapshotFile()
-    # Assuming metadata should be a dictionary
     underTest.metadata = {"com.acme.AcmeTest": """{"header":"data"}"""}
 
-    # Create and add snapshots
     apple_snapshot = Snapshot.of("Granny Smith")
     apple_snapshot = apple_snapshot.plus_facet("color", "green")
     apple_snapshot = apple_snapshot.plus_facet("crisp", "yes")
 
-    # Directly assigning snapshots to the '_snapshots' dictionary
-    underTest._snapshots["Apple"] = apple_snapshot
-    underTest._snapshots["Orange"] = Snapshot.of("Orange")
+    underTest._snapshots = underTest._snapshots.plus("Apple", apple_snapshot)
+    underTest._snapshots = underTest._snapshots.plus("Orange", Snapshot.of("Orange"))
 
-    # Simulating a buffer to capture the serialized output
     buffer = []
     underTest.serialize(buffer)
 
-    # Define expected output
     expected_output = """╔═ 📷 com.acme.AcmeTest ═╗
 {"header":"data"}
 ╔═ Apple ═╗
