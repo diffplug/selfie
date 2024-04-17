@@ -131,8 +131,9 @@ selfieSystem = None
 
 def _initSelfieSystem(system: SnapshotSystem):
     global selfieSystem
-    if selfieSystem is not None:
-        raise Exception("Selfie system already initialized")
+    # TODO: Figure out how to wipe this state in unit tests
+    # if selfieSystem is not None:
+    #     raise Exception("Selfie system already initialized")
     selfieSystem = system
 
 
