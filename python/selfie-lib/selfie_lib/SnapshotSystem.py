@@ -8,14 +8,6 @@ from .SnapshotReader import SnapshotReader
 from .SnapshotValueReader import SnapshotValueReader
 
 
-class Mode:
-    def __init__(self, can_write: bool):
-        self._can_write = can_write
-
-    def can_write(self, write: bool, call):
-        return self._can_write
-
-
 class FS(ABC):
     @abstractmethod
     def file_walk[T](self, typed_path, walk: Callable[[Sequence[TypedPath]], T]) -> T:

@@ -1,6 +1,7 @@
 # maintain alphabetical order
 from .LineReader import LineReader as LineReader
 from .Literals import LiteralValue as LiteralValue
+from .Mode import Mode as Mode
 from .ParseException import ParseException as ParseException
 from .PerCharacterEscaper import PerCharacterEscaper as PerCharacterEscaper
 from .Slice import Slice as Slice
@@ -10,7 +11,6 @@ from .SnapshotSystem import _initSelfieSystem as _initSelfieSystem
 from .SnapshotSystem import _selfieSystem as _selfieSystem
 from .SnapshotSystem import DiskStorage as DiskStorage
 from .SnapshotSystem import FS as FS
-from .SnapshotSystem import Mode as Mode
 from .SnapshotSystem import SnapshotFile as SnapshotFile
 from .SnapshotSystem import SnapshotSystem as SnapshotSystem
 from .SnapshotValue import SnapshotValue as SnapshotValue
