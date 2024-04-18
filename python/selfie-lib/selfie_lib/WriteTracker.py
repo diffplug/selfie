@@ -90,7 +90,7 @@ class SnapshotFileLayout:
         return TypedPath(str(Path(file_path)))
 
 
-def recordCall(callerFileOnly: bool = False) -> CallStack:
+def recordCall(callerFileOnly: bool) -> CallStack:
     stack_frames = inspect.stack()[1:]
 
     if callerFileOnly:
