@@ -1,35 +1,14 @@
 from abc import ABC, abstractmethod
-from typing import Callable, Sequence, Optional
-from .TypedPath import TypedPath
-from .Snapshot import Snapshot
-from .SnapshotFile import SnapshotFile
+from enum import Enum, auto
+from typing import ByteString, Optional
+
+from .FS import FS
+
 from .Literals import LiteralValue
-from .SnapshotReader import SnapshotReader
-from .SnapshotValueReader import SnapshotValueReader
-
-
-class FS(ABC):
-    @abstractmethod
-    def file_walk[T](self, typed_path, walk: Callable[[Sequence[TypedPath]], T]) -> T:
-        pass
-
-    def file_read(self, typed_path) -> str:
-        return self.file_read_binary(typed_path).decode()
-
-    def file_write(self, typed_path, content: str):
-        self.file_write_binary(typed_path, content.encode())
-
-    @abstractmethod
-    def file_read_binary(self, typed_path) -> bytes:
-        pass
-
-    @abstractmethod
-    def file_write_binary(self, typed_path, content: bytes):
-        pass
-
-    @abstractmethod
-    def assert_failed(self, message: str, expected=None, actual=None) -> Exception:
-        pass
+from .Snapshot import Snapshot
+from .TypedPath import TypedPath
+from .WriteTracker import CallStack, SnapshotFileLayout
+from .CommentTracker import CommentTracker
 
 
 class DiskStorage(ABC):
@@ -49,73 +28,47 @@ class DiskStorage(ABC):
 
 
 class SnapshotSystem(ABC):
-    from .WriteTracker import CallStack, SnapshotFileLayout
-
-    def __init__(self):
-        from .CommentTracker import CommentTracker
-        from .WriteTracker import InlineWriteTracker
-
-        self._comment_tracker = CommentTracker()
-        self._inline_write_tracker = InlineWriteTracker()
+    @property
+    @abstractmethod
+    def fs(self) -> FS: ...
 
     @property
     @abstractmethod
-    def fs(self) -> FS:
-        pass
+    def mode(self) -> "Mode": ...
 
     @property
     @abstractmethod
-    def mode(self) -> "Mode":
-        pass
+    def layout(self) -> SnapshotFileLayout: ...
 
-    @property
     @abstractmethod
-    def layout(self) -> SnapshotFileLayout:
-        pass
-
     def source_file_has_writable_comment(self, call: CallStack) -> bool:
-        return self._comment_tracker.hasWritableComment(call, self.layout)
-
-    def write_inline(self, literal_value: LiteralValue, call: CallStack):
-        from .WriteTracker import CallLocation
-
-        call_location = CallLocation(call.location.file_name, call.location.line)
-        self._inline_write_tracker.record(
-            call_location, literal_value, call, self.layout
-        )
+        """
+        Returns true if the sourcecode for the given call has a writable annotation.
+        """
+        ...
 
     @abstractmethod
-    def diskThreadLocal(self) -> DiskStorage:
-        pass
+    def write_inline(self, literal_value: LiteralValue, call: CallStack) -> None:
+        """
+        Indicates that the following value should be written into test sourcecode.
+        """
+        ...
 
-    def read_snapshot_from_disk(self, file_path: TypedPath) -> Optional[Snapshot]:
-        try:
-            content = self.fs.file_read_binary(file_path)
-            value_reader = SnapshotValueReader.of_binary(content)
-            snapshot_reader = SnapshotReader(value_reader)
-            return snapshot_reader.next_snapshot()
-        except Exception as e:
-            raise self.fs.assert_failed(
-                f"Failed to read snapshot from {file_path.absolute_path}: {str(e)}"
-            )
+    @abstractmethod
+    def write_to_be_file(
+        self, path: TypedPath, data: ByteString, call: CallStack
+    ) -> None:
+        """
+        Writes the given bytes to the given file, checking for duplicate writes.
+        """
+        ...
 
-    def write_snapshot_to_disk(self, snapshot: Snapshot, file_path: TypedPath):
-        try:
-            # Create a SnapshotFile object that will contain the snapshot
-            snapshot_file = SnapshotFile.create_empty_with_unix_newlines(True)
-            snapshot_file.set_at_test_time("default", snapshot)
-
-            # Serialize the SnapshotFile object
-            serialized_data = []
-            snapshot_file.serialize(serialized_data)
-
-            # Write serialized data to disk as binary
-            serialized_str = "\n".join(serialized_data)
-            self.fs.file_write_binary(file_path, serialized_str.encode())
-        except Exception as e:
-            raise self.fs.assert_failed(
-                f"Failed to write snapshot to {file_path.absolute_path}: {str(e)}"
-            )
+    @abstractmethod
+    def disk_thread_local(self) -> DiskStorage:
+        """
+        Returns the DiskStorage for the test associated with this thread, else error.
+        """
+        ...
 
 
 selfieSystem = None
@@ -135,3 +88,49 @@ def _selfieSystem() -> "SnapshotSystem":
             "Selfie system not initialized, make sure that `pytest-selfie` is installed and that you are running tests with `pytest`."
         )
     return selfieSystem
+
+
+class Mode(Enum):
+    interactive = auto()
+    readonly = auto()
+    overwrite = auto()
+
+    def can_write(self, is_todo: bool, call: CallStack, system: SnapshotSystem) -> bool:
+        if self == Mode.interactive:
+            return is_todo or system.source_file_has_writable_comment(call)
+        elif self == Mode.readonly:
+            if system.source_file_has_writable_comment(call):
+                layout = system.layout
+                path = layout.sourcePathForCall(call)
+                comment, line = CommentTracker.commentString(path)
+                raise system.fs.assert_failed(
+                    f"Selfie is in readonly mode, so `{comment}` is illegal at {call.location.with_line(line).ide_link(layout)}"
+                )
+            return False
+        elif self == Mode.overwrite:
+            return True
+        else:
+            raise ValueError(f"Unknown mode: {self}")
+
+    def msg_snapshot_not_found(self) -> str:
+        return self.msg("Snapshot not found")
+
+    def msg_snapshot_not_found_no_such_file(self, file) -> str:
+        return self.msg(f"Snapshot not found: no such file {file}")
+
+    def msg_snapshot_mismatch(self) -> str:
+        return self.msg("Snapshot mismatch")
+
+    def msg(self, headline: str) -> str:
+        if self == Mode.interactive:
+            return (
+                f"{headline}\n"
+                "- update this snapshot by adding '_TODO' to the function name\n"
+                "- update all snapshots in this file by adding '//selfieonce' or '//SELFIEWRITE'"
+            )
+        elif self == Mode.readonly:
+            return headline
+        elif self == Mode.overwrite:
+            return f"{headline}\n(didn't expect this to ever happen in overwrite mode)"
+        else:
+            raise ValueError(f"Unknown mode: {self}")

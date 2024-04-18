@@ -8,7 +8,7 @@ from functools import total_ordering
 from .SourceFile import SourceFile
 from .Literals import LiteralValue
 from .TypedPath import TypedPath
-from .SnapshotSystem import FS
+from .FS import FS
 
 
 T = TypeVar("T")
