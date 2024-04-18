@@ -1,3 +1,4 @@
+from calendar import c
 from enum import Enum, auto
 from typing import Protocol, TypeVar
 from abc import abstractmethod
@@ -262,3 +263,24 @@ class LiteralBoolean(LiteralFormat[bool]):
 
     def parse(self, string: str, language: Language) -> bool:
         return self.__to_boolean_strict(string)
+
+
+class TodoStub(Enum):
+    toMatchDisk = auto()
+    toBeFile = auto()
+
+    def create_literal(self):
+        return LiteralValue(None, self, LiteralTodoStub())
+
+
+class LiteralTodoStub(LiteralFormat[TodoStub]):
+    def encode(
+        self,
+        value: TodoStub,
+        language: Language,
+        encoding_policy: EscapeLeadingWhitespace,
+    ) -> str:
+        raise NotImplementedError()
+
+    def parse(self, string: str, language: Language) -> TodoStub:
+        raise NotImplementedError()
