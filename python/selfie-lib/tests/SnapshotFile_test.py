@@ -38,7 +38,7 @@ Orange
 
 def test_write():
     underTest = SnapshotFile()
-    underTest.metadata = {"com.acme.AcmeTest": """{"header":"data"}"""}
+    underTest.metadata = ("com.acme.AcmeTest", """{"header":"data"}""")
 
     apple_snapshot = Snapshot.of("Granny Smith")
     apple_snapshot = apple_snapshot.plus_facet("color", "green")
