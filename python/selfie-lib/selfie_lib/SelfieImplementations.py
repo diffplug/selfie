@@ -24,13 +24,13 @@ class DiskSelfie(FluentFacet):
         super().__init__(actual, disk)
         self._expected = expected
 
-    def toMatchDisk(self, sub="") -> "DiskSelfie":
+    def to_match_disk(self, sub="") -> "DiskSelfie":
         call = recordCall()
         snapshot_system = _selfieSystem()
-        if snapshot_system.mode.can_write(False, call):
-            snapshot_system.diskThreadLocal().write_disk(self._actual, sub, call)
+        if snapshot_system.mode.can_write(False, call, _selfieSystem()):
+            snapshot_system.disk_thread_local().write_disk(self._actual, sub, call)
         else:
-            expected = snapshot_system.diskThreadLocal().read_disk(sub, call)
+            expected = snapshot_system.disk_thread_local().read_disk(sub, call)
             if expected != self._actual:
                 raise snapshot_system.fs.assert_failed(
                     "Snapshot mismatch!", expected, self._actual
@@ -40,7 +40,7 @@ class DiskSelfie(FluentFacet):
     def toMatchDisk_TODO(self, sub="") -> "DiskSelfie":
         call = recordCall()
         snapshot_system = _selfieSystem()
-        if snapshot_system.mode.can_write(True, call):
+        if snapshot_system.mode.can_write(True, call, _selfieSystem()):
             self._disk.write_disk(self._actual, sub, call)
             actual_snapshot_value = self._actual.subject_or_facet_maybe(sub)
             if actual_snapshot_value is None:
@@ -68,7 +68,7 @@ class StringSelfie(DiskSelfie):
     def __init__(self, actual: Snapshot, disk: DiskStorage, expected: str):
         super().__init__(actual, disk, expected)
 
-    def toBe(self, expected: str) -> str:
+    def to_be(self, expected: str) -> str:
         result = self._expected
         if result != expected:
             raise _selfieSystem().fs.assert_failed(
@@ -76,10 +76,10 @@ class StringSelfie(DiskSelfie):
             )
         return result
 
-    def toBe_TODO(self) -> str:
+    def to_be_TODO(self) -> str:
         call = recordCall()
         snapshot_system = _selfieSystem()
-        if snapshot_system.mode.can_write(True, call):
+        if snapshot_system.mode.can_write(True, call, _selfieSystem()):
             actual_snapshot_value = self._actual.subject_or_facet_maybe("")
             if actual_snapshot_value is None:
                 actual_value = "None"

@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from enum import Enum, auto
+import glob
 from typing import ByteString, Optional
 
 from .FS import FS
@@ -74,20 +75,21 @@ class SnapshotSystem(ABC):
 selfieSystem = None
 
 
+def _selfieSystem() -> "SnapshotSystem":
+    global selfieSystem
+    if selfieSystem is None:
+        raise Exception(
+            "Selfie system not initialized, make sure that `pytest-selfie` is installed and that you are running tests with `pytest`."
+        )
+    return selfieSystem
+
+
 def _initSelfieSystem(system: SnapshotSystem):
     global selfieSystem
     # TODO: Figure out how to wipe this state in unit tests
     # if selfieSystem is not None:
     #     raise Exception("Selfie system already initialized")
     selfieSystem = system
-
-
-def _selfieSystem() -> "SnapshotSystem":
-    if selfieSystem is None:
-        raise Exception(
-            "Selfie system not initialized, make sure that `pytest-selfie` is installed and that you are running tests with `pytest`."
-        )
-    return selfieSystem
 
 
 class Mode(Enum):
