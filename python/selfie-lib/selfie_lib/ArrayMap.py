@@ -1,5 +1,5 @@
-from collections.abc import Set, Iterator, Mapping
-from typing import List, TypeVar, Union, Any
+from collections.abc import Set, Iterator, Mapping, ItemsView
+from typing import List, Tuple, TypeVar, Union, Any
 from abc import abstractmethod, ABC
 
 T = TypeVar("T")
@@ -118,6 +118,32 @@ class _ArrayMapKeys(ListBackedSet[K]):
         return (self.__data[i] for i in range(0, len(self.__data), 2))  # type: ignore
 
 
+class _ArrayMapEntries(ListBackedSet[Tuple[K, V]], ItemsView[K, V]):
+    def __init__(self, data: List[Union[K, V]]):
+        self.__data = data
+
+    def __len__(self) -> int:
+        return len(self.__data) // 2
+
+    def __getitem__(self, index: Union[int, slice]):  # type: ignore
+        if isinstance(index, slice):
+            return [
+                (self.__data[i], self.__data[i + 1])
+                for i in range(
+                    index.start * 2 if index.start else 0,
+                    index.stop * 2 if index.stop else len(self.__data),
+                    index.step * 2 if index.step else 2,
+                )
+            ]
+        else:
+            return (self.__data[2 * index], self.__data[2 * index + 1])
+
+    def __iter__(self) -> Iterator[Tuple[K, V]]:
+        return (
+            (self.__data[i], self.__data[i + 1]) for i in range(0, len(self.__data), 2)
+        )  # type: ignore
+
+
 class ArrayMap(Mapping[K, V]):
     __data: List[Union[K, V]]
     __keys: ListBackedSet[K]
@@ -140,6 +166,9 @@ class ArrayMap(Mapping[K, V]):
 
     def keys(self) -> ListBackedSet[K]:  # type: ignore
         return self.__keys
+
+    def items(self) -> _ArrayMapEntries[K, V]:  # type: ignore
+        return _ArrayMapEntries(self.__data)
 
     def __getitem__(self, key: K) -> V:
         index = self._binary_search_key(key)

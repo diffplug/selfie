@@ -145,3 +145,17 @@ def test_map_length():
     assert len(map) == 1, "Length should be 1 after removing another item"
     map = map.minus_sorted_indices([0])
     assert len(map) == 0, "Length should be 0 after removing all items"
+
+
+def test_keys():
+    assert ArrayMap.empty().keys().__len__() == 0
+    map = ArrayMap.empty().plus("a", "alpha").plus("b", "beta")
+    assert map.keys()[0] == "a"
+    assert map.keys()[1] == "b"
+
+
+def test_items():
+    assert ArrayMap.empty().items().__len__() == 0
+    map = ArrayMap.empty().plus("a", "alpha").plus("b", "beta")
+    assert map.items()[0] == ("a", "alpha")
+    assert map.items()[1] == ("b", "beta")
