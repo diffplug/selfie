@@ -1,24 +1,29 @@
-from typing import Optional
-from pytest_selfie.SelfieSettingsAPI import calc_mode
+from typing import Optional, ByteString
+
+from selfie_lib.FS import FS
+from selfie_lib.WriteTracker import InlineWriteTracker
+
+from .SelfieSettingsAPI import calc_mode, SelfieSettingsAPI
 from selfie_lib import (
-    Snapshot,
+    ArrayMap,
     _initSelfieSystem,
-    SnapshotSystem,
-    TypedPath,
-    recordCall,
-    FS,
-    SnapshotFileLayout,
-    DiskStorage,
     CallStack,
+    CommentTracker,
+    DiskStorage,
     LiteralValue,
     Mode,
+    recordCall,
+    Snapshot,
+    SnapshotFileLayout,
+    SnapshotSystem,
+    TypedPath,
 )
-from selfie_lib.CommentTracker import CommentTracker
 from pathlib import Path
 import pytest
 import re
 
 
+# TODO: do we need FS to be abstract at all on Python? Probably not
 class FSImplementation(FS):
     def file_walk(self, typed_path, walk):
         pass
@@ -46,36 +51,50 @@ class DiskStorageImplementation(DiskStorage):
 
 
 class PytestSnapshotSystem(SnapshotSystem):
-    def __init__(self):
-        self._mode = calc_mode()
-        self._comment_tracker = CommentTracker()
+    def __init__(self, settings: SelfieSettingsAPI):
+        self.__fs = FSImplementation()
+        self.__mode = calc_mode()
+        self.__layout = SnapshotFileLayout(self.__fs)
+        self.__comment_tracker = CommentTracker()
+        self.__inline_write_tracker = InlineWriteTracker()
+        # self.__toBeFileWriteTracker = ToBeFileWriteTracker() #TODO
+        self.__progress_per_file: ArrayMap[str, SnapshotFileProgress] = ArrayMap.empty()
 
     @property
     def mode(self) -> Mode:
-        return self._mode
+        return self.__mode
 
     @property
     def fs(self) -> FS:
-        return FSImplementation()
+        return self.__fs
 
     @property
     def layout(self) -> SnapshotFileLayout:
-        return SnapshotFileLayout(self.fs)
+        return self.__layout
 
-    def diskThreadLocal(self) -> DiskStorage:
+    def disk_thread_local(self) -> DiskStorage:
         return DiskStorageImplementation()
 
     def source_file_has_writable_comment(self, call: CallStack) -> bool:
-        return self._comment_tracker.hasWritableComment(call, self.layout)
+        return self.__comment_tracker.hasWritableComment(call, self.layout)
 
     def write_inline(self, literal_value: LiteralValue, call: CallStack):
+        pass
+
+    def write_to_be_file(
+        self, path: TypedPath, data: "ByteString", call: CallStack
+    ) -> None:
         pass
 
     def finishedAllTests(self):
         pass
 
 
-pytestSystem = PytestSnapshotSystem()
+pytestSystem = PytestSnapshotSystem(SelfieSettingsAPI())
+
+
+class SnapshotFileProgress:
+    pass
 
 
 def pytest_addoption(parser):
@@ -130,7 +149,7 @@ def replace_todo_in_test_file(test_id, replacement_text=None):
     new_test_code = test_code.splitlines()
 
     # Using CommentTracker to check for writable comments
-    if pytestSystem._comment_tracker.hasWritableComment(
+    if pytestSystem.__comment_tracker.hasWritableComment(
         recordCall(), pytestSystem.layout
     ):
         print(f"Checking for writable comment in file: {full_file_path}")
