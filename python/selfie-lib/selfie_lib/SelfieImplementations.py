@@ -1,6 +1,5 @@
 import base64
 
-from charset_normalizer import is_binary
 from .Snapshot import Snapshot
 from .SnapshotFile import SnapshotFile
 from .SnapshotSystem import DiskStorage, SnapshotSystem, _selfieSystem, Mode
