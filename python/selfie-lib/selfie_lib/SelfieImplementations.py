@@ -1,8 +1,11 @@
+import base64
+
+from charset_normalizer import is_binary
 from .Snapshot import Snapshot
 from .SnapshotFile import SnapshotFile
 from .SnapshotSystem import DiskStorage, SnapshotSystem, _selfieSystem, Mode
 from .WriteTracker import recordCall as recordCall
-from .Literals import LiteralValue, LiteralString, TodoStub
+from .Literals import LiteralValue, LiteralString, LiteralFormat, TodoStub
 
 
 from abc import ABC, abstractmethod
@@ -82,46 +85,90 @@ class DiskSelfie(FluentFacet):
     def facets(self, *facets: str) -> "StringFacet":
         raise NotImplementedError()
 
-    def facetBinary(self, facet: str) -> "BinaryFacet":
+    def facet_binary(self, facet: str) -> "BinaryFacet":
         raise NotImplementedError()
 
 
-class StringSelfie(DiskSelfie):
-    def __init__(self, actual: Snapshot, disk: DiskStorage):
+class StringSelfie(DiskSelfie, StringFacet):
+    def __init__(
+        self,
+        actual: Snapshot,
+        disk: DiskStorage,
+        only_facets: Optional[List[str]] = None,
+    ):
         super().__init__(actual, disk)
+        self.only_facets = only_facets
+
+        if self.only_facets is not None:
+            assert all(
+                facet == "" or facet in actual.facets for facet in self.only_facets
+            ), f"The following facets were not found in the snapshot: {[facet for facet in self.only_facets if actual.subject_or_facet_maybe(facet) is None]}\navailable facets are: {list(actual.facets.keys())}"
+            assert (
+                len(self.only_facets) > 0
+            ), "Must have at least one facet to display, this was empty."
+            if "" in self.only_facets:
+                assert (
+                    self.only_facets.index("") == 0
+                ), f'If you\'re going to specify the subject facet (""), you have to list it first, this was {self.only_facets}'
+
+    def to_match_disk(self, sub: str = "") -> "StringSelfie":
+        super().to_match_disk(sub)
+        return self
+
+    def to_match_disk_TODO(self, sub: str = "") -> "StringSelfie":
+        super().to_match_disk_TODO(sub)
+        return self
+
+    def actualString(self) -> str:
+        if not self.actual.facets or (self.only_facets and len(self.only_facets) == 1):
+            # single value doesn't have to worry about escaping at all
+            only_value = self.actual.subject_or_facet(
+                self.only_facets[0] if self.only_facets else ""
+            )
+            if only_value.is_binary:
+                return (
+                    base64.b64encode(only_value.value_binary())
+                    .decode()
+                    .replace("\r", "")
+                )
+            else:
+                return only_value.value_string()
+        else:
+            return serializeOnlyFacets(
+                self.actual, self.only_facets or [""] + list(self.actual.facets.keys())
+            )
+
+    def to_be_TODO(self, unused_arg: Any = None) -> str:
+        return toBeDidntMatch(None, self.actualString(), LiteralString())
 
     def to_be(self, expected: str) -> str:
-        result = self._actual._subject.value_string()  # TODO handle facets
-        if result != expected:
-            raise _selfieSystem().fs.assert_failed(
-                "Expected value does not match!", expected, result
-            )
-        return result
-
-    def to_be_TODO(self) -> str:
-        call = recordCall()
-        snapshot_system = _selfieSystem()
-        if snapshot_system.mode.can_write(True, call, _selfieSystem()):
-            actual_snapshot_value = self._actual.subject_or_facet_maybe("")
-            if actual_snapshot_value is None:
-                actual_value = "None"
-            else:
-                actual_value = (
-                    actual_snapshot_value.value_string()
-                    if not actual_snapshot_value.is_binary
-                    else "binary data"
-                )
-            literal_value = LiteralValue(
-                expected=None,
-                actual=f"TODO: Expected '{self._actual}', got '{actual_value}'",
-                format=LiteralString(),
-            )
-            snapshot_system.write_inline(literal_value, call)
+        actual_string = self.actualString()
+        if actual_string == expected:
+            return checkSrc(actual_string)
         else:
-            raise snapshot_system.fs.assert_failed(
-                "Can't call `toBe_TODO` in readonly mode!"
+            return toBeDidntMatch(expected, actual_string, LiteralString())
+
+
+def checkSrc[T](value: T) -> T:
+    _selfieSystem().mode.can_write(False, recordCall(True), _selfieSystem())
+    return value
+
+
+def toBeDidntMatch[T](expected: Optional[T], actual: T, format: LiteralFormat[T]) -> T:
+    call = recordCall(False)
+    writable = _selfieSystem().mode.can_write(expected is None, call, _selfieSystem())
+    if writable:
+        _selfieSystem().write_inline(LiteralValue(expected, actual, format), call)
+        return actual
+    else:
+        if expected is None:
+            raise _selfieSystem().fs.assert_failed(
+                f"Can't call `toBe_TODO` in {Mode.readonly} mode!"
             )
-        return self._actual._subject.value_string()  # TODO handle facets
+        else:
+            raise _selfieSystem().fs.assert_failed(
+                _selfieSystem().mode.msg_snapshot_mismatch(), expected, actual
+            )
 
 
 def assertEqual(
