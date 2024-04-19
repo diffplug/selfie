@@ -23,17 +23,7 @@ import pytest
 import re
 
 
-# TODO: do we need FS to be abstract at all on Python? Probably not
 class FSImplementation(FS):
-    def file_walk(self, typed_path, walk):
-        pass
-
-    def file_read_binary(self, typed_path) -> bytes:
-        return b""
-
-    def file_write_binary(self, typed_path, content: bytes):
-        pass
-
     def assert_failed(self, message: str, expected=None, actual=None) -> Exception:
         raise Exception(message)
 
@@ -130,6 +120,24 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus):
     pytestSystem.finishedAllTests()
 
 
+@pytest.hookimpl(hookwrapper=True)
+def pytest_pyfunc_call(pyfuncitem):
+    outcome = yield
+    try:
+        result = outcome.get_result()
+    except Exception as e:
+        result = str(e)
+        print(f"Test error: {pyfuncitem.nodeid} with {e}")
+
+    # Store expected result if TODO was used and test passed
+    if "TODO" in pyfuncitem.name and outcome.excinfo is None:
+        expected_result = result
+        pyfuncitem.todo_replace = {"expected": expected_result}
+        replace_todo_in_test_file(pyfuncitem.nodeid, expected_result)
+
+    print(f"SELFIE end test {pyfuncitem.nodeid} with {result}")
+
+
 def update_test_files(session):
     for test in session.items:
         if getattr(test, "todo_replace", None):
@@ -150,7 +158,7 @@ def replace_todo_in_test_file(test_id, replacement_text=None):
 
     # Using CommentTracker to check for writable comments
     if pytestSystem.__comment_tracker.hasWritableComment(
-        recordCall(), pytestSystem.layout
+        recordCall(False), pytestSystem.layout
     ):
         print(f"Checking for writable comment in file: {full_file_path}")
         typed_path = TypedPath.of_file(full_file_path.absolute().__str__())
@@ -214,21 +222,3 @@ def replace_todo_in_test_file(test_id, replacement_text=None):
         print(f"Updated test code in {full_file_path}")
     else:
         print("No changes made to the test code.")
-
-
-@pytest.hookimpl(hookwrapper=True)
-def pytest_pyfunc_call(pyfuncitem):
-    outcome = yield
-    try:
-        result = outcome.get_result()
-    except Exception as e:
-        result = str(e)
-        print(f"Test error: {pyfuncitem.nodeid} with {e}")
-
-    # Store expected result if TODO was used and test passed
-    if "TODO" in pyfuncitem.name and outcome.excinfo is None:
-        expected_result = result
-        pyfuncitem.todo_replace = {"expected": expected_result}
-        replace_todo_in_test_file(pyfuncitem.nodeid, expected_result)
-
-    print(f"SELFIE end test {pyfuncitem.nodeid} with {result}")
