@@ -65,7 +65,7 @@ class DiskSelfie(FluentFacet):
         if _selfieSystem().mode.can_write(False, call, _selfieSystem()):
             self.disk.write_disk(self.actual, sub, call)
         else:
-            assertEqual(self.disk.read_disk(sub, call), self.actual, _selfieSystem())
+            __assertEqual(self.disk.read_disk(sub, call), self.actual, _selfieSystem())
         return self
 
     def to_match_disk_TODO(self, sub: str = "") -> "DiskSelfie":
@@ -119,7 +119,7 @@ class StringSelfie(DiskSelfie, StringFacet):
         super().to_match_disk_TODO(sub)
         return self
 
-    def actualString(self) -> str:
+    def __actual(self) -> str:
         if not self.actual.facets or (self.only_facets and len(self.only_facets) == 1):
             # single value doesn't have to worry about escaping at all
             only_value = self.actual.subject_or_facet(
@@ -134,27 +134,29 @@ class StringSelfie(DiskSelfie, StringFacet):
             else:
                 return only_value.value_string()
         else:
-            return serializeOnlyFacets(
+            return __serializeOnlyFacets(
                 self.actual, self.only_facets or [""] + list(self.actual.facets.keys())
             )
 
     def to_be_TODO(self, unused_arg: Any = None) -> str:
-        return toBeDidntMatch(None, self.actualString(), LiteralString())
+        return __toBeDidntMatch(None, self.__actual(), LiteralString())
 
     def to_be(self, expected: str) -> str:
-        actual_string = self.actualString()
+        actual_string = self.__actual()
         if actual_string == expected:
-            return checkSrc(actual_string)
+            return __checkSrc(actual_string)
         else:
-            return toBeDidntMatch(expected, actual_string, LiteralString())
+            return __toBeDidntMatch(expected, actual_string, LiteralString())
 
 
-def checkSrc[T](value: T) -> T:
+def __checkSrc[T](value: T) -> T:
     _selfieSystem().mode.can_write(False, recordCall(True), _selfieSystem())
     return value
 
 
-def toBeDidntMatch[T](expected: Optional[T], actual: T, format: LiteralFormat[T]) -> T:
+def __toBeDidntMatch[T](
+    expected: Optional[T], actual: T, format: LiteralFormat[T]
+) -> T:
     call = recordCall(False)
     writable = _selfieSystem().mode.can_write(expected is None, call, _selfieSystem())
     if writable:
@@ -171,7 +173,7 @@ def toBeDidntMatch[T](expected: Optional[T], actual: T, format: LiteralFormat[T]
             )
 
 
-def assertEqual(
+def __assertEqual(
     expected: Optional[Snapshot], actual: Snapshot, storage: SnapshotSystem
 ):
     if expected is None:
@@ -196,12 +198,12 @@ def assertEqual(
         )
         raise storage.fs.assert_failed(
             storage.mode.msg_snapshot_mismatch(),
-            serializeOnlyFacets(expected, mismatched_keys),
-            serializeOnlyFacets(actual, mismatched_keys),
+            __serializeOnlyFacets(expected, mismatched_keys),
+            __serializeOnlyFacets(actual, mismatched_keys),
         )
 
 
-def serializeOnlyFacets(snapshot: Snapshot, keys: List[str]) -> str:
+def __serializeOnlyFacets(snapshot: Snapshot, keys: List[str]) -> str:
     writer = []
     for key in keys:
         if not key:
