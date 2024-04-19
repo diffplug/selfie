@@ -87,7 +87,7 @@ class SnapshotFile:
         if peek_key and peek_key.startswith(cls.HEADER_PREFIX):
             metadata_name = peek_key[len(cls.HEADER_PREFIX) :]
             metadata_value = value_reader.next_value().value_string()
-            result.metadata = {metadata_name: metadata_value}
+            result.metadata = (metadata_name, metadata_value)
             reader.next_snapshot()
 
         while True:

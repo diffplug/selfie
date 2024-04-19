@@ -16,7 +16,7 @@ Orange
 ╔═ [end of file] ═╗
 """.strip()
     file = SnapshotFile.parse(SnapshotValueReader.of(file_content))
-    assert file.metadata == {"com.acme.AcmeTest": """{"header":"data"}"""}
+    assert file.metadata == ("com.acme.AcmeTest", """{"header":"data"}""")
 
 
 def test_read_without_metadata():
