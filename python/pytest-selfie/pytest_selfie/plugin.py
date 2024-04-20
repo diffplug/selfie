@@ -74,6 +74,10 @@ class PytestSnapshotSystem(SnapshotSystem):
     def finishedAllTests(self):
         pass
 
+    def checkSrc(self, actual):
+        print(f"Checking source for value: {actual}")
+        return True
+
 
 pytestSystem = PytestSnapshotSystem()
 
@@ -145,12 +149,10 @@ def replace_todo_in_test_file(test_id, replacement_text=None):
     # Rejoin lines into a single string
     new_test_code = "\n".join(new_test_code)
 
-    # Handling toBe_TODO() replacements
-    pattern_to_be = re.compile(
-        r"expectSelfie\(\s*\"(.*?)\"\s*\)\.toBe_TODO\(\)", re.DOTALL
-    )
+    # Handling toBe_TODO() replacements for strings, ints, and booleans
+    pattern_to_be = re.compile(r"expectSelfie\((\".*?\"|\d+|True|False)\)\.toBe_TODO\(\)")
     new_test_code = pattern_to_be.sub(
-        lambda m: f"expectSelfie(\"{m.group(1)}\").toBe('{m.group(1)}')", new_test_code
+        lambda m: f"expectSelfie({m.group(1)}).toBe({m.group(1)})", new_test_code
     )
 
     # Handling toMatchDisk_TODO() replacements

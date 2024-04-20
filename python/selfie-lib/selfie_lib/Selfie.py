@@ -1,5 +1,5 @@
 from tracemalloc import Snapshot
-from .SelfieImplementations import StringSelfie
+from .SelfieImplementations import StringSelfie, IntSelfie, BooleanSelfie
 from .Snapshot import Snapshot
 from .SnapshotSystem import _selfieSystem
 
@@ -10,9 +10,10 @@ def expectSelfie(actual):
         diskStorage = _selfieSystem().diskThreadLocal()
         return StringSelfie(snapshot, diskStorage, actual)
     elif isinstance(actual, int):
-        return IntSelfie(actual)
+        snapshot = Snapshot.of(actual)
+        diskStorage = _selfieSystem().diskThreadLocal()
+        return IntSelfie(snapshot, diskStorage)
     elif isinstance(actual, bool):
-        return BooleanSelfie(actual)
-    else:
-        raise ValueError("Unsupported type for Selfie.")
-
+        snapshot = Snapshot.of(actual)
+        diskStorage = _selfieSystem().diskThreadLocal()
+        return BooleanSelfie(snapshot, diskStorage)
