@@ -19,9 +19,30 @@ class FluentFacet:
         raise NotImplementedError()
 
 
-class DiskSelfie(FluentFacet):
-    def __init__(self, actual: Snapshot, disk: DiskStorage, expected: str = ""):
-        super().__init__(actual, disk)
+class BaseSelfie:
+    def __init__(self, snapshot):
+        self._snapshot = snapshot
+
+    def toBeDidntMatch(self, expected, literal_type):
+        call = recordCall()
+        snapshot_system = _selfieSystem()
+        literal_value = LiteralValue(
+            expected=expected,
+            actual=f"Expected '{expected}', got '{self._snapshot.subject_or_facet("")}'",
+            format=literal_type,
+        )
+        snapshot_system.write_inline(literal_value, call)
+        raise snapshot_system.fs.assert_failed(
+            "Expected value does not match!",
+            expected,
+            self._snapshot.subject_or_facet(""),
+        )
+
+
+class DiskSelfie(FluentFacet, BaseSelfie):
+    def __init__(self, snapshot, disk: DiskStorage, expected: str = ""):
+        FluentFacet.__init__(self, snapshot, disk)
+        BaseSelfie.__init__(self, snapshot)
         self._expected = expected
 
     def toMatchDisk(self, sub="") -> "DiskSelfie":
@@ -70,28 +91,9 @@ class LiteralType:
     LiteralString = "str"
 
 
-class BaseSelfie:
-    def __init__(self, snapshot):
-        self._snapshot = snapshot
-
-    def toBeDidntMatch(self, expected, literal_type):
-        call = recordCall()
-        snapshot_system = _selfieSystem()
-        literal_value = LiteralValue(
-            expected=expected,
-            actual=f"Expected '{expected}', got '{self._snapshot.subject_or_facet("")}'",
-            format=literal_type,
-        )
-        snapshot_system.write_inline(literal_value, call)
-        raise snapshot_system.fs.assert_failed(
-            "Expected value does not match!", expected, self._snapshot.subject_or_facet("")
-        )
-
-
-class IntSelfie(DiskSelfie): 
+class IntSelfie(DiskSelfie):
     def __init__(self, snapshot, disk: DiskStorage):
         super().__init__(snapshot, disk)
-        self._snapshot = snapshot
 
     def toBe(self, expected: int):
         actual = int(self._snapshot.subject_or_facet("")._value)
@@ -101,10 +103,9 @@ class IntSelfie(DiskSelfie):
             self.toBeDidntMatch(expected, LiteralType.LiteralInt)
 
 
-class BooleanSelfie(DiskSelfie):  
+class BooleanSelfie(DiskSelfie):
     def __init__(self, snapshot, disk: DiskStorage):
         super().__init__(snapshot, disk)
-        self._snapshot = snapshot
 
     def toBe(self, expected: bool):
         actual = self._snapshot.subject_or_facet("")._value.lower() == "true"

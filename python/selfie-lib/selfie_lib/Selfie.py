@@ -10,7 +10,7 @@ def expectSelfie(actual):
         snapshot = Snapshot.of(actual)
         return StringSelfie(snapshot, diskStorage, actual)
     elif isinstance(actual, bool):
-        snapshot = Snapshot.of(str(actual))  
+        snapshot = Snapshot.of(str(actual))
         return BooleanSelfie(snapshot, diskStorage)
     elif isinstance(actual, int):
         snapshot = Snapshot.of(str(actual))
