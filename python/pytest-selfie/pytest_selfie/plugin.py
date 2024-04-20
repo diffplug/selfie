@@ -1,22 +1,29 @@
-from typing import Optional, ByteString
+from cgi import test
+import os
+from collections import defaultdict
+from typing import DefaultDict, Optional, ByteString, List
 
-from selfie_lib.FS import FS
-from selfie_lib.WriteTracker import InlineWriteTracker
-
-from .SelfieSettingsAPI import calc_mode, SelfieSettingsAPI
-from .replace_todo import replace_todo_in_test_file, update_test_files
+from selfie_lib.Atomic import AtomicReference
+from .SelfieSettingsAPI import SelfieSettingsAPI
 from selfie_lib import (
-    ArrayMap,
+    _clearSelfieSystem,
     _initSelfieSystem,
+    ArrayMap,
+    ArraySet,
     CallStack,
     CommentTracker,
     DiskStorage,
+    DiskWriteTracker,
+    FS,
+    InlineWriteTracker,
     LiteralValue,
     Mode,
     Snapshot,
+    SnapshotFile,
     SnapshotFileLayout,
     SnapshotSystem,
     TypedPath,
+    WithinTestGC,
 )
 import pytest
 
@@ -24,6 +31,42 @@ import pytest
 class FSImplementation(FS):
     def assert_failed(self, message: str, expected=None, actual=None) -> Exception:
         raise Exception(message)
+
+
+@pytest.hookimpl
+def pytest_collection_modifyitems(
+    session: pytest.Session, config: pytest.Config, items: List[pytest.Item]
+) -> None:
+    settings = SelfieSettingsAPI(config)
+    system = PytestSnapshotSystem(settings)
+    session.selfie_system = system  # type: ignore
+    _initSelfieSystem(system)
+    for item in items:
+        (file, _, testname) = item.reportinfo()
+        system.planning_to_run(TypedPath.of_file(os.path.abspath(file)), testname)
+
+
+@pytest.hookimpl
+def pytest_sessionfinish(session: pytest.Session, exitstatus):
+    system: PytestSnapshotSystem = session.selfie_system  # type: ignore
+    system.finished_all_tests()
+    _clearSelfieSystem(system)
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_protocol(item: pytest.Item, nextitem: Optional[pytest.Item]):
+    (file, _, testname) = item.reportinfo()
+    testfile = TypedPath.of_file(os.path.abspath(file))
+
+    system: PytestSnapshotSystem = item.session.system  # type: ignore
+    system.test_start(testfile, testname)
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_pyfunc_call(pyfuncitem: pytest.Function):
+    outcome = yield
+    system: PytestSnapshotSystem = pyfuncitem.session.system  # type: ignore
+    system.test_finished_and_failed(outcome.excinfo is not None)
 
 
 class DiskStorageImplementation(DiskStorage):
@@ -41,12 +84,50 @@ class DiskStorageImplementation(DiskStorage):
 class PytestSnapshotSystem(SnapshotSystem):
     def __init__(self, settings: SelfieSettingsAPI):
         self.__fs = FSImplementation()
-        self.__mode = calc_mode()
+        self.__mode = settings.calc_mode()
         self.__layout = SnapshotFileLayout(self.__fs)
         self.__comment_tracker = CommentTracker()
         self.__inline_write_tracker = InlineWriteTracker()
         # self.__toBeFileWriteTracker = ToBeFileWriteTracker() #TODO
-        self.__progress_per_file: ArrayMap[str, SnapshotFileProgress] = ArrayMap.empty()
+        self.__progress_per_file: DefaultDict[TypedPath, SnapshotFileProgress] = (
+            defaultdict(lambda key: SnapshotFileProgress(self, key))  # type: ignore
+        )  # type: ignore
+        # the test which is running right now, if any
+        self.__in_progress: Optional[SnapshotFileProgress] = None
+        # double-checks that we don't have any tests in progress
+        self.check_for_invalid_state: AtomicReference[Optional[ArraySet[TypedPath]]] = (
+            AtomicReference(ArraySet.empty())
+        )
+
+    def planning_to_run(self, testfile: TypedPath, testname: str):
+        progress = self.__progress_per_file[testfile]
+        progress.finishes_expected += 1
+
+    def mark_path_as_written(self, path: TypedPath):
+        def update_fun(arg: Optional[ArraySet[TypedPath]]):
+            if arg is None:
+                raise RuntimeError(
+                    "Snapshot file is being written after all tests were finished."
+                )
+            return arg.plusOrThis(path)
+
+        self.check_for_invalid_state.update_and_get(update_fun)
+
+    def test_start(self, testfile: TypedPath, testname: str):
+        if self.__in_progress is not None:
+            raise RuntimeError("Test already in progress")
+        self.__in_progress = self.__progress_per_file[testfile]
+        self.__in_progress.test_start(testname)
+        pass
+
+    def test_finished_and_failed(self, failed: bool):
+        if self.__in_progress is None:
+            raise RuntimeError("No test in progress")
+        self.__in_progress.test_finished_and_failed(failed)
+        pass
+
+    def finished_all_tests(self):
+        pass
 
     @property
     def mode(self) -> Mode:
@@ -74,15 +155,162 @@ class PytestSnapshotSystem(SnapshotSystem):
     ) -> None:
         pass
 
-    def finishedAllTests(self):
-        pass
-
-
-pytestSystem = PytestSnapshotSystem(SelfieSettingsAPI())
-
 
 class SnapshotFileProgress:
-    pass
+    TERMINATED = ArrayMap.empty().plus(" ~ / f!n1shed / ~ ", WithinTestGC())
+
+    def __init__(self, system: PytestSnapshotSystem, test_file: TypedPath):
+        self.system = system
+        # the test file which holds the test case which we are the snapshot file for
+        self.test_file = test_file
+
+        # before the tests run, we find out how many we expect to happen
+        self.finishes_expected = 0
+        # while the tests run, we count up until they have all run, and then we can cleanup
+        self.finishes_so_far = 0
+        # have any tests failed?
+        self.has_failed = False
+
+        # lazy-loaded snapshot file
+        self.file: Optional[SnapshotFile] = None
+        self.tests: AtomicReference[ArrayMap[str, WithinTestGC]] = AtomicReference(
+            ArrayMap.empty()
+        )
+        self.disk_write_tracker: Optional[DiskWriteTracker] = DiskWriteTracker()
+        # the test name which is currently in progress, if any
+        self.testname_in_progress: Optional[str] = None
+
+    def assert_not_terminated(self):
+        if self.tests.get() == SnapshotFileProgress.TERMINATED:
+            raise RuntimeError(
+                "Cannot call methods on a terminated SnapshotFileProgress"
+            )
+
+    def test_start(self, testname: str):
+        if "/" in testname:
+            raise ValueError(f"Test name cannot contain '/', was {test}")
+        self.assert_not_terminated()
+        if self.testname_in_progress is not None:
+            raise RuntimeError(
+                f"Cannot start a new test {testname}, {self.testname_in_progress} is already in progress"
+            )
+        self.testname_in_progress = testname
+        self.tests.update_and_get(lambda it: it.plus_or_noop(testname, WithinTestGC()))
+
+    def test_finished_and_failed(self, failed: bool):
+        self.assert_not_terminated()
+        if self.testname_in_progress is None:
+            raise RuntimeError("Can't finish, no test was in progress!")
+        self.finishes_so_far += 1
+        if failed:
+            self.has_failed = True
+            self.tests.get()[self.testname_in_progress].keep_all()
+        self.testname_in_progress = None
+
+        if self.finishes_so_far == self.finishes_expected:
+            self.__all_tests_finished()
+
+    def __all_tests_finished(self):
+        self.assert_not_terminated()
+        self.disk_write_tracker = None  # don't need this anymore
+        tests = self.tests.get_and_update(lambda _: SnapshotFileProgress.TERMINATED)
+        if tests == SnapshotFileProgress.TERMINATED:
+            raise ValueError(f"Snapshot for {self.test_file} already terminated!")
+        if self.file is not None:
+            stale_snapshot_indices = WithinTestGC.find_stale_snapshots_within(
+                self.file.snapshots,
+                tests,
+                find_test_methods_that_didnt_run(self.test_file, tests),
+            )
+            if stale_snapshot_indices or self.file.was_set_at_test_time:
+                self.file.remove_all_indices(stale_snapshot_indices)
+                snapshot_path = self.system.layout.snapshot_path_for_class(
+                    self.class_name
+                )
+                if not self.file.snapshots:
+                    delete_file_and_parent_dir_if_empty(snapshot_path)
+                else:
+                    self.system.mark_path_as_written(
+                        self.system.layout.snapshot_path_for_class(self.class_name)
+                    )
+                    os.makedirs(os.path.dirname(snapshot_path), exist_ok=True)
+                    with open(snapshot_path, "w", encoding="utf-8") as writer:
+                        self.file.serialize(writer)
+        else:
+            # we never read or wrote to the file
+            every_test_in_class_ran = not any(
+                find_test_methods_that_didnt_run(self.test_file, tests)
+            )
+            is_stale = (
+                every_test_in_class_ran
+                and not self.has_failed
+                and all(it.succeeded_and_used_no_snapshots() for it in tests.values())
+            )
+            if is_stale:
+                snapshot_file = self.system.layout.snapshot_path_for_class(
+                    self.class_name
+                )
+                delete_file_and_parent_dir_if_empty(snapshot_file)
+        # now that we are done, allow our contents to be GC'ed
+        self.file = None
+
+    def keep(self, test: str, suffix_or_all: Optional[str]):
+        self.assert_not_terminated()
+        if suffix_or_all is None:
+            self.tests.get()[test].keep_all()
+        else:
+            self.tests.get()[test].keep_suffix(suffix_or_all)
+
+    def write(
+        self,
+        test: str,
+        suffix: str,
+        snapshot: Snapshot,
+        call_stack: CallStack,
+        layout: SnapshotFileLayout,
+    ):
+        self.assert_not_terminated()
+        key = f"{test}{suffix}"
+        self.disk_write_tracker.record(key, snapshot, call_stack, layout)  # type: ignore
+        self.tests.get()[test].keep_suffix(suffix)
+        self.read_file().set_at_test_time(key, snapshot)
+
+    def read(self, test: str, suffix: str) -> Optional[Snapshot]:
+        self.assert_not_terminated()
+        snapshot = self.read_file().snapshots.get(f"{test}{suffix}")
+        if snapshot is not None:
+            self.tests.get()[test].keep_suffix(suffix)
+        return snapshot
+
+    def read_file(self) -> SnapshotFile:
+        if self.file is None:
+            snapshot_path = self.system.layout.snapshot_path_for_class(self.class_name)
+            if os.path.exists(snapshot_path) and os.path.isfile(snapshot_path):
+                with open(snapshot_path, "rb") as f:
+                    content = f.read()
+                self.file = SnapshotFile.parse(SnapshotValueReader.of(content))
+            else:
+                self.file = SnapshotFile.create_empty_with_unix_newlines(
+                    self.system.layout.unix_newlines
+                )
+        return self.file
+
+
+def delete_file_and_parent_dir_if_empty(snapshot_file: TypedPath):
+    if os.path.isfile(snapshot_file.absolute_path):
+        os.remove(snapshot_file.absolute_path)
+        # if the parent folder is now empty, delete it
+        parent = os.path.dirname(snapshot_file.absolute_path)
+        if not os.listdir(parent):
+            os.rmdir(parent)
+
+
+def find_test_methods_that_didnt_run(
+    testfile: TypedPath, tests: ArrayMap[str, WithinTestGC]
+) -> ArrayMap[str, WithinTestGC]:
+    # Implementation of finding test methods that didn't run
+    # You can replace this with your own logic based on the class_name and tests dictionary
+    return ArrayMap.empty()
 
 
 def pytest_addoption(parser):
@@ -101,36 +329,3 @@ def pytest_addoption(parser):
 @pytest.fixture
 def bar(request):
     return request.config.option.dest_foo
-
-
-@pytest.hookimpl
-def pytest_sessionstart(session: pytest.Session):
-    print("SELFIE SESSION STARTED")
-    global pytestSystem
-    replace_todo_in_test_file(pytestSystem, "tests/Simple_test.py::test_inline")
-    _initSelfieSystem(pytestSystem)
-
-
-@pytest.hookimpl
-def pytest_sessionfinish(session: pytest.Session, exitstatus):
-    print("SELFIE SESSION FINISHED")
-    update_test_files(pytestSystem, session)
-    pytestSystem.finishedAllTests()
-
-
-@pytest.hookimpl(hookwrapper=True)
-def pytest_pyfunc_call(pyfuncitem):
-    outcome = yield
-    try:
-        result = outcome.get_result()
-    except Exception as e:
-        result = str(e)
-        print(f"Test error: {pyfuncitem.nodeid} with {e}")
-
-    # Store expected result if TODO was used and test passed
-    if "TODO" in pyfuncitem.name and outcome.excinfo is None:
-        expected_result = result
-        pyfuncitem.todo_replace = {"expected": expected_result}
-        replace_todo_in_test_file(pyfuncitem.nodeid, expected_result)
-
-    print(f"SELFIE end test {pyfuncitem.nodeid} with {result}")
