@@ -3,6 +3,7 @@ from typing import List, Optional, Generic, TypeVar, Dict, cast
 from abc import ABC, abstractmethod
 import inspect
 import threading
+import os
 from functools import total_ordering
 
 from .SourceFile import SourceFile
@@ -83,11 +84,11 @@ class SnapshotFileLayout:
     def __init__(self, fs: FS):
         self.fs = fs
 
-    def sourcePathForCall(self, call: CallStack) -> TypedPath:
+    def sourcefile_for_call(self, call: CallStack) -> TypedPath:
         file_path = call.location.file_name
         if not file_path:
             raise ValueError("No file path available in CallLocation.")
-        return TypedPath(str(Path(file_path)))
+        return TypedPath(os.path.abspath(Path(file_path)))
 
 
 def recordCall(callerFileOnly: bool) -> CallStack:
@@ -153,6 +154,9 @@ class DiskWriteTracker(WriteTracker[T, U]):
 
 
 class InlineWriteTracker(WriteTracker[CallLocation, LiteralValue]):
+    def hasWrites(self) -> bool:
+        return not self.writes
+
     def record(
         self,
         key: CallLocation,
@@ -163,7 +167,7 @@ class InlineWriteTracker(WriteTracker[CallLocation, LiteralValue]):
         super().recordInternal(key, snapshot, call, layout)
 
         call_stack_from_location = CallStack(key, [])
-        file = layout.sourcePathForCall(call_stack_from_location)
+        file = layout.sourcefile_for_call(call_stack_from_location)
 
         if snapshot.expected is not None:
             content = SourceFile(file.name, layout.fs.file_read(file))
@@ -183,3 +187,6 @@ class InlineWriteTracker(WriteTracker[CallLocation, LiteralValue]):
                     snapshot.expected,
                     parsed_value,
                 )
+
+    def persist_writes(self, layout: SnapshotFileLayout):
+        raise NotImplementedError("InlineWriteTracker does not support persist_writes")
