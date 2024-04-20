@@ -1,7 +1,8 @@
 from cgi import test
 import os
 from collections import defaultdict
-from typing import DefaultDict, Optional, ByteString, List
+import re
+from typing import ByteString, DefaultDict, List, Optional, Iterator
 
 from selfie_lib.Atomic import AtomicReference
 from .SelfieSettingsAPI import SelfieSettingsAPI
@@ -22,6 +23,8 @@ from selfie_lib import (
     SnapshotFile,
     SnapshotFileLayout,
     SnapshotSystem,
+    SnapshotValueReader,
+    SourceFile,
     TypedPath,
     WithinTestGC,
 )
@@ -31,6 +34,35 @@ import pytest
 class FSImplementation(FS):
     def assert_failed(self, message: str, expected=None, actual=None) -> Exception:
         raise Exception(message)
+
+
+class PytestSnapshotFileLayout(SnapshotFileLayout):
+    def __init__(self, fs: FSImplementation, settings: SelfieSettingsAPI):
+        super().__init__(fs)
+        self.__settings = settings
+        self.__root_folder = TypedPath.of_folder(os.path.abspath(settings.root_dir))
+        self.unix_newlines = self.__infer_default_line_ending_is_unix()
+
+    def snapshotfile_for_testfile(self, testfile: TypedPath) -> TypedPath:
+        if testfile.name.endswith(".py"):
+            return testfile.parent_folder().resolve_file(f"{testfile.name[:-3]}.ss")
+        else:
+            raise ValueError(f"Unknown file extension, expected .py: {testfile.name}")
+
+    def __infer_default_line_ending_is_unix(self) -> bool:
+        def walk_callback(walk: Iterator[TypedPath]) -> bool:
+            for file_path in walk:
+                try:
+                    txt = self.fs.file_read(file_path)
+                    # look for a file that has a newline somewhere in it
+                    if "\n" in txt:
+                        return "\r" not in txt
+                except Exception:
+                    # might be a binary file that throws an encoding exception
+                    pass
+            return True  # if we didn't find any files, assume unix
+
+        return self.fs.file_walk(self.__root_folder, walk_callback)
 
 
 @pytest.hookimpl
@@ -85,7 +117,7 @@ class PytestSnapshotSystem(SnapshotSystem):
     def __init__(self, settings: SelfieSettingsAPI):
         self.__fs = FSImplementation()
         self.__mode = settings.calc_mode()
-        self.__layout = SnapshotFileLayout(self.__fs)
+        self.__layout = PytestSnapshotFileLayout(self.__fs, settings)
         self.__comment_tracker = CommentTracker()
         self.__inline_write_tracker = InlineWriteTracker()
         # self.__toBeFileWriteTracker = ToBeFileWriteTracker() #TODO
@@ -127,7 +159,18 @@ class PytestSnapshotSystem(SnapshotSystem):
         pass
 
     def finished_all_tests(self):
-        pass
+        snapshotsFilesWrittenToDisk = self.check_for_invalid_state.get_and_update(
+            lambda _: None
+        )
+        if snapshotsFilesWrittenToDisk is None:
+            raise RuntimeError("finished_all_tests() was called more than once.")
+        if self.mode != Mode.readonly:
+            for path in self.__comment_tracker.paths_with_once():
+                source = SourceFile(path.name, self.fs.file_read(path))
+                source.remove_selfie_once_comments()
+                self.fs.file_write(path, source.as_string)
+            if self.__inline_write_tracker.hasWrites():
+                self.__inline_write_tracker.persist_writes(self.layout)
 
     @property
     def mode(self) -> Mode:
@@ -224,18 +267,25 @@ class SnapshotFileProgress:
             )
             if stale_snapshot_indices or self.file.was_set_at_test_time:
                 self.file.remove_all_indices(stale_snapshot_indices)
-                snapshot_path = self.system.layout.snapshot_path_for_class(
-                    self.class_name
+                snapshot_path = self.system.__layout.snapshotfile_for_testfile(
+                    self.test_file
                 )
                 if not self.file.snapshots:
                     delete_file_and_parent_dir_if_empty(snapshot_path)
                 else:
                     self.system.mark_path_as_written(
-                        self.system.layout.snapshot_path_for_class(self.class_name)
+                        self.system.__layout.snapshotfile_for_testfile(self.test_file)
                     )
-                    os.makedirs(os.path.dirname(snapshot_path), exist_ok=True)
-                    with open(snapshot_path, "w", encoding="utf-8") as writer:
-                        self.file.serialize(writer)
+                    os.makedirs(
+                        os.path.dirname(snapshot_path.absolute_path), exist_ok=True
+                    )
+                    with open(
+                        snapshot_path.absolute_path, "w", encoding="utf-8"
+                    ) as writer:
+                        list = []
+                        self.file.serialize(list)
+                        for e in list:
+                            writer.write(e)
         else:
             # we never read or wrote to the file
             every_test_in_class_ran = not any(
@@ -247,8 +297,8 @@ class SnapshotFileProgress:
                 and all(it.succeeded_and_used_no_snapshots() for it in tests.values())
             )
             if is_stale:
-                snapshot_file = self.system.layout.snapshot_path_for_class(
-                    self.class_name
+                snapshot_file = self.system.__layout.snapshotfile_for_testfile(
+                    self.test_file
                 )
                 delete_file_and_parent_dir_if_empty(snapshot_file)
         # now that we are done, allow our contents to be GC'ed
@@ -284,14 +334,18 @@ class SnapshotFileProgress:
 
     def read_file(self) -> SnapshotFile:
         if self.file is None:
-            snapshot_path = self.system.layout.snapshot_path_for_class(self.class_name)
-            if os.path.exists(snapshot_path) and os.path.isfile(snapshot_path):
-                with open(snapshot_path, "rb") as f:
+            snapshot_path = self.system.__layout.snapshotfile_for_testfile(
+                self.test_file
+            )
+            if os.path.exists(snapshot_path.absolute_path) and os.path.isfile(
+                snapshot_path.absolute_path
+            ):
+                with open(snapshot_path.absolute_path, "rb") as f:
                     content = f.read()
-                self.file = SnapshotFile.parse(SnapshotValueReader.of(content))
+                self.file = SnapshotFile.parse(SnapshotValueReader.of_binary(content))
             else:
                 self.file = SnapshotFile.create_empty_with_unix_newlines(
-                    self.system.layout.unix_newlines
+                    self.system.__layout.unix_newlines
                 )
         return self.file
 
