@@ -66,6 +66,10 @@ class SnapshotSystem(ABC):
         self._comment_tracker = CommentTracker()
         self._inline_write_tracker = InlineWriteTracker()
 
+    def checkSrc(self, actual):
+        print(f"Checking source for value: {actual}")
+        return True
+
     @property
     @abstractmethod
     def fs(self) -> FS:

@@ -5,15 +5,13 @@ from .SnapshotSystem import _selfieSystem
 
 
 def expectSelfie(actual):
+    diskStorage = _selfieSystem().diskThreadLocal()
     if isinstance(actual, str):
         snapshot = Snapshot.of(actual)
-        diskStorage = _selfieSystem().diskThreadLocal()
         return StringSelfie(snapshot, diskStorage, actual)
-    elif isinstance(actual, int):
-        snapshot = Snapshot.of(actual)
-        diskStorage = _selfieSystem().diskThreadLocal()
-        return IntSelfie(snapshot, diskStorage)
     elif isinstance(actual, bool):
-        snapshot = Snapshot.of(actual)
-        diskStorage = _selfieSystem().diskThreadLocal()
+        snapshot = Snapshot.of(str(actual))  
         return BooleanSelfie(snapshot, diskStorage)
+    elif isinstance(actual, int):
+        snapshot = Snapshot.of(str(actual))
+        return IntSelfie(snapshot, diskStorage)

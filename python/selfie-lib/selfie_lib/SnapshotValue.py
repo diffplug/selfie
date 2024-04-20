@@ -20,36 +20,15 @@ class SnapshotValue(ABC):
         pass
 
     @staticmethod
-    def of(data: Union[bytes, str, int, "SnapshotValue"]) -> "SnapshotValue":
+    def of(data: Union[bytes, str, "SnapshotValue"]) -> "SnapshotValue":
         if isinstance(data, bytes):
             return SnapshotValueBinary(data)
         elif isinstance(data, str):
             return SnapshotValueString(data)
-        elif isinstance(data, int):
-            return SnapshotValueInt(data)
         elif isinstance(data, SnapshotValue):
             return data
         else:
             raise TypeError("Unsupported type for Snapshot creation")
-
-
-class SnapshotValueInt(SnapshotValue):
-    def __init__(self, value: int):
-        self._value = value
-
-    def value_binary(self) -> bytes:
-        raise NotImplementedError("This is an integer value.")
-
-    def value_string(self) -> str:
-        return str(self._value)
-
-    def __eq__(self, other: object) -> bool:
-        if isinstance(other, SnapshotValueInt):
-            return self._value == other._value
-        return False
-
-    def __hash__(self) -> int:
-        return hash(self._value)
 
 
 class SnapshotValueBinary(SnapshotValue):

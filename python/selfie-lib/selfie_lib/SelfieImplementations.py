@@ -84,8 +84,11 @@ class BaseSelfie:
         )
         snapshot_system.write_inline(literal_value, call)
         raise snapshot_system.fs.assert_failed(
-            "Expected value does not match!", expected, self._snapshot.subject_or_facet("")
+            "Expected value does not match!",
+            expected,
+            self._snapshot.subject_or_facet(""),
         )
+
 
 class IntSelfie(BaseSelfie):
     def __init__(self, snapshot, disk: DiskStorage):
@@ -93,11 +96,12 @@ class IntSelfie(BaseSelfie):
         self.disk = disk
 
     def toBe(self, expected: int):
-        actual = self._snapshot.subject_or_facet("")._value  # Assuming .value extracts the int from SnapshotValue
+        actual = int(self._snapshot.subject_or_facet("")._value)
         if actual == expected:
             _selfieSystem().checkSrc(actual)
         else:
             self.toBeDidntMatch(expected, LiteralType.LiteralInt)
+
 
 class BooleanSelfie(BaseSelfie):
     def __init__(self, snapshot, disk: DiskStorage):
@@ -105,7 +109,7 @@ class BooleanSelfie(BaseSelfie):
         self.disk = disk
 
     def toBe(self, expected: bool):
-        actual = self._snapshot.subject_or_facet("")._value  # Assuming .value extracts the bool from SnapshotValue
+        actual = self._snapshot.subject_or_facet("")._value.lower() == "true"
         if actual == expected:
             _selfieSystem().checkSrc(actual)
         else:
