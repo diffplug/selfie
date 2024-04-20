@@ -155,7 +155,7 @@ def replace_todo_in_test_file(test_id, replacement_text=None):
         lambda m: f"expectSelfie({m.group(1)}).toBe({m.group(1)})", new_test_code
     )
 
-    # Handling toMatchDisk_TODO() replacements
+    # Handling toMatchDisk_TODO() replacements for strings, ints, and booleans
     test_disk_start = new_test_code.find("def test_disk():")
     test_disk_end = new_test_code.find("def ", test_disk_start + 1)
     test_disk_code = (
@@ -165,7 +165,7 @@ def replace_todo_in_test_file(test_id, replacement_text=None):
     )
 
     pattern_to_match_disk = re.compile(
-        r"expectSelfie\(\s*\"(.*?)\"\s*\)\.toMatchDisk_TODO\(\)", re.DOTALL
+        r"expectSelfie\(\s*(\".*?\"|\d+|True|False)\s*\)\.toMatchDisk_TODO\(\)", re.DOTALL
     )
     snapshot_file_path = full_file_path.parent / "SomethingOrOther.ss"
 
@@ -175,10 +175,10 @@ def replace_todo_in_test_file(test_id, replacement_text=None):
         def write_snapshot(match):
             selfie_value = match.group(1)
             snapshot_content = (
-                f'expectSelfie("{selfie_value}").toMatchDisk("{selfie_value}")'
+                f'expectSelfie({selfie_value}).toMatchDisk("{selfie_value}")'
             )
             snapshot_file.write(snapshot_content + "\n")
-            return f'expectSelfie("{selfie_value}").toMatchDisk()'
+            return f'expectSelfie({selfie_value}).toMatchDisk()'
 
         test_disk_code = pattern_to_match_disk.sub(write_snapshot, test_disk_code)
 
