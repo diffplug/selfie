@@ -64,6 +64,58 @@ class DiskSelfie(FluentFacet):
         return self
 
 
+class LiteralType:
+    LiteralInt = "int"
+    LiteralBoolean = "bool"
+    LiteralString = "str"
+
+
+class BaseSelfie:
+    def __init__(self, actual):
+        self.actual = actual
+
+    def toBeDidntMatch(self, expected, actual, literal_type):
+        call = recordCall()
+        snapshot_system = _selfieSystem()
+        literal_value = LiteralValue(
+            expected=expected,
+            actual=f"Expected '{expected}', got '{actual}'",
+            format=literal_type,
+        )
+        snapshot_system.write_inline(literal_value, call)
+        raise snapshot_system.fs.assert_failed(
+            "Expected value does not match!", expected, actual
+        )
+
+
+class IntSelfie(BaseSelfie):
+    def __init__(self, actual: int):
+        super().__init__(actual)
+
+    def toBe_TODO(self, unusedArg=None):
+        return self.toBeDidntMatch(None, self.actual, LiteralType.LiteralInt)
+
+    def toBe(self, expected: int):
+        if self.actual == expected:
+            _selfieSystem().checkSrc(self.actual)
+        else:
+            self.toBeDidntMatch(expected, self.actual, LiteralType.LiteralInt)
+
+
+class BooleanSelfie(BaseSelfie):
+    def __init__(self, actual: bool):
+        super().__init__(actual)
+
+    def toBe_TODO(self, unusedArg=None):
+        return self.toBeDidntMatch(None, self.actual, LiteralType.LiteralBoolean)
+
+    def toBe(self, expected: bool):
+        if self.actual == expected:
+            _selfieSystem().checkSrc(self.actual)
+        else:
+            self.toBeDidntMatch(expected, self.actual, LiteralType.LiteralBoolean)
+
+
 class StringSelfie(DiskSelfie):
     def __init__(self, actual: Snapshot, disk: DiskStorage, expected: str):
         super().__init__(actual, disk, expected)
