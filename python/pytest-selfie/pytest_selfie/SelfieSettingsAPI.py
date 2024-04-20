@@ -1,27 +1,16 @@
 import os
 from pathlib import Path
+import re
 from typing import Optional
 from selfie_lib import Mode
-
-
-def calc_mode():
-    override = os.getenv("selfie") or os.getenv("SELFIE")
-    if override:
-        # Convert the mode to lowercase and match it with the Mode enum
-        try:
-            return Mode[override.lower()]
-        except KeyError:
-            raise ValueError(f"No such mode: {override}")
-
-    ci = os.getenv("ci") or os.getenv("CI")
-    if ci and ci.lower() == "true":
-        return Mode.readonly
-    else:
-        return Mode.interactive
+import pytest
 
 
 class SelfieSettingsAPI:
-    STANDARD_DIRS = ["tests"]
+    """API for configuring the selfie plugin, you can set its values like this https://docs.pytest.org/en/7.1.x/reference/customize.html#configuration-file-formats"""
+
+    def __init__(self, config: pytest.Config):
+        self.root_dir = config.rootpath
 
     @property
     def allow_multiple_equivalent_writes_to_one_location(self) -> bool:
@@ -35,27 +24,23 @@ class SelfieSettingsAPI:
 
     @property
     def root_folder(self) -> Path:
-        """Returns the root folder for storing snapshots."""
-        user_dir = Path(os.getcwd())
-        for standard_dir in self.STANDARD_DIRS:
-            candidate = user_dir / standard_dir
-            if candidate.is_dir():
-                return candidate
-        raise AssertionError(
-            f"Could not find a standard test directory, 'user.dir' is equal to {user_dir}, looked in {self.STANDARD_DIRS}"
-        )
+        """Returns the root folder for storing snapshots. Set by https://docs.pytest.org/en/7.1.x/reference/customize.html#finding-the-rootdir"""
+        return self.root_dir
 
-    @property
-    def other_source_roots(self) -> list[Path]:
-        """List of other source roots that should be considered besides the root folder."""
-        source_roots = []
-        root_dir = self.root_folder
-        user_dir = Path(os.getcwd())
-        for standard_dir in self.STANDARD_DIRS:
-            candidate = user_dir / standard_dir
-            if candidate.is_dir() and candidate != root_dir:
-                source_roots.append(candidate)
-        return source_roots
+    def calc_mode(self) -> Mode:
+        override = os.getenv("selfie") or os.getenv("SELFIE")
+        if override:
+            # Convert the mode to lowercase and match it with the Mode enum
+            try:
+                return Mode[override.lower()]
+            except KeyError:
+                raise ValueError(f"No such mode: {override}")
+
+        ci = os.getenv("ci") or os.getenv("CI")
+        if ci and ci.lower() == "true":
+            return Mode.readonly
+        else:
+            return Mode.interactive
 
 
 class SelfieSettingsSmuggleError(SelfieSettingsAPI):
