@@ -1,4 +1,5 @@
 from collections.abc import Set, Iterator, Mapping, ItemsView
+import re
 from typing import List, Tuple, TypeVar, Union, Any
 from abc import abstractmethod, ABC
 
@@ -202,6 +203,18 @@ class ArrayMap(Mapping[K, V]):
         for index in adjusted_indices:
             del new_data[index]
         return ArrayMap.__create(new_data)
+
+    def plus_or_noop(self, key: K, value: V) -> "ArrayMap[K, V]":
+        index = self._binary_search_key(key)
+        if index >= 0:
+            return self
+        else:
+            # Insert new key-value pair
+            insert_at = -(index + 1)
+            new_data = self.__data[:]
+            new_data.insert(insert_at * 2, key)
+            new_data.insert(insert_at * 2 + 1, value)
+            return ArrayMap.__create(new_data)
 
     def plus_or_noop_or_replace(self, key: K, value: V) -> "ArrayMap[K, V]":
         index = self._binary_search_key(key)

@@ -15,7 +15,7 @@ class SnapshotFile:
     def __init__(self):
         self.unix_newlines: bool = True
         self.metadata: Optional[Tuple[str, str]] = None
-        self._snapshots: ArrayMap[str, Snapshot] = ArrayMap.empty()
+        self.snapshots: ArrayMap[str, Snapshot] = ArrayMap.empty()
         self._lock: Lock = Lock()
         self.was_set_at_test_time: bool = False
 
