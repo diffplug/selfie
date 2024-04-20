@@ -90,14 +90,15 @@ def pytest_runtest_protocol(item: pytest.Item, nextitem: Optional[pytest.Item]):
     (file, _, testname) = item.reportinfo()
     testfile = TypedPath.of_file(os.path.abspath(file))
 
-    system: PytestSnapshotSystem = item.session.system  # type: ignore
+    system: PytestSnapshotSystem = item.session.selfie_system  # type: ignore
     system.test_start(testfile, testname)
+    yield
 
 
 @pytest.hookimpl(hookwrapper=True)
 def pytest_pyfunc_call(pyfuncitem: pytest.Function):
     outcome = yield
-    system: PytestSnapshotSystem = pyfuncitem.session.system  # type: ignore
+    system: PytestSnapshotSystem = pyfuncitem.session.selfie_system  # type: ignore
     system.test_finished_and_failed(outcome.excinfo is not None)
 
 
@@ -113,6 +114,15 @@ class DiskStorageImplementation(DiskStorage):
         print(f"Keeping snapshot for: {sub_or_keep_all}")
 
 
+class _keydefaultdict(defaultdict):
+    def __missing__(self, key):
+        if self.default_factory is None:
+            raise KeyError(key)
+        else:
+            ret = self[key] = self.default_factory(key)
+        return ret
+
+
 class PytestSnapshotSystem(SnapshotSystem):
     def __init__(self, settings: SelfieSettingsAPI):
         self.__fs = FSImplementation()
@@ -121,8 +131,9 @@ class PytestSnapshotSystem(SnapshotSystem):
         self.__comment_tracker = CommentTracker()
         self.__inline_write_tracker = InlineWriteTracker()
         # self.__toBeFileWriteTracker = ToBeFileWriteTracker() #TODO
+
         self.__progress_per_file: DefaultDict[TypedPath, SnapshotFileProgress] = (
-            defaultdict(lambda key: SnapshotFileProgress(self, key))  # type: ignore
+            _keydefaultdict(lambda key: SnapshotFileProgress(self, key))  # type: ignore
         )  # type: ignore
         # the test which is running right now, if any
         self.__in_progress: Optional[SnapshotFileProgress] = None
@@ -146,8 +157,10 @@ class PytestSnapshotSystem(SnapshotSystem):
         self.check_for_invalid_state.update_and_get(update_fun)
 
     def test_start(self, testfile: TypedPath, testname: str):
-        if self.__in_progress is not None:
-            raise RuntimeError("Test already in progress")
+        if self.__in_progress:
+            raise RuntimeError(
+                f"Test already in progress. {self.__in_progress.test_file} is running, can't start {testfile}"
+            )
         self.__in_progress = self.__progress_per_file[testfile]
         self.__in_progress.test_start(testname)
         pass
@@ -156,6 +169,7 @@ class PytestSnapshotSystem(SnapshotSystem):
         if self.__in_progress is None:
             raise RuntimeError("No test in progress")
         self.__in_progress.test_finished_and_failed(failed)
+        self.__in_progress = None
         pass
 
     def finished_all_tests(self):

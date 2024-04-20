@@ -8,7 +8,7 @@ from .Snapshot import Snapshot
 
 class WithinTestGC:
     def __init__(self):
-        self.suffixes_to_keep = ArraySet[str]()
+        self.suffixes_to_keep = ArraySet.empty()
         self.lock = Lock()
 
     def keep_suffix(self, suffix: str):
