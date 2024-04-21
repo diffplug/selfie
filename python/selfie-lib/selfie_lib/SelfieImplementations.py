@@ -47,9 +47,6 @@ class DiskSelfie(FluentFacet, BaseSelfie):
         FluentFacet.__init__(self, snapshot, disk)
         BaseSelfie.__init__(self, snapshot)
         self._expected = expected
-    
-    def toMatchDisk_TODO(self):
-        print(f"TODO: Check disk match for {self._snapshot.subject_or_facet('')}")
 
     def toMatchDisk(self, sub="") -> "DiskSelfie":
         call = recordCall()
@@ -133,7 +130,7 @@ class StringSelfie(DiskSelfie):
             )
         return result
 
-    def toBe_TODO(self) -> str:
+    def toBe_TODO(self):
         call = recordCall()
         snapshot_system = _selfieSystem()
         if snapshot_system.mode.can_write(True, call):
@@ -156,4 +153,3 @@ class StringSelfie(DiskSelfie):
             raise snapshot_system.fs.assert_failed(
                 "Can't call `toBe_TODO` in readonly mode!"
             )
-        return self._expected
