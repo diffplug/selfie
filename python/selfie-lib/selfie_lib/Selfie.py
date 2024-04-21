@@ -15,3 +15,5 @@ def expectSelfie(actual):
     elif isinstance(actual, int):
         snapshot = Snapshot.of(str(actual))
         return IntSelfie(snapshot, diskStorage)
+    else:
+        raise ValueError("Unsupported type for expectSelfie")

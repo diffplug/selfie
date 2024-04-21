@@ -23,6 +23,9 @@ class BaseSelfie:
     def __init__(self, snapshot):
         self._snapshot = snapshot
 
+    def toBe_TODO(self):
+        print(f"TODO: Implement check for {self._snapshot.subject_or_facet('')}")
+
     def toBeDidntMatch(self, expected, literal_type):
         call = recordCall()
         snapshot_system = _selfieSystem()
@@ -44,6 +47,9 @@ class DiskSelfie(FluentFacet, BaseSelfie):
         FluentFacet.__init__(self, snapshot, disk)
         BaseSelfie.__init__(self, snapshot)
         self._expected = expected
+    
+    def toMatchDisk_TODO(self):
+        print(f"TODO: Check disk match for {self._snapshot.subject_or_facet('')}")
 
     def toMatchDisk(self, sub="") -> "DiskSelfie":
         call = recordCall()
