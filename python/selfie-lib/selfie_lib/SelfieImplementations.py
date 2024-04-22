@@ -64,7 +64,7 @@ class DiskSelfie(FluentFacet):
         if _selfieSystem().mode.can_write(False, call, _selfieSystem()):
             self.disk.write_disk(self.actual, sub, call)
         else:
-            __assertEqual(self.disk.read_disk(sub, call), self.actual, _selfieSystem())
+            _assertEqual(self.disk.read_disk(sub, call), self.actual, _selfieSystem())
         return self
 
     def to_match_disk_TODO(self, sub: str = "") -> "DiskSelfie":
@@ -133,29 +133,27 @@ class StringSelfie(DiskSelfie, StringFacet):
             else:
                 return only_value.value_string()
         else:
-            return __serializeOnlyFacets(
+            return _serializeOnlyFacets(
                 self.actual, self.only_facets or [""] + list(self.actual.facets.keys())
             )
 
     def to_be_TODO(self, unused_arg: Any = None) -> str:
-        return __toBeDidntMatch(None, self.__actual(), LiteralString())
+        return _toBeDidntMatch(None, self.__actual(), LiteralString())
 
     def to_be(self, expected: str) -> str:
         actual_string = self.__actual()
         if actual_string == expected:
-            return __checkSrc(actual_string)
+            return _checkSrc(actual_string)
         else:
-            return __toBeDidntMatch(expected, actual_string, LiteralString())
+            return _toBeDidntMatch(expected, actual_string, LiteralString())
 
 
-def __checkSrc[T](value: T) -> T:
+def _checkSrc[T](value: T) -> T:
     _selfieSystem().mode.can_write(False, recordCall(True), _selfieSystem())
     return value
 
 
-def __toBeDidntMatch[T](
-    expected: Optional[T], actual: T, format: LiteralFormat[T]
-) -> T:
+def _toBeDidntMatch[T](expected: Optional[T], actual: T, format: LiteralFormat[T]) -> T:
     call = recordCall(False)
     writable = _selfieSystem().mode.can_write(expected is None, call, _selfieSystem())
     if writable:
@@ -172,7 +170,7 @@ def __toBeDidntMatch[T](
             )
 
 
-def __assertEqual(
+def _assertEqual(
     expected: Optional[Snapshot], actual: Snapshot, storage: SnapshotSystem
 ):
     if expected is None:
@@ -197,12 +195,12 @@ def __assertEqual(
         )
         raise storage.fs.assert_failed(
             storage.mode.msg_snapshot_mismatch(),
-            __serializeOnlyFacets(expected, mismatched_keys),
-            __serializeOnlyFacets(actual, mismatched_keys),
+            _serializeOnlyFacets(expected, mismatched_keys),
+            _serializeOnlyFacets(actual, mismatched_keys),
         )
 
 
-def __serializeOnlyFacets(snapshot: Snapshot, keys: List[str]) -> str:
+def _serializeOnlyFacets(snapshot: Snapshot, keys: List[str]) -> str:
     writer = []
     for key in keys:
         if not key:
