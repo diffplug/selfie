@@ -107,18 +107,6 @@ def pytest_runtest_makereport(call: pytest.CallInfo[None], item: pytest.Item):
         system.test_failed(TypedPath.of_file(os.path.abspath(file)), testname)
 
 
-class DiskStorageImplementation(DiskStorage):
-    def read_disk(self, sub: str, call: CallStack) -> Optional[Snapshot]:
-        print(f"Reading from disk: sub={sub}")
-        return None
-
-    def write_disk(self, actual: Snapshot, sub: str, call: CallStack):
-        print(f"Writing to disk: {actual} at {sub}")
-
-    def keep(self, sub_or_keep_all: Optional[str]):
-        print(f"Keeping snapshot for: {sub_or_keep_all}")
-
-
 class _keydefaultdict(defaultdict):
     """A special defaultdict that passes the key to the default_factory."""
 
@@ -215,7 +203,14 @@ class PytestSnapshotSystem(SnapshotSystem):
         return self._layout
 
     def disk_thread_local(self) -> DiskStorage:
-        return DiskStorageImplementation()
+        if (
+            self.__in_progress is None
+            or self.__in_progress.testname_in_progress is None
+        ):
+            raise RuntimeError("No test in progress")
+        return DiskStoragePytest(
+            self.__in_progress, self.__in_progress.testname_in_progress
+        )
 
     def source_file_has_writable_comment(self, call: CallStack) -> bool:
         return self.__comment_tracker.hasWritableComment(call, self.layout)
@@ -227,6 +222,21 @@ class PytestSnapshotSystem(SnapshotSystem):
         self, path: TypedPath, data: "ByteString", call: CallStack
     ) -> None:
         pass
+
+
+class DiskStoragePytest(DiskStorage):
+    def __init__(self, progress: "SnapshotFileProgress", testname: str):
+        self.__progress = progress
+        self._testname = testname
+
+    def read_disk(self, sub: str, call: CallStack) -> Optional[Snapshot]:
+        raise NotImplementedError()
+
+    def write_disk(self, actual: Snapshot, sub: str, call: CallStack):
+        raise NotImplementedError()
+
+    def keep(self, sub_or_keep_all: Optional[str]):
+        self.__progress.keep(self._testname, sub_or_keep_all)
 
 
 class SnapshotFileProgress:
