@@ -28,7 +28,7 @@ class SnapshotFile:
                 SnapshotValue.of(self.metadata[1]),
             )
 
-        for entry_key, entry_value in self._snapshots.items():
+        for entry_key, entry_value in self.snapshots.items():
             self.writeEntry(valueWriter, entry_key, None, entry_value._subject)
             for facet_key, facet_value in entry_value.facets.items():
                 self.writeEntry(valueWriter, entry_key, facet_key, facet_value)
@@ -97,7 +97,7 @@ class SnapshotFile:
             if peek_key.startswith(cls.HEADER_PREFIX):
                 continue
             next_snapshot = reader.next_snapshot()
-            result._snapshots = result._snapshots.plus(peek_key, next_snapshot)
+            result.snapshots = result.snapshots.plus(peek_key, next_snapshot)
 
         return result
 

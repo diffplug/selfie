@@ -33,7 +33,7 @@ Orange
 """.strip()
     file = SnapshotFile.parse(SnapshotValueReader.of(file_content))
     assert file.metadata is None
-    assert set(file._snapshots.keys()) == {"Apple", "Orange"}
+    assert set(file.snapshots.keys()) == {"Apple", "Orange"}
 
 
 def test_write():
@@ -44,8 +44,8 @@ def test_write():
     apple_snapshot = apple_snapshot.plus_facet("color", "green")
     apple_snapshot = apple_snapshot.plus_facet("crisp", "yes")
 
-    underTest._snapshots = underTest._snapshots.plus("Apple", apple_snapshot)
-    underTest._snapshots = underTest._snapshots.plus("Orange", Snapshot.of("Orange"))
+    underTest.snapshots = underTest.snapshots.plus("Apple", apple_snapshot)
+    underTest.snapshots = underTest.snapshots.plus("Orange", Snapshot.of("Orange"))
 
     buffer = []
     underTest.serialize(buffer)
