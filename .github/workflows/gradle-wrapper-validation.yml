@@ -1,14 +1,14 @@
 on:
   push:
     paths:
-      - 'jvm/gradlew'
-      - 'jvm/gradlew.bat'
-      - 'jvm/gradle/wrapper/'
+      - "jvm/gradlew"
+      - "jvm/gradlew.bat"
+      - "jvm/gradle/wrapper/"
   pull_request:
     paths:
-      - 'jvm/gradlew'
-      - 'jvm/gradlew.bat'
-      - 'jvm/gradle/wrapper/'
+      - "jvm/gradlew"
+      - "jvm/gradlew.bat"
+      - "jvm/gradle/wrapper/"
 permissions:
   contents: read
 defaults:
@@ -20,4 +20,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: gradle/wrapper-validation-action@v3
+      - uses: gradle/actions/wrapper-validation@v3
