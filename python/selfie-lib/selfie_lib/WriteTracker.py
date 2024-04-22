@@ -189,5 +189,4 @@ class InlineWriteTracker(WriteTracker[CallLocation, LiteralValue]):
                 )
 
     def persist_writes(self, layout: SnapshotFileLayout):
-        # raise NotImplementedError("InlineWriteTracker does not support persist_writes")
-        pass
+        raise NotImplementedError("InlineWriteTracker does not support persist_writes")

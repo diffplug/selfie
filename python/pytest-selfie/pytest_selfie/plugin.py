@@ -216,12 +216,14 @@ class PytestSnapshotSystem(SnapshotSystem):
         return self.__comment_tracker.hasWritableComment(call, self.layout)
 
     def write_inline(self, literal_value: LiteralValue, call: CallStack):
-        pass
+        self.__inline_write_tracker.record(
+            call.location, literal_value, call, self.layout
+        )
 
     def write_to_be_file(
         self, path: TypedPath, data: "ByteString", call: CallStack
     ) -> None:
-        pass
+        raise NotImplementedError
 
 
 class DiskStoragePytest(DiskStorage):
