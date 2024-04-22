@@ -2,7 +2,7 @@ from cgi import test
 import os
 from collections import defaultdict
 import re
-from typing import ByteString, DefaultDict, List, Optional, Iterator
+from typing import ByteString, DefaultDict, List, Optional, Iterator, Tuple
 
 from selfie_lib.Atomic import AtomicReference
 from .SelfieSettingsAPI import SelfieSettingsAPI
@@ -93,13 +93,18 @@ def pytest_runtest_protocol(item: pytest.Item, nextitem: Optional[pytest.Item]):
     system: PytestSnapshotSystem = item.session.selfie_system  # type: ignore
     system.test_start(testfile, testname)
     yield
+    system.test_finish(testfile, testname)
 
 
-@pytest.hookimpl(hookwrapper=True)
-def pytest_pyfunc_call(pyfuncitem: pytest.Function):
-    outcome = yield
-    system: PytestSnapshotSystem = pyfuncitem.session.selfie_system  # type: ignore
-    system.test_finished_and_failed(outcome.excinfo is not None)
+@pytest.hookimpl
+def pytest_runtest_makereport(call: pytest.CallInfo[None], item: pytest.Item):
+    if call.excinfo is not None and call.when in (
+        "call",
+        "teardown",
+    ):
+        system: PytestSnapshotSystem = item.session.selfie_system  # type: ignore
+        (file, _, testname) = item.reportinfo()
+        system.test_failed(TypedPath.of_file(os.path.abspath(file)), testname)
 
 
 class DiskStorageImplementation(DiskStorage):
@@ -115,11 +120,13 @@ class DiskStorageImplementation(DiskStorage):
 
 
 class _keydefaultdict(defaultdict):
+    """A special defaultdict that passes the key to the default_factory."""
+
     def __missing__(self, key):
         if self.default_factory is None:
             raise KeyError(key)
         else:
-            ret = self[key] = self.default_factory(key)
+            ret = self[key] = self.default_factory(key)  # type: ignore
         return ret
 
 
@@ -127,7 +134,7 @@ class PytestSnapshotSystem(SnapshotSystem):
     def __init__(self, settings: SelfieSettingsAPI):
         self.__fs = FSImplementation()
         self.__mode = settings.calc_mode()
-        self.__layout = PytestSnapshotFileLayout(self.__fs, settings)
+        self._layout = PytestSnapshotFileLayout(self.__fs, settings)
         self.__comment_tracker = CommentTracker()
         self.__inline_write_tracker = InlineWriteTracker()
         # self.__toBeFileWriteTracker = ToBeFileWriteTracker() #TODO
@@ -163,14 +170,23 @@ class PytestSnapshotSystem(SnapshotSystem):
             )
         self.__in_progress = self.__progress_per_file[testfile]
         self.__in_progress.test_start(testname)
-        pass
 
-    def test_finished_and_failed(self, failed: bool):
+    def test_failed(self, testfile: TypedPath, testname: str):
+        self.__assert_inprogress(testfile)
+        self.__in_progress.test_failed(testname)  # type: ignore
+
+    def test_finish(self, testfile: TypedPath, testname: str):
+        self.__assert_inprogress(testfile)
+        self.__in_progress.test_finish(testname)  # type: ignore
+        self.__in_progress = None
+
+    def __assert_inprogress(self, testfile: TypedPath):
         if self.__in_progress is None:
             raise RuntimeError("No test in progress")
-        self.__in_progress.test_finished_and_failed(failed)
-        self.__in_progress = None
-        pass
+        if self.__in_progress.test_file != testfile:
+            raise RuntimeError(
+                f"{self.__in_progress.test_file} is in progress, can't accept data for {testfile}."
+            )
 
     def finished_all_tests(self):
         snapshotsFilesWrittenToDisk = self.check_for_invalid_state.get_and_update(
@@ -196,7 +212,7 @@ class PytestSnapshotSystem(SnapshotSystem):
 
     @property
     def layout(self) -> SnapshotFileLayout:
-        return self.__layout
+        return self._layout
 
     def disk_thread_local(self) -> DiskStorage:
         return DiskStorageImplementation()
@@ -236,6 +252,7 @@ class SnapshotFileProgress:
         self.disk_write_tracker: Optional[DiskWriteTracker] = DiskWriteTracker()
         # the test name which is currently in progress, if any
         self.testname_in_progress: Optional[str] = None
+        self.testname_in_progress_failed = False
 
     def assert_not_terminated(self):
         if self.tests.get() == SnapshotFileProgress.TERMINATED:
@@ -254,18 +271,26 @@ class SnapshotFileProgress:
         self.testname_in_progress = testname
         self.tests.update_and_get(lambda it: it.plus_or_noop(testname, WithinTestGC()))
 
-    def test_finished_and_failed(self, failed: bool):
+    def test_failed(self, testname: str):
+        self.__assert_in_progress(testname)
+        self.has_failed = True
+        self.tests.get()[testname].keep_all()
+
+    def test_finish(self, testname: str):
+        self.__assert_in_progress(testname)
+        self.finishes_so_far += 1
+        self.testname_in_progress = None
+        if self.finishes_so_far == self.finishes_expected:
+            self.__all_tests_finished()
+
+    def __assert_in_progress(self, testname: str):
         self.assert_not_terminated()
         if self.testname_in_progress is None:
             raise RuntimeError("Can't finish, no test was in progress!")
-        self.finishes_so_far += 1
-        if failed:
-            self.has_failed = True
-            self.tests.get()[self.testname_in_progress].keep_all()
-        self.testname_in_progress = None
-
-        if self.finishes_so_far == self.finishes_expected:
-            self.__all_tests_finished()
+        if self.testname_in_progress != testname:
+            raise RuntimeError(
+                f"Can't finish {testname}, {self.testname_in_progress} was in progress"
+            )
 
     def __all_tests_finished(self):
         self.assert_not_terminated()
@@ -281,14 +306,14 @@ class SnapshotFileProgress:
             )
             if stale_snapshot_indices or self.file.was_set_at_test_time:
                 self.file.remove_all_indices(stale_snapshot_indices)
-                snapshot_path = self.system.__layout.snapshotfile_for_testfile(
+                snapshot_path = self.system._layout.snapshotfile_for_testfile(
                     self.test_file
                 )
                 if not self.file.snapshots:
                     delete_file_and_parent_dir_if_empty(snapshot_path)
                 else:
                     self.system.mark_path_as_written(
-                        self.system.__layout.snapshotfile_for_testfile(self.test_file)
+                        self.system._layout.snapshotfile_for_testfile(self.test_file)
                     )
                     os.makedirs(
                         os.path.dirname(snapshot_path.absolute_path), exist_ok=True
@@ -311,7 +336,7 @@ class SnapshotFileProgress:
                 and all(it.succeeded_and_used_no_snapshots() for it in tests.values())
             )
             if is_stale:
-                snapshot_file = self.system.__layout.snapshotfile_for_testfile(
+                snapshot_file = self.system._layout.snapshotfile_for_testfile(
                     self.test_file
                 )
                 delete_file_and_parent_dir_if_empty(snapshot_file)
@@ -348,7 +373,7 @@ class SnapshotFileProgress:
 
     def read_file(self) -> SnapshotFile:
         if self.file is None:
-            snapshot_path = self.system.__layout.snapshotfile_for_testfile(
+            snapshot_path = self.system._layout.snapshotfile_for_testfile(
                 self.test_file
             )
             if os.path.exists(snapshot_path.absolute_path) and os.path.isfile(
@@ -359,7 +384,7 @@ class SnapshotFileProgress:
                 self.file = SnapshotFile.parse(SnapshotValueReader.of_binary(content))
             else:
                 self.file = SnapshotFile.create_empty_with_unix_newlines(
-                    self.system.__layout.unix_newlines
+                    self.system._layout.unix_newlines
                 )
         return self.file
 
