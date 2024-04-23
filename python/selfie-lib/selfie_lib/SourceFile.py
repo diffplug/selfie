@@ -19,18 +19,21 @@ class SourceFile:
         # Split content into lines
         lines = self.__content_slice.__str__().split("\n")
 
-        # Create a new list of lines, excluding lines containing '# selfieonce'
-        # or removing '# selfieonce' from lines where it doesn't span the entire line.
+        # Create a new list of lines, excluding lines containing '# selfieonce' or '#selfieonce'
         new_lines = []
         for line in lines:
-            # Check if '# selfieonce' is in the line
+            # Check for both variations of the comment
             if "# selfieonce" in line:
                 cleaned_line = line.split("# selfieonce")[0].strip()
-                # If the line has code before '# selfieonce', keep the code part
-                if cleaned_line:
-                    new_lines.append(cleaned_line)
+            elif "#selfieonce" in line:
+                cleaned_line = line.split("#selfieonce")[0].strip()
             else:
                 new_lines.append(line)
+                continue
+
+            # If the line has code before the comment, keep the code part
+            if cleaned_line:
+                new_lines.append(cleaned_line)
 
         # Recombine the lines into a single string
         new_content = "\n".join(new_lines)
