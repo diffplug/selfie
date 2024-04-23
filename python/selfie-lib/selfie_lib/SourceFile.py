@@ -17,15 +17,15 @@ class SourceFile:
 
     def remove_selfie_once_comments(self):
         # Split content into lines
-        lines = self.__content_slice.__str__().split('\n')
-    
+        lines = self.__content_slice.__str__().split("\n")
+
         # Create a new list of lines, excluding lines containing '# selfieonce'
         # or removing '# selfieonce' from lines where it doesn't span the entire line.
         new_lines = []
         for line in lines:
             # Check if '# selfieonce' is in the line
-            if '# selfieonce' in line:
-                cleaned_line = line.split('# selfieonce')[0].strip()
+            if "# selfieonce" in line:
+                cleaned_line = line.split("# selfieonce")[0].strip()
                 # If the line has code before '# selfieonce', keep the code part
                 if cleaned_line:
                     new_lines.append(cleaned_line)
@@ -33,13 +33,13 @@ class SourceFile:
                 new_lines.append(line)
 
         # Recombine the lines into a single string
-        new_content = '\n'.join(new_lines)
+        new_content = "\n".join(new_lines)
 
         # Update the content slice with new content
         self.__content_slice = Slice(new_content)
 
         if not self.__unix_newlines:
-            self.__content_slice = Slice(new_content.replace('\n', '\r\n'))
+            self.__content_slice = Slice(new_content.replace("\n", "\r\n"))
 
     @property
     def as_string(self) -> str:
