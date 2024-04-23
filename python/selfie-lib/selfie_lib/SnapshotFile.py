@@ -1,7 +1,8 @@
+import base64
 from threading import Lock
-from typing import List, Optional, Dict
+from typing import Tuple, List, Optional, Dict
 
-from .Snapshot import Snapshot
+from .Snapshot import Snapshot, SnapshotValue
 from .SnapshotReader import SnapshotReader
 from .SnapshotValueReader import SnapshotValueReader
 from .ArrayMap import ArrayMap
@@ -13,31 +14,56 @@ class SnapshotFile:
 
     def __init__(self):
         self.unix_newlines: bool = True
-        self.metadata: Optional[Dict[str, str]] = None
-        self._snapshots: ArrayMap[str, Snapshot] = ArrayMap.empty()
+        self.metadata: Optional[Tuple[str, str]] = None
+        self.snapshots: ArrayMap[str, Snapshot] = ArrayMap.empty()
         self._lock: Lock = Lock()
         self.was_set_at_test_time: bool = False
 
-    def serialize(self, value_writer: List[str]) -> None:
-        if self.metadata:
-            for key, value in self.metadata.items():
-                value_writer.append(f"╔═ 📷 {key} ═╗\n{value}\n")
-
-        for key, snapshot in self._snapshots.items():
-            subject_str = (
-                snapshot._subject.value_string()
-                if hasattr(snapshot._subject, "value_string")
-                else str(snapshot._subject)
+    def serialize(self, valueWriter: List[str]):
+        if self.metadata is not None:
+            self.writeEntry(
+                valueWriter,
+                f"📷 {self.metadata[0]}",
+                None,
+                SnapshotValue.of(self.metadata[1]),
             )
-            value_writer.append(f"╔═ {key} ═╗\n{subject_str}\n")
-            for facet_key, facet_value in snapshot.facets.items():
-                facet_value_str = (
-                    facet_value.value_string()
-                    if hasattr(facet_value, "value_string")
-                    else str(facet_value)
-                )
-                value_writer.append(f"╔═ {key}[{facet_key}] ═╗\n{facet_value_str}\n")
-        value_writer.append("╔═ [end of file] ═╗\n")
+
+        for entry_key, entry_value in self.snapshots.items():
+            self.writeEntry(valueWriter, entry_key, None, entry_value._subject)
+            for facet_key, facet_value in entry_value.facets.items():
+                self.writeEntry(valueWriter, entry_key, facet_key, facet_value)
+
+        self.writeEntry(valueWriter, "", "end of file", SnapshotValue.of(""))
+
+    @staticmethod
+    def writeEntry(
+        valueWriter: List[str], key: str, facet: Optional[str], value: SnapshotValue
+    ):
+        valueWriter.append("╔═ ")
+        valueWriter.append(SnapshotValueReader.name_esc.escape(key))
+        if facet is not None:
+            valueWriter.append("[")
+            valueWriter.append(SnapshotValueReader.name_esc.escape(facet))
+            valueWriter.append("]")
+        valueWriter.append(" ═╗")
+        if value.is_binary:
+            valueWriter.append(" base64 length ")
+            valueWriter.append(str(len(value.value_binary())))
+            valueWriter.append(" bytes")
+        valueWriter.append("\n")
+
+        if not key and facet == "end of file":
+            return
+
+        if value.is_binary:
+            escaped = base64.b64encode(value.value_binary()).decode("utf-8")
+            valueWriter.append(escaped.replace("\r", ""))
+        else:
+            escaped = SnapshotValueReader.body_esc.escape(value.value_string()).replace(
+                "\n╔", "\n\ud801\udf41"
+            )
+            valueWriter.append(escaped)
+        valueWriter.append("\n")
 
     def set_at_test_time(self, key: str, snapshot: Snapshot) -> None:
         with self._lock:
@@ -61,7 +87,7 @@ class SnapshotFile:
         if peek_key and peek_key.startswith(cls.HEADER_PREFIX):
             metadata_name = peek_key[len(cls.HEADER_PREFIX) :]
             metadata_value = value_reader.next_value().value_string()
-            result.metadata = {metadata_name: metadata_value}
+            result.metadata = (metadata_name, metadata_value)
             reader.next_snapshot()
 
         while True:
@@ -71,7 +97,7 @@ class SnapshotFile:
             if peek_key.startswith(cls.HEADER_PREFIX):
                 continue
             next_snapshot = reader.next_snapshot()
-            result._snapshots = result._snapshots.plus(peek_key, next_snapshot)
+            result.snapshots = result.snapshots.plus(peek_key, next_snapshot)
 
         return result
 

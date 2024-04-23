@@ -15,6 +15,9 @@ class SourceFile:
             self.__content_slice.__str__()
         )
 
+    def remove_selfie_once_comments(self):
+        raise NotImplementedError("remove_selfie_once_comments is not implemented")
+
     @property
     def as_string(self) -> str:
         return (

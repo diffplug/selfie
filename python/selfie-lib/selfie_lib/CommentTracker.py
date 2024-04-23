@@ -23,7 +23,7 @@ class CommentTracker:
         self.cache: Dict[TypedPath, WritableComment] = {}
         self.lock = threading.Lock()
 
-    def pathsWithOnce(self) -> Iterable[TypedPath]:
+    def paths_with_once(self) -> Iterable[TypedPath]:
         with self.lock:
             return [
                 path
@@ -32,7 +32,7 @@ class CommentTracker:
             ]
 
     def hasWritableComment(self, call: CallStack, layout: SnapshotFileLayout) -> bool:
-        path = layout.sourcePathForCall(call)
+        path = layout.sourcefile_for_call(call)
         with self.lock:
             if path in self.cache:
                 comment = self.cache[path]

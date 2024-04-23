@@ -1,5 +1,6 @@
-from collections.abc import Set, Iterator, Mapping
-from typing import List, TypeVar, Union, Any
+from collections.abc import Set, Iterator, Mapping, ItemsView
+import re
+from typing import List, Tuple, TypeVar, Union, Any
 from abc import abstractmethod, ABC
 
 T = TypeVar("T")
@@ -94,8 +95,59 @@ class ArraySet(ListBackedSet[K]):
             return ArraySet.__create(new_data)
 
 
+class _ArrayMapKeys(ListBackedSet[K]):
+    def __init__(self, data: List[Union[K, V]]):
+        self.__data = data
+
+    def __len__(self) -> int:
+        return len(self.__data) // 2
+
+    def __getitem__(self, index: Union[int, slice]):  # type: ignore
+        if isinstance(index, slice):
+            return [
+                self.__data[i]
+                for i in range(
+                    index.start * 2 if index.start else 0,
+                    index.stop * 2 if index.stop else len(self.__data),
+                    index.step * 2 if index.step else 2,
+                )
+            ]
+        else:
+            return self.__data[2 * index]
+
+    def __iter__(self) -> Iterator[K]:
+        return (self.__data[i] for i in range(0, len(self.__data), 2))  # type: ignore
+
+
+class _ArrayMapEntries(ListBackedSet[Tuple[K, V]], ItemsView[K, V]):
+    def __init__(self, data: List[Union[K, V]]):
+        self.__data = data
+
+    def __len__(self) -> int:
+        return len(self.__data) // 2
+
+    def __getitem__(self, index: Union[int, slice]):  # type: ignore
+        if isinstance(index, slice):
+            return [
+                (self.__data[i], self.__data[i + 1])
+                for i in range(
+                    index.start * 2 if index.start else 0,
+                    index.stop * 2 if index.stop else len(self.__data),
+                    index.step * 2 if index.step else 2,
+                )
+            ]
+        else:
+            return (self.__data[2 * index], self.__data[2 * index + 1])
+
+    def __iter__(self) -> Iterator[Tuple[K, V]]:
+        return (
+            (self.__data[i], self.__data[i + 1]) for i in range(0, len(self.__data), 2)
+        )  # type: ignore
+
+
 class ArrayMap(Mapping[K, V]):
     __data: List[Union[K, V]]
+    __keys: ListBackedSet[K]
 
     def __init__(self):
         raise NotImplementedError("Use ArrayMap.empty() or other class methods instead")
@@ -104,6 +156,7 @@ class ArrayMap(Mapping[K, V]):
     def __create(cls, data: List[Union[K, V]]) -> "ArrayMap[K, V]":
         instance = cls.__new__(cls)
         instance.__data = data
+        instance.__keys = _ArrayMapKeys(data)
         return instance
 
     @classmethod
@@ -111,6 +164,12 @@ class ArrayMap(Mapping[K, V]):
         if not hasattr(cls, "__EMPTY"):
             cls.__EMPTY = cls.__create([])
         return cls.__EMPTY
+
+    def keys(self) -> ListBackedSet[K]:  # type: ignore
+        return self.__keys
+
+    def items(self) -> _ArrayMapEntries[K, V]:  # type: ignore
+        return _ArrayMapEntries(self.__data)
 
     def __getitem__(self, key: K) -> V:
         index = self._binary_search_key(key)
@@ -125,8 +184,7 @@ class ArrayMap(Mapping[K, V]):
         return len(self.__data) // 2
 
     def _binary_search_key(self, key: K) -> int:
-        keys = [self.__data[i] for i in range(0, len(self.__data), 2)]
-        return _binary_search(keys, key)
+        return _binary_search(self.__keys, key)
 
     def plus(self, key: K, value: V) -> "ArrayMap[K, V]":
         index = self._binary_search_key(key)
@@ -145,6 +203,18 @@ class ArrayMap(Mapping[K, V]):
         for index in adjusted_indices:
             del new_data[index]
         return ArrayMap.__create(new_data)
+
+    def plus_or_noop(self, key: K, value: V) -> "ArrayMap[K, V]":
+        index = self._binary_search_key(key)
+        if index >= 0:
+            return self
+        else:
+            # Insert new key-value pair
+            insert_at = -(index + 1)
+            new_data = self.__data[:]
+            new_data.insert(insert_at * 2, key)
+            new_data.insert(insert_at * 2 + 1, value)
+            return ArrayMap.__create(new_data)
 
     def plus_or_noop_or_replace(self, key: K, value: V) -> "ArrayMap[K, V]":
         index = self._binary_search_key(key)

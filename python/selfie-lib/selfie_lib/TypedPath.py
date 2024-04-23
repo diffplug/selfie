@@ -9,6 +9,9 @@ class TypedPath:
     def __hash__(self):
         return hash(self.absolute_path)
 
+    def __str__(self) -> str:
+        return self.absolute_path
+
     @property
     def name(self) -> str:
         if self.absolute_path.endswith("/"):

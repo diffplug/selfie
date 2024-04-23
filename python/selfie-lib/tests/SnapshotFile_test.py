@@ -16,7 +16,7 @@ Orange
 ╔═ [end of file] ═╗
 """.strip()
     file = SnapshotFile.parse(SnapshotValueReader.of(file_content))
-    assert file.metadata == {"com.acme.AcmeTest": """{"header":"data"}"""}
+    assert file.metadata == ("com.acme.AcmeTest", """{"header":"data"}""")
 
 
 def test_read_without_metadata():
@@ -33,19 +33,19 @@ Orange
 """.strip()
     file = SnapshotFile.parse(SnapshotValueReader.of(file_content))
     assert file.metadata is None
-    assert set(file._snapshots.keys()) == {"Apple", "Orange"}
+    assert set(file.snapshots.keys()) == {"Apple", "Orange"}
 
 
 def test_write():
     underTest = SnapshotFile()
-    underTest.metadata = {"com.acme.AcmeTest": """{"header":"data"}"""}
+    underTest.metadata = ("com.acme.AcmeTest", """{"header":"data"}""")
 
     apple_snapshot = Snapshot.of("Granny Smith")
     apple_snapshot = apple_snapshot.plus_facet("color", "green")
     apple_snapshot = apple_snapshot.plus_facet("crisp", "yes")
 
-    underTest._snapshots = underTest._snapshots.plus("Apple", apple_snapshot)
-    underTest._snapshots = underTest._snapshots.plus("Orange", Snapshot.of("Orange"))
+    underTest.snapshots = underTest.snapshots.plus("Apple", apple_snapshot)
+    underTest.snapshots = underTest.snapshots.plus("Orange", Snapshot.of("Orange"))
 
     buffer = []
     underTest.serialize(buffer)

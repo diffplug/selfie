@@ -3,12 +3,13 @@ from typing import List, Optional, Generic, TypeVar, Dict, cast
 from abc import ABC, abstractmethod
 import inspect
 import threading
+import os
 from functools import total_ordering
 
 from .SourceFile import SourceFile
 from .Literals import LiteralValue
 from .TypedPath import TypedPath
-from .SnapshotSystem import FS
+from .FS import FS
 
 
 T = TypeVar("T")
@@ -55,6 +56,9 @@ class CallLocation:
             return NotImplemented
         return (self._file_name, self._line) == (other.file_name, other.line)
 
+    def __hash__(self):
+        return hash((self._file_name, self._line))
+
 
 class CallStack:
     def __init__(self, location: CallLocation, rest_of_stack: List[CallLocation]):
@@ -83,15 +87,25 @@ class SnapshotFileLayout:
     def __init__(self, fs: FS):
         self.fs = fs
 
-    def sourcePathForCall(self, call: CallStack) -> TypedPath:
+    def sourcefile_for_call(self, call: CallStack) -> TypedPath:
         file_path = call.location.file_name
         if not file_path:
             raise ValueError("No file path available in CallLocation.")
-        return TypedPath(str(Path(file_path)))
+        return TypedPath(os.path.abspath(Path(file_path)))
 
 
-def recordCall(callerFileOnly: bool = False) -> CallStack:
-    stack_frames = inspect.stack()[1:]
+def recordCall(callerFileOnly: bool) -> CallStack:
+    stack_frames_raw = inspect.stack()
+    first_real_frame = next(
+        (
+            i
+            for i, x in enumerate(stack_frames_raw)
+            if x.frame.f_globals.get("__package__") != __package__
+        ),
+        None,
+    )
+    # filter to only the stack after the selfie-lib package
+    stack_frames = stack_frames_raw[first_real_frame:]
 
     if callerFileOnly:
         caller_file = stack_frames[0].filename
@@ -119,10 +133,6 @@ class WriteTracker(ABC, Generic[T, U]):
     def __init__(self):
         self.lock = threading.Lock()
         self.writes: Dict[T, FirstWrite[U]] = {}
-
-    @abstractmethod
-    def record(self, key: T, snapshot: U, call: CallStack, layout: SnapshotFileLayout):
-        pass
 
     def recordInternal(
         self,
@@ -153,33 +163,38 @@ class DiskWriteTracker(WriteTracker[T, U]):
 
 
 class InlineWriteTracker(WriteTracker[CallLocation, LiteralValue]):
+    def hasWrites(self) -> bool:
+        return len(self.writes) > 0
+
     def record(
         self,
-        key: CallLocation,
         snapshot: LiteralValue,
         call: CallStack,
         layout: SnapshotFileLayout,
     ):
-        super().recordInternal(key, snapshot, call, layout)
+        super().recordInternal(call.location, snapshot, call, layout)
 
-        call_stack_from_location = CallStack(key, [])
-        file = layout.sourcePathForCall(call_stack_from_location)
+        call_stack_from_location = CallStack(call.location, [])
+        file = layout.sourcefile_for_call(call_stack_from_location)
 
         if snapshot.expected is not None:
             content = SourceFile(file.name, layout.fs.file_read(file))
             try:
                 snapshot = cast(LiteralValue, snapshot)
-                parsed_value = content.parse_to_be_like(key.line).parse_literal(
-                    snapshot.format
-                )
+                parsed_value = content.parse_to_be_like(
+                    call.location.line
+                ).parse_literal(snapshot.format)
             except Exception as e:
                 raise AssertionError(
-                    f"Error while parsing the literal at {key.ide_link(layout)}. Please report this error at https://github.com/diffplug/selfie",
+                    f"Error while parsing the literal at {call.location.ide_link(layout)}. Please report this error at https://github.com/diffplug/selfie",
                     e,
                 )
             if parsed_value != snapshot.expected:
                 raise layout.fs.assert_failed(
-                    f"Selfie cannot modify the literal at {key.ide_link(layout)} because Selfie has a parsing bug. Please report this error at https://github.com/diffplug/selfie",
+                    f"Selfie cannot modify the literal at {call.location.ide_link(layout)} because Selfie has a parsing bug. Please report this error at https://github.com/diffplug/selfie",
                     snapshot.expected,
                     parsed_value,
                 )
+
+    def persist_writes(self, layout: SnapshotFileLayout):
+        raise NotImplementedError("InlineWriteTracker does not support persist_writes")
