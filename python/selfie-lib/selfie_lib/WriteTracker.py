@@ -95,7 +95,17 @@ class SnapshotFileLayout:
 
 
 def recordCall(callerFileOnly: bool) -> CallStack:
-    stack_frames = inspect.stack()[1:]
+    stack_frames_raw = inspect.stack()
+    first_real_frame = next(
+        (
+            i
+            for i, x in enumerate(stack_frames_raw)
+            if x.frame.f_globals.get("__package__") != __package__
+        ),
+        None,
+    )
+    # filter to only the stack after the selfie-lib package
+    stack_frames = stack_frames_raw[first_real_frame:]
 
     if callerFileOnly:
         caller_file = stack_frames[0].filename
