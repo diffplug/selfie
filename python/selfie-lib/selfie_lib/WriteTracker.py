@@ -134,10 +134,6 @@ class WriteTracker(ABC, Generic[T, U]):
         self.lock = threading.Lock()
         self.writes: Dict[T, FirstWrite[U]] = {}
 
-    @abstractmethod
-    def record(self, key: T, snapshot: U, call: CallStack, layout: SnapshotFileLayout):
-        pass
-
     def recordInternal(
         self,
         key: T,
