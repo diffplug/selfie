@@ -182,13 +182,15 @@ class PytestSnapshotSystem(SnapshotSystem):
         )
         if snapshotsFilesWrittenToDisk is None:
             raise RuntimeError("finished_all_tests() was called more than once.")
+
         if self.mode != Mode.readonly:
+            if self.__inline_write_tracker.hasWrites():
+                self.__inline_write_tracker.persist_writes(self.layout)
+
             for path in self.__comment_tracker.paths_with_once():
                 source = SourceFile(path.name, self.fs.file_read(path))
                 source.remove_selfie_once_comments()
                 self.fs.file_write(path, source.as_string)
-            if self.__inline_write_tracker.hasWrites():
-                self.__inline_write_tracker.persist_writes(self.layout)
 
     @property
     def mode(self) -> Mode:
