@@ -56,6 +56,9 @@ class CallLocation:
             return NotImplemented
         return (self._file_name, self._line) == (other.file_name, other.line)
 
+    def __hash__(self):
+        return hash((self._file_name, self._line))
+
 
 class CallStack:
     def __init__(self, location: CallLocation, rest_of_stack: List[CallLocation]):
@@ -155,35 +158,34 @@ class DiskWriteTracker(WriteTracker[T, U]):
 
 class InlineWriteTracker(WriteTracker[CallLocation, LiteralValue]):
     def hasWrites(self) -> bool:
-        return not self.writes
+        return len(self.writes) > 0
 
     def record(
         self,
-        key: CallLocation,
         snapshot: LiteralValue,
         call: CallStack,
         layout: SnapshotFileLayout,
     ):
-        super().recordInternal(key, snapshot, call, layout)
+        super().recordInternal(call.location, snapshot, call, layout)
 
-        call_stack_from_location = CallStack(key, [])
+        call_stack_from_location = CallStack(call.location, [])
         file = layout.sourcefile_for_call(call_stack_from_location)
 
         if snapshot.expected is not None:
             content = SourceFile(file.name, layout.fs.file_read(file))
             try:
                 snapshot = cast(LiteralValue, snapshot)
-                parsed_value = content.parse_to_be_like(key.line).parse_literal(
-                    snapshot.format
-                )
+                parsed_value = content.parse_to_be_like(
+                    call.location.line
+                ).parse_literal(snapshot.format)
             except Exception as e:
                 raise AssertionError(
-                    f"Error while parsing the literal at {key.ide_link(layout)}. Please report this error at https://github.com/diffplug/selfie",
+                    f"Error while parsing the literal at {call.location.ide_link(layout)}. Please report this error at https://github.com/diffplug/selfie",
                     e,
                 )
             if parsed_value != snapshot.expected:
                 raise layout.fs.assert_failed(
-                    f"Selfie cannot modify the literal at {key.ide_link(layout)} because Selfie has a parsing bug. Please report this error at https://github.com/diffplug/selfie",
+                    f"Selfie cannot modify the literal at {call.location.ide_link(layout)} because Selfie has a parsing bug. Please report this error at https://github.com/diffplug/selfie",
                     snapshot.expected,
                     parsed_value,
                 )
