@@ -149,11 +149,16 @@ class StringSelfie(DiskSelfie, StringFacet):
 
     def to_be(self, expected: Union[str, int, bool]) -> str:
         actual_string = self.__actual()
+
+        # Check if expected is a string
+        if not isinstance(expected, str):
+            raise TypeError("Expected value must be a string")
+
         if actual_string == expected:
             return _checkSrc(actual_string)
         else:
             return _toBeDidntMatch(
-                expected if isinstance(expected, str) else None,
+                expected,
                 actual_string,
                 LiteralString(),
             )
@@ -236,17 +241,14 @@ class IntSelfie:
         self.actual = actual
 
     def to_be_TODO(self, unused_arg: Any = None):
-        return self.to_be_didnt_match(None, self.actual, LiteralInt())
+        return _toBeDidntMatch(None, self.actual, LiteralInt())
 
     def to_be(self, expected: Union[str, int, bool]) -> int:
         # Compare actual to expected; handle match or mismatch.
         if self.actual == expected:
             return _checkSrc(self.actual)
         else:
-            return self.to_be_didnt_match(expected, self.actual, LiteralInt())
-
-    def to_be_didnt_match(self, expected, actual, format):
-        return _toBeDidntMatch(expected, actual, format)
+            return _toBeDidntMatch(expected, self.actual, LiteralInt())
 
 
 class BooleanSelfie:
@@ -254,14 +256,11 @@ class BooleanSelfie:
         self.actual = actual
 
     def to_be_TODO(self, unused_arg: Any = None):
-        return self.to_be_didnt_match(None, self.actual, LiteralBoolean())
+        return _toBeDidntMatch(None, self.actual, LiteralBoolean())
 
     def to_be(self, expected: Union[str, int, bool]) -> bool:
         # Compare actual to expected; handle match or mismatch.
         if self.actual == expected:
             return _checkSrc(self.actual)
         else:
-            return self.to_be_didnt_match(expected, self.actual, LiteralBoolean())
-
-    def to_be_didnt_match(self, expected, actual, format):
-        return _toBeDidntMatch(expected, actual, format)
+            return _toBeDidntMatch(expected, self.actual, LiteralBoolean())
