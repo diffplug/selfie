@@ -228,11 +228,29 @@ class IntSelfie:
         return self.to_be_didnt_match(None, self.actual, LiteralInt())
 
     def to_be(self, expected: int):
-        # Checks if the snapshot can be written and returns the actual value
+        # Compare actual to expected; handle match or mismatch.
         if self.actual == expected:
             return _checkSrc(self.actual)
         else:
             return self.to_be_didnt_match(expected, self.actual, LiteralInt())
+
+    def to_be_didnt_match(self, expected, actual, format):
+        return _toBeDidntMatch(expected, actual, format)
+
+
+class BooleanSelfie:
+    def __init__(self, actual: bool):
+        self.actual = actual
+
+    def to_be_TODO(self, unused_arg: Any = None):
+        return self.to_be_didnt_match(None, self.actual, LiteralBoolean())
+
+    def to_be(self, expected: bool):
+        # Compare actual to expected; handle match or mismatch.
+        if self.actual == expected:
+            return _checkSrc(self.actual)
+        else:
+            return self.to_be_didnt_match(expected, self.actual, LiteralBoolean())
 
     def to_be_didnt_match(self, expected, actual, format):
         return _toBeDidntMatch(expected, actual, format)
