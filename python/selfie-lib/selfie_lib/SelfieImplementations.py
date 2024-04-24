@@ -244,6 +244,9 @@ class IntSelfie:
         return _toBeDidntMatch(None, self.actual, LiteralInt())
 
     def to_be(self, expected: Union[str, int, bool]) -> int:
+        if not isinstance(expected, int):
+            raise TypeError("Expected value must be an int")
+
         # Compare actual to expected; handle match or mismatch.
         if self.actual == expected:
             return _checkSrc(self.actual)
@@ -259,6 +262,9 @@ class BooleanSelfie:
         return _toBeDidntMatch(None, self.actual, LiteralBoolean())
 
     def to_be(self, expected: Union[str, int, bool]) -> bool:
+        if not isinstance(expected, bool):
+            raise TypeError("Expected value must be a bool")
+
         # Compare actual to expected; handle match or mismatch.
         if self.actual == expected:
             return _checkSrc(self.actual)
