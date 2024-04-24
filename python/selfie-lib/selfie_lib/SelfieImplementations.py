@@ -15,7 +15,7 @@ from .Literals import (
 
 
 from abc import ABC, abstractmethod
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Union
 from itertools import chain
 
 
@@ -147,12 +147,16 @@ class StringSelfie(DiskSelfie, StringFacet):
     def to_be_TODO(self, unused_arg: Any = None) -> str:
         return _toBeDidntMatch(None, self.__actual(), LiteralString())
 
-    def to_be(self, expected: str) -> str:
+    def to_be(self, expected: Union[str, int, bool]) -> str:
         actual_string = self.__actual()
         if actual_string == expected:
             return _checkSrc(actual_string)
         else:
-            return _toBeDidntMatch(expected, actual_string, LiteralString())
+            return _toBeDidntMatch(
+                expected if isinstance(expected, str) else None,
+                actual_string,
+                LiteralString(),
+            )
 
 
 def _checkSrc[T](value: T) -> T:
@@ -234,7 +238,7 @@ class IntSelfie:
     def to_be_TODO(self, unused_arg: Any = None):
         return self.to_be_didnt_match(None, self.actual, LiteralInt())
 
-    def to_be(self, expected: int):
+    def to_be(self, expected: Union[str, int, bool]) -> int:
         # Compare actual to expected; handle match or mismatch.
         if self.actual == expected:
             return _checkSrc(self.actual)
@@ -252,7 +256,7 @@ class BooleanSelfie:
     def to_be_TODO(self, unused_arg: Any = None):
         return self.to_be_didnt_match(None, self.actual, LiteralBoolean())
 
-    def to_be(self, expected: bool):
+    def to_be(self, expected: Union[str, int, bool]) -> bool:
         # Compare actual to expected; handle match or mismatch.
         if self.actual == expected:
             return _checkSrc(self.actual)
