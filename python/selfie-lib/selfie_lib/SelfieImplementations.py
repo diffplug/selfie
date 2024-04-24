@@ -4,7 +4,14 @@ from .Snapshot import Snapshot
 from .SnapshotFile import SnapshotFile
 from .SnapshotSystem import DiskStorage, SnapshotSystem, _selfieSystem, Mode
 from .WriteTracker import recordCall as recordCall
-from .Literals import LiteralValue, LiteralString, LiteralFormat, TodoStub
+from .Literals import (
+    LiteralValue,
+    LiteralString,
+    LiteralFormat,
+    TodoStub,
+    LiteralInt,
+    LiteralBoolean,
+)
 
 
 from abc import ABC, abstractmethod

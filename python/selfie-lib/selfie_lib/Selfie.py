@@ -1,4 +1,4 @@
-from .SelfieImplementations import StringSelfie
+from .SelfieImplementations import StringSelfie, IntSelfie, BooleanSelfie
 from .Snapshot import Snapshot
 from .SnapshotSystem import _selfieSystem
 
