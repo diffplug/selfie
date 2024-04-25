@@ -39,7 +39,7 @@ class FSImplementation:
             expected_str = self._nullable_to_string(expected, "(null)")
             actual_str = self._nullable_to_string(actual, "(null)")
             if not expected_str and not actual_str and (expected is None or actual is None):
-                raise AssertionError(f"{message} - Expected: {expected_str}, Actual: {actual_str}")
+                raise AssertionError(f"AssertionError: {message} - Expected: {expected_str}, Actual: {actual_str}")
             else:
                 self._comparison_assertion(message, expected_str, actual_str)
 
