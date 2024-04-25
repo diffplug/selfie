@@ -32,7 +32,7 @@ class CommentTracker:
             ]
 
     def hasWritableComment(self, call: CallStack, layout: SnapshotFileLayout) -> bool:
-        path = layout.sourcefile_for_call(call)
+        path = layout.sourcefile_for_call(call.location)
         with self.lock:
             if path in self.cache:
                 comment = self.cache[path]
