@@ -197,26 +197,37 @@ class InlineWriteTracker(WriteTracker[CallLocation, LiteralValue]):
                 )
 
     def persist_writes(self, layout: SnapshotFileLayout):
+        # Assuming there is at least one write to process
+        if not self.writes:
+            raise ValueError("No writes to process.")
+
         # Sorting writes based on file name and line number
         sorted_writes = sorted(
             self.writes.values(),
             key=lambda x: (x.call_stack.location.file_name, x.call_stack.location.line),
         )
 
-        current_file = None
-        content = None
+        # Initialize from the first write
+        first_write = sorted_writes[0]
+        current_file = layout.sourcefile_for_call(
+            CallStack(first_write.call_stack.location, [])
+        )
+        file_content = layout.fs.file_read(current_file)
+        if file_content is None:
+            raise ValueError("Failed to read file content from the initial file.")
+
+        # Create a SourceFile object from the initial file content
+        content = SourceFile(current_file.name, file_content)
         delta_line_numbers = 0
 
         for write in sorted_writes:
-            # Obtain the file path from the current write's call location using the layout mapping
+            # Determine the file path for the current write
             file_path = layout.sourcefile_for_call(
                 CallStack(write.call_stack.location, [])
             )
             # If we switch to a new file, write changes to the disk for the previous file
-            if current_file is None or file_path.name != current_file.name:
-                if current_file is not None and content is not None:
-                    # Final write to disk for the last file processed before changing the file
-                    layout.fs.file_write(current_file, content.as_string)
+            if file_path.name != current_file.name:
+                layout.fs.file_write(current_file, content.as_string)
                 current_file = file_path
                 file_content = layout.fs.file_read(current_file)
                 if file_content is None:
@@ -242,5 +253,4 @@ class InlineWriteTracker(WriteTracker[CallLocation, LiteralValue]):
                 )
 
         # Final write to disk for the last file processed
-        if current_file is not None and content is not None:
-            layout.fs.file_write(current_file, content.as_string)
+        layout.fs.file_write(current_file, content.as_string)
