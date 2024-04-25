@@ -109,7 +109,7 @@ class Mode(Enum):
         elif self == Mode.readonly:
             if system.source_file_has_writable_comment(call):
                 layout = system.layout
-                path = layout.sourcefile_for_call(call)
+                path = layout.sourcefile_for_call(call.location)
                 comment, line = CommentTracker.commentString(path)
                 raise system.fs.assert_failed(
                     f"Selfie is in readonly mode, so `{comment}` is illegal at {call.location.with_line(line).ide_link(layout)}"
