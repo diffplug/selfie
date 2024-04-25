@@ -1,3 +1,4 @@
+import re
 from .Slice import Slice
 from .Literals import Language, LiteralFormat, LiteralValue
 from .EscapeLeadingWhitespace import EscapeLeadingWhitespace
@@ -55,12 +56,14 @@ class SourceFile:
     class ToBeLiteral:
         def __init__(
             self,
+            parent: "SourceFile",
             dot_fun_open_paren: str,
             function_call_plus_arg: Slice,
             arg: Slice,
             language: Language,
             escape_leading_whitespace: EscapeLeadingWhitespace,
         ) -> None:
+            self.__parent = parent
             self.__dot_fun_open_paren = dot_fun_open_paren
             self.__function_call_plus_arg = function_call_plus_arg
             self.__arg = arg
@@ -92,9 +95,12 @@ class SourceFile:
                 )
             existing_newlines = self.__function_call_plus_arg.count("\n")
             new_newlines = encoded.count("\n")
-            self.__content_slice = self.__function_call_plus_arg.replaceSelfWith(
-                f"{self.__dot_fun_open_paren}{encoded})"
+            self.__parent.__content_slice = Slice(
+                self.__function_call_plus_arg.replaceSelfWith(
+                    f"{self.__dot_fun_open_paren}{encoded})"
+                )
             )
+
             return new_newlines - existing_newlines
 
         def parse_literal(self, literal_format: LiteralFormat) -> Any:
@@ -206,6 +212,7 @@ class SourceFile:
                     f"starting at line {line_one_indexed}"
                 )
         return self.ToBeLiteral(
+            self,
             dot_fun_open_paren.replace("_TODO", ""),
             self.__content_slice.subSequence(dot_function_call, end_paren + 1),
             self.__content_slice.subSequence(arg_start, end_arg),
