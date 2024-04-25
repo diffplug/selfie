@@ -39,7 +39,7 @@ export function ButtonList() {
           js
         </Button>
       </Link>
-      <Link href="/other-platforms">
+      <Link href="/py">
         <Button
           className={
             selectedLanguage === "py" ? pressedClasses : unPressedClasses
@@ -48,7 +48,7 @@ export function ButtonList() {
           py
         </Button>
       </Link>
-      <Link href="/other-platforms">
+      <Link href="/py">
         <Button
           className={
             selectedLanguage === "other-platforms"
