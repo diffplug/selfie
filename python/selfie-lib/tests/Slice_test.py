@@ -12,3 +12,10 @@ def test_unixLine():
     assert str(one_two_three.unixLine(4)) == ""
     assert str(one_two_three.unixLine(5)) == "FOURTH"
     assert str(one_two_three.unixLine(6)) == ""
+
+
+def test_replace_self():
+    undertest = Slice("ABC")
+    justB = undertest.subSequence(1, 2)
+    assert str(justB) == "B"
+    assert justB.replaceSelfWith("D") == "ADC"
