@@ -229,17 +229,12 @@ class InlineWriteTracker(WriteTracker[CallLocation, LiteralValue]):
             if isinstance(write.snapshot.format, LiteralTodoStub):
                 content.replace_on_line(line, ".${kind.name}_TODO(", ".${kind.name}(")
             else:
-                try:
-                    to_be_literal = content.parse_to_be_like(line)
-                    # Attempt to set the literal value and adjust for line shifts due to content changes
-                    literal_change = to_be_literal.set_literal_and_get_newline_delta(
-                        write.snapshot
-                    )
-                    delta_line_numbers += literal_change
-                except Exception as e:
-                    raise AssertionError(
-                        f"Error while processing line {line} in file {current_file.name}: {str(e)}"
-                    )
+                to_be_literal = content.parse_to_be_like(line)
+                # Attempt to set the literal value and adjust for line shifts due to content changes
+                literal_change = to_be_literal.set_literal_and_get_newline_delta(
+                    write.snapshot
+                )
+                delta_line_numbers += literal_change
 
         # Final write to disk for the last file processed
         layout.fs.file_write(current_file, content.as_string)
