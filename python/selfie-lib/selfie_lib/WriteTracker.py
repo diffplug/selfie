@@ -197,4 +197,50 @@ class InlineWriteTracker(WriteTracker[CallLocation, LiteralValue]):
                 )
 
     def persist_writes(self, layout: SnapshotFileLayout):
-        raise NotImplementedError("InlineWriteTracker does not support persist_writes")
+        # Sorting writes based on file name and line number
+        sorted_writes = sorted(
+            self.writes.values(),
+            key=lambda x: (x.call_stack.location.file_name, x.call_stack.location.line),
+        )
+
+        current_file = None
+        content = None
+        delta_line_numbers = 0
+
+        for write in sorted_writes:
+            # Obtain the file path from the current write's call location using the layout mapping
+            file_path = layout.sourcefile_for_call(
+                CallStack(write.call_stack.location, [])
+            )
+            # If we switch to a new file, write changes to the disk for the previous file
+            if current_file is None or file_path.name != current_file.name:
+                if current_file is not None and content is not None:
+                    # Final write to disk for the last file processed before changing the file
+                    layout.fs.file_write(current_file, content.as_string)
+                current_file = file_path
+                file_content = layout.fs.file_read(current_file)
+                if file_content is None:
+                    continue
+                content = SourceFile(current_file.name, file_content)
+                delta_line_numbers = 0
+
+            if content is None:
+                continue
+
+            # Calculate the line number taking into account changes that shifted line numbers
+            line = write.call_stack.location.line + delta_line_numbers
+            try:
+                to_be_literal = content.parse_to_be_like(line)
+                # Attempt to set the literal value and adjust for line shifts due to content changes
+                literal_change = to_be_literal.set_literal_and_get_newline_delta(
+                    write.snapshot
+                )
+                delta_line_numbers += literal_change
+            except Exception as e:
+                raise AssertionError(
+                    f"Error while processing line {line} in file {current_file.name}: {str(e)}"
+                )
+
+        # Final write to disk for the last file processed
+        if current_file is not None and content is not None:
+            layout.fs.file_write(current_file, content.as_string)

@@ -214,4 +214,10 @@ class SourceFile:
         )
 
 
-TO_BE_LIKES = [".toBe(", ".toBe_TODO(", ".toBeBase64(", ".toBeBase64_TODO("]
+TO_BE_LIKES = [
+    ".toBe(",
+    ".toBe_TODO(",
+    ".toBeBase64(",
+    ".toBeBase64_TODO(",
+    ".to_be_TODO(",
+]
