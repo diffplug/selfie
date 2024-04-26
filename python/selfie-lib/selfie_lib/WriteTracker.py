@@ -7,7 +7,7 @@ import os
 from functools import total_ordering
 
 from .SourceFile import SourceFile
-from .Literals import LiteralValue
+from .Literals import LiteralValue, LiteralTodoStub
 from .TypedPath import TypedPath
 from .FS import FS
 
@@ -87,8 +87,8 @@ class SnapshotFileLayout:
     def __init__(self, fs: FS):
         self.fs = fs
 
-    def sourcefile_for_call(self, call: CallStack) -> TypedPath:
-        file_path = call.location.file_name
+    def sourcefile_for_call(self, call: CallLocation) -> TypedPath:
+        file_path = call.file_name
         if not file_path:
             raise ValueError("No file path available in CallLocation.")
         return TypedPath(os.path.abspath(Path(file_path)))
@@ -174,8 +174,7 @@ class InlineWriteTracker(WriteTracker[CallLocation, LiteralValue]):
     ):
         super().recordInternal(call.location, snapshot, call, layout)
 
-        call_stack_from_location = CallStack(call.location, [])
-        file = layout.sourcefile_for_call(call_stack_from_location)
+        file = layout.sourcefile_for_call(call.location)
 
         if snapshot.expected is not None:
             content = SourceFile(file.name, layout.fs.file_read(file))
@@ -197,4 +196,45 @@ class InlineWriteTracker(WriteTracker[CallLocation, LiteralValue]):
                 )
 
     def persist_writes(self, layout: SnapshotFileLayout):
-        raise NotImplementedError("InlineWriteTracker does not support persist_writes")
+        # Assuming there is at least one write to process
+        if not self.writes:
+            return
+
+        # Sorting writes based on file name and line number
+        sorted_writes = sorted(
+            self.writes.values(),
+            key=lambda x: (x.call_stack.location.file_name, x.call_stack.location.line),
+        )
+
+        # Initialize from the first write
+        first_write = sorted_writes[0]
+        current_file = layout.sourcefile_for_call(first_write.call_stack.location)
+        content = SourceFile(current_file.name, layout.fs.file_read(current_file))
+        delta_line_numbers = 0
+
+        for write in sorted_writes:
+            # Determine the file path for the current write
+            file_path = layout.sourcefile_for_call(write.call_stack.location)
+            # If we switch to a new file, write changes to the disk for the previous file
+            if file_path != current_file:
+                layout.fs.file_write(current_file, content.as_string)
+                current_file = file_path
+                content = SourceFile(
+                    current_file.name, layout.fs.file_read(current_file)
+                )
+                delta_line_numbers = 0
+
+            # Calculate the line number taking into account changes that shifted line numbers
+            line = write.call_stack.location.line + delta_line_numbers
+            if isinstance(write.snapshot.format, LiteralTodoStub):
+                content.replace_on_line(line, ".${kind.name}_TODO(", ".${kind.name}(")
+            else:
+                to_be_literal = content.parse_to_be_like(line)
+                # Attempt to set the literal value and adjust for line shifts due to content changes
+                literal_change = to_be_literal.set_literal_and_get_newline_delta(
+                    write.snapshot
+                )
+                delta_line_numbers += literal_change
+
+        # Final write to disk for the last file processed
+        layout.fs.file_write(current_file, content.as_string)

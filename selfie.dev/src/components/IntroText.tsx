@@ -2,10 +2,16 @@ import clsx from "clsx";
 import slugify from "@sindresorhus/slugify";
 import { Button } from "./Button";
 import Link from "next/link";
+import { useRouter } from "next/router";
+import { getPathParts } from "@/lib/languageFromPath";
 
-const THE_CONTEXT_WINDOW = "https://thecontextwindow.ai/p/temporarily-embarrassed-snapshots";
+const THE_CONTEXT_WINDOW =
+  "https://thecontextwindow.ai/p/temporarily-embarrassed-snapshots";
 
 export function IntroText() {
+  const router = useRouter();
+  const selectedLanguage = getPathParts(router.pathname).language;
+
   return (
     <div
       className={clsx([
@@ -35,7 +41,7 @@ export function IntroText() {
         <SectionLink title="literal" />, <SectionLink title="lensable" />
         <br /> and <SectionLink title="like a filesystem" />
       </p>
-      <Link href="/jvm/get-started">
+      <Link href={`/${selectedLanguage}/get-started`}>
         <Button
           className={clsx([
             "w-[154px]",
@@ -67,14 +73,25 @@ export function IntroText() {
       >
         <p>
           Snapshot testing is the <br />{" "}
-          <a href={THE_CONTEXT_WINDOW} className="text-blue hover:underline cursor-pointer">fastest and most precise</a>
+          <a
+            href={THE_CONTEXT_WINDOW}
+            className="text-blue hover:underline cursor-pointer"
+          >
+            fastest and most precise
+          </a>
           <br />
           mechanism to{" "}
-          <a href={THE_CONTEXT_WINDOW} className="text-red hover:underline cursor-pointer">
+          <a
+            href={THE_CONTEXT_WINDOW}
+            className="text-red hover:underline cursor-pointer"
+          >
             record <br /> and specify
           </a>{" "}
           the <br />
-          <a href={THE_CONTEXT_WINDOW} className="text-green hover:underline cursor-pointer">
+          <a
+            href={THE_CONTEXT_WINDOW}
+            className="text-green hover:underline cursor-pointer"
+          >
             behavior of your <br />
             system and its <br />
             components
