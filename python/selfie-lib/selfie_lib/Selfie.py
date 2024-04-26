@@ -16,14 +16,8 @@ class Cacheable(Protocol[T]):
         raise NotImplementedError
 
 
-system_instance: Union[SnapshotSystem, None] = None
-
-
 def get_system() -> SnapshotSystem:
-    global system_instance
-    if system_instance is None:
-        system_instance = _selfieSystem()
-    return system_instance
+    return _selfieSystem()
 
 
 def expect_selfie(actual: Union[str, int, bool]):
