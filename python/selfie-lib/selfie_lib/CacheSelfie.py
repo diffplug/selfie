@@ -3,15 +3,20 @@ import threading
 from .WriteTracker import recordCall
 from .Snapshot import Snapshot
 from .Literals import LiteralValue, LiteralString, TodoStub
+from .SnapshotSystem import DiskStorage
+from .RoundTrip import Roundtrip
+from .Selfie import Cacheable
 
 T = TypeVar("T")
 
 
 class CacheSelfie(Generic[T]):
-    def __init__(self, disk, roundtrip, generator):
-        self.disk = disk
-        self.roundtrip = roundtrip
-        self.generator = generator
+    def __init__(
+        self, disk: DiskStorage, roundtrip: Roundtrip[T, str], generator: Cacheable[T]
+    ):
+        self.disk: DiskStorage = disk
+        self.roundtrip: Roundtrip[T, str] = roundtrip
+        self.generator: Cacheable[T] = generator
 
     def to_match_disk(self, sub: str = "") -> T:
         return self._to_match_disk_impl(sub, False)
@@ -25,7 +30,7 @@ class CacheSelfie(Generic[T]):
         call = recordCall(False)
         system = get_system()
         if system.mode.can_write(is_todo, call, system):
-            actual = self.generator.get()
+            actual = self.generator()
             self.disk.write_disk(
                 Snapshot.of(self.roundtrip.serialize(actual)), sub, call
             )
@@ -58,7 +63,7 @@ class CacheSelfie(Generic[T]):
         system = get_system()
         writable = system.mode.can_write(snapshot is None, call, system)
         if writable:
-            actual = self.generator.get()
+            actual = self.generator()
             literal_string_formatter = LiteralString()
             system.write_inline(
                 LiteralValue(
