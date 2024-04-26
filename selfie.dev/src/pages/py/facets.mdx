@@ -19,9 +19,7 @@ Assuming you have [installed selfie](/py/get-started#installation) and glanced t
 
 ## Our toy project
 
-**TODO: Toy project for Python not [yet](https://github.com/diffplug/selfie/issues/322) implemented, PRs Welcomed.**
-
-We'll be using the [`example-pytest-selfie`](https://github.com/diffplug/selfie/issues/322) project from the selfie GitHub repo. You can clone the code and follow along, but there's no need to. If you did clone the project, you could run **Not Implemented** and you'd have a webapp running at `localhost:8080`.
+We'll be using the [`example-pytest-selfie`](https://github.com/diffplug/selfie/tree/main/python/example-pytest-selfie) project from the selfie GitHub repo. You can clone the code and follow along, but there's no need to. If you did clone the project, you could run **Not Implemented** and you'd have a webapp running at `localhost:8080`.
 
 It has a homepage where we can login. We can go to `/email` to see the emails the server has sent and click our login link, and boom we've got some auth cookies.
 
@@ -29,14 +27,14 @@ There's nothing web-specific about selfie, it's just a familiar example.
 
 ## Typed snapshots
 
-**TODO: Use request instead?, toy project not implemented [yet](https://github.com/diffplug/selfie/issues/322).**
+**TODO: Use request instead?, This implementation of toy project not added [yet](https://github.com/diffplug/selfie/tree/main/python/example-pytest-selfie).**
 
 Let's use [requests](https://pypi.org/project/requests/) to do gets and posts. So if we want to assert that the homepage is working, we can do this:
 
 ```python
 @Test
 public void homepage() {
-  expectSelfie(requests.get("/").text).toBe("""
+  expect_selfie(requests.get("/").text).to_be("""
 <html><body>
 \u0020 <h1>Please login</h1>
 \u0020 <form action="/login" method="post">
@@ -49,9 +47,9 @@ public void homepage() {
 
 Since you [saw the quickstart](/py/get-started#quickstart), you know that selfie wrote that big bad string literal for us. The `\u0020` is just escaped whitespace, to protect it from getting mangled by terrible autoformatters like [spotless](https://github.com/diffplug/spotless).
 
-**TODO: `Camera` and `expectSelfie(T, Camera&lt;T&gt;)` not yet implemented, [PRs welcomed](https://github.com/diffplug/selfie/issues/302)**
+**TODO: `Camera` and `expect_selfie(T, Camera&lt;T&gt;)` not yet implemented, [PRs welcomed](https://github.com/diffplug/selfie/issues/302)**
 
-The first thing to notice is that we'll be doing a lot of `requests.get().body().text`. It would be nice if we could just do `expectSelfie(get("/"))`, but we'll have to write our own `expectSelfie(requests.models.Response)` method. Selfie gives us [`expectSelfie(T, Camera&lt;T&gt;)`](https://github.com/diffplug/selfie/issues/302) and [`Camera`](https://github.com/diffplug/selfie/issues/302) to do exactly that.
+The first thing to notice is that we'll be doing a lot of `requests.get().body().text`. It would be nice if we could just do `expect_selfie(get("/"))`, but we'll have to write our own `expect_selfie(requests.models.Response)` method. Selfie gives us [`expect_selfie(T, Camera&lt;T&gt;)`](https://github.com/diffplug/selfie/issues/302) and [`Camera`](https://github.com/diffplug/selfie/issues/302) to do exactly that.
 
 **TODO: [Not implemented](https://github.com/diffplug/selfie/issues/302)**
 
@@ -71,7 +69,7 @@ class Selfie :
             return self
 ```
 
-We can write our `expectSelfie(Response)` anywhere, but we recommend putting it into a class named `SelfieSettings` in the package `selfie`, but you can use any name and put these methods anywhere. We recommend `expectSelfie` because it's a good hint that the string constants are self-updating.
+We can write our `expect_selfie(Response)` anywhere, but we recommend putting it into a class named `SelfieSettings` in the package `selfie`, but you can use any name and put these methods anywhere. We recommend `expect_selfie` because it's a good hint that the string constants are self-updating.
 
 **TODO: [Not implemented](https://github.com/diffplug/selfie/issues/302)**
 
@@ -113,7 +111,7 @@ And now our snapshot has `statusLine` at the bottom, which we can use in both li
 
 ```python
 def test_homepage():
-  expectSelfie(get("/")).toBe("""
+  expect_selfie(get("/")).toBe("""
 <html><body>
 \u0020 <h1>Please login</h1>
 \u0020 <form action="/login" method="post">
@@ -284,8 +282,6 @@ login=user@domain.com|JclThw==;Path=/""")
 
 status code: 401""")
 ```
-
-**TODO: Toy project not [yet](https://github.com/diffplug/selfie/issues/322) implemented**
 
 We just wrote a high-level specification of a realistic login flow, and it only took 25 lines of java code — most of which were generated for us, and could be regenerated on a whim if we want to change our copywriting. The [corresponding disk snapshot](https://github.com/diffplug/selfie/issues/322) gives us an exhaustive specification and description of the server's behavior.
 
