@@ -52,6 +52,8 @@ class CacheSelfie(Generic[T]):
         return self._to_be_impl(expected)
 
     def _to_be_impl(self, snapshot: Optional[str]) -> T:
+        from .Selfie import get_system
+
         call = recordCall(False)
         system = get_system()
         writable = system.mode.can_write(snapshot is None, call, system)
