@@ -31,25 +31,24 @@ from selfie_lib import (
 import pytest
 
 
-class FSImplementation:
-    def assertFailed(self, message, expected=None, actual=None):
+class FSImplementation(FS):
+    def assert_failed(self, message, expected=None, actual=None) -> Exception:
         if expected is None and actual is None:
-            raise AssertionError(message)
-        else:
-            expected_str = self._nullable_to_string(expected, "(null)")
-            actual_str = self._nullable_to_string(actual, "(null)")
-            if not expected_str and not actual_str and (expected is None or actual is None):
-                raise AssertionError(f"AssertionError: {message} - Expected: {expected_str}, Actual: {actual_str}")
-            else:
-                self._comparison_assertion(message, expected_str, actual_str)
+            return AssertionError(message)
+
+        expected_str = self._nullable_to_string(expected, "(null)")
+        actual_str = self._nullable_to_string(actual, "(null)")
+
+        if not expected_str and not actual_str and (expected is None or actual is None):
+            return self._comparison_assertion(message, "(null)", "(null)")
+        return self._comparison_assertion(message, expected_str, actual_str)
 
     def _nullable_to_string(self, value, on_null):
         return str(value) if value is not None else on_null
 
-    def _comparison_assertion(self, message, expected, actual):
+    def _comparison_assertion(self, message, expected, actual) -> Exception:
         error_message = f"{message} - Expected: {expected}, Actual: {actual}"
-        raise AssertionError(error_message)
-
+        return AssertionError(error_message)
 
 
 class PytestSnapshotFileLayout(SnapshotFileLayout):
