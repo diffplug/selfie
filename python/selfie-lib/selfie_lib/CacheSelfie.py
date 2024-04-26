@@ -1,9 +1,8 @@
 from typing import Generic, TypeVar, Optional, Any
 import threading
-from WriteTracker import recordCall
-from Snapshot import Snapshot
-from Literals import LiteralValue, LiteralString, TodoStub
-from Selfie import get_system
+from .WriteTracker import recordCall
+from .Snapshot import Snapshot
+from .Literals import LiteralValue, LiteralString, TodoStub
 
 T = TypeVar("T")
 
@@ -21,6 +20,8 @@ class CacheSelfie(Generic[T]):
         return self._to_match_disk_impl(sub, True)
 
     def _to_match_disk_impl(self, sub: str, is_todo: bool) -> T:
+        from .Selfie import get_system
+
         call = recordCall(False)
         system = get_system()
         if system.mode.can_write(is_todo, call, system):
