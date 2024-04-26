@@ -36,8 +36,7 @@ def expect_selfie(actual: Union[str, int, bool]):
 def cache_selfie_string(to_cache: Cacheable[str]) -> CacheSelfie[str]:
     """Create a CacheSelfie instance for caching strings with identity transformation."""
     identity_roundtrip = Roundtrip.identity()
-    deferred_disk_storage = get_system().disk_thread_local()
-    return CacheSelfie(deferred_disk_storage, identity_roundtrip, to_cache)
+    return cache_selfie_generic(identity_roundtrip, to_cache)
 
 
 def cache_selfie_generic(
