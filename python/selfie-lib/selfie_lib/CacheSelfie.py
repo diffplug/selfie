@@ -5,15 +5,14 @@ from .Snapshot import Snapshot
 from .Literals import LiteralValue, LiteralString, TodoStub
 from .SnapshotSystem import DiskStorage
 from .RoundTrip import Roundtrip
-from .Selfie import Cacheable
 
 T = TypeVar("T")
 
 
 class CacheSelfie(Generic[T]):
-    def __init__(
-        self, disk: DiskStorage, roundtrip: Roundtrip[T, str], generator: Cacheable[T]
-    ):
+    def __init__(self, disk: DiskStorage, roundtrip: Roundtrip[T, str], generator):
+        from .Selfie import Cacheable
+
         self.disk: DiskStorage = disk
         self.roundtrip: Roundtrip[T, str] = roundtrip
         self.generator: Cacheable[T] = generator
