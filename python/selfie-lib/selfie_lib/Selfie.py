@@ -11,7 +11,7 @@ T = TypeVar("T", covariant=True)
 
 # Define Cacheable as a generic protocol
 class Cacheable(Protocol[T]):
-    def get(self) -> T:
+    def __call__(self) -> T:
         """Method to get the cached object."""
         raise NotImplementedError
 

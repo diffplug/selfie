@@ -15,7 +15,7 @@ class Roundtrip(Generic[T, SerializedForm]):
         raise NotImplementedError
 
     @classmethod
-    def identity(cls):
+    def identity(cls) -> "Roundtrip[T, T]":
         """Return an identity Roundtrip that does no transformation."""
 
         class Identity(Roundtrip[Any, Any]):
