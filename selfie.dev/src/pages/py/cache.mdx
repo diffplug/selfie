@@ -27,7 +27,7 @@ expect_selfie(customer.firstName).to_be("Fred")
 To use `cache_selfie`, you pass a **\*function** that **returns a value\*** to snapshot.
 
 ```python
-cache_selfie(() -> customer.firstName).to_be("Fred")
+cache_selfie(lambda: customer.firstName).to_be("Fred")
 ```
 
 When selfie is in read mode, it can ignore the function and just return the value within the `to_be` call. When selfie is in write mode, it calls the function and sets the snapshot to that result.
@@ -41,7 +41,7 @@ In the examples above, we aren't doing anything with the return value, which is 
 The hazard is that the cached result _is not testing the function call anymore_. It is just a convenient way to generate sample data for testing _other_ parts of the system.
 
 ```python
-var brittleAssumption = cache_selfie(() -> expensiveOperation()).to_be("sand")
+var brittleAssumption = cache_selfie(lambda: expensiveOperation()).to_be("sand")
 buildStuffOn(brittleAssumption)
 ```
 
@@ -54,11 +54,11 @@ If you have a test with multiple `cache_selfie` calls, avoid using `_TODO`. You 
 You have these choices for specifying the data in a snapshot:
 
 ```python
-cache_selfie(() -> "string").to_be("string")
-cache_selfie(() -> "string").to_match_disk()
-cache_selfie_binary(() -> bytearray[3]).to_be_base64("AAAA")
-cache_selfie_binary(() -> bytearray[3]).to_be_file("pkg/someFile.ext")
-cache_selfie_binary(() -> bytearray[3]).to_match_disk()
+cache_selfie(lambda: "string").to_be("string")
+cache_selfie(lambda:"string").to_match_disk()
+cache_selfie_binary(lambda: bytearray[3]).to_be_base64("AAAA")
+cache_selfie_binary(lambda: bytearray[3]).to_be_file("pkg/someFile.ext")
+cache_selfie_binary(lambda: bytearray[3]).to_match_disk()
 ```
 
 The `to_match_disk` method is nice because Selfie will garbage-collect the snapshot if it isn't being used, you can "set it and forget it". `to_be` is nice to read inline with the code, and `to_be_file` is nice because you can open the result in external programs.

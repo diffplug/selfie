@@ -62,8 +62,9 @@ def test_order_flow():
 This will generate a snapshot file like so:
 
 ```html
-╔═ gzipFavicon ═╗ base64 length 12 bytes Umlja1JvbGwuanBn ╔═ orderFlow/initial
-═╗
+╔═ gzipFavicon ═╗ base64 length 12 bytes 
+Umlja1JvbGwuanBn
+╔═ orderFlow/initial ═╗
 <html>
   <body>
     <button>Submit order</button>
@@ -122,7 +123,7 @@ Selfie's faceting is built around [Camera](https://kdoc.selfie.dev/selfie-lib/co
 ```python
 class Snapshot:
   subject: SnapshotValue
-  facets: Dict[str, SnapshotValue]
+  facets: frozendict[str, SnapshotValue]
 
 class Lens(ABC) :
   def transform(self, snapshot: Snapshot) -> Snapshot:
