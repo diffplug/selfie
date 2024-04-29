@@ -240,8 +240,9 @@ class InlineWriteTracker(WriteTracker[CallLocation, LiteralValue]):
         layout.fs.file_write(current_file, content.as_string)
 
 
-class ToBeFileWriteTracker:
+class ToBeFileWriteTracker(WriteTracker[str, bytes]):
     def __init__(self):
+        super().__init__()
         self.files_written = {}
 
     def writeToDisk(self, key, snapshot, call, layout):
