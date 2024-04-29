@@ -137,6 +137,17 @@ class PytestSnapshotSystem(SnapshotSystem):
             AtomicReference(ArraySet.empty())
         )
 
+    def to_be_file(self, path: str, data: bytes, call_stack: CallStack) -> None:
+        testfile = TypedPath.of_file(os.path.abspath(path))
+        layout = self.layout
+        try:
+            # Writing data to the file
+            layout.fs.file_write_binary(testfile, data)
+            # Marking the path as written to avoid duplicates
+            self.mark_path_as_written(testfile)
+        except Exception as e:
+            raise Exception(f"Failed to write to {path}: {str(e)}")
+
     def planning_to_run(self, testfile: TypedPath, testname: str):
         progress = self.__progress_per_file[testfile]
         progress.finishes_expected += 1
