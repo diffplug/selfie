@@ -3,4 +3,4 @@ import random
 
 
 def test_cache_selfie():
-    cache_selfie_string(lambda: str(random.random())).to_be_todo()
+    cache_selfie_string(lambda: str(random.random())).to_be("0.6623096709843852")
