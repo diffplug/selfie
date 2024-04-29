@@ -240,35 +240,22 @@ class InlineWriteTracker(WriteTracker[CallLocation, LiteralValue]):
         layout.fs.file_write(current_file, content.as_string)
 
 
-class ToBeFileWriteTracker(WriteTracker[str, bytes]):
-    def __init__(self):
-        super().__init__()
-        self.files_written = {}
-
-    def writeToDisk(self, key, snapshot, call, layout):
-        if key in self.files_written:
-            raise Exception("Duplicate write detected for: " + str(key))
-        lazyBytes = ToBeFileLazyBytes(key, layout, snapshot)
-        lazyBytes.writeToDisk()
-        self.files_written[key] = lazyBytes
-
-
 class ToBeFileLazyBytes:
-    def __init__(self, location, layout, data):
+    def __init__(self, location: TypedPath, layout: SnapshotFileLayout, data: bytes):
         self.location = location
         self.layout = layout
         self.data = data
 
-    def writeToDisk(self):
+    def writeToDisk(self) -> None:
         if self.data is None:
             raise Exception("Data has already been written to disk")
-        self.layout.fs.fileWriteBinary(self.location, self.data)
+        self.layout.fs.file_write_binary(self.location, self.data)
         self.data = None  # Allow garbage collection
 
     def readData(self):
         if self.data is not None:
             return self.data
-        return self.layout.fs.fileReadBinary(self.location)
+        return self.layout.fs.file_read_binary(self.location)
 
     def __eq__(self, other):
         if not isinstance(other, ToBeFileLazyBytes):
@@ -277,3 +264,23 @@ class ToBeFileLazyBytes:
 
     def __hash__(self):
         return hash(self.readData())
+
+
+class ToBeFileWriteTracker(WriteTracker[TypedPath, ToBeFileLazyBytes]):
+    def __init__(self):
+        super().__init__()
+        self.files_written = {}
+
+    def writeToDisk(
+        self,
+        key: TypedPath,
+        snapshot: bytes,
+        call: CallStack,
+        layout: SnapshotFileLayout,
+    ) -> None:
+        if key in self.files_written:
+            raise Exception("Duplicate write detected for: " + str(key))
+        lazyBytes = ToBeFileLazyBytes(key, layout, snapshot)
+        self.recordInternal(key, lazyBytes, call, layout)
+        lazyBytes.writeToDisk()
+        self.files_written[key] = lazyBytes
