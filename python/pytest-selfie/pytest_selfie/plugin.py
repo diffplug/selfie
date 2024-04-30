@@ -36,12 +36,12 @@ class FSImplementation(FS):
         if expected is None and actual is None:
             return AssertionError(message)
 
-        expected_str = self._nullable_to_string(expected, "(null)")
-        actual_str = self._nullable_to_string(actual, "(null)")
+        on_null = "(null)"
+        expected_str = self._nullable_to_string(expected, on_null)
+        actual_str = self._nullable_to_string(actual, on_null)
 
-        if not expected_str and not actual_str and (expected is None or actual is None):
-            return self._comparison_assertion(message, "(null)", "(null)")
-        return self._comparison_assertion(message, expected_str, actual_str)
+        assert expected_str == actual_str, self._format_message(message, expected_str, actual_str)
+
 
     def _nullable_to_string(self, value, on_null):
         return str(value) if value is not None else on_null
