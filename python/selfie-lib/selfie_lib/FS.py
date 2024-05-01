@@ -32,6 +32,21 @@ class FS(ABC):
     def file_write_binary(self, typed_path: TypedPath, content: bytes):
         Path(typed_path.absolute_path).write_bytes(content)
 
-    @abstractmethod
-    def assert_failed(self, message: str, expected=None, actual=None) -> Exception:
-        pass
+    def assert_failed(self, message, expected=None, actual=None) -> Exception:
+        if expected is None and actual is None:
+            return AssertionError(message)
+
+        on_null = ""
+        expected_str = self.__nullable_to_string(expected, on_null)
+        actual_str = self.__nullable_to_string(actual, on_null)
+
+        if expected_str != actual_str:
+            return self.__comparison_assertion(message, expected_str, actual_str)
+        return AssertionError(message)
+
+    def __nullable_to_string(self, value, on_null):
+        return str(value) if value is not None else on_null
+
+    def __comparison_assertion(self, message, expected, actual) -> Exception:
+        error_message = f"{message} - Expected: {expected}, Actual: {actual}"
+        return AssertionError(error_message)
