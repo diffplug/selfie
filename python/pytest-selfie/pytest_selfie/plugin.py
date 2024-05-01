@@ -1,8 +1,7 @@
 from cgi import test
 import os
 from collections import defaultdict
-import re
-from typing import ByteString, DefaultDict, List, Optional, Iterator, Tuple
+from typing import ByteString, DefaultDict, List, Optional, Iterator
 
 from selfie_lib.Atomic import AtomicReference
 from .SelfieSettingsAPI import SelfieSettingsAPI
@@ -32,8 +31,33 @@ import pytest
 
 
 class FSImplementation(FS):
-    def assert_failed(self, message: str, expected=None, actual=None) -> Exception:
-        raise Exception(message)
+    def assert_failed(self, message, expected=None, actual=None) -> Exception:
+        if expected is None and actual is None:
+            return AssertionError(message)
+
+        expected_str = self.__nullable_to_string(expected, "")
+        actual_str = self.__nullable_to_string(actual, "")
+
+        if not expected_str and not actual_str and (expected is None or actual is None):
+            on_null = "(null)"
+            return self.__comparison_assertion(
+                message,
+                self.__nullable_to_string(expected, on_null),
+                self.__nullable_to_string(actual, on_null),
+            )
+        else:
+            return self.__comparison_assertion(message, expected_str, actual_str)
+
+    def __nullable_to_string(self, value, on_null: str) -> str:
+        return str(value) if value is not None else on_null
+
+    def __comparison_assertion(
+        self, message: str, expected: str, actual: str
+    ) -> Exception:
+        # this *should* through an exception that a good pytest runner will show nicely
+        assert expected == actual, message
+        # but in case it doesn't, we'll create our own here
+        return AssertionError(message)
 
 
 class PytestSnapshotFileLayout(SnapshotFileLayout):
