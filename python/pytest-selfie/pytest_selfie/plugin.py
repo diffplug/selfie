@@ -247,26 +247,27 @@ class DiskStoragePytest(DiskStorage):
         self.__progress = progress
         self._testname = testname
 
-    def read_disk(self, sub: str, call: 'CallStack') -> Optional['Snapshot']:
+    def read_disk(self, sub: str, call: "CallStack") -> Optional["Snapshot"]:
         return self.__progress.read(self._testname, self._suffix(sub))
 
-    def write_disk(self, actual: 'Snapshot', sub: str, call: 'CallStack'):
-        self.__progress.write(self._testname, self._suffix(sub), actual, call, self.__progress.system.layout)
+    def write_disk(self, actual: "Snapshot", sub: str, call: "CallStack"):
+        self.__progress.write(
+            self._testname,
+            self._suffix(sub),
+            actual,
+            call,
+            self.__progress.system.layout,
+        )
 
     def keep(self, sub_or_keep_all: Optional[str]):
-        self.__progress.keep(self._testname, self._suffix(sub_or_keep_all) if sub_or_keep_all else None)
+        self.__progress.keep(
+            self._testname, self._suffix(sub_or_keep_all) if sub_or_keep_all else None
+        )
 
     def _suffix(self, sub: str) -> str:
         return f"/{sub}" if sub else ""
 
-    def __eq__(self, other: 'DiskStoragePytest') -> bool:
-        if not isinstance(other, DiskStoragePytest):
-            return NotImplemented
-        return (self.__progress, self._testname) == (other.__progress, other._testname)
 
-    def __str__(self) -> str:
-        return f"{self.__progress.class_or_filename}#{self._testname}"
-    
 class SnapshotFileProgress:
     TERMINATED = ArrayMap.empty().plus(" ~ / f!n1shed / ~ ", WithinTestGC())
 
