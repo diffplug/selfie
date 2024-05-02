@@ -266,8 +266,8 @@ class LiteralBoolean(LiteralFormat[bool]):
 
 
 class TodoStub(Enum):
-    toMatchDisk = auto()
-    toBeFile = auto()
+    to_match_disk = auto()
+    to_be_file = auto()
 
     def create_literal(self):
         return LiteralValue(None, self, LiteralTodoStub())

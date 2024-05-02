@@ -1,6 +1,6 @@
 import base64
 from threading import Lock
-from typing import Tuple, List, Optional, Dict
+from typing import Tuple, List, Optional
 
 from .Snapshot import Snapshot, SnapshotValue
 from .SnapshotReader import SnapshotReader
@@ -67,14 +67,14 @@ class SnapshotFile:
 
     def set_at_test_time(self, key: str, snapshot: Snapshot) -> None:
         with self._lock:
-            self._snapshots = self._snapshots.plus(key, snapshot)
+            self.snapshots = self.snapshots.plus_or_noop_or_replace(key, snapshot)
             self.was_set_at_test_time = True
 
     def remove_all_indices(self, indices: List[int]) -> None:
         with self._lock:
             if not indices:
                 return
-            self._snapshots = self._snapshots.minus_sorted_indices(indices)
+            self.snapshots = self.snapshots.minus_sorted_indices(indices)
             self.was_set_at_test_time = True
 
     @classmethod
