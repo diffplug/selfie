@@ -81,7 +81,7 @@ class LiteralString(LiteralFormat[str]):
         self, value: str, language: Language, encoding_policy: EscapeLeadingWhitespace
     ) -> str:
         if language == Language.PYTHON:
-            if "/n" not in value:
+            if "\n" not in value:
                 return self._encodeSinglePython(value)
             else:
                 return self.encodeMultiPython(value, encoding_policy)
@@ -134,14 +134,14 @@ class LiteralString(LiteralFormat[str]):
         source = source_with_quotes[1:-1]
         to_unescape = self.inline_backslashes(source)  # changed from inline_dollar
         return self._unescape_python(to_unescape)
-
+            
     def encodeMultiPython(
         self, arg: str, escape_leading_whitespace: EscapeLeadingWhitespace
     ) -> str:
         escape_backslashes = arg.replace("\\", "\\\\")
         escape_triple_quotes = escape_backslashes.replace(TRIPLE_QUOTE, '\\"\\"\\"')
-
-        def protect_trailing_whitespace(line):
+        
+        def protect_trailing_whitespace(line: str) -> str:
             if line.endswith(" "):
                 return line[:-1] + "\\u0020"
             elif line.endswith("\t"):
