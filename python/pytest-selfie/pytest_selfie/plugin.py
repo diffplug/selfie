@@ -1,8 +1,7 @@
 from cgi import test
 import os
 from collections import defaultdict
-import re
-from typing import ByteString, DefaultDict, List, Optional, Iterator, Tuple
+from typing import ByteString, DefaultDict, List, Optional, Iterator
 
 from selfie_lib.Atomic import AtomicReference
 from .SelfieSettingsAPI import SelfieSettingsAPI
