@@ -67,7 +67,7 @@ class SnapshotFile:
 
     def set_at_test_time(self, key: str, snapshot: Snapshot) -> None:
         with self._lock:
-            self.snapshots = self.snapshots.plus(key, snapshot)
+            self.snapshots = self.snapshots.plus_or_noop_or_replace(key, snapshot)
             self.was_set_at_test_time = True
 
     def remove_all_indices(self, indices: List[int]) -> None:
