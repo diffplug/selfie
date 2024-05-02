@@ -337,11 +337,13 @@ class SnapshotFileProgress:
         if tests == SnapshotFileProgress.TERMINATED:
             raise ValueError(f"Snapshot for {self.test_file} already terminated!")
         if self.file is not None:
-            stale_snapshot_indices = WithinTestGC.find_stale_snapshots_within(
-                self.file.snapshots,
-                tests,
-                find_test_methods_that_didnt_run(self.test_file, tests),
-            )
+            # TODO: figure out GC
+            stale_snapshot_indices = []
+            # stale_snapshot_indices = WithinTestGC.find_stale_snapshots_within(
+            #     self.file.snapshots,
+            #     tests,
+            #     find_test_methods_that_didnt_run(self.test_file, tests),
+            # )
             if stale_snapshot_indices or self.file.was_set_at_test_time:
                 self.file.remove_all_indices(stale_snapshot_indices)
                 snapshot_path = self.system._layout.snapshotfile_for_testfile(
