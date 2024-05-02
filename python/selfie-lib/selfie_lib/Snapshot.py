@@ -13,6 +13,10 @@ class Snapshot:
         self._facet_data = facet_data
 
     @property
+    def subject(self) -> SnapshotValue:
+        return self._subject
+
+    @property
     def facets(self) -> ArrayMap[str, SnapshotValue]:
         return self._facet_data
 
