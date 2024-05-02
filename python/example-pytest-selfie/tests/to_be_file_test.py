@@ -5,13 +5,13 @@ from selfie_lib.WriteTracker import (
     TypedPath,
     SnapshotFileLayout,
 )
-from selfie_lib.FS import FS
+from pytest_selfie import FSImplementation
 from pathlib import Path
 import os
 
 
 def test_to_be_file():
-    layout = SnapshotFileLayout(FS())
+    layout = SnapshotFileLayout(FSImplementation())
     tracker = ToBeFileWriteTracker()
 
     # Record the current call stack.
