@@ -78,7 +78,7 @@ class DiskSelfie(FluentFacet):
         call = recordCall(False)
         if _selfieSystem().mode.can_write(True, call, _selfieSystem()):
             self.disk.write_disk(self.actual, sub, call)
-            _selfieSystem().write_inline(TodoStub.toMatchDisk.create_literal(), call)
+            _selfieSystem().write_inline(TodoStub.to_match_disk.create_literal(), call)
             return self
         else:
             raise _selfieSystem().fs.assert_failed(
