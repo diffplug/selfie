@@ -231,3 +231,9 @@ class ArrayMap(Mapping[K, V]):
             new_data.insert(insert_at * 2, key)
             new_data.insert(insert_at * 2 + 1, value)
         return ArrayMap.__create(new_data)
+
+    def __str__(self):
+        return "{" + ", ".join(f"{k}: {v}" for k, v in self.items()) + "}"
+
+    def __repr__(self):
+        return self.__str__()

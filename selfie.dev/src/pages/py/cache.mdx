@@ -18,50 +18,50 @@ export const imageUrl = "https://selfie.dev/cache.webp";
 
 **TODO: We don't currently have an example of cache selfie for python [yet](https://github.com/diffplug/selfie/issues/319)**.
 
-To use `expectSelfie`, you pass a _value_ that you want to snapshot.
+To use `expect_selfie`, you pass a _value_ that you want to snapshot.
 
 ```python
-expectSelfie(customer.firstName).toBe("Fred")
+expect_selfie(customer.firstName).to_be("Fred")
 ```
 
-To use `cacheSelfie`, you pass a **\*function** that **returns a value\*** to snapshot.
+To use `cache_selfie`, you pass a **\*function** that **returns a value\*** to snapshot.
 
 ```python
-cacheSelfie(() -> customer.firstName).toBe("Fred")
+cache_selfie(lambda: customer.firstName).to_be("Fred")
 ```
 
-When selfie is in read mode, it can ignore the function and just return the value within the `toBe` call. When selfie is in write mode, it calls the function and sets the snapshot to that result.
+When selfie is in read mode, it can ignore the function and just return the value within the `to_be` call. When selfie is in write mode, it calls the function and sets the snapshot to that result.
 
 You control whether a given value is being read or written using the `_TODO`, `//selfieonce`, `//SELFIEWRITE` mechanism described in the [quickstart](./get-started#quickstart).
 
 ## Benefits and hazards
 
-In the examples above, we aren't doing anything with the return value, which is usually a mistake. The benefit of `cacheSelfie` is that we can take an expensive non-deterministic operation, and build a cheap deterministic test on top of the cached value.
+In the examples above, we aren't doing anything with the return value, which is usually a mistake. The benefit of `cache_selfie` is that we can take an expensive non-deterministic operation, and build a cheap deterministic test on top of the cached value.
 
 The hazard is that the cached result _is not testing the function call anymore_. It is just a convenient way to generate sample data for testing _other_ parts of the system.
 
 ```python
-var brittleAssumption = cacheSelfie(() -> expensiveOperation()).toBe("sand")
+var brittleAssumption = cache_selfie(lambda: expensiveOperation()).to_be("sand")
 buildStuffOn(brittleAssumption)
 ```
 
-Perhaps the `toBe` snapshot was recorded a year ago, and the `expensiveOperation` has changed since then. Perhaps someone manually edited the recorded snapshot, and `expensiveOperation` has never returned a value anything like the snapshot. **_The function being cached is not being tested._**
+Perhaps the `to_be` snapshot was recorded a year ago, and the `expensiveOperation` has changed since then. Perhaps someone manually edited the recorded snapshot, and `expensiveOperation` has never returned a value anything like the snapshot. **_The function being cached is not being tested._**
 
-If you have a test with multiple `cacheSelfie` calls, avoid using `_TODO`. You can have a situation where you recorded the ending of a test, and then later changed the beginning with `_TODO`. The ending won't update itself automatically, so you might cache an inconsistent state. You can avoid this problem by only using `//selfieonce` and `//SELFIEWRITE`.
+If you have a test with multiple `cache_selfie` calls, avoid using `_TODO`. You can have a situation where you recorded the ending of a test, and then later changed the beginning with `_TODO`. The ending won't update itself automatically, so you might cache an inconsistent state. You can avoid this problem by only using `//selfieonce` and `//SELFIEWRITE`.
 
 ## Strings and binary
 
 You have these choices for specifying the data in a snapshot:
 
 ```python
-cacheSelfie(() -> "string").toBe("string")
-cacheSelfie(() -> "string").toMatchDisk()
-cacheSelfieBinary(() -> bytearray[3]).toBeBase64("AAAA")
-cacheSelfieBinary(() -> bytearray[3]).toBeFile("pkg/someFile.ext")
-cacheSelfieBinary(() -> bytearray[3]).toMatchDisk()
+cache_selfie(lambda: "string").to_be("string")
+cache_selfie(lambda:"string").to_match_disk()
+cache_selfie_binary(lambda: bytearray[3]).to_be_base64("AAAA")
+cache_selfie_binary(lambda: bytearray[3]).to_be_file("pkg/someFile.ext")
+cache_selfie_binary(lambda: bytearray[3]).to_match_disk()
 ```
 
-The `toMatchDisk` method is nice because Selfie will garbage-collect the snapshot if it isn't being used, you can "set it and forget it". `toBe` is nice to read inline with the code, and `toBeFile` is nice because you can open the result in external programs.
+The `to_match_disk` method is nice because Selfie will garbage-collect the snapshot if it isn't being used, you can "set it and forget it". `to_be` is nice to read inline with the code, and `to_be_file` is nice because you can open the result in external programs.
 
 ## Roundtripping typed data
 
@@ -74,15 +74,15 @@ interface Roundtrip<T, SerializedForm> {
   SerializedForm serialize(T value)
   T parse(serialized: SerializedForm)
 }
-T cacheSelfie<T>(Roundtrip<T, String> roundtrip, () -> someT())
-T cacheSelfieBinary<T>(Roundtrip<T, byte[]> roundtrip, () -> someT())
+T cache_selfie<T>(Roundtrip<T, String> roundtrip, () -> someT())
+T cache_selfie_binary<T>(Roundtrip<T, byte[]> roundtrip, () -> someT())
 ```
 
 But you don't have to implement `Roundtrip` yourself.
 
 **TODO: Change once correct example is made**
 
-If you're using the `@kotlinx.serialization.Serializable` framework (where you annotate model classes with `@Serializable`), then you can use `cacheSelfieJson(() -> T)` and selfie will use Kotlin's built-in json serialization to implement the roundtrip.
+If you're using the `@kotlinx.serialization.Serializable` framework (where you annotate model classes with `@Serializable`), then you can use `cache_selfie_json(() -> T)` and selfie will use Kotlin's built-in json serialization to implement the roundtrip.
 
 If you're using Java's `java.io.Serializable` (where model classes must implement `Serializable`) then you can use `cacheSelfieBinarySerializable(() -> T)` and selfie will use Java's built-in binary serialization mechanism to implement the roundtrip.
 
@@ -101,7 +101,7 @@ val chatCompletionRequest = ChatCompletionRequest(
   model = ModelId("gpt-4-turbo-preview"),
   messages = listOf(ChatMessage(role = ChatRole.User,
     content = "Expressive language describing a robot creating a self portrait.")))
-val chat = cacheSelfieJson { openAI().chatCompletion(chatCompletionRequest) }.toBe("""{
+val chat = cache_selfie_json { openAI().chatCompletion(chatCompletionRequest) }.to_be("""{
   "id": "chatcmpl-8sOV0z7DDfvVdj1jaru6Cv2Geq3Dj",
   "created": 1707974578,
   "model": "gpt-4-0125-preview",
@@ -122,22 +122,22 @@ val chat = cacheSelfieJson { openAI().chatCompletion(chatCompletionRequest) }.to
   },
   "system_fingerprint": "fp_f084bcfc79"
 }""")
-val images = cacheSelfieJson {
+val images = cache_selfie_json {
   openAI().imageURL(ImageCreation(
     prompt = chat.choices[0].message.content!!,
-    model = ModelId("dall-e-3"))) }.toBe("""[
+    model = ModelId("dall-e-3"))) }.to_be("""[
   {
     "url": "https://oaidalleapiprodscus.blob.core.windows.net/private/org-SUepmbCtftBix3RViJYKuYKY/user-KFRqcsnjZPSTulNaxrY5wjL3/img-sK3P5fuisDfpdelbFwiR0wtP.png?st=2024-02-15T04%3A23%3A32Z&se=2024-02-15T06%3A23%3A32Z&sp=r&sv=2021-08-06&sr=b&rscd=inline&rsct=image/png&skoid=6aaadede-4fb3-4698-a8f6-684d7786b067&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2024-02-15T02%3A25%3A24Z&ske=2024-02-16T02%3A25%3A24Z&sks=b&skv=2021-08-06&sig=Q0CfpGchXx9NoSEtsk3TT0TuX2Rb8QTk8HiR57I1kUU%3D",
     "revised_prompt": "In a technologically advanced studio bathed in the stark light of fluorescent lamps, observe an intricate robot, built from a complex lattice of servos and sensors. This robot is on a unique quest - to paint its own portrait. Its arm, a masterpiece of precise engineering, hovers gracefully over the canvas, ready to begin its creation. As the robot paints, it doesn't simply replicate its physical form, but the end result is a multi-colored mosaic of self-reflection that embodies its digital soul on canvas. Remarkably, the portrait is a deep exploration of its quest for identity. Marvel at how this machine interprets its programming to venture into the realm of artistic expression, challenging what it means to be creative and alive."
   }
 ]""")
-cacheSelfieBinary { HttpClient().request(images[0].url).readBytes() }
-  .toBeFile("com/example/kotest/dalle-3.png")
+cache_selfie_binary { HttpClient().request(images[0].url).readBytes() }
+  .to_be_file("com/example/kotest/dalle-3.png")
 ```
 
 **TODO: Update once example is done**
 
-Since we used `toBeFile`, we can open `com/example/kotest/dalle-3.png` in Mac Preview / Windows Explorer.
+Since we used `to_be_file`, we can open `com/example/kotest/dalle-3.png` in Mac Preview / Windows Explorer.
 
 <img alt="Robot self portrait" src="/dalle-3.webp" width="400px" />
 

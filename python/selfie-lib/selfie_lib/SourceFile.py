@@ -111,19 +111,16 @@ class SourceFile:
         idx = line_content.indexOf(to_find)
         if idx == -1:
             raise AssertionError(
-                f"Expected to find `{to_find}` on line {line_one_indexed}, "
-                f"but there was only `{line_content}`"
+                f"Expected to find `{to_find}` on line {line_one_indexed}, but there was only `{line_content}`"
             )
-        start_index = idx
-        end_index = idx + len(to_find)
-        return line_content.subSequence(start_index, end_index)
+        return line_content.subSequence(idx, idx + len(to_find))
 
     def replace_on_line(self, line_one_indexed: int, find: str, replace: str) -> None:
         assert "\n" not in find
         assert "\n" not in replace
-        line_content = self._content_slice.unixLine(line_one_indexed).__str__()
-        new_content = line_content.replace(find, replace)
-        self._content_slice = Slice(self._content_slice.replaceSelfWith(new_content))
+
+        slice = self.find_on_line(find, line_one_indexed)
+        self._content_slice = Slice(slice.replaceSelfWith(replace))
 
     def parse_to_be_like(self, line_one_indexed: int) -> ToBeLiteral:
         line_content = self._content_slice.unixLine(line_one_indexed)

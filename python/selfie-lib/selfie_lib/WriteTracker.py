@@ -7,7 +7,7 @@ import os
 from functools import total_ordering
 
 from .SourceFile import SourceFile
-from .Literals import LiteralValue, LiteralTodoStub
+from .Literals import LiteralValue, LiteralTodoStub, TodoStub
 from .TypedPath import TypedPath
 from .FS import FS
 
@@ -227,7 +227,8 @@ class InlineWriteTracker(WriteTracker[CallLocation, LiteralValue]):
             # Calculate the line number taking into account changes that shifted line numbers
             line = write.call_stack.location.line + delta_line_numbers
             if isinstance(write.snapshot.format, LiteralTodoStub):
-                content.replace_on_line(line, ".${kind.name}_TODO(", ".${kind.name}(")
+                kind: TodoStub = write.snapshot.actual  # type: ignore
+                content.replace_on_line(line, f".{kind.name}_TODO(", f".{kind.name}(")
             else:
                 to_be_literal = content.parse_to_be_like(line)
                 # Attempt to set the literal value and adjust for line shifts due to content changes

@@ -134,7 +134,7 @@ class Mode(Enum):
             return (
                 f"{headline}\n"
                 "- update this snapshot by adding '_TODO' to the function name\n"
-                "- update all snapshots in this file by adding '//selfieonce' or '//SELFIEWRITE'"
+                "- update all snapshots in this file by adding '# selfieonce' or '# SELFIEWRITE'"
             )
         elif self == Mode.readonly:
             return headline
