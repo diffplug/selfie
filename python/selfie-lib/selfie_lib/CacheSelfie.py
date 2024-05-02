@@ -1,5 +1,4 @@
 from typing import Generic, TypeVar, Optional, Any
-import threading
 from .WriteTracker import recordCall
 from .Snapshot import Snapshot
 from .Literals import LiteralValue, LiteralString, TodoStub
@@ -34,7 +33,7 @@ class CacheSelfie(Generic[T]):
                 Snapshot.of(self.roundtrip.serialize(actual)), sub, call
             )
             if is_todo:
-                system.write_inline(TodoStub.toMatchDisk.create_literal(), call)
+                system.write_inline(TodoStub.to_match_disk.create_literal(), call)
             return actual
         else:
             if is_todo:
