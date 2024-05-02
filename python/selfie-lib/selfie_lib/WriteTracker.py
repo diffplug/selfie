@@ -228,7 +228,7 @@ class InlineWriteTracker(WriteTracker[CallLocation, LiteralValue]):
             line = write.call_stack.location.line + delta_line_numbers
             if isinstance(write.snapshot.format, LiteralTodoStub):
                 kind: TodoStub = write.snapshot.actual  # type: ignore
-                content.replace_on_line(line, f".${kind.name}_TODO(", ".${kind.name}(")
+                content.replace_on_line(line, f".{kind.name}_TODO(", f".{kind.name}(")
             else:
                 to_be_literal = content.parse_to_be_like(line)
                 # Attempt to set the literal value and adjust for line shifts due to content changes
