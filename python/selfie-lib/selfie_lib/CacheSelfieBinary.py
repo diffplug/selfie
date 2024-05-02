@@ -33,7 +33,7 @@ class CacheSelfieBinary(Generic[T]):
             self.disk.write_disk(Snapshot.of(serialized_data), sub, call)
 
             if is_todo:
-                system.write_inline(TodoStub.toMatchDisk.create_literal(), call)
+                system.write_inline(TodoStub.to_match_disk.create_literal(), call)
 
             return actual
         else:
@@ -69,7 +69,7 @@ class CacheSelfieBinary(Generic[T]):
             actual = self.generator()
 
             if is_todo:
-                system.write_inline(TodoStub.toBeFile.create_literal(), call)
+                system.write_inline(TodoStub.to_be_file.create_literal(), call)
 
             with open(subpath, "wb") as file:
                 file.write(self.roundtrip.serialize(actual))
