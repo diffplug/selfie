@@ -269,7 +269,6 @@ class ToBeFileLazyBytes:
 class ToBeFileWriteTracker(WriteTracker[TypedPath, ToBeFileLazyBytes]):
     def __init__(self):
         super().__init__()
-        self.files_written = {}
 
     def writeToDisk(
         self,
@@ -278,9 +277,6 @@ class ToBeFileWriteTracker(WriteTracker[TypedPath, ToBeFileLazyBytes]):
         call: CallStack,
         layout: SnapshotFileLayout,
     ) -> None:
-        if key in self.files_written:
-            raise Exception("Duplicate write detected for: " + str(key))
         lazyBytes = ToBeFileLazyBytes(key, layout, snapshot)
         self.recordInternal(key, lazyBytes, call, layout)
         lazyBytes.writeToDisk()
-        self.files_written[key] = lazyBytes
