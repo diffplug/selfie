@@ -224,13 +224,8 @@ class PytestSnapshotSystem(SnapshotSystem):
     def write_to_be_file(
         self, path: TypedPath, data: "ByteString", call: CallStack
     ) -> None:
-        try:
-            # Using ToBeFileWriteTracker to manage file writes
-            self.__toBeFileWriteTracker.writeToDisk(path, data, call, self._layout)
-            # Mark the path as written to avoid duplicates
-            self.mark_path_as_written(path)
-        except Exception as e:
-            raise Exception(f"Failed to write to {path}: {str(e)}")
+        # Directly write to disk using ToBeFileWriteTracker
+        self.__toBeFileWriteTracker.writeToDisk(path, data, call, self._layout)
 
 
 class DiskStoragePytest(DiskStorage):
