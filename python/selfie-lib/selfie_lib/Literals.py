@@ -81,7 +81,7 @@ class LiteralString(LiteralFormat[str]):
         self, value: str, language: Language, encoding_policy: EscapeLeadingWhitespace
     ) -> str:
         if language == Language.PYTHON:
-            if "/n" not in value:
+            if "\n" not in value:
                 return self._encodeSinglePython(value)
             else:
                 return self.encodeMultiPython(value, encoding_policy)
@@ -141,7 +141,7 @@ class LiteralString(LiteralFormat[str]):
         escape_backslashes = arg.replace("\\", "\\\\")
         escape_triple_quotes = escape_backslashes.replace(TRIPLE_QUOTE, '\\"\\"\\"')
 
-        def protect_trailing_whitespace(line):
+        def protect_trailing_whitespace(line: str) -> str:
             if line.endswith(" "):
                 return line[:-1] + "\\u0020"
             elif line.endswith("\t"):
