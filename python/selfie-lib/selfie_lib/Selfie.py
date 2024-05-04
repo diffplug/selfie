@@ -16,10 +16,6 @@ class Cacheable(Protocol[T]):
         raise NotImplementedError
 
 
-def get_system() -> SnapshotSystem:
-    return _selfieSystem()
-
-
 def expect_selfie(actual: Union[str, int, bool]):
     if isinstance(actual, int):
         return IntSelfie(actual)
@@ -43,5 +39,5 @@ def cache_selfie_generic(
     roundtrip: Roundtrip[T, str], to_cache: Cacheable[T]
 ) -> CacheSelfie[T]:
     """Create a CacheSelfie instance for caching generic objects with specified roundtrip."""
-    deferred_disk_storage = get_system().disk_thread_local()
+    deferred_disk_storage = _selfieSystem().disk_thread_local()
     return CacheSelfie(deferred_disk_storage, roundtrip, to_cache)
