@@ -1,5 +1,6 @@
-from selfie_lib.Selfie import cache_selfie_string
 import random
+
+from selfie_lib.Selfie import cache_selfie_string
 
 
 def test_cache_selfie():

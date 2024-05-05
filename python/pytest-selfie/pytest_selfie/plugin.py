@@ -1,21 +1,17 @@
-from cgi import test
 import os
+from cgi import test
 from collections import defaultdict
-from typing import ByteString, DefaultDict, List, Optional, Iterator
+from typing import ByteString, DefaultDict, Iterator, List, Optional
 
-from selfie_lib.Atomic import AtomicReference
-from selfie_lib.WriteTracker import ToBeFileWriteTracker
-from .SelfieSettingsAPI import SelfieSettingsAPI
+import pytest
 from selfie_lib import (
-    _clearSelfieSystem,
-    _initSelfieSystem,
+    FS,
     ArrayMap,
     ArraySet,
     CallStack,
     CommentTracker,
     DiskStorage,
     DiskWriteTracker,
-    FS,
     InlineWriteTracker,
     LiteralValue,
     Mode,
@@ -27,8 +23,13 @@ from selfie_lib import (
     SourceFile,
     TypedPath,
     WithinTestGC,
+    _clearSelfieSystem,
+    _initSelfieSystem,
 )
-import pytest
+from selfie_lib.Atomic import AtomicReference
+from selfie_lib.WriteTracker import ToBeFileWriteTracker
+
+from .SelfieSettingsAPI import SelfieSettingsAPI
 
 
 class FSImplementation(FS):
