@@ -1,10 +1,11 @@
-from typing import Generic, TypeVar, Optional, Any
-from .WriteTracker import recordCall
-from .Snapshot import Snapshot
-from .Literals import LiteralValue, LiteralString, TodoStub
-from .SnapshotSystem import DiskStorage
-from .RoundTrip import Roundtrip
 import base64
+from typing import Any, Generic, Optional, TypeVar
+
+from .Literals import LiteralString, LiteralValue, TodoStub
+from .RoundTrip import Roundtrip
+from .Snapshot import Snapshot
+from .SnapshotSystem import DiskStorage
+from .WriteTracker import recordCall
 
 T = TypeVar("T")
 

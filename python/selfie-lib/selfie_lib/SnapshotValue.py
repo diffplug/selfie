@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Union, Type
+from typing import Union
 
 
 def unix_newlines(string: str) -> str:

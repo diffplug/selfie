@@ -1,5 +1,6 @@
 import pytest
-from selfie_lib import SnapshotValueReader, ParseException
+
+from selfie_lib import ParseException, SnapshotValueReader
 
 
 class TestSnapshotValueReader:

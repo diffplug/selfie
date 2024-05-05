@@ -1,4 +1,5 @@
 import pytest
+
 from selfie_lib.TypedPath import TypedPath
 
 

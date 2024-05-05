@@ -1,13 +1,13 @@
-from selfie_lib.WriteTracker import (
-    ToBeFileWriteTracker,
-    ToBeFileLazyBytes,
-    recordCall,
-    TypedPath,
-    SnapshotFileLayout,
-)
-from pytest_selfie import FSImplementation
-from pathlib import Path
 import os
+from pathlib import Path
+
+from pytest_selfie import FSImplementation
+from selfie_lib.WriteTracker import (
+    SnapshotFileLayout,
+    ToBeFileWriteTracker,
+    TypedPath,
+    recordCall,
+)
 
 
 def test_to_be_file():

@@ -1,16 +1,15 @@
-from pathlib import Path
-from typing import List, Optional, Generic, TypeVar, Dict, cast
-from abc import ABC, abstractmethod
 import inspect
-import threading
 import os
+import threading
+from abc import ABC
 from functools import total_ordering
+from pathlib import Path
+from typing import Dict, Generic, List, Optional, TypeVar, cast
 
-from .SourceFile import SourceFile
-from .Literals import LiteralValue, LiteralTodoStub, TodoStub
-from .TypedPath import TypedPath
 from .FS import FS
-
+from .Literals import LiteralTodoStub, LiteralValue, TodoStub
+from .SourceFile import SourceFile
+from .TypedPath import TypedPath
 
 T = TypeVar("T")
 U = TypeVar("U")

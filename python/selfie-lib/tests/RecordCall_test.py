@@ -1,6 +1,7 @@
-from unittest.mock import Mock
-from selfie_lib.WriteTracker import CallLocation, CallStack, recordCall
 import os
+from unittest.mock import Mock
+
+from selfie_lib.WriteTracker import CallLocation, CallStack, recordCall
 
 
 def test_call_location_ide_link():
@@ -28,7 +29,7 @@ def test_record_call_with_caller_file_only_false():
         len(call_stack.rest_of_stack) > 0
     ), "Expected the rest of stack to contain more than one CallLocation"
 
-    expected_call_location_str = "File: RecordCall_test.py, Line: 25"
+    expected_call_location_str = "File: RecordCall_test.py, Line: 26"
 
     if call_stack.location.file_name is not None:
         actual_file_name = os.path.basename(call_stack.location.file_name)

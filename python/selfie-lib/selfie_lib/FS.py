@@ -1,9 +1,8 @@
-from selfie_lib.TypedPath import TypedPath
-from pathlib import Path
-
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import Callable, Iterator
-from itertools import chain
+
+from selfie_lib.TypedPath import TypedPath
 
 
 class FS(ABC):

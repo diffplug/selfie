@@ -1,4 +1,5 @@
 from typing import Optional
+
 from .Snapshot import Snapshot
 from .SnapshotValueReader import SnapshotValueReader
 

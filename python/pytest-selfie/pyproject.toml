@@ -23,3 +23,6 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.plugins.pytest11]
 pytest_selfie = "pytest_selfie.plugin"
+
+[tool.ruff]
+lint.extend-select = ["I"]

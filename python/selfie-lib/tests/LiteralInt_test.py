@@ -1,5 +1,5 @@
-from selfie_lib.Literals import LiteralInt, Language
 from selfie_lib.EscapeLeadingWhitespace import EscapeLeadingWhitespace
+from selfie_lib.Literals import Language, LiteralInt
 
 
 def _encode(value: int, expected: str):

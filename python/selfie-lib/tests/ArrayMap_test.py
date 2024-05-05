@@ -1,4 +1,5 @@
 import pytest
+
 from selfie_lib.ArrayMap import ArrayMap
 
 

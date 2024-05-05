@@ -1,6 +1,7 @@
 import pytest
-from selfie_lib.Literals import LiteralString
+
 from selfie_lib.EscapeLeadingWhitespace import EscapeLeadingWhitespace
+from selfie_lib.Literals import LiteralString
 
 
 class TestLiteralString:

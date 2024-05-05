@@ -1,7 +1,6 @@
-from typing import Dict, Iterable, Tuple, Sequence, TypeVar, Callable
-from abc import ABC, abstractmethod
-from enum import Enum, auto
 import threading
+from enum import Enum, auto
+from typing import Dict, Iterable, Tuple
 
 from .Slice import Slice
 from .TypedPath import TypedPath

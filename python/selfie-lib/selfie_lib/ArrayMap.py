@@ -1,7 +1,6 @@
-from collections.abc import Set, Iterator, Mapping, ItemsView
-import re
-from typing import List, Tuple, TypeVar, Union, Any
-from abc import abstractmethod, ABC
+from abc import ABC, abstractmethod
+from collections.abc import ItemsView, Iterator, Mapping, Set
+from typing import Any, List, Tuple, TypeVar, Union
 
 T = TypeVar("T")
 V = TypeVar("V")
