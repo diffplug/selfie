@@ -1,6 +1,6 @@
-from typing import TypeVar, Generic, Protocol, Union
-from .SelfieImplementations import StringSelfie, IntSelfie, BooleanSelfie
-from .SnapshotSystem import _selfieSystem, SnapshotSystem
+from typing import TypeVar, Any, Protocol, Union, overload
+from .SelfieImplementations import ReprSelfie, StringSelfie
+from .SnapshotSystem import _selfieSystem
 from .Snapshot import Snapshot
 from .CacheSelfie import CacheSelfie
 from .RoundTrip import Roundtrip
@@ -16,17 +16,27 @@ class Cacheable(Protocol[T]):
         raise NotImplementedError
 
 
-def expect_selfie(actual: Union[str, int, bool]):
-    if isinstance(actual, int):
-        return IntSelfie(actual)
-    elif isinstance(actual, str):
+@overload
+def expect_selfie(actual: str) -> StringSelfie: ...
+
+
+# @overload
+# def expect_selfie(actual: bytes) -> BinarySelfie: ...
+
+
+@overload
+def expect_selfie[T](actual: T) -> ReprSelfie[T]: ...
+
+
+def expect_selfie(
+    actual: Union[str, Any],
+) -> Union[StringSelfie, ReprSelfie]:
+    if isinstance(actual, str):
         snapshot = Snapshot.of(actual)
         diskStorage = _selfieSystem().disk_thread_local()
         return StringSelfie(snapshot, diskStorage)
-    elif isinstance(actual, bool):
-        return BooleanSelfie(actual)
     else:
-        raise NotImplementedError()
+        return ReprSelfie(actual)
 
 
 def cache_selfie_string(to_cache: Cacheable[str]) -> CacheSelfie[str]:
