@@ -1,7 +1,5 @@
 import base64
 
-from annotated_types import T
-
 from .Snapshot import Snapshot
 from .SnapshotFile import SnapshotFile
 from .SnapshotSystem import DiskStorage, SnapshotSystem, _selfieSystem, Mode
