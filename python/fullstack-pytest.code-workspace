@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "example-pytest-selfie"
+		},
+		{
+			"path": "pytest-selfie"
+		},
+		{
+			"path": "selfie-lib"
+		}
+	],
+	"settings": {}
+}
