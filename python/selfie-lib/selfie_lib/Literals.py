@@ -1,7 +1,8 @@
 from calendar import c
 from enum import Enum, auto
-from typing import Protocol, TypeVar
+from typing import Any, Protocol, TypeVar
 from abc import abstractmethod
+
 from .EscapeLeadingWhitespace import EscapeLeadingWhitespace
 import io
 import re
@@ -247,22 +248,17 @@ class LiteralString(LiteralFormat[str]):
         )
 
 
-class LiteralBoolean(LiteralFormat[bool]):
+class LiteralRepr(LiteralFormat[Any]):
     def encode(
-        self, value: bool, language: Language, encoding_policy: EscapeLeadingWhitespace
+        self, value: Any, language: Language, encoding_policy: EscapeLeadingWhitespace
     ) -> str:
-        return str(value)
-
-    def __to_boolean_strict(self, string: str) -> bool:
-        if string.lower() == "true":
-            return True
-        elif string.lower() == "false":
-            return False
+        if isinstance(value, int):
+            return LiteralInt().encode(value, language, encoding_policy)
         else:
-            raise ValueError("String is not a valid boolean representation: " + string)
+            return repr(value)
 
-    def parse(self, string: str, language: Language) -> bool:
-        return self.__to_boolean_strict(string)
+    def parse(self, string: str, language: Language) -> Any:
+        return eval(string)
 
 
 class TodoStub(Enum):
