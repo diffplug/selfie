@@ -1,6 +1,5 @@
-from typing import Optional
-from typing import Union
 from collections import Counter
+from typing import Optional, Union
 
 
 class Slice:

@@ -1,7 +1,8 @@
-from .Slice import Slice
-from .Literals import Language, LiteralFormat, LiteralValue
-from .EscapeLeadingWhitespace import EscapeLeadingWhitespace
 from typing import Any
+
+from .EscapeLeadingWhitespace import EscapeLeadingWhitespace
+from .Literals import Language, LiteralFormat, LiteralValue
+from .Slice import Slice
 
 
 class SourceFile:

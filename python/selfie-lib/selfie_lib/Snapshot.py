@@ -1,6 +1,7 @@
-from typing import Union, Iterable, Dict
-from .SnapshotValue import SnapshotValue
+from typing import Dict, Iterable, Union
+
 from .ArrayMap import ArrayMap
+from .SnapshotValue import SnapshotValue
 
 
 class Snapshot:

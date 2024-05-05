@@ -1,5 +1,6 @@
 from base64 import b64decode
-from selfie_lib import SnapshotValueReader, Snapshot, SnapshotReader
+
+from selfie_lib import Snapshot, SnapshotReader, SnapshotValueReader
 
 
 class TestSnapshotReader:

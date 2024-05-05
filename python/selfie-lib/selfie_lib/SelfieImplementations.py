@@ -1,9 +1,8 @@
 import base64
+from abc import ABC, abstractmethod
+from itertools import chain
+from typing import Any, List, Optional
 
-from .Snapshot import Snapshot
-from .SnapshotFile import SnapshotFile
-from .SnapshotSystem import DiskStorage, SnapshotSystem, _selfieSystem, Mode
-from .WriteTracker import recordCall as recordCall
 from .Literals import (
     LiteralFormat,
     LiteralRepr,
@@ -11,11 +10,10 @@ from .Literals import (
     LiteralValue,
     TodoStub,
 )
-
-
-from abc import ABC, abstractmethod
-from typing import Any, List, Optional
-from itertools import chain
+from .Snapshot import Snapshot
+from .SnapshotFile import SnapshotFile
+from .SnapshotSystem import DiskStorage, Mode, SnapshotSystem, _selfieSystem
+from .WriteTracker import recordCall as recordCall
 
 
 class ReprSelfie[T]:

@@ -2,13 +2,12 @@ from abc import ABC, abstractmethod
 from enum import Enum, auto
 from typing import ByteString, Optional
 
+from .CommentTracker import CommentTracker
 from .FS import FS
-
 from .Literals import LiteralValue
 from .Snapshot import Snapshot
 from .TypedPath import TypedPath
 from .WriteTracker import CallStack, SnapshotFileLayout
-from .CommentTracker import CommentTracker
 
 
 class DiskStorage(ABC):

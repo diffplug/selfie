@@ -1,6 +1,7 @@
-from unittest.mock import Mock
-from selfie_lib.WriteTracker import CallLocation, CallStack, recordCall
 import os
+from unittest.mock import Mock
+
+from selfie_lib.WriteTracker import CallLocation, CallStack, recordCall
 
 
 def test_call_location_ide_link():

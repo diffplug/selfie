@@ -1,8 +1,9 @@
 import base64
 from typing import Callable, List, Optional
-from .PerCharacterEscaper import PerCharacterEscaper
-from .ParseException import ParseException
+
 from .LineReader import LineReader
+from .ParseException import ParseException
+from .PerCharacterEscaper import PerCharacterEscaper
 from .SnapshotValue import SnapshotValue
 
 

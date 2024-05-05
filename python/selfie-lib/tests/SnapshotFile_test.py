@@ -1,4 +1,4 @@
-from selfie_lib import SnapshotFile, SnapshotValueReader, Snapshot
+from selfie_lib import Snapshot, SnapshotFile, SnapshotValueReader
 
 
 def test_read_with_metadata():

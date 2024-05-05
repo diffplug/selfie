@@ -1,10 +1,10 @@
-from enum import Enum, auto
-from typing import Any, Protocol, TypeVar
-from abc import abstractmethod
-
-from .EscapeLeadingWhitespace import EscapeLeadingWhitespace
 import io
 import re
+from abc import abstractmethod
+from enum import Enum, auto
+from typing import Any, Protocol, TypeVar
+
+from .EscapeLeadingWhitespace import EscapeLeadingWhitespace
 
 T = TypeVar("T")
 

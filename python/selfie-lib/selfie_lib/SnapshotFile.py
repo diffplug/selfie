@@ -1,11 +1,11 @@
 import base64
 from threading import Lock
-from typing import Tuple, List, Optional
+from typing import List, Optional, Tuple
 
+from .ArrayMap import ArrayMap
 from .Snapshot import Snapshot, SnapshotValue
 from .SnapshotReader import SnapshotReader
 from .SnapshotValueReader import SnapshotValueReader
-from .ArrayMap import ArrayMap
 
 
 class SnapshotFile:

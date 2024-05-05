@@ -1,6 +1,6 @@
-from typing import Dict, Iterable, Tuple
-from enum import Enum, auto
 import threading
+from enum import Enum, auto
+from typing import Dict, Iterable, Tuple
 
 from .Slice import Slice
 from .TypedPath import TypedPath
