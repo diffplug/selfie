@@ -1,22 +1,37 @@
 import base64
 
+from annotated_types import T
+
 from .Snapshot import Snapshot
 from .SnapshotFile import SnapshotFile
 from .SnapshotSystem import DiskStorage, SnapshotSystem, _selfieSystem, Mode
 from .WriteTracker import recordCall as recordCall
 from .Literals import (
-    LiteralValue,
-    LiteralString,
     LiteralFormat,
+    LiteralRepr,
+    LiteralString,
+    LiteralValue,
     TodoStub,
-    LiteralInt,
-    LiteralBoolean,
 )
 
 
 from abc import ABC, abstractmethod
-from typing import Any, List, Optional, Union
+from typing import Any, List, Optional
 from itertools import chain
+
+
+class ReprSelfie[T]:
+    def __init__(self, actual: T):
+        self.actual = actual
+
+    def to_be_TODO(self, unused_arg: Optional[T] = None) -> T:
+        return _toBeDidntMatch(None, self.actual, LiteralRepr())
+
+    def to_be(self, expected: T) -> T:
+        if self.actual == expected:
+            return _checkSrc(self.actual)
+        else:
+            return _toBeDidntMatch(expected, self.actual, LiteralRepr())
 
 
 class FluentFacet(ABC):
@@ -95,7 +110,7 @@ class DiskSelfie(FluentFacet):
         raise NotImplementedError()
 
 
-class StringSelfie(DiskSelfie, StringFacet):
+class StringSelfie(DiskSelfie, StringFacet, ReprSelfie[str]):
     def __init__(
         self,
         actual: Snapshot,
@@ -147,7 +162,7 @@ class StringSelfie(DiskSelfie, StringFacet):
     def to_be_TODO(self, unused_arg: Any = None) -> str:
         return _toBeDidntMatch(None, self.__actual(), LiteralString())
 
-    def to_be(self, expected: Union[str, int, bool]) -> str:
+    def to_be(self, expected: str) -> str:
         actual_string = self.__actual()
 
         # Check if expected is a string
@@ -234,39 +249,3 @@ def _serializeOnlyFacets(snapshot: Snapshot, keys: List[str]) -> str:
         return writer_str[len(EMPTY_KEY_AND_FACET) : -1]
     else:
         return writer_str[:-1]
-
-
-class IntSelfie:
-    def __init__(self, actual: int):
-        self.actual = actual
-
-    def to_be_TODO(self, unused_arg: Any = None):
-        return _toBeDidntMatch(None, self.actual, LiteralInt())
-
-    def to_be(self, expected: Union[str, int, bool]) -> int:
-        if not isinstance(expected, int):
-            raise TypeError("Expected value must be an int")
-
-        # Compare actual to expected; handle match or mismatch.
-        if self.actual == expected:
-            return _checkSrc(self.actual)
-        else:
-            return _toBeDidntMatch(expected, self.actual, LiteralInt())
-
-
-class BooleanSelfie:
-    def __init__(self, actual: bool):
-        self.actual = actual
-
-    def to_be_TODO(self, unused_arg: Any = None):
-        return _toBeDidntMatch(None, self.actual, LiteralBoolean())
-
-    def to_be(self, expected: Union[str, int, bool]) -> bool:
-        if not isinstance(expected, bool):
-            raise TypeError("Expected value must be a bool")
-
-        # Compare actual to expected; handle match or mismatch.
-        if self.actual == expected:
-            return _checkSrc(self.actual)
-        else:
-            return _toBeDidntMatch(expected, self.actual, LiteralBoolean())
