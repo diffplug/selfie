@@ -1,4 +1,3 @@
-import re
 from .Slice import Slice
 from .Literals import Language, LiteralFormat, LiteralValue
 from .EscapeLeadingWhitespace import EscapeLeadingWhitespace

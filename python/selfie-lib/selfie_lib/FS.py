@@ -3,7 +3,6 @@ from pathlib import Path
 
 from abc import ABC, abstractmethod
 from typing import Callable, Iterator
-from itertools import chain
 
 
 class FS(ABC):

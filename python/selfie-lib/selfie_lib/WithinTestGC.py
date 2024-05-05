@@ -1,4 +1,3 @@
-from re import S, T
 from typing import Iterable, Tuple, List
 from threading import Lock
 

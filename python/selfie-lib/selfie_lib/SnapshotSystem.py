@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 from enum import Enum, auto
-import glob
 from typing import ByteString, Optional
 
 from .FS import FS

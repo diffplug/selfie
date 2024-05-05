@@ -1,6 +1,6 @@
 from pathlib import Path
 from typing import List, Optional, Generic, TypeVar, Dict, cast
-from abc import ABC, abstractmethod
+from abc import ABC
 import inspect
 import threading
 import os

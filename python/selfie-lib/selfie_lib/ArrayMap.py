@@ -1,5 +1,4 @@
 from collections.abc import Set, Iterator, Mapping, ItemsView
-import re
 from typing import List, Tuple, TypeVar, Union, Any
 from abc import abstractmethod, ABC
 
