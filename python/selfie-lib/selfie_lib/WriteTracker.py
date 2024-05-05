@@ -239,3 +239,45 @@ class InlineWriteTracker(WriteTracker[CallLocation, LiteralValue]):
 
         # Final write to disk for the last file processed
         layout.fs.file_write(current_file, content.as_string)
+
+
+class ToBeFileLazyBytes:
+    def __init__(self, location: TypedPath, layout: SnapshotFileLayout, data: bytes):
+        self.location = location
+        self.layout = layout
+        self.data = data
+
+    def writeToDisk(self) -> None:
+        if self.data is None:
+            raise Exception("Data has already been written to disk")
+        self.layout.fs.file_write_binary(self.location, self.data)
+        self.data = None  # Allow garbage collection
+
+    def readData(self):
+        if self.data is not None:
+            return self.data
+        return self.layout.fs.file_read_binary(self.location)
+
+    def __eq__(self, other):
+        if not isinstance(other, ToBeFileLazyBytes):
+            return False
+        return self.readData() == other.readData()
+
+    def __hash__(self):
+        return hash(self.readData())
+
+
+class ToBeFileWriteTracker(WriteTracker[TypedPath, ToBeFileLazyBytes]):
+    def __init__(self):
+        super().__init__()
+
+    def writeToDisk(
+        self,
+        key: TypedPath,
+        snapshot: bytes,
+        call: CallStack,
+        layout: SnapshotFileLayout,
+    ) -> None:
+        lazyBytes = ToBeFileLazyBytes(key, layout, snapshot)
+        self.recordInternal(key, lazyBytes, call, layout)
+        lazyBytes.writeToDisk()

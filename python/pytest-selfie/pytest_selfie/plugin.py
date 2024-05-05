@@ -4,6 +4,7 @@ from collections import defaultdict
 from typing import ByteString, DefaultDict, List, Optional, Iterator
 
 from selfie_lib.Atomic import AtomicReference
+from selfie_lib.WriteTracker import ToBeFileWriteTracker
 from .SelfieSettingsAPI import SelfieSettingsAPI
 from selfie_lib import (
     _clearSelfieSystem,
@@ -149,7 +150,7 @@ class PytestSnapshotSystem(SnapshotSystem):
         self._layout = PytestSnapshotFileLayout(self.__fs, settings)
         self.__comment_tracker = CommentTracker()
         self.__inline_write_tracker = InlineWriteTracker()
-        # self.__toBeFileWriteTracker = ToBeFileWriteTracker() #TODO
+        self.__toBeFileWriteTracker = ToBeFileWriteTracker()
 
         self.__progress_per_file: DefaultDict[TypedPath, SnapshotFileProgress] = (
             _keydefaultdict(lambda key: SnapshotFileProgress(self, key))  # type: ignore
@@ -247,7 +248,8 @@ class PytestSnapshotSystem(SnapshotSystem):
     def write_to_be_file(
         self, path: TypedPath, data: "ByteString", call: CallStack
     ) -> None:
-        raise NotImplementedError
+        # Directly write to disk using ToBeFileWriteTracker
+        self.__toBeFileWriteTracker.writeToDisk(path, data, call, self._layout)
 
 
 class DiskStoragePytest(DiskStorage):

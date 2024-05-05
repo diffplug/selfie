@@ -33,5 +33,5 @@ class FS(ABC):
         Path(typed_path.absolute_path).write_bytes(content)
 
     @abstractmethod
-    def assert_failed(self, message: str, expected=None, actual=None) -> Exception:
+    def assert_failed(self, message, expected=None, actual=None) -> Exception:
         pass
