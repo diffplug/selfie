@@ -19,3 +19,6 @@ pytest-selfie = { path = "../pytest-selfie", develop = true }
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+lint.extend-select = ["I"]
