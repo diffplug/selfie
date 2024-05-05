@@ -23,10 +23,10 @@ class CacheSelfie(Generic[T]):
         return self._to_match_disk_impl(sub, True)
 
     def _to_match_disk_impl(self, sub: str, is_todo: bool) -> T:
-        from .Selfie import get_system
+        from .Selfie import _selfieSystem
 
         call = recordCall(False)
-        system = get_system()
+        system = _selfieSystem()
         if system.mode.can_write(is_todo, call, system):
             actual = self.generator()
             self.disk.write_disk(
@@ -55,10 +55,10 @@ class CacheSelfie(Generic[T]):
         return self._to_be_impl(expected)
 
     def _to_be_impl(self, snapshot: Optional[str]) -> T:
-        from .Selfie import get_system
+        from .Selfie import _selfieSystem
 
         call = recordCall(False)
-        system = get_system()
+        system = _selfieSystem()
         writable = system.mode.can_write(snapshot is None, call, system)
         if writable:
             actual = self.generator()
