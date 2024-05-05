@@ -1,4 +1,4 @@
-from typing import TypeVar, Any, Protocol, Union, overload
+from typing import Any, TypeVar, Optional, Protocol, Union, overload
 from .SelfieImplementations import ReprSelfie, StringSelfie
 from .SnapshotSystem import _selfieSystem
 from .Snapshot import Snapshot
@@ -39,15 +39,25 @@ def expect_selfie(
         return ReprSelfie(actual)
 
 
-def cache_selfie_string(to_cache: Cacheable[str]) -> CacheSelfie[str]:
-    """Create a CacheSelfie instance for caching strings with identity transformation."""
-    identity_roundtrip = Roundtrip.identity()
-    return cache_selfie_generic(identity_roundtrip, to_cache)
+@overload
+def cache_selfie(to_cache: Cacheable[str]) -> CacheSelfie[str]: ...
 
 
-def cache_selfie_generic(
-    roundtrip: Roundtrip[T, str], to_cache: Cacheable[T]
-) -> CacheSelfie[T]:
-    """Create a CacheSelfie instance for caching generic objects with specified roundtrip."""
-    deferred_disk_storage = _selfieSystem().disk_thread_local()
-    return CacheSelfie(deferred_disk_storage, roundtrip, to_cache)
+@overload
+def cache_selfie(
+    to_cache: Cacheable[T], roundtrip: Roundtrip[T, str]
+) -> CacheSelfie[T]: ...
+
+
+def cache_selfie(
+    to_cache: Union[Cacheable[str], Cacheable[T]],
+    roundtrip: Optional[Roundtrip[T, str]] = None,
+) -> Union[CacheSelfie[str], CacheSelfie[T]]:
+    if roundtrip is None:
+        # the cacheable better be a string!
+        return cache_selfie(to_cache, Roundtrip.identity())  # type: ignore
+    elif isinstance(roundtrip, Roundtrip) and to_cache is not None:
+        deferred_disk_storage = _selfieSystem().disk_thread_local()
+        return CacheSelfie(deferred_disk_storage, roundtrip, to_cache)
+    else:
+        raise TypeError("Invalid arguments provided to cache_selfie")
