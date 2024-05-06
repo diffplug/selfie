@@ -65,7 +65,7 @@ class ArraySet(ListBackedSet[K]):
     @classmethod
     def __create(cls, data: List[K]) -> "ArraySet[K]":
         instance = super().__new__(cls)
-        instance.__data = data
+        instance.__data = data  # noqa: SLF001
         return instance
 
     def __iter__(self) -> Iterator[K]:
@@ -154,8 +154,8 @@ class ArrayMap(Mapping[K, V]):
     @classmethod
     def __create(cls, data: List[Union[K, V]]) -> "ArrayMap[K, V]":
         instance = cls.__new__(cls)
-        instance.__data = data
-        instance.__keys = _ArrayMapKeys(data)
+        instance.__data = data  # noqa: SLF001
+        instance.__keys = _ArrayMapKeys(data)  # noqa: SLF001
         return instance
 
     @classmethod
@@ -188,7 +188,7 @@ class ArrayMap(Mapping[K, V]):
     def plus(self, key: K, value: V) -> "ArrayMap[K, V]":
         index = self._binary_search_key(key)
         if index >= 0:
-            raise ValueError("Key already exists")
+            raise KeyError
         insert_at = -(index + 1)
         new_data = self.__data[:]
         new_data.insert(insert_at * 2, key)

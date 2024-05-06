@@ -12,7 +12,6 @@ class TestLiteralString:
     def test_encode_single(self, value, expected):
         literal_string = LiteralString()
         actual = literal_string._encodeSinglePython(value)
-        print(actual)
         assert actual == expected
 
     @pytest.mark.parametrize(

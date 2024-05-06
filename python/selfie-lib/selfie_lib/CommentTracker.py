@@ -34,11 +34,7 @@ class CommentTracker:
         path = layout.sourcefile_for_call(call.location)
         with self.lock:
             if path in self.cache:
-                comment = self.cache[path]
-                if comment.writable:
-                    return True
-                else:
-                    return False
+                return self.cache[path].writable
             else:
                 new_comment, _ = self.__commentAndLine(path)
                 self.cache[path] = new_comment
@@ -58,7 +54,7 @@ class CommentTracker:
 
     @staticmethod
     def __commentAndLine(typedPath: TypedPath) -> Tuple[WritableComment, int]:
-        with open(typedPath.absolute_path, "r") as file:
+        with open(typedPath.absolute_path) as file:
             content = Slice(file.read())
         for comment_str in [
             "# selfieonce",

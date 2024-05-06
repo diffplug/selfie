@@ -132,27 +132,27 @@ def test_plus_with_existing_keys():
 
 
 def test_map_length():
-    map = ArrayMap.empty()
-    assert len(map) == 0, "Length should be 0 for an empty map"
-    map = map.plus("key1", "value1")
-    assert len(map) == 1, "Length should be 1 after adding one item"
-    map = map.plus("key2", "value2")
-    assert len(map) == 2, "Length should be 2 after adding another item"
-    map = map.plus("key3", "value3")
-    assert len(map) == 3, "Length should be 3 after adding a third item"
-    map = map.minus_sorted_indices([1])
-    assert len(map) == 2, "Length should be 2 after removing one item"
-    map = map.minus_sorted_indices([0])
-    assert len(map) == 1, "Length should be 1 after removing another item"
-    map = map.minus_sorted_indices([0])
-    assert len(map) == 0, "Length should be 0 after removing all items"
+    undertest = ArrayMap.empty()
+    assert len(undertest) == 0, "Length should be 0 for an empty map"
+    undertest = undertest.plus("key1", "value1")
+    assert len(undertest) == 1, "Length should be 1 after adding one item"
+    undertest = undertest.plus("key2", "value2")
+    assert len(undertest) == 2, "Length should be 2 after adding another item"
+    undertest = undertest.plus("key3", "value3")
+    assert len(undertest) == 3, "Length should be 3 after adding a third item"
+    undertest = undertest.minus_sorted_indices([1])
+    assert len(undertest) == 2, "Length should be 2 after removing one item"
+    undertest = undertest.minus_sorted_indices([0])
+    assert len(undertest) == 1, "Length should be 1 after removing another item"
+    undertest = undertest.minus_sorted_indices([0])
+    assert len(undertest) == 0, "Length should be 0 after removing all items"
 
 
 def test_keys():
     assert ArrayMap.empty().keys().__len__() == 0
-    map = ArrayMap.empty().plus("a", "alpha").plus("b", "beta")
-    assert map.keys()[0] == "a"
-    assert map.keys()[1] == "b"
+    undertest = ArrayMap.empty().plus("a", "alpha").plus("b", "beta")
+    assert undertest.keys()[0] == "a"
+    assert undertest.keys()[1] == "b"
 
 
 def test_items():
