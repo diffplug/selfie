@@ -3,56 +3,56 @@ import pytest
 from selfie_lib.ArrayMap import ArrayMap
 
 
-def assertEmpty(map):
-    assert len(map) == 0
-    assert list(map.keys()) == []
-    assert list(map.values()) == []
-    assert list(map.items()) == []
+def assertEmpty(undertest):
+    assert len(undertest) == 0
+    assert list(undertest.keys()) == []
+    assert list(undertest.values()) == []
+    assert list(undertest.items()) == []
     with pytest.raises(KeyError):
-        _ = map["key"]
-    assert map == {}
-    assert map == ArrayMap.empty()
+        _ = undertest["key"]
+    assert undertest == {}
+    assert undertest == ArrayMap.empty()
 
 
-def assertSingle(map, key, value):
-    assert len(map) == 1
-    assert set(map.keys()) == {key}
-    assert list(map.values()) == [value]
-    assert set(map.items()) == {(key, value)}
-    assert map[key] == value
+def assertSingle(undertest, key, value):
+    assert len(undertest) == 1
+    assert set(undertest.keys()) == {key}
+    assert list(undertest.values()) == [value]
+    assert set(undertest.items()) == {(key, value)}
+    assert undertest[key] == value
     with pytest.raises(KeyError):
-        _ = map[key + "blah"]
-    assert map == {key: value}
-    assert map == ArrayMap.empty().plus(key, value)
+        _ = undertest[key + "blah"]
+    assert undertest == {key: value}
+    assert undertest == ArrayMap.empty().plus(key, value)
 
 
-def assertDouble(map, key1, value1, key2, value2):
-    assert len(map) == 2
-    assert set(map.keys()) == {key1, key2}
-    assert list(map.values()) == [value1, value2]
-    assert set(map.items()) == {(key1, value1), (key2, value2)}
-    assert map[key1] == value1
-    assert map[key2] == value2
+def assertDouble(undertest, key1, value1, key2, value2):
+    assert len(undertest) == 2
+    assert set(undertest.keys()) == {key1, key2}
+    assert list(undertest.values()) == [value1, value2]
+    assert set(undertest.items()) == {(key1, value1), (key2, value2)}
+    assert undertest[key1] == value1
+    assert undertest[key2] == value2
     with pytest.raises(KeyError):
-        _ = map[key1 + "blah"]
-    assert map == {key1: value1, key2: value2}
-    assert map == {key2: value2, key1: value1}
-    assert map == ArrayMap.empty().plus(key1, value1).plus(key2, value2)
-    assert map == ArrayMap.empty().plus(key2, value2).plus(key1, value1)
+        _ = undertest[key1 + "blah"]
+    assert undertest == {key1: value1, key2: value2}
+    assert undertest == {key2: value2, key1: value1}
+    assert undertest == ArrayMap.empty().plus(key1, value1).plus(key2, value2)
+    assert undertest == ArrayMap.empty().plus(key2, value2).plus(key1, value1)
 
 
-def assertTriple(map, key1, value1, key2, value2, key3, value3):
-    assert len(map) == 3
-    assert set(map.keys()) == {key1, key2, key3}
-    assert list(map.values()) == [value1, value2, value3]
-    assert set(map.items()) == {(key1, value1), (key2, value2), (key3, value3)}
-    assert map[key1] == value1
-    assert map[key2] == value2
-    assert map[key3] == value3
+def assertTriple(undertest, key1, value1, key2, value2, key3, value3):
+    assert len(undertest) == 3
+    assert set(undertest.keys()) == {key1, key2, key3}
+    assert list(undertest.values()) == [value1, value2, value3]
+    assert set(undertest.items()) == {(key1, value1), (key2, value2), (key3, value3)}
+    assert undertest[key1] == value1
+    assert undertest[key2] == value2
+    assert undertest[key3] == value3
     with pytest.raises(KeyError):
-        _ = map[key1 + "blah"]
-    assert map == {key1: value1, key2: value2, key3: value3}
-    assert map == ArrayMap.empty().plus(key1, value1).plus(key2, value2).plus(
+        _ = undertest[key1 + "blah"]
+    assert undertest == {key1: value1, key2: value2, key3: value3}
+    assert undertest == ArrayMap.empty().plus(key1, value1).plus(key2, value2).plus(
         key3, value3
     )
 
@@ -157,6 +157,6 @@ def test_keys():
 
 def test_items():
     assert ArrayMap.empty().items().__len__() == 0
-    map = ArrayMap.empty().plus("a", "alpha").plus("b", "beta")
-    assert map.items()[0] == ("a", "alpha")
-    assert map.items()[1] == ("b", "beta")
+    undertest = ArrayMap.empty().plus("a", "alpha").plus("b", "beta")
+    assert undertest.items()[0] == ("a", "alpha")
+    assert undertest.items()[1] == ("b", "beta")
