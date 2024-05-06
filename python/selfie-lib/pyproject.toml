@@ -21,6 +21,7 @@ build-backend = "poetry.core.masonry.api"
 [tool.ruff.lint]
 select = ["ALL"]
 ignore = [ "S", "FA",  "PYI", "EM", "PLR",  "FBT", "COM", "RET", "PT", "PTH", "PLW", "PLC",
+"PT", # TODO: pytest
 "TRY", # TODO: exception standards
 "ANN", # TODO: require type annotations
 "D", # TODO: docstring warnings
