@@ -34,12 +34,10 @@ class FluentFacet(ABC):
     @abstractmethod
     def facet(self, facet: str) -> "StringFacet":
         """Extract a single facet from a snapshot in order to do an inline snapshot."""
-        pass
 
     @abstractmethod
     def facets(self, *facets: str) -> "StringFacet":
         """Extract multiple facets from a snapshot in order to do an inline snapshot."""
-        pass
 
     @abstractmethod
     def facet_binary(self, facet: str) -> "BinaryFacet":
@@ -93,17 +91,17 @@ class DiskSelfie(FluentFacet):
             return self
         else:
             raise _selfieSystem().fs.assert_failed(
-                "Can't call `toMatchDisk_TODO` in {} mode!".format(Mode.readonly)
+                f"Can't call `toMatchDisk_TODO` in {Mode.readonly} mode!"
             )
 
     def facet(self, facet: str) -> "StringFacet":
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def facets(self, *facets: str) -> "StringFacet":
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def facet_binary(self, facet: str) -> "BinaryFacet":
-        raise NotImplementedError()
+        raise NotImplementedError
 
 
 class StringSelfie(DiskSelfie, StringFacet, ReprSelfie[str]):

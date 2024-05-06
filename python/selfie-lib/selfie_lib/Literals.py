@@ -101,7 +101,7 @@ class LiteralString(LiteralFormat[str]):
                 return self.parseMultiPython(string)
         else:
             raise NotImplementedError(
-                "Encoding for language {} is not implemented.".format(language)
+                f"Encoding for language {language} is not implemented."
             )
 
     def _encodeSinglePython(self, value: str) -> str:
