@@ -18,5 +18,13 @@ pytest = "^8.0.0"
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
-[tool.ruff]
-lint.extend-select = ["I"]
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = ["D", "S", "ANN", "FA","N", "PYI", "EM", "PLR", "TRY", "FBT", "COM", "RET", "PT", "PTH",
+"E501", # line too long
+"PLC0414", # import alias does not rename original package
+"W291", # trailing whitespace, we need it for testing snapshots
+]
+
+[tool.ruff.lint.flake8-self]
+ignore-names = ["__create"]
