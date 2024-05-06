@@ -20,7 +20,7 @@ class ReprSelfie[T]:
     def __init__(self, actual: T):
         self.actual = actual
 
-    def to_be_TODO(self, unused_arg: Optional[T] = None) -> T:
+    def to_be_TODO(self, _: Optional[T] = None) -> T:
         return _toBeDidntMatch(None, self.actual, LiteralRepr())
 
     def to_be(self, expected: T) -> T:
@@ -49,7 +49,7 @@ class StringFacet(FluentFacet, ABC):
     def to_be(self, expected: str) -> str:
         pass
 
-    def to_be_TODO(self, unused_arg: Any = None) -> str:
+    def to_be_TODO(self, _: Any = None) -> str:
         return self.to_be_TODO()
 
 
@@ -58,7 +58,7 @@ class BinaryFacet(FluentFacet, ABC):
     def to_be_base64(self, expected: str) -> bytes:
         pass
 
-    def to_be_base64_TODO(self, unused_arg: Any = None) -> bytes:
+    def to_be_base64_TODO(self, _: Any = None) -> bytes:
         return self.to_be_base64_TODO()
 
     @abstractmethod
@@ -150,10 +150,10 @@ class StringSelfie(DiskSelfie, StringFacet, ReprSelfie[str]):
                 return only_value.value_string()
         else:
             return _serializeOnlyFacets(
-                self.actual, self.only_facets or [""] + list(self.actual.facets.keys())
+                self.actual, self.only_facets or ["", *list(self.actual.facets.keys())]
             )
 
-    def to_be_TODO(self, unused_arg: Any = None) -> str:
+    def to_be_TODO(self, _: Any = None) -> str:
         return _toBeDidntMatch(None, self.__actual(), LiteralString())
 
     def to_be(self, expected: str) -> str:
@@ -178,11 +178,11 @@ def _checkSrc[T](value: T) -> T:
     return value
 
 
-def _toBeDidntMatch[T](expected: Optional[T], actual: T, format: LiteralFormat[T]) -> T:
+def _toBeDidntMatch[T](expected: Optional[T], actual: T, fmt: LiteralFormat[T]) -> T:
     call = recordCall(False)
     writable = _selfieSystem().mode.can_write(expected is None, call, _selfieSystem())
     if writable:
-        _selfieSystem().write_inline(LiteralValue(expected, actual, format), call)
+        _selfieSystem().write_inline(LiteralValue(expected, actual, fmt), call)
         return actual
     else:
         if expected is None:
@@ -210,11 +210,7 @@ def _assertEqual(
                 chain(
                     [""],
                     expected.facets.keys(),
-                    (
-                        facet
-                        for facet in actual.facets.keys()
-                        if facet not in expected.facets
-                    ),
+                    (facet for facet in actual.facets if facet not in expected.facets),
                 ),
             )
         )

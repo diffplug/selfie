@@ -45,10 +45,7 @@ class Slice:
         elif isinstance(other, str):
             if len(self) != len(other):
                 return False
-            for i in range(len(self)):
-                if self[i] != other[i]:
-                    return False
-            return True
+            return all(self[i] == other[i] for i in range(len(self)))
         return False
 
     def indexOf(self, lookingFor: str, startOffset: int = 0) -> int:

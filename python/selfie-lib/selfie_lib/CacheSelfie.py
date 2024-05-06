@@ -47,7 +47,7 @@ class CacheSelfie(Generic[T]):
                     )
                 return self.roundtrip.parse(snapshot.subject.value_string())
 
-    def to_be_TODO(self, unused_arg: Optional[Any] = None) -> T:  # noqa: ARG002
+    def to_be_TODO(self, _: Optional[Any] = None) -> T:
         return self._to_be_impl(None)
 
     def to_be(self, expected: str) -> T:
@@ -144,7 +144,7 @@ class CacheSelfieBinary(Generic[T]):
                     serialized_data = file.read()
                 return self.roundtrip.parse(serialized_data)
 
-    def to_be_base64_TODO(self, unused_arg: Optional[Any] = None) -> T:  # noqa: ARG002
+    def to_be_base64_TODO(self, _: Optional[Any] = None) -> T:
         return self._to_be_base64_impl(None)
 
     def to_be_base64(self, snapshot: str) -> T:

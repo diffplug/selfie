@@ -8,7 +8,7 @@ class Snapshot:
     def __init__(
         self,
         subject: SnapshotValue,
-        facet_data: ArrayMap[str, SnapshotValue] = ArrayMap.empty(),
+        facet_data: ArrayMap[str, SnapshotValue] = ArrayMap.empty(),  # noqa: B008
     ):
         self._subject = subject
         self._facet_data = facet_data

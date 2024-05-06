@@ -29,7 +29,7 @@ class SnapshotFile:
             )
 
         for entry_key, entry_value in self.snapshots.items():
-            self.writeEntry(valueWriter, entry_key, None, entry_value._subject)
+            self.writeEntry(valueWriter, entry_key, None, entry_value.subject)
             for facet_key, facet_value in entry_value.facets.items():
                 self.writeEntry(valueWriter, entry_key, facet_key, facet_value)
 

@@ -22,10 +22,10 @@ class Language(Enum):
 
 
 class LiteralValue:
-    def __init__(self, expected: T | None, actual: T, format: "LiteralFormat") -> None:
+    def __init__(self, expected: T | None, actual: T, fmt: "LiteralFormat") -> None:
         self.expected = expected
         self.actual = actual
-        self.format = format
+        self.format = fmt
 
 
 class LiteralFormat(Protocol[T]):
@@ -259,7 +259,7 @@ class LiteralRepr(LiteralFormat[Any]):
         else:
             return repr(value)
 
-    def parse(self, string: str, language: Language) -> Any:
+    def parse(self, string: str, language: Language) -> Any:  # noqa: ARG002
         return eval(string)
 
 

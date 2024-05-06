@@ -32,7 +32,7 @@ class CallLocation:
     def with_line(self, line: int) -> "CallLocation":
         return CallLocation(self._file_name, line)
 
-    def ide_link(self, layout: "SnapshotFileLayout") -> str:
+    def ide_link(self, _: "SnapshotFileLayout") -> str:
         return f"File: {self._file_name}, Line: {self._line}"
 
     def same_path_as(self, other: "CallLocation") -> bool:
@@ -184,9 +184,8 @@ class InlineWriteTracker(WriteTracker[CallLocation, LiteralValue]):
                 ).parse_literal(snapshot.format)
             except Exception as e:
                 raise AssertionError(
-                    f"Error while parsing the literal at {call.location.ide_link(layout)}. Please report this error at https://github.com/diffplug/selfie",
-                    e,
-                )
+                    f"Error while parsing the literal at {call.location.ide_link(layout)}. Please report this error at https://github.com/diffplug/selfie"
+                ) from e
             if parsed_value != snapshot.expected:
                 raise layout.fs.assert_failed(
                     f"Selfie cannot modify the literal at {call.location.ide_link(layout)} because Selfie has a parsing bug. Please report this error at https://github.com/diffplug/selfie",

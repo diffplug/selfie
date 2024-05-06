@@ -22,7 +22,7 @@ def expect_selfie(actual: str) -> StringSelfie: ...
 
 
 # @overload
-# def expect_selfie(actual: bytes) -> BinarySelfie: ...
+# def expect_selfie(actual: bytes) -> BinarySelfie: ...  # noqa: ERA001
 
 
 @overload

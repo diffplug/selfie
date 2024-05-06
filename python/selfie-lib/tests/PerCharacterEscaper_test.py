@@ -79,10 +79,10 @@ class TestPerCharacterEscaper:
     def test_roundtrip(self):
         escaper = PerCharacterEscaper.self_escape("`<>")
 
-        def roundtrip(str):
+        def roundtrip(s):
             assert (
-                escaper.unescape(escaper.escape(str)) == str
-            ), f"Roundtrip of '{str}' did not return the original string"
+                escaper.unescape(escaper.escape(s)) == s
+            ), f"Roundtrip of '{s}' did not return the original string"
 
         roundtrip("")
         roundtrip("<local>~`/")

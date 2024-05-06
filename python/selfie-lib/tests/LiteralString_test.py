@@ -11,7 +11,7 @@ class TestLiteralString:
     )
     def test_encode_single(self, value, expected):
         literal_string = LiteralString()
-        actual = literal_string._encodeSinglePython(value)
+        actual = literal_string._encodeSinglePython(value)  # noqa: SLF001
         assert actual == expected
 
     @pytest.mark.parametrize(
@@ -20,7 +20,7 @@ class TestLiteralString:
     )
     def test_encode_single_with_dollars(self, value, expected):
         literal_string = LiteralString()
-        actual = literal_string._encodeSinglePython(value)
+        actual = literal_string._encodeSinglePython(value)  # noqa: SLF001
         assert actual == expected.replace("`", '"')
 
     @pytest.mark.parametrize(
@@ -44,7 +44,7 @@ class TestLiteralString:
     )
     def test_parse_single(self, value, expected):
         literal_string = LiteralString()
-        actual = literal_string._parseSinglePython(f'"{value.replace("'", "\"")}"')
+        actual = literal_string._parseSinglePython(f'"{value.replace("'", "\"")}"')  # noqa: SLF001
         assert actual == expected
 
     @pytest.mark.parametrize(
