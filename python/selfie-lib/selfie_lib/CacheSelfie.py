@@ -1,9 +1,8 @@
 import base64
-from typing import Any, Generic, Optional, TypeVar
+from typing import Any, Generic, Optional, Protocol, TypeVar
 
 from .Literals import LiteralString, LiteralValue, TodoStub
 from .RoundTrip import Roundtrip
-from .Selfie import Cacheable, _selfieSystem
 from .Snapshot import Snapshot
 from .SnapshotSystem import DiskStorage
 from .WriteTracker import recordCall
@@ -15,7 +14,7 @@ class CacheSelfie(Generic[T]):
     def __init__(self, disk: DiskStorage, roundtrip: Roundtrip[T, str], generator):
         self.disk: DiskStorage = disk
         self.roundtrip: Roundtrip[T, str] = roundtrip
-        self.generator: Cacheable[T] = generator
+        self.generator: Protocol[T] = generator
 
     def to_match_disk(self, sub: str = "") -> T:
         return self._to_match_disk_impl(sub, False)
@@ -24,6 +23,8 @@ class CacheSelfie(Generic[T]):
         return self._to_match_disk_impl(sub, True)
 
     def _to_match_disk_impl(self, sub: str, is_todo: bool) -> T:
+        from .Selfie import _selfieSystem
+
         call = recordCall(False)
         system = _selfieSystem()
         if system.mode.can_write(is_todo, call, system):
@@ -54,6 +55,8 @@ class CacheSelfie(Generic[T]):
         return self._to_be_impl(expected)
 
     def _to_be_impl(self, snapshot: Optional[str]) -> T:
+        from .Selfie import _selfieSystem
+
         call = recordCall(False)
         system = _selfieSystem()
         writable = system.mode.can_write(snapshot is None, call, system)
@@ -75,7 +78,12 @@ class CacheSelfie(Generic[T]):
 
 
 class CacheSelfieBinary(Generic[T]):
-    def __init__(self, disk: DiskStorage, roundtrip: Roundtrip[T, bytes], generator):
+    def __init__(
+        self,
+        disk: DiskStorage,
+        roundtrip: Roundtrip[T, bytes],
+        generator: Protocol[T],
+    ):
         self.disk: DiskStorage = disk
         self.roundtrip: Roundtrip[T, bytes] = roundtrip
         self.generator = generator
@@ -87,6 +95,8 @@ class CacheSelfieBinary(Generic[T]):
         return self._to_match_disk_impl(sub, True)
 
     def _to_match_disk_impl(self, sub: str, is_todo: bool) -> T:
+        from .Selfie import _selfieSystem
+
         system = _selfieSystem()
         call = recordCall(False)
 
@@ -122,6 +132,8 @@ class CacheSelfieBinary(Generic[T]):
         return self._to_be_file_impl(subpath, False)
 
     def _to_be_file_impl(self, subpath: str, is_todo: bool) -> T:
+        from .Selfie import _selfieSystem
+
         system = _selfieSystem()
         call = recordCall(False)
         writable = system.mode.can_write(is_todo, call, system)
@@ -151,6 +163,8 @@ class CacheSelfieBinary(Generic[T]):
         return self._to_be_base64_impl(snapshot)
 
     def _to_be_base64_impl(self, snapshot: Optional[str]) -> T:
+        from .Selfie import _selfieSystem
+
         system = _selfieSystem()
         call = recordCall(False)
         writable = system.mode.can_write(snapshot is None, call, system)
