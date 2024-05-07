@@ -1,7 +1,5 @@
-from typing import Any, Optional, Protocol, TypeVar, Union, overload
+from typing import Any, TypeVar, Union, overload
 
-from .CacheSelfie import CacheSelfie
-from .RoundTrip import Roundtrip
 from .SelfieImplementations import ReprSelfie, StringSelfie
 from .Snapshot import Snapshot
 from .SnapshotSystem import _selfieSystem
