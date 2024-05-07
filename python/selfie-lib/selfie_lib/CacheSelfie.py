@@ -2,7 +2,7 @@ import base64
 from typing import Any, Generic, Optional, Protocol, TypeVar, Union, overload
 
 from .Literals import LiteralString, LiteralValue, TodoStub
-from .RoundTrip import Roundtrip
+from .Roundtrip import Roundtrip
 from .Snapshot import Snapshot
 from .SnapshotSystem import DiskStorage, _selfieSystem
 from .WriteTracker import recordCall
