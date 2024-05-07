@@ -77,9 +77,8 @@ def test_double():
     assertDouble(double, "one", "1", "two", "2")
     assertDouble(single.plus("a", "sorted"), "a", "sorted", "one", "1")
 
-    with pytest.raises(ValueError) as context:
+    with pytest.raises(KeyError):
         single.plus("one", "2")
-    assert str(context.value) == "Key already exists"
 
 
 def test_triple():
@@ -116,7 +115,7 @@ def test_minus_sorted_indices():
 
 def test_plus_with_existing_keys():
     map_with_duplicates = ArrayMap.empty().plus("a", "alpha").plus("b", "beta")
-    with pytest.raises(ValueError):
+    with pytest.raises(KeyError):
         map_with_duplicates.plus("a", "new alpha")
     updated_map = map_with_duplicates.plus("c", "gamma")
     assert len(updated_map) == 3

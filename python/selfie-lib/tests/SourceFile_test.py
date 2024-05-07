@@ -1,3 +1,5 @@
+import pytest
+
 from selfie_lib import SourceFile
 
 
@@ -12,10 +14,8 @@ def python_test(source_raw, function_call_plus_arg_raw, arg_raw=""):
 
 
 def python_test_error(source_raw, error_msg):
-    try:
+    with pytest.raises(ValueError, match=error_msg):
         python_test(source_raw, "unusedArg")
-    except AssertionError as e:
-        assert str(e) == error_msg
 
 
 def todo():

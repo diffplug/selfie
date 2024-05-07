@@ -20,8 +20,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.ruff.lint]
 select = ["ALL"]
-ignore = [ "S", "FA",  "PYI", "EM", "PLR",  "FBT", "COM", "RET", "PT", "PTH", "PLW", "PLC",
-"PT", # TODO: pytest
+ignore = [ "S", "FA",  "PYI", "EM", "PLR",  "FBT", "COM", "RET", "PTH", "PLW", "PLC",
 "TRY", # TODO: exception standards
 "ANN", # TODO: require type annotations
 "D", # TODO: docstring warnings
@@ -33,6 +32,3 @@ ignore = [ "S", "FA",  "PYI", "EM", "PLR",  "FBT", "COM", "RET", "PT", "PTH", "P
 "PGH003", # specific rule codes when ignoring type issues
 "ISC001"
 ]
-
-[tool.ruff.lint.flake8-self]
-ignore-names = ["__create"]

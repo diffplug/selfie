@@ -45,7 +45,7 @@ class PerCharacterEscaper:
             chr(self.__escape_code_point)
         ) and not input_string.endswith(chr(self.__escape_code_point) * 2):
             raise ValueError(
-                f"Escape character '{self.__escape_code_point}' can't be the last character in a string."
+                f"Escape character '{chr(self.__escape_code_point)}' can't be the last character in a string."
             )
 
         no_escapes: int = self.__first_offset_needing_escape(input_string)
