@@ -28,15 +28,15 @@ class SelfieSettingsAPI:
         return self.root_dir
 
     def calc_mode(self) -> Mode:
-        override = os.getenv("selfie") or os.getenv("SELFIE")
+        override = os.getenv("selfie") or os.getenv("SELFIE")  # noqa: SIM112
         if override:
             # Convert the mode to lowercase and match it with the Mode enum
             try:
                 return Mode[override.lower()]
             except KeyError:
-                raise ValueError(f"No such mode: {override}")
+                raise ValueError(f"No such mode: {override}") from None
 
-        ci = os.getenv("ci") or os.getenv("CI")
+        ci = os.getenv("ci") or os.getenv("CI")  # noqa: SIM112
         if ci and ci.lower() == "true":
             return Mode.readonly
         else:

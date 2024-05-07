@@ -54,14 +54,12 @@ def test_of_file_class_method():
 
 def test_assert_folder_failure():
     with pytest.raises(AssertionError):
-        file = TypedPath("/home/user/document.txt")
-        file.assert_folder()
+        TypedPath("/home/user/document.txt").assert_folder()
 
 
 def test_parent_folder_failure():
-    with pytest.raises(ValueError):
-        path = TypedPath("/")
-        path.parent_folder()
+    with pytest.raises(ValueError, match="Path does not have a parent folder"):
+        TypedPath("/").parent_folder()
 
 
 def test_equality():
@@ -86,5 +84,8 @@ def test_ordering():
 def test_relativize_error():
     parent = TypedPath("/home/user/")
     child = TypedPath("/home/another_user/document.txt")
-    with pytest.raises(ValueError):
+    with pytest.raises(
+        ValueError,
+        match="Expected /home/another_user/document.txt to start with /home/user/",
+    ):
         parent.relativize(child)

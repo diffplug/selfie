@@ -58,31 +58,29 @@ class TestPerCharacterEscaper:
 
     def test_corner_cases_self(self):
         escaper = PerCharacterEscaper.self_escape("`123")
-        with pytest.raises(ValueError) as excinfo:
+        with pytest.raises(
+            ValueError,
+            match="Escape character '`' can't be the last character in a string.",
+        ):
             escaper.unescape("`")
-        assert (
-            str(excinfo.value)
-            == "Escape character '`' can't be the last character in a string."
-        ), "Unescaping a string ending with a single escape character should raise ValueError"
         assert escaper.unescape("`a") == "a", "Unescaping '`a' should produce 'a'"
 
     def test_corner_cases_specific(self):
         escaper = PerCharacterEscaper.specified_escape("`a1b2c3d")
-        with pytest.raises(ValueError) as excinfo:
+        with pytest.raises(
+            ValueError,
+            match="Escape character '`' can't be the last character in a string.",
+        ):
             escaper.unescape("`")
-        assert (
-            str(excinfo.value)
-            == "Escape character '`' can't be the last character in a string."
-        ), "Unescaping a string ending with a single escape character should raise ValueError"
         assert escaper.unescape("`e") == "e", "Unescaping '`e' should produce 'e'"
 
     def test_roundtrip(self):
         escaper = PerCharacterEscaper.self_escape("`<>")
 
-        def roundtrip(str):
+        def roundtrip(s):
             assert (
-                escaper.unescape(escaper.escape(str)) == str
-            ), f"Roundtrip of '{str}' did not return the original string"
+                escaper.unescape(escaper.escape(s)) == s
+            ), f"Roundtrip of '{s}' did not return the original string"
 
         roundtrip("")
         roundtrip("<local>~`/")

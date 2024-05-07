@@ -95,7 +95,7 @@ class SourceFile:
                 )
             existing_newlines = self.__function_call_plus_arg.count("\n")
             new_newlines = encoded.count("\n")
-            self.__parent._content_slice = Slice(
+            self.__parent._content_slice = Slice(  # noqa: SLF001
                 self.__function_call_plus_arg.replaceSelfWith(
                     f"{self.__dot_fun_open_paren}{encoded})"
                 )
@@ -119,8 +119,8 @@ class SourceFile:
         assert "\n" not in find
         assert "\n" not in replace
 
-        slice = self.find_on_line(find, line_one_indexed)
-        self._content_slice = Slice(slice.replaceSelfWith(replace))
+        found = self.find_on_line(find, line_one_indexed)
+        self._content_slice = Slice(found.replaceSelfWith(replace))
 
     def parse_to_be_like(self, line_one_indexed: int) -> ToBeLiteral:
         line_content = self._content_slice.unixLine(line_one_indexed)

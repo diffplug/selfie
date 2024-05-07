@@ -83,7 +83,7 @@ class PytestSnapshotFileLayout(SnapshotFileLayout):
                     # look for a file that has a newline somewhere in it
                     if "\n" in txt:
                         return "\r" not in txt
-                except Exception:
+                except UnicodeDecodeError:  # noqa: PERF203
                     # might be a binary file that throws an encoding exception
                     pass
             return True  # if we didn't find any files, assume unix
@@ -105,14 +105,14 @@ def pytest_collection_modifyitems(
 
 
 @pytest.hookimpl
-def pytest_sessionfinish(session: pytest.Session, exitstatus):
+def pytest_sessionfinish(session: pytest.Session, exitstatus):  # noqa: ARG001
     system: PytestSnapshotSystem = session.selfie_system  # type: ignore
     system.finished_all_tests()
     _clearSelfieSystem(system)
 
 
 @pytest.hookimpl(hookwrapper=True)
-def pytest_runtest_protocol(item: pytest.Item, nextitem: Optional[pytest.Item]):
+def pytest_runtest_protocol(item: pytest.Item, nextitem: Optional[pytest.Item]):  # noqa: ARG001
     (file, _, testname) = item.reportinfo()
     testfile = TypedPath.of_file(os.path.abspath(file))
 
@@ -148,7 +148,7 @@ class PytestSnapshotSystem(SnapshotSystem):
     def __init__(self, settings: SelfieSettingsAPI):
         self.__fs = FSImplementation()
         self.__mode = settings.calc_mode()
-        self._layout = PytestSnapshotFileLayout(self.__fs, settings)
+        self.layout_pytest = PytestSnapshotFileLayout(self.__fs, settings)
         self.__comment_tracker = CommentTracker()
         self.__inline_write_tracker = InlineWriteTracker()
         self.__toBeFileWriteTracker = ToBeFileWriteTracker()
@@ -163,7 +163,7 @@ class PytestSnapshotSystem(SnapshotSystem):
             AtomicReference(ArraySet.empty())
         )
 
-    def planning_to_run(self, testfile: TypedPath, testname: str):
+    def planning_to_run(self, testfile: TypedPath, testname: str):  # noqa: ARG002
         progress = self.__progress_per_file[testfile]
         progress.finishes_expected += 1
 
@@ -228,7 +228,7 @@ class PytestSnapshotSystem(SnapshotSystem):
 
     @property
     def layout(self) -> SnapshotFileLayout:
-        return self._layout
+        return self.layout_pytest
 
     def disk_thread_local(self) -> DiskStorage:
         if (
@@ -250,7 +250,7 @@ class PytestSnapshotSystem(SnapshotSystem):
         self, path: TypedPath, data: "ByteString", call: CallStack
     ) -> None:
         # Directly write to disk using ToBeFileWriteTracker
-        self.__toBeFileWriteTracker.writeToDisk(path, data, call, self._layout)
+        self.__toBeFileWriteTracker.writeToDisk(path, data, call, self.layout_pytest)
 
 
 class DiskStoragePytest(DiskStorage):
@@ -258,7 +258,7 @@ class DiskStoragePytest(DiskStorage):
         self.__progress = progress
         self._testname = testname
 
-    def read_disk(self, sub: str, call: "CallStack") -> Optional["Snapshot"]:
+    def read_disk(self, sub: str, call: "CallStack") -> Optional["Snapshot"]:  # noqa: ARG002
         return self.__progress.read(self._testname, self._suffix(sub))
 
     def write_disk(self, actual: "Snapshot", sub: str, call: "CallStack"):
@@ -349,23 +349,21 @@ class SnapshotFileProgress:
         if tests == SnapshotFileProgress.TERMINATED:
             raise ValueError(f"Snapshot for {self.test_file} already terminated!")
         if self.file is not None:
-            # TODO: figure out GC
             stale_snapshot_indices = []
-            # stale_snapshot_indices = WithinTestGC.find_stale_snapshots_within(
-            #     self.file.snapshots,
-            #     tests,
-            #     find_test_methods_that_didnt_run(self.test_file, tests),
-            # )
+            # TODO: figure out GC  # noqa: TD002, FIX002, TD003
+            # stale_snapshot_indices = WithinTestGC.find_stale_snapshots_within(self.file.snapshots, tests, find_test_methods_that_didnt_run(self.test_file, tests))  # noqa: ERA001
             if stale_snapshot_indices or self.file.was_set_at_test_time:
                 self.file.remove_all_indices(stale_snapshot_indices)
-                snapshot_path = self.system._layout.snapshotfile_for_testfile(
+                snapshot_path = self.system.layout_pytest.snapshotfile_for_testfile(
                     self.test_file
                 )
                 if not self.file.snapshots:
                     delete_file_and_parent_dir_if_empty(snapshot_path)
                 else:
                     self.system.mark_path_as_written(
-                        self.system._layout.snapshotfile_for_testfile(self.test_file)
+                        self.system.layout_pytest.snapshotfile_for_testfile(
+                            self.test_file
+                        )
                     )
                     os.makedirs(
                         os.path.dirname(snapshot_path.absolute_path), exist_ok=True
@@ -373,10 +371,10 @@ class SnapshotFileProgress:
                     with open(
                         snapshot_path.absolute_path, "w", encoding="utf-8"
                     ) as writer:
-                        list = []
-                        self.file.serialize(list)
-                        for e in list:
-                            writer.write(e)
+                        filecontent = []
+                        self.file.serialize(filecontent)
+                        for line in filecontent:
+                            writer.write(line)
         else:
             # we never read or wrote to the file
             every_test_in_class_ran = not any(
@@ -388,7 +386,7 @@ class SnapshotFileProgress:
                 and all(it.succeeded_and_used_no_snapshots() for it in tests.values())
             )
             if is_stale:
-                snapshot_file = self.system._layout.snapshotfile_for_testfile(
+                snapshot_file = self.system.layout_pytest.snapshotfile_for_testfile(
                     self.test_file
                 )
                 delete_file_and_parent_dir_if_empty(snapshot_file)
@@ -425,7 +423,7 @@ class SnapshotFileProgress:
 
     def read_file(self) -> SnapshotFile:
         if self.file is None:
-            snapshot_path = self.system._layout.snapshotfile_for_testfile(
+            snapshot_path = self.system.layout_pytest.snapshotfile_for_testfile(
                 self.test_file
             )
             if os.path.exists(snapshot_path.absolute_path) and os.path.isfile(
@@ -436,7 +434,7 @@ class SnapshotFileProgress:
                 self.file = SnapshotFile.parse(SnapshotValueReader.of_binary(content))
             else:
                 self.file = SnapshotFile.create_empty_with_unix_newlines(
-                    self.system._layout.unix_newlines
+                    self.system.layout_pytest.unix_newlines
                 )
         return self.file
 
@@ -451,7 +449,8 @@ def delete_file_and_parent_dir_if_empty(snapshot_file: TypedPath):
 
 
 def find_test_methods_that_didnt_run(
-    testfile: TypedPath, tests: ArrayMap[str, WithinTestGC]
+    testfile: TypedPath,  # noqa: ARG001
+    tests: ArrayMap[str, WithinTestGC],  # noqa: ARG001
 ) -> ArrayMap[str, WithinTestGC]:
     # Implementation of finding test methods that didn't run
     # You can replace this with your own logic based on the class_name and tests dictionary
@@ -471,6 +470,6 @@ def pytest_addoption(parser):
     parser.addini("HELLO", "Dummy pytest.ini setting")
 
 
-@pytest.fixture
+@pytest.fixture()
 def bar(request):
     return request.config.option.dest_foo

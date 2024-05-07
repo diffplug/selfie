@@ -22,10 +22,10 @@ class Language(Enum):
 
 
 class LiteralValue:
-    def __init__(self, expected: T | None, actual: T, format: "LiteralFormat") -> None:
+    def __init__(self, expected: T | None, actual: T, fmt: "LiteralFormat") -> None:
         self.expected = expected
         self.actual = actual
-        self.format = format
+        self.format = fmt
 
 
 class LiteralFormat(Protocol[T]):
@@ -65,11 +65,14 @@ class LiteralInt(LiteralFormat[int]):
             return buffer
 
     def encode(
-        self, value: int, language: Language, encoding_policy: EscapeLeadingWhitespace
+        self,
+        value: int,
+        language: Language,
+        encoding_policy: EscapeLeadingWhitespace,  # noqa: ARG002
     ) -> str:
         return self._encode_underscores(io.StringIO(), value, language).getvalue()
 
-    def parse(self, string: str, language: Language) -> int:
+    def parse(self, string: str, language: Language) -> int:  # noqa: ARG002
         return int(string.replace("_", ""))
 
 
@@ -87,7 +90,7 @@ class LiteralString(LiteralFormat[str]):
                 return self.encodeMultiPython(value, encoding_policy)
         else:
             raise NotImplementedError(
-                "Encoding for language {} is not implemented.".format(language)
+                f"Encoding for language {language} is not implemented."
             )
 
     def parse(self, string: str, language: Language) -> str:
@@ -98,7 +101,7 @@ class LiteralString(LiteralFormat[str]):
                 return self.parseMultiPython(string)
         else:
             raise NotImplementedError(
-                "Encoding for language {} is not implemented.".format(language)
+                f"Encoding for language {language} is not implemented."
             )
 
     def _encodeSinglePython(self, value: str) -> str:
@@ -256,7 +259,7 @@ class LiteralRepr(LiteralFormat[Any]):
         else:
             return repr(value)
 
-    def parse(self, string: str, language: Language) -> Any:
+    def parse(self, string: str, language: Language) -> Any:  # noqa: ARG002
         return eval(string)
 
 
@@ -275,7 +278,7 @@ class LiteralTodoStub(LiteralFormat[TodoStub]):
         language: Language,
         encoding_policy: EscapeLeadingWhitespace,
     ) -> str:
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def parse(self, string: str, language: Language) -> TodoStub:
-        raise NotImplementedError()
+        raise NotImplementedError

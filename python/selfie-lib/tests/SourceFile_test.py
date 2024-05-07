@@ -1,3 +1,5 @@
+import pytest
+
 from selfie_lib import SourceFile
 
 
@@ -7,15 +9,13 @@ def python_test(source_raw, function_call_plus_arg_raw, arg_raw=""):
     arg = arg_raw.replace("'", '"')
     parsed = SourceFile("UnderTest.py", source)
     to_be_literal = parsed.parse_to_be_like(1)
-    assert to_be_literal._get_function_call_plus_arg() == function_call_plus_arg
-    assert to_be_literal._get_arg() == arg
+    assert to_be_literal._get_function_call_plus_arg() == function_call_plus_arg  # noqa: SLF001
+    assert to_be_literal._get_arg() == arg  # noqa: SLF001
 
 
 def python_test_error(source_raw, error_msg):
-    try:
+    with pytest.raises(ValueError, match=error_msg):
         python_test(source_raw, "unusedArg")
-    except AssertionError as e:
-        assert str(e) == error_msg
 
 
 def todo():

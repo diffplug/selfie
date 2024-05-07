@@ -13,8 +13,8 @@ Our CI server runs three checks in the `selfie-lib` directory.
 
 - `poetry run pytest` - run tests
 - `poetry run pyright` - type checking
-- `poetry run ruff check` - code formatting
-  - `poetry run ruff format` to fix any problems that `check` found
+- `poetry run ruff format --check && poetry run ruff check` - code lint & formatting
+  - `poetry run ruff format && poetry run ruff --fix` to fix
 
 The same setup is used for `pytest-selfie` and `example-pytest-selfie`.
 

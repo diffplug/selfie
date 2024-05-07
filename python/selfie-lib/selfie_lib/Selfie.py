@@ -1,7 +1,5 @@
-from typing import Any, Optional, Protocol, TypeVar, Union, overload
+from typing import Any, TypeVar, Union, overload
 
-from .CacheSelfie import CacheSelfie
-from .RoundTrip import Roundtrip
 from .SelfieImplementations import ReprSelfie, StringSelfie
 from .Snapshot import Snapshot
 from .SnapshotSystem import _selfieSystem
@@ -10,19 +8,12 @@ from .SnapshotSystem import _selfieSystem
 T = TypeVar("T", covariant=True)
 
 
-# Define Cacheable as a generic protocol
-class Cacheable(Protocol[T]):
-    def __call__(self) -> T:
-        """Method to get the cached object."""
-        raise NotImplementedError
-
-
 @overload
 def expect_selfie(actual: str) -> StringSelfie: ...
 
 
 # @overload
-# def expect_selfie(actual: bytes) -> BinarySelfie: ...
+# def expect_selfie(actual: bytes) -> BinarySelfie: ...  # noqa: ERA001
 
 
 @overload
@@ -38,27 +29,3 @@ def expect_selfie(
         return StringSelfie(snapshot, diskStorage)
     else:
         return ReprSelfie(actual)
-
-
-@overload
-def cache_selfie(to_cache: Cacheable[str]) -> CacheSelfie[str]: ...
-
-
-@overload
-def cache_selfie(
-    to_cache: Cacheable[T], roundtrip: Roundtrip[T, str]
-) -> CacheSelfie[T]: ...
-
-
-def cache_selfie(
-    to_cache: Union[Cacheable[str], Cacheable[T]],
-    roundtrip: Optional[Roundtrip[T, str]] = None,
-) -> Union[CacheSelfie[str], CacheSelfie[T]]:
-    if roundtrip is None:
-        # the cacheable better be a string!
-        return cache_selfie(to_cache, Roundtrip.identity())  # type: ignore
-    elif isinstance(roundtrip, Roundtrip) and to_cache is not None:
-        deferred_disk_storage = _selfieSystem().disk_thread_local()
-        return CacheSelfie(deferred_disk_storage, roundtrip, to_cache)
-    else:
-        raise TypeError("Invalid arguments provided to cache_selfie")

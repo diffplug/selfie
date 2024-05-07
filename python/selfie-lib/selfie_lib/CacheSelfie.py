@@ -1,22 +1,52 @@
 import base64
-from typing import Any, Generic, Optional, TypeVar
+from typing import Any, Generic, Optional, Protocol, TypeVar, Union, overload
 
 from .Literals import LiteralString, LiteralValue, TodoStub
-from .RoundTrip import Roundtrip
+from .Roundtrip import Roundtrip
 from .Snapshot import Snapshot
-from .SnapshotSystem import DiskStorage
+from .SnapshotSystem import DiskStorage, _selfieSystem
 from .WriteTracker import recordCall
 
-T = TypeVar("T")
+T = TypeVar("T", covariant=True)
+
+
+class Cacheable(Protocol[T]):
+    def __call__(self) -> T:
+        """Method to get the cached object."""
+        raise NotImplementedError
+
+
+@overload
+def cache_selfie(to_cache: Cacheable[str]) -> "CacheSelfie[str]": ...
+
+
+@overload
+def cache_selfie(
+    to_cache: Cacheable[T], roundtrip: Roundtrip[T, str]
+) -> "CacheSelfie[T]": ...
+
+
+def cache_selfie(
+    to_cache: Union[Cacheable[str], Cacheable[T]],
+    roundtrip: Optional[Roundtrip[T, str]] = None,
+) -> Union["CacheSelfie[str]", "CacheSelfie[T]"]:
+    if roundtrip is None:
+        # the cacheable better be a string!
+        return cache_selfie(to_cache, Roundtrip.identity())  # type: ignore
+    elif isinstance(roundtrip, Roundtrip) and to_cache is not None:
+        deferred_disk_storage = _selfieSystem().disk_thread_local()
+        return CacheSelfie(deferred_disk_storage, roundtrip, to_cache)  # type: ignore
+    else:
+        raise TypeError("Invalid arguments provided to cache_selfie")
 
 
 class CacheSelfie(Generic[T]):
-    def __init__(self, disk: DiskStorage, roundtrip: Roundtrip[T, str], generator):
-        from .Selfie import Cacheable
-
-        self.disk: DiskStorage = disk
-        self.roundtrip: Roundtrip[T, str] = roundtrip
-        self.generator: Cacheable[T] = generator
+    def __init__(
+        self, disk: DiskStorage, roundtrip: Roundtrip[T, str], generator: Cacheable[T]
+    ):
+        self.disk = disk
+        self.roundtrip = roundtrip
+        self.generator = generator
 
     def to_match_disk(self, sub: str = "") -> T:
         return self._to_match_disk_impl(sub, False)
@@ -25,8 +55,6 @@ class CacheSelfie(Generic[T]):
         return self._to_match_disk_impl(sub, True)
 
     def _to_match_disk_impl(self, sub: str, is_todo: bool) -> T:
-        from .Selfie import _selfieSystem
-
         call = recordCall(False)
         system = _selfieSystem()
         if system.mode.can_write(is_todo, call, system):
@@ -50,15 +78,13 @@ class CacheSelfie(Generic[T]):
                     )
                 return self.roundtrip.parse(snapshot.subject.value_string())
 
-    def to_be_TODO(self, unused_arg: Optional[Any] = None) -> T:
+    def to_be_TODO(self, _: Optional[Any] = None) -> T:
         return self._to_be_impl(None)
 
     def to_be(self, expected: str) -> T:
         return self._to_be_impl(expected)
 
     def _to_be_impl(self, snapshot: Optional[str]) -> T:
-        from .Selfie import _selfieSystem
-
         call = recordCall(False)
         system = _selfieSystem()
         writable = system.mode.can_write(snapshot is None, call, system)
@@ -80,9 +106,14 @@ class CacheSelfie(Generic[T]):
 
 
 class CacheSelfieBinary(Generic[T]):
-    def __init__(self, disk: DiskStorage, roundtrip: Roundtrip[T, bytes], generator):
-        self.disk: DiskStorage = disk
-        self.roundtrip: Roundtrip[T, bytes] = roundtrip
+    def __init__(
+        self,
+        disk: DiskStorage,
+        roundtrip: Roundtrip[T, bytes],
+        generator: Cacheable[T],
+    ):
+        self.disk = disk
+        self.roundtrip = roundtrip
         self.generator = generator
 
     def to_match_disk(self, sub: str = "") -> T:
@@ -92,8 +123,6 @@ class CacheSelfieBinary(Generic[T]):
         return self._to_match_disk_impl(sub, True)
 
     def _to_match_disk_impl(self, sub: str, is_todo: bool) -> T:
-        from .Selfie import _selfieSystem
-
         system = _selfieSystem()
         call = recordCall(False)
 
@@ -117,9 +146,7 @@ class CacheSelfieBinary(Generic[T]):
 
                 if snapshot.subject.is_binary or len(snapshot.facets) > 0:
                     raise Exception(
-                        "Expected a binary subject with no facets, got {}".format(
-                            snapshot
-                        )
+                        f"Expected a binary subject with no facets, got {snapshot}"
                     )
 
                 return self.roundtrip.parse(snapshot.subject.value_binary())
@@ -131,8 +158,6 @@ class CacheSelfieBinary(Generic[T]):
         return self._to_be_file_impl(subpath, False)
 
     def _to_be_file_impl(self, subpath: str, is_todo: bool) -> T:
-        from .Selfie import _selfieSystem
-
         system = _selfieSystem()
         call = recordCall(False)
         writable = system.mode.can_write(is_todo, call, system)
@@ -155,15 +180,13 @@ class CacheSelfieBinary(Generic[T]):
                     serialized_data = file.read()
                 return self.roundtrip.parse(serialized_data)
 
-    def to_be_base64_TODO(self, unused_arg: Optional[Any] = None) -> T:
+    def to_be_base64_TODO(self, _: Optional[Any] = None) -> T:
         return self._to_be_base64_impl(None)
 
     def to_be_base64(self, snapshot: str) -> T:
         return self._to_be_base64_impl(snapshot)
 
     def _to_be_base64_impl(self, snapshot: Optional[str]) -> T:
-        from .Selfie import _selfieSystem
-
         system = _selfieSystem()
         call = recordCall(False)
         writable = system.mode.can_write(snapshot is None, call, system)

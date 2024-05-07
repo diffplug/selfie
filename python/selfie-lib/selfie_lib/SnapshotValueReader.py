@@ -62,7 +62,7 @@ class SnapshotValueReader:
     def skip_value(self) -> None:
         self.__next_key()
         self.__reset_line()
-        self.__scan_value(lambda line: None)
+        self.__scan_value(lambda _: None)
 
     def __scan_value(self, consumer: Callable[[str], None]) -> None:
         nextLine: Optional[str] = self.__next_line()

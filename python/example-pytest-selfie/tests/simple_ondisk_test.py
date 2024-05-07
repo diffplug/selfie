@@ -1,4 +1,4 @@
-from selfie_lib.Selfie import expect_selfie
+from selfie_lib import expect_selfie
 
 
 def test_write():
@@ -6,4 +6,4 @@ def test_write():
 
 
 def test_read():
-    expect_selfie("B").to_match_disk_TODO()
+    expect_selfie("B").to_match_disk()

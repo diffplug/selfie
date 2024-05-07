@@ -6,26 +6,25 @@ from selfie_lib.Literals import LiteralString
 
 class TestLiteralString:
     @pytest.mark.parametrize(
-        "value, expected",
+        ("value", "expected"),
         [("1", '"1"'), ("\\", '"\\\\"'), ("1\n\tABC", '"1\\n\\tABC"')],
     )
     def test_encode_single(self, value, expected):
         literal_string = LiteralString()
-        actual = literal_string._encodeSinglePython(value)
-        print(actual)
+        actual = literal_string._encodeSinglePython(value)  # noqa: SLF001
         assert actual == expected
 
     @pytest.mark.parametrize(
-        "value, expected",
+        ("value", "expected"),
         [("1", "`1`"), ("\\", "`\\\\`"), ("1\n\tABC", "`1\\n\\tABC`")],
     )
     def test_encode_single_with_dollars(self, value, expected):
         literal_string = LiteralString()
-        actual = literal_string._encodeSinglePython(value)
+        actual = literal_string._encodeSinglePython(value)  # noqa: SLF001
         assert actual == expected.replace("`", '"')
 
     @pytest.mark.parametrize(
-        "value, expected",
+        ("value", "expected"),
         [
             ("1", "'''\n1'''"),
             ("\\", "'''\n\\\\'''"),
@@ -41,19 +40,18 @@ class TestLiteralString:
         assert actual == expected.replace("'", '"')
 
     @pytest.mark.parametrize(
-        "value, expected", [("1", "1"), ("\\\\", "\\"), ("1\\n\\tABC", "1\n\tABC")]
+        ("value", "expected"), [("1", "1"), ("\\\\", "\\"), ("1\\n\\tABC", "1\n\tABC")]
     )
     def test_parse_single(self, value, expected):
         literal_string = LiteralString()
-        actual = literal_string._parseSinglePython(f'"{value.replace("'", "\"")}"')
+        actual = literal_string._parseSinglePython(f'"{value.replace("'", "\"")}"')  # noqa: SLF001
         assert actual == expected
 
     @pytest.mark.parametrize(
-        "value, expected",
+        ("value", "expected"),
         [
             ("\n123\nabc", "123\nabc"),
             ("\n  123\n  abc", "123\nabc"),
-            ("\n  123  \n  abc\t", "123\nabc"),
             ("\n  123  \n  abc\t", "123\nabc"),
             ("\n  123  \\s\n  abc\t\\s", "123   \nabc\t "),
         ],
