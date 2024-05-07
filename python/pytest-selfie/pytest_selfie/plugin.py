@@ -349,13 +349,9 @@ class SnapshotFileProgress:
         if tests == SnapshotFileProgress.TERMINATED:
             raise ValueError(f"Snapshot for {self.test_file} already terminated!")
         if self.file is not None:
-            # TODO: figure out GC
             stale_snapshot_indices = []
-            # stale_snapshot_indices = WithinTestGC.find_stale_snapshots_within(
-            #     self.file.snapshots,
-            #     tests,
-            #     find_test_methods_that_didnt_run(self.test_file, tests),
-            # )
+            # TODO: figure out GC  # noqa: TD002, FIX002, TD003
+            # stale_snapshot_indices = WithinTestGC.find_stale_snapshots_within(self.file.snapshots, tests, find_test_methods_that_didnt_run(self.test_file, tests))  # noqa: ERA001
             if stale_snapshot_indices or self.file.was_set_at_test_time:
                 self.file.remove_all_indices(stale_snapshot_indices)
                 snapshot_path = self.system.layout_pytest.snapshotfile_for_testfile(
@@ -453,7 +449,8 @@ def delete_file_and_parent_dir_if_empty(snapshot_file: TypedPath):
 
 
 def find_test_methods_that_didnt_run(
-    testfile: TypedPath, tests: ArrayMap[str, WithinTestGC]
+    testfile: TypedPath,  # noqa: ARG001
+    tests: ArrayMap[str, WithinTestGC],  # noqa: ARG001
 ) -> ArrayMap[str, WithinTestGC]:
     # Implementation of finding test methods that didn't run
     # You can replace this with your own logic based on the class_name and tests dictionary
