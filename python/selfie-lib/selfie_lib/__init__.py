@@ -10,7 +10,7 @@ from .LineReader import LineReader as LineReader
 from .Literals import LiteralValue as LiteralValue
 from .ParseException import ParseException as ParseException
 from .PerCharacterEscaper import PerCharacterEscaper as PerCharacterEscaper
-from .RoundTrip import Roundtrip as Roundtrip
+from .Roundtrip import Roundtrip as Roundtrip
 from .Selfie import expect_selfie as expect_selfie
 from .Slice import Slice as Slice
 from .Snapshot import Snapshot as Snapshot
