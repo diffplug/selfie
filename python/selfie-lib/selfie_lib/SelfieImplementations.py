@@ -158,11 +158,6 @@ class StringSelfie(DiskSelfie, StringFacet, ReprSelfie[str]):
 
     def to_be(self, expected: str) -> str:
         actual_string = self.__actual()
-
-        # Check if expected is a string
-        if not isinstance(expected, str):
-            raise TypeError("Expected value must be a string")
-
         if actual_string == expected:
             return _checkSrc(actual_string)
         else:
