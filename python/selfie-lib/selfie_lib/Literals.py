@@ -259,8 +259,8 @@ class LiteralRepr(LiteralFormat[Any]):
         else:
             return repr(value)
 
-    def parse(self, string: str, language: Language) -> Any:  # noqa: ARG002
-        return eval(string)
+    def parse(self, string: str, language: Language) -> Any:
+        raise NotImplementedError
 
 
 class TodoStub(Enum):

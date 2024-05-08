@@ -1,7 +1,7 @@
 from typing import Any
 
 from .EscapeLeadingWhitespace import EscapeLeadingWhitespace
-from .Literals import Language, LiteralFormat, LiteralValue
+from .Literals import Language, LiteralFormat, LiteralRepr, LiteralValue
 from .Slice import Slice
 
 
@@ -78,21 +78,25 @@ class SourceFile:
 
         def set_literal_and_get_newline_delta(self, literal_value: LiteralValue) -> int:
             encoded = literal_value.format.encode(
-                literal_value.actual, self.__language, self.__escape_leading_whitespace
+                literal_value.actual,
+                self.__language,
+                self.__escape_leading_whitespace,
             )
-            round_tripped = literal_value.format.parse(encoded, self.__language)
-            if round_tripped != literal_value.actual:
-                raise ValueError(
-                    f"There is an error in {literal_value.format.__class__.__name__}, "
-                    "the following value isn't round tripping.\n"
-                    f"Please report this error and the data below at "
-                    "https://github.com/diffplug/selfie/issues/new\n"
-                    f"```\n"
-                    f"ORIGINAL\n{literal_value.actual}\n"
-                    f"ROUNDTRIPPED\n{round_tripped}\n"
-                    f"ENCODED ORIGINAL\n{encoded}\n"
-                    f"```\n"
-                )
+            if not isinstance(literal_value.format, LiteralRepr):
+                # we don't roundtrip LiteralRepr because `eval` is dangerous
+                round_tripped = literal_value.format.parse(encoded, self.__language)
+                if round_tripped != literal_value.actual:
+                    raise ValueError(
+                        f"There is an error in {literal_value.format.__class__.__name__}, "
+                        "the following value isn't round tripping.\n"
+                        f"Please report this error and the data below at "
+                        "https://github.com/diffplug/selfie/issues/new\n"
+                        f"```\n"
+                        f"ORIGINAL\n{literal_value.actual}\n"
+                        f"ROUNDTRIPPED\n{round_tripped}\n"
+                        f"ENCODED ORIGINAL\n{encoded}\n"
+                        f"```\n"
+                    )
             existing_newlines = self.__function_call_plus_arg.count("\n")
             new_newlines = encoded.count("\n")
             self.__parent._content_slice = Slice(  # noqa: SLF001
