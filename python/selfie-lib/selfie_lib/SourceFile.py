@@ -156,7 +156,9 @@ class SourceFile:
         end_arg = -1
         end_paren = 0
         if self._content_slice[arg_start] == '"':
-            if self._content_slice[arg_start].startswith(self.TRIPLE_QUOTE):
+            if self._content_slice.subSequence(
+                arg_start, len(self._content_slice)
+            ).starts_with(self.TRIPLE_QUOTE):
                 end_arg = self._content_slice.indexOf(
                     self.TRIPLE_QUOTE, arg_start + len(self.TRIPLE_QUOTE)
                 )
