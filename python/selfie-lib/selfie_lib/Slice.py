@@ -89,3 +89,8 @@ class Slice:
 
     def baseLineAtOffset(self, index: int) -> int:
         return 1 + Slice(self.base, 0, index).count("\n")
+
+    def starts_with(self, prefix: str) -> bool:
+        if len(prefix) > len(self):
+            return False
+        return all(self[i] == prefix[i] for i in range(len(prefix)))
