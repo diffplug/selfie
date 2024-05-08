@@ -26,11 +26,11 @@ class TestLiteralString:
     @pytest.mark.parametrize(
         ("value", "expected"),
         [
-            ("1", "'''\n1'''"),
-            ("\\", "'''\n\\\\'''"),
+            ("1", "'''1'''"),
+            ("\\", "'''\\\\'''"),
             (
                 "  leading\ntrailing  ",
-                "'''\n" + "  leading\n" + "trailing \\u0020'''",
+                "'''  leading\ntrailing \\u0020'''",
             ),
         ],
     )

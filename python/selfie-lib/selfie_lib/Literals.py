@@ -160,7 +160,7 @@ class LiteralString(LiteralFormat[str]):
             for line in lines
         )
 
-        return f"{TRIPLE_QUOTE}\n{protect_whitespace}{TRIPLE_QUOTE}"
+        return f"{TRIPLE_QUOTE}{protect_whitespace}{TRIPLE_QUOTE}"
 
     _char_literal_pattern = re.compile(r"""\{'(\\?.)'\}""")
 
