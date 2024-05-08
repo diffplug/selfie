@@ -111,14 +111,14 @@ internal object SnapshotSystemJUnit5 : SnapshotSystem {
       if (inlineWriteTracker.hasWrites()) {
         inlineWriteTracker.persistWrites(layout)
       }
-    }
-    for (stale in findStaleSnapshotFiles(layout)) {
-      val staleFile = layout.snapshotPathForClass(stale)
-      if (snapshotsFilesWrittenToDisk.contains(staleFile)) {
-        throw AssertionError(
-            "Selfie wrote a snapshot and then marked it stale for deletion in the same run: $staleFile\nSelfie will delete this snapshot on the next run, which is bad! Why is Selfie marking this snapshot as stale?")
-      } else {
-        deleteFileAndParentDirIfEmpty(staleFile)
+      for (stale in findStaleSnapshotFiles(layout)) {
+        val staleFile = layout.snapshotPathForClass(stale)
+        if (snapshotsFilesWrittenToDisk.contains(staleFile)) {
+          throw AssertionError(
+              "Selfie wrote a snapshot and then marked it stale for deletion in the same run: $staleFile\nSelfie will delete this snapshot on the next run, which is bad! Why is Selfie marking this snapshot as stale?")
+        } else {
+          deleteFileAndParentDirIfEmpty(staleFile)
+        }
       }
     }
   }
