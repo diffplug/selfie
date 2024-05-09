@@ -44,36 +44,22 @@ MAX_RAW_NUMBER = 1000
 PADDING_SIZE = len(str(MAX_RAW_NUMBER)) - 1
 
 
-class LiteralInt(LiteralFormat[int]):
-    def _encode_underscores(
-        self, buffer: io.StringIO, value: int, language: Language
-    ) -> io.StringIO:
-        if value >= MAX_RAW_NUMBER:
-            mod = value % MAX_RAW_NUMBER
-            left_padding = PADDING_SIZE - len(str(mod))
-            self._encode_underscores(buffer, value // MAX_RAW_NUMBER, language)
-            buffer.write("_")
-            buffer.write("0" * left_padding)
-            buffer.write(str(mod))
-            return buffer
-        elif value < 0:
-            buffer.write("-")
-            self._encode_underscores(buffer, abs(value), language)
-            return buffer
-        else:
-            buffer.write(str(value))
-            return buffer
-
-    def encode(
-        self,
-        value: int,
-        language: Language,
-        encoding_policy: EscapeLeadingWhitespace,  # noqa: ARG002
-    ) -> str:
-        return self._encode_underscores(io.StringIO(), value, language).getvalue()
-
-    def parse(self, string: str, language: Language) -> int:  # noqa: ARG002
-        return int(string.replace("_", ""))
+def _encode_int_underscores(buffer: io.StringIO, value: int) -> str:
+    if value >= MAX_RAW_NUMBER:
+        mod = value % MAX_RAW_NUMBER
+        left_padding = PADDING_SIZE - len(str(mod))
+        _encode_int_underscores(buffer, value // MAX_RAW_NUMBER)
+        buffer.write("_")
+        buffer.write("0" * left_padding)
+        buffer.write(str(mod))
+        return buffer.getvalue()
+    elif value < 0:
+        buffer.write("-")
+        _encode_int_underscores(buffer, abs(value))
+        return buffer.getvalue()
+    else:
+        buffer.write(str(value))
+        return buffer.getvalue()
 
 
 TRIPLE_QUOTE = '"""'
@@ -252,10 +238,13 @@ class LiteralString(LiteralFormat[str]):
 
 class LiteralRepr(LiteralFormat[Any]):
     def encode(
-        self, value: Any, language: Language, encoding_policy: EscapeLeadingWhitespace
+        self,
+        value: Any,
+        language: Language,  # noqa: ARG002
+        encoding_policy: EscapeLeadingWhitespace,  # noqa: ARG002
     ) -> str:
         if isinstance(value, int):
-            return LiteralInt().encode(value, language, encoding_policy)
+            return _encode_int_underscores(io.StringIO(), value)
         else:
             return repr(value)
 
