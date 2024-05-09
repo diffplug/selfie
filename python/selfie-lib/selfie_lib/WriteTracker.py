@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Dict, Generic, List, Optional, TypeVar, cast
 
 from .FS import FS
-from .Literals import LiteralTodoStub, LiteralValue, TodoStub
+from .Literals import LiteralString, LiteralTodoStub, LiteralValue, TodoStub
 from .SourceFile import SourceFile
 from .TypedPath import TypedPath
 
@@ -175,7 +175,11 @@ class InlineWriteTracker(WriteTracker[CallLocation, LiteralValue]):
 
         file = layout.sourcefile_for_call(call.location)
 
-        if snapshot.expected is not None:
+        if (
+            snapshot.expected is not None
+            and isinstance(snapshot.expected, str)
+            and isinstance(snapshot.format, LiteralString)
+        ):
             content = SourceFile(file.name, layout.fs.file_read(file))
             try:
                 snapshot = cast(LiteralValue, snapshot)
