@@ -212,27 +212,10 @@ class LiteralString(LiteralFormat[str]):
         return value.getvalue()
 
     def parseMultiPython(self, source_with_quotes: str) -> str:
-        assert source_with_quotes.startswith(TRIPLE_QUOTE + "\n")
+        assert source_with_quotes.startswith(TRIPLE_QUOTE)
         assert source_with_quotes.endswith(TRIPLE_QUOTE)
-
-        source = source_with_quotes[len(TRIPLE_QUOTE) + 1 : -len(TRIPLE_QUOTE)]
-        lines = source.split("\n")
-
-        common_prefix = min(
-            (line[: len(line) - len(line.lstrip())] for line in lines if line.strip()),
-            default="",
-        )
-
-        def remove_common_prefix(line: str) -> str:
-            return line[len(common_prefix) :] if common_prefix else line
-
-        def handle_escape_sequences(line: str) -> str:
-            return self._unescape_python(line.rstrip())
-
-        return "\n".join(
-            handle_escape_sequences(remove_common_prefix(line))
-            for line in lines
-            if line.strip()
+        return self._unescape_python(
+            source_with_quotes[len(TRIPLE_QUOTE) : -len(TRIPLE_QUOTE)]
         )
 
 
