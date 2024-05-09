@@ -95,14 +95,14 @@ internal class SnapshotSystemKotest(settings: SelfieSettingsAPI) : SnapshotSyste
       if (inlineWriteTracker.hasWrites()) {
         inlineWriteTracker.persistWrites(layout)
       }
-    }
-    for (stale in findStaleSnapshotFiles(layout)) {
-      val staleFile = layout.snapshotPathForClassOrFilename(stale)
-      if (snapshotsFilesWrittenToDisk.contains(staleFile)) {
-        throw AssertionError(
-            "Selfie wrote a snapshot and then marked it stale for deletion in the same run: $staleFile\nSelfie will delete this snapshot on the next run, which is bad! Why is Selfie marking this snapshot as stale?")
-      } else {
-        deleteFileAndParentDirIfEmpty(staleFile)
+      for (stale in findStaleSnapshotFiles(layout)) {
+        val staleFile = layout.snapshotPathForClassOrFilename(stale)
+        if (snapshotsFilesWrittenToDisk.contains(staleFile)) {
+          throw AssertionError(
+              "Selfie wrote a snapshot and then marked it stale for deletion in the same run: $staleFile\nSelfie will delete this snapshot on the next run, which is bad! Why is Selfie marking this snapshot as stale?")
+        } else {
+          deleteFileAndParentDirIfEmpty(staleFile)
+        }
       }
     }
   }
