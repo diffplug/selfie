@@ -1,7 +1,7 @@
 from typing import Any
 
 from .EscapeLeadingWhitespace import EscapeLeadingWhitespace
-from .Literals import Language, LiteralFormat, LiteralValue
+from .Literals import Language, LiteralFormat, LiteralRepr, LiteralValue
 from .Slice import Slice
 
 
@@ -78,21 +78,25 @@ class SourceFile:
 
         def set_literal_and_get_newline_delta(self, literal_value: LiteralValue) -> int:
             encoded = literal_value.format.encode(
-                literal_value.actual, self.__language, self.__escape_leading_whitespace
+                literal_value.actual,
+                self.__language,
+                self.__escape_leading_whitespace,
             )
-            round_tripped = literal_value.format.parse(encoded, self.__language)
-            if round_tripped != literal_value.actual:
-                raise ValueError(
-                    f"There is an error in {literal_value.format.__class__.__name__}, "
-                    "the following value isn't round tripping.\n"
-                    f"Please report this error and the data below at "
-                    "https://github.com/diffplug/selfie/issues/new\n"
-                    f"```\n"
-                    f"ORIGINAL\n{literal_value.actual}\n"
-                    f"ROUNDTRIPPED\n{round_tripped}\n"
-                    f"ENCODED ORIGINAL\n{encoded}\n"
-                    f"```\n"
-                )
+            if not isinstance(literal_value.format, LiteralRepr):
+                # we don't roundtrip LiteralRepr because `eval` is dangerous
+                round_tripped = literal_value.format.parse(encoded, self.__language)
+                if round_tripped != literal_value.actual:
+                    raise ValueError(
+                        f"There is an error in {literal_value.format.__class__.__name__}, "
+                        "the following value isn't round tripping.\n"
+                        f"Please report this error and the data below at "
+                        "https://github.com/diffplug/selfie/issues/new\n"
+                        f"```\n"
+                        f"ORIGINAL\n{literal_value.actual}\n"
+                        f"ROUNDTRIPPED\n{round_tripped}\n"
+                        f"ENCODED ORIGINAL\n{encoded}\n"
+                        f"```\n"
+                    )
             existing_newlines = self.__function_call_plus_arg.count("\n")
             new_newlines = encoded.count("\n")
             self.__parent._content_slice = Slice(  # noqa: SLF001
@@ -153,48 +157,98 @@ class SourceFile:
                     f"on line {line_one_indexed}"
                 )
 
-        end_arg = -1
-        end_paren = 0
         if self._content_slice[arg_start] == '"':
-            if self._content_slice.subSequence(
-                arg_start, len(self._content_slice)
-            ).starts_with(self.TRIPLE_QUOTE):
-                end_arg = self._content_slice.indexOf(
-                    self.TRIPLE_QUOTE, arg_start + len(self.TRIPLE_QUOTE)
+            (end_paren, end_arg) = self._parse_string(
+                line_one_indexed, arg_start, dot_fun_open_paren
+            )
+        else:
+            (end_paren, end_arg) = self._parse_code(
+                line_one_indexed, arg_start, dot_fun_open_paren
+            )
+        return self.ToBeLiteral(
+            self,
+            dot_fun_open_paren.replace("_TODO", ""),
+            self._content_slice.subSequence(dot_function_call, end_paren + 1),
+            self._content_slice.subSequence(arg_start, end_arg),
+            self.__language,
+            self.__escape_leading_whitespace,
+        )
+
+    def _parse_code(
+        self,
+        line_one_indexed: int,
+        arg_start: int,
+        dot_fun_open_paren: str,
+    ):
+        # Initialize variables
+        parenthesis_count = 1
+        string_delimiter = None
+
+        # Iterate through the characters starting from the given index
+        for i in range(arg_start, len(self._content_slice)):
+            char = self._content_slice[i]
+
+            # Check if we are entering or leaving a string
+            if char in ["'", '"'] and self._content_slice[i - 1] != "\\":
+                if not string_delimiter:
+                    string_delimiter = char
+                elif char == string_delimiter:
+                    string_delimiter = None
+
+            # Skip characters inside strings
+            if string_delimiter:
+                continue
+
+            # Count parentheses
+            if char == "(":
+                parenthesis_count += 1
+            elif char == ")":
+                parenthesis_count -= 1
+
+            # If all parentheses are closed, return the current index
+            if parenthesis_count == 0:
+                end_paren = i
+                end_arg = i - 1
+                return (end_paren, end_arg)
+        # else ...
+        raise AssertionError(
+            f"Appears to be an unclosed function call `{dot_fun_open_paren}` "
+            f"starting at line {line_one_indexed}"
+        )
+
+    def _parse_string(
+        self,
+        line_one_indexed: int,
+        arg_start: int,
+        dot_fun_open_paren: str,
+    ):
+        if self._content_slice.subSequence(
+            arg_start, len(self._content_slice)
+        ).starts_with(self.TRIPLE_QUOTE):
+            end_arg = self._content_slice.indexOf(
+                self.TRIPLE_QUOTE, arg_start + len(self.TRIPLE_QUOTE)
+            )
+            if end_arg == -1:
+                raise AssertionError(
+                    f"Appears to be an unclosed multiline string literal `{self.TRIPLE_QUOTE}` "
+                    f"on line {line_one_indexed}"
                 )
-                if end_arg == -1:
-                    raise AssertionError(
-                        f"Appears to be an unclosed multiline string literal `{self.TRIPLE_QUOTE}` "
-                        f"on line {line_one_indexed}"
-                    )
-                else:
-                    end_arg += len(self.TRIPLE_QUOTE)
-                    end_paren = end_arg
             else:
-                end_arg = arg_start + 1
-                while (
-                    self._content_slice[end_arg] != '"'
-                    or self._content_slice[end_arg - 1] == "\\"
-                ):
-                    end_arg += 1
-                    if end_arg == self._content_slice.__len__():
-                        raise AssertionError(
-                            f'Appears to be an unclosed string literal `"` '
-                            f"on line {line_one_indexed}"
-                        )
-                end_arg += 1
+                end_arg += len(self.TRIPLE_QUOTE)
                 end_paren = end_arg
         else:
-            end_arg = arg_start
-            while not self._content_slice[end_arg].isspace():
-                if self._content_slice[end_arg] == ")":
-                    break
+            end_arg = arg_start + 1
+            while (
+                self._content_slice[end_arg] != '"'
+                or self._content_slice[end_arg - 1] == "\\"
+            ):
                 end_arg += 1
                 if end_arg == self._content_slice.__len__():
                     raise AssertionError(
-                        f"Appears to be an unclosed numeric literal "
+                        f'Appears to be an unclosed string literal `"` '
                         f"on line {line_one_indexed}"
                     )
+            end_arg += 1
             end_paren = end_arg
         while self._content_slice[end_paren] != ")":
             if not self._content_slice[end_paren].isspace():
@@ -210,14 +264,7 @@ class SourceFile:
                     f"Appears to be an unclosed function call `{dot_fun_open_paren}` "
                     f"starting at line {line_one_indexed}"
                 )
-        return self.ToBeLiteral(
-            self,
-            dot_fun_open_paren.replace("_TODO", ""),
-            self._content_slice.subSequence(dot_function_call, end_paren + 1),
-            self._content_slice.subSequence(arg_start, end_arg),
-            self.__language,
-            self.__escape_leading_whitespace,
-        )
+        return (end_paren, end_arg)
 
 
 TO_BE_LIKES = [
