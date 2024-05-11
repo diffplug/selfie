@@ -20,7 +20,7 @@ spotless {
 dependencies {
   testImplementation project(':selfie-runner-junit5')
   testImplementation "org.jetbrains.kotlin:kotlin-test-junit5:$ver_KOTLIN_TEST"
-  testImplementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0"
+  testImplementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1"
   testImplementation "org.junit.jupiter:junit-jupiter:$ver_JUNIT_USE"
   testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
