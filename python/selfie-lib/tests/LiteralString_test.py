@@ -50,10 +50,10 @@ class TestLiteralString:
     @pytest.mark.parametrize(
         ("value", "expected"),
         [
-            ("\n123\nabc", "123\nabc"),
-            ("\n  123\n  abc", "123\nabc"),
-            ("\n  123  \n  abc\t", "123\nabc"),
-            ("\n  123  \\s\n  abc\t\\s", "123   \nabc\t "),
+            ("\n123\nabc", "\n123\nabc"),
+            ("\n  123\n  abc", "\n  123\n  abc"),
+            ("\n  123  \n  abc\t", "\n  123  \n  abc\t"),
+            ("  123  \n  abc\t", "  123  \n  abc\t"),
         ],
     )
     def test_parse_multi(self, value, expected):

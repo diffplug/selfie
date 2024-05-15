@@ -208,7 +208,7 @@ class SourceFile:
             # If all parentheses are closed, return the current index
             if parenthesis_count == 0:
                 end_paren = i
-                end_arg = i - 1
+                end_arg = i
                 return (end_paren, end_arg)
         # else ...
         raise AssertionError(
