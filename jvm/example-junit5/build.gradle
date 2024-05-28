@@ -5,10 +5,10 @@ repositories {
   mavenCentral()
 }
 dependencies {
-  implementation 'io.jooby:jooby:3.0.10'
-  implementation 'io.jooby:jooby-netty:3.0.10'
+  implementation 'io.jooby:jooby:3.1.2'
+  implementation 'io.jooby:jooby-netty:3.1.2'
   implementation 'jakarta.mail:jakarta.mail-api:2.1.3'
-  testImplementation 'io.jooby:jooby-test:3.0.10'
+  testImplementation 'io.jooby:jooby-test:3.1.2'
   testImplementation "org.junit.jupiter:junit-jupiter:$ver_JUNIT_USE"
   testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
   testImplementation 'io.rest-assured:rest-assured:5.4.0'
