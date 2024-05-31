@@ -11,6 +11,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- For java versions which don't support multiline string literals, we now encode multiline strings like so:
+  - ```java
+    toBe("line1",
+         "line2",
+         "line3");
+    ```
+### Changed
+- Bump Kotlin to 2.0.0. ([#405](https://github.com/diffplug/selfie/pull/405))
 ### Fixed
 - Do not remove stale snapshot files when readonly is true. ([#367](https://github.com/diffplug/selfie/pull/367))
 
