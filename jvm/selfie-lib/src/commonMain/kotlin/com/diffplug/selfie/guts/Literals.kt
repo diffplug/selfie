@@ -136,7 +136,7 @@ internal object LiteralString : LiteralFormat<String>() {
             // TODO: support triple-quoted strings in groovy
             // https://github.com/diffplug/selfie/issues/105
             Language.GROOVY,
-            Language.JAVA_PRE15 -> encodeSingleJava(value)
+            Language.JAVA_PRE15 -> encodeMultiAsSingleJava(value)
             Language.JAVA -> encodeMultiJava(value, encodingPolicy)
             Language.KOTLIN -> encodeMultiKotlin(value, encodingPolicy)
           }
@@ -200,6 +200,8 @@ internal object LiteralString : LiteralFormat<String>() {
     val toUnescape = if (removeDollars) inlineDollars(source) else source
     return unescapeJava(toUnescape)
   }
+  fun encodeMultiAsSingleJava(arg: String): String =
+      arg.lines().joinToString(",\n") { encodeSingleJava(it) }
   fun encodeMultiKotlin(arg: String, escapeLeadingWhitespace: EscapeLeadingWhitespace): String {
     val escapeDollars = arg.replace("$", KOTLIN_DOLLAR)
     val escapeTripleQuotes =
