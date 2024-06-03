@@ -168,6 +168,11 @@ class SourceFile(filename: String, content: String) {
         contentSlice.subSequence(dotFunctionCall, endParen + 1),
         fullArg)
   }
+
+  companion object {
+    internal inline fun commaDelimitedParseCleanup(str: String): String =
+        str.efficientReplace("\",\n\"", "\\n")
+  }
   private fun argSlice(
       argStartInitial: Int,
       dotFunOpenParen: String,

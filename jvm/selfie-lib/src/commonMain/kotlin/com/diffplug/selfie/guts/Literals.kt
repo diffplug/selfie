@@ -145,7 +145,7 @@ internal object LiteralString : LiteralFormat<String>() {
           when (language) {
             Language.SCALA,
             Language.JAVA_PRE15,
-            Language.JAVA -> parseSingleJava(str)
+            Language.JAVA -> parseSingleJava(SourceFile.commaDelimitedParseCleanup(str))
             Language.GROOVY,
             Language.KOTLIN -> parseSingleJavaWithDollars(str)
           }
