@@ -64,6 +64,12 @@ object Selfie {
   @JvmStatic fun expectSelfie(actual: Boolean) = BooleanSelfie(actual)
 
   @JvmStatic
+  fun <T> expectSelfies(items: Iterable<T>, toString: (T) -> String): StringSelfie {
+    val snapshots = items.joinToString("\n", transform = toString)
+    return expectSelfie(snapshots)
+  }
+
+  @JvmStatic
   fun cacheSelfie(toCache: Cacheable<String>) = cacheSelfie(Roundtrip.identity(), toCache)
 
   @JvmStatic
