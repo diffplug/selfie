@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- Added `Selfie.expectSelfies(Iterable<T> items, Function<T, String> toString)` for doing easy "multi-asserts". ([#416](https://github.com/diffplug/selfie/pull/416))
 - For java versions which don't support multiline string literals, we now encode multiline strings like so: ([#406](https://github.com/diffplug/selfie/pull/406))
   - ```java
     toBe("line1",
