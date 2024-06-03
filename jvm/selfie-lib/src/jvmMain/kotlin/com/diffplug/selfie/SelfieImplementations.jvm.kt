@@ -16,16 +16,23 @@
 package com.diffplug.selfie
 
 actual interface StringFacet : FluentFacet {
+  /** Expects this string to be equal to the expected string. */
   actual fun toBe(expected: String): String
+
+  /** Marks that the expected value should be written when the test executes. */
   actual fun toBe_TODO(): String
+
+  /** Alias for [toBe_TODO], the argument is ignored. */
   fun toBe_TODO(unusedArg: Any?): String = toBe_TODO()
 
-  // the methods below are aliases for multiline strings for JAVA_PRE15
+  /** Alias for [toBe_TODO], the arguments are ignored. */
   fun toBe_TODO(
       expected: String,
       expectedLine2: String,
       vararg expectedOtherLines: String
   ): String = toBe_TODO()
+
+  /** Expects this string to be equal to the value of all its arguments concatenated by newlines. */
   fun toBe(expected: String, expectedLine2: String, vararg expectedOtherLines: String): String {
     val buffer = StringBuilder()
     buffer.append(expected)
