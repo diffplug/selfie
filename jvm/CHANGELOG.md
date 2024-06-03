@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
-- For java versions which don't support multiline string literals, we now encode multiline strings like so:
+- For java versions which don't support multiline string literals, we now encode multiline strings like so: ([#406](https://github.com/diffplug/selfie/pull/406))
   - ```java
     toBe("line1",
          "line2",
