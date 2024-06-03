@@ -85,7 +85,12 @@ sealed class WriteTracker<K : Comparable<K>, V> {
         }
     if (existing.snapshot != snapshot) {
       throw layout.fs.assertFailed(
-          "Snapshot was set to multiple values!\n  first time: ${existing.callStack.location.ideLink(layout)}\n   this time: ${call.location.ideLink(layout)}\n$howToFix",
+          "Snapshot was set to multiple values!\n" +
+              "  first value: ${existing.snapshot}\n" +
+              "    this time: ${snapshot}\n" +
+              "   first call: ${existing.callStack.ideLink(layout)}\n" +
+              "    this call: ${call.ideLink(layout)}\n" +
+              "$howToFix",
           existing.snapshot,
           snapshot)
     } else if (!layout.allowMultipleEquivalentWritesToOneLocation) {

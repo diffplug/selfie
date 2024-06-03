@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bump Kotlin to 2.0.0. ([#405](https://github.com/diffplug/selfie/pull/405))
 ### Fixed
 - Do not remove stale snapshot files when readonly is true. ([#367](https://github.com/diffplug/selfie/pull/367))
+- Provide more debugging info when a snapshot gets set multiple times. (helps with [#370](https://github.com/diffplug/selfie/issues/370))
 
 ## [2.0.2] - 2024-03-20
 ### Fixed
