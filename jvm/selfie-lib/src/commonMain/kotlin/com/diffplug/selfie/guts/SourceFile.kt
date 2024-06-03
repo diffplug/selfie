@@ -44,9 +44,9 @@ class SourceFile(filename: String, content: String) {
    */
   inner class ToBeLiteral
   internal constructor(
-      internal val dotFunOpenParen: String,
+      private val dotFunOpenParen: String,
       internal val functionCallPlusArg: Slice,
-      internal val arg: Slice,
+      internal val arg: String,
   ) {
     /**
      * Modifies the parent [SourceFile] to set the value within the `toBe` call, and returns the net
@@ -85,7 +85,7 @@ class SourceFile(filename: String, content: String) {
      * `toBe_TODO()`.
      */
     fun <T : Any> parseLiteral(literalFormat: LiteralFormat<T>): T {
-      return literalFormat.parse(arg.toString(), language)
+      return literalFormat.parse(arg, language)
     }
   }
   fun removeSelfieOnceComments() {
@@ -121,11 +121,64 @@ class SourceFile(filename: String, content: String) {
                 "Expected to find inline assertion on line $lineOneIndexed, but there was only `${lineContent}`")
     val dotFunctionCallInPlace = lineContent.indexOf(dotFunOpenParen)
     val dotFunctionCall = dotFunctionCallInPlace + lineContent.startIndex
-    var argStart = dotFunctionCall + dotFunOpenParen.length
+    val argStart = dotFunctionCall + dotFunOpenParen.length
     if (contentSlice.length == argStart) {
       throw AssertionError(
           "Appears to be an unclosed function call `$dotFunOpenParen)` on line $lineOneIndexed")
     }
+
+    var commaDelimitedNewlines: MutableList<Slice>? = null
+    val arg = argSlice(argStart, dotFunOpenParen, lineOneIndexed)
+    var endParen = arg.endIndex
+    while (contentSlice[endParen] != ')') {
+      val nextChar = contentSlice[endParen]
+      if (nextChar == ',') {
+        val nextArg = argSlice(endParen + 1, dotFunOpenParen, lineOneIndexed)
+        if (commaDelimitedNewlines == null) {
+          commaDelimitedNewlines = mutableListOf(arg, nextArg)
+        } else {
+          commaDelimitedNewlines.add(nextArg)
+        }
+        endParen = nextArg.endIndex - 1
+      } else if (!nextChar.isWhitespace()) {
+        throw AssertionError(
+            "Non-primitive literal in `$dotFunOpenParen)` starting at line $lineOneIndexed: error for character `${contentSlice[endParen]}` on line ${contentSlice.baseLineAtOffset(endParen)}")
+      }
+      ++endParen
+      if (endParen == contentSlice.length) {
+        throw AssertionError(
+            "Appears to be an unclosed function call `$dotFunOpenParen)` starting at line $lineOneIndexed")
+      }
+    }
+    val fullArg =
+        if (commaDelimitedNewlines == null) arg.toString()
+        else
+            commaDelimitedNewlines.joinToString("\\n", "\"", "\"") {
+              check(it.startsWith("\"") && it.endsWith("\"")) {
+                "Expected string literal to start with a single quote on line ${
+                    it.baseLineAtOffset(
+                        0
+                    )
+                }"
+              }
+              it.subSequence(1, it.length - 1)
+            }
+    return ToBeLiteral(
+        dotFunOpenParen.replace("_TODO", ""),
+        contentSlice.subSequence(dotFunctionCall, endParen + 1),
+        fullArg)
+  }
+
+  companion object {
+    internal inline fun commaDelimitedParseCleanup(str: String): String =
+        str.efficientReplace("\",\n\"", "\\n")
+  }
+  private fun argSlice(
+      argStartInitial: Int,
+      dotFunOpenParen: String,
+      lineOneIndexed: Int,
+  ): Slice {
+    var argStart = argStartInitial
     while (contentSlice[argStart].isWhitespace()) {
       ++argStart
       if (contentSlice.length == argStart) {
@@ -133,10 +186,8 @@ class SourceFile(filename: String, content: String) {
             "Appears to be an unclosed function call `$dotFunOpenParen)` on line $lineOneIndexed")
       }
     }
-
     // argStart is now the first non-whitespace character after the opening paren
-    var endArg = -1
-    var endParen: Int
+    var endArg: Int
     if (contentSlice[argStart] == '"') {
       if (contentSlice.subSequence(argStart, contentSlice.length).startsWith(TRIPLE_QUOTE)) {
         endArg = contentSlice.indexOf(TRIPLE_QUOTE, argStart + TRIPLE_QUOTE.length)
@@ -145,7 +196,6 @@ class SourceFile(filename: String, content: String) {
               "Appears to be an unclosed multiline string literal `${TRIPLE_QUOTE}` on line $lineOneIndexed")
         } else {
           endArg += TRIPLE_QUOTE.length
-          endParen = endArg
         }
       } else {
         endArg = argStart + 1
@@ -157,7 +207,6 @@ class SourceFile(filename: String, content: String) {
           }
         }
         endArg += 1
-        endParen = endArg
       }
     } else {
       endArg = argStart
@@ -170,23 +219,8 @@ class SourceFile(filename: String, content: String) {
           throw AssertionError("Appears to be an unclosed numeric literal on line $lineOneIndexed")
         }
       }
-      endParen = endArg
     }
-    while (contentSlice[endParen] != ')') {
-      if (!contentSlice[endParen].isWhitespace()) {
-        throw AssertionError(
-            "Non-primitive literal in `$dotFunOpenParen)` starting at line $lineOneIndexed: error for character `${contentSlice[endParen]}` on line ${contentSlice.baseLineAtOffset(endParen)}")
-      }
-      ++endParen
-      if (endParen == contentSlice.length) {
-        throw AssertionError(
-            "Appears to be an unclosed function call `$dotFunOpenParen)` starting at line $lineOneIndexed")
-      }
-    }
-    return ToBeLiteral(
-        dotFunOpenParen.replace("_TODO", ""),
-        contentSlice.subSequence(dotFunctionCall, endParen + 1),
-        contentSlice.subSequence(argStart, endArg))
+    return contentSlice.subSequence(argStart, endArg)
   }
 }
 private val TO_BE_LIKES = listOf(".toBe(", ".toBe_TODO(", ".toBeBase64(", ".toBeBase64_TODO(")

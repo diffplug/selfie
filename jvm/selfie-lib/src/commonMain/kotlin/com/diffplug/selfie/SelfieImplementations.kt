@@ -69,9 +69,8 @@ interface FluentFacet {
   fun facetBinary(facet: String): BinaryFacet
 }
 
-interface StringFacet : FluentFacet {
+expect interface StringFacet : FluentFacet {
   fun toBe(expected: String): String
-  fun toBe_TODO(unusedArg: Any?): String = toBe_TODO()
   fun toBe_TODO(): String
 }
 

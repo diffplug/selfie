@@ -99,4 +99,20 @@ class LiteralStringTest {
     val actual = LiteralString.parseSingleJavaWithDollars("\"${value}\"")
     actual shouldBe expected
   }
+
+  @Test
+  fun encodeMultiAsSingleJava() {
+    encodeMultiAsSingleJava(
+        "1\n 2\n\t3",
+        """
+"1",
+" 2",
+"\t3"
+    """
+            .trimIndent())
+  }
+  private fun encodeMultiAsSingleJava(value: String, expected: String) {
+    val actual = LiteralString.encodeMultiAsSingleJava(value)
+    actual shouldBe expected.replace("'", "\"")
+  }
 }
