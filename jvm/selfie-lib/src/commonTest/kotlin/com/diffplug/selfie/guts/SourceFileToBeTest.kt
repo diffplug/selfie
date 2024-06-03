@@ -58,6 +58,11 @@ class SourceFileToBeTest {
   }
 
   @Test
+  fun multiLineStringAsSingle() {
+    javaTest(".toBe('1',\n' 2',\n'\\t3')", "'1\\n 2\\n\\t3'")
+  }
+
+  @Test
   fun errorUnclosed() {
     javaTestError(".toBe(", "Appears to be an unclosed function call `.toBe()` on line 1")
     javaTestError(".toBe(  \n ", "Appears to be an unclosed function call `.toBe()` on line 1")

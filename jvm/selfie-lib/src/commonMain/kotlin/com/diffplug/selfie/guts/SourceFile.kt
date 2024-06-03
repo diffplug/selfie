@@ -126,11 +126,21 @@ class SourceFile(filename: String, content: String) {
       throw AssertionError(
           "Appears to be an unclosed function call `$dotFunOpenParen)` on line $lineOneIndexed")
     }
+
+    var commaDelimitedNewlines: MutableList<Slice>? = null
     val arg = argSlice(argStart, dotFunOpenParen, lineOneIndexed)
     var endParen = arg.endIndex
     while (contentSlice[endParen] != ')') {
       val nextChar = contentSlice[endParen]
-      if (!nextChar.isWhitespace()) {
+      if (nextChar == ',') {
+        val nextArg = argSlice(endParen + 1, dotFunOpenParen, lineOneIndexed)
+        if (commaDelimitedNewlines == null) {
+          commaDelimitedNewlines = mutableListOf(arg, nextArg)
+        } else {
+          commaDelimitedNewlines.add(nextArg)
+        }
+        endParen = nextArg.endIndex - 1
+      } else if (!nextChar.isWhitespace()) {
         throw AssertionError(
             "Non-primitive literal in `$dotFunOpenParen)` starting at line $lineOneIndexed: error for character `${contentSlice[endParen]}` on line ${contentSlice.baseLineAtOffset(endParen)}")
       }
@@ -140,10 +150,23 @@ class SourceFile(filename: String, content: String) {
             "Appears to be an unclosed function call `$dotFunOpenParen)` starting at line $lineOneIndexed")
       }
     }
+    val fullArg =
+        if (commaDelimitedNewlines == null) arg.toString()
+        else
+            commaDelimitedNewlines.joinToString("\\n", "\"", "\"") {
+              check(it.startsWith("\"") && it.endsWith("\"")) {
+                "Expected string literal to start with a single quote on line ${
+                    it.baseLineAtOffset(
+                        0
+                    )
+                }"
+              }
+              it.subSequence(1, it.length - 1)
+            }
     return ToBeLiteral(
         dotFunOpenParen.replace("_TODO", ""),
         contentSlice.subSequence(dotFunctionCall, endParen + 1),
-        arg.toString())
+        fullArg)
   }
   private fun argSlice(
       argStartInitial: Int,

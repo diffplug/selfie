@@ -101,7 +101,7 @@ class LiteralStringTest {
   }
 
   @Test
-  fun encodeMultiAsJava() {
+  fun encodeMultiAsSingleJava() {
     encodeMultiAsSingleJava(
         "1\n 2\n\t3",
         """
