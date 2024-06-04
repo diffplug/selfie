@@ -15,7 +15,9 @@
  */
 package com.diffplug.selfie
 
-internal actual fun codePointAt(input: String, index: Int): Int = input.codePointAt(index)
+internal actual fun codePointAt(s: String, i: Int): Int = s.codePointAt(i)
+
+internal actual fun charCount(codePoint: Int): Int = Character.charCount(codePoint)
 
 /**
  * If your escape policy is "'123", it means this:
@@ -47,7 +49,7 @@ private constructor(
           break@outer
         }
       }
-      offset += Character.charCount(codepoint)
+      offset += charCount(codepoint)
     }
     return firstOffsetNeedingEscape
   }
@@ -63,7 +65,7 @@ private constructor(
       var offset = noEscapes
       while (offset < length) {
         val codepoint = codePointAt(input, offset)
-        offset += Character.charCount(codepoint)
+        offset += charCount(codepoint)
         val idx = indexOf(escapedCodePoints, codepoint)
         if (idx == -1) {
           builder.appendCodePoint(codepoint)
@@ -85,7 +87,7 @@ private constructor(
         firstOffsetNeedingEscape = offset
         break
       }
-      offset += Character.charCount(codepoint)
+      offset += charCount(codepoint)
     }
     return firstOffsetNeedingEscape
   }
@@ -101,7 +103,7 @@ private constructor(
       var offset = noEscapes
       while (offset < length) {
         var codepoint = codePointAt(input, offset)
-        offset += Character.charCount(codepoint)
+        offset += charCount(codepoint)
         // if we need to escape something, escape it
         if (codepoint == escapeCodePoint) {
           if (offset < length) {
@@ -110,7 +112,7 @@ private constructor(
             if (idx != -1) {
               codepoint = escapedCodePoints[idx]
             }
-            offset += Character.charCount(codepoint)
+            offset += charCount(codepoint)
           } else {
             throw IllegalArgumentException(
                 "Escape character '" +

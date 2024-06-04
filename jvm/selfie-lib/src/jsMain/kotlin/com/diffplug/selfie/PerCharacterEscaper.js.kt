@@ -15,7 +15,12 @@
  */
 package com.diffplug.selfie
 
-internal actual fun codePointAt(input: String, index: Int): Int = js("value.codePointAt(offset)")
+internal actual fun codePointAt(s: String, i: Int): Int = js("s.codePointAt(i)")
+
+private const val MIN_SUPPLEMENTARY_CODE_POINT = 0x010000
+
+internal actual fun charCount(codePoint: Int): Int =
+    if (codePoint >= MIN_SUPPLEMENTARY_CODE_POINT) 2 else 1
 
 /**
  * If your escape policy is "'123", it means this:
@@ -35,7 +40,6 @@ private constructor(
     private val escapedCodePoints: IntArray,
     private val escapedByCodePoints: IntArray
 ) {
-  val MIN_SUPPLEMENTARY_CODE_POINT = 0x010000
   val MAX_CODE_POINT = 0X10FFFF
   val MIN_LOW_SURROGATE = '\uDC00'
   val MIN_HIGH_SURROGATE = '\uD800'
@@ -71,9 +75,6 @@ private constructor(
     //     codePoint >= MIN_CODE_POINT && codePoint <= MAX_CODE_POINT
     val plane = codePoint ushr 16
     return plane < MAX_CODE_POINT + 1 ushr 16
-  }
-  private fun charCount(codePoint: Int): Int {
-    return if (codePoint >= MIN_SUPPLEMENTARY_CODE_POINT) 2 else 1
   }
   private fun firstOffsetNeedingEscape(input: String): Int {
     val length = input.length
