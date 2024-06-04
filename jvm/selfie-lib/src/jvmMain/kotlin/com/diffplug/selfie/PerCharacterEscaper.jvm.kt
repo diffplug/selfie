@@ -15,6 +15,8 @@
  */
 package com.diffplug.selfie
 
+internal actual fun codePointAt(input: String, index: Int): Int = input.codePointAt(index)
+
 /**
  * If your escape policy is "'123", it means this:
  * ```
@@ -38,7 +40,7 @@ private constructor(
     var firstOffsetNeedingEscape = -1
     var offset = 0
     outer@ while (offset < length) {
-      val codepoint = input.codePointAt(offset)
+      val codepoint = codePointAt(input, offset)
       for (escaped in escapedCodePoints) {
         if (codepoint == escaped) {
           firstOffsetNeedingEscape = offset
@@ -60,7 +62,7 @@ private constructor(
       builder.append(input, 0, noEscapes)
       var offset = noEscapes
       while (offset < length) {
-        val codepoint = input.codePointAt(offset)
+        val codepoint = codePointAt(input, offset)
         offset += Character.charCount(codepoint)
         val idx = indexOf(escapedCodePoints, codepoint)
         if (idx == -1) {
@@ -78,7 +80,7 @@ private constructor(
     var firstOffsetNeedingEscape = -1
     var offset = 0
     while (offset < length) {
-      val codepoint = input.codePointAt(offset)
+      val codepoint = codePointAt(input, offset)
       if (codepoint == escapeCodePoint) {
         firstOffsetNeedingEscape = offset
         break
@@ -98,12 +100,12 @@ private constructor(
       builder.append(input, 0, noEscapes)
       var offset = noEscapes
       while (offset < length) {
-        var codepoint = input.codePointAt(offset)
+        var codepoint = codePointAt(input, offset)
         offset += Character.charCount(codepoint)
         // if we need to escape something, escape it
         if (codepoint == escapeCodePoint) {
           if (offset < length) {
-            codepoint = input.codePointAt(offset)
+            codepoint = codePointAt(input, offset)
             val idx = indexOf(escapedByCodePoints, codepoint)
             if (idx != -1) {
               codepoint = escapedCodePoints[idx]

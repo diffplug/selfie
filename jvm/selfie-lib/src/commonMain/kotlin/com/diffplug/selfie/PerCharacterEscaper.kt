@@ -15,6 +15,8 @@
  */
 package com.diffplug.selfie
 
+internal expect fun codePointAt(input: String, index: Int): Int
+
 expect class PerCharacterEscaper {
   fun escape(input: String): String
   fun unescape(input: String): String

@@ -15,6 +15,8 @@
  */
 package com.diffplug.selfie
 
+internal actual fun codePointAt(input: String, index: Int): Int = js("value.codePointAt(offset)")
+
 /**
  * If your escape policy is "'123", it means this:
  * ```
@@ -171,10 +173,6 @@ private constructor(
         }
       }
       return -1
-    }
-    private fun codePointAt(value: String, offset: Int): Int {
-      val codePoint = js("value.codePointAt(offset)")
-      return codePoint
     }
     private fun codePoints(value: String): IntArray {
       val result = mutableListOf<Int>()
