@@ -11,6 +11,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- `SelfieSettingsAPI` now has a field `javaDontUseTripleQuoteLiterals` which ensures that multiline strings are always encoded as `"` strings. ([#417](https://github.com/diffplug/selfie/pull/417))
 
 ## [2.1.0] - 2024-06-03
 ### Added

@@ -24,10 +24,9 @@ private const val TRIPLE_QUOTE = "\"\"\""
  *   parsing).
  * @param content The exact content of the file, unix or windows newlines will be preserved
  */
-class SourceFile(filename: String, content: String) {
+class SourceFile(filename: String, content: String, val language: Language) {
   private val unixNewlines = content.indexOf('\r') == -1
   private var contentSlice = Slice(content.efficientReplace("\r\n", "\n"))
-  private val language = Language.fromFilename(filename)
   private val escapeLeadingWhitespace =
       EscapeLeadingWhitespace.appropriateFor(contentSlice.toString())
 

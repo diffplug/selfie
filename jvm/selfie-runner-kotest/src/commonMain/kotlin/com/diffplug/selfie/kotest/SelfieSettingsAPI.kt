@@ -92,6 +92,18 @@ open class SelfieSettingsAPI {
       }
     }
 
+  /**
+   * By default, Selfie will encode multiline strings using triple quotes if the runtime supports
+   * it, or it will use comma-delimited single-quote strings if the runtime doesn't. This can cause
+   * a problem if you develop on Java 17 (and generate `toBe` assertions there) and then run your
+   * tests in CI on Java 11.
+   *
+   * <p>
+   * If you override this value to true, Selfie will never use triple quote literals.
+   */
+  open val javaDontUseTripleQuoteLiterals: Boolean
+    get() = false
+
   internal companion object {
     private val STANDARD_DIRS =
         listOf(

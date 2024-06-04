@@ -130,7 +130,15 @@ interface SnapshotFileLayout {
   val rootFolder: TypedPath
   val fs: FS
   val allowMultipleEquivalentWritesToOneLocation: Boolean
+  val javaDontUseTripleQuoteLiterals: Boolean
   fun sourcePathForCall(call: CallLocation): TypedPath
   fun sourcePathForCallMaybe(call: CallLocation): TypedPath?
   fun checkForSmuggledError()
+  fun parseSourceFile(file: TypedPath): SourceFile {
+    var language = Language.fromFilename(file.name)
+    if (language == Language.JAVA && javaDontUseTripleQuoteLiterals) {
+      language = Language.JAVA_PRE15
+    }
+    return SourceFile(file.name, fs.fileRead(file), language)
+  }
 }

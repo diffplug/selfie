@@ -25,7 +25,6 @@ import com.diffplug.selfie.guts.InlineWriteTracker
 import com.diffplug.selfie.guts.LiteralValue
 import com.diffplug.selfie.guts.SnapshotFileLayout
 import com.diffplug.selfie.guts.SnapshotSystem
-import com.diffplug.selfie.guts.SourceFile
 import com.diffplug.selfie.guts.ToBeFileWriteTracker
 import com.diffplug.selfie.guts.TypedPath
 import com.diffplug.selfie.guts.WithinTestGC
@@ -104,7 +103,7 @@ internal object SnapshotSystemJUnit5 : SnapshotSystem {
 
     if (mode != Mode.readonly) {
       for (path in commentTracker.pathsWithOnce()) {
-        val source = SourceFile(path.name, layout.fs.fileRead(path))
+        val source = layout.parseSourceFile(path)
         source.removeSelfieOnceComments()
         layout.fs.fileWrite(path, source.asString)
       }
