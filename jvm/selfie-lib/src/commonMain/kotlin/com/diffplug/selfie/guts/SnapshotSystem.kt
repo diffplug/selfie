@@ -133,4 +133,7 @@ interface SnapshotFileLayout {
   fun sourcePathForCall(call: CallLocation): TypedPath
   fun sourcePathForCallMaybe(call: CallLocation): TypedPath?
   fun checkForSmuggledError()
+  fun parseSourceFile(file: TypedPath): SourceFile {
+    return SourceFile(file.name, fs.fileRead(file), Language.fromFilename(file.name))
+  }
 }
