@@ -97,7 +97,7 @@ class SourceFileToBeTest {
     val source = sourceRaw.replace('\'', '"')
     val functionCallPlusArg = functionCallPlusArgRaw.replace('\'', '"')
     val arg = argRaw.replace('\'', '"')
-    val parsed = SourceFile("UnderTest.java", source)
+    val parsed = SourceFile("UnderTest.java", source, Language.JAVA_PRE15)
     parsed.parseToBeLike(1).functionCallPlusArg.toString() shouldBe functionCallPlusArg
     parsed.parseToBeLike(1).arg.toString() shouldBe arg
   }
