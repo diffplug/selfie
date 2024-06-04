@@ -31,6 +31,7 @@ class SnapshotFileLayoutJUnit5(settings: SelfieSettingsAPI, override val fs: FS)
   private val otherSourceRoots = settings.otherSourceRoots
   override val allowMultipleEquivalentWritesToOneLocation =
       settings.allowMultipleEquivalentWritesToOneLocation
+  override val javaDontUseTripleQuoteLiterals = settings.javaDontUseTripleQuoteLiterals
   val snapshotFolderName = settings.snapshotFolderName
   internal val unixNewlines = inferDefaultLineEndingIsUnix(rootFolder, fs)
   val extension: String = ".ss"
