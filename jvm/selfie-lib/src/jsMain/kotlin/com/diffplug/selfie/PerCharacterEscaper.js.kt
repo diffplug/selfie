@@ -18,6 +18,9 @@ package com.diffplug.selfie
 internal actual fun codePointAt(s: String, i: Int): Int = js("s.codePointAt(i)")
 
 private const val MIN_SUPPLEMENTARY_CODE_POINT = 0x010000
+private const val MAX_CODE_POINT = 0X10FFFF
+private const val MIN_LOW_SURROGATE = '\uDC00'
+private const val MIN_HIGH_SURROGATE = '\uD800'
 
 internal actual fun charCount(codePoint: Int): Int =
     if (codePoint >= MIN_SUPPLEMENTARY_CODE_POINT) 2 else 1
@@ -31,6 +34,34 @@ internal actual fun codePoints(s: String): IntArray {
     offset += 1
   }
   return result.toIntArray()
+}
+private fun highSurrogate(codePoint: Int): Char {
+  return ((codePoint ushr 10) + (MIN_HIGH_SURROGATE - (MIN_SUPPLEMENTARY_CODE_POINT ushr 10)).code)
+      .toChar()
+}
+private fun lowSurrogate(codePoint: Int): Char {
+  return ((codePoint and 0x3ff) + MIN_LOW_SURROGATE.code).toChar()
+}
+private fun isBmpCodePoint(codePoint: Int): Boolean {
+  return codePoint ushr 16 == 0
+}
+private fun isValidCodePoint(codePoint: Int): Boolean {
+  // Optimized form of:
+  //     codePoint >= MIN_CODE_POINT && codePoint <= MAX_CODE_POINT
+  val plane = codePoint ushr 16
+  return plane < MAX_CODE_POINT + 1 ushr 16
+}
+
+internal actual fun StringBuilder.appendCP(codePoint: Int): StringBuilder {
+  if (isBmpCodePoint(codePoint)) {
+    append(codePoint.toChar())
+  } else if (isValidCodePoint(codePoint)) {
+    append(highSurrogate(codePoint))
+    append(lowSurrogate(codePoint))
+  } else {
+    throw IllegalArgumentException("Not a valid Unicode code point: $codePoint")
+  }
+  return this
 }
 
 /**
@@ -51,42 +82,6 @@ private constructor(
     private val escapedCodePoints: IntArray,
     private val escapedByCodePoints: IntArray
 ) {
-  val MAX_CODE_POINT = 0X10FFFF
-  val MIN_LOW_SURROGATE = '\uDC00'
-  val MIN_HIGH_SURROGATE = '\uD800'
-  private fun highSurrogate(codePoint: Int): Char {
-    return ((codePoint ushr 10) +
-            (MIN_HIGH_SURROGATE - (MIN_SUPPLEMENTARY_CODE_POINT ushr 10)).code)
-        .toChar()
-  }
-  private fun lowSurrogate(codePoint: Int): Char {
-    return ((codePoint and 0x3ff) + MIN_LOW_SURROGATE.code).toChar()
-  }
-  private fun toSurrogates(codePoint: Int, dst: CharArray, index: Int) {
-    // We write elements "backwards" to guarantee all-or-nothing
-    dst[index + 1] = lowSurrogate(codePoint)
-    dst[index] = highSurrogate(codePoint)
-  }
-  private fun toChars(codePoint: Int): CharArray {
-    return if (isBmpCodePoint(codePoint)) {
-      charArrayOf(codePoint.toChar())
-    } else if (isValidCodePoint(codePoint)) {
-      val result = CharArray(2)
-      toSurrogates(codePoint, result, 0)
-      result
-    } else {
-      throw IllegalArgumentException("Not a valid Unicode code point: $codePoint")
-    }
-  }
-  private fun isBmpCodePoint(codePoint: Int): Boolean {
-    return codePoint ushr 16 == 0
-  }
-  private fun isValidCodePoint(codePoint: Int): Boolean {
-    // Optimized form of:
-    //     codePoint >= MIN_CODE_POINT && codePoint <= MAX_CODE_POINT
-    val plane = codePoint ushr 16
-    return plane < MAX_CODE_POINT + 1 ushr 16
-  }
   private fun firstOffsetNeedingEscape(input: String): Int {
     val length = input.length
     var firstOffsetNeedingEscape = -1
@@ -118,10 +113,10 @@ private constructor(
         offset += charCount(codepoint)
         val idx = indexOf(escapedCodePoints, codepoint)
         if (idx == -1) {
-          builder.append(toChars(codepoint))
+          builder.appendCP(codepoint)
         } else {
-          builder.append(toChars(escapeCodePoint))
-          builder.append(toChars(escapedByCodePoints[idx]))
+          builder.appendCP(escapeCodePoint)
+          builder.appendCP(escapedByCodePoints[idx])
         }
       }
       builder.toString()
@@ -165,13 +160,15 @@ private constructor(
             offset += charCount(codepoint)
           } else {
             throw IllegalArgumentException(
-                "Escape character '" +
-                    toChars(escapeCodePoint).concatToString(0, 0 + 1) +
-                    "' can't be the last character in a string.")
+                StringBuilder()
+                    .append("Escape character '")
+                    .appendCP(escapeCodePoint)
+                    .append("' can't be the last character in a string.")
+                    .toString())
           }
         }
         // we didn't escape it, append it raw
-        builder.append(toChars(codepoint))
+        builder.appendCP(codepoint)
       }
       builder.toString()
     }

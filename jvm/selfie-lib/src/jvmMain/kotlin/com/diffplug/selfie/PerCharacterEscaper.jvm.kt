@@ -21,6 +21,8 @@ internal actual fun charCount(codePoint: Int): Int = Character.charCount(codePoi
 
 internal actual fun codePoints(s: String): IntArray = s.codePoints().toArray()
 
+internal actual fun StringBuilder.appendCP(codePoint: Int) = this.appendCodePoint(codePoint)
+
 /**
  * If your escape policy is "'123", it means this:
  * ```
@@ -70,10 +72,10 @@ private constructor(
         offset += charCount(codepoint)
         val idx = indexOf(escapedCodePoints, codepoint)
         if (idx == -1) {
-          builder.appendCodePoint(codepoint)
+          builder.appendCP(codepoint)
         } else {
-          builder.appendCodePoint(escapeCodePoint)
-          builder.appendCodePoint(escapedByCodePoints[idx])
+          builder.appendCP(escapeCodePoint)
+          builder.appendCP(escapedByCodePoints[idx])
         }
       }
       builder.toString()
@@ -117,13 +119,15 @@ private constructor(
             offset += charCount(codepoint)
           } else {
             throw IllegalArgumentException(
-                "Escape character '" +
-                    String(intArrayOf(escapeCodePoint), 0, 1) +
-                    "' can't be the last character in a string.")
+                StringBuilder()
+                    .append("Escape character '")
+                    .appendCP(escapeCodePoint)
+                    .append("' can't be the last character in a string.")
+                    .toString())
           }
         }
         // we didn't escape it, append it raw
-        builder.appendCodePoint(codepoint)
+        builder.appendCP(codepoint)
       }
       builder.toString()
     }

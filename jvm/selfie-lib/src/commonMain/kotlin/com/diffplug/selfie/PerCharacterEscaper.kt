@@ -21,6 +21,8 @@ internal expect fun charCount(codePoint: Int): Int
 
 internal expect fun codePoints(s: String): IntArray
 
+internal expect fun StringBuilder.appendCP(codePoint: Int): StringBuilder
+
 expect class PerCharacterEscaper {
   fun escape(input: String): String
   fun unescape(input: String): String
