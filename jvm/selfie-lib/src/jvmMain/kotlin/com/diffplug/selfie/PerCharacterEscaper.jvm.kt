@@ -19,6 +19,8 @@ internal actual fun codePointAt(s: String, i: Int): Int = s.codePointAt(i)
 
 internal actual fun charCount(codePoint: Int): Int = Character.charCount(codePoint)
 
+internal actual fun codePoints(s: String): IntArray = s.codePoints().toArray()
+
 /**
  * If your escape policy is "'123", it means this:
  * ```
@@ -137,12 +139,12 @@ private constructor(
       return -1
     }
     actual fun selfEscape(escapePolicy: String): PerCharacterEscaper {
-      val escapedCodePoints = escapePolicy.codePoints().toArray()
+      val escapedCodePoints = codePoints(escapePolicy)
       val escapeCodePoint = escapedCodePoints[0]
       return PerCharacterEscaper(escapeCodePoint, escapedCodePoints, escapedCodePoints)
     }
     actual fun specifiedEscape(escapePolicy: String): PerCharacterEscaper {
-      val codePoints = escapePolicy.codePoints().toArray()
+      val codePoints = codePoints(escapePolicy)
       require(codePoints.size % 2 == 0)
       val escapeCodePoint = codePoints[0]
       val escapedCodePoints = IntArray(codePoints.size / 2)

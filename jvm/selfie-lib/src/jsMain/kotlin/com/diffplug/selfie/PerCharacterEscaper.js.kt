@@ -22,6 +22,17 @@ private const val MIN_SUPPLEMENTARY_CODE_POINT = 0x010000
 internal actual fun charCount(codePoint: Int): Int =
     if (codePoint >= MIN_SUPPLEMENTARY_CODE_POINT) 2 else 1
 
+internal actual fun codePoints(s: String): IntArray {
+  val result = mutableListOf<Int>()
+  var offset = 0
+  while (offset < s.length) {
+    val codepoint = codePointAt(s, offset)
+    result.add(codepoint)
+    offset += 1
+  }
+  return result.toIntArray()
+}
+
 /**
  * If your escape policy is "'123", it means this:
  * ```
@@ -174,17 +185,6 @@ private constructor(
         }
       }
       return -1
-    }
-    private fun codePoints(value: String): IntArray {
-      val result = mutableListOf<Int>()
-      var offset = 0
-      while (offset < value.length) {
-        val codepoint = codePointAt(value, offset)
-        result.add(codepoint)
-        offset += 1
-      }
-
-      return result.toIntArray()
     }
     actual fun selfEscape(escapePolicy: String): PerCharacterEscaper {
       val escapedCodePoints = codePoints(escapePolicy)
