@@ -36,6 +36,8 @@ class RecordCallTest {
             get() = TODO()
           override val allowMultipleEquivalentWritesToOneLocation: Boolean
             get() = TODO()
+          override val javaDontUseTripleQuoteLiterals: Boolean
+            get() = TODO()
           override fun sourcePathForCall(call: CallLocation) =
               TypedPath("testpkg/RecordCallTest.kt")
           override fun sourcePathForCallMaybe(call: CallLocation): TypedPath? =
