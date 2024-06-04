@@ -170,6 +170,6 @@ class SnapshotValueReaderTest {
 c2Fk
 """)
     reader.peekKey() shouldBe "Apple"
-    reader.nextValue().valueBinary() shouldBe "sad".toByteArray()
+    reader.nextValue().valueBinary() shouldBe "sad".encodeToByteArray()
   }
 }

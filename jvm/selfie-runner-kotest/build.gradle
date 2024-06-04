@@ -36,6 +36,7 @@ kotlin {
     }
     commonTest {
       dependencies {
+        implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:$ver_KOTLIN_SERIALIZATION")
         implementation("io.kotest:kotest-framework-engine:$ver_KOTEST")
         implementation("io.kotest:kotest-assertions-core:$ver_KOTEST")
         implementation(kotlin('test'))
@@ -48,12 +49,7 @@ kotlin {
     }
   }
 }
-
-tasks.named('compileTestDevelopmentExecutableKotlinJs') {
-  enabled = false // TODO: https://github.com/diffplug/selfie/issues/186
-}
 jsNodeTest {
-  enabled = false // TODO: https://github.com/diffplug/selfie/issues/186
   getInputs().dir('../undertest-kotest/src/commonTest/kotlin')
 }
 jvmTest {

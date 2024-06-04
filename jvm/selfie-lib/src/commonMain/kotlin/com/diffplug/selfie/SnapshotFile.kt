@@ -20,8 +20,9 @@ import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.jvm.JvmStatic
 
-class ParseException private constructor(val line: Int, message: String?, cause: Throwable?) :
-    IllegalArgumentException(message, cause) {
+class ParseException
+private constructor(val line: Int, private val innerMessage: String?, cause: Throwable?) :
+    IllegalArgumentException(innerMessage, cause) {
   constructor(
       lineReader: LineReader,
       message: String
@@ -32,7 +33,7 @@ class ParseException private constructor(val line: Int, message: String?, cause:
       cause: Exception
   ) : this(lineReader.getLineNumber(), null, cause)
   override val message: String
-    get() = "L${line}:${super.message}"
+    get() = "L${line}:${innerMessage ?: super.cause!!.message}"
 }
 
 sealed interface SnapshotValue {
@@ -102,9 +103,7 @@ private constructor(
 
   companion object {
     @JvmStatic fun of(binary: ByteArray) = of(SnapshotValue.of(binary))
-
     @JvmStatic fun of(string: String) = of(SnapshotValue.of(string))
-
     @JvmStatic fun of(subject: SnapshotValue) = Snapshot(subject, ArrayMap.empty())
 
     /**
@@ -389,14 +388,30 @@ class SnapshotValueReader(val lineReader: LineReader) {
   }
 }
 
-expect class LineReader {
-  fun getLineNumber(): Int
-  fun readLine(): String?
-  fun unixNewlines(): Boolean
+class LineReader private constructor(private val content: String) {
+  private var currentLine: Int = 0
+  private var currentPos: Int = 0
+  fun getLineNumber(): Int = currentLine
+  fun readLine(): String? {
+    if (currentPos >= content.length) return null
+    val start = currentPos
+    val end = content.indexOf('\n', start)
+    val line: String =
+        if (end == -1) {
+          // No more newline characters, read to the end of the content
+          content.substring(start).also { currentPos = content.length }
+        } else {
+          content.substring(start, end).also { currentPos = end + 1 }
+        }
+
+    currentLine++
+    return if (line.endsWith("\r")) line.substring(0, line.length - 1) else line
+  }
+  fun unixNewlines(): Boolean = !content.contains("\r\n")
 
   companion object {
-    fun forString(content: String): LineReader
-    fun forBinary(content: ByteArray): LineReader
+    fun forString(content: String) = LineReader(content)
+    fun forBinary(content: ByteArray) = forString(content.decodeToString())
   }
 }
 
