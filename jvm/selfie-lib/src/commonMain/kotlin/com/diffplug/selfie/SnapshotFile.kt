@@ -20,8 +20,9 @@ import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.jvm.JvmStatic
 
-class ParseException private constructor(val line: Int, message: String?, cause: Throwable?) :
-    IllegalArgumentException(message, cause) {
+class ParseException
+private constructor(val line: Int, private val innerMessage: String?, cause: Throwable?) :
+    IllegalArgumentException(innerMessage, cause) {
   constructor(
       lineReader: LineReader,
       message: String
@@ -32,7 +33,7 @@ class ParseException private constructor(val line: Int, message: String?, cause:
       cause: Exception
   ) : this(lineReader.getLineNumber(), null, cause)
   override val message: String
-    get() = "L${line}:${super.message}"
+    get() = "L${line}:${innerMessage ?: super.cause!!.message}"
 }
 
 sealed interface SnapshotValue {
