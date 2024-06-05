@@ -63,9 +63,12 @@ suspend fun preserveSelfiesOnDisk(vararg subsToKeep: String) {
     subsToKeep.forEach { disk.keep(it) }
   }
 }
+suspend fun <T> expectSelfies(items: Iterable<T>, toString: (T) -> String): StringSelfie =
+    expectSelfie(items.joinToString("\n", transform = toString))
 suspend fun cacheSelfie(toCache: suspend () -> String) = cacheSelfie(Roundtrip.identity(), toCache)
 suspend fun <T> cacheSelfie(roundtrip: Roundtrip<T, String>, toCache: suspend () -> T) =
     CacheSelfieSuspend(disk(), roundtrip, toCache)
+
 /**
  * Memoizes any type which is marked with `@kotlinx.serialization.Serializable` as pretty-printed
  * json.
