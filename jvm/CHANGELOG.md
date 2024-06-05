@@ -11,6 +11,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- Added `Selfie.expectSelfies(Iterable<T> items, Function<T, String> toString)` for doing easy "multi-asserts" in `suspend fun` also. ([#421](https://github.com/diffplug/selfie/pull/421))
 
 ## [2.2.0] - 2024-06-04
 ### Added
