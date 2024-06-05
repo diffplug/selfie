@@ -64,10 +64,8 @@ object Selfie {
   @JvmStatic fun expectSelfie(actual: Boolean) = BooleanSelfie(actual)
 
   @JvmStatic
-  fun <T> expectSelfies(items: Iterable<T>, toString: (T) -> String): StringSelfie {
-    val snapshots = items.joinToString("\n", transform = toString)
-    return expectSelfie(snapshots)
-  }
+  fun <T> expectSelfies(items: Iterable<T>, toString: (T) -> String): StringSelfie =
+      expectSelfie(items.joinToString("\n", transform = toString))
 
   @JvmStatic
   fun cacheSelfie(toCache: Cacheable<String>) = cacheSelfie(Roundtrip.identity(), toCache)
@@ -75,6 +73,7 @@ object Selfie {
   @JvmStatic
   fun <T> cacheSelfie(roundtrip: Roundtrip<T, String>, toCache: Cacheable<T>) =
       CacheSelfie(deferredDiskStorage, roundtrip, toCache)
+
   /**
    * Memoizes any type which is marked with `@kotlinx.serialization.Serializable` as pretty-printed
    * json.
