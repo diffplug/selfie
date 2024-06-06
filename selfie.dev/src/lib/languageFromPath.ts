@@ -1,7 +1,7 @@
 export const languageSlugsToLabels = {
   jvm: "jvm",
-  js: "js",
   py: "py",
+  js: "js",
   "other-platforms": "...",
 };
 
