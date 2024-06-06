@@ -3,7 +3,7 @@ import {
   PathParts,
   languageSlugsToLabels,
 } from "@/lib/languageFromPath";
-import clsx from "clsx";
+import clsx from "clsx/lite";
 import Link from "next/link";
 import { Dispatch, SetStateAction } from "react";
 import { Button } from "../Button";
@@ -28,64 +28,58 @@ export function LanguageSelect({
     <>
       <ShadowHider />
       <div
-        className={clsx([
-          "flex",
-          "items-end",
-          "gap-[10px]",
-          "z-20",
-          "bg-white",
-        ])}
+        className={clsx("flex", "items-end", "gap-[10px]", "z-20", "bg-white")}
       >
         <Link href={"/"}>
           <Selfie
-            className={clsx([
+            className={clsx(
               "relative",
               "text-[45px]",
               "top-[6px]",
               "desktop:text-[93px]",
-              "wide-phone:text-[58px]",
-            ])}
+              "wide-phone:text-[58px]"
+            )}
           />
         </Link>
-        <div className={clsx(["relative", "hidden", "wide-phone:block"])}>
+        <div className={clsx("relative", "hidden", "wide-phone:block")}>
           <Button
-            className={clsx([
+            className={clsx(
               "text-white",
               "bg-blue",
               "w-[70px]",
               "rounded-[4px]",
               "wide-phone:h-[30px]",
-              "desktop:w-[94px]",
-            ])}
+              "desktop:w-[94px]"
+            )}
             onClick={() => setSelectIsOpen((prevIsOpen) => !prevIsOpen)}
           >
             {languageSlugsToLabels[pathParts.language]}
             {isOpen ? (
               <Close
-                className={clsx([
+                className={clsx(
                   "h-[12px]",
                   "w-[12px]",
                   "mt-[1px]",
                   "desktop:h-5",
                   "desktop:w-5",
-                  "desktop:mt-[5px]",
-                ])}
+                  "desktop:mt-[5px]"
+                )}
               />
             ) : (
               <CaretBottom
-                className={clsx([
+                className={clsx(
                   "h-[12px]",
                   "w-[12px]",
                   "desktop:h-5",
-                  "desktop:w-5",
-                ])}
+                  "desktop:w-5"
+                )}
               />
             )}
           </Button>
         </div>
       </div>
       <div
-        className={clsx([
+        className={clsx(
           "hidden",
           "absolute",
           "bg-white",
@@ -95,22 +89,22 @@ export function LanguageSelect({
           "transition-all",
           "duration-500",
           isOpen ? "translate-x-[230px]" : "translate-x-[-20px]",
-          isOpen ? "desktop:translate-x-[337px]" : "translate-x-[-20px]",
-        ])}
+          isOpen ? "desktop:translate-x-[337px]" : "translate-x-[-20px]"
+        )}
       >
         {Object.keys(languageSlugsToLabels)
           .filter((slug) => slug !== pathParts.language)
           .map((slug) => (
             <Button
-              className={clsx([
+              className={clsx(
                 "w-[70px]",
                 "shadow-button",
                 "tablet:shadow-button-tablet",
                 "rounded-[4px]",
                 "hover:text-white",
                 "hover:bg-blue",
-                "desktop:w-[94px]",
-              ])}
+                "desktop:w-[94px]"
+              )}
               onClick={() => handleChange(slug as LanguageSlug)}
               key={slug}
             >
@@ -125,7 +119,7 @@ export function LanguageSelect({
 function ShadowHider() {
   return (
     <div
-      className={clsx([
+      className={clsx(
         "hidden",
         "wide-phone:block",
         "absolute",
@@ -134,8 +128,8 @@ function ShadowHider() {
         "desktop:w-[330px]",
         "h-full",
         "bottom-[-4px]",
-        "z-10",
-      ])}
+        "z-10"
+      )}
     ></div>
   );
 }

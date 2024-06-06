@@ -1,4 +1,4 @@
-import clsx from "clsx";
+import clsx from "clsx/lite";
 import slugify from "@sindresorhus/slugify";
 import { Button } from "./Button";
 import Link from "next/link";
@@ -14,7 +14,7 @@ export function IntroText() {
 
   return (
     <div
-      className={clsx([
+      className={clsx(
         "w-full",
         "flex",
         "flex-col",
@@ -26,16 +26,16 @@ export function IntroText() {
         "wide-phone:text-right",
         "tablet:top-[262px]",
         "tablet:gap-[40px]",
-        "desktop:top-[345px]",
-      ])}
+        "desktop:top-[345px]"
+      )}
     >
       <p
-        className={clsx([
+        className={clsx(
           "text-[20px]",
           "leading-[1.25em]",
           "tablet:text-[30px]",
-          "desktop:text-[45px]",
-        ])}
+          "desktop:text-[45px]"
+        )}
       >
         Which is <br className="tablet:hidden" />{" "}
         <SectionLink title="literal" />, <SectionLink title="lensable" />
@@ -43,7 +43,7 @@ export function IntroText() {
       </p>
       <Link href={`/${selectedLanguage}/get-started`}>
         <Button
-          className={clsx([
+          className={clsx(
             "w-[154px]",
             "h-[35px]",
             "rounded-[10px]",
@@ -55,21 +55,21 @@ export function IntroText() {
             "shadow-button",
             "tablet:shadow-button-tablet",
             "hover:text-white",
-            "hover:bg-blue",
-          ])}
+            "hover:bg-blue"
+          )}
         >
           get started
         </Button>
       </Link>
       <div
-        className={clsx([
+        className={clsx(
           "text-[18px]",
           "leading-[1.2em]",
           "grid",
           "gap-[30px]",
           "tablet:text-[22px]",
-          "desktop:text-[34px]",
-        ])}
+          "desktop:text-[34px]"
+        )}
       >
         <p>
           Snapshot testing is the <br />{" "}

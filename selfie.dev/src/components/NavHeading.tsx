@@ -1,5 +1,5 @@
 import { LanguageSlug, getPathParts } from "@/lib/languageFromPath";
-import clsx from "clsx";
+import clsx from "clsx/lite";
 import { useRouter } from "next/router";
 import { useState } from "react";
 import { HeadingAnchor } from "./HeadingAnchor";
@@ -31,8 +31,8 @@ export function NavHeading({ text, popout }: NavHeadingProps) {
   return (
     <>
       <br />
-      <div className={clsx(["flex", "items-end", "justify-between"])}>
-        <h2 id={text} className={clsx(["group", "flex", "items-end"])}>
+      <div className={clsx("flex", "items-end", "justify-between")}>
+        <h2 id={text} className={clsx("group", "flex", "items-end")}>
           <span>
             <Selfie /> is {text.replace(/\-/g, " ")}
           </span>

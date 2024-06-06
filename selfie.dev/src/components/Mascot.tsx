@@ -1,4 +1,4 @@
-import clsx from "clsx";
+import clsx from "clsx/lite";
 import { useEffect, useRef, useState } from "react";
 
 export function Mascot() {
@@ -66,7 +66,7 @@ export function Mascot() {
   return (
     <div
       ref={mascotRef}
-      className={clsx([
+      className={clsx(
         "fixed",
         "top-[80px]",
         "left-[-200px]",
@@ -78,24 +78,21 @@ export function Mascot() {
         "tablet:top-[30px]",
         "desktop:left-[-250px]",
         "flex",
-        "flex-start",
-      ])}
+        "flex-start"
+      )}
     >
-      <div
-        className={clsx(["h-1"])}
-        style={{ width: spacerWidth + "px" }}
-      ></div>
+      <div className={clsx("h-1")} style={{ width: spacerWidth + "px" }}></div>
       <img
         src="/mascot.webp"
         alt="Selfie mascot"
-        className={clsx([
+        className={clsx(
           "max-w-[830px]",
           "h-[1745px]",
           "object-cover",
           "object-left",
           "desktop:max-w-[1245px]",
-          "desktop:h-[2616px]",
-        ])}
+          "desktop:h-[2616px]"
+        )}
       />
     </div>
   );

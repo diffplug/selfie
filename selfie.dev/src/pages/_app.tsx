@@ -4,7 +4,7 @@ import { Navigation } from "@/components/Navigation/Navigation";
 import * as mdxComponents from "@/components/mdx";
 import "@/styles/tailwind.css";
 import { MDXProvider } from "@mdx-js/react";
-import clsx from "clsx";
+import clsx from "clsx/lite";
 import { AppProps } from "next/app";
 import Head from "next/head";
 
@@ -29,23 +29,35 @@ export default function App({ Component, pageProps, router }: AppProps) {
           name="twitter:image"
           content={"https://selfie.dev/twitter-card.webp"}
         />
-        {pageProps.showHeroLinks === 'false' && <meta name="robots" content="noindex" />}
-        {router.pathname === "/" && <link rel="canonical" href="https://selfie.dev/jvm" />}
+        {pageProps.showHeroLinks === "false" && (
+          <meta name="robots" content="noindex" />
+        )}
+        {router.pathname === "/" && (
+          <link rel="canonical" href="https://selfie.dev/jvm" />
+        )}
       </Head>
       <MDXProvider components={mdxComponents}>
         <div
-          className={clsx([
+          className={clsx(
             "flex",
             "flex-col",
             "gap-[10px]",
             "px-2",
             "wide-phone:px-4",
-            "wide-phone:py-2",
-          ])}
+            "wide-phone:py-2"
+          )}
         >
-            {pageProps.showHeroLinks ? (pageProps.showHeroLinks === 'true' ? <Hero /> : <HeroDemoGif />) : <Navigation {...pageProps} />}
+          {pageProps.showHeroLinks ? (
+            pageProps.showHeroLinks === "true" ? (
+              <Hero />
+            ) : (
+              <HeroDemoGif />
+            )
+          ) : (
+            <Navigation {...pageProps} />
+          )}
         </div>
-        <div className={clsx(["px-2", "wide-phone:px-4"])}>
+        <div className={clsx("px-2", "wide-phone:px-4")}>
           <Component {...pageProps} />
         </div>
       </MDXProvider>

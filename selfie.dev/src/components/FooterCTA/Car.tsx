@@ -1,4 +1,4 @@
-import clsx from "clsx";
+import clsx from "clsx/lite";
 import { buttonClasses } from "./constants";
 import Link from "next/link";
 import { useRouter } from "next/router";
@@ -13,12 +13,12 @@ export function Car({ imageHeight }: CarProps) {
   return (
     <div
       style={{ height: imageHeight }}
-      className={clsx([
+      className={clsx(
         "relative",
         "z-10",
         "mx-[-0.5rem]",
-        "wide-phone:mx-[-1rem]",
-      ])}
+        "wide-phone:mx-[-1rem]"
+      )}
     >
       <picture>
         <source media="(max-width: 604px)" srcSet="/car-1536w.webp" />
@@ -29,11 +29,11 @@ export function Car({ imageHeight }: CarProps) {
         <source media="(min-width: 1300px)" srcSet="/car_feathered.webp" />
         <img
           src="/car_feathered.webp"
-          className={clsx(["left-0", "right-0", "absolute", "top-0", "m-auto"])}
+          className={clsx("left-0", "right-0", "absolute", "top-0", "m-auto")}
         />
       </picture>
       <span
-        className={clsx([
+        className={clsx(
           "absolute",
           "bottom-0",
           "wide-phone:bottom-1",
@@ -46,14 +46,14 @@ export function Car({ imageHeight }: CarProps) {
           "right-[10px]",
           "tablet:right-[20px]",
           "desktop:right-[110px]",
-          "text-white",
-        ])}
+          "text-white"
+        )}
       >
         let your codebase take&nbsp;its&nbsp;own&nbsp;selfies
       </span>
       <Link
         href={`/${pathParts.language}/get-started`}
-        className={clsx([
+        className={clsx(
           buttonClasses,
           "absolute",
           "bottom-[80px]",
@@ -65,8 +65,8 @@ export function Car({ imageHeight }: CarProps) {
           "tablet:w-[210px]",
           "left-0",
           "right-0",
-          "m-auto",
-        ])}
+          "m-auto"
+        )}
       >
         get started
       </Link>

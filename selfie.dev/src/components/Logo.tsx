@@ -1,8 +1,8 @@
-import clsx from "clsx";
+import clsx from "clsx/lite";
 export function Logo() {
   return (
     <h1
-      className={clsx([
+      className={clsx(
         "inline",
         "bg-gradient-to-r",
         "from-blue",
@@ -18,8 +18,8 @@ export function Logo() {
         "wide-phone:drop-shadow-logo-wide-phone",
         "tablet:drop-shadow-logo-tablet",
         "desktop:text-[148px]",
-        "desktop:drop-shadow-logo-desktop",
-      ])}
+        "desktop:drop-shadow-logo-desktop"
+      )}
     >
       selfie
     </h1>
