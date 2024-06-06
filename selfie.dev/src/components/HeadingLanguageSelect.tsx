@@ -26,7 +26,19 @@ export function HeadingLanguageSelect({
   const resizing = useResizing();
   const [isTouchDevice, setIsTouchDevice] = useState(false);
   return (
-    <div className={clsx("relative", "mb-[7px]")}>
+    <div
+      className={clsx("relative", "mb-[7px]")}
+      onMouseEnter={() => {
+        if (!isTouchDevice) {
+          setSelectIsOpen(true);
+        }
+      }}
+      onMouseLeave={() => {
+        if (!isTouchDevice) {
+          setSelectIsOpen(false);
+        }
+      }}
+    >
       <Button
         className={clsx(
           "text-white",
@@ -39,16 +51,6 @@ export function HeadingLanguageSelect({
           "desktop:w-[94px]"
         )}
         onClick={() => setSelectIsOpen((prevIsOpen) => !prevIsOpen)}
-        onMouseEnter={() => {
-          if (!isTouchDevice) {
-            setSelectIsOpen(true);
-          }
-        }}
-        onMouseLeave={() => {
-          if (!isTouchDevice) {
-            setSelectIsOpen(false);
-          }
-        }}
         onTouchStart={() => {
           setIsTouchDevice(true);
         }}
