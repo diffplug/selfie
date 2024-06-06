@@ -32,11 +32,14 @@ export function NavHeading({ text, popout }: NavHeadingProps) {
     <>
       <br />
       <div className={clsx(["flex", "items-end", "justify-between"])}>
-        <h2 id={text} className={clsx(["group"])}>
-          <Selfie /> is {text.replace(/\-/g, " ")}
+        <h2 id={text} className={clsx(["group", "flex", "items-end"])}>
+          <span>
+            <Selfie /> is {text.replace(/\-/g, " ")}
+          </span>
+          {"\u00a0"}
+          <HeadingPopout destinationUrl={popout} />
           <HeadingAnchor slug={text} />
         </h2>
-        <HeadingPopout destinationUrl={popout} />
         <HeadingLanguageSelect
           pathParts={pathParts}
           isOpen={selectIsOpen}
