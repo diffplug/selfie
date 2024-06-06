@@ -38,7 +38,7 @@ export function NavHeading({ text, popout }: NavHeadingProps) {
           </span>
           {"\u00a0"}
           <HeadingPopout destinationUrl={popout} />
-          <HeadingAnchor slug={text} />
+          <HeadingAnchor slug={text} className="mr-2" />
         </h2>
         <HeadingLanguageSelect
           pathParts={pathParts}
