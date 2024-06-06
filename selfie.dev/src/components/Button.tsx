@@ -5,13 +5,20 @@ type ButtonProps = {
   children: ReactNode;
   className?: string;
   onClick?: () => void;
+  onTouchStart?: () => void;
 };
 
-export function Button({ children, className, onClick }: ButtonProps) {
+export function Button({
+  children,
+  className,
+  onClick,
+  onTouchStart,
+}: ButtonProps) {
   return (
     <span
       className={clsx(buttonClasses, className)}
       onClick={onClick}
+      onTouchStart={onTouchStart}
       role="button"
     >
       {children}

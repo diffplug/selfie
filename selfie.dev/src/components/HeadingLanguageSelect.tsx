@@ -5,7 +5,7 @@ import {
 } from "@/lib/languageFromPath";
 import { useResizing } from "@/lib/useResizing";
 import clsx from "clsx/lite";
-import { Dispatch, SetStateAction } from "react";
+import { Dispatch, SetStateAction, useState } from "react";
 import { Button } from "./Button";
 import { CaretBottom } from "./Icons/CaretBottom";
 import { Close } from "./Icons/Close";
@@ -24,8 +24,21 @@ export function HeadingLanguageSelect({
   handleChange,
 }: HeadingLanguageSelectProps) {
   const resizing = useResizing();
+  const [isTouchDevice, setIsTouchDevice] = useState(false);
   return (
-    <div className={clsx("relative", "mb-[7px]")}>
+    <div
+      className={clsx("relative", "mb-[7px]")}
+      onMouseEnter={() => {
+        if (!isTouchDevice) {
+          setSelectIsOpen(true);
+        }
+      }}
+      onMouseLeave={() => {
+        if (!isTouchDevice) {
+          setSelectIsOpen(false);
+        }
+      }}
+    >
       <Button
         className={clsx(
           "text-white",
@@ -38,6 +51,9 @@ export function HeadingLanguageSelect({
           "desktop:w-[94px]"
         )}
         onClick={() => setSelectIsOpen((prevIsOpen) => !prevIsOpen)}
+        onTouchStart={() => {
+          setIsTouchDevice(true);
+        }}
       >
         {languageSlugsToLabels[pathParts.language]}
         {isOpen ? (
@@ -46,7 +62,17 @@ export function HeadingLanguageSelect({
           <CaretBottom className={clsx("h-[12px]", "w-[12px]")} />
         )}
       </Button>
-      <div className={clsx("absolute", "top-0", "z-10", "flex", "flex-col")}>
+      <div
+        className={clsx(
+          "absolute",
+          "top-0",
+          "z-10",
+          "flex",
+          "flex-col",
+          "h-[242px]",
+          !isOpen && "pointer-events-none"
+        )}
+      >
         {Object.keys(languageSlugsToLabels)
           .filter((slug) => slug !== pathParts.language)
           .map((slug, idx) => (
