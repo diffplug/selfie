@@ -130,8 +130,8 @@ class Mode(Enum):
         if self == Mode.interactive:
             return (
                 f"{headline}\n"
-                "- update this snapshot by adding '_TODO' to the function name\n"
-                "- update all snapshots in this file by adding '# selfieonce' or '# SELFIEWRITE'"
+                "- update this snapshot by adding `_TODO` to the function name\n"
+                "- update all snapshots in this file by adding `#selfieonce` or `#SELFIEWRITE`"
             )
         elif self == Mode.readonly:
             return headline

@@ -42,13 +42,13 @@ expect_selfie([1, 2, 3]).to_be_TODO()
 If you run this test, selfie will rewrite your sourcecode to be this:
 
 ```python
-expect_selfie([1, 2, 3]).to_be("[1, 2, 3]")
+expect_selfie([1, 2, 3]).to_be([1, 2, 3])
 ```
 
 Now, let's change the code to this:
 
 ```python
-expect_selfie("oops").to_be("[1, 2, 3]")
+expect_selfie("oops").to_be([1, 2, 3])
 ```
 
 When we run the test, we will get a failure, and the failure message will be:
@@ -56,17 +56,17 @@ When we run the test, we will get a failure, and the failure message will be:
 ```
 Snapshot mismatch
 - update this snapshot by adding `_TODO` to the function name
-- update all snapshots in this file by adding `//selfieonce` or `//SELFIEWRITE`
+- update all snapshots in this file by adding `#selfieonce` or `#SELFIEWRITE`
 ```
 
 As you can see, we have three options:
 
-- replace `to_be` with `to_be_TODO` (you can leave or remove the `"[1, 2, 3]"`, makes no difference)
+- replace `to_be` with `to_be_TODO` (you can leave or remove the `[1, 2, 3]`, makes no difference)
   - rewrites only this one snapshot, and selfie will remove the `_TODO`
-- put `//selfieonce` anywhere in the file
-  - rewrites all snapshots in the file, and selfie will remove `//selfieonce` after it has done so
-- put `//SELFIEWRITE` anywhere in that file
-  - rewrites all snapshots in the file until you remove `//SELFIEWRITE` yourself
+- put `#selfieonce` anywhere in the file
+  - rewrites all snapshots in the file, and selfie will remove `#selfieonce` after it has done so
+- put `#SELFIEWRITE` anywhere in that file
+  - rewrites all snapshots in the file until you remove `#SELFIEWRITE` yourself
 
 ## Disk
 
