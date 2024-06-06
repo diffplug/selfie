@@ -62,7 +62,17 @@ export function HeadingLanguageSelect({
           <CaretBottom className={clsx("h-[12px]", "w-[12px]")} />
         )}
       </Button>
-      <div className={clsx("absolute", "top-0", "z-10", "flex", "flex-col")}>
+      <div
+        className={clsx(
+          "absolute",
+          "top-0",
+          "z-10",
+          "flex",
+          "flex-col",
+          "h-[242px]",
+          !isOpen && "pointer-events-none"
+        )}
+      >
         {Object.keys(languageSlugsToLabels)
           .filter((slug) => slug !== pathParts.language)
           .map((slug, idx) => (
