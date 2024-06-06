@@ -8,6 +8,12 @@
 		},
 		{
 			"path": "selfie-lib"
+		},
+		{
+			"path": "../.github/workflows"
+		},
+		{
+			"path": "../selfie.dev"
 		}
 	],
 	"settings": {}
