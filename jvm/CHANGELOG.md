@@ -11,6 +11,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- `cacheSelfie` was missing `@JvmOverloads` on the methods with default arguments. ([#425](https://github.com/diffplug/selfie/pull/425))
 
 ## [2.2.1] - 2024-06-05
 ### Fixed

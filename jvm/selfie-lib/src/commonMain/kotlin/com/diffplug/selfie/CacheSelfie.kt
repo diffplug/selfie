@@ -20,15 +20,19 @@ import com.diffplug.selfie.guts.LiteralString
 import com.diffplug.selfie.guts.LiteralValue
 import com.diffplug.selfie.guts.TodoStub
 import com.diffplug.selfie.guts.recordCall
+import kotlin.jvm.JvmOverloads
 
 class CacheSelfie<T>(
     private val disk: DiskStorage,
     private val roundtrip: Roundtrip<T, String>,
     private val generator: Cacheable<T>
 ) {
+  @JvmOverloads
   fun toMatchDisk(sub: String = ""): T {
     return toMatchDiskImpl(sub, false)
   }
+
+  @JvmOverloads
   fun toMatchDisk_TODO(sub: String = ""): T {
     return toMatchDiskImpl(sub, true)
   }
@@ -57,6 +61,8 @@ class CacheSelfie<T>(
       }
     }
   }
+
+  @JvmOverloads
   fun toBe_TODO(unusedArg: Any? = null): T {
     return toBeImpl(null)
   }
