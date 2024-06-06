@@ -115,13 +115,19 @@ type SectionLinkProps = {
   title: string;
 };
 function SectionLink({ title }: SectionLinkProps) {
+  function handleClick(e: React.MouseEvent<HTMLAnchorElement>) {
+    e.preventDefault();
+    const elementId = slugify(title);
+    history.pushState({}, "", `#${elementId}`);
+    document.getElementById(elementId)!.scrollIntoView({ behavior: "smooth" });
+  }
   return (
-    <Link
+    <a
       href={`#${slugify(title)}`}
-      scroll={false}
       className="cursor-pointer underline hover:text-blue"
+      onClick={handleClick}
     >
       {title}
-    </Link>
+    </a>
   );
 }
