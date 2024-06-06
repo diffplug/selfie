@@ -17,7 +17,7 @@ const subNavButtonList: SubNavButton[] = [
     isPressed: (subpathName) => subpathName === "",
   },
   {
-    text: "get started",
+    text: "get\u00a0started",
     hrefSubpath: "/get-started",
     isPressed: (subpathName) => subpathName === "get-started",
   },

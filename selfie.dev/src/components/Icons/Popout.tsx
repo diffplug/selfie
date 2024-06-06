@@ -5,12 +5,11 @@ export function Popout(props: SVGProps<SVGSVGElement>) {
   return (
     <svg
       className={clsx([
-        "w-[26px]",
-        "h-[26px]",
-        "tablet:w-[32px]",
-        "tablet:h-[32px]",
+        "w-[32px]",
+        "h-[32px]",
         "desktop:w-[36px]",
         "desktop:h-[36px]",
+        "fill-black",
       ])}
       viewBox="0 0 32 32"
       {...props}

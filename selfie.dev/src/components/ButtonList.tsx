@@ -30,15 +30,6 @@ export function ButtonList() {
           jvm
         </Button>
       </Link>
-      <Link href="/js">
-        <Button
-          className={
-            selectedLanguage === "js" ? pressedClasses : unPressedClasses
-          }
-        >
-          js
-        </Button>
-      </Link>
       <Link href="/py">
         <Button
           className={
@@ -48,7 +39,16 @@ export function ButtonList() {
           py
         </Button>
       </Link>
-      <Link href="/py">
+      <Link href="/js">
+        <Button
+          className={
+            selectedLanguage === "js" ? pressedClasses : unPressedClasses
+          }
+        >
+          js
+        </Button>
+      </Link>
+      <Link href="/js">
         <Button
           className={
             selectedLanguage === "other-platforms"
