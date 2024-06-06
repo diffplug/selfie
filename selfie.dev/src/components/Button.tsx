@@ -5,13 +5,26 @@ type ButtonProps = {
   children: ReactNode;
   className?: string;
   onClick?: () => void;
+  onMouseEnter?: () => void;
+  onMouseLeave?: () => void;
+  onTouchStart?: () => void;
 };
 
-export function Button({ children, className, onClick }: ButtonProps) {
+export function Button({
+  children,
+  className,
+  onClick,
+  onMouseEnter,
+  onMouseLeave,
+  onTouchStart,
+}: ButtonProps) {
   return (
     <span
       className={clsx(buttonClasses, className)}
       onClick={onClick}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+      onTouchStart={onTouchStart}
       role="button"
     >
       {children}
