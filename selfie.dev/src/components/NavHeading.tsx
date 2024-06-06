@@ -1,7 +1,11 @@
+import { LanguageSlug, getPathParts } from "@/lib/languageFromPath";
 import clsx from "clsx";
+import { useRouter } from "next/router";
+import { useState } from "react";
+import { HeadingAnchor } from "./HeadingAnchor";
+import { HeadingLanguageSelect } from "./HeadingLanguageSelect";
 import { HeadingPopout } from "./HeadingPopout";
 import { Selfie } from "./Selfie";
-import { HeadingAnchor } from "./HeadingAnchor";
 
 type NavHeadingProps = {
   text: string;
@@ -9,6 +13,21 @@ type NavHeadingProps = {
 };
 
 export function NavHeading({ text, popout }: NavHeadingProps) {
+  const router = useRouter();
+  const pathParts = getPathParts(router.pathname);
+  if (!pathParts.language) {
+    pathParts.language = "jvm";
+  }
+  function handleChange(value: LanguageSlug) {
+    let nextRoute = "/" + value;
+    if (pathParts.subpath) {
+      nextRoute += "/" + pathParts.subpath;
+    }
+    router.push(nextRoute + `#${text}`);
+    setSelectIsOpen(false);
+  }
+
+  const [selectIsOpen, setSelectIsOpen] = useState<boolean>(false);
   return (
     <>
       <br />
@@ -18,6 +37,12 @@ export function NavHeading({ text, popout }: NavHeadingProps) {
           <HeadingAnchor slug={text} />
         </h2>
         <HeadingPopout destinationUrl={popout} />
+        <HeadingLanguageSelect
+          pathParts={pathParts}
+          isOpen={selectIsOpen}
+          setSelectIsOpen={setSelectIsOpen}
+          handleChange={handleChange}
+        />
       </div>
     </>
   );
