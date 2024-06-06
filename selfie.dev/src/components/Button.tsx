@@ -1,4 +1,4 @@
-import clsx from "clsx";
+import clsx from "clsx/lite";
 import { ReactNode } from "react";
 
 type ButtonProps = {
@@ -10,7 +10,7 @@ type ButtonProps = {
 export function Button({ children, className, onClick }: ButtonProps) {
   return (
     <span
-      className={clsx([buttonClasses, className])}
+      className={clsx(buttonClasses, className)}
       onClick={onClick}
       role="button"
     >
@@ -25,13 +25,13 @@ type ButtonLinkProps = {
 };
 export function ButtonLink({ children, className, href }: ButtonLinkProps) {
   return (
-    <a className={clsx([buttonClasses, className])} href={href} role="button">
+    <a className={clsx(buttonClasses, className)} href={href} role="button">
       {children}
     </a>
   );
 }
 
-const buttonClasses = clsx([
+const buttonClasses = clsx(
   "flex",
   "justify-center",
   "items-center",
@@ -46,5 +46,5 @@ const buttonClasses = clsx([
   "desktop:h-[53px]",
   "desktop:text-[34px]",
   "desktop:border-[4px]",
-  "desktop:rounded-[16px]",
-]);
+  "desktop:rounded-[16px]"
+);

@@ -1,4 +1,4 @@
-import clsx from "clsx";
+import clsx from "clsx/lite";
 import { useEffect, useRef, useState } from "react";
 import { Horse } from "./Horse";
 import { Car } from "./Car";
@@ -54,24 +54,24 @@ export function FooterCTA() {
       <div
         ref={spacerRef}
         style={{ height: imageHeight }}
-        className={clsx([
+        className={clsx(
           "w-full", // spacer under the images to allow for more scrolling
           "relative",
-          "z-0",
-        ])}
+          "z-0"
+        )}
       ></div>
       <div
         style={{ height: imageHeight }}
-        className={clsx([
+        className={clsx(
           "max-w-full", // sticky image container
           "sticky",
           "bottom-0",
-          "z-10",
-        ])}
+          "z-10"
+        )}
       >
         <div
           style={{ height: imageHeight, maxHeight: imageHeight }}
-          className={clsx([
+          className={clsx(
             "animate-shrink-with-scroll",
             "overflow-hidden",
             "absolute",
@@ -80,8 +80,8 @@ export function FooterCTA() {
             "left-0",
             "right-0",
             "mx-[-0.5rem]",
-            "wide-phone:mx-[-1rem]",
-          ])}
+            "wide-phone:mx-[-1rem]"
+          )}
         >
           <Horse imageRef={imageRef} setImageHeight={setImageHeight} />
         </div>

@@ -1,5 +1,5 @@
 import { LanguageSlug, getPathParts } from "@/lib/languageFromPath";
-import clsx from "clsx";
+import clsx from "clsx/lite";
 import { useRouter } from "next/router";
 import { useState } from "react";
 import { LanguageSelect } from "./LanguageSelect";
@@ -22,7 +22,7 @@ export function Navigation() {
 
   return (
     <div
-      className={clsx([
+      className={clsx(
         "relative",
         "flex",
         "justify-between",
@@ -30,8 +30,8 @@ export function Navigation() {
         "z-10",
         "overflow-hidden",
         "mb-[-4px]",
-        "pb-[4px]",
-      ])}
+        "pb-[4px]"
+      )}
     >
       {pathParts && (
         <>

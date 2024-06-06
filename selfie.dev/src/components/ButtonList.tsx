@@ -1,4 +1,4 @@
-import clsx from "clsx";
+import clsx from "clsx/lite";
 import Link from "next/link";
 import { Button } from "./Button";
 import { useRouter } from "next/router";
@@ -9,15 +9,15 @@ export function ButtonList() {
   const selectedLanguage = getPathParts(router.pathname).language;
   return (
     <div
-      className={clsx([
+      className={clsx(
         "align-center",
         "flex",
         "flex-row",
         "justify-between",
         "wide-phone:w-[220px]",
         "tablet:w-[328px]",
-        "desktop:w-[490px]",
-      ])}
+        "desktop:w-[490px]"
+      )}
     >
       <Link href="/jvm">
         <Button
@@ -63,7 +63,7 @@ export function ButtonList() {
   );
 }
 
-const sharedClasses = clsx([
+const sharedClasses = clsx(
   "w-[34px]",
   "h-[23px]",
   "rounded-[4px]",
@@ -72,22 +72,22 @@ const sharedClasses = clsx([
   "tablet:w-[73px]",
   "desktop:w-[110px]",
   "hover:text-white",
-  "hover:bg-blue",
-]);
+  "hover:bg-blue"
+);
 
-const pressedClasses = clsx([
+const pressedClasses = clsx(
   "mt-[1px]",
   "text-white",
   "bg-blue",
   "shadow-none",
   "tablet:mt-[3px]",
-  sharedClasses,
-]);
+  sharedClasses
+);
 
-const unPressedClasses = clsx([
+const unPressedClasses = clsx(
   "text-black",
   "bg-white",
   "shadow-button",
   "tablet:shadow-button-tablet",
-  sharedClasses,
-]);
+  sharedClasses
+);

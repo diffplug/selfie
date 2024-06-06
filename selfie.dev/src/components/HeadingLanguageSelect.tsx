@@ -4,7 +4,7 @@ import {
   languageSlugsToLabels,
 } from "@/lib/languageFromPath";
 import { useResizing } from "@/lib/useResizing";
-import clsx from "clsx";
+import clsx from "clsx/lite";
 import { Dispatch, SetStateAction } from "react";
 import { Button } from "./Button";
 import { CaretBottom } from "./Icons/CaretBottom";
@@ -25,9 +25,9 @@ export function HeadingLanguageSelect({
 }: HeadingLanguageSelectProps) {
   const resizing = useResizing();
   return (
-    <div className={clsx(["relative", "mb-[7px]"])}>
+    <div className={clsx("relative", "mb-[7px]")}>
       <Button
-        className={clsx([
+        className={clsx(
           "text-white",
           "bg-blue",
           "w-[70px]",
@@ -35,23 +35,23 @@ export function HeadingLanguageSelect({
           "h-[30px]",
           "z-20",
           "relative",
-          "desktop:w-[94px]",
-        ])}
+          "desktop:w-[94px]"
+        )}
         onClick={() => setSelectIsOpen((prevIsOpen) => !prevIsOpen)}
       >
         {languageSlugsToLabels[pathParts.language]}
         {isOpen ? (
-          <Close className={clsx(["h-[12px]", "w-[12px]"])} />
+          <Close className={clsx("h-[12px]", "w-[12px]")} />
         ) : (
-          <CaretBottom className={clsx(["h-[12px]", "w-[12px]"])} />
+          <CaretBottom className={clsx("h-[12px]", "w-[12px]")} />
         )}
       </Button>
-      <div className={clsx(["absolute", "top-0", "z-10", "flex", "flex-col"])}>
+      <div className={clsx("absolute", "top-0", "z-10", "flex", "flex-col")}>
         {Object.keys(languageSlugsToLabels)
           .filter((slug) => slug !== pathParts.language)
           .map((slug, idx) => (
             <Button
-              className={clsx([
+              className={clsx(
                 "w-[70px]",
                 "rounded-[4px]",
                 "h-[30px]",
@@ -68,8 +68,8 @@ export function HeadingLanguageSelect({
                   : `tablet:translate-y-[-${idx * 35}px]`,
                 isOpen
                   ? `desktop:translate-y-[${53 + (idx + 1) * 10}px]`
-                  : `desktop:translate-y-[-${idx * 53}px]`,
-              ])}
+                  : `desktop:translate-y-[-${idx * 53}px]`
+              )}
               onClick={() => handleChange(slug as LanguageSlug)}
               key={slug}
             >

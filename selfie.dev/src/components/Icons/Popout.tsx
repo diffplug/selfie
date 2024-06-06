@@ -1,16 +1,16 @@
-import clsx from "clsx";
+import clsx from "clsx/lite";
 import { SVGProps } from "react";
 
 export function Popout(props: SVGProps<SVGSVGElement>) {
   return (
     <svg
-      className={clsx([
+      className={clsx(
         "w-[32px]",
         "h-[32px]",
         "desktop:w-[36px]",
         "desktop:h-[36px]",
-        "fill-black",
-      ])}
+        "fill-black"
+      )}
       viewBox="0 0 32 32"
       {...props}
     >

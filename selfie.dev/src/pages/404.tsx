@@ -1,30 +1,30 @@
-import clsx from "clsx";
+import clsx from "clsx/lite";
 export default function Custom404() {
   return (
     <>
       <div
-        className={clsx([
+        className={clsx(
           "fixed",
           "top-0",
           "bottom-0",
           "left-0",
           "right-0",
           "h-screen",
-          "max-w-screen",
-        ])}
+          "max-w-screen"
+        )}
       >
         <div
-          className={clsx([
+          className={clsx(
             "h-[100vh]",
             "absolute",
             "bottom-0",
             "left-0",
             "right-0",
-            "max-w-screen",
-          ])}
+            "max-w-screen"
+          )}
         >
           <div
-            className={clsx([
+            className={clsx(
               "h-full",
               "max-w-[1300px]",
               "overflow-hidden",
@@ -35,8 +35,8 @@ export default function Custom404() {
               "flex",
               "items-center",
               "justify-center",
-              "m-auto",
-            ])}
+              "m-auto"
+            )}
           >
             <h1 className="relative text-center text-xl text-white backdrop-blur-sm wide-phone:text-2xl">
               404 - Page not found

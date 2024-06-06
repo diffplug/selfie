@@ -1,4 +1,4 @@
-import clsx from "clsx";
+import clsx from "clsx/lite";
 
 type SelfieProps = {
   className?: string;
@@ -7,7 +7,7 @@ type SelfieProps = {
 export function Selfie({ className }: SelfieProps) {
   return (
     <span
-      className={clsx([
+      className={clsx(
         "inline",
         "bg-gradient-to-r",
         "from-blue",
@@ -19,8 +19,8 @@ export function Selfie({ className }: SelfieProps) {
         "leading-none",
         "text-transparent",
         "desktop:text-[70px]",
-        className,
-      ])}
+        className
+      )}
     >
       selfie
     </span>

@@ -1,5 +1,5 @@
-import clsx from "clsx";
-export const buttonClasses = clsx([
+import clsx from "clsx/lite";
+export const buttonClasses = clsx(
   "flex",
   "justify-center",
   "items-center",
@@ -19,5 +19,5 @@ export const buttonClasses = clsx([
   "text-black",
   "bg-white",
   "shadow-button",
-  "tablet:shadow-button-tablet",
-]);
+  "tablet:shadow-button-tablet"
+);

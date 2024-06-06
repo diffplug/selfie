@@ -1,5 +1,5 @@
 import { PathParts } from "@/lib/languageFromPath";
-import clsx from "clsx";
+import clsx from "clsx/lite";
 import Link from "next/link";
 import { Button } from "../Button";
 import { Octocat } from "../Icons/Octocat";
@@ -41,7 +41,7 @@ type SubNavigationProps = {
 export function SubNavigation({ pathParts, selectIsOpen }: SubNavigationProps) {
   return (
     <nav
-      className={clsx([
+      className={clsx(
         "flex",
         "items-end",
         "justify-end",
@@ -50,20 +50,20 @@ export function SubNavigation({ pathParts, selectIsOpen }: SubNavigationProps) {
         selectIsOpen ? "translate-x-[290px]" : "translate-x-0",
         selectIsOpen ? "desktop:translate-x-[417px]" : "translate-x-0",
         "pr-[2px]",
-        "tablet:pr-[5px]",
-      ])}
+        "tablet:pr-[5px]"
+      )}
     >
       <ul role="list">
-        <li className={clsx(["flex", "gap-[10px]"])}>
+        <li className={clsx("flex", "gap-[10px]")}>
           {subNavButtonList.map((subNavButton) => {
             return (
               <Link
                 href={`/${pathParts.language}${subNavButton.hrefSubpath}`}
-                className={clsx([
+                className={clsx(
                   !pathParts.is404 &&
                     subNavButton.isPressed(pathParts.subpath) &&
-                    "pt-[2px]",
-                ])}
+                    "pt-[2px]"
+                )}
                 key={subNavButton.hrefSubpath}
               >
                 <Button
@@ -81,22 +81,22 @@ export function SubNavigation({ pathParts, selectIsOpen }: SubNavigationProps) {
           })}
           <Link href="https://github.com/diffplug/selfie">
             <Button
-              className={clsx([
+              className={clsx(
                 unPressedClasses,
                 "fill-black",
                 "hover:fill-white",
-                "desktop:px-2",
-              ])}
+                "desktop:px-2"
+              )}
             >
               <Octocat
-                className={clsx([
+                className={clsx(
                   "w-[16px]",
                   "h-[16px]",
                   "wide-phone:w-[22px]",
                   "wide-phone:h-[22px]",
                   "desktop:w-[32px]",
-                  "desktop:h-[32px]",
-                ])}
+                  "desktop:h-[32px]"
+                )}
               />
             </Button>
           </Link>
@@ -106,7 +106,7 @@ export function SubNavigation({ pathParts, selectIsOpen }: SubNavigationProps) {
   );
 }
 
-const sharedClasses = clsx([
+const sharedClasses = clsx(
   "px-1",
   "flex",
   "justify-center",
@@ -128,20 +128,20 @@ const sharedClasses = clsx([
   "desktop:h-[53px]",
   "desktop:text-[34px]",
   "desktop:border-[4px]",
-  "desktop:rounded-[16px]",
-]);
+  "desktop:rounded-[16px]"
+);
 
-const pressedClasses = clsx([
+const pressedClasses = clsx(
   "text-white",
   "bg-blue",
   "shadow-none",
-  sharedClasses,
-]);
+  sharedClasses
+);
 
-const unPressedClasses = clsx([
+const unPressedClasses = clsx(
   "text-black",
   "bg-white",
   "shadow-button",
   "tablet:shadow-button-tablet",
-  sharedClasses,
-]);
+  sharedClasses
+);

@@ -1,4 +1,4 @@
-import clsx from "clsx";
+import clsx from "clsx/lite";
 import { createContext, useContext } from "react";
 import { LinkIcon } from "./Icons/LinkIcon";
 import slugify from "@sindresorhus/slugify";
@@ -39,15 +39,15 @@ export function code({ children, ...props }: ParentComponentProps) {
   let isBlock = useContext(CodeBlockContext);
   const className = isBlock
     ? ""
-    : clsx([
+    : clsx(
         "bg-grey",
         "px-[7px]",
         "py-[2px]",
         "rounded",
         "text-sm",
         "leading-[1.5em]",
-        "break-words",
-      ]);
+        "break-words"
+      );
   return children ? (
     <code
       {...props}
@@ -63,14 +63,14 @@ export function pre({ children, ...props }: ParentComponentProps) {
   return (
     <CodeBlockContext.Provider value={true}>
       <div
-        className={clsx([
+        className={clsx(
           "rounded-lg",
           "bg-grey/60",
           "shadow",
           "text-sm",
           "overflow-hidden",
-          "leading-[1.5em]",
-        ])}
+          "leading-[1.5em]"
+        )}
       >
         <pre className="overflow-scroll p-2" {...props}>
           {children}

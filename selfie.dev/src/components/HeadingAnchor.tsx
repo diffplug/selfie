@@ -1,4 +1,4 @@
-import clsx from "clsx";
+import clsx from "clsx/lite";
 import { LinkIcon } from "./Icons/LinkIcon";
 
 interface HeadingAnchorProps {
@@ -18,7 +18,7 @@ export function HeadingAnchor({ className, slug }: HeadingAnchorProps) {
       {"\u00a0"}
       <LinkIcon
         onClick={handleLinkClick}
-        className={clsx([
+        className={clsx(
           "inline",
           "wide-phone:mr-2",
           "tablet:opacity-0",
@@ -28,8 +28,8 @@ export function HeadingAnchor({ className, slug }: HeadingAnchorProps) {
           "stroke-black",
           "stroke-2",
           "group-hover:opacity-100",
-          className,
-        ])}
+          className
+        )}
       />
     </span>
   );

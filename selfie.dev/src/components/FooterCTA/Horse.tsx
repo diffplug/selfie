@@ -1,4 +1,4 @@
-import clsx from "clsx";
+import clsx from "clsx/lite";
 import { buttonClasses } from "./constants";
 import Link from "next/link";
 import { MutableRefObject } from "react";
@@ -25,11 +25,11 @@ export function Horse({ imageRef, setImageHeight }: HorseProps) {
             }
             imageRef.current = el;
           }}
-          className={clsx(["m-auto"])}
+          className={clsx("m-auto")}
         />
       </picture>
       <span
-        className={clsx([
+        className={clsx(
           "absolute",
           "w-full",
           "top-1",
@@ -37,14 +37,14 @@ export function Horse({ imageRef, setImageHeight }: HorseProps) {
           "tablet:text-lg",
           "tablet:top-2",
           "desktop:top-4",
-          "text-center",
-        ])}
+          "text-center"
+        )}
       >
         are you still writing assertions
       </span>
       <Link
         href="https://thecontextwindow.ai/p/temporarily-embarrassed-snapshots"
-        className={clsx([
+        className={clsx(
           buttonClasses,
           "absolute",
           "top-10",
@@ -57,8 +57,8 @@ export function Horse({ imageRef, setImageHeight }: HorseProps) {
           "tablet:left-[400px]",
           "desktop:top-16",
           "right-6",
-          "m-auto",
-        ])}
+          "m-auto"
+        )}
       >
         by hand?
       </Link>
