@@ -11,17 +11,17 @@ T = TypeVar("T", covariant=True)
 
 
 @overload
-def cache_selfie(to_cache: Callable[..., str]) -> "CacheSelfie[str]": ...
+def cache_selfie(to_cache: Callable[[()], str]) -> "CacheSelfie[str]": ...
 
 
 @overload
 def cache_selfie(
-    to_cache: Callable[..., T], roundtrip: Roundtrip[T, str]
+    to_cache: Callable[[()], T], roundtrip: Roundtrip[T, str]
 ) -> "CacheSelfie[T]": ...
 
 
 def cache_selfie(
-    to_cache: Union[Callable[..., str], Callable[..., T]],
+    to_cache: Union[Callable[[()], str], Callable[[()], T]],
     roundtrip: Optional[Roundtrip[T, str]] = None,
 ) -> Union["CacheSelfie[str]", "CacheSelfie[T]"]:
     if roundtrip is None:
@@ -39,7 +39,7 @@ class CacheSelfie(Generic[T]):
         self,
         disk: DiskStorage,
         roundtrip: Roundtrip[T, str],
-        generator: Callable[..., T],
+        generator: Callable[[()], T],
     ):
         self.disk = disk
         self.roundtrip = roundtrip
@@ -107,7 +107,7 @@ class CacheSelfieBinary(Generic[T]):
         self,
         disk: DiskStorage,
         roundtrip: Roundtrip[T, bytes],
-        generator: Callable[..., T],
+        generator: Callable[[()], T],
     ):
         self.disk = disk
         self.roundtrip = roundtrip
