@@ -2,7 +2,6 @@
 from .ArrayMap import ArrayMap as ArrayMap
 from .ArrayMap import ArraySet as ArraySet
 from .Atomic import AtomicReference as AtomicReference
-from .CacheSelfie import Cacheable as Cacheable
 from .CacheSelfie import cache_selfie as cache_selfie
 from .CommentTracker import CommentTracker as CommentTracker
 from .FS import FS as FS
