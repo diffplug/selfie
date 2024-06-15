@@ -87,3 +87,9 @@ class Snapshot:
     def items(self) -> Iterator[tuple[str, SnapshotValue]]:
         yield ("", self._subject)
         yield from self._facet_data.items()
+
+    def __repr__(self) -> str:
+        pieces = [f"Snapshot.of({self.subject.value_string()!r})"]
+        for e in self.facets.items():
+            pieces.append(f"\n  .plus_facet({e[0]!r}, {e[1].value_string()!r})")  # noqa: PERF401
+        return "".join(pieces)
