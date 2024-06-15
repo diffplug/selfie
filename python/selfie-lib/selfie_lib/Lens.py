@@ -7,7 +7,7 @@ from .Snapshot import Snapshot, SnapshotValue
 T = TypeVar("T")
 
 
-class Lens(Protocol[Snapshot]):
+class Lens(Protocol):
     def __call__(self, snapshot: Snapshot) -> Snapshot:
         raise NotImplementedError
 
