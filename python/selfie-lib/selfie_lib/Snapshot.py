@@ -1,4 +1,4 @@
-from typing import Dict, Iterable, Union
+from typing import Iterator, Union
 
 from .ArrayMap import ArrayMap
 from .SnapshotValue import SnapshotValue
@@ -53,18 +53,24 @@ class Snapshot:
         return Snapshot(data, ArrayMap.empty())
 
     @staticmethod
-    def of_entries(entries: Iterable[Dict[str, SnapshotValue]]) -> "Snapshot":
-        root = None
+    def of_items(items: Iterator[tuple[str, SnapshotValue]]) -> "Snapshot":
+        subject = None
         facets = ArrayMap.empty()
-        for entry in entries:
-            key, value = entry["key"], entry["value"]
+        for entry in items:
+            (key, value) = entry
             if key == "":
-                if root is not None:
-                    raise ValueError("Duplicate root snapshot detected")
-                root = value
+                if subject is not None:
+                    raise ValueError(
+                        "Duplicate root snapshot value.\n   first: ${subject}\n  second: ${value}"
+                    )
+                subject = value
             else:
                 facets = facets.plus(key, value)
-        return Snapshot(root if root else SnapshotValue.of(""), facets)
+        return Snapshot(subject if subject else SnapshotValue.of(""), facets)
+
+    def items(self) -> Iterator[tuple[str, SnapshotValue]]:
+        yield ("", self._subject)
+        yield from self._facet_data.items()
 
     @staticmethod
     def _unix_newlines(string: str) -> str:
