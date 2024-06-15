@@ -1,6 +1,7 @@
 from typing import Iterator, Union
 
 from .ArrayMap import ArrayMap
+from .LineReader import _to_unix
 from .SnapshotValue import SnapshotValue
 
 
@@ -36,7 +37,7 @@ class Snapshot:
             raise ValueError("The empty string is reserved for the subject.")
         return Snapshot(
             self._subject,
-            self._facet_data.plus(_unix_newlines(key), SnapshotValue.of(value)),
+            self._facet_data.plus(_to_unix(key), SnapshotValue.of(value)),
         )
 
     def plus_or_replace(
@@ -48,7 +49,7 @@ class Snapshot:
             return Snapshot(
                 self._subject,
                 self._facet_data.plus_or_noop_or_replace(
-                    _unix_newlines(key), SnapshotValue.of(value)
+                    _to_unix(key), SnapshotValue.of(value)
                 ),
             )
 
@@ -86,7 +87,3 @@ class Snapshot:
     def items(self) -> Iterator[tuple[str, SnapshotValue]]:
         yield ("", self._subject)
         yield from self._facet_data.items()
-
-
-def _unix_newlines(string: str) -> str:
-    return string.replace("\\r\\n", "\\n")

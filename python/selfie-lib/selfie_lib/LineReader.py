@@ -1,6 +1,13 @@
 import io
 
 
+def _to_unix(s: str) -> str:
+    if s.find("\r\n") == -1:
+        return s
+    else:
+        return s.replace("\r\n", "\n")
+
+
 class LineReader:
     def __init__(self, content: bytes):
         self.__buffer = io.BytesIO(content)
