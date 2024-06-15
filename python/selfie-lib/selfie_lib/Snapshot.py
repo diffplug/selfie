@@ -34,8 +34,23 @@ class Snapshot:
     ) -> "Snapshot":
         if key == "":
             raise ValueError("The empty string is reserved for the subject.")
-        new_facet_data = self._facet_data.plus(key, SnapshotValue.of(value))
-        return Snapshot(self._subject, new_facet_data)
+        return Snapshot(
+            self._subject,
+            self._facet_data.plus(_unix_newlines(key), SnapshotValue.of(value)),
+        )
+
+    def plus_or_replace(
+        self, key: str, value: Union[bytes, str, SnapshotValue]
+    ) -> "Snapshot":
+        if key == "":
+            return Snapshot(SnapshotValue.of(value), self._facet_data)
+        else:
+            return Snapshot(
+                self._subject,
+                self._facet_data.plus_or_noop_or_replace(
+                    _unix_newlines(key), SnapshotValue.of(value)
+                ),
+            )
 
     def subject_or_facet_maybe(self, key: str) -> Union[SnapshotValue, None]:
         return self._subject if key == "" else self._facet_data.get(key)
@@ -72,6 +87,6 @@ class Snapshot:
         yield ("", self._subject)
         yield from self._facet_data.items()
 
-    @staticmethod
-    def _unix_newlines(string: str) -> str:
-        return string.replace("\\r\\n", "\\n")
+
+def _unix_newlines(string: str) -> str:
+    return string.replace("\\r\\n", "\\n")
