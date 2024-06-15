@@ -24,7 +24,7 @@ class SnapshotValue(ABC):
         if isinstance(data, bytes):
             return SnapshotValueBinary(data)
         elif isinstance(data, str):
-            return SnapshotValueString(data)
+            return SnapshotValueString(unix_newlines(data))
         elif isinstance(data, SnapshotValue):
             return data
         else:
