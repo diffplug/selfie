@@ -2,10 +2,12 @@
 from .ArrayMap import ArrayMap as ArrayMap
 from .ArrayMap import ArraySet as ArraySet
 from .Atomic import AtomicReference as AtomicReference
-from .CacheSelfie import Cacheable as Cacheable
 from .CacheSelfie import cache_selfie as cache_selfie
 from .CommentTracker import CommentTracker as CommentTracker
 from .FS import FS as FS
+from .Lens import Camera as Camera
+from .Lens import CompoundLens as CompoundLens
+from .Lens import Lens as Lens
 from .LineReader import LineReader as LineReader
 from .Literals import LiteralValue as LiteralValue
 from .ParseException import ParseException as ParseException

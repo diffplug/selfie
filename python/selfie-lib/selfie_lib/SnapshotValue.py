@@ -1,9 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Union
 
-
-def unix_newlines(string: str) -> str:
-    return string.replace("\r\n", "\n")
+from .LineReader import _to_unix
 
 
 class SnapshotValue(ABC):
@@ -24,7 +22,7 @@ class SnapshotValue(ABC):
         if isinstance(data, bytes):
             return SnapshotValueBinary(data)
         elif isinstance(data, str):
-            return SnapshotValueString(data)
+            return SnapshotValueString(_to_unix(data))
         elif isinstance(data, SnapshotValue):
             return data
         else:

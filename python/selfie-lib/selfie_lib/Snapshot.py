@@ -1,6 +1,7 @@
-from typing import Dict, Iterable, Union
+from typing import Iterator, Union
 
 from .ArrayMap import ArrayMap
+from .LineReader import _to_unix
 from .SnapshotValue import SnapshotValue
 
 
@@ -34,8 +35,23 @@ class Snapshot:
     ) -> "Snapshot":
         if key == "":
             raise ValueError("The empty string is reserved for the subject.")
-        new_facet_data = self._facet_data.plus(key, SnapshotValue.of(value))
-        return Snapshot(self._subject, new_facet_data)
+        return Snapshot(
+            self._subject,
+            self._facet_data.plus(_to_unix(key), SnapshotValue.of(value)),
+        )
+
+    def plus_or_replace(
+        self, key: str, value: Union[bytes, str, SnapshotValue]
+    ) -> "Snapshot":
+        if key == "":
+            return Snapshot(SnapshotValue.of(value), self._facet_data)
+        else:
+            return Snapshot(
+                self._subject,
+                self._facet_data.plus_or_noop_or_replace(
+                    _to_unix(key), SnapshotValue.of(value)
+                ),
+            )
 
     def subject_or_facet_maybe(self, key: str) -> Union[SnapshotValue, None]:
         return self._subject if key == "" else self._facet_data.get(key)
@@ -53,19 +69,27 @@ class Snapshot:
         return Snapshot(data, ArrayMap.empty())
 
     @staticmethod
-    def of_entries(entries: Iterable[Dict[str, SnapshotValue]]) -> "Snapshot":
-        root = None
+    def of_items(items: Iterator[tuple[str, SnapshotValue]]) -> "Snapshot":
+        subject = None
         facets = ArrayMap.empty()
-        for entry in entries:
-            key, value = entry["key"], entry["value"]
+        for entry in items:
+            (key, value) = entry
             if key == "":
-                if root is not None:
-                    raise ValueError("Duplicate root snapshot detected")
-                root = value
+                if subject is not None:
+                    raise ValueError(
+                        "Duplicate root snapshot value.\n   first: ${subject}\n  second: ${value}"
+                    )
+                subject = value
             else:
                 facets = facets.plus(key, value)
-        return Snapshot(root if root else SnapshotValue.of(""), facets)
+        return Snapshot(subject if subject else SnapshotValue.of(""), facets)
 
-    @staticmethod
-    def _unix_newlines(string: str) -> str:
-        return string.replace("\\r\\n", "\\n")
+    def items(self) -> Iterator[tuple[str, SnapshotValue]]:
+        yield ("", self._subject)
+        yield from self._facet_data.items()
+
+    def __repr__(self) -> str:
+        pieces = [f"Snapshot.of({self.subject.value_string()!r})"]
+        for e in self.facets.items():
+            pieces.append(f"\n  .plus_facet({e[0]!r}, {e[1].value_string()!r})")  # noqa: PERF401
+        return "".join(pieces)

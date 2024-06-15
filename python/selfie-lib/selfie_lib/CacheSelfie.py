@@ -1,5 +1,5 @@
 import base64
-from typing import Any, Generic, Optional, Protocol, TypeVar, Union, overload
+from typing import Any, Callable, Generic, Optional, TypeVar, Union, overload
 
 from .Literals import LiteralString, LiteralValue, TodoStub
 from .Roundtrip import Roundtrip
@@ -10,24 +10,18 @@ from .WriteTracker import recordCall
 T = TypeVar("T", covariant=True)
 
 
-class Cacheable(Protocol[T]):
-    def __call__(self) -> T:
-        """Method to get the cached object."""
-        raise NotImplementedError
-
-
 @overload
-def cache_selfie(to_cache: Cacheable[str]) -> "CacheSelfie[str]": ...
+def cache_selfie(to_cache: Callable[..., str]) -> "CacheSelfie[str]": ...
 
 
 @overload
 def cache_selfie(
-    to_cache: Cacheable[T], roundtrip: Roundtrip[T, str]
+    to_cache: Callable[..., T], roundtrip: Roundtrip[T, str]
 ) -> "CacheSelfie[T]": ...
 
 
 def cache_selfie(
-    to_cache: Union[Cacheable[str], Cacheable[T]],
+    to_cache: Union[Callable[..., str], Callable[..., T]],
     roundtrip: Optional[Roundtrip[T, str]] = None,
 ) -> Union["CacheSelfie[str]", "CacheSelfie[T]"]:
     if roundtrip is None:
@@ -42,7 +36,10 @@ def cache_selfie(
 
 class CacheSelfie(Generic[T]):
     def __init__(
-        self, disk: DiskStorage, roundtrip: Roundtrip[T, str], generator: Cacheable[T]
+        self,
+        disk: DiskStorage,
+        roundtrip: Roundtrip[T, str],
+        generator: Callable[..., T],
     ):
         self.disk = disk
         self.roundtrip = roundtrip
@@ -110,7 +107,7 @@ class CacheSelfieBinary(Generic[T]):
         self,
         disk: DiskStorage,
         roundtrip: Roundtrip[T, bytes],
-        generator: Cacheable[T],
+        generator: Callable[..., T],
     ):
         self.disk = disk
         self.roundtrip = roundtrip
