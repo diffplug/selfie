@@ -1,7 +1,9 @@
-from typing import Callable
+from typing import Callable, Generic, TypeVar
+
+T = TypeVar("T")
 
 
-class AtomicReference[T]:
+class AtomicReference(Generic[T]):
     """
     This has the same API as Java's AtomicReference, but it doesn't make any sense in the Python runtime.
     The point of keeping it is that it makes the port from Kotlin more 1:1

@@ -1,7 +1,7 @@
 import base64
 from abc import ABC, abstractmethod
 from itertools import chain
-from typing import Any, List, Optional
+from typing import Any, Generic, List, Optional, TypeVar
 
 from .Literals import (
     LiteralFormat,
@@ -15,8 +15,10 @@ from .SnapshotFile import SnapshotFile
 from .SnapshotSystem import DiskStorage, Mode, SnapshotSystem, _selfieSystem
 from .WriteTracker import recordCall as recordCall
 
+T = TypeVar("T")
 
-class ReprSelfie[T]:
+
+class ReprSelfie(Generic[T]):
     def __init__(self, actual: T):
         self.actual = actual
 
@@ -168,12 +170,12 @@ class StringSelfie(DiskSelfie, StringFacet, ReprSelfie[str]):
             )
 
 
-def _checkSrc[T](value: T) -> T:
+def _checkSrc(value: T) -> T:
     _selfieSystem().mode.can_write(False, recordCall(True), _selfieSystem())
     return value
 
 
-def _toBeDidntMatch[T](expected: Optional[T], actual: T, fmt: LiteralFormat[T]) -> T:
+def _toBeDidntMatch(expected: Optional[T], actual: T, fmt: LiteralFormat[T]) -> T:
     call = recordCall(False)
     writable = _selfieSystem().mode.can_write(expected is None, call, _selfieSystem())
     if writable:

@@ -1,15 +1,17 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Callable, Iterator
+from typing import Callable, Iterator, TypeVar
 
 from selfie_lib.TypedPath import TypedPath
+
+T = TypeVar("T")
 
 
 class FS(ABC):
     def file_exists(self, typed_path: TypedPath) -> bool:
         return Path(typed_path.absolute_path).is_file()
 
-    def file_walk[T](
+    def file_walk(
         self, typed_path: TypedPath, walk: Callable[[Iterator[TypedPath]], T]
     ) -> T:
         def walk_generator(path: TypedPath) -> Iterator[TypedPath]:
