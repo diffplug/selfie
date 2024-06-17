@@ -2,7 +2,7 @@ import io
 import re
 from abc import abstractmethod
 from enum import Enum, auto
-from typing import Any, Protocol, TypeVar
+from typing import Any, Optional, Protocol, TypeVar
 
 from .EscapeLeadingWhitespace import EscapeLeadingWhitespace
 
@@ -22,7 +22,7 @@ class Language(Enum):
 
 
 class LiteralValue:
-    def __init__(self, expected: T | None, actual: T, fmt: "LiteralFormat") -> None:
+    def __init__(self, expected: Optional[T], actual: T, fmt: "LiteralFormat") -> None:
         self.expected = expected
         self.actual = actual
         self.format = fmt

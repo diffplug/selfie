@@ -17,10 +17,10 @@ class SnapshotValueReader:
 
     def __init__(self, line_reader: LineReader):
         self.line_reader = line_reader
-        self.line: str | None = None
+        self.line: Optional[str] = None
         self.unix_newlines = self.line_reader.unix_newlines()
 
-    def peek_key(self) -> str | None:
+    def peek_key(self) -> Optional[str]:
         return self.__next_key()
 
     def next_value(self) -> SnapshotValue:
