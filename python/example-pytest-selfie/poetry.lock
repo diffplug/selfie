@@ -11,9 +11,6 @@ files = [
     {file = "annotated_types-0.7.0.tar.gz", hash = "sha256:aff07c09a53a08bc8cfccb9c85b05f1aa9a2a6f23728d790723543408344ce89"},
 ]
 
-[package.dependencies]
-typing-extensions = {version = ">=4.0.0", markers = "python_version < \"3.9\""}
-
 [[package]]
 name = "anyio"
 version = "4.4.0"
@@ -376,7 +373,7 @@ name = "pytest-selfie"
 version = "0.1.0"
 description = "A pytest plugin for selfie snapshot testing."
 optional = false
-python-versions = "^3.8"
+python-versions = "^3.9"
 files = []
 develop = true
 
@@ -419,7 +416,7 @@ name = "selfie-lib"
 version = "0.1.0"
 description = "Infrastructure for creating selfie-compatible test runner plugins."
 optional = false
-python-versions = "^3.8"
+python-versions = "^3.9"
 files = []
 develop = true
 
@@ -482,5 +479,5 @@ files = [
 
 [metadata]
 lock-version = "2.0"
-python-versions = "^3.8"
-content-hash = "5227c250d42d0ef38a063a004d66b753aea9fd7ec483ea95c7b9717f50ac95ee"
+python-versions = "^3.9"
+content-hash = "7140f7d8043cc3ad3175d38c361c7958659861f69a85c46d25db61243ff659c4"

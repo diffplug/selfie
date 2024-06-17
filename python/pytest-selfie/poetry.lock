@@ -144,7 +144,7 @@ name = "selfie-lib"
 version = "0.1.0"
 description = "Infrastructure for creating selfie-compatible test runner plugins."
 optional = false
-python-versions = "^3.8"
+python-versions = "^3.9"
 files = []
 develop = true
 
@@ -165,5 +165,5 @@ files = [
 
 [metadata]
 lock-version = "2.0"
-python-versions = "^3.8"
-content-hash = "bf67e210faca9c9b5b93f61c12eda5c35847ba8db98e5f2473e95b078fe460d6"
+python-versions = "^3.9"
+content-hash = "4d5856efd92e968a95f09de1936df3b970928084549226defe3f34e805b43cb5"
