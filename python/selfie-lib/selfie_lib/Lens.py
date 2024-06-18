@@ -1,6 +1,6 @@
 import re
 from abc import ABC, abstractmethod
-from typing import Callable, Generic, Iterator, List, Optional, Protocol, TypeVar
+from typing import Callable, Generic, Iterator, List, Optional, Protocol, TypeVar, Union
 
 from .Snapshot import Snapshot, SnapshotValue
 
@@ -44,7 +44,7 @@ class CompoundLens(Lens):
         return self.mutate_all_facets(lambda s: s.replace(toReplace, replacement))
 
     def replace_all_regex(
-        self, pattern: str | re.Pattern[str], replacement: str
+        self, pattern: Union[str, re.Pattern[str]], replacement: str
     ) -> "CompoundLens":
         return self.mutate_all_facets(lambda s: re.sub(pattern, replacement, s))
 

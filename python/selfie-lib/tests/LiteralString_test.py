@@ -44,7 +44,8 @@ class TestLiteralString:
     )
     def test_parse_single(self, value, expected):
         literal_string = LiteralString()
-        actual = literal_string._parseSinglePython(f'"{value.replace("'", "\"")}"')  # noqa: SLF001
+        replaced = value.replace("'", '"')
+        actual = literal_string._parseSinglePython(f'"{replaced}"')  # noqa: SLF001
         assert actual == expected
 
     @pytest.mark.parametrize(
@@ -58,5 +59,6 @@ class TestLiteralString:
     )
     def test_parse_multi(self, value, expected):
         literal_string = LiteralString()
-        actual = literal_string.parseMultiPython(f'"""{value.replace("'", "\"")}"""')
+        replaced = value.replace("'", '"')
+        actual = literal_string.parseMultiPython(f'"""{replaced}"""')
         assert actual == expected

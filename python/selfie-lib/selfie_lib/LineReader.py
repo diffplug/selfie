@@ -1,4 +1,5 @@
 import io
+from typing import Optional
 
 
 def _to_unix(s: str) -> str:
@@ -30,7 +31,7 @@ class LineReader:
     def unix_newlines(self) -> bool:
         return self.__uses_unix_newlines
 
-    def read_line(self) -> str | None:
+    def read_line(self) -> Optional[str]:
         line_bytes = self.__buffer.readline()
         if line_bytes == b"":
             return None
