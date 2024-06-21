@@ -82,12 +82,18 @@ class Camera(Generic[T], ABC):
         pass
 
     def with_lens(self, lens: Lens) -> "Camera[T]":
+        parent = self
+
         class WithLensCamera(Camera):
-            def __init__(self, camera: Camera[T], lens: Callable[[Snapshot], Snapshot]):
-                self.__camera = camera
-                self.__lens = lens
-
             def snapshot(self, subject: T) -> Snapshot:
-                return self.__lens(self.__camera.snapshot(subject))
+                return lens(parent.snapshot(subject))
 
-        return WithLensCamera(self, lens)
+        return WithLensCamera()
+
+    @staticmethod
+    def of(lambda_func: Callable[[T], Snapshot]) -> "Camera[T]":
+        class LambdaCamera(Camera):
+            def snapshot(self, subject: T) -> Snapshot:
+                return lambda_func(subject)
+
+        return LambdaCamera()
