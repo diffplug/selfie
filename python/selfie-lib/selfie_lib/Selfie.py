@@ -4,16 +4,15 @@ from .SelfieImplementations import ReprSelfie, StringSelfie
 from .Snapshot import Snapshot
 from .SnapshotSystem import _selfieSystem
 
-# Declare T as covariant
-T = TypeVar("T", covariant=True)
+T = TypeVar("T")
 
 
 @overload
 def expect_selfie(actual: str) -> StringSelfie: ...
 
 
-# @overload
-# def expect_selfie(actual: bytes) -> BinarySelfie: ...  # noqa: ERA001
+@overload
+def expect_selfie(actual: Snapshot) -> StringSelfie: ...
 
 
 @overload
@@ -21,11 +20,11 @@ def expect_selfie(actual: T) -> ReprSelfie[T]: ...
 
 
 def expect_selfie(
-    actual: Union[str, Any],
+    actual: Any,
 ) -> Union[StringSelfie, ReprSelfie]:
     if isinstance(actual, str):
-        snapshot = Snapshot.of(actual)
-        diskStorage = _selfieSystem().disk_thread_local()
-        return StringSelfie(snapshot, diskStorage)
+        return StringSelfie(Snapshot.of(actual), _selfieSystem().disk_thread_local())
+    elif isinstance(actual, Snapshot):
+        return StringSelfie(actual, _selfieSystem().disk_thread_local())
     else:
         return ReprSelfie(actual)
