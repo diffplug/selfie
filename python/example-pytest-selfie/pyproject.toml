@@ -6,14 +6,15 @@ authors = ["Selina Delgado <sdelgado411@gmail.com>","Harvir Sahota <hsahota2312@
 license = "Apache-2.0"
 
 [tool.poetry.dependencies]
-python = "^3.9"
-openai = "^1.0.0"
 flask = "^3.0.3"
+openai = "^1.0.0"
+python = "^3.9"
 
 [tool.poetry.group.dev.dependencies]
-ruff = "^0.4.0"
 pyright = "^1.1.350"
 pytest = "^8.0.0"
+requests = "^2.32.3"
+ruff = "^0.4.0"
 selfie-lib = { path = "../selfie-lib", develop = true }
 pytest-selfie = { path = "../pytest-selfie", develop = true }
 
