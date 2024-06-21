@@ -96,22 +96,22 @@ def index():
     if user:
         return render_template_string(
             """
-            <html><body>
-                <h1>Welcome back {{ username }}</h1>
-            </body></html>
-        """,
+<html><body>
+  <h1>Welcome back {{ username }}</h1>
+</body></html>""",
             username=user["email"],
         )
     else:
-        return render_template_string("""
-            <html><body>
-                <h1>Please login</h1>
-                <form action="/login" method="post">
-                    <input type="text" name="email" placeholder="email">
-                    <input type="submit" value="login">
-                </form>
-            </body></html>
-        """)
+        return render_template_string(
+            """
+<html><body>
+  <h1>Please login</h1>
+  <form action="/login" method="post">
+    <input type="text" name="email" placeholder="email">
+    <input type="submit" value="login">
+  </form>
+</body></html>"""
+        )
 
 
 @app.route("/login", methods=["POST"])
@@ -127,25 +127,26 @@ def login():
         f'Click <a href="{login_link}">here</a> to login.',
     )
 
-    return render_template_string("""
-        <html><body>
-            <h1>Email sent!</h1>
-            <p>Check your email for your login link.</p>
-        </body></html>
-    """)
+    return render_template_string(
+        """
+<html><body>
+  <h1>Email sent!</h1>
+  <p>Check your email for your login link.</p>
+</body></html>"""
+    )
 
 
 @app.route("/login-confirm/<code>")
 def login_confirm(code):
     email = database.pop(code, None)
     if email is None:
-        return render_template_string("""
-            <html><body>
-                <h1>Login link expired.</h1>
-                <p>Sorry, <a href="/">try again</a>.</p>
-            </body></html>
-        """)
-
+        return render_template_string(
+            """
+<html><body>
+  <h1>Login link expired.</h1>
+  <p>Sorry, <a href="/">try again</a>.</p>
+</body></html>"""
+        )
     response = make_response(redirect("/"))
     response.set_cookie("login", f"{email}|{sign_email(email)}")
     return response
