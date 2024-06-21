@@ -51,8 +51,9 @@ class StringFacet(FluentFacet, ABC):
     def to_be(self, expected: str) -> str:
         pass
 
+    @abstractmethod
     def to_be_TODO(self, _: Any = None) -> str:
-        return self.to_be_TODO()
+        pass
 
 
 class BinaryFacet(FluentFacet, ABC):
@@ -104,7 +105,7 @@ class DiskSelfie(FluentFacet):
         return StringSelfie(self.actual, self.disk, list(facets))
 
     def facet_binary(self, facet: str) -> "BinaryFacet":
-        raise NotImplementedError
+        return BinarySelfie(self.actual, self.disk, facet)
 
 
 class StringSelfie(DiskSelfie, StringFacet, ReprSelfie[str]):
@@ -169,6 +170,32 @@ class StringSelfie(DiskSelfie, StringFacet, ReprSelfie[str]):
                 actual_string,
                 LiteralString(),
             )
+
+
+class BinarySelfie(DiskSelfie, BinaryFacet):
+    def __init__(self, actual: Snapshot, disk: DiskStorage, only_facet: str):
+        super().__init__(actual, disk)
+        self.only_facet = only_facet
+
+        facet_value = actual.subject_or_facet_maybe(only_facet)
+        if facet_value is None:
+            raise ValueError(f"The facet {only_facet} was not found in the snapshot")
+        elif not facet_value.is_binary:
+            raise ValueError(
+                f"The facet {only_facet} is a string, not a binary snapshot"
+            )
+
+    def to_be_base64(self, expected: str) -> bytes:
+        raise NotImplementedError
+
+    def to_be_base64_TODO(self, _: Any = None) -> bytes:
+        raise NotImplementedError
+
+    def to_be_file(self, subpath: str) -> bytes:
+        raise NotImplementedError
+
+    def to_be_file_TODO(self, subpath: str) -> bytes:
+        raise NotImplementedError
 
 
 def _checkSrc(value: T) -> T:
