@@ -60,8 +60,9 @@ class BinaryFacet(FluentFacet, ABC):
     def to_be_base64(self, expected: str) -> bytes:
         pass
 
+    @abstractmethod
     def to_be_base64_TODO(self, _: Any = None) -> bytes:
-        return self.to_be_base64_TODO()
+        pass
 
     @abstractmethod
     def to_be_file(self, subpath: str) -> bytes:
@@ -97,10 +98,10 @@ class DiskSelfie(FluentFacet):
             )
 
     def facet(self, facet: str) -> "StringFacet":
-        raise NotImplementedError
+        return StringSelfie(self.actual, self.disk, [facet])
 
     def facets(self, *facets: str) -> "StringFacet":
-        raise NotImplementedError
+        return StringSelfie(self.actual, self.disk, list(facets))
 
     def facet_binary(self, facet: str) -> "BinaryFacet":
         raise NotImplementedError
