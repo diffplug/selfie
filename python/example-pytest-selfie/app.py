@@ -1,11 +1,11 @@
 # app.py
 import base64
 import hashlib
-import secrets
 import threading
 import time
 from datetime import datetime, timedelta
 from functools import wraps
+from random import Random
 
 from flask import (
     Flask,
@@ -16,6 +16,7 @@ from flask import (
     request,
 )
 
+random_0 = Random(0)
 app = Flask(__name__)
 
 # In-memory database (replace with a real database in production)
@@ -47,7 +48,9 @@ dev_time = DevTime()
 def repeatable_random(length):
     # This is a simplified version, not as secure as Java's SecureRandom
     return "".join(
-        secrets.choice("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789")
+        random_0.choice(
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+        )
         for _ in range(length)
     )
 
