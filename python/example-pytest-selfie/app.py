@@ -30,16 +30,16 @@ email_condition = threading.Condition(email_lock)
 
 class DevTime:
     def __init__(self):
-        self.now = datetime(2000, 1, 1)
+        self.current_time = datetime(2000, 1, 1)
 
     def set_year(self, year):
-        self.now = datetime(year, 1, 1)
+        self.current_time = datetime(year, 1, 1)
 
     def advance_24hrs(self):
-        self.now += timedelta(days=1)
+        self.current_time += timedelta(days=1)
 
     def now(self):
-        return self.now
+        return self.current_time
 
 
 dev_time = DevTime()
@@ -187,9 +187,11 @@ def wait_for_incoming_email(timeout=1):
 
 @app.route("/dev/time", methods=["POST"])
 def set_dev_time():
-    action = request.json.get("action")
+    json = request.json
+    assert json is not None
+    action = json.get("action")
     if action == "set_year":
-        year = request.json.get("year")
+        year = json.get("year")
         dev_time.set_year(year)
     elif action == "advance_24hrs":
         dev_time.advance_24hrs()
