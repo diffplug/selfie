@@ -13,7 +13,8 @@ def web_selfie(response: TestResponse) -> StringSelfie:
     redirect_reason = REDIRECTS.get(response.status_code)
     if redirect_reason is not None:
         actual = Snapshot.of(
-            f"REDIRECT {response.status_code} {redirect_reason} to {response.headers.get("Location")}"
+            f"REDIRECT {response.status_code} {redirect_reason} to "
+            + response.headers.get("Location")
         )
     else:
         actual = Snapshot.of(response.data.decode()).plus_facet(
