@@ -20,6 +20,7 @@ selfie-lib = { path = "../selfie-lib", develop = true }
 pytest-selfie = { path = "../pytest-selfie", develop = true }
 markdownify = "^0.12.1"
 beautifulsoup4 = "^4.12.3"
+werkzeug = "^3.0.3"
 
 [build-system]
 requires = ["poetry-core"]
