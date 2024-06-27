@@ -7,19 +7,11 @@ export const imageUrl = "https://selfie.dev/advanced.webp";
 
 <DocsImage imgAbsoluteUrl={imageUrl} />
 
-**_THIS IS BROKEN. [WE ARE WORKING ON THIS](https://github.com/diffplug/selfie/issues/303)._**
-
-**_THIS IS BROKEN. [WE ARE WORKING ON THIS](https://github.com/diffplug/selfie/issues/303)._**
-
-**_THIS IS BROKEN. [WE ARE WORKING ON THIS](https://github.com/diffplug/selfie/issues/303)._**
-
-**TODO: Facets is currently not implemented [yet](https://github.com/diffplug/selfie/issues/303)**
-
 Assuming you have [installed selfie](/py/get-started#installation) and glanced through the [quickstart](/py/get-started#quickstart), then you're ready to start taking multifaceted snapshots of arbitrary typed data.
 
 ## Our toy project
 
-We'll be using the [`example-pytest-selfie`](https://github.com/diffplug/selfie/tree/main/python/example-pytest-selfie) project from the selfie GitHub repo. You can clone the code and follow along, but there's no need to. If you did clone the project, you could run **Not Implemented** and you'd have a webapp running at `localhost:8080`.
+We'll be using the [`example-pytest-selfie`](https://github.com/diffplug/selfie/tree/main/python/example-pytest-selfie) project from the selfie GitHub repo. You can clone the code and follow along, but there's no need to. If you did clone the project, you could run `poetry run python app.py` and you'd have a little flask webapp running at `127.0.0.1:5000`.
 
 It has a homepage where we can login. We can go to `/email` to see the emails the server has sent and click our login link, and boom we've got some auth cookies.
 
@@ -27,75 +19,55 @@ There's nothing web-specific about selfie, it's just a familiar example.
 
 ## Typed snapshots
 
-**TODO: Use request instead?, This implementation of toy project not added [yet](https://github.com/diffplug/selfie/tree/main/python/example-pytest-selfie).**
-
-Let's use [requests](https://pypi.org/project/requests/) to do gets and posts. So if we want to assert that the homepage is working, we can do this:
+Since it's a flask app, we can use its built-in test client. So if we want to assert that the homepage is working, we can do this:
 
 ```python
-@Test
-public void homepage() {
-  expect_selfie(requests.get("/").text).to_be("""
+@pytest.fixture
+def client():
+  app.config["TESTING"] = True
+  with app.test_client() as client:
+    yield client
+
+def test_homepage(client):
+  expect_selfie(client.get("/").data.decode()).to_be("""
 <html><body>
-\u0020 <h1>Please login</h1>
-\u0020 <form action="/login" method="post">
-\u0020   <input type="text" name="email" placeholder="email">
-\u0020   <input type="submit" value="login">
-\u0020 </form>
+  <h1>Please login</h1>
+  <form action="/login" method="post">
+    <input type="text" name="email" placeholder="email">
+    <input type="submit" value="login">
+  </form>
 </body></html>""")
-}
 ```
 
-Since you [saw the quickstart](/py/get-started#quickstart), you know that selfie wrote that big bad string literal for us. The `\u0020` is just escaped whitespace, to protect it from getting mangled by terrible autoformatters like [spotless](https://github.com/diffplug/spotless).
+Since you [saw the quickstart](/py/get-started#quickstart), you know that selfie wrote that big bad string literal for us.
 
-**TODO: `Camera` and `expect_selfie(T, Camera&lt;T&gt;)` not yet implemented, [PRs welcomed](https://github.com/diffplug/selfie/issues/302)**
-
-The first thing to notice is that we'll be doing a lot of `requests.get().body().text`. It would be nice if we could just do `expect_selfie(get("/"))`, but we'll have to write our own `expect_selfie(requests.models.Response)` method. Selfie gives us [`expect_selfie(T, Camera&lt;T&gt;)`](https://github.com/diffplug/selfie/issues/302) and [`Camera`](https://github.com/diffplug/selfie/issues/302) to do exactly that.
-
-**TODO: [Not implemented](https://github.com/diffplug/selfie/issues/302)**
+The first thing to notice is that we'll be doing a lot of `.data.decode()`. It would be nice if we could just do `expect_selfie(get("/"))`, so let's add a `web_selfie` method to handle that. I'm going to use static types, but you can ignore those if you want.
 
 ```python
-class Selfie :
-  @staticmethod
-    def expect_selfie(actual, camera):
-        return Selfie.DiskSelfie(actual, camera)
+from selfie_lib import expect_selfie, StringSelfie
+from werkzeug.test import TestResponse # this is what `app.test_client().get` returns
 
-    class DiskSelfie:
-        def __init__(self, actual, camera):
-            self.actual = actual
-            self.camera = camera
+...
 
-        def __enter__(self):
-            self.snapshot = self.camera.snapshot(self.actual)
-            return self
+def web_selfie(response: TestResponse) -> StringSelfie:
+    return expect_selfie(response.data.decode())
+
+def test_homepage(client):
+    web_selfie(client.get("/")).to_be("""
+<html><body>
+  <h1>Please login</h1>
+  <form action="/login" method="post">
+    <input type="text" name="email" placeholder="email">
+    <input type="submit" value="login">
+  </form>
+</body></html>""")
 ```
 
-We can write our `expect_selfie(Response)` anywhere, but we recommend putting it into a class named `SelfieSettings` in the package `selfie`, but you can use any name and put these methods anywhere. We recommend `expect_selfie` because it's a good hint that the string constants are self-updating.
-
-**TODO: [Not implemented](https://github.com/diffplug/selfie/issues/302)**
-
-```python
-import requests
-from selfie import Camera, Selfie, Snapshot
-
-def request_camera(request):
-    return Snapshot(request.text)
-
-class SelfieSettings:
-    REQUEST_CAMERA = Camera(request_camera)
-
-    @staticmethod
-    def expect_selfie(request):
-        return Selfie.expect_selfie(request, SelfieSettings.REQUEST_CAMERA)
-
-```
+You can write `web_selfie` anywhere, but we recommend putting it into `selfie_settings.py`. We allso recommend keeping the `xxx_selfie` pattern because it's a good hint that the string constants are self-updating.
 
 ## Facets
 
-**TODO: Facets is currently not implemented [yet](https://github.com/diffplug/selfie/issues/303)**
-
-Every snapshot has a "subject": `Snapshot.of(String subject)`. But each snapshot can also have an unlimited number of "facets", which are other named values. For example, maybe we want to add the response's status line.
-
-**TODO: [Not implemented](https://github.com/diffplug/selfie/issues/303)**
+Every snapshot has a "subject": `Snapshot.of(subject: str)`. But each snapshot can also have an unlimited number of "facets", which are other named values. For example, maybe we want to add the response's status line.
 
 ```python
 def response_camera(response):

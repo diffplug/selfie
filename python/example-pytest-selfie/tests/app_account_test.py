@@ -1,5 +1,6 @@
 import pytest
-from selfie_lib import expect_selfie
+from selfie_lib import StringSelfie, expect_selfie
+from werkzeug.test import TestResponse
 
 from app import app, wait_for_incoming_email
 
@@ -11,9 +12,12 @@ def client():
         yield client
 
 
+def web_selfie(response: TestResponse) -> StringSelfie:
+    return expect_selfie(response.data.decode())
+
+
 def test_homepage(client):
-    response = client.get("/")
-    expect_selfie(response.data.decode()).to_be("""
+    web_selfie(client.get("/")).to_be("""
 <html><body>
   <h1>Please login</h1>
   <form action="/login" method="post">
