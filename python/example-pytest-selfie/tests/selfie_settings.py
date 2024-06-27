@@ -1,4 +1,4 @@
-from selfie_lib import Snapshot, StringSelfie, expect_selfie
+from selfie_lib import Camera, Snapshot, StringSelfie, expect_selfie
 from werkzeug.test import TestResponse
 
 REDIRECTS = {
@@ -9,14 +9,19 @@ REDIRECTS = {
 }
 
 
-def web_selfie(response: TestResponse) -> StringSelfie:
+def web_camera(response: TestResponse) -> Snapshot:
     redirect_reason = REDIRECTS.get(response.status_code)
     if redirect_reason is not None:
-        actual = Snapshot.of(
-            f"REDIRECT {response.status_code} {redirect_reason} to {response.headers.get("Location", "<unknown>")}"
+        return Snapshot.of(
+            f"REDIRECT {response.status_code} {redirect_reason} to "
+            + response.headers.get("Location", "<unknown>")
         )
     else:
-        actual = Snapshot.of(response.data.decode()).plus_facet(
-            "status", response.status
-        )
-    return expect_selfie(actual)
+        return Snapshot.of(response.data.decode()).plus_facet("status", response.status)
+
+
+WEB_CAMERA = Camera.of(web_camera)
+
+
+def web_selfie(response: TestResponse) -> StringSelfie:
+    return expect_selfie(response, WEB_CAMERA)
