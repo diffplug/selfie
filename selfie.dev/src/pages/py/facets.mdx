@@ -50,10 +50,10 @@ from werkzeug.test import TestResponse # this is what `app.test_client().get` re
 ...
 
 def web_selfie(response: TestResponse) -> StringSelfie:
-    return expect_selfie(response.data.decode())
+  return expect_selfie(response.data.decode())
 
 def test_homepage(client):
-    web_selfie(client.get("/")).to_be("""
+  web_selfie(client.get("/")).to_be("""
 <html><body>
   <h1>Please login</h1>
   <form action="/login" method="post">
@@ -67,67 +67,56 @@ You can write `web_selfie` anywhere, but we recommend putting it into `selfie_se
 
 ## Facets
 
-Every snapshot has a "subject": `Snapshot.of(subject: str)`. But each snapshot can also have an unlimited number of "facets", which are other named values. For example, maybe we want to add the response's status line.
+Every snapshot has a "subject": `Snapshot.of(subject: str)`. But each snapshot can also have an unlimited number of "facets", which are other named values. For example, maybe we want to add the response's status code.
 
 ```python
-def response_camera(response):
-    return (
-        Snapshot(response.text)
-        .plus_facet("statusLine", response.status_line)
-    )
+def web_selfie(response: TestResponse) -> StringSelfie:
+  actual = Snapshot.of(response.data.decode()) \
+    .plus_facet("status", response.status)
+  return expect_selfie(actual)
 ```
 
-And now our snapshot has `statusLine` at the bottom, which we can use in both literal and disk snapshots.
-
-**[TODO: Not implemented](https://github.com/diffplug/selfie/issues/303)**
+And now our snapshot has `status` at the bottom, which we can use in both literal and disk snapshots.
 
 ```python
 def test_homepage():
   expect_selfie(get("/")).toBe("""
 <html><body>
-\u0020 <h1>Please login</h1>
-\u0020 <form action="/login" method="post">
-\u0020   <input type="text" name="email" placeholder="email">
-\u0020   <input type="submit" value="login">
-\u0020 </form>
+  <h1>Please login</h1>
+  <form action="/login" method="post">
+    <input type="text" name="email" placeholder="email">
+    <input type="submit" value="login">
+  </form>
 </body></html>
-╔═ [statusLine] ═╗
-HTTP/1.1 200 OK""");
+╔═ [status] ═╗
+200 OK""")
 ```
 
 Now that we have the status code, it begs the question: what should the subject be for a 301 redirect? Surely the redirected URL, not just an empty string?
 
-**[TODO: Not implemented](https://github.com/diffplug/selfie/issues/303)**
-
 ```python
-def request_camera(request):
-    redirect_reason = REDIRECTS.get(request.status_code)
-    if redirect_reason is not None:
-        return Snapshot.of("REDIRECT " + str(request.status_code) + " " + redirect_reason + " to " + request.headers.get("Location"))
-    else:
-        return Snapshot.of(request.body).plus_facet("statusLine", request.status_line)
-
 REDIRECTS = {
-    status.value: status.name
-    for status in StatusCode
-    if status in {
-        StatusCode.SEE_OTHER,
-        StatusCode.FOUND,
-        StatusCode.TEMPORARY_REDIRECT,
-        StatusCode.MOVED_PERMANENTLY
-    }
+  303: "See Other",
+  302: "Found",
+  307: "Temporary Redirect",
+  301: "Moved Permanently",
 }
+
+def web_selfie(response: TestResponse) -> StringSelfie:
+  redirect_reason = REDIRECTS.get(response.status_code)
+  if redirect_reason is not None:
+    actual = Snapshot.of(f"REDIRECT {response.status_code} {redirect_reason} to {response.headers.get("Location")}")
+  else:
+    actual = Snapshot.of(response.data.decode()) \
+      .plus_facet("status", response.status)
+  return expect_selfie(actual)
 ```
 
 So a snapshot doesn't have to be only one value, and it's fine if the schema changes depending on the content of the value being snapshotted. The snapshots are for you to read (and look at diffs of), so record whatever is meaningful to you.
 
 ## Lenses
 
-**TODO: Lenses is not [yet](https://github.com/diffplug/selfie/issues/323) implemented, PRs welcomed!**
-
-A [Lens](https://github.com/diffplug/selfie/issues/323) is a function that transforms one `Snapshot` into another `Snapshot`, transforming / creating / removing values along the way. For example, we might want to pretty-print the HTML in our snapshots.
-
-**TODO: [Not implemented](https://github.com/diffplug/selfie/issues/323)**
+A `Lens` is a function that transforms one `Snapshot` into another `Snapshot`, transforming / creating / removing values along the way. For example, we might want to pretty-print the HTML in our snapshots.
 
 ```python
 from bs4 import BeautifulSoup
@@ -161,8 +150,6 @@ def expect_selfie(data: Union[Response, Email], camera):
 ```
 
 ## Compound lens
-
-**TODO: Compound lens not implemented[yet](https://github.com/diffplug/selfie/issues/324), PRs welcomed!**
 
 Selfie has a useful class called [`CompoundLens`](https://github.com/diffplug/selfie/issues/324). It is a fluent API for mutating facets and piping data through functions from one facet into another. An important gotcha here is that the **subject** can be treated as a facet named `""` (empty string). `CompoundLens` uses this hack to simplify a snapshot into only a map of facets, instead of a subject plus a map of facets.
 

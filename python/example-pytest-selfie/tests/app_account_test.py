@@ -1,8 +1,8 @@
 import pytest
-from selfie_lib import StringSelfie, expect_selfie
-from werkzeug.test import TestResponse
+from selfie_lib import expect_selfie
 
 from app import app, wait_for_incoming_email
+from tests.selfie_settings import web_selfie
 
 
 @pytest.fixture
@@ -10,10 +10,6 @@ def client():
     app.config["TESTING"] = True
     with app.test_client() as client:
         yield client
-
-
-def web_selfie(response: TestResponse) -> StringSelfie:
-    return expect_selfie(response.data.decode())
 
 
 def test_homepage(client):
@@ -24,7 +20,9 @@ def test_homepage(client):
     <input type="text" name="email" placeholder="email">
     <input type="submit" value="login">
   </form>
-</body></html>""")
+</body></html>
+╔═ [status] ═╗
+200 OK""")
 
 
 def test_T01_not_logged_in(client):
