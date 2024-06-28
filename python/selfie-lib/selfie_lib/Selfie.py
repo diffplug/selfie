@@ -1,4 +1,4 @@
-from typing import Any, TypeVar, overload
+from typing import Any, Callable, TypeVar, overload
 
 from .Lens import Camera
 from .SelfieImplementations import BinarySelfie, DiskSelfie, ReprSelfie, StringSelfie
@@ -28,10 +28,18 @@ def expect_selfie(actual: T) -> ReprSelfie[T]: ...
 def expect_selfie(actual: T, camera: Camera[T]) -> StringSelfie: ...
 
 
+@overload
+def expect_selfie(actual: T, camera: Callable[[T], Snapshot]) -> StringSelfie: ...
+
+
 def expect_selfie(actual: Any, camera: Any = None) -> DiskSelfie:
     disk_storage = _selfieSystem().disk_thread_local()
     if camera is not None:
-        return StringSelfie(camera.snapshot(actual), disk_storage)
+        if isinstance(camera, Camera):
+            actual_snapshot = camera.snapshot(actual)
+        else:
+            actual_snapshot = camera(actual)
+        return StringSelfie(actual_snapshot, disk_storage)
     elif isinstance(actual, str):
         return StringSelfie(Snapshot.of(actual), disk_storage)
     elif isinstance(actual, Snapshot):
