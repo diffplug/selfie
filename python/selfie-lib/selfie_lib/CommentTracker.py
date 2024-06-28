@@ -54,7 +54,7 @@ class CommentTracker:
 
     @staticmethod
     def __commentAndLine(typedPath: TypedPath) -> Tuple[WritableComment, int]:
-        with open(typedPath.absolute_path) as file:
+        with open(typedPath.absolute_path, encoding="utf-8") as file:
             content = Slice(file.read())
         for comment_str in [
             "# selfieonce",
