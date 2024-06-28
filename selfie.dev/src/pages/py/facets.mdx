@@ -114,6 +114,25 @@ def web_selfie(response: TestResponse) -> StringSelfie:
 
 So a snapshot doesn't have to be only one value, and it's fine if the schema changes depending on the content of the value being snapshotted. The snapshots are for you to read (and look at diffs of), so record whatever is meaningful to you.
 
+## Cameras
+
+So if you want to capture multiple facets of something, you need a function which turns that something into a `Snapshot`. Selfie calls this idea a `Camera`. You can pass a `Camera` as the second argument to `expect_selfie`, which would look like so:
+
+```python
+def _web_camera(response: TestResponse) -> Snapshot:
+    redirect_reason = REDIRECTS.get(response.status_code)
+    if redirect_reason is not None:
+        return Snapshot.of(
+            f"REDIRECT {response.status_code} {redirect_reason} to "
+            + response.headers.get("Location", "<unknown>")
+        )
+    else:
+        return Snapshot.of(response.data.decode()).plus_facet("status", response.status)
+
+def web_selfie(response: TestResponse) -> StringSelfie:
+    return expect_selfie(response, _web_camera)
+```
+
 ## Lenses
 
 A `Lens` is a function that transforms one `Snapshot` into another `Snapshot`, transforming / creating / removing values along the way. For example, we might want to pretty-print the HTML in our snapshots.
@@ -121,33 +140,29 @@ A `Lens` is a function that transforms one `Snapshot` into another `Snapshot`, t
 ```python
 from bs4 import BeautifulSoup
 
-def pretty_print_html(html):
-    soup = BeautifulSoup(html, 'html.parser')
-    return soup.prettify()
+def _pretty_print_html(html : str) -> str:
+  return BeautifulSoup(html, 'html.parser').prettify()
+```
 
-def response_camera(response):
-    (...)
-    // call prettyPrint when we take the snapshot
-    return Snapshot.of(pretty_print_html(response.body))
-                    .plus_facet("statusLine", response.status_line)
+One option is to call this function inside the `Camera`. But this mixes concerns - its better to have one function that grabs all the data (the `Camera`), and other functions that clean it up (the `Lens`es). Selfie makes it easy to combine these like so:
 
+```python
+def _web_camera(response: TestResponse) -> Snapshot: ...
+def _pretty_print_html(html : str) -> str: ...
+def _pretty_print_lens(snapshot : Snapshot) -> Snapshot:
+  if (snapshot.subject.contains("<html"))
+    return snapshot.with_subject(_pretty_print_html(snapshot.subject))
+  else
+    return snapshot
+
+_WEB_CAMERA = Camera.of(_web_camera).with_lens(_pretty_print_lens)
+
+def web_selfie(response: TestResponse) -> StringSelfie:
+    return expect_selfie(response, _WEB_CAMERA)
 ```
 
 Calling transformation functions inside the `Camera` is fine, but another option is to create a `Lens` and then use `Camera.withLens`. This approach is especially helpful if there are multiple `Camera`s which need the same transformation.
 
-**TODO: [Not implemented](https://github.com/diffplug/selfie/issues/323)**
-
-```python
-def pretty_print(snapshot):
-    subject = snapshot.subject.value_string()
-    if "<html>" in subject:
-        return snapshot.plus_or_replace("", pretty_print_html(subject))
-    else:
-        return snapshot
-
-def expect_selfie(data: Union[Response, Email], camera):
-    return Selfie.expect_selfie(data, camera.with_lens(pretty_print))
-```
 
 ## Compound lens
 

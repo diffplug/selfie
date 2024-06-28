@@ -9,7 +9,7 @@ REDIRECTS = {
 }
 
 
-def web_camera(response: TestResponse) -> Snapshot:
+def _web_camera(response: TestResponse) -> Snapshot:
     redirect_reason = REDIRECTS.get(response.status_code)
     if redirect_reason is not None:
         return Snapshot.of(
@@ -20,8 +20,8 @@ def web_camera(response: TestResponse) -> Snapshot:
         return Snapshot.of(response.data.decode()).plus_facet("status", response.status)
 
 
-WEB_CAMERA = Camera.of(web_camera)
+WEB_CAMERA = Camera.of(_web_camera)
 
 
 def web_selfie(response: TestResponse) -> StringSelfie:
-    return expect_selfie(response, WEB_CAMERA)
+    return expect_selfie(response, _web_camera)
