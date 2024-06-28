@@ -26,6 +26,8 @@ def test_homepage(client):
  </body>
 </html>
 
+╔═ [md] ═╗
+Please login
 ╔═ [status] ═╗
 200 OK""")
 

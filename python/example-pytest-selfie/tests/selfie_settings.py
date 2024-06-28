@@ -1,5 +1,8 @@
+import re
+
 from bs4 import BeautifulSoup
-from selfie_lib import Camera, Snapshot, StringSelfie, expect_selfie
+from markdownify import markdownify as md
+from selfie_lib import Camera, CompoundLens, Snapshot, StringSelfie, expect_selfie
 from werkzeug.test import TestResponse
 
 REDIRECTS = {
@@ -21,20 +24,42 @@ def _web_camera(response: TestResponse) -> Snapshot:
         return Snapshot.of(response.data.decode()).plus_facet("status", response.status)
 
 
-def _pretty_print_html(html: str) -> str:
-    return BeautifulSoup(html, "html.parser").prettify()
+def _pretty_print_html(html: str):
+    return BeautifulSoup(html, "html.parser").prettify() if "<html" in html else None
 
 
-def _pretty_print_lens(snapshot: Snapshot) -> Snapshot:
-    if "<html" in snapshot.subject.value_string():
-        return snapshot.plus_or_replace(
-            "", _pretty_print_html(snapshot.subject.value_string())
-        )
+def _html_to_md(html: str):
+    if "<html" not in html:
+        return None
     else:
-        return snapshot
+        # Remove <br> tags
+        clean_html = re.sub(r"<br.*?>", "", html)
+
+        # Convert HTML to Markdown
+        md_text = md(clean_html)
+
+        # Remove specific patterns from lines
+        md_text = re.sub(r"(?m)^====+", "", md_text)
+        md_text = re.sub(r"(?m)^---+", "", md_text)
+        md_text = re.sub(r"(?m)^\*\*\*[^\* ]+", "", md_text)
+
+        # Replace multiple newlines with double newlines
+        md_text = re.sub(r"\n\n+", "\n\n", md_text)
+
+        # Trim each line
+        trim_lines = "\n".join(line.strip() for line in md_text.split("\n"))
+
+        return trim_lines.strip()
 
 
-WEB_CAMERA = Camera.of(_web_camera).with_lens(_pretty_print_lens)
+HTML_LENS = (
+    CompoundLens()
+    .mutate_facet("", _pretty_print_html)
+    .replace_all_regex("http://localhost:\\d+/", "https://demo.selfie.dev/")
+    .set_facet_from("md", "", _html_to_md)
+)
+
+WEB_CAMERA = Camera.of(_web_camera).with_lens(HTML_LENS)
 
 
 def web_selfie(response: TestResponse) -> StringSelfie:
