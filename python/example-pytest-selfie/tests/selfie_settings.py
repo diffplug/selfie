@@ -52,15 +52,15 @@ def _html_to_md(html: str):
         return trim_lines.strip()
 
 
-HTML_LENS = (
+_HTML_LENS = (
     CompoundLens()
     .mutate_facet("", _pretty_print_html)
     .replace_all_regex("http://localhost:\\d+/", "https://demo.selfie.dev/")
     .set_facet_from("md", "", _html_to_md)
 )
 
-WEB_CAMERA = Camera.of(_web_camera).with_lens(HTML_LENS)
+_WEB_CAMERA = Camera.of(_web_camera).with_lens(_HTML_LENS)
 
 
 def web_selfie(response: TestResponse) -> StringSelfie:
-    return expect_selfie(response, WEB_CAMERA)
+    return expect_selfie(response, _WEB_CAMERA)
