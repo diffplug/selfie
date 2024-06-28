@@ -2,7 +2,8 @@ import pytest
 from selfie_lib import expect_selfie
 
 from app import app, wait_for_incoming_email
-from tests.selfie_settings import web_selfie
+
+from .selfie_settings import web_selfie
 
 
 @pytest.fixture
@@ -13,14 +14,18 @@ def client():
 
 
 def test_homepage(client):
-    web_selfie(client.get("/")).to_be("""
-<html><body>
-  <h1>Please login</h1>
+    web_selfie(client.get("/")).to_be("""<html>
+ <body>
+  <h1>
+   Please login
+  </h1>
   <form action="/login" method="post">
-    <input type="text" name="email" placeholder="email">
-    <input type="submit" value="login">
+   <input name="email" placeholder="email" type="text"/>
+   <input type="submit" value="login"/>
   </form>
-</body></html>
+ </body>
+</html>
+
 ╔═ [status] ═╗
 200 OK""")
 
