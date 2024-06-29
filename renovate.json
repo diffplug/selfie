@@ -1,8 +1,11 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "config:recommended"
+    "config:recommended",
+    "schedule:monthly"
   ],
+  "minimumReleaseAge": "14 days",
+  "prCreation": "not-pending",
   "ignoreDeps": ["org.junit.jupiter:junit-jupiter-api", "org.junit.platform:junit-platform-launcher"],
   "packageRules": [
     {
@@ -23,8 +26,5 @@
         "io.jooby:"
       ]
     }
-  ],
-  "schedule": [
-    "every weekend"
   ]
 }
