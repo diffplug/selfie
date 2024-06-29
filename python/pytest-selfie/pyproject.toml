@@ -12,7 +12,7 @@ pytest = "^8.0.0"
 selfie-lib = { path = "../selfie-lib", develop = true }
 
 [tool.poetry.group.dev.dependencies]
-ruff = "^0.4.0"
+ruff = "^0.5.0"
 pyright = "^1.1.350"
 pytest = "^8.0.0"
 
