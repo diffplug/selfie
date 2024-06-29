@@ -12,10 +12,9 @@ openai = "^1.0.0"
 python = "^3.9"
 
 [tool.poetry.group.dev.dependencies]
+ruff = "^0.5.0"
 pyright = "^1.1.350"
 pytest = "^8.0.0"
-requests = "^2.32.3"
-ruff = "^0.4.0"
 selfie-lib = { path = "../selfie-lib", develop = true }
 pytest-selfie = { path = "../pytest-selfie", develop = true }
 markdownify = "^0.12.1"
