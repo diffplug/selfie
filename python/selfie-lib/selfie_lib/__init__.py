@@ -14,6 +14,12 @@ from .ParseException import ParseException as ParseException
 from .PerCharacterEscaper import PerCharacterEscaper as PerCharacterEscaper
 from .Roundtrip import Roundtrip as Roundtrip
 from .Selfie import expect_selfie as expect_selfie
+from .SelfieImplementations import BinaryFacet as BinaryFacet
+from .SelfieImplementations import BinarySelfie as BinarySelfie
+from .SelfieImplementations import FluentFacet as FluentFacet
+from .SelfieImplementations import ReprSelfie as ReprSelfie
+from .SelfieImplementations import StringFacet as StringFacet
+from .SelfieImplementations import StringSelfie as StringSelfie
 from .Slice import Slice as Slice
 from .Snapshot import Snapshot as Snapshot
 from .SnapshotFile import SnapshotFile as SnapshotFile

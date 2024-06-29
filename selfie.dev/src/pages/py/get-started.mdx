@@ -7,27 +7,16 @@ export const imageUrl = "https://selfie.dev/get-started.webp";
 
 <DocsImage imgAbsoluteUrl={imageUrl} />
 
-TODO: adapt this to Python
-
-To start snapshot testing in Python, all you need is to add a [single dependency](https://pypi.org/project/pytest-selfie/).
+To start snapshot testing in Python, all you need is to add a single dependency.
 
 ## Installation
 
 ### Requirements
 
-Selfie snapshot testing works with the following Python test runners:
+Selfie requires Python 3.9 or newer. It has plugins for the following Python test runners:
 
-- Pytest
+- Pytest via [pytest-selfie](https://pypi.org/project/pytest-selfie/).
 - PRs welcome for other test runners (see [here](https://github.com/diffplug/selfie/issues/350) for a guide)
-
-Both disk and inline snapshots can be used with Python test code.
-
-### Poetry
-
-Dependencies are managed using [poetry](https://python-poetry.org/docs/#installing-with-the-official-installer),
-then just cd into `selfie-lib` and `run poetry install`.
-
-Replace `ver_SELFIE` with the [latest available version of selfie](https://github.com/diffplug/selfie/blob/main/python/CHANGELOG.md).
 
 ## Quickstart
 

@@ -7,19 +7,11 @@ export const imageUrl = "https://selfie.dev/advanced.webp";
 
 <DocsImage imgAbsoluteUrl={imageUrl} />
 
-**_THIS IS BROKEN. [WE ARE WORKING ON THIS](https://github.com/diffplug/selfie/issues/303)._**
-
-**_THIS IS BROKEN. [WE ARE WORKING ON THIS](https://github.com/diffplug/selfie/issues/303)._**
-
-**_THIS IS BROKEN. [WE ARE WORKING ON THIS](https://github.com/diffplug/selfie/issues/303)._**
-
-**TODO: Facets is currently not implemented [yet](https://github.com/diffplug/selfie/issues/303)**
-
 Assuming you have [installed selfie](/py/get-started#installation) and glanced through the [quickstart](/py/get-started#quickstart), then you're ready to start taking multifaceted snapshots of arbitrary typed data.
 
 ## Our toy project
 
-We'll be using the [`example-pytest-selfie`](https://github.com/diffplug/selfie/tree/main/python/example-pytest-selfie) project from the selfie GitHub repo. You can clone the code and follow along, but there's no need to. If you did clone the project, you could run **Not Implemented** and you'd have a webapp running at `localhost:8080`.
+We'll be using the [`example-pytest-selfie`](https://github.com/diffplug/selfie/tree/main/python/example-pytest-selfie) project from the selfie GitHub repo. You can clone the code and follow along, but there's no need to. If you did clone the project, you could run `poetry run python app.py` and you'd have a little flask webapp running at `127.0.0.1:5000`.
 
 It has a homepage where we can login. We can go to `/email` to see the emails the server has sent and click our login link, and boom we've got some auth cookies.
 
@@ -27,208 +19,184 @@ There's nothing web-specific about selfie, it's just a familiar example.
 
 ## Typed snapshots
 
-**TODO: Use request instead?, This implementation of toy project not added [yet](https://github.com/diffplug/selfie/tree/main/python/example-pytest-selfie).**
-
-Let's use [requests](https://pypi.org/project/requests/) to do gets and posts. So if we want to assert that the homepage is working, we can do this:
+Since it's a flask app, we can use its built-in test client. So if we want to assert that the homepage is working, we can do this:
 
 ```python
-@Test
-public void homepage() {
-  expect_selfie(requests.get("/").text).to_be("""
+@pytest.fixture
+def client():
+  app.config["TESTING"] = True
+  with app.test_client() as client:
+    yield client
+
+def test_homepage(client):
+  expect_selfie(client.get("/").data.decode()).to_be("""
 <html><body>
-\u0020 <h1>Please login</h1>
-\u0020 <form action="/login" method="post">
-\u0020   <input type="text" name="email" placeholder="email">
-\u0020   <input type="submit" value="login">
-\u0020 </form>
+  <h1>Please login</h1>
+  <form action="/login" method="post">
+    <input type="text" name="email" placeholder="email">
+    <input type="submit" value="login">
+  </form>
 </body></html>""")
-}
 ```
 
-Since you [saw the quickstart](/py/get-started#quickstart), you know that selfie wrote that big bad string literal for us. The `\u0020` is just escaped whitespace, to protect it from getting mangled by terrible autoformatters like [spotless](https://github.com/diffplug/spotless).
+Since you [saw the quickstart](/py/get-started#quickstart), you know that selfie wrote that big bad string literal for us.
 
-**TODO: `Camera` and `expect_selfie(T, Camera&lt;T&gt;)` not yet implemented, [PRs welcomed](https://github.com/diffplug/selfie/issues/302)**
-
-The first thing to notice is that we'll be doing a lot of `requests.get().body().text`. It would be nice if we could just do `expect_selfie(get("/"))`, but we'll have to write our own `expect_selfie(requests.models.Response)` method. Selfie gives us [`expect_selfie(T, Camera&lt;T&gt;)`](https://github.com/diffplug/selfie/issues/302) and [`Camera`](https://github.com/diffplug/selfie/issues/302) to do exactly that.
-
-**TODO: [Not implemented](https://github.com/diffplug/selfie/issues/302)**
+The first thing to notice is that we'll be doing a lot of `.data.decode()`. It would be nice if we could just do `expect_selfie(get("/"))`, so let's add a `web_selfie` method to handle that. I'm going to use static types, but you can ignore those if you want.
 
 ```python
-class Selfie :
-  @staticmethod
-    def expect_selfie(actual, camera):
-        return Selfie.DiskSelfie(actual, camera)
+from selfie_lib import expect_selfie, StringSelfie
+from werkzeug.test import TestResponse # this is what `app.test_client().get` returns
 
-    class DiskSelfie:
-        def __init__(self, actual, camera):
-            self.actual = actual
-            self.camera = camera
+...
 
-        def __enter__(self):
-            self.snapshot = self.camera.snapshot(self.actual)
-            return self
+def web_selfie(response: TestResponse) -> StringSelfie:
+  return expect_selfie(response.data.decode())
+
+def test_homepage(client):
+  web_selfie(client.get("/")).to_be("""
+<html><body>
+  <h1>Please login</h1>
+  <form action="/login" method="post">
+    <input type="text" name="email" placeholder="email">
+    <input type="submit" value="login">
+  </form>
+</body></html>""")
 ```
 
-We can write our `expect_selfie(Response)` anywhere, but we recommend putting it into a class named `SelfieSettings` in the package `selfie`, but you can use any name and put these methods anywhere. We recommend `expect_selfie` because it's a good hint that the string constants are self-updating.
-
-**TODO: [Not implemented](https://github.com/diffplug/selfie/issues/302)**
-
-```python
-import requests
-from selfie import Camera, Selfie, Snapshot
-
-def request_camera(request):
-    return Snapshot(request.text)
-
-class SelfieSettings:
-    REQUEST_CAMERA = Camera(request_camera)
-
-    @staticmethod
-    def expect_selfie(request):
-        return Selfie.expect_selfie(request, SelfieSettings.REQUEST_CAMERA)
-
-```
+You can write `web_selfie` anywhere, but we recommend putting it into `selfie_settings.py`. We allso recommend keeping the `xxx_selfie` pattern because it's a good hint that the string constants are self-updating.
 
 ## Facets
 
-**TODO: Facets is currently not implemented [yet](https://github.com/diffplug/selfie/issues/303)**
-
-Every snapshot has a "subject": `Snapshot.of(String subject)`. But each snapshot can also have an unlimited number of "facets", which are other named values. For example, maybe we want to add the response's status line.
-
-**TODO: [Not implemented](https://github.com/diffplug/selfie/issues/303)**
+Every snapshot has a **subject**: `Snapshot.of(subject: str)`. But each snapshot can also have an unlimited number of **facets**, which are other named values. For example, maybe we want to add the response's status code.
 
 ```python
-def response_camera(response):
-    return (
-        Snapshot(response.text)
-        .plus_facet("statusLine", response.status_line)
-    )
+def web_selfie(response: TestResponse) -> StringSelfie:
+  actual = Snapshot.of(response.data.decode()) \
+    .plus_facet("status", response.status)
+  return expect_selfie(actual)
 ```
 
-And now our snapshot has `statusLine` at the bottom, which we can use in both literal and disk snapshots.
-
-**[TODO: Not implemented](https://github.com/diffplug/selfie/issues/303)**
+And now our snapshot has `status` at the bottom, which we can use in both literal and disk snapshots.
 
 ```python
 def test_homepage():
   expect_selfie(get("/")).toBe("""
 <html><body>
-\u0020 <h1>Please login</h1>
-\u0020 <form action="/login" method="post">
-\u0020   <input type="text" name="email" placeholder="email">
-\u0020   <input type="submit" value="login">
-\u0020 </form>
+  <h1>Please login</h1>
+  <form action="/login" method="post">
+    <input type="text" name="email" placeholder="email">
+    <input type="submit" value="login">
+  </form>
 </body></html>
-╔═ [statusLine] ═╗
-HTTP/1.1 200 OK""");
+╔═ [status] ═╗
+200 OK""")
 ```
 
 Now that we have the status code, it begs the question: what should the subject be for a 301 redirect? Surely the redirected URL, not just an empty string?
 
-**[TODO: Not implemented](https://github.com/diffplug/selfie/issues/303)**
-
 ```python
-def request_camera(request):
-    redirect_reason = REDIRECTS.get(request.status_code)
-    if redirect_reason is not None:
-        return Snapshot.of("REDIRECT " + str(request.status_code) + " " + redirect_reason + " to " + request.headers.get("Location"))
-    else:
-        return Snapshot.of(request.body).plus_facet("statusLine", request.status_line)
-
 REDIRECTS = {
-    status.value: status.name
-    for status in StatusCode
-    if status in {
-        StatusCode.SEE_OTHER,
-        StatusCode.FOUND,
-        StatusCode.TEMPORARY_REDIRECT,
-        StatusCode.MOVED_PERMANENTLY
-    }
+  303: "See Other",
+  302: "Found",
+  307: "Temporary Redirect",
+  301: "Moved Permanently",
 }
+
+def web_selfie(response: TestResponse) -> StringSelfie:
+  redirect_reason = REDIRECTS.get(response.status_code)
+  if redirect_reason is not None:
+    actual = Snapshot.of(f"REDIRECT {response.status_code} {redirect_reason} to {response.headers.get("Location")}")
+  else:
+    actual = Snapshot.of(response.data.decode()) \
+      .plus_facet("status", response.status)
+  return expect_selfie(actual)
 ```
 
 So a snapshot doesn't have to be only one value, and it's fine if the schema changes depending on the content of the value being snapshotted. The snapshots are for you to read (and look at diffs of), so record whatever is meaningful to you.
 
+## Cameras
+
+If you want to capture multiple facets of something, you need a function which turns that something into a `Snapshot`. Selfie calls this a `Camera`. You can pass a `Camera` as the second argument to `expect_selfie`, which would look like so:
+
+```python
+def _web_camera(response: TestResponse) -> Snapshot:
+    redirect_reason = REDIRECTS.get(response.status_code)
+    if redirect_reason is not None:
+        return Snapshot.of(
+            f"REDIRECT {response.status_code} {redirect_reason} to "
+            + response.headers.get("Location", "<unknown>")
+        )
+    else:
+        return Snapshot.of(response.data.decode()).plus_facet("status", response.status)
+
+def web_selfie(response: TestResponse) -> StringSelfie:
+    return expect_selfie(response, _web_camera)
+```
+
 ## Lenses
 
-**TODO: Lenses is not [yet](https://github.com/diffplug/selfie/issues/323) implemented, PRs welcomed!**
-
-A [Lens](https://github.com/diffplug/selfie/issues/323) is a function that transforms one `Snapshot` into another `Snapshot`, transforming / creating / removing values along the way. For example, we might want to pretty-print the HTML in our snapshots.
-
-**TODO: [Not implemented](https://github.com/diffplug/selfie/issues/323)**
+A `Lens` is a function that transforms one `Snapshot` into another `Snapshot`, transforming / creating / removing values along the way. For example, we might want to pretty-print the HTML in our snapshots.
 
 ```python
 from bs4 import BeautifulSoup
 
-def pretty_print_html(html):
-    soup = BeautifulSoup(html, 'html.parser')
-    return soup.prettify()
-
-def response_camera(response):
-    (...)
-    // call prettyPrint when we take the snapshot
-    return Snapshot.of(pretty_print_html(response.body))
-                    .plus_facet("statusLine", response.status_line)
-
+def _pretty_print_html(html : str) -> str:
+  return BeautifulSoup(html, 'html.parser').prettify()
 ```
 
-Calling transformation functions inside the `Camera` is fine, but another option is to create a `Lens` and then use `Camera.withLens`. This approach is especially helpful if there are multiple `Camera`s which need the same transformation.
-
-**TODO: [Not implemented](https://github.com/diffplug/selfie/issues/323)**
+One option is to call this function inside the `Camera`. But this mixes concerns - its better to have one function that grabs all the data (the `Camera`), and other functions that clean it up (the `Lens`es). Selfie makes it easy to combine these like so:
 
 ```python
-def pretty_print(snapshot):
-    subject = snapshot.subject.value_string()
-    if "<html>" in subject:
-        return snapshot.plus_or_replace("", pretty_print_html(subject))
-    else:
-        return snapshot
+def _web_camera(response: TestResponse) -> Snapshot: ...
+def _pretty_print_html(html : str) -> str: ...
+def _pretty_print_lens(snapshot: Snapshot) -> Snapshot:
+  if "<html" in snapshot.subject.value_string():
+    # You can think of a `Snapshot` is an immutable dict of facets
+    # The value of each facet is either `str` or `bytes`
+    # The "subject" is a special facet whose key is ""
+    return snapshot.plus_or_replace("", _pretty_print_html(snapshot.subject.value_string()))
+  else:
+    return snapshot
 
-def expect_selfie(data: Union[Response, Email], camera):
-    return Selfie.expect_selfie(data, camera.with_lens(pretty_print))
+_WEB_CAMERA = Camera.of(_web_camera).with_lens(_pretty_print_lens)
+
+def web_selfie(response: TestResponse) -> StringSelfie:
+    return expect_selfie(response, _WEB_CAMERA)
 ```
+
+By keeping the lens separate from the camera, you can also reuse the lens in other cameras. For example, you might want to pretty-print the HTML in an email.
 
 ## Compound lens
 
-**TODO: Compound lens not implemented[yet](https://github.com/diffplug/selfie/issues/324), PRs welcomed!**
-
-Selfie has a useful class called [`CompoundLens`](https://github.com/diffplug/selfie/issues/324). It is a fluent API for mutating facets and piping data through functions from one facet into another. An important gotcha here is that the **subject** can be treated as a facet named `""` (empty string). `CompoundLens` uses this hack to simplify a snapshot into only a map of facets, instead of a subject plus a map of facets.
+The example above has some nasty plumbing for dealing with the `Snapshot` API. To make this easier, you can use `CompoundLens`. It is a fluent API for mutating facets and piping data through functions from one facet into another. An important gotcha here is that the **subject** can be treated as a facet named `""` (empty string). `CompoundLens` uses this hack to simplify a snapshot into only a map of facets, instead of a subject plus a map of facets.
 
 We can easily mutate a specific facet, such as to pretty-print HTML in the subject...
 
-**TODO: [Not implemented](https://github.com/diffplug/selfie/issues/324)**
-
 ```python
-HTML = CompoundLens().mutate_facet("", lambda maybe_html: pretty_print_html(maybe_html) if "<html>" in maybe_html else None)
+_HTML_LENS = CompoundLens().mutate_facet("", _pretty_print_html)
 ```
 
-Or we can mutate all facets, such as to remove a random local port number...
-
-**TODO: [Not implemented](https://github.com/diffplug/selfie/issues/324)**
+Or we can mutate every facet, such as to remove a random local port number...
 
 ```python
-HTML = (
-    CompoundLens()
-    .mutate_facet("", lambda maybe_html: pretty_print_html(maybe_html) if "<html>" in maybe_html else None)
+_HTML_LENS = CompoundLens() \
+    .mutate_facet("", _pretty_print_html) \
     .replace_all_regex("http://localhost:\\d+/", "https://www.example.com/")
-)
 ```
 
 Or we can render HTML into markdown, and store the easy-to-read markdown in its own facet...
 
-**TODO: [Not implemented](https://github.com/diffplug/selfie/issues/324) yet, use markdown2?**
-
 ```python
-import markdown2
+from markdownify import markdownify as md
 
-def html_to_md(html):
-    return markdown2.markdown(html)
+def _html_to_md(html: str) -> str:
+  return md(html) if "<html" in html else None
 
 HTML = (
     CompoundLens()
-    .mutate_facet("", SelfieSettings.pretty_print_html)
+    .mutate_facet("", _pretty_print_html)
     .replace_all_regex("http://localhost:\\d+/", "https://www.diffplug.com/")
-    .set_facet_from("md", "", html_to_md)
+    .set_facet_from("md", "", _html_to_md)
 )
 ```
 
@@ -237,28 +205,20 @@ HTML = (
 Snapshot testing has been badly underused for three reasons:
 
 - controlling read vs write used to be cumbersome (fixed by [control comments](/py/get-started#quickstart))
-
-**TODO: Selfie garbage collection not implemented [yet](https://github.com/diffplug/selfie/issues/325), PRs welcomed!**
-
-- stale snapshots used to pile up (fixed by [garbage collection](https://github.com/diffplug/selfie/issues/325))
+- stale snapshots used to pile up (fixed by garbage collection [TODO](https://github.com/diffplug/selfie/issues/325))
 - a great test should tell a story, and disk snapshots can't do that
 
 Inline snapshots are a partial fix for storytelling within a test, but the harnessing can become verbose. This is where we combine it all:
 
 - exhaustive specification on disk
 - succinct storytelling inline
-
-**TODO: Selfie `Camera` and `CompoundLens` not implemented [yet](https://github.com/diffplug/selfie/issues/302), PRs welcomed!**
-
-- minimal boilerplate thanks to [`Camera`](#typed-snapshots) and [`CompoundLens`](#compound-lens)
+- minimal boilerplate thanks to [`Camera`](#cameras) and [`CompoundLens`](#compound-lens)
 
 Let's look at a test that puts all of this together.
 
-**TODO: Not implemented [yet](https://github.com/diffplug/selfie/issues/303), PRs welcomed!**
-
 ```python
 def test_login_flow(app):
-    expect_selfie(get("/")).to_match_disk("1. not logged in").facet("md").to_be("Please login")
+    web_selfie(get("/")).to_match_disk("1. not logged in").facet("md").to_be("Please login")
 
     expect_selfie(given().param("email", "user@domain.com").post("/login")).to_match_disk("2. post login form")\
         .facet("md").to_be("""Email sent!
@@ -283,7 +243,7 @@ login=user@domain.com|JclThw==;Path=/""")
 status code: 401""")
 ```
 
-We just wrote a high-level specification of a realistic login flow, and it only took 25 lines of java code — most of which were generated for us, and could be regenerated on a whim if we want to change our copywriting. The [corresponding disk snapshot](https://github.com/diffplug/selfie/issues/322) gives us an exhaustive specification and description of the server's behavior.
+We just wrote a high-level specification of a realistic login flow, and it only took TODO lines of python code — most of which were generated for us, and could be regenerated on a whim if we want to change our copywriting. The [corresponding disk snapshot TODO](https://github.com/diffplug/selfie/issues/322) gives us an exhaustive specification and description of the server's behavior.
 
 Didn't think that adopting a bugfixed version of your internationalization lib would cause any changes to your website whatsever? Oops. Don't wade through failed assertions, get a diff in every failure. If you want, regenerate all the snapshots to get a full view of the problem across the whole codebase in your git client.
 

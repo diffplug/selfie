@@ -8,8 +8,6 @@ export const description =
 
 <NavHeading text="literal" popout="/py/get-started#quickstart" />
 
-## NOT READY YET - WIP
-
 This is a reasonable way to test.
 
 ```python
@@ -26,7 +24,7 @@ def test_mc_test_face():
     print(primes_below(100))
 ```
 
-With literal snapshots, you can `println` directly into your testcode, combining the speed and freedom of `println` with the repeatability and collaborative spirit of conventional assertions.
+With literal snapshots, you can `print` directly into your testcode, combining the speed and freedom of `print` with the repeatability and collaborative spirit of conventional assertions.
 
 ```python
 def test_primes_below_100():
@@ -38,7 +36,7 @@ When you run the test, selfie will automatically rewrite `_TODO()` into whatever
 ```python
 def test_primes_below100():
   expect_selfie(primes_below(100))
-    .to_be("[2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97]")
+    .to_be([2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97])
 ```
 
 And from now on it's a proper assertion, but you didn't have to spend any time writing it. It's not only less work, but also more complete than the usual `.startsWith().endsWith()` rigamarole.
