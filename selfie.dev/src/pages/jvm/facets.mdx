@@ -40,7 +40,7 @@ The first thing to notice is that we'll be doing a lot of `RestAssured.get().bod
 
 ```java
 class Selfie {
-  public static <T> Selfie.DiskSelfie expectSelfie(T actual, Camera<T> camera) { ... }
+  public static <T> StringSelfie expectSelfie(T actual, Camera<T> camera) { ... }
 }
 @FunctionalInterface
 interface Camera<T> {
@@ -64,7 +64,7 @@ public class SelfieSettings extends SelfieSettingsAPI {
   private static final Camera<Response> RESPONSE_CAMERA = (Response response) ->
     Snapshot.of(response.getBody().asString());
 
-  public static Selfie.DiskSelfie expectSelfie(Response response) {
+  public static StringSelfie expectSelfie(Response response) {
     return Selfie.expectSelfie(response, RESPONSE_CAMERA);
   }
 }
@@ -152,10 +152,10 @@ private static final Lens PRETTY_PRINT = (Snapshot snapshot) -> {
   }
 };
 
-public static Selfie.DiskSelfie expectSelfie(Response response) {
+public static StringSelfie expectSelfie(Response response) {
   return Selfie.expectSelfie(response, RESPONSE_CAMERA.withLens(PRETTY_PRINT));
 }
-public static Selfie.DiskSelfie expectSelfie(Email email) {
+public static StringSelfie expectSelfie(Email email) {
   return Selfie.expectSelfie(email, EMAIL_CAMERA.withLens(PRETTY_PRINT));
 }
 ```
