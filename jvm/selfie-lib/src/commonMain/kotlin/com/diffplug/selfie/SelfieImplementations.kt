@@ -30,8 +30,7 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.jvm.JvmOverloads
 
 /** A selfie which can be stored into a selfie-managed file. */
-open class DiskSelfie
-internal constructor(protected val actual: Snapshot, protected val disk: DiskStorage) :
+open class DiskSelfie internal constructor(val actual: Snapshot, protected val disk: DiskStorage) :
     FluentFacet {
   @JvmOverloads
   open fun toMatchDisk(sub: String = ""): DiskSelfie {
