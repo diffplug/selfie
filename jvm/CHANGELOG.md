@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
-- `DiskSelfie` now makes the `Snapshot actual` value public, so that other testing infrastructure can read from snapshotted values.
+- `DiskSelfie` now makes the `Snapshot actual` value public, so that other testing infrastructure can read from snapshotted values. ([#467](https://github.com/diffplug/selfie/pull/467))
 ### Fixed
 - `cacheSelfie` was missing `@JvmOverloads` on the methods with default arguments. ([#425](https://github.com/diffplug/selfie/pull/425))
 
