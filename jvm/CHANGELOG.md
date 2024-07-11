@@ -11,6 +11,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [2.3.0] - 2024-07-11
 ### Added
 - `DiskSelfie` now makes the `Snapshot actual` value public, so that other testing infrastructure can read from snapshotted values. ([#467](https://github.com/diffplug/selfie/pull/467))
 ### Fixed
