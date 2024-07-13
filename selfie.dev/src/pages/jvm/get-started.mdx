@@ -159,8 +159,17 @@ To set the mode, you set the `selfie` or `SELFIE` environment variable or system
 [MAVEN]
 user@machine repo % mvn test -Dselfie=overwrite
 
-[GRADLE (only works if you followed the install instructions above re: environment)]
+[GRADLE (only works if you followed the install instructions)]
 user@machine repo % ./gradlew test -Pselfie=overwrite
+```
+
+In Gradle, you can also go to `~/.gradle/gradle.properties` and add `selfie=overwrite`. Now snapshots will always overwrite on your machine (for every test task which was setup properly).
+
+```kotlin
+test {
+  environment project.properties.subMap(["selfie"]) // build.gradle
+  environment(properties.filter { it.key == "selfie" }) // build.gradle.kts
+}
 ```
 
 ## Beyond toString
