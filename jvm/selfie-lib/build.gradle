@@ -31,6 +31,11 @@ kotlin {
         compileOnly("org.jetbrains.kotlinx:kotlinx-serialization-json:$ver_KOTLIN_SERIALIZATION")
       }
     }
+    jsMain {
+      dependencies {
+        api("org.jetbrains.kotlinx:kotlinx-serialization-json:$ver_KOTLIN_SERIALIZATION")
+      }
+    }
     commonTest {
       dependencies {
         implementation kotlin('test')

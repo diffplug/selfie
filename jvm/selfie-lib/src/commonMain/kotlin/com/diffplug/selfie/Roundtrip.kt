@@ -32,6 +32,7 @@ interface Roundtrip<T, SerializedForm> {
 /** Roundtrips the given type into pretty-printed Json. */
 class RoundtripJson<T>(private val strategy: kotlinx.serialization.KSerializer<T>) :
     Roundtrip<T, String> {
+  @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
   private val json =
       kotlinx.serialization.json.Json {
         prettyPrint = true
