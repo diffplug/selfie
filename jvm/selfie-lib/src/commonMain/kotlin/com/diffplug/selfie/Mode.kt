@@ -42,7 +42,9 @@ enum class Mode {
   internal fun msgSnapshotNotFound() = msg("Snapshot not found")
   internal fun msgSnapshotNotFoundNoSuchFile(file: TypedPath) =
       msg("Snapshot not found: no such file $file")
-  internal fun msgSnapshotMismatch() = msg("Snapshot mismatch")
+  internal fun msgSnapshotMismatch(expected: String, actual: String) = msg("Snapshot mismatch")
+  internal fun msgSnapshotMismatchBinary(expected: ByteArray, actual: ByteArray) =
+      msg("Snapshot mismatch")
   private fun msg(headline: String) =
       when (this) {
         interactive ->

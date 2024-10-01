@@ -146,7 +146,9 @@ class BinarySelfie(actual: Snapshot, disk: DiskStorage, private val onlyFacet: S
           return actualBytes
         } else {
           throw Selfie.system.fs.assertFailed(
-              Selfie.system.mode.msgSnapshotMismatch(), expected, actualBytes)
+              Selfie.system.mode.msgSnapshotMismatchBinary(expected, actualBytes),
+              expected,
+              actualBytes)
         }
       }
     }
@@ -241,7 +243,9 @@ private fun <T : Any> toBeDidntMatch(expected: T?, actual: T, format: LiteralFor
       throw Selfie.system.fs.assertFailed("Can't call `toBe_TODO` in ${Mode.readonly} mode!")
     } else {
       throw Selfie.system.fs.assertFailed(
-          Selfie.system.mode.msgSnapshotMismatch(), expected, actual)
+          Selfie.system.mode.msgSnapshotMismatch(expected.toString(), actual.toString()),
+          expected,
+          actual)
     }
   }
 }
@@ -263,10 +267,12 @@ private fun assertEqual(expected: Snapshot?, actual: Snapshot, storage: Snapshot
               .filter { expected.subjectOrFacetMaybe(it) != actual.subjectOrFacetMaybe(it) }
               .toList()
               .sorted()
+      val expectedFacets = serializeOnlyFacets(expected, mismatchedKeys)
+      val actualFacets = serializeOnlyFacets(actual, mismatchedKeys)
       throw storage.fs.assertFailed(
-          storage.mode.msgSnapshotMismatch(),
-          serializeOnlyFacets(expected, mismatchedKeys),
-          serializeOnlyFacets(actual, mismatchedKeys))
+          storage.mode.msgSnapshotMismatch(expectedFacets, actualFacets),
+          expectedFacets,
+          actualFacets)
     }
   }
 }
