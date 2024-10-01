@@ -62,9 +62,9 @@ enum class Mode {
   private fun msg(headline: String) =
       when (this) {
         interactive ->
-            "$headline\n" + (if (headline.any { it == '\n' }) "────────────────────\n" else "") +
-                "- update this snapshot by adding `_TODO` to the function name\n" +
-                "- update all snapshots in this file by adding `//selfieonce` or `//SELFIEWRITE`"
+            "$headline\n" +
+                "‣ update this snapshot by adding `_TODO` to the function name\n" +
+                "‣ update all snapshots in this file by adding `//selfieonce` or `//SELFIEWRITE`"
         readonly -> headline
         overwrite -> "$headline\n(didn't expect this to ever happen in overwrite mode)"
       }

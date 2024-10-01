@@ -40,9 +40,8 @@ class InteractiveTest : HarnessJUnit() {
         """Snapshot mismatch at L1:C1
 -10
 +5
-────────────────────
-- update this snapshot by adding `_TODO` to the function name
-- update all snapshots in this file by adding `//selfieonce` or `//SELFIEWRITE`"""
+‣ update this snapshot by adding `_TODO` to the function name
+‣ update all snapshots in this file by adding `//selfieonce` or `//SELFIEWRITE`"""
   }
 
   @Test @Order(3)
@@ -75,8 +74,8 @@ class InteractiveTest : HarnessJUnit() {
     ut_mirrorKt().lineWith("expectSelfie(").setContent("    expectSelfie(\"5\").toMatchDisk()")
     gradleInteractiveFail().message shouldBe
         "Snapshot not found\n" +
-            "- update this snapshot by adding `_TODO` to the function name\n" +
-            "- update all snapshots in this file by adding `//selfieonce` or `//SELFIEWRITE`"
+            "‣ update this snapshot by adding `_TODO` to the function name\n" +
+            "‣ update all snapshots in this file by adding `//selfieonce` or `//SELFIEWRITE`"
   }
 
   @Test @Order(7)
