@@ -48,23 +48,12 @@ object SnapshotNotEqualErrorMsg {
 
     if (endOfLineActual == endOfLineExpected) {
       // it ended at a line break
-      if (actual.length > expected.length) {
-        val line =
-            actual.let { str ->
-              val endIdx =
-                  str.indexOf('\n', endOfLineActual + 1).let { if (it == -1) str.length else it }
-              str.substring(endOfLineActual + 1, endIdx)
-            }
-        return "Snapshot mismatch at L${lineNumber+1}:C1 - line(s) added\n+$line"
-      } else {
-        val line =
-            expected.let { str ->
-              val endIdx =
-                  str.indexOf('\n', endOfLineActual + 1).let { if (it == -1) str.length else it }
-              str.substring(endOfLineActual + 1, endIdx)
-            }
-        return "Snapshot mismatch at L${lineNumber+1}:C1 - line(s) removed\n-$line"
-      }
+      val longer = if (actual.length > expected.length) actual else expected
+      val added = if (actual.length > expected.length) "+" else "-"
+      val endIdx =
+          longer.indexOf('\n', endOfLineActual + 1).let { if (it == -1) longer.length else it }
+      val line = longer.substring(endOfLineActual + 1, endIdx)
+      return "Snapshot mismatch at L${lineNumber+1}:C1 - line(s) ${if (added == "+") "added" else "removed"}\n${added}$line"
     } else {
       val expectedLine = expected.substring(index - columnNumber + 1, endOfLineExpected)
       val actualLine = actual.substring(index - columnNumber + 1, endOfLineActual)
