@@ -37,9 +37,12 @@ class InteractiveTest : HarnessJUnit() {
   fun inlineMismatch() {
     ut_mirrorKt().lineWith("expectSelfie(").setContent("    expectSelfie(5).toBe(10)")
     gradleInteractiveFail().message shouldBe
-        "Snapshot mismatch\n" +
-            "- update this snapshot by adding `_TODO` to the function name\n" +
-            "- update all snapshots in this file by adding `//selfieonce` or `//SELFIEWRITE`"
+        """Snapshot mismatch at L1:C1
+-10
++5
+────────────────────
+- update this snapshot by adding `_TODO` to the function name
+- update all snapshots in this file by adding `//selfieonce` or `//SELFIEWRITE`"""
   }
 
   @Test @Order(3)
