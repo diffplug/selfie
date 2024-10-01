@@ -42,11 +42,33 @@ object SnapshotNotEqualErrorMsg {
       }
       index++
     }
-    if (expected.length != actual.length) {
-      //            val diffString = if (expected.length < actual.length) "Actual is longer" else
-      // "Expected is longer"
-      return "Snapshot mismatch at L$lineNumber:C$columnNumber"
+    val endOfLineExpected =
+        expected.indexOf('\n', index).let { if (it == -1) expected.length else it }
+    val endOfLineActual = actual.indexOf('\n', index).let { if (it == -1) actual.length else it }
+
+    if (endOfLineActual == endOfLineExpected) {
+      // it ended at a line break
+      if (actual.length > expected.length) {
+        val line =
+            actual.let { str ->
+              val endIdx =
+                  str.indexOf('\n', endOfLineActual + 1).let { if (it == -1) str.length else it }
+              str.substring(endOfLineActual + 1, endIdx)
+            }
+        return "Snapshot mismatch at L${lineNumber+1}:C1 - line(s) added\n+$line"
+      } else {
+        val line =
+            expected.let { str ->
+              val endIdx =
+                  str.indexOf('\n', endOfLineActual + 1).let { if (it == -1) str.length else it }
+              str.substring(endOfLineActual + 1, endIdx)
+            }
+        return "Snapshot mismatch at L${lineNumber+1}:C1 - line(s) removed\n-$line"
+      }
+    } else {
+      val expectedLine = expected.substring(index - columnNumber + 1, endOfLineExpected)
+      val actualLine = actual.substring(index - columnNumber + 1, endOfLineActual)
+      return "Snapshot mismatch at L$lineNumber:C$columnNumber\n-$expectedLine\n+$actualLine"
     }
-    throw IllegalArgumentException("The strings were supposed to be unequal")
   }
 }

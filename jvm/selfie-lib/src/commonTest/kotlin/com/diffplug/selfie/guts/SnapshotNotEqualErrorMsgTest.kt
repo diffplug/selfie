@@ -44,4 +44,54 @@ class SnapshotNotEqualErrorMsgTest {
 -123 Testing
 +ABC Testing"""
   }
+
+  @Test
+  fun extraLine1() {
+    SnapshotNotEqualErrorMsg.forUnequalStrings("123", "123ABC") shouldBe
+        """Snapshot mismatch at L1:C4
+-123
++123ABC"""
+    SnapshotNotEqualErrorMsg.forUnequalStrings("123ABC", "123") shouldBe
+        """Snapshot mismatch at L1:C4
+-123ABC
++123"""
+  }
+
+  @Test
+  fun extraLine2() {
+    SnapshotNotEqualErrorMsg.forUnequalStrings("line\n123", "line\n123ABC") shouldBe
+        """Snapshot mismatch at L2:C4
+-123
++123ABC"""
+    SnapshotNotEqualErrorMsg.forUnequalStrings("line\n123ABC", "line\n123") shouldBe
+        """Snapshot mismatch at L2:C4
+-123ABC
++123"""
+  }
+
+  @Test
+  fun extraLine() {
+    SnapshotNotEqualErrorMsg.forUnequalStrings("line", "line\nnext") shouldBe
+        """Snapshot mismatch at L2:C1 - line(s) added
++next"""
+    SnapshotNotEqualErrorMsg.forUnequalStrings("line\nnext", "line") shouldBe
+        """Snapshot mismatch at L2:C1 - line(s) removed
+-next"""
+  }
+
+  @Test
+  fun extraNewline() {
+    SnapshotNotEqualErrorMsg.forUnequalStrings("line", "line\n") shouldBe
+        """Snapshot mismatch at L2:C1 - line(s) added
++"""
+    SnapshotNotEqualErrorMsg.forUnequalStrings("line\n", "line") shouldBe
+        """Snapshot mismatch at L2:C1 - line(s) removed
+-"""
+    SnapshotNotEqualErrorMsg.forUnequalStrings("", "\n") shouldBe
+        """Snapshot mismatch at L2:C1 - line(s) added
++"""
+    SnapshotNotEqualErrorMsg.forUnequalStrings("\n", "") shouldBe
+        """Snapshot mismatch at L2:C1 - line(s) removed
+-"""
+  }
 }
