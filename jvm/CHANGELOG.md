@@ -11,6 +11,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- Snapshot mismatch error messages now show a diff of the first mismatched line. ([#477](https://github.com/diffplug/selfie/pull/477))
+  - before
+    ```
+    Snapshot mismatch
+    - update this snapshot by adding `_TODO` to the function name
+    - update all snapshots in this file by adding `//selfieonce` or `//SELFIEWRITE`
+    ```
+  - after
+    ```
+    Snapshot mismatch at L7:C9
+    -Testing 123
+    +Testing ABC
+    ‣ update this snapshot by adding `_TODO` to the function name
+    ‣ update all snapshots in this file by adding `//selfieonce` or `//SELFIEWRITE`
+    ```
 
 ## [2.3.0] - 2024-07-11
 ### Added

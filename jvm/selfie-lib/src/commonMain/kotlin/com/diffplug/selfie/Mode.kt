@@ -17,6 +17,7 @@ package com.diffplug.selfie
 
 import com.diffplug.selfie.guts.CallStack
 import com.diffplug.selfie.guts.CommentTracker
+import com.diffplug.selfie.guts.SnapshotNotEqualErrorMsg
 import com.diffplug.selfie.guts.SnapshotSystem
 import com.diffplug.selfie.guts.TypedPath
 
@@ -42,13 +43,28 @@ enum class Mode {
   internal fun msgSnapshotNotFound() = msg("Snapshot not found")
   internal fun msgSnapshotNotFoundNoSuchFile(file: TypedPath) =
       msg("Snapshot not found: no such file $file")
-  internal fun msgSnapshotMismatch() = msg("Snapshot mismatch")
+  internal fun msgSnapshotMismatch(expected: String, actual: String) =
+      msg(SnapshotNotEqualErrorMsg.forUnequalStrings(expected, actual))
+  internal fun msgSnapshotMismatchBinary(expected: ByteArray, actual: ByteArray) =
+      msgSnapshotMismatch(expected.toQuotedPrintable(), actual.toQuotedPrintable())
+  private fun ByteArray.toQuotedPrintable(): String {
+    val sb = StringBuilder()
+    for (byte in this) {
+      val b = byte.toInt() and 0xFF // Make sure byte is treated as unsigned
+      if (b in 33..126 && b != 61) { // Printable ASCII, except '='
+        sb.append(b.toChar())
+      } else {
+        sb.append("=").append(b.toString(16).uppercase().padStart(2, '0')) // Convert to hex and pad
+      }
+    }
+    return sb.toString()
+  }
   private fun msg(headline: String) =
       when (this) {
         interactive ->
             "$headline\n" +
-                "- update this snapshot by adding `_TODO` to the function name\n" +
-                "- update all snapshots in this file by adding `//selfieonce` or `//SELFIEWRITE`"
+                "‣ update this snapshot by adding `_TODO` to the function name\n" +
+                "‣ update all snapshots in this file by adding `//selfieonce` or `//SELFIEWRITE`"
         readonly -> headline
         overwrite -> "$headline\n(didn't expect this to ever happen in overwrite mode)"
       }
