@@ -63,6 +63,7 @@ internal data class SnapshotValueString(val value: String) : SnapshotValue {
   override fun toString(): String = value
 }
 
+@ConsistentCopyVisibility
 data class Snapshot
 private constructor(
     val subject: SnapshotValue,
