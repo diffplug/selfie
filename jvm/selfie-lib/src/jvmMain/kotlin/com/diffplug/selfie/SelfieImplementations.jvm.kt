@@ -42,6 +42,6 @@ actual interface StringFacet : FluentFacet {
       buffer.append("\n")
       buffer.append(line)
     }
-    return buffer.toString()
+    return toBe(buffer.toString())
   }
 }

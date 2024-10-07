@@ -11,6 +11,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- Multiline `toBe` assertions (introduced in `2.1.0` for Java pre-15) were not throwing exceptions on snapshot mismatch, now fixed. ([#479](https://github.com/diffplug/selfie/pull/479))
 
 ## [2.4.0] - 2024-10-01
 ### Added
