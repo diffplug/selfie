@@ -1,2 +1,2 @@
-pytest>=8.0.0
--e ../selfie-lib
+file:../selfie-lib
+pytest>=8.0.0,<9.0.0

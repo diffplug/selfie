@@ -1,4 +1,5 @@
+file:../selfie-lib
+file:../pytest-selfie
+pytest>=8.0.0,<9.0.0
 flask>=3.0.3
 openai>=1.0.0
--e ../selfie-lib
--e ../pytest-selfie

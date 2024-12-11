@@ -24,6 +24,9 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
       - name: Set up Python environment
         shell: bash
         run: |
@@ -34,7 +37,7 @@ jobs:
             . .venv/bin/activate
           fi
           python -m pip install --upgrade pip
-          pip install uv
+          uv pip install --system
 
       - name: selfie-lib - install dependencies
         shell: bash
@@ -90,8 +93,7 @@ jobs:
           else
             . ../../.venv/bin/activate
           fi
-          python -m pip install -e . -e ../selfie-lib
-          python -m pip install -r requirements.txt -r dev-requirements.txt
+          uv pip install -r requirements.txt -r dev-requirements.txt
 
       - name: pytest-selfie - pyright
         shell: bash
@@ -124,8 +126,7 @@ jobs:
           else
             . ../../.venv/bin/activate
           fi
-          python -m pip install -e . -e ../selfie-lib -e ../pytest-selfie
-          python -m pip install -r requirements.txt -r dev-requirements.txt
+          uv pip install -r requirements.txt -r dev-requirements.txt
 
       - name: example-pytest-selfie - pytest
         shell: bash
