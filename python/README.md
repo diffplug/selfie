@@ -4,14 +4,31 @@
 
 ## Contributing
 
-Dependencies are managed using uv:
-- Install uv: curl -LsSf https://astral.sh/uv/install.sh | sh
-- Then cd into each directory and run:
-  - Install: uv pip install -r requirements.txt -r dev-requirements.txt
-  - Tests: ./scripts/run-tests.sh
-  - Type checking: ./scripts/run-typecheck.sh
-  - Linting: ./scripts/run-lint.sh
-  - Auto-fix formatting: uv python -m ruff format && uv python -m ruff check --fix
+Dependencies are managed using Python's venv and uv:
+
+1. Create and activate virtual environment:
+   ```bash
+   python -m venv .venv
+   # On Windows:
+   .venv\Scripts\activate
+   # On Unix:
+   source .venv/bin/activate
+   ```
+
+2. Install dependencies:
+   ```bash
+   python -m pip install --upgrade pip
+   pip install uv
+   uv pip install -r requirements.txt -r dev-requirements.txt
+   ```
+
+3. Run checks:
+   ```bash
+   python -m pytest -vv
+   python -m pyright
+   python -m ruff format --check && python -m ruff check
+   ```
+   - To fix formatting: `python -m ruff format && python -m ruff check --fix`
 
 Our CI server runs these checks for all Python packages (`selfie-lib`, `pytest-selfie`, and `example-pytest-selfie`).
 

@@ -1,3 +1,2 @@
--e ../selfie-lib
 pytest>=8.0.0
-python>=3.9
+-e ../selfie-lib
