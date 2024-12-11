@@ -1,0 +1,5 @@
+# Main dependencies
+flask==3.0.3
+openai==1.0.0
+-e ../selfie-lib
+-e ../pytest-selfie

@@ -1,0 +1,7 @@
+Metadata-Version: 2.1
+Name: example-pytest-selfie
+Version: 0.1.0
+Summary: An example project for using the pytest plugin for selfie snapshot testing.
+Author-email: Selina Delgado <sdelgado411@gmail.com>, Harvir Sahota <hsahota2312@gmail.com>, Ned Twigg <ned.twigg@diffplug.com>, Edwin Ye <EdwinYeDeveloper@gmail.com>
+License: Apache-2.0
+Requires-Python: >=3.9

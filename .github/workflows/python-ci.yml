@@ -18,41 +18,46 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - run: pipx install poetry
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-          cache: "poetry"
-      - name: selfie-lib - poetry install
-        run: poetry install
+      - name: Install uv
+        shell: bash
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+      - name: Add uv to PATH
+        shell: bash
+        run: echo "$HOME/.local/bin" >> $GITHUB_PATH
+      - name: selfie-lib - install dependencies
+        run: uv pip install -r requirements.txt -r dev-requirements.txt
         working-directory: python/selfie-lib
       - name: selfie-lib - pytest
-        run: poetry run pytest -vv
+        run: python -m pytest -vv
         working-directory: python/selfie-lib
       - name: selfie-lib - pyright
-        run: poetry run pyright
+        run: python -m pyright
         working-directory: python/selfie-lib
       - name: selfie-lib - ruff
-        run: poetry run ruff format --check && poetry run ruff check
+        run: python -m ruff format --check && python -m ruff check
         working-directory: python/selfie-lib
-      - name: pytest-selfie - poetry install
-        run: poetry install
+      - name: pytest-selfie - install dependencies
+        run: uv pip install -r requirements.txt -r dev-requirements.txt
         working-directory: python/pytest-selfie
       - name: pytest-selfie - pyright
-        run: poetry run pyright
+        run: python -m pyright
         working-directory: python/pytest-selfie
       - name: pytest-selfie - ruff
-        run: poetry run ruff format --check && poetry run ruff check
+        run: python -m ruff format --check && python -m ruff check
         working-directory: python/pytest-selfie
-      - name: example-pytest-selfie - poetry install
-        run: poetry install
+      - name: example-pytest-selfie - install dependencies
+        run: uv pip install -r requirements.txt -r dev-requirements.txt
         working-directory: python/example-pytest-selfie
-      - run: poetry run pytest -vv
+      - name: example-pytest-selfie - pytest
+        run: python -m pytest -vv
         working-directory: python/example-pytest-selfie
       - name: example-pytest-selfie - pyright
-        run: poetry run pyright
+        run: python -m pyright
         working-directory: python/example-pytest-selfie
       - name: example-pytest-selfie - ruff
-        run: poetry run ruff format --check && poetry run ruff check
+        run: python -m ruff format --check && python -m ruff check
         working-directory: python/example-pytest-selfie

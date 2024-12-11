@@ -4,19 +4,16 @@
 
 ## Contributing
 
-Dependencies are managed using poetry:
+Dependencies are managed using uv:
+- Install uv: curl -LsSf https://astral.sh/uv/install.sh | sh
+- Then cd into each directory and run:
+  - Install: uv pip install -r requirements.txt -r dev-requirements.txt
+  - Tests: ./scripts/run-tests.sh
+  - Type checking: ./scripts/run-typecheck.sh
+  - Linting: ./scripts/run-lint.sh
+  - Auto-fix formatting: uv python -m ruff format && uv python -m ruff check --fix
 
-- https://python-poetry.org/docs/#installing-with-the-official-installer
-- then cd into `selfie-lib` and run `poetry install`
-
-Our CI server runs three checks in the `selfie-lib` directory.
-
-- `poetry run pytest` - run tests
-- `poetry run pyright` - type checking
-- `poetry run ruff format --check && poetry run ruff check` - code lint & formatting
-  - `poetry run ruff format && poetry run ruff check --fix` to fix
-
-The same setup is used for `pytest-selfie` and `example-pytest-selfie`.
+Our CI server runs these checks for all Python packages (`selfie-lib`, `pytest-selfie`, and `example-pytest-selfie`).
 
 For the IDE we use VSCode. Make sure to open the `python` directory, not the parent `selfie`. Recommended VSCode plugins:
 

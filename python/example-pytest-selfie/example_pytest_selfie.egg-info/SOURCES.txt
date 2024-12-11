@@ -1,0 +1,17 @@
+README.md
+pyproject.toml
+setup.py
+example_pytest_selfie.egg-info/PKG-INFO
+example_pytest_selfie.egg-info/SOURCES.txt
+example_pytest_selfie.egg-info/dependency_links.txt
+example_pytest_selfie.egg-info/top_level.txt
+tests/__init__.py
+tests/app_account_test.py
+tests/cache_selfie_test.py
+tests/get_started_test.py
+tests/homepage_test.py
+tests/selfie_settings.py
+tests/simple_comment_removal_test.py
+tests/simple_inline_test.py
+tests/simple_ondisk_test.py
+tests/to_be_file_test.py

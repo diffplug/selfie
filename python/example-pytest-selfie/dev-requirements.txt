@@ -1,0 +1,7 @@
+# Dev dependencies
+ruff==0.5.0
+pyright==1.1.350
+pytest==8.0.0
+markdownify==0.12.1
+beautifulsoup4==4.12.3
+werkzeug==3.0.3
