@@ -1,7 +1,7 @@
 import inspect
 import os
 import threading
-from abc import ABC
+from abc import ABC, abstractmethod
 from functools import total_ordering
 from pathlib import Path
 from typing import Dict, Generic, List, Optional, TypeVar, cast
@@ -82,7 +82,7 @@ class CallStack:
         return hash((self.location, tuple(self.rest_of_stack)))
 
 
-class SnapshotFileLayout:
+class SnapshotFileLayout(ABC):
     def __init__(self, fs: FS):
         self.fs = fs
 
@@ -91,6 +91,10 @@ class SnapshotFileLayout:
         if not file_path:
             raise ValueError("No file path available in CallLocation.")
         return TypedPath(os.path.abspath(Path(file_path)))
+
+    @abstractmethod
+    def get_snapshot_file(self, test_file: TypedPath) -> TypedPath:
+        pass
 
 
 def recordCall(callerFileOnly: bool) -> CallStack:

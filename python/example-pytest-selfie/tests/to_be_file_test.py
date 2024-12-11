@@ -10,8 +10,13 @@ from selfie_lib.WriteTracker import (
 )
 
 
+class TestSnapshotFileLayout(SnapshotFileLayout):
+    def get_snapshot_file(self, test_file: TypedPath) -> TypedPath:
+        return TypedPath(str(test_file).replace(".jpg", ".ss"))
+
+
 def test_to_be_file():
-    layout = SnapshotFileLayout(FSImplementation())
+    layout = TestSnapshotFileLayout(FSImplementation())
     tracker = ToBeFileWriteTracker()
 
     # Record the current call stack.

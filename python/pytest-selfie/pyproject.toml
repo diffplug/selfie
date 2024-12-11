@@ -35,5 +35,6 @@ ignore = [ "S", "FA",  "PYI", "EM", "PLR",  "FBT", "COM", "RET", "PTH", "PLW", "
 "PLC0414", # import alias does not rename original package
 "W291", # trailing whitespace, we need it for testing snapshots
 "PGH003", # specific rule codes when ignoring type issues
-"ISC001"
+"ISC001",
+"F401" # unused imports - needed for pytest fixtures
 ]
