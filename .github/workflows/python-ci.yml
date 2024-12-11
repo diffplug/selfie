@@ -33,7 +33,7 @@ jobs:
         shell: pwsh
         run: |
           python -m pip install uv
-          echo "$env:USERPROFILE\.local\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
+          echo "$env:USERPROFILE/.local/bin" | Out-File -FilePath $env:GITHUB_PATH -Append
       - name: selfie-lib - install dependencies
         shell: ${{ runner.os == 'Windows' && 'C:\\Program Files\\Git\\bin\\bash.exe -e' || 'bash' }}
         run: |
