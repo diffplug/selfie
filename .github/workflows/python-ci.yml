@@ -29,35 +29,60 @@ jobs:
         shell: bash
         run: echo "$HOME/.local/bin" >> $GITHUB_PATH
       - name: selfie-lib - install dependencies
-        run: uv pip install -r requirements.txt -r dev-requirements.txt
+        run: |
+          uv venv
+          source .venv/bin/activate || . .venv/Scripts/activate
+          uv pip install -r requirements.txt -r dev-requirements.txt
         working-directory: python/selfie-lib
       - name: selfie-lib - pytest
-        run: python -m pytest -vv
+        run: |
+          source .venv/bin/activate || . .venv/Scripts/activate
+          python -m pytest -vv
         working-directory: python/selfie-lib
       - name: selfie-lib - pyright
-        run: python -m pyright
+        run: |
+          source .venv/bin/activate || . .venv/Scripts/activate
+          python -m pyright
         working-directory: python/selfie-lib
       - name: selfie-lib - ruff
-        run: python -m ruff format --check && python -m ruff check
+        run: |
+          source .venv/bin/activate || . .venv/Scripts/activate
+          python -m ruff format --check && python -m ruff check
         working-directory: python/selfie-lib
       - name: pytest-selfie - install dependencies
-        run: uv pip install -r requirements.txt -r dev-requirements.txt
+        run: |
+          uv venv
+          source .venv/bin/activate || . .venv/Scripts/activate
+          uv pip install -r requirements.txt -r dev-requirements.txt
         working-directory: python/pytest-selfie
       - name: pytest-selfie - pyright
-        run: python -m pyright
+        run: |
+          source .venv/bin/activate || . .venv/Scripts/activate
+          python -m pyright
         working-directory: python/pytest-selfie
       - name: pytest-selfie - ruff
-        run: python -m ruff format --check && python -m ruff check
+        run: |
+          source .venv/bin/activate || . .venv/Scripts/activate
+          python -m ruff format --check && python -m ruff check
         working-directory: python/pytest-selfie
       - name: example-pytest-selfie - install dependencies
-        run: uv pip install -r requirements.txt -r dev-requirements.txt
+        run: |
+          uv venv
+          source .venv/bin/activate || . .venv/Scripts/activate
+          uv pip install -r requirements.txt -r dev-requirements.txt
         working-directory: python/example-pytest-selfie
       - name: example-pytest-selfie - pytest
-        run: python -m pytest -vv
+        run: |
+          source .venv/bin/activate || . .venv/Scripts/activate
+          python -m pytest -vv
         working-directory: python/example-pytest-selfie
       - name: example-pytest-selfie - pyright
-        run: python -m pyright
+        run: |
+          source .venv/bin/activate || . .venv/Scripts/activate
+          python -m pyright
         working-directory: python/example-pytest-selfie
       - name: example-pytest-selfie - ruff
-        run: python -m ruff format --check && python -m ruff check
+        run: |
+          source .venv/bin/activate || . .venv/Scripts/activate
+          python -m ruff format --check && python -m ruff check
         working-directory: python/example-pytest-selfie
