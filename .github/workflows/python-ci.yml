@@ -33,15 +33,12 @@ jobs:
         shell: pwsh
         run: |
           python -m pip install uv
-          $pythonPath = (Get-Command python).Path
-          $scriptsPath = Join-Path (Split-Path $pythonPath) "Scripts"
-          echo $scriptsPath | Out-File -FilePath $env:GITHUB_PATH -Append
       - name: selfie-lib - install dependencies
         shell: ${{ runner.os == 'Windows' && 'C:\\Program Files\\Git\\bin\\bash.exe -e' || 'bash' }}
         run: |
-          uv venv
+          python -m uv venv
           source .venv/bin/activate || . .venv/Scripts/activate
-          uv pip install -r requirements.txt -r dev-requirements.txt
+          python -m uv pip install -r requirements.txt -r dev-requirements.txt
         working-directory: python/selfie-lib
       - name: selfie-lib - pytest
         shell: ${{ runner.os == 'Windows' && 'C:\\Program Files\\Git\\bin\\bash.exe -e' || 'bash' }}
@@ -64,9 +61,9 @@ jobs:
       - name: pytest-selfie - install dependencies
         shell: ${{ runner.os == 'Windows' && 'C:\\Program Files\\Git\\bin\\bash.exe -e' || 'bash' }}
         run: |
-          uv venv
+          python -m uv venv
           source .venv/bin/activate || . .venv/Scripts/activate
-          uv pip install -r requirements.txt -r dev-requirements.txt
+          python -m uv pip install -r requirements.txt -r dev-requirements.txt
         working-directory: python/pytest-selfie
       - name: pytest-selfie - pyright
         shell: ${{ runner.os == 'Windows' && 'C:\\Program Files\\Git\\bin\\bash.exe -e' || 'bash' }}
@@ -83,9 +80,9 @@ jobs:
       - name: example-pytest-selfie - install dependencies
         shell: ${{ runner.os == 'Windows' && 'C:\\Program Files\\Git\\bin\\bash.exe -e' || 'bash' }}
         run: |
-          uv venv
+          python -m uv venv
           source .venv/bin/activate || . .venv/Scripts/activate
-          uv pip install -r requirements.txt -r dev-requirements.txt
+          python -m uv pip install -r requirements.txt -r dev-requirements.txt
         working-directory: python/example-pytest-selfie
       - name: example-pytest-selfie - pytest
         shell: ${{ runner.os == 'Windows' && 'C:\\Program Files\\Git\\bin\\bash.exe -e' || 'bash' }}
