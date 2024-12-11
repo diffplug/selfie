@@ -28,19 +28,19 @@ class SelfieSettingsAPI:
         return self.root_dir
 
     def calc_mode(self) -> Mode:
-        override = os.getenv("selfie") or os.getenv("SELFIE")  # noqa: SIM112
-        if override:
-            # Convert the mode to lowercase and match it with the Mode enum
+        selfie_env = os.getenv("selfie") or os.getenv("SELFIE")  # noqa: SIM112
+        if selfie_env:
+            # Only use env var if explicitly set to "readonly"
+            if selfie_env.lower() == "readonly":
+                return Mode.readonly
             try:
-                return Mode[override.lower()]
+                # For backward compatibility, try to match other mode names
+                return Mode[selfie_env.lower()]
             except KeyError:
-                raise ValueError(f"No such mode: {override}") from None
+                raise ValueError(f"No such mode: {selfie_env}") from None
 
-        ci = os.getenv("ci") or os.getenv("CI")  # noqa: SIM112
-        if ci and ci.lower() == "true":
-            return Mode.readonly
-        else:
-            return Mode.interactive
+        # Default to interactive mode when no environment variables are set
+        return Mode.interactive
 
 
 class SelfieSettingsSmuggleError(SelfieSettingsAPI):

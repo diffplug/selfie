@@ -59,6 +59,7 @@ jobs:
           else
             . ../../.venv/bin/activate
           fi
+          unset SELFIE || true
           python -m pytest -vv
 
       - name: selfie-lib - pyright
@@ -104,6 +105,7 @@ jobs:
           else
             . ../../.venv/bin/activate
           fi
+          unset SELFIE || true
           python -m pytest -vv
 
       - name: pytest-selfie - pyright
@@ -149,6 +151,7 @@ jobs:
           else
             . ../../.venv/bin/activate
           fi
+          unset SELFIE || true
           python -m pytest -vv
 
       - name: example-pytest-selfie - pyright
