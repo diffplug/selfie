@@ -19,159 +19,85 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Install uv and set Python version
+        uses: astral-sh/setup-uv@v4
         with:
           python-version: ${{ matrix.python-version }}
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v4
-
-      - name: Set up Python environment
-        shell: bash
-        run: |
-          python -m venv .venv
-          if [ "${{ runner.os }}" = "Windows" ]; then
-            . .venv/Scripts/activate
-          else
-            . .venv/bin/activate
-          fi
-          python -m pip install --upgrade pip
 
       - name: selfie-lib - install dependencies
         shell: bash
         working-directory: python/selfie-lib
         run: |
-          if [ "${{ runner.os }}" = "Windows" ]; then
-            . ../../.venv/Scripts/activate
-          else
-            . ../../.venv/bin/activate
-          fi
-          uv pip install -e .
-          uv pip install -r requirements.txt -r dev-requirements.txt
+          uv pip install --frozen -e .
+          uv pip install --frozen -r requirements.txt -r dev-requirements.txt
 
       - name: selfie-lib - pytest
         shell: bash
         working-directory: python/selfie-lib
         run: |
-          if [ "${{ runner.os }}" = "Windows" ]; then
-            . ../../.venv/Scripts/activate
-          else
-            . ../../.venv/bin/activate
-          fi
           unset SELFIE || true
-          python -m pytest -vv
+          uv run --frozen pytest -vv
 
       - name: selfie-lib - pyright
         shell: bash
         working-directory: python/selfie-lib
-        run: |
-          if [ "${{ runner.os }}" = "Windows" ]; then
-            . ../../.venv/Scripts/activate
-          else
-            . ../../.venv/bin/activate
-          fi
-          python -m pyright
+        run: uv run --frozen pyright
 
       - name: selfie-lib - ruff
         shell: bash
         working-directory: python/selfie-lib
         run: |
-          if [ "${{ runner.os }}" = "Windows" ]; then
-            . ../../.venv/Scripts/activate
-          else
-            . ../../.venv/bin/activate
-          fi
-          python -m ruff format --check && python -m ruff check
+          uv run --frozen ruff format --check
+          uv run --frozen ruff check
 
       - name: pytest-selfie - install dependencies
         shell: bash
         working-directory: python/pytest-selfie
         run: |
-          if [ "${{ runner.os }}" = "Windows" ]; then
-            . ../../.venv/Scripts/activate
-          else
-            . ../../.venv/bin/activate
-          fi
-          uv pip install -e . -e ../selfie-lib
-          uv pip install -r requirements.txt -r dev-requirements.txt
+          uv pip install --frozen -e . -e ../selfie-lib
+          uv pip install --frozen -r requirements.txt -r dev-requirements.txt
 
       - name: pytest-selfie - pytest
         shell: bash
         working-directory: python/pytest-selfie
         run: |
-          if [ "${{ runner.os }}" = "Windows" ]; then
-            . ../../.venv/Scripts/activate
-          else
-            . ../../.venv/bin/activate
-          fi
           unset SELFIE || true
-          python -m pytest -vv
+          uv run --frozen pytest -vv
 
       - name: pytest-selfie - pyright
         shell: bash
         working-directory: python/pytest-selfie
-        run: |
-          if [ "${{ runner.os }}" = "Windows" ]; then
-            . ../../.venv/Scripts/activate
-          else
-            . ../../.venv/bin/activate
-          fi
-          python -m pyright
+        run: uv run --frozen pyright
 
       - name: pytest-selfie - ruff
         shell: bash
         working-directory: python/pytest-selfie
         run: |
-          if [ "${{ runner.os }}" = "Windows" ]; then
-            . ../../.venv/Scripts/activate
-          else
-            . ../../.venv/bin/activate
-          fi
-          python -m ruff format --check && python -m ruff check
+          uv run --frozen ruff format --check
+          uv run --frozen ruff check
 
       - name: example-pytest-selfie - install dependencies
         shell: bash
         working-directory: python/example-pytest-selfie
         run: |
-          if [ "${{ runner.os }}" = "Windows" ]; then
-            . ../../.venv/Scripts/activate
-          else
-            . ../../.venv/bin/activate
-          fi
-          uv pip install -e . -e ../selfie-lib -e ../pytest-selfie
-          uv pip install -r requirements.txt -r dev-requirements.txt
+          uv pip install --frozen -e . -e ../selfie-lib -e ../pytest-selfie
+          uv pip install --frozen -r requirements.txt -r dev-requirements.txt
 
       - name: example-pytest-selfie - pytest
         shell: bash
         working-directory: python/example-pytest-selfie
         run: |
-          if [ "${{ runner.os }}" = "Windows" ]; then
-            . ../../.venv/Scripts/activate
-          else
-            . ../../.venv/bin/activate
-          fi
           unset SELFIE || true
-          python -m pytest -vv
+          uv run --frozen pytest -vv
 
       - name: example-pytest-selfie - pyright
         shell: bash
         working-directory: python/example-pytest-selfie
-        run: |
-          if [ "${{ runner.os }}" = "Windows" ]; then
-            . ../../.venv/Scripts/activate
-          else
-            . ../../.venv/bin/activate
-          fi
-          python -m pyright
+        run: uv run --frozen pyright
 
       - name: example-pytest-selfie - ruff
         shell: bash
         working-directory: python/example-pytest-selfie
         run: |
-          if [ "${{ runner.os }}" = "Windows" ]; then
-            . ../../.venv/Scripts/activate
-          else
-            . ../../.venv/bin/activate
-          fi
-          python -m ruff format --check && python -m ruff check
+          uv run --frozen ruff format --check
+          uv run --frozen ruff check
