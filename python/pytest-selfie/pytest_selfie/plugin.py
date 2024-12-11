@@ -75,6 +75,9 @@ class PytestSnapshotFileLayout(SnapshotFileLayout):
         else:
             raise ValueError(f"Unknown file extension, expected .py: {testfile.name}")
 
+    def get_snapshot_file(self, test_file: TypedPath) -> TypedPath:
+        return self.snapshotfile_for_testfile(test_file)
+
     def __infer_default_line_ending_is_unix(self) -> bool:
         def walk_callback(walk: Iterator[TypedPath]) -> bool:
             for file_path in walk:
