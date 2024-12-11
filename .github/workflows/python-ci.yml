@@ -45,7 +45,7 @@ jobs:
           else
             . ../../.venv/bin/activate
           fi
-          uv pip install -r requirements.txt -r dev-requirements.txt
+          uv pip install -e . -r requirements.txt -r dev-requirements.txt
 
       - name: selfie-lib - pytest
         shell: bash
@@ -89,7 +89,7 @@ jobs:
           else
             . ../../.venv/bin/activate
           fi
-          uv pip install -r requirements.txt -r dev-requirements.txt
+          uv pip install -e . -r requirements.txt -r dev-requirements.txt
 
       - name: pytest-selfie - pyright
         shell: bash
@@ -122,7 +122,7 @@ jobs:
           else
             . ../../.venv/bin/activate
           fi
-          uv pip install -r requirements.txt -r dev-requirements.txt
+          uv pip install -e . -r requirements.txt -r dev-requirements.txt
 
       - name: example-pytest-selfie - pytest
         shell: bash
