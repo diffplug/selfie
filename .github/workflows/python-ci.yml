@@ -37,7 +37,6 @@ jobs:
             . .venv/bin/activate
           fi
           python -m pip install --upgrade pip
-          uv pip install --system
 
       - name: selfie-lib - install dependencies
         shell: bash
@@ -48,8 +47,8 @@ jobs:
           else
             . ../../.venv/bin/activate
           fi
-          python -m pip install -e .
-          python -m pip install -r requirements.txt -r dev-requirements.txt
+          uv pip install -e .
+          uv pip install -r requirements.txt -r dev-requirements.txt
 
       - name: selfie-lib - pytest
         shell: bash
@@ -93,7 +92,19 @@ jobs:
           else
             . ../../.venv/bin/activate
           fi
+          uv pip install .
           uv pip install -r requirements.txt -r dev-requirements.txt
+
+      - name: pytest-selfie - pytest
+        shell: bash
+        working-directory: python/pytest-selfie
+        run: |
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            . ../../.venv/Scripts/activate
+          else
+            . ../../.venv/bin/activate
+          fi
+          python -m pytest -vv
 
       - name: pytest-selfie - pyright
         shell: bash
