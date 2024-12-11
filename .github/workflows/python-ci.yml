@@ -22,12 +22,18 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Install uv
+      - name: Install uv (Unix)
+        if: runner.os != 'Windows'
         shell: bash
         run: |
           curl -LsSf https://astral.sh/uv/install.sh | sh
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
-          echo "${USERPROFILE}\\.local\\bin" >> $GITHUB_PATH
+          echo "${HOME}/.local/bin" >> $GITHUB_PATH
+      - name: Install uv (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          iwr https://astral.sh/uv/install.ps1 -useb | iex
+          echo "$env:USERPROFILE\.local\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
       - name: selfie-lib - install dependencies
         shell: ${{ runner.os == 'Windows' && 'C:\\Program Files\\Git\\bin\\bash.exe -e' || 'bash' }}
         run: |
