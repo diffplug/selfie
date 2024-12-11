@@ -1,2 +1,2 @@
 pytest>=8.0.0
--e file:../selfie-lib
+-e ../selfie-lib

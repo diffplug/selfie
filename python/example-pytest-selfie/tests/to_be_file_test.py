@@ -12,7 +12,10 @@ from selfie_lib.WriteTracker import (
 
 class TestSnapshotFileLayout(SnapshotFileLayout):
     def get_snapshot_file(self, test_file: TypedPath) -> TypedPath:
-        return TypedPath(str(test_file).replace(".jpg", ".ss"))
+        """Return the path to the snapshot file for the current test."""
+        test_dir = os.path.dirname(str(test_file))
+        test_name = os.path.splitext(os.path.basename(str(test_file)))[0]
+        return TypedPath(os.path.join(test_dir, f"{test_name}.ss"))
 
 
 def test_to_be_file():

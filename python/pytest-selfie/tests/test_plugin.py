@@ -1,9 +1,8 @@
 import os
-from pathlib import Path
-from typing import Any
-
 import pytest
 from _pytest.config import Config
+from pathlib import Path
+from typing import Any
 
 from pytest_selfie.plugin import PytestSnapshotSystem, SelfieSettingsAPI
 from selfie_lib import Mode, TypedPath
@@ -13,7 +12,7 @@ class MockConfig(Config):  # type: ignore
     def __init__(self, tmp_path: Path):
         self._rootpath = tmp_path
 
-    def getoption(self, _name: str, default: Any = None, _skip: bool = False) -> Any:
+    def getoption(self, name: str, default: Any = None, skip: bool = False) -> Any:
         return default
 
     @property
