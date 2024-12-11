@@ -29,70 +29,70 @@ jobs:
         shell: bash
         run: echo "$HOME/.local/bin" >> $GITHUB_PATH
       - name: selfie-lib - install dependencies
-        shell: bash
+        shell: ${{ runner.os == 'Windows' && 'C:\\Program Files\\Git\\bin\\bash.exe -e' || 'bash' }}
         run: |
           uv venv
           source .venv/bin/activate || . .venv/Scripts/activate
           uv pip install -r requirements.txt -r dev-requirements.txt
         working-directory: python/selfie-lib
       - name: selfie-lib - pytest
-        shell: bash
+        shell: ${{ runner.os == 'Windows' && 'C:\\Program Files\\Git\\bin\\bash.exe -e' || 'bash' }}
         run: |
           source .venv/bin/activate || . .venv/Scripts/activate
           python -m pytest -vv
         working-directory: python/selfie-lib
       - name: selfie-lib - pyright
-        shell: bash
+        shell: ${{ runner.os == 'Windows' && 'C:\\Program Files\\Git\\bin\\bash.exe -e' || 'bash' }}
         run: |
           source .venv/bin/activate || . .venv/Scripts/activate
           python -m pyright
         working-directory: python/selfie-lib
       - name: selfie-lib - ruff
-        shell: bash
+        shell: ${{ runner.os == 'Windows' && 'C:\\Program Files\\Git\\bin\\bash.exe -e' || 'bash' }}
         run: |
           source .venv/bin/activate || . .venv/Scripts/activate
           python -m ruff format --check && python -m ruff check
         working-directory: python/selfie-lib
       - name: pytest-selfie - install dependencies
-        shell: bash
+        shell: ${{ runner.os == 'Windows' && 'C:\\Program Files\\Git\\bin\\bash.exe -e' || 'bash' }}
         run: |
           uv venv
           source .venv/bin/activate || . .venv/Scripts/activate
           uv pip install -r requirements.txt -r dev-requirements.txt
         working-directory: python/pytest-selfie
       - name: pytest-selfie - pyright
-        shell: bash
+        shell: ${{ runner.os == 'Windows' && 'C:\\Program Files\\Git\\bin\\bash.exe -e' || 'bash' }}
         run: |
           source .venv/bin/activate || . .venv/Scripts/activate
           python -m pyright
         working-directory: python/pytest-selfie
       - name: pytest-selfie - ruff
-        shell: bash
+        shell: ${{ runner.os == 'Windows' && 'C:\\Program Files\\Git\\bin\\bash.exe -e' || 'bash' }}
         run: |
           source .venv/bin/activate || . .venv/Scripts/activate
           python -m ruff format --check && python -m ruff check
         working-directory: python/pytest-selfie
       - name: example-pytest-selfie - install dependencies
-        shell: bash
+        shell: ${{ runner.os == 'Windows' && 'C:\\Program Files\\Git\\bin\\bash.exe -e' || 'bash' }}
         run: |
           uv venv
           source .venv/bin/activate || . .venv/Scripts/activate
           uv pip install -r requirements.txt -r dev-requirements.txt
         working-directory: python/example-pytest-selfie
       - name: example-pytest-selfie - pytest
-        shell: bash
+        shell: ${{ runner.os == 'Windows' && 'C:\\Program Files\\Git\\bin\\bash.exe -e' || 'bash' }}
         run: |
           source .venv/bin/activate || . .venv/Scripts/activate
           python -m pytest -vv
         working-directory: python/example-pytest-selfie
       - name: example-pytest-selfie - pyright
-        shell: bash
+        shell: ${{ runner.os == 'Windows' && 'C:\\Program Files\\Git\\bin\\bash.exe -e' || 'bash' }}
         run: |
           source .venv/bin/activate || . .venv/Scripts/activate
           python -m pyright
         working-directory: python/example-pytest-selfie
       - name: example-pytest-selfie - ruff
-        shell: bash
+        shell: ${{ runner.os == 'Windows' && 'C:\\Program Files\\Git\\bin\\bash.exe -e' || 'bash' }}
         run: |
           source .venv/bin/activate || . .venv/Scripts/activate
           python -m ruff format --check && python -m ruff check
