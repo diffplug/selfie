@@ -13,7 +13,7 @@ class MockConfig(Config):  # type: ignore
     def __init__(self, tmp_path: Path):
         self._rootpath = tmp_path
 
-    def getoption(self, name: str, default: Any = None, skip: bool = False) -> Any:  # type: ignore[override]
+    def getoption(self, _name: str, default: Any = None, _skip: bool = False) -> Any:  # type: ignore[override]
         return default
 
     @property
