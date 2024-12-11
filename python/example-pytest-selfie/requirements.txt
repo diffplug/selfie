@@ -1,4 +1,4 @@
 flask>=3.0.3
 openai>=1.0.0
--e ../selfie-lib
--e ../pytest-selfie
+-e file:../selfie-lib
+-e file:../pytest-selfie
