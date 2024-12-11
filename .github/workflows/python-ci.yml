@@ -32,7 +32,7 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          iwr https://astral.sh/uv/install.ps1 -useb | iex
+          python -m pip install uv
           echo "$env:USERPROFILE\.local\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
       - name: selfie-lib - install dependencies
         shell: ${{ runner.os == 'Windows' && 'C:\\Program Files\\Git\\bin\\bash.exe -e' || 'bash' }}
