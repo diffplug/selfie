@@ -187,16 +187,65 @@ class BinarySelfie(ReprSelfie[bytes], BinaryFacet):
             )
 
     def to_be_base64(self, expected: str) -> bytes:
-        raise NotImplementedError
+        actual_bytes = self.actual.subject_or_facet(self.only_facet).value_binary()
+        expected_bytes = base64.b64decode(expected)
+        if actual_bytes == expected_bytes:
+            return _checkSrc(actual_bytes)
+        else:
+            actual_b64 = base64.b64encode(actual_bytes).decode().replace("\r", "")
+            _toBeDidntMatch(expected, actual_b64, LiteralString())
+            return actual_bytes
 
     def to_be_base64_TODO(self, _: Any = None) -> bytes:
-        raise NotImplementedError
+        actual_bytes = self.actual.subject_or_facet(self.only_facet).value_binary()
+        actual_b64 = base64.b64encode(actual_bytes).decode().replace("\r", "")
+        _toBeDidntMatch(None, actual_b64, LiteralString())
+        return actual_bytes
 
     def to_be_file(self, subpath: str) -> bytes:
-        raise NotImplementedError
+        call = recordCall(False)
+        writable = _selfieSystem().mode.can_write(False, call, _selfieSystem())
+        actual_bytes = self.actual.subject_or_facet(self.only_facet).value_binary()
+        root_folder = (
+            _selfieSystem().layout.sourcefile_for_call(call.location).parent_folder()
+        )
+        path = root_folder.resolve_file(subpath)
+
+        if writable:
+            _selfieSystem().write_to_be_file(path, actual_bytes, call)
+            return actual_bytes
+        else:
+            if not _selfieSystem().fs.file_exists(path):
+                raise _selfieSystem().fs.assert_failed(
+                    _selfieSystem().mode.msg_snapshot_not_found_no_such_file(path)
+                )
+            expected = _selfieSystem().fs.file_read_binary(path)
+            if expected == actual_bytes:
+                return actual_bytes
+            else:
+                raise _selfieSystem().fs.assert_failed(
+                    _selfieSystem().mode.msg_snapshot_mismatch(), expected, actual_bytes
+                )
 
     def to_be_file_TODO(self, subpath: str) -> bytes:
-        raise NotImplementedError
+        call = recordCall(False)
+        writable = _selfieSystem().mode.can_write(True, call, _selfieSystem())
+        actual_bytes = self.actual.subject_or_facet(self.only_facet).value_binary()
+
+        if writable:
+            root_folder = (
+                _selfieSystem()
+                .layout.sourcefile_for_call(call.location)
+                .parent_folder()
+            )
+            path = root_folder.resolve_file(subpath)
+            _selfieSystem().write_to_be_file(path, actual_bytes, call)
+            _selfieSystem().write_inline(TodoStub.to_be_file.create_literal(), call)
+            return actual_bytes
+        else:
+            raise _selfieSystem().fs.assert_failed(
+                f"Can't call `toBeFile_TODO` in {Mode.readonly} mode!"
+            )
 
 
 def _checkSrc(value: T) -> T:
