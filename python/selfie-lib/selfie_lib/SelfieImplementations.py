@@ -11,7 +11,6 @@ from .Literals import (
     TodoStub,
 )
 from .Snapshot import Snapshot
-from .SnapshotFile import SnapshotFile
 from .SnapshotSystem import DiskStorage, Mode, SnapshotSystem, _selfieSystem
 from .WriteTracker import recordCall as recordCall
 

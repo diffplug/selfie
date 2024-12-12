@@ -1,3 +1,13 @@
+"""
+Snapshot class for managing test snapshots.
+
+Implementation Note:
+    This class uses private members (_subject, _facet_data) to maintain SnapshotValue
+    as an internal implementation detail while exposing Union[bytes, str] in the public API.
+    This design choice allows us to keep the implementation flexibility of SnapshotValue
+    while providing a simpler public interface.
+"""
+
 from collections.abc import Iterator
 from typing import Union
 
@@ -100,6 +110,8 @@ class Snapshot:
 
     def __repr__(self) -> str:
         pieces = [f"Snapshot.of({self._subject.value_string()!r})"]
-        for e in self._facet_data.items():
-            pieces.append(f"\n  .plus_facet({e[0]!r}, {e[1].value_string()!r})")
+        pieces.extend(
+            f"\n  .plus_facet({e[0]!r}, {e[1].value_string()!r})"
+            for e in self._facet_data.items()
+        )
         return "".join(pieces)

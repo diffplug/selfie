@@ -34,3 +34,9 @@ ignore = [ "S", "FA",  "PYI", "EM", "PLR",  "FBT", "COM", "RET", "PTH", "PLW", "
 "PGH003", # specific rule codes when ignoring type issues
 "ISC001"
 ]
+
+[tool.ruff.lint.per-file-ignores]
+"selfie_lib/CacheSelfie.py" = ["SLF001"]
+"selfie_lib/Lens.py" = ["SLF001"]
+"selfie_lib/SelfieImplementations.py" = ["SLF001"]
+"selfie_lib/SnapshotFile.py" = ["SLF001"]
