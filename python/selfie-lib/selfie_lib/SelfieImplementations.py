@@ -254,7 +254,7 @@ def _serializeOnlyFacets(snapshot: Snapshot, facets: list[str]) -> str:
         if value is None:
             continue
         if not facet:
-            SnapshotFile.writeEntry(writer, "", None, value)
+            SnapshotFile.writeEntry(writer, "", "html", value)
         else:
             SnapshotFile.writeEntry(writer, "", facet, value)
 
