@@ -249,7 +249,7 @@ class PytestSnapshotSystem(SnapshotSystem):
         self, path: TypedPath, data: "ByteString", call: CallStack
     ) -> None:
         # Directly write to disk using ToBeFileWriteTracker
-        self.__toBeFileWriteTracker.writeToDisk(path, data, call, self.layout_pytest)
+        self.__toBeFileWriteTracker.writeToDisk(path, bytes(data), call, self.layout_pytest)
 
 
 class DiskStoragePytest(DiskStorage):
