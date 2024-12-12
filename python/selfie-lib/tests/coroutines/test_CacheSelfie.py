@@ -1,6 +1,7 @@
 import asyncio
-import pytest
 from typing import Optional
+
+import pytest
 
 from selfie_lib.coroutines.CacheSelfie import cache_selfie_suspend
 from selfie_lib.Roundtrip import Roundtrip
@@ -9,7 +10,7 @@ from selfie_lib.WriteTracker import CallStack
 
 
 class TestDiskStorage(DiskStorage):
-    def read_disk(self, sub: str, call: CallStack) -> Optional[Snapshot]:
+    def read_disk(self, _: str, __: CallStack) -> Optional[Snapshot]:
         return None
 
     def write_disk(self, actual: Snapshot, sub: str, call: CallStack):
