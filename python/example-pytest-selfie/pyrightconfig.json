@@ -1,1 +1,8 @@
-{"typeCheckingMode": "basic", "disableBytesTypePromotions": false}
+{
+    "venvPath": ".",
+    "venv": ".venv",
+    "extraPaths": [
+      "../selfie-lib",
+      "../pytest-selfie"
+    ]
+  }
