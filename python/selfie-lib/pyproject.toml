@@ -8,8 +8,7 @@ authors = [
   { name = "Ned Twigg", email = "ned.twigg@diffplug.com" },
   { name = "Selina Delgado", email = "sdelgado411@gmail.com"}
 ]
-
-license = "Apache-2.0"
+license = { text = "Apache-2.0" }
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = []
