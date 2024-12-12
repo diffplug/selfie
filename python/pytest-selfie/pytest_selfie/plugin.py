@@ -1,5 +1,4 @@
 import os
-from cgi import test
 from collections import defaultdict
 from typing import ByteString, DefaultDict, Iterator, List, Optional
 
@@ -312,7 +311,7 @@ class SnapshotFileProgress:
 
     def test_start(self, testname: str):
         if "/" in testname:
-            raise ValueError(f"Test name cannot contain '/', was {test}")
+            raise ValueError(f"Test name cannot contain '/', was {testname}")
         self.assert_not_terminated()
         if self.testname_in_progress is not None:
             raise RuntimeError(
