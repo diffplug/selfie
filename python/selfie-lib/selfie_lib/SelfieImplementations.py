@@ -208,7 +208,7 @@ class BinarySelfie(ReprSelfie[bytes], BinaryFacet):
         return self.actual.subject_or_facet(self.only_facet).value_binary()
 
     def _actual_string(self) -> str:
-        return base64.b64encode(self._actual_bytes()).decode().replace('\r', '')
+        return base64.b64encode(self._actual_bytes()).decode().replace("\r", "")
 
     def to_be_file_impl(self, subpath: str, is_todo: bool) -> bytes:
         call = recordCall(False)
