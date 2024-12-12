@@ -22,119 +22,61 @@ Selfie requires Python 3.9 or newer. It has plugins for the following Python tes
 
 _If you haven't seen the [GIF on our GitHub](https://github.com/diffplug/selfie), you might want to watch that first (give us a ⭐ while you're at it 😉)._
 
-Let's say we have the following test code:
+Here's a basic example of snapshot testing with Selfie:
 
 ```python
-expect_selfie([1, 2, 3]).to_be_TODO()
+from selfie_lib import expect_selfie
+
+def test_quickstart():
+    expect_selfie([1, 2, 3]).to_be([1, 2, 3])
 ```
 
-If you run this test, selfie will rewrite your sourcecode to be this:
+## Data Types
+
+Selfie supports various Python data types for snapshot testing:
 
 ```python
+# Examples from simple_inline_test.py
+expect_selfie(20000).to_be(20_000)
 expect_selfie([1, 2, 3]).to_be([1, 2, 3])
+expect_selfie(("a", 2, 3)).to_be(("a", 2, 3))
+expect_selfie({"a": 1, "b": 2}).to_be({"a": 1, "b": 2})
 ```
 
-Now, let's change the code to this:
+## Basic Disk Snapshots
+
+For simple disk snapshots, use `to_match_disk`:
 
 ```python
-expect_selfie("oops").to_be([1, 2, 3])
+expect_selfie("A").to_match_disk()
 ```
 
-When we run the test, we will get a failure, and the failure message will be:
+> ⚠️ **Note**: Advanced disk snapshot features are still under development.
 
-```
-Snapshot mismatch
-- update this snapshot by adding `_TODO` to the function name
-- update all snapshots in this file by adding `#selfieonce` or `#SELFIEWRITE`
-```
-
-As you can see, we have three options:
-
-- replace `to_be` with `to_be_TODO` (you can leave or remove the `[1, 2, 3]`, makes no difference)
-  - rewrites only this one snapshot, and selfie will remove the `_TODO`
-- put `#selfieonce` anywhere in the file
-  - rewrites all snapshots in the file, and selfie will remove `#selfieonce` after it has done so
-- put `#SELFIEWRITE` anywhere in that file
-  - rewrites all snapshots in the file until you remove `#SELFIEWRITE` yourself
-
-## Disk
-
-To store a snapshot on disk, swap `toBe` for `to_match_disk`:
-
-```python
-expect_selfie([1, 2, 3]).to_match_disk_TODO()
-```
-
-This will create a file called `SomethingOrOther.ss` in the same directory as your test. It will also rewrite the test source to:
-
-```python
-expect_selfie([1, 2, 3]).to_match_disk()
-```
-
-Just like inline literal snapshots, you can use `_TODO`, `//selfieonce`, and `//SELFIEWRITE` to control how the snapshots are written and updated. You don't have to use `_TODO` if you have the `//selfieonce` or `//SELFIEWRITE` comments in your file.
-
-If you want the disk snapshots to live in a different folder, set `snapshotFolderName` using [SelfieSettings](https://pydoc.selfie.dev/namespacepytest__selfie_1_1SelfieSettingsAPI).
-
-## CI
-
-The nice thing about `//SELFIEWRITE` is that all of your snapshots will update on every run, which makes it easy to explore — like multiassert on steroids. **The bad thing about `//SELFIEWRITE` is that all of the tests always pass, even if the snapshots actually change on every run.**
-
-For example, you might have a realtime timestamp or a random port number embedded in a snapshot. Randomness and realtime cannot be present in a repeatable assertion, and you might not realize that a tiny part of a large snapshot is changing while you're in `//SELFIEWRITE` mode.
-
-For this reason, it is critical that a CI server should always run in `readonly` mode. No action is needed on your part, selfie automatically puts itself into `readonly` mode if the `CI=true` environment variable is present, which is true for all popular CI systems.
-
-When in `readonly` mode, selfie not only refuses to update any snapshots, it also fails the build if `_TODO`, `//selfieonce`, or `//SELFIEWRITE` are present in the sourcecode, even if the snapshots were correct. Writing snapshots is a strictly private affair 😏.
-
-## Overwrite everything
+## Modes and CI Integration
 
 Selfie has three modes:
+- `interactive` (default): Allows snapshot updates
+- `readonly`: No snapshots can be written
+- `overwrite`: Every snapshot is overwritten
 
-- `interactive`, the default mode, which we discussed in the [quickstart](#quickstart)
-- `readonly`, the default mode if `CI=true`, where no snapshots can be written
-- `overwrite`, where every snapshot is overwritten, regardless of whether it is `_TODO` or not
-
-To set the mode, you set the `selfie` or `SELFIE` environment variable or system property to either `interactive`, `readonly`, or `overwrite`. But in the vast majority of cases, it's best to leave it alone and let the defaults do their thing.
-
-**TODO: Change once available**
-
-```console
-[MAVEN]
-user@machine repo % mvn test -Dselfie=overwrite
-
-[GRADLE (only works if you followed the install instructions above re: environment)]
-user@machine repo % ./gradlew test -Pselfie=overwrite
-```
-
-## Beyond toString
-
-All of the examples so far have asserted on Strings. You can also do inline literal assertions on primitive values, and disk assertions on byte arrays:
-
-```python
-expect_selfie(10/4).to_be(2.5)
-expect_selfie((10/4) == 2.5).to_be(true)
-expect_selfie(bytearray(100)).to_match_disk()
-```
-
-But the real power of selfie is asserting on arbitrary objects using **facets**, which are covered in the [advanced section](/py/facets).
+> 🚧 **Work in Progress**:
+> - CI mode examples and integration
+> - Advanced disk snapshot features
+> - Binary data handling
 
 ## Reference
 
 Full API documentation is available at [pydoc.selfie.dev](https://pydoc.selfie.dev).
 
-- `.to_be_TODO()` or `.to_be_TODO(argumentIsIgnored)`
-  - creates or updates an inline literal snapshot
-- `.to_match_disk_TODO()`
-  - creates or updates a disk snapshot
-- `//selfieonce`
-  - all snapshots in the file will be updated, whether they are `_TODO` or not
-  - selfie will remove the comment after the snapshots have updated
-- `//SELFIEWRITE`
-  - all snapshots in the file will be updated, whether they are `_TODO` or not
-  - selfie will not remove the comment after the snapshots have updated
-- mode is set by the `SELFIE` environment variable or system property
-  - `interactive`, default
-  - `readonly`, default if `CI` environment variable is `true`
-  - `overwrite`, all snapshots can be overwritten
-- `Camera` and `Lens` are covered in the [advanced section](/py/facets).
+Currently implemented features:
+- Basic snapshot testing with `.to_be()`
+- Simple disk snapshots with `.to_match_disk()`
+- Support for Python primitive types and collections
+- Basic interactive mode
 
-_Pull requests to improve the landing page and documentation are greatly appreciated, you can find the [source code here](https://github.com/diffplug/selfie)._
+> ⚠️ **Note**: Some advanced features like CI mode integration and advanced disk snapshots are still under development.
+
+The real power of selfie is asserting on arbitrary objects using **facets**, which are covered in the [advanced section](/py/facets).
+
+_Pull requests to improve the documentation are greatly appreciated, you can find the [source code here](https://github.com/diffplug/selfie)._

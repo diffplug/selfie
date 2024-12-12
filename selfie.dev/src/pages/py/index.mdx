@@ -28,24 +28,37 @@ With literal snapshots, you can `print` directly into your testcode, combining t
 
 ```python
 def test_primes_below_100():
-  expect_selfie(primes_below(100)).to_be_TODO()
-```
-
-When you run the test, selfie will automatically rewrite `_TODO()` into whatever it turned out to be.
-
-```python
-def test_primes_below100():
-  expect_selfie(primes_below(100))
-    .to_be([2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97])
+    expect_selfie(primes_below(100)).to_be([
+        2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97
+    ])
 ```
 
 And from now on it's a proper assertion, but you didn't have to spend any time writing it. It's not only less work, but also more complete than the usual `.startsWith().endsWith()` rigamarole.
 
+## Implementation Status
+
+✅ Implemented:
+- Basic snapshot testing
+- Inline literals
+- Web examples (facets)
+- HTML pretty printing
+- Markdown conversion
+
+⚠️ Partially implemented:
+- Disk snapshots (basic functionality)
+- CI mode integration
+
+❌ Not implemented/WIP:
+- Cache functionality ([Issue #302](https://github.com/diffplug/selfie/issues/302))
+- Binary data handling
+- Typed data roundtripping
+- AI examples ([Issue #319](https://github.com/diffplug/selfie/issues/319))
+
 <NavHeading text="like-a-filesystem" popout="/py/get-started#disk" />
 
-## NOT READY YET - WIP
-
-That `primes_below(100)` snapshot above is almost too long. Something bigger, such as `primes_below(10_000)` is definitely too big. To handle this, selfie lets you put your snapshots on disk.
+> 🚧 **Work in Progress**: Filesystem-like features
+>
+> Advanced disk snapshot features are currently under development. Basic disk snapshots are available using `to_match_disk()`, but advanced features like custom snapshot folders and binary data handling are still in progress.
 
 ```python
 def test_gzip_favicon():
@@ -57,66 +70,11 @@ def test_order_flow():
   expect_selfie(get("/orders")).to_match_disk("ordered")
 ```
 
-This will generate a snapshot file like so:
-
-```html
-╔═ gzipFavicon ═╗ base64 length 12 bytes 
-Umlja1JvbGwuanBn
-╔═ orderFlow/initial ═╗
-<html>
-  <body>
-    <button>Submit order</button>
-  </body>
-</html>
-╔═ orderFlow/ordered ═╗
-<html>
-  <body>
-    <p>Thanks for your business!</p>
-    <details>
-      <summary>Order information</summary>
-      <p>Tracking #ABC123</p>
-    </details>
-  </body>
-</html>
-```
-
-Selfie's snapshot files `.ss` are simple to parse, just split them up on `\n╔═`. Escaping rules only come into play if the content you are escaping has lines that start with `╔`, and you can always use `selfie-lib` as a parser if you want.
-
-You can treat your snapshot files as an output deliverable of your code, and use them as an input to other tooling.
-
 <NavHeading text="lensable" popout="/py/facets" />
 
-## NOT READY YET - WIP
-
-A problem with the snapshots we've shown so far is that they are one dimensional. What about headers and cookies? What about the content the user actually sees, without all the markup? What if we could do this?
-
-```
-╔═ orderFlow/initial [md] ═╗
-Submit order
-╔═ orderFlow/ordered [md] ═╗
-Thanks for your business!</p>
-```
-
-Well, you can! Every snapshot has a _subject_, which is the main thing you are recording. And that subject can have any number of _facets_, which are named views of the subject from a different lens.
-
-```python
-html = "<html>..."
-snapshot = Snapshot(html).plus_facet("md", parse_html_to_md(html))
-expect_selfie(snapshot).to_match_disk()
-```
-
-You can also use facets in combination with disk and inline literal snapshots to make your tests more like a story.
-
-```python
-def test_order_flow():
-  expect_selfie(get("/orders")).to_match_disk("initial")
-    .facet("md").to_be("Submit order")
-  post_order()
-  expect_selfie(get("/orders")).to_match_disk("ordered")
-    .facet("md").to_be("Thanks for your business!")
-```
-
-Selfie's faceting is built around [Camera](https://kdoc.selfie.dev/selfie-lib/com.diffplug.selfie/-camera/), [Lens](https://kdoc.selfie.dev/selfie-lib/com.diffplug.selfie/-lens/), and [Snapshot](https://kdoc.selfie.dev/selfie-lib/com.diffplug.selfie/-snapshot/), whose API is roughly:
+> 🚧 **Work in Progress**: Advanced Facet Features
+>
+> While basic faceting is implemented for web testing and HTML/Markdown conversion, some advanced features are still under development. See the [facets section](/py/facets) for currently available features.
 
 ```python
 class Snapshot:
@@ -134,28 +92,10 @@ class Camera(Generic [T]):
     # returns a new Camera which applies the given lens to every snapshot
 ```
 
-See the [facets section](/py/facets) for more details on how you can use Selfie for snapshot testing with Java, Kotlin, or any JVM language.
-
 <NavHeading text="cacheable" popout="/py/cache" />
 
-## NOT READY YET - WIP
-
-Sometimes a test has a component which is slow, expensive, or non-deterministic. In cases like this, it can be useful to save the result of a previous execution of the API call, and use that as a mock for future tests.
-
-```python
-client = expensive_ai_service()
-chat_response = cache_selfie(client.chat("What's your favorite number today?")).to_be("Since it's March 14, my favorite number is π")
-# build other stuff with the chat response
-```
-
-You can cache simple strings, but you can also cache typed API objects, binary data, or anything else you can serialize to a string or a byte array.
-
-```python
-imageBytes = cache_selfie_binary(() -> {
-  return client.generate_image("A robot making a self portrait")
-}).to_be_file("selfie.png")
-```
-
-For more information on how to use `cache_selfie`, see the [cache example](/py/cache).
+> ⚠️ **Note**: Cache Functionality
+>
+> Cache functionality is currently under development ([Issue #302](https://github.com/diffplug/selfie/issues/302)). This includes features for caching test results and handling non-deterministic data. See the [cache documentation](/py/cache) for updates.
 
 <FooterCTA />
