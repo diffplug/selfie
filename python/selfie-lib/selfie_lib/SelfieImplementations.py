@@ -254,7 +254,8 @@ def _serializeOnlyFacets(snapshot: Snapshot, facets: list[str]) -> str:
         if value is None:
             continue
         if not facet:
-            SnapshotFile.writeEntry(writer, "", "html", value)
+            # Empty facets should have no header at all
+            writer.extend([value.value_string(), "\n"])
         else:
             SnapshotFile.writeEntry(writer, "", facet, value)
 
