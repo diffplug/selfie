@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
-from collections.abc import Set
-from typing import Any, ItemsView, Iterator, List, Mapping, Tuple, TypeVar, Union
+from collections.abc import ItemsView, Iterator, Mapping, Set
+from typing import Any, TypeVar, Union
 
 T = TypeVar("T")
 V = TypeVar("V")
@@ -44,7 +44,7 @@ class ListBackedSet(Set[T], ABC):
     def __len__(self) -> int: ...
 
     @abstractmethod
-    def __getitem__(self, index: Union[int, slice]) -> Union[T, List[T]]: ...
+    def __getitem__(self, index: Union[int, slice]) -> Union[T, list[T]]: ...
 
     @abstractmethod
     def __iter__(self) -> Iterator[T]: ...
@@ -57,13 +57,13 @@ class ListBackedSet(Set[T], ABC):
 
 
 class ArraySet(ListBackedSet[K]):
-    __data: List[K]
+    __data: list[K]
 
     def __init__(self):
         raise NotImplementedError("Use ArraySet.empty() or other class methods instead")
 
     @classmethod
-    def __create(cls, data: List[K]) -> "ArraySet[K]":
+    def __create(cls, data: list[K]) -> "ArraySet[K]":
         instance = super().__new__(cls)
         instance.__data = data  # noqa: SLF001
         return instance
@@ -80,7 +80,7 @@ class ArraySet(ListBackedSet[K]):
     def __len__(self) -> int:
         return len(self.__data)
 
-    def __getitem__(self, index: Union[int, slice]) -> Union[K, List[K]]:
+    def __getitem__(self, index: Union[int, slice]) -> Union[K, list[K]]:
         return self.__data[index]
 
     def plusOrThis(self, element: K) -> "ArraySet[K]":
@@ -95,7 +95,7 @@ class ArraySet(ListBackedSet[K]):
 
 
 class _ArrayMapKeys(ListBackedSet[K]):
-    def __init__(self, data: List[Union[K, V]]):
+    def __init__(self, data: list[Union[K, V]]):
         self.__data = data
 
     def __len__(self) -> int:
@@ -118,8 +118,8 @@ class _ArrayMapKeys(ListBackedSet[K]):
         return (self.__data[i] for i in range(0, len(self.__data), 2))  # type: ignore
 
 
-class _ArrayMapEntries(ListBackedSet[Tuple[K, V]], ItemsView[K, V]):
-    def __init__(self, data: List[Union[K, V]]):
+class _ArrayMapEntries(ListBackedSet[tuple[K, V]], ItemsView[K, V]):
+    def __init__(self, data: list[Union[K, V]]):
         self.__data = data
 
     def __len__(self) -> int:
@@ -138,21 +138,21 @@ class _ArrayMapEntries(ListBackedSet[Tuple[K, V]], ItemsView[K, V]):
         else:
             return (self.__data[2 * index], self.__data[2 * index + 1])
 
-    def __iter__(self) -> Iterator[Tuple[K, V]]:
+    def __iter__(self) -> Iterator[tuple[K, V]]:
         return (
             (self.__data[i], self.__data[i + 1]) for i in range(0, len(self.__data), 2)
         )  # type: ignore
 
 
 class ArrayMap(Mapping[K, V]):
-    __data: List[Union[K, V]]
+    __data: list[Union[K, V]]
     __keys: ListBackedSet[K]
 
     def __init__(self):
         raise NotImplementedError("Use ArrayMap.empty() or other class methods instead")
 
     @classmethod
-    def __create(cls, data: List[Union[K, V]]) -> "ArrayMap[K, V]":
+    def __create(cls, data: list[Union[K, V]]) -> "ArrayMap[K, V]":
         instance = cls.__new__(cls)
         instance.__data = data  # noqa: SLF001
         instance.__keys = _ArrayMapKeys(data)  # noqa: SLF001
@@ -195,7 +195,7 @@ class ArrayMap(Mapping[K, V]):
         new_data.insert(insert_at * 2 + 1, value)
         return ArrayMap.__create(new_data)
 
-    def minus_sorted_indices(self, indices: List[int]) -> "ArrayMap[K, V]":
+    def minus_sorted_indices(self, indices: list[int]) -> "ArrayMap[K, V]":
         new_data = self.__data[:]
         adjusted_indices = [i * 2 for i in indices] + [i * 2 + 1 for i in indices]
         adjusted_indices.sort(reverse=True)

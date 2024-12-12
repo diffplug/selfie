@@ -1,7 +1,7 @@
 import base64
 from abc import ABC, abstractmethod
 from itertools import chain
-from typing import Any, Generic, List, Optional, TypeVar
+from typing import Any, Generic, Optional, TypeVar
 
 from .Literals import (
     LiteralFormat,
@@ -114,7 +114,7 @@ class StringSelfie(ReprSelfie[str], StringFacet):
         self,
         actual: Snapshot,
         disk: DiskStorage,
-        only_facets: Optional[List[str]] = None,
+        only_facets: Optional[list[str]] = None,
     ):
         super().__init__("<IT IS AN ERROR FOR THIS TO BE VISIBLE>", actual, disk)
         self.only_facets = only_facets
@@ -247,7 +247,7 @@ def _assertEqual(
         )
 
 
-def _serializeOnlyFacets(snapshot: Snapshot, keys: List[str]) -> str:
+def _serializeOnlyFacets(snapshot: Snapshot, keys: list[str]) -> str:
     writer = []
     for key in keys:
         if not key:

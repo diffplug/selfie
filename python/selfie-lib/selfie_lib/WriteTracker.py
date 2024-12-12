@@ -4,7 +4,7 @@ import threading
 from abc import ABC
 from functools import total_ordering
 from pathlib import Path
-from typing import Dict, Generic, List, Optional, TypeVar, cast
+from typing import Generic, Optional, TypeVar, cast
 
 from .FS import FS
 from .Literals import LiteralString, LiteralTodoStub, LiteralValue, TodoStub
@@ -60,7 +60,7 @@ class CallLocation:
 
 
 class CallStack:
-    def __init__(self, location: CallLocation, rest_of_stack: List[CallLocation]):
+    def __init__(self, location: CallLocation, rest_of_stack: list[CallLocation]):
         self.location = location
         self.rest_of_stack = rest_of_stack
 
@@ -131,7 +131,7 @@ class FirstWrite(Generic[U]):
 class WriteTracker(ABC, Generic[T, U]):
     def __init__(self):
         self.lock = threading.Lock()
-        self.writes: Dict[T, FirstWrite[U]] = {}
+        self.writes: dict[T, FirstWrite[U]] = {}
 
     def recordInternal(
         self,

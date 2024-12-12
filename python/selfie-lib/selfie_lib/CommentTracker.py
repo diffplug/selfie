@@ -1,6 +1,6 @@
 import threading
+from collections.abc import Iterable
 from enum import Enum, auto
-from typing import Dict, Iterable, Tuple
 
 from .Slice import Slice
 from .TypedPath import TypedPath
@@ -19,7 +19,7 @@ class WritableComment(Enum):
 
 class CommentTracker:
     def __init__(self):
-        self.cache: Dict[TypedPath, WritableComment] = {}
+        self.cache: dict[TypedPath, WritableComment] = {}
         self.lock = threading.Lock()
 
     def paths_with_once(self) -> Iterable[TypedPath]:
@@ -41,7 +41,7 @@ class CommentTracker:
                 return new_comment.writable
 
     @staticmethod
-    def commentString(typedPath: TypedPath) -> Tuple[str, int]:
+    def commentString(typedPath: TypedPath) -> tuple[str, int]:
         comment, line = CommentTracker.__commentAndLine(typedPath)
         if comment == WritableComment.NO_COMMENT:
             raise ValueError("No writable comment found")
@@ -53,7 +53,7 @@ class CommentTracker:
             raise ValueError("Invalid comment type")
 
     @staticmethod
-    def __commentAndLine(typedPath: TypedPath) -> Tuple[WritableComment, int]:
+    def __commentAndLine(typedPath: TypedPath) -> tuple[WritableComment, int]:
         with open(typedPath.absolute_path, encoding="utf-8") as file:
             content = Slice(file.read())
         for comment_str in [

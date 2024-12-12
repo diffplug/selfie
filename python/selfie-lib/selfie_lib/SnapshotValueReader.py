@@ -1,5 +1,5 @@
 import base64
-from typing import Callable, List, Optional
+from typing import Callable, Optional
 
 from .LineReader import LineReader
 from .ParseException import ParseException
@@ -33,7 +33,7 @@ class SnapshotValueReader:
         self.__reset_line()
 
         # Read value
-        buffer: List[str] = []
+        buffer: list[str] = []
 
         def consumer(line: str) -> None:
             # Check for special condition and append to buffer accordingly
