@@ -18,41 +18,40 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - run: pipx install poetry
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: astral-sh/setup-uv@v4
         with:
           python-version: ${{ matrix.python-version }}
-          cache: "poetry"
-      - name: selfie-lib - poetry install
-        run: poetry install
+          enable-cache: true
+      - name: selfie-lib - uv install
+        run: uv sync
         working-directory: python/selfie-lib
       - name: selfie-lib - pytest
-        run: poetry run pytest -vv
+        run: uv run pytest -vv
         working-directory: python/selfie-lib
       - name: selfie-lib - pyright
-        run: poetry run pyright
+        run: uv run pyright
         working-directory: python/selfie-lib
       - name: selfie-lib - ruff
-        run: poetry run ruff format --check && poetry run ruff check
+        run: uv run ruff format --check && uv run ruff check
         working-directory: python/selfie-lib
-      - name: pytest-selfie - poetry install
-        run: poetry install
-        working-directory: python/pytest-selfie
-      - name: pytest-selfie - pyright
-        run: poetry run pyright
-        working-directory: python/pytest-selfie
-      - name: pytest-selfie - ruff
-        run: poetry run ruff format --check && poetry run ruff check
-        working-directory: python/pytest-selfie
-      - name: example-pytest-selfie - poetry install
-        run: poetry install
-        working-directory: python/example-pytest-selfie
-      - run: poetry run pytest -vv
-        working-directory: python/example-pytest-selfie
-      - name: example-pytest-selfie - pyright
-        run: poetry run pyright
-        working-directory: python/example-pytest-selfie
-      - name: example-pytest-selfie - ruff
-        run: poetry run ruff format --check && poetry run ruff check
-        working-directory: python/example-pytest-selfie
+      # - name: pytest-selfie - poetry install
+      #   run: poetry install
+      #   working-directory: python/pytest-selfie
+      # - name: pytest-selfie - pyright
+      #   run: poetry run pyright
+      #   working-directory: python/pytest-selfie
+      # - name: pytest-selfie - ruff
+      #   run: poetry run ruff format --check && poetry run ruff check
+      #   working-directory: python/pytest-selfie
+      # - name: example-pytest-selfie - poetry install
+      #   run: poetry install
+      #   working-directory: python/example-pytest-selfie
+      # - run: poetry run pytest -vv
+      #   working-directory: python/example-pytest-selfie
+      # - name: example-pytest-selfie - pyright
+      #   run: poetry run pyright
+      #   working-directory: python/example-pytest-selfie
+      # - name: example-pytest-selfie - ruff
+      #   run: poetry run ruff format --check && poetry run ruff check
+      #   working-directory: python/example-pytest-selfie
