@@ -67,7 +67,7 @@ class Snapshot:
                 ),
             )
 
-    def _subject_or_facet_maybe_internal(self, key: str) -> SnapshotValue | None:
+    def _subject_or_facet_maybe_internal(self, key: str) -> Union[SnapshotValue, None]:
         return self._subject if key == "" else self._facet_data.get(key)
 
     def subject_or_facet_maybe(self, key: str) -> Union[bytes, str, None]:
@@ -109,9 +109,9 @@ class Snapshot:
         yield from self._facet_data.items()
 
     def __repr__(self) -> str:
-        pieces = [f"Snapshot.of({self._subject.value_string()!r})"]
-        pieces.extend(
+        parts = [f"Snapshot.of({self._subject.value_string()!r})"]
+        parts.extend(
             f"\n  .plus_facet({e[0]!r}, {e[1].value_string()!r})"
             for e in self._facet_data.items()
         )
-        return "".join(pieces)
+        return "".join(parts)
