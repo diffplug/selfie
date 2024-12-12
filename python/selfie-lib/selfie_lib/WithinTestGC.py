@@ -1,5 +1,6 @@
+from collections.abc import Iterable
 from threading import Lock
-from typing import Iterable, List, Tuple
+from typing import List, Tuple
 
 from .ArrayMap import ArrayMap, ArraySet
 from .Snapshot import Snapshot

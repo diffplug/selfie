@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Callable, Iterator, TypeVar
+from typing import Callable, TypeVar
 
 from selfie_lib.TypedPath import TypedPath
 

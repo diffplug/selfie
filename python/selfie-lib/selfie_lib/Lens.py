@@ -1,6 +1,7 @@
 import re
 from abc import ABC, abstractmethod
-from typing import Callable, Generic, Iterator, List, Optional, Protocol, TypeVar, Union
+from collections.abc import Iterator
+from typing import Callable, Generic, List, Optional, Protocol, TypeVar, Union
 
 from .Snapshot import Snapshot, SnapshotValue
 
