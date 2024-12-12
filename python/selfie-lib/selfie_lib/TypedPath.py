@@ -6,8 +6,10 @@ import os.path
 class TypedPath:
     def __init__(self, absolute_path: str):
         # Normalize path separators for internal storage
-        normalized_path = os.path.normpath(absolute_path).replace("\\", "/")
-        self.absolute_path = normalized_path if not normalized_path.endswith("/") else normalized_path.rstrip("/") + "/"
+        normalized = os.path.normpath(absolute_path)
+        # Convert to forward slashes and ensure proper trailing slash
+        path = normalized.replace("\\", "/")
+        self.absolute_path = path.rstrip("/") + "/" if absolute_path.endswith(("/", "\\")) else path
 
     def __hash__(self):
         return hash(self.absolute_path)
@@ -45,7 +47,6 @@ class TypedPath:
         self.assert_folder()
         if child.startswith("/") or child.endswith("/"):
             raise ValueError("Child path is not valid for file resolution")
-        # Use platform-agnostic path joining
         normalized_child = os.path.normpath(child)
         joined_path = os.path.join(self.absolute_path.rstrip("/"), normalized_child)
         return self.of_file(joined_path)
@@ -54,7 +55,6 @@ class TypedPath:
         self.assert_folder()
         if child.startswith("/"):
             raise ValueError("Child path starts with a slash")
-        # Use platform-agnostic path joining
         normalized_child = os.path.normpath(child.rstrip("/"))
         joined_path = os.path.join(self.absolute_path.rstrip("/"), normalized_child)
         return self.of_folder(joined_path)
@@ -75,16 +75,12 @@ class TypedPath:
 
     @classmethod
     def of_folder(cls, path: str) -> "TypedPath":
-        # Use platform-agnostic path normalization
-        normalized_path = os.path.normpath(path).replace("\\", "/")
-        if not normalized_path.endswith("/"):
-            normalized_path += "/"
-        return cls(normalized_path)
+        normalized = os.path.normpath(path).replace("\\", "/")
+        return cls(normalized + "/")
 
     @classmethod
     def of_file(cls, path: str) -> "TypedPath":
-        # Use platform-agnostic path normalization
-        normalized_path = os.path.normpath(path).replace("\\", "/")
-        if normalized_path.endswith("/"):
+        normalized = os.path.normpath(path)
+        if normalized.endswith("/"):
             raise ValueError("Expected path to not end with a slash for a file")
-        return cls(normalized_path)
+        return cls(normalized)
