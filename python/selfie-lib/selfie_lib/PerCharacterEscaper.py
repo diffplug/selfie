@@ -1,5 +1,3 @@
-
-
 class PerCharacterEscaper:
     def __init__(
         self,
