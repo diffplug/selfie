@@ -150,6 +150,7 @@ source = { editable = "../selfie-lib" }
 dev = [
     { name = "pyright", specifier = ">=1.1.350" },
     { name = "pytest", specifier = ">=8.0.0" },
+    { name = "pytest-asyncio", specifier = ">=0.24.0" },
     { name = "ruff", specifier = ">=0.5.0" },
 ]
 
