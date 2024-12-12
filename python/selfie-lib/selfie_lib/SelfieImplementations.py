@@ -11,6 +11,7 @@ from .Literals import (
     TodoStub,
 )
 from .Snapshot import Snapshot
+from .SnapshotFile import SnapshotFile
 from .SnapshotSystem import DiskStorage, Mode, SnapshotSystem, _selfieSystem
 from .WriteTracker import recordCall as recordCall
 
@@ -247,16 +248,15 @@ def _assertEqual(
 
 
 def _serializeOnlyFacets(snapshot: Snapshot, facets: list[str]) -> str:
-    result = []
+    writer = []
     for facet in facets:
         value = snapshot._subject_or_facet_maybe_internal(facet)
         if value is None:
             continue
-        if value.is_binary:
-            result.append(
-                f"{facet}: base64 length {len(value.value_binary())} bytes\n"
-                + base64.b64encode(value.value_binary()).decode().replace("\r", "")
-            )
+        if not facet:
+            SnapshotFile.writeEntry(writer, "", None, value)
         else:
-            result.append(f"{facet}: {value.value_string()}")
-    return "\n".join(result)
+            SnapshotFile.writeEntry(writer, "", facet, value)
+
+    writer_str = "".join(writer)
+    return writer_str[:-1] if writer_str else ""
