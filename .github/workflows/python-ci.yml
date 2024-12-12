@@ -38,14 +38,11 @@ jobs:
       - name: pytest-selfie - ruff
         run: uv run ruff format --check && uv run ruff check
         working-directory: python/pytest-selfie
-      # - name: example-pytest-selfie - poetry install
-      #   run: poetry install
-      #   working-directory: python/example-pytest-selfie
-      # - run: poetry run pytest -vv
-      #   working-directory: python/example-pytest-selfie
-      # - name: example-pytest-selfie - pyright
-      #   run: poetry run pyright
-      #   working-directory: python/example-pytest-selfie
-      # - name: example-pytest-selfie - ruff
-      #   run: poetry run ruff format --check && poetry run ruff check
-      #   working-directory: python/example-pytest-selfie
+      - run: uv run pytest -vv
+        working-directory: python/example-pytest-selfie
+      - name: example-pytest-selfie - pyright
+        run: uv run pyright
+        working-directory: python/example-pytest-selfie
+      - name: example-pytest-selfie - ruff
+        run: uv run ruff format --check && uv run ruff check
+        working-directory: python/example-pytest-selfie
