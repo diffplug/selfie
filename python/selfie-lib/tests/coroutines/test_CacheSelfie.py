@@ -9,7 +9,7 @@ from selfie_lib.WriteTracker import CallStack
 
 
 class TestDiskStorage(DiskStorage):
-    def read_disk(self, _sub: str, _call: CallStack) -> Optional[Snapshot]:
+    def read_disk(self, sub: str, call: CallStack) -> Optional[Snapshot]:
         return None
 
     def write_disk(self, actual: Snapshot, sub: str, call: CallStack):
@@ -29,10 +29,6 @@ async def test_cache_selfie_suspend():
     disk = TestDiskStorage()
     roundtrip = Roundtrip[str, str]()
 
-    cache = await cache_selfie_suspend(
-        disk,
-        roundtrip,
-        async_value
-    )
+    cache = await cache_selfie_suspend(disk, roundtrip, async_value)
 
     assert cache.generator() == "test_value"
