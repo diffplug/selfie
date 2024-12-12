@@ -142,9 +142,10 @@ class StringSelfie(ReprSelfie[str], StringFacet):
     def __actual(self) -> str:
         if not self.actual.facets or (self.only_facets and len(self.only_facets) == 1):
             # single value doesn't have to worry about escaping at all
-            only_value = self.actual.subject_or_facet(
-                self.only_facets[0] if self.only_facets else ""
-            )
+            facet_key = self.only_facets[0] if self.only_facets else ""
+            only_value = self.actual._subject_or_facet_maybe_internal(facet_key)
+            if only_value is None:
+                raise ValueError(f"Facet {facet_key} not found")
             if only_value.is_binary:
                 return (
                     base64.b64encode(only_value.value_binary())
@@ -175,16 +176,15 @@ class StringSelfie(ReprSelfie[str], StringFacet):
 
 class BinarySelfie(ReprSelfie[bytes], BinaryFacet):
     def __init__(self, actual: Snapshot, disk: DiskStorage, only_facet: str):
-        super().__init__(actual.subject.value_binary(), actual, disk)
-        self.only_facet = only_facet
-
-        facet_value = actual.subject_or_facet_maybe(only_facet)
+        facet_value = actual._subject_or_facet_maybe_internal(only_facet)
         if facet_value is None:
             raise ValueError(f"The facet {only_facet} was not found in the snapshot")
         elif not facet_value.is_binary:
             raise ValueError(
                 f"The facet {only_facet} is a string, not a binary snapshot"
             )
+        super().__init__(facet_value.value_binary(), actual, disk)
+        self.only_facet = only_facet
 
     def to_be_base64(self, expected: str) -> bytes:
         raise NotImplementedError
@@ -247,21 +247,17 @@ def _assertEqual(
         )
 
 
-def _serializeOnlyFacets(snapshot: Snapshot, keys: list[str]) -> str:
-    writer = []
-    for key in keys:
-        if not key:
-            SnapshotFile.writeEntry(writer, "", None, snapshot.subject_or_facet(key))
+def _serializeOnlyFacets(snapshot: Snapshot, facets: list[str]) -> str:
+    result = []
+    for facet in facets:
+        value = snapshot._subject_or_facet_maybe_internal(facet)
+        if value is None:
+            continue
+        if value.is_binary:
+            result.append(
+                f"{facet}: base64 length {len(value.value_binary())} bytes\n"
+                + base64.b64encode(value.value_binary()).decode().replace("\r", "")
+            )
         else:
-            value = snapshot.subject_or_facet(key)
-            if value is not None:
-                SnapshotFile.writeEntry(writer, "", key, value)
-
-    EMPTY_KEY_AND_FACET = "╔═  ═╗\n"
-    writer_str = "".join(writer)
-
-    if writer_str.startswith(EMPTY_KEY_AND_FACET):
-        # this codepath is triggered by the `key.isEmpty()` line above
-        return writer_str[len(EMPTY_KEY_AND_FACET) : -1]
-    else:
-        return writer_str[:-1]
+            result.append(f"{facet}: {value.value_string()}")
+    return "\n".join(result)

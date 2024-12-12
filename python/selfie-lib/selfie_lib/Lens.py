@@ -53,7 +53,7 @@ class CompoundLens(Lens):
         self, target: str, source: str, function: Callable[[str], Optional[str]]
     ) -> "CompoundLens":
         def _set_facet_from(snapshot: Snapshot) -> Snapshot:
-            source_value = snapshot.subject_or_facet_maybe(source)
+            source_value = snapshot._subject_or_facet_maybe_internal(source)
             if source_value is None:
                 return snapshot
             else:

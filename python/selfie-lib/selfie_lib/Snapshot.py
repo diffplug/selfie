@@ -15,9 +15,12 @@ class Snapshot:
         self._subject = subject
         self._facet_data = facet_data
 
+    def _get_value(self, value: SnapshotValue) -> Union[bytes, str]:
+        return value.value_binary() if value.is_binary else value.value_string()
+
     @property
-    def subject(self) -> SnapshotValue:
-        return self._subject
+    def subject(self) -> Union[bytes, str]:
+        return self._get_value(self._subject)
 
     @property
     def facets(self) -> ArrayMap[str, SnapshotValue]:
@@ -54,10 +57,16 @@ class Snapshot:
                 ),
             )
 
-    def subject_or_facet_maybe(self, key: str) -> Union[SnapshotValue, None]:
+    def _subject_or_facet_maybe_internal(self, key: str) -> SnapshotValue | None:
         return self._subject if key == "" else self._facet_data.get(key)
 
-    def subject_or_facet(self, key: str) -> SnapshotValue:
+    def subject_or_facet_maybe(self, key: str) -> Union[bytes, str, None]:
+        value = self._subject_or_facet_maybe_internal(key)
+        if value is None:
+            return None
+        return self._get_value(value)
+
+    def subject_or_facet(self, key: str) -> Union[bytes, str]:
         value = self.subject_or_facet_maybe(key)
         if value is None:
             raise KeyError(f"'{key}' not found in snapshot.")
@@ -90,7 +99,7 @@ class Snapshot:
         yield from self._facet_data.items()
 
     def __repr__(self) -> str:
-        pieces = [f"Snapshot.of({self.subject.value_string()!r})"]
-        for e in self.facets.items():
-            pieces.append(f"\n  .plus_facet({e[0]!r}, {e[1].value_string()!r})")  # noqa: PERF401
+        pieces = [f"Snapshot.of({self._subject.value_string()!r})"]
+        for e in self._facet_data.items():
+            pieces.append(f"\n  .plus_facet({e[0]!r}, {e[1].value_string()!r})")
         return "".join(pieces)

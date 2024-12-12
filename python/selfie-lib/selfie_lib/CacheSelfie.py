@@ -69,11 +69,12 @@ class CacheSelfie(Generic[T]):
                 snapshot = self.disk.read_disk(sub, call)
                 if snapshot is None:
                     raise Exception(system.mode.msg_snapshot_not_found())
-                if snapshot.subject.is_binary or len(snapshot.facets) > 0:
+                subject = snapshot._subject
+                if subject.is_binary or len(snapshot.facets) > 0:
                     raise Exception(
                         f"Expected a string subject with no facets, got {snapshot}"
                     )
-                return self.roundtrip.parse(snapshot.subject.value_string())
+                return self.roundtrip.parse(subject.value_string())
 
     def to_be_TODO(self, _: Optional[Any] = None) -> T:
         return self._to_be_impl(None)
@@ -141,12 +142,13 @@ class CacheSelfieBinary(Generic[T]):
                 if snapshot is None:
                     raise Exception(system.mode.msg_snapshot_not_found())
 
-                if snapshot.subject.is_binary or len(snapshot.facets) > 0:
+                subject = snapshot._subject
+                if subject.is_binary or len(snapshot.facets) > 0:
                     raise Exception(
                         f"Expected a binary subject with no facets, got {snapshot}"
                     )
 
-                return self.roundtrip.parse(snapshot.subject.value_binary())
+                return self.roundtrip.parse(subject.value_binary())
 
     def to_be_file_TODO(self, subpath: str) -> T:
         return self._to_be_file_impl(subpath, True)
