@@ -17,6 +17,7 @@ dependencies = []
 dev = [
     "pyright>=1.1.350",
     "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
     "ruff>=0.5.0",
 ]
 
@@ -34,3 +35,7 @@ ignore = [ "S", "FA",  "PYI", "EM", "PLR",  "FBT", "COM", "RET", "PTH", "PLW", "
 "PGH003", # specific rule codes when ignoring type issues
 "ISC001"
 ]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
