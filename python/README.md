@@ -4,17 +4,17 @@
 
 ## Contributing
 
-Dependencies are managed using poetry:
+Dependencies are managed using uv:
 
-- https://python-poetry.org/docs/#installing-with-the-official-installer
-- then cd into `selfie-lib` and run `poetry install`
+- https://docs.astral.sh/uv/getting-started/installation/
+- then cd into `selfie-lib` and run `uv sync` to get the dependencies
 
 Our CI server runs three checks in the `selfie-lib` directory.
 
-- `poetry run pytest` - run tests
-- `poetry run pyright` - type checking
-- `poetry run ruff format --check && poetry run ruff check` - code lint & formatting
-  - `poetry run ruff format && poetry run ruff check --fix` to fix
+- `uv run pytest` - run tests
+- `uv run pyright` - type checking
+- `uv run ruff format --check && uv run ruff check` - code lint & formatting
+  - `uv run ruff format && uv run ruff check --fix` to fix
 
 The same setup is used for `pytest-selfie` and `example-pytest-selfie`.
 
