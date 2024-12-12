@@ -119,13 +119,28 @@ class Mode(Enum):
             raise ValueError(f"Unknown mode: {self}")
 
     def msg_snapshot_not_found(self) -> str:
-        return self.msg("Snapshot not found")
+        return self.msg(
+            "Snapshot not found. To create the snapshot:\n"
+            "1. Add '_TODO' to the function name\n"
+            "2. Or add '#selfieonce' or '#SELFIEWRITE' to the file"
+        )
 
     def msg_snapshot_not_found_no_such_file(self, file) -> str:
-        return self.msg(f"Snapshot not found: no such file {file}")
+        return self.msg(
+            f"Snapshot not found: file '{file}' does not exist.\n"
+            "To create the snapshot file:\n"
+            "1. Add '_TODO' to the function name\n"
+            "2. Or add '#selfieonce' or '#SELFIEWRITE' to the test file\n"
+            "3. Or run with --selfie-overwrite to create all missing snapshots"
+        )
 
     def msg_snapshot_mismatch(self) -> str:
-        return self.msg("Snapshot mismatch")
+        return self.msg(
+            "Snapshot does not match expected value. To update:\n"
+            "1. Add '_TODO' to the function name to update this snapshot\n"
+            "2. Or add '#selfieonce' or '#SELFIEWRITE' to update all snapshots in this file\n"
+            "3. Or run with --selfie-overwrite to update all snapshots in the project"
+        )
 
     def msg(self, headline: str) -> str:
         if self == Mode.interactive:
