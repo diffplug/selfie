@@ -1,0 +1,34 @@
+[tool.poetry]
+name = "selfie-lib"
+version = "0.1.0"
+description = "Infrastructure for creating selfie-compatible test runner plugins."
+authors = ["Selina Delgado <sdelgado411@gmail.com>","Harvir Sahota <hsahota2312@gmail.com>","Ned Twigg <ned.twigg@diffplug.com>","Edwin Ye <EdwinYeDeveloper@gmail.com>"]
+license = "Apache-2.0"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.5.0"
+pyright = "^1.1.350"
+pytest = "^8.0.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [ "S", "FA",  "PYI", "EM", "PLR",  "FBT", "COM", "RET", "PTH", "PLW", "PLC",
+"TRY", # TODO: exception standards
+"ANN", # TODO: require type annotations
+"D", # TODO: docstring warnings
+"N", # TODO: naming conventions
+"E501", # line too long
+"C901", # function to complex
+"PLC0414", # import alias does not rename original package
+"W291", # trailing whitespace, we need it for testing snapshots
+"PGH003", # specific rule codes when ignoring type issues
+"ISC001"
+]

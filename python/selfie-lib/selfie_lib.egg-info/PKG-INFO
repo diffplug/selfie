@@ -1,0 +1,12 @@
+Metadata-Version: 2.1
+Name: selfie-lib
+Version: 0.1.0
+Summary: Infrastructure for creating selfie-compatible test runner plugins.
+Requires-Python: >=3.12
+Description-Content-Type: text/markdown
+
+# selfie-lib
+
+This package is the API and logic for selfie snapshot testing.
+
+See the [get started guide here](https://selfie.dev/py/get-started).
