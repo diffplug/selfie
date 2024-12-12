@@ -197,6 +197,11 @@ class BinarySelfie(ReprSelfie[bytes], BinaryFacet):
             return actual_bytes
 
     def to_be_base64_TODO(self, _: Any = None) -> bytes:
+        call = recordCall(False)
+        if not _selfieSystem().mode.can_write(True, call, _selfieSystem()):
+            raise _selfieSystem().fs.assert_failed(
+                f"Can't call `to_be_base64_TODO` in {_selfieSystem().mode} mode!"
+            )
         actual_bytes = self.actual.subject_or_facet(self.only_facet).value_binary()
         actual_b64 = base64.b64encode(actual_bytes).decode().replace("\r", "")
         _toBeDidntMatch(None, actual_b64, LiteralString())
@@ -229,23 +234,20 @@ class BinarySelfie(ReprSelfie[bytes], BinaryFacet):
 
     def to_be_file_TODO(self, subpath: str) -> bytes:
         call = recordCall(False)
-        writable = _selfieSystem().mode.can_write(True, call, _selfieSystem())
-        actual_bytes = self.actual.subject_or_facet(self.only_facet).value_binary()
-
-        if writable:
-            root_folder = (
-                _selfieSystem()
-                .layout.sourcefile_for_call(call.location)
-                .parent_folder()
-            )
-            path = root_folder.resolve_file(subpath)
-            _selfieSystem().write_to_be_file(path, actual_bytes, call)
-            _selfieSystem().write_inline(TodoStub.to_be_file.create_literal(), call)
-            return actual_bytes
-        else:
+        if not _selfieSystem().mode.can_write(True, call, _selfieSystem()):
             raise _selfieSystem().fs.assert_failed(
-                f"Can't call `toBeFile_TODO` in {Mode.readonly} mode!"
+                f"Can't call `to_be_file_TODO` in {_selfieSystem().mode} mode!"
             )
+        actual_bytes = self.actual.subject_or_facet(self.only_facet).value_binary()
+        root_folder = (
+            _selfieSystem()
+            .layout.sourcefile_for_call(call.location)
+            .parent_folder()
+        )
+        path = root_folder.resolve_file(subpath)
+        _selfieSystem().write_to_be_file(path, actual_bytes, call)
+        _selfieSystem().write_inline(TodoStub.to_be_file.create_literal(), call)
+        return actual_bytes
 
 
 def _checkSrc(value: T) -> T:
