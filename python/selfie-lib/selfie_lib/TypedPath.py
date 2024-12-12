@@ -1,5 +1,5 @@
-from functools import total_ordering
 import os.path
+from functools import total_ordering
 
 
 @total_ordering
@@ -9,7 +9,9 @@ class TypedPath:
         normalized = os.path.normpath(absolute_path)
         # Convert to forward slashes and ensure proper trailing slash
         path = normalized.replace("\\", "/")
-        self.absolute_path = path.rstrip("/") + "/" if absolute_path.endswith(("/", "\\")) else path
+        self.absolute_path = (
+            path.rstrip("/") + "/" if absolute_path.endswith(("/", "\\")) else path
+        )
 
     def __hash__(self):
         return hash(self.absolute_path)
