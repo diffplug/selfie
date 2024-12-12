@@ -10,7 +10,7 @@ from selfie_lib.WriteTracker import CallStack
 
 
 class TestDiskStorage(DiskStorage):
-    def read_disk(self, _: str, __: CallStack) -> Optional[Snapshot]:
+    def read_disk(self, sub: str, call: CallStack) -> Optional[Snapshot]:
         return None
 
     def write_disk(self, actual: Snapshot, sub: str, call: CallStack):
