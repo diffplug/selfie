@@ -1,6 +1,5 @@
 from collections.abc import Iterable
 from threading import Lock
-from typing import List, Tuple
 
 from .ArrayMap import ArrayMap, ArraySet
 from .Snapshot import Snapshot
@@ -42,7 +41,7 @@ class WithinTestGC:
         snapshots: ArrayMap[str, Snapshot],
         tests_that_ran: ArrayMap[str, "WithinTestGC"],
         tests_that_didnt_run: Iterable[str],
-    ) -> List[int]:
+    ) -> list[int]:
         stale_indices = []
 
         # combine what we know about methods that did run with what we know about the tests that didn't
@@ -57,7 +56,7 @@ class WithinTestGC:
         key_idx = 0
         while key_idx < len(keys) and gc_idx < len(gc_roots):
             key: str = keys[key_idx]  # type: ignore
-            gc: Tuple[str, WithinTestGC] = gc_roots[gc_idx]  # type: ignore
+            gc: tuple[str, WithinTestGC] = gc_roots[gc_idx]  # type: ignore
             if key.startswith(gc[0]):
                 if len(key) == len(gc[0]):
                     # startWith + same length = exact match, no suffix

@@ -1,6 +1,6 @@
 import base64
 from threading import Lock
-from typing import List, Optional, Tuple
+from typing import Optional
 
 from .ArrayMap import ArrayMap
 from .Snapshot import Snapshot, SnapshotValue
@@ -14,12 +14,12 @@ class SnapshotFile:
 
     def __init__(self):
         self.unix_newlines: bool = True
-        self.metadata: Optional[Tuple[str, str]] = None
+        self.metadata: Optional[tuple[str, str]] = None
         self.snapshots: ArrayMap[str, Snapshot] = ArrayMap.empty()
         self._lock: Lock = Lock()
         self.was_set_at_test_time: bool = False
 
-    def serialize(self, valueWriter: List[str]):
+    def serialize(self, valueWriter: list[str]):
         if self.metadata is not None:
             self.writeEntry(
                 valueWriter,
@@ -37,7 +37,7 @@ class SnapshotFile:
 
     @staticmethod
     def writeEntry(
-        valueWriter: List[str], key: str, facet: Optional[str], value: SnapshotValue
+        valueWriter: list[str], key: str, facet: Optional[str], value: SnapshotValue
     ):
         valueWriter.append("╔═ ")
         valueWriter.append(SnapshotValueReader.name_esc.escape(key))
@@ -70,7 +70,7 @@ class SnapshotFile:
             self.snapshots = self.snapshots.plus_or_noop_or_replace(key, snapshot)
             self.was_set_at_test_time = True
 
-    def remove_all_indices(self, indices: List[int]) -> None:
+    def remove_all_indices(self, indices: list[int]) -> None:
         with self._lock:
             if not indices:
                 return
