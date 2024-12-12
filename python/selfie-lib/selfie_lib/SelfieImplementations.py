@@ -187,16 +187,45 @@ class BinarySelfie(ReprSelfie[bytes], BinaryFacet):
             )
 
     def to_be_base64(self, expected: str) -> bytes:
-        raise NotImplementedError
+        actual_bytes = self.actual.subject_or_facet(self.only_facet).value_binary()
+        actual_base64 = base64.b64encode(actual_bytes).decode().replace("\r", "")
+        if actual_base64 == expected:
+            return actual_bytes
+        else:
+            _toBeDidntMatch(expected, actual_base64, LiteralString())
+            return actual_bytes
 
     def to_be_base64_TODO(self, _: Any = None) -> bytes:
-        raise NotImplementedError
+        actual_bytes = self.actual.subject_or_facet(self.only_facet).value_binary()
+        actual_base64 = base64.b64encode(actual_bytes).decode().replace("\r", "")
+        _toBeDidntMatch(None, actual_base64, LiteralString())
+        return actual_bytes
 
     def to_be_file(self, subpath: str) -> bytes:
-        raise NotImplementedError
+        actual_bytes = self.actual.subject_or_facet(self.only_facet).value_binary()
+        call = recordCall(False)
+        if _selfieSystem().mode.can_write(False, call, _selfieSystem()):
+            self.disk.write_disk(Snapshot.of(actual_bytes), subpath, call)
+        else:
+            expected = self.disk.read_disk(subpath, call)
+            if expected is None:
+                raise _selfieSystem().fs.assert_failed(
+                    _selfieSystem().mode.msg_snapshot_not_found()
+                )
+            _assertEqual(expected, Snapshot.of(actual_bytes), _selfieSystem())
+        return actual_bytes
 
     def to_be_file_TODO(self, subpath: str) -> bytes:
-        raise NotImplementedError
+        actual_bytes = self.actual.subject_or_facet(self.only_facet).value_binary()
+        call = recordCall(False)
+        if _selfieSystem().mode.can_write(True, call, _selfieSystem()):
+            self.disk.write_disk(Snapshot.of(actual_bytes), subpath, call)
+            _selfieSystem().write_inline(TodoStub.to_be_file.create_literal(), call)
+            return actual_bytes
+        else:
+            raise _selfieSystem().fs.assert_failed(
+                f"Can't call `toBeFile_TODO` in {Mode.readonly} mode!"
+            )
 
 
 def _checkSrc(value: T) -> T:
