@@ -23,9 +23,6 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           enable-cache: true
-      - name: selfie-lib - uv install
-        run: uv sync
-        working-directory: python/selfie-lib
       - name: selfie-lib - pytest
         run: uv run pytest -vv
         working-directory: python/selfie-lib
