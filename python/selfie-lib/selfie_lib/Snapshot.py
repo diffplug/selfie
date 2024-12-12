@@ -1,4 +1,5 @@
-from typing import Iterator, Union
+from collections.abc import Iterator
+from typing import Union
 
 from .ArrayMap import ArrayMap
 from .LineReader import _to_unix

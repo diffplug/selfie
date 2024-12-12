@@ -1,22 +1,24 @@
-[tool.poetry]
+[project]
 name = "selfie-lib"
 version = "0.1.0"
 description = "Infrastructure for creating selfie-compatible test runner plugins."
-authors = ["Selina Delgado <sdelgado411@gmail.com>","Harvir Sahota <hsahota2312@gmail.com>","Ned Twigg <ned.twigg@diffplug.com>","Edwin Ye <EdwinYeDeveloper@gmail.com>"]
-license = "Apache-2.0"
+authors = [
+  { name = "Edwin Ye", email = "EdwinYeDeveloper@gmail.com" },
+  { name = "Harvir Sahota", email = "hsahota2312@gmail.com" },
+  { name = "Ned Twigg", email = "ned.twigg@diffplug.com" },
+  { name = "Selina Delgado", email = "sdelgado411@gmail.com"}
+]
+license = { text = "Apache-2.0" }
 readme = "README.md"
+requires-python = ">=3.9"
+dependencies = []
 
-[tool.poetry.dependencies]
-python = "^3.9"
-
-[tool.poetry.group.dev.dependencies]
-ruff = "^0.5.0"
-pyright = "^1.1.350"
-pytest = "^8.0.0"
-
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+[dependency-groups]
+dev = [
+    "pyright>=1.1.350",
+    "pytest>=8.0.0",
+    "ruff>=0.5.0",
+]
 
 [tool.ruff.lint]
 select = ["ALL"]

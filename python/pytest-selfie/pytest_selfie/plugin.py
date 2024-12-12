@@ -1,7 +1,7 @@
 import os
-from cgi import test
 from collections import defaultdict
-from typing import ByteString, DefaultDict, Iterator, List, Optional
+from collections.abc import ByteString, Iterator
+from typing import Optional
 
 import pytest
 from selfie_lib import (
@@ -93,7 +93,7 @@ class PytestSnapshotFileLayout(SnapshotFileLayout):
 
 @pytest.hookimpl
 def pytest_collection_modifyitems(
-    session: pytest.Session, config: pytest.Config, items: List[pytest.Item]
+    session: pytest.Session, config: pytest.Config, items: list[pytest.Item]
 ) -> None:
     settings = SelfieSettingsAPI(config)
     system = PytestSnapshotSystem(settings)
@@ -153,7 +153,7 @@ class PytestSnapshotSystem(SnapshotSystem):
         self.__inline_write_tracker = InlineWriteTracker()
         self.__toBeFileWriteTracker = ToBeFileWriteTracker()
 
-        self.__progress_per_file: DefaultDict[TypedPath, SnapshotFileProgress] = (
+        self.__progress_per_file: defaultdict[TypedPath, SnapshotFileProgress] = (
             _keydefaultdict(lambda key: SnapshotFileProgress(self, key))  # type: ignore
         )  # type: ignore
         # the test which is running right now, if any
@@ -250,7 +250,9 @@ class PytestSnapshotSystem(SnapshotSystem):
         self, path: TypedPath, data: "ByteString", call: CallStack
     ) -> None:
         # Directly write to disk using ToBeFileWriteTracker
-        self.__toBeFileWriteTracker.writeToDisk(path, data, call, self.layout_pytest)
+        self.__toBeFileWriteTracker.writeToDisk(
+            path, bytes(data), call, self.layout_pytest
+        )
 
 
 class DiskStoragePytest(DiskStorage):
@@ -312,7 +314,7 @@ class SnapshotFileProgress:
 
     def test_start(self, testname: str):
         if "/" in testname:
-            raise ValueError(f"Test name cannot contain '/', was {test}")
+            raise ValueError(f"Test name cannot contain '/', was {testname}")
         self.assert_not_terminated()
         if self.testname_in_progress is not None:
             raise RuntimeError(
@@ -470,6 +472,6 @@ def pytest_addoption(parser):
     parser.addini("HELLO", "Dummy pytest.ini setting")
 
 
-@pytest.fixture()
+@pytest.fixture
 def bar(request):
     return request.config.option.dest_foo

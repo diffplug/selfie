@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
+from collections.abc import ByteString
 from enum import Enum, auto
-from typing import ByteString, Optional
+from typing import Optional
 
 from .CommentTracker import CommentTracker
 from .FS import FS
