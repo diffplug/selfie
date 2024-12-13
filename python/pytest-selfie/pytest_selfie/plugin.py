@@ -56,7 +56,7 @@ class FSImplementation(FS):
     def __comparison_assertion(
         self, message: str, expected: str, actual: str
     ) -> Exception:
-        # this *should* through an exception that a good pytest runner will show nicely
+        # this *should* throw an exception that a good pytest runner will show nicely
         assert expected == actual, message
         # but in case it doesn't, we'll create our own here
         return AssertionError(message)
@@ -68,6 +68,9 @@ class PytestSnapshotFileLayout(SnapshotFileLayout):
         self.__settings = settings
         self.__root_folder = TypedPath.of_folder(os.path.abspath(settings.root_dir))
         self.unix_newlines = self.__infer_default_line_ending_is_unix()
+
+    def root_folder(self) -> TypedPath:
+        return self.__root_folder
 
     def snapshotfile_for_testfile(self, testfile: TypedPath) -> TypedPath:
         if testfile.name.endswith(".py"):

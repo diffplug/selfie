@@ -1,7 +1,7 @@
 import inspect
 import os
 import threading
-from abc import ABC
+from abc import ABC, abstractmethod
 from functools import total_ordering
 from pathlib import Path
 from typing import Generic, Optional, TypeVar, cast
@@ -82,9 +82,13 @@ class CallStack:
         return hash((self.location, tuple(self.rest_of_stack)))
 
 
-class SnapshotFileLayout:
+class SnapshotFileLayout(ABC):
     def __init__(self, fs: FS):
         self.fs = fs
+
+    @abstractmethod
+    def root_folder(self) -> TypedPath:
+        pass
 
     def sourcefile_for_call(self, call: CallLocation) -> TypedPath:
         file_path = call.file_name
@@ -150,7 +154,7 @@ class WriteTracker(ABC, Generic[T, U]):
             existing = self.writes[key]
             if existing.snapshot != snapshot:
                 raise ValueError(
-                    f"Snapshot was set to multiple values!\n  first time: {existing.call_stack.location.ide_link(layout)}\n   this time: {call.location.ide_link(layout)}\n"
+                    f"Snapshot was set to multiple values!\n  first time: {existing.call_stack.location.ide_link(layout)}\n   this time: {call.location.ide_link(layout)}"
                 )
             elif not allow_multiple_equivalent_writes:
                 raise ValueError("Snapshot was set to the same value multiple times.")
