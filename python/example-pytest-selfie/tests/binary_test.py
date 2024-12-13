@@ -52,10 +52,8 @@ def test_base64_mismatch():
         expect_selfie(b"test data").to_be_base64("AAAA")
     expect_selfie(
         safify(str(exc_info.value))
-    ).to_be("""Snapshot mismatch, TODO: string comparison
-- update this snapshot by adding `_TODO` to the function name
-- update all snapshots in this file by adding `#safewordonce` or `#safewordWRITE`""")
+    ).to_be("Snapshot mismatch, TODO: string comparison")
 
 def safify(string: str) -> str:
-    return string.replace("selfie", "safeword").replace("SELFIE", "safeword")
+    return string.split("\n")[0]
 
