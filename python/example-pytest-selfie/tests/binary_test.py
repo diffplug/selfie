@@ -50,10 +50,10 @@ def test_base64_mismatch():
     """Test error handling for mismatched base64 data"""
     with pytest.raises(Exception) as exc_info:
         expect_selfie(b"test data").to_be_base64("AAAA")
-    expect_selfie(
-        safify(str(exc_info.value))
-    ).to_be("Snapshot mismatch, TODO: string comparison")
+    expect_selfie(safify(str(exc_info.value))).to_be(
+        "Snapshot mismatch, TODO: string comparison"
+    )
+
 
 def safify(string: str) -> str:
     return string.split("\n")[0]
-
