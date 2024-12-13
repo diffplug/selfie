@@ -31,6 +31,20 @@ def test_binary_file_duplicate_equal():
     )
 
 
+def test_binary_file_duplicate_equal():
+    """Test writing same binary data to a file multiple times"""
+    with pytest.raises(Exception) as exc_info:
+        expect_selfie(b"a").to_be_file(
+            "tests/binary_test__test_binary_file_duplicate_unequal.bin"
+        )
+        expect_selfie(b"b").to_be_file(
+            "tests/binary_test__test_binary_file_duplicate_unequal.bin"
+        )
+    expect_selfie(safify(str(exc_info.value))).to_be(
+        "Snapshot mismatch, TODO: string comparison"
+    )
+
+
 def test_binary_file_mismatch():
     """Test error handling for mismatched binary data"""
     with pytest.raises(AssertionError):
