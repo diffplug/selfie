@@ -31,7 +31,7 @@ def test_binary_file_duplicate_equal():
     )
 
 
-def test_binary_file_duplicate_equal():
+def test_binary_file_duplicate_unequal():
     """Test writing same binary data to a file multiple times"""
     with pytest.raises(Exception) as exc_info:
         expect_selfie(b"a").to_be_file(
