@@ -1,8 +1,6 @@
-import base64
-import os
-
 import pytest
 from selfie_lib import expect_selfie
+
 
 def test_empty_binary_base64():
     """Test base64 encoding of empty byte array"""
@@ -25,13 +23,20 @@ def test_binary_file():
 
 def test_binary_file_duplicate_equal():
     """Test writing same binary data to a file multiple times"""
-    expect_selfie(b"equal").to_be_file("tests/binary_test__test_binary_file_duplicate_equal.bin")
-    expect_selfie(b"equal").to_be_file("tests/binary_test__test_binary_file_duplicate_equal.bin")
+    expect_selfie(b"equal").to_be_file(
+        "tests/binary_test__test_binary_file_duplicate_equal.bin"
+    )
+    expect_selfie(b"equal").to_be_file(
+        "tests/binary_test__test_binary_file_duplicate_equal.bin"
+    )
+
 
 def test_binary_file_mismatch():
     """Test error handling for mismatched binary data"""
     with pytest.raises(AssertionError):
-        expect_selfie(b"different").to_be_file("tests/binary_test__SHOULD_NOT_EXIST.bin")
+        expect_selfie(b"different").to_be_file(
+            "tests/binary_test__SHOULD_NOT_EXIST.bin"
+        )
 
 
 def test_binary_file_not_found():
@@ -45,6 +50,8 @@ def test_base64_mismatch():
     """Test error handling for mismatched base64 data"""
     with pytest.raises(Exception) as exc_info:
         expect_selfie(b"test data").to_be_base64("AAAA")
-    expect_selfie(str(exc_info.value)).to_be("""Snapshot mismatch, TODO: string comparison
+    expect_selfie(
+        str(exc_info.value)
+    ).to_be("""Snapshot mismatch, TODO: string comparison
 - update this snapshot by adding `_TODO` to the function name
 - update all snapshots in this file by adding `#selfieonce` or `#SELFIEWRITE`""")
