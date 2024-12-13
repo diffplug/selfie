@@ -87,7 +87,7 @@ class SnapshotFileLayout(ABC):
         self.fs = fs
 
     @abstractmethod
-    def root_folder() -> TypedPath:
+    def root_folder(self) -> TypedPath:
         pass
 
     def sourcefile_for_call(self, call: CallLocation) -> TypedPath:
