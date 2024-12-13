@@ -154,7 +154,7 @@ class WriteTracker(ABC, Generic[T, U]):
             existing = self.writes[key]
             if existing.snapshot != snapshot:
                 raise ValueError(
-                    f"Snapshot was set to multiple values!\n  first time: {existing.call_stack.location.ide_link(layout)}\n   this time: {call.location.ide_link(layout)}\n"
+                    f"Snapshot was set to multiple values!\n  first time: {existing.call_stack.location.ide_link(layout)}\n   this time: {call.location.ide_link(layout)}"
                 )
             elif not allow_multiple_equivalent_writes:
                 raise ValueError("Snapshot was set to the same value multiple times.")
