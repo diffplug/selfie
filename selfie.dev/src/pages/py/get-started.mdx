@@ -71,19 +71,19 @@ This will create a file called `SomethingOrOther.ss` in the same directory as yo
 expect_selfie([1, 2, 3]).to_match_disk()
 ```
 
-Just like inline literal snapshots, you can use `_TODO`, `//selfieonce`, and `//SELFIEWRITE` to control how the snapshots are written and updated. You don't have to use `_TODO` if you have the `//selfieonce` or `//SELFIEWRITE` comments in your file.
+Just like inline literal snapshots, you can use `_TODO`, `#selfieonce`, and `#SELFIEWRITE` to control how the snapshots are written and updated. You don't have to use `_TODO` if you have the `#selfieonce` or `#SELFIEWRITE` comments in your file.
 
 If you want the disk snapshots to live in a different folder, set `snapshotFolderName` using [SelfieSettings](https://pydoc.selfie.dev/namespacepytest__selfie_1_1SelfieSettingsAPI).
 
 ## CI
 
-The nice thing about `//SELFIEWRITE` is that all of your snapshots will update on every run, which makes it easy to explore — like multiassert on steroids. **The bad thing about `//SELFIEWRITE` is that all of the tests always pass, even if the snapshots actually change on every run.**
+The nice thing about `#SELFIEWRITE` is that all of your snapshots will update on every run, which makes it easy to explore — like multiassert on steroids. **The bad thing about `#SELFIEWRITE` is that all of the tests always pass, even if the snapshots actually change on every run.**
 
-For example, you might have a realtime timestamp or a random port number embedded in a snapshot. Randomness and realtime cannot be present in a repeatable assertion, and you might not realize that a tiny part of a large snapshot is changing while you're in `//SELFIEWRITE` mode.
+For example, you might have a realtime timestamp or a random port number embedded in a snapshot. Randomness and realtime cannot be present in a repeatable assertion, and you might not realize that a tiny part of a large snapshot is changing while you're in `#SELFIEWRITE` mode.
 
 For this reason, it is critical that a CI server should always run in `readonly` mode. No action is needed on your part, selfie automatically puts itself into `readonly` mode if the `CI=true` environment variable is present, which is true for all popular CI systems.
 
-When in `readonly` mode, selfie not only refuses to update any snapshots, it also fails the build if `_TODO`, `//selfieonce`, or `//SELFIEWRITE` are present in the sourcecode, even if the snapshots were correct. Writing snapshots is a strictly private affair 😏.
+When in `readonly` mode, selfie not only refuses to update any snapshots, it also fails the build if `_TODO`, `#selfieonce`, or `#SELFIEWRITE` are present in the sourcecode, even if the snapshots were correct. Writing snapshots is a strictly private affair 😏.
 
 ## Overwrite everything
 
@@ -95,27 +95,27 @@ Selfie has three modes:
 
 To set the mode, you set the `selfie` or `SELFIE` environment variable or system property to either `interactive`, `readonly`, or `overwrite`. But in the vast majority of cases, it's best to leave it alone and let the defaults do their thing.
 
-**TODO: Change once available**
+## Strings, repr, and more
 
-```console
-[MAVEN]
-user@machine repo % mvn test -Dselfie=overwrite
+If you call `repr(x)` on some variable `x`, Python will return a string that represents the underlying value. This string is what selfie uses to stuff a value inside the brackets of `to_be()`.
 
-[GRADLE (only works if you followed the install instructions above re: environment)]
-user@machine repo % ./gradlew test -Pselfie=overwrite
-```
-
-## Beyond toString
-
-All of the examples so far have asserted on Strings. You can also do inline literal assertions on primitive values, and disk assertions on byte arrays:
+All of the examples so far have asserted on the string returned by `repr`. But selfie also has special handling for byte arrays (`bytes`).
 
 ```python
 expect_selfie(10/4).to_be(2.5)
-expect_selfie((10/4) == 2.5).to_be(true)
+expect_selfie((10/4) == 2.5).to_be(True)
+
+# saves as base64 within a subsection of a `.ss` file, with garbage collection for unused sections
 expect_selfie(bytearray(100)).to_match_disk()
+
+# base64 assertion
+expect_selfie(bytearray(100)).to_be_base64("blahblah") 
+
+# raw local file, no garbage collection
+expect_selfie(generatePngFile()).to_be_file("you_can_open_image_locally.png") 
 ```
 
-But the real power of selfie is asserting on arbitrary objects using **facets**, which are covered in the [advanced section](/py/facets).
+But the real power of selfie is asserting on arbitrary objects using **facets**, which are covered in more detail [in their own section](/py/facets).
 
 ## Reference
 
@@ -125,16 +125,16 @@ Full API documentation is available at [pydoc.selfie.dev](https://pydoc.selfie.d
   - creates or updates an inline literal snapshot
 - `.to_match_disk_TODO()`
   - creates or updates a disk snapshot
-- `//selfieonce`
+- `#selfieonce`
   - all snapshots in the file will be updated, whether they are `_TODO` or not
   - selfie will remove the comment after the snapshots have updated
-- `//SELFIEWRITE`
+- `#SELFIEWRITE`
   - all snapshots in the file will be updated, whether they are `_TODO` or not
   - selfie will not remove the comment after the snapshots have updated
 - mode is set by the `SELFIE` environment variable or system property
   - `interactive`, default
   - `readonly`, default if `CI` environment variable is `true`
   - `overwrite`, all snapshots can be overwritten
-- `Camera` and `Lens` are covered in the [advanced section](/py/facets).
+- `Camera` and `Lens` are covered in the [facets section](/py/facets).
 
 _Pull requests to improve the landing page and documentation are greatly appreciated, you can find the [source code here](https://github.com/diffplug/selfie)._
