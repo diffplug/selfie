@@ -56,7 +56,7 @@ class FSImplementation(FS):
     def __comparison_assertion(
         self, message: str, expected: str, actual: str
     ) -> Exception:
-        # this *should* through an exception that a good pytest runner will show nicely
+        # this *should* throw an exception that a good pytest runner will show nicely
         assert expected == actual, message
         # but in case it doesn't, we'll create our own here
         return AssertionError(message)
