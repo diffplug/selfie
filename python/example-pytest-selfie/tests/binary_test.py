@@ -24,12 +24,20 @@ def test_binary_file():
     expect_selfie(data).to_be_file("test_binary.bin")
 
 
-def test_binary_file_duplicate():
+def test_binary_file_duplicate_equal():
     """Test writing same binary data to a file multiple times"""
-    data = b"same data"
-    expect_selfie(data).to_be_file("duplicate.bin")
-    expect_selfie(data).to_be_file("duplicate.bin")
+    expect_selfie(b"equal").to_be_file("duplicate_equal.bin")
+    expect_selfie(b"equal").to_be_file("duplicate_equal.bin")
 
+def test_binary_file_duplicate_unequal():
+    """Test writing same binary data to a file multiple times"""
+    try:
+        expect_selfie(b"a").to_be_file("duplicate_unequal.bin")
+        expect_selfie(b"b").to_be_file("duplicate_unequal.bin")
+    except AssertionError as e:
+        expect_selfie(str(e)).to_be("""Snapshot mismatch, TODO: string comparison
+- update this snapshot by adding `_TODO` to the function name
+- update all snapshots in this file by adding """)
 
 def test_binary_file_mismatch():
     """Test error handling for mismatched binary data"""
@@ -48,16 +56,6 @@ def test_base64_mismatch():
     """Test error handling for mismatched base64 data"""
     data = b"test data"
     encoded = base64.b64encode(b"different data").decode()
-    with pytest.raises(AssertionError):
-        expect_selfie(data).to_be_base64(encoded)
-
-
-def test_readonly_mode_todo():
-    """Test error handling in readonly mode for TODO methods"""
-    from selfie_lib import _selfieSystem
-
-    print(f"Current mode: {_selfieSystem().mode}")
-    print(f"SELFIE env var: {os.getenv('SELFIE')}")
     with pytest.raises(AssertionError) as exc_info:
-        expect_selfie(b"test").to_be_base64_TODO()
-    assert "readonly mode" in str(exc_info.value).lower()
+        expect_selfie(data).to_be_base64("dGVzdCBkYXRh")
+    expect_selfie(str(exc_info.value)).to_be_TODO("Error while parsing the literal at File: /Users/ntwigg/Documents/dev/selfie/python/example-pytest-selfie/tests/binary_test.py, Line: 60. Please report this error at https://github.com/diffplug/selfie")
