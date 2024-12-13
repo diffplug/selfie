@@ -69,6 +69,9 @@ class PytestSnapshotFileLayout(SnapshotFileLayout):
         self.__root_folder = TypedPath.of_folder(os.path.abspath(settings.root_dir))
         self.unix_newlines = self.__infer_default_line_ending_is_unix()
 
+    def root_folder(self) -> TypedPath:
+        return self.__root_folder
+
     def snapshotfile_for_testfile(self, testfile: TypedPath) -> TypedPath:
         if testfile.name.endswith(".py"):
             return testfile.parent_folder().resolve_file(f"{testfile.name[:-3]}.ss")
