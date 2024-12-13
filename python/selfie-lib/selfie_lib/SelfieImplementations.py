@@ -273,7 +273,9 @@ def _toBeDidntMatch(expected: Optional[T], actual: T, fmt: LiteralFormat[T]) -> 
             expectedStr = repr(expected)
             actualStr = repr(actual)
             if expectedStr == actualStr:
-                raise f"Value of type {type(actual)} is not `==` to the expected value, but they both have the same `repr` value:\n${expectedStr}"
+                raise ValueError(
+                    f"Value of type {type(actual)} is not `==` to the expected value, but they both have the same `repr` value:\n${expectedStr}"
+                )
             else:
                 raise _selfieSystem().fs.assert_failed(
                     message=_selfieSystem().mode.msg_snapshot_mismatch(
