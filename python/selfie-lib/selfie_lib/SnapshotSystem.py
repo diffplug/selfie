@@ -124,8 +124,24 @@ class Mode(Enum):
     def msg_snapshot_not_found_no_such_file(self, file) -> str:
         return self.msg(f"Snapshot not found: no such file {file}")
 
-    def msg_snapshot_mismatch(self) -> str:
-        return self.msg("Snapshot mismatch")
+    def msg_snapshot_mismatch(self, expected: str, actual: str) -> str:  # noqa: ARG002
+        return self.msg("Snapshot mismatch, TODO: string comparison")
+
+    def msg_snapshot_mismatch_binary(self, expected: bytes, actual: bytes) -> str:
+        return self.msg_snapshot_mismatch(
+            self._to_quoted_printable(expected), self._to_quoted_printable(actual)
+        )
+
+    def _to_quoted_printable(self, byte_data: bytes) -> str:
+        result = []
+        for b in byte_data:
+            # b is already an integer in [0..255] when iterating through a bytes object
+            if 33 <= b <= 126 and b != 61:  # '=' is ASCII 61, so skip it
+                result.append(chr(b))
+            else:
+                # Convert to uppercase hex, pad to 2 digits, and prepend '='
+                result.append(f"={b:02X}")
+        return "".join(result)
 
     def msg(self, headline: str) -> str:
         if self == Mode.interactive:

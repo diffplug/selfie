@@ -186,83 +186,71 @@ class BinarySelfie(ReprSelfie[bytes], BinaryFacet):
                 f"The facet {only_facet} is a string, not a binary snapshot"
             )
 
+    def _actual_bytes(self) -> bytes:
+        return self.actual.subject_or_facet(self.only_facet).value_binary()
+
+    def to_match_disk(self, sub: str = "") -> "BinarySelfie":
+        super().to_match_disk(sub)
+        return self
+
+    def to_match_disk_TODO(self, sub: str = "") -> "BinarySelfie":
+        super().to_match_disk_TODO(sub)
+        return self
+
+    def to_be_base64_TODO(self, _: Any = None) -> bytes:
+        _toBeDidntMatch(None, self._actual_string(), LiteralString())
+        return self._actual_bytes()
+
     def to_be_base64(self, expected: str) -> bytes:
-        actual_bytes = self.actual.subject_or_facet(self.only_facet).value_binary()
         expected_bytes = base64.b64decode(expected)
+        actual_bytes = self._actual_bytes()
         if actual_bytes == expected_bytes:
             return _checkSrc(actual_bytes)
         else:
-            actual_b64 = base64.b64encode(actual_bytes).decode().replace("\r", "")
-            _toBeDidntMatch(expected, actual_b64, LiteralString())
+            _toBeDidntMatch(expected, self._actual_string(), LiteralString())
             return actual_bytes
-
-    def to_be_base64_TODO(self, _: Any = None) -> bytes:
-        call = recordCall(False)
-        if not _selfieSystem().mode.can_write(True, call, _selfieSystem()):
-            raise _selfieSystem().fs.assert_failed(
-                message=f"Can't call `to_be_base64_TODO` in {Mode.readonly} mode!"
-            )
-        return self._actual_bytes()
-
-    def _actual_bytes(self) -> bytes:
-        return self.actual.subject_or_facet(self.only_facet).value_binary()
 
     def _actual_string(self) -> str:
         return base64.b64encode(self._actual_bytes()).decode().replace("\r", "")
 
-    def to_be_file_impl(self, subpath: str, is_todo: bool) -> bytes:
+    def _to_be_file_impl(self, subpath: str, is_todo: bool) -> bytes:
         call = recordCall(False)
-        actual_bytes = self.actual.subject_or_facet(self.only_facet).value_binary()
         writable = _selfieSystem().mode.can_write(is_todo, call, _selfieSystem())
-        if is_todo and not writable:
-            raise _selfieSystem().fs.assert_failed(
-                message=f"Can't call `to_be_file_TODO` in {Mode.readonly} mode!"
-            )
-        if not writable:
-            path = (
-                _selfieSystem()
-                .layout.sourcefile_for_call(call.location)
-                .parent_folder()
-                .resolve_file(subpath)
-            )
-            if not _selfieSystem().fs.file_exists(path):
-                raise _selfieSystem().fs.assert_failed(
-                    message=_selfieSystem().mode.msg_snapshot_not_found_no_such_file(
-                        path
-                    )
-                )
-            expected = _selfieSystem().fs.file_read_binary(path)
-            if expected == actual_bytes:
-                return actual_bytes
-            else:
-                raise _selfieSystem().fs.assert_failed(
-                    message=_selfieSystem().mode.msg_snapshot_mismatch(),
-                    expected=expected,
-                    actual=actual_bytes,
-                )
-        else:
+        actual_bytes = self._actual_bytes()
+        path = _selfieSystem().layout.root_folder().resolve_file(subpath)
+
+        if writable:
             if is_todo:
                 _selfieSystem().write_inline(TodoStub.to_be_file.create_literal(), call)
-            _selfieSystem().write_to_be_file(
-                _selfieSystem()
-                .layout.sourcefile_for_call(call.location)
-                .parent_folder()
-                .resolve_file(subpath),
-                actual_bytes,
-                call,
-            )
+            _selfieSystem().write_to_be_file(path, actual_bytes, call)
             return actual_bytes
+        else:
+            if is_todo:
+                raise _selfieSystem().fs.assert_failed(
+                    f"Can't call `to_be_file_TODO` in {Mode.readonly} mode!"
+                )
+            else:
+                if not _selfieSystem().fs.file_exists(path):
+                    raise _selfieSystem().fs.assert_failed(
+                        _selfieSystem().mode.msg_snapshot_not_found_no_such_file(path)
+                    )
+                expected = _selfieSystem().fs.file_read_binary(path)
+                if expected == actual_bytes:
+                    return actual_bytes
+                else:
+                    raise _selfieSystem().fs.assert_failed(
+                        message=_selfieSystem().mode.msg_snapshot_mismatch_binary(
+                            expected, actual_bytes
+                        ),
+                        expected=expected,
+                        actual=actual_bytes,
+                    )
 
     def to_be_file_TODO(self, subpath: str) -> bytes:
-        call = recordCall(False)
-        if not _selfieSystem().mode.can_write(True, call, _selfieSystem()):
-            raise _selfieSystem().fs.assert_failed(
-                message=f"Can't call `to_be_file_TODO` in {Mode.readonly} mode!"
-            )
-        return self.to_be_file_impl(subpath, True)
+        return self._to_be_file_impl(subpath, True)
 
     def to_be_file(self, subpath: str) -> bytes:
-        return self.to_be_file_impl(subpath, False)
+        return self._to_be_file_impl(subpath, False)
 
 
 def _checkSrc(value: T) -> T:
@@ -279,11 +267,13 @@ def _toBeDidntMatch(expected: Optional[T], actual: T, fmt: LiteralFormat[T]) -> 
     else:
         if expected is None:
             raise _selfieSystem().fs.assert_failed(
-                message=f"Can't call `toBe_TODO` in {Mode.readonly} mode!"
+                f"Can't call `toBe_TODO` in {Mode.readonly} mode!"
             )
         else:
             raise _selfieSystem().fs.assert_failed(
-                message=_selfieSystem().mode.msg_snapshot_mismatch(),
+                message=_selfieSystem().mode.msg_snapshot_mismatch(
+                    expected=repr(expected), actual=repr(actual)
+                ),
                 expected=expected,
                 actual=actual,
             )
@@ -308,10 +298,14 @@ def _assertEqual(
                 ),
             )
         )
+        expectedFacets = _serializeOnlyFacets(expected, mismatched_keys)
+        actualFacets = _serializeOnlyFacets(actual, mismatched_keys)
         raise storage.fs.assert_failed(
-            message=storage.mode.msg_snapshot_mismatch(),
-            expected=_serializeOnlyFacets(expected, mismatched_keys),
-            actual=_serializeOnlyFacets(actual, mismatched_keys),
+            message=storage.mode.msg_snapshot_mismatch(
+                expected=expectedFacets, actual=actualFacets
+            ),
+            expected=expectedFacets,
+            actual=actualFacets,
         )
 
 
