@@ -1,17 +1,10 @@
-import os.path
 from functools import total_ordering
 
 
 @total_ordering
 class TypedPath:
     def __init__(self, absolute_path: str):
-        # Normalize path separators for internal storage
-        normalized = os.path.normpath(absolute_path)
-        # Convert to forward slashes and ensure proper trailing slash
-        path = normalized.replace("\\", "/")
-        self.absolute_path = (
-            path.rstrip("/") + "/" if absolute_path.endswith(("/", "\\")) else path
-        )
+        self.absolute_path = absolute_path
 
     def __hash__(self):
         return hash(self.absolute_path)
@@ -49,17 +42,13 @@ class TypedPath:
         self.assert_folder()
         if child.startswith("/") or child.endswith("/"):
             raise ValueError("Child path is not valid for file resolution")
-        normalized_child = os.path.normpath(child)
-        joined_path = os.path.join(self.absolute_path.rstrip("/"), normalized_child)
-        return self.of_file(joined_path)
+        return self.of_file(f"{self.absolute_path}{child}")
 
     def resolve_folder(self, child: str) -> "TypedPath":
         self.assert_folder()
         if child.startswith("/"):
             raise ValueError("Child path starts with a slash")
-        normalized_child = os.path.normpath(child.rstrip("/"))
-        joined_path = os.path.join(self.absolute_path.rstrip("/"), normalized_child)
-        return self.of_folder(joined_path)
+        return self.of_folder(f"{self.absolute_path}{child}/")
 
     def relativize(self, child: "TypedPath") -> str:
         self.assert_folder()
@@ -77,12 +66,14 @@ class TypedPath:
 
     @classmethod
     def of_folder(cls, path: str) -> "TypedPath":
-        normalized = os.path.normpath(path).replace("\\", "/")
-        return cls(normalized + "/")
+        unix_path = path.replace("\\", "/")
+        if not unix_path.endswith("/"):
+            unix_path += "/"
+        return cls(unix_path)
 
     @classmethod
     def of_file(cls, path: str) -> "TypedPath":
-        normalized = os.path.normpath(path)
-        if normalized.endswith("/"):
+        unix_path = path.replace("\\", "/")
+        if unix_path.endswith("/"):
             raise ValueError("Expected path to not end with a slash for a file")
-        return cls(normalized)
+        return cls(unix_path)
