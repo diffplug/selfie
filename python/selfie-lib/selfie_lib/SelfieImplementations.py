@@ -267,7 +267,7 @@ def _toBeDidntMatch(expected: Optional[T], actual: T, fmt: LiteralFormat[T]) -> 
     else:
         if expected is None:
             raise _selfieSystem().fs.assert_failed(
-                f"Can't call `toBe_TODO` in {Mode.readonly} mode!"
+                f"Can't call `to_be_TODO` in {Mode.readonly} mode!"
             )
         else:
             expectedStr = repr(expected)
