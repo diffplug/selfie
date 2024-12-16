@@ -19,6 +19,15 @@ export function ButtonList() {
         "desktop:w-[490px]"
       )}
     >
+      <Link href="/py">
+        <Button
+          className={
+            selectedLanguage === "py" ? pressedClasses : unPressedClasses
+          }
+        >
+          py
+        </Button>
+      </Link>
       <Link href="/jvm">
         <Button
           className={
@@ -28,15 +37,6 @@ export function ButtonList() {
           }
         >
           jvm
-        </Button>
-      </Link>
-      <Link href="/py">
-        <Button
-          className={
-            selectedLanguage === "py" ? pressedClasses : unPressedClasses
-          }
-        >
-          py
         </Button>
       </Link>
       <Link href="/js">

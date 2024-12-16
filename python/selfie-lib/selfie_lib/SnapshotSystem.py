@@ -125,7 +125,9 @@ class Mode(Enum):
         return self.msg(f"Snapshot not found: no such file {file}")
 
     def msg_snapshot_mismatch(self, expected: str, actual: str) -> str:  # noqa: ARG002
-        return self.msg("Snapshot mismatch, TODO: string comparison")
+        return self.msg(
+            "Snapshot mismatch (error msg could be better https://github.com/diffplug/selfie/issues/501)"
+        )
 
     def msg_snapshot_mismatch_binary(self, expected: bytes, actual: bytes) -> str:
         return self.msg_snapshot_mismatch(

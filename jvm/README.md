@@ -1,9 +1,8 @@
 # Selfie snapshot testing for Java, Kotlin, and the JVM
 
-- [Quickstart](https://selfie.dev/jvm/get-started)
-- [Facets](https://selfie.dev/jvm/facets)
-- [Caching / memoizing](https://selfie.dev/jvm/cache)
-- [Why selfie](https://selfie.dev/jvm)
+- High-level documentation - [selfie.dev](https://selfie.dev/jvm/get-started).
+- API documentation - [pydoc.selfie.dev](https://kdoc.selfie.dev).
+- Source code - [github.com/diffplug/selfie](https://github.com/diffplug/selfie)
 
 ## Contributing
 

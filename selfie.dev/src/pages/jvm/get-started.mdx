@@ -183,7 +183,7 @@ expectSelfie(TimeUnit.DAYS.toMillis(365*1_000_000L)).toBe(31_536_000_000_000_000
 expectSelfie(new byte[100]).toMatchDisk();
 ```
 
-But the real power of selfie is asserting on arbitrary objects using **facets**, which are covered in the [advanced section](/jvm/facets).
+But the real power of selfie is asserting on arbitrary objects using **facets**, which are covered in the [facets section](/jvm/facets).
 
 ## Reference
 
@@ -203,6 +203,7 @@ Full API documentation is available at [kdoc.selfie.dev](https://kdoc.selfie.dev
   - `interactive`, default
   - `readonly`, default if `CI` environment variable is `true`
   - `overwrite`, all snapshots can be overwritten
-- `Camera` and `Lens` are covered in the [advanced section](/jvm/facets).
+- `Camera` and `Lens` are covered in the [facet section](/jvm/facets)
+- `cacheSelfie` and binary snapshots (`toBeBase64` and `toBeFile`) are covered in the [cache section](/jvm/cache)
 
 *Pull requests to improve the landing page and documentation are greatly appreciated, you can find the [source code here](https://github.com/diffplug/selfie).*
