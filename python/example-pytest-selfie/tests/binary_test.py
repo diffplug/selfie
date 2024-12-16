@@ -41,7 +41,7 @@ def test_binary_file_duplicate_unequal():
             "tests/binary_test__test_binary_file_duplicate_unequal.bin"
         )
     expect_selfie(safify(str(exc_info.value))).to_be(
-        "Snapshot mismatch, TODO: string comparison"
+        "Snapshot mismatch (error msg could be better https://github.com/diffplug/selfie/issues/501)"
     )
 
 
@@ -65,7 +65,7 @@ def test_base64_mismatch():
     with pytest.raises(Exception) as exc_info:
         expect_selfie(b"test data").to_be_base64("AAAA")
     expect_selfie(safify(str(exc_info.value))).to_be(
-        "Snapshot mismatch, TODO: string comparison"
+        "Snapshot mismatch (error msg could be better https://github.com/diffplug/selfie/issues/501)"
     )
 
 
