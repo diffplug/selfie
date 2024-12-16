@@ -1,9 +1,7 @@
 /jvm/advanced /jvm/facets 301
 /js https://github.com/diffplug/selfie/issues/84
 /js/* https://github.com/diffplug/selfie/issues/84
-/py https://github.com/diffplug/selfie/issues/85
 /go https://github.com/diffplug/selfie/issues/85
 /go/* https://github.com/diffplug/selfie/issues/85
 /other-platforms https://github.com/diffplug/selfie/issues/85
 /other-platforms/* https://github.com/diffplug/selfie/issues/85
-/cs490 https://docs.google.com/presentation/d/1K_xOISzzx0NRnNi_p7GrLIFVh5u9s0mstq2m3Idq19Q/edit?usp=sharing
