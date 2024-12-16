@@ -73,14 +73,14 @@ export function ButtonList() {
         "desktop:w-[490px]"
       )}
     >
+      <Link href="/py">
+        <Button className={unPressedClasses}>py</Button>
+      </Link>{" "}
       <Link href="/jvm">
         <Button className={unPressedClasses}>jvm</Button>
       </Link>{" "}
       <Link href="/js">
         <Button className={unPressedClasses}>js</Button>
-      </Link>{" "}
-      <Link href="/other-platforms">
-        <Button className={unPressedClasses}>py</Button>
       </Link>{" "}
       <Link href="/other-platforms">
         <Button className={unPressedClasses}>...</Button>
