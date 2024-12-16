@@ -1,6 +1,6 @@
 [project]
 name = "selfie-lib"
-version = "1.0.0"
+version = "1.0.1.dev0"
 description = "Infrastructure for creating selfie-compatible test runner plugins."
 authors = [
   { name = "Edwin Ye", email = "EdwinYeDeveloper@gmail.com" },

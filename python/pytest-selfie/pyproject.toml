@@ -1,6 +1,6 @@
 [project]
 name = "pytest-selfie"
-version = "1.0.0"
+version = "1.0.1.dev0"
 description = "A pytest plugin for selfie snapshot testing."
 authors = [
   { name = "Edwin Ye", email = "EdwinYeDeveloper@gmail.com" },
