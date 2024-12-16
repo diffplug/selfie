@@ -26,7 +26,9 @@ def _web_camera(response: TestResponse) -> Snapshot:
         )
 
     if response.headers.get("Set-Cookie"):
-        snapshot = snapshot.plus_facet("cookies", response.headers.get("Set-Cookie", ""))
+        snapshot = snapshot.plus_facet(
+            "cookies", response.headers.get("Set-Cookie", "")
+        )
     return snapshot
 
 
