@@ -16,7 +16,7 @@ def openai():
 
 def test_gen_ai():
     # Fetch the chat response with caching
-    chat = cache_selfie_json(
+    chat: dict = cache_selfie_json(
         lambda: openai()
         .chat.completions.create(
             model="gpt-4o",
@@ -63,7 +63,7 @@ def test_gen_ai():
     }
 }""")
     # raise ValueError(f"KEYS={chat.keys()} TYPE={type(chat)}")
-    image_url = cache_selfie_json(
+    image_url: dict = cache_selfie_json(
         lambda: openai()
         .images.generate(
             model="dall-e-3", prompt=chat["choices"][0]["message"]["content"]
