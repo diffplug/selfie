@@ -12,9 +12,18 @@ def client():
     with app.test_client() as client:
         yield client
 
+def test_homepage_v1(client):
+  expect_selfie(client.get("/").data.decode()).to_be("""
+<html><body>
+  <h1>Please login</h1>
+  <form action="/login" method="post">
+    <input type="text" name="email" placeholder="email">
+    <input type="submit" value="login">
+  </form>
+</body></html>""")
 
-def test_homepage(client):
-    web_selfie(client.get("/")).to_be("""<html>
+def test_homepage_v2(client):
+  web_selfie(client.get("/")).to_be("""<html>
  <body>
   <h1>
    Please login
@@ -30,51 +39,40 @@ def test_homepage(client):
 Please login
 ╔═ [status] ═╗
 200 OK""")
+    
+def test_login_flow(client):
+  web_selfie(client.get("/")).to_match_disk("1. not logged in") \
+    .facet("md").to_be("Please login")
 
+  web_selfie(client.post("/login", data={"email": "user@domain.com"})) \
+    .to_match_disk("2. post login form") \
+    .facet("md").to_be("""Email sent!
 
-def test_T01_not_logged_in(client):
-    response = client.get("/")
-    expect_selfie(response.data.decode()).to_be("""
-<html><body>
-  <h1>Please login</h1>
-  <form action="/login" method="post">
-    <input type="text" name="email" placeholder="email">
-    <input type="submit" value="login">
-  </form>
-</body></html>""")
+Check your email for your login link.""")
 
-
-def test_T02_login(client):
-    response = client.post("/login", data={"email": "user@domain.com"})
-    expect_selfie(response.data.decode()).to_be("""
-<html><body>
-  <h1>Email sent!</h1>
-  <p>Check your email for your login link.</p>
-</body></html>""")
-
-    email = wait_for_incoming_email()
-    expect_selfie(email).to_be(
+  email = wait_for_incoming_email()
+  expect_selfie(email).to_be(
         {
             "to": "user@domain.com",
             "subject": "Login to example.com",
             "html_content": 'Click <a href="http://localhost/login-confirm/2Yw4aCQ">here</a> to login.',
         }
     )
+  
+  web_selfie(client.get("/login-confirm/2Yw4aCQ")).to_be("""REDIRECT 302 Found to /
+╔═ [cookies] ═╗
+login=user@domain.com|29Xwa32OsHUoHm4TRitwQMWpuynz3r1aw3BcB5pPGdY=; Path=/""")
+
+  client.set_cookie('login', 'user@domain.com|29Xwa32OsHUoHm4TRitwQMWpuynz3r1aw3BcB5pPGdY=')
+  web_selfie(client.get("/")).to_match_disk("3. log in works with cookies") \
+    .facet("md").to_be("Welcome back user@domain.com")
+
+  client.set_cookie('login', 'user@domain.com|ABCDEF')
+  web_selfie(client.get("/")).to_match_disk("4. log in fails with fake cookies") \
+    .facet("status").to_be("401 UNAUTHORIZED")
 
 
-def test_T03_login_confirm(client):
-    response = client.get("/login-confirm/erjchFY=", follow_redirects=False)
-    expect_selfie(headers_to_string(response)).to_be("""200 OK
-Content-Type=text/html; charset=utf-8""")
-
-
-def headers_to_string(response):
-    headers = [f"{response.status}"]
-    for name, value in response.headers.items():
-        if name.lower() not in ["server", "date", "content-length"]:
-            headers.append(f"{name}={value}")
-    return "\n".join(headers)
-
+#SELFIEWRITE
 
 if __name__ == "__main__":
     pytest.main()
