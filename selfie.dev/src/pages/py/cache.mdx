@@ -7,7 +7,7 @@ export const imageUrl = "https://selfie.dev/cache.webp";
 
 <DocsImage imgAbsoluteUrl={imageUrl} />
 
-*`cacheSelfie` helps you build fast deterministic tests even if they contain slow non-deterministic components. A generative AI example is available [here](https://github.com/diffplug/selfie/blob/main/python/example-pytest-selfie/tests/cache_selfie_test.py).*
+*`cache_selfie` helps you build fast deterministic tests even if they contain slow non-deterministic components. A generative AI example is available [here](https://github.com/diffplug/selfie/blob/main/python/example-pytest-selfie/tests/cache_test.py).*
 
 To use `expect_selfie`, you pass a _value_ that you want to snapshot.
 
@@ -46,7 +46,7 @@ You have these choices for specifying the data in a snapshot:
 
 ```python
 cache_selfie(lambda: "string").to_be("string")
-cache_selfie(lambda:"string").to_match_disk()
+cache_selfie(lambda: "string").to_match_disk()
 cache_selfie_binary(lambda: bytearray[3]).to_be_base64("AAAA")
 cache_selfie_binary(lambda: bytearray[3]).to_be_file("pkg/someFile.ext")
 cache_selfie_binary(lambda: bytearray[3]).to_match_disk()
