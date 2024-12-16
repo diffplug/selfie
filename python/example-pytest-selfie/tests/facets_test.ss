@@ -46,32 +46,6 @@ Check your email for your login link.
 Welcome back user@domain.com
 ╔═ test_login_flow/3. log in works with cookies[status] ═╗
 200 OK
-╔═ test_login_flow/3. log in works with those cookies ═╗
-<html>
- <body>
-  <h1>
-   Welcome back user@domain.com
-  </h1>
- </body>
-</html>
-
-╔═ test_login_flow/3. log in works with those cookies[md] ═╗
-Welcome back user@domain.com
-╔═ test_login_flow/3. log in works with those cookies[status] ═╗
-200 OK
-╔═ test_login_flow/4. log in blocked without cookies ═╗
-<html>
- <body>
-  <h1>
-   Welcome back user@domain.com
-  </h1>
- </body>
-</html>
-
-╔═ test_login_flow/4. log in blocked without cookies[md] ═╗
-Welcome back user@domain.com
-╔═ test_login_flow/4. log in blocked without cookies[status] ═╗
-200 OK
 ╔═ test_login_flow/4. log in fails with fake cookies ═╗
 <!DOCTYPE html>
 <html lang="en">

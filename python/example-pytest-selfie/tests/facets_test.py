@@ -42,7 +42,6 @@ Please login
 ╔═ [status] ═╗
 200 OK""")
 
-
 def test_login_flow(client):
     web_selfie(client.get("/")).to_match_disk("1. not logged in").facet("md").to_be(
         "Please login"
