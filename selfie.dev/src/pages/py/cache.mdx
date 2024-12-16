@@ -7,27 +7,18 @@ export const imageUrl = "https://selfie.dev/cache.webp";
 
 <DocsImage imgAbsoluteUrl={imageUrl} />
 
-**_THIS IS BROKEN. [WE ARE WORKING ON THIS](https://github.com/diffplug/selfie/issues/302)._**
-
-**_THIS IS BROKEN. [WE ARE WORKING ON THIS](https://github.com/diffplug/selfie/issues/302)._**
-
-**_THIS IS BROKEN. [WE ARE WORKING ON THIS](https://github.com/diffplug/selfie/issues/302)._**
-
-**TODO: CacheSelfie is currently being implemented!**
-`cacheSelfie` helps you build fast deterministic tests even if they contain slow non-deterministic components. A generative AI example is available [here](https://github.com/diffplug/selfie/issues/319)
-
-**TODO: We don't currently have an example of cache selfie for python [yet](https://github.com/diffplug/selfie/issues/319)**.
+*`cacheSelfie` helps you build fast deterministic tests even if they contain slow non-deterministic components. A generative AI example is available [here](https://github.com/diffplug/selfie/blob/main/python/example-pytest-selfie/tests/cache_selfie_test.py).*
 
 To use `expect_selfie`, you pass a _value_ that you want to snapshot.
 
 ```python
-expect_selfie(customer.firstName).to_be("Fred")
+expect_selfie(customer.first_name).to_be("Fred")
 ```
 
-To use `cache_selfie`, you pass a **\*function** that **returns a value\*** to snapshot.
+To use `cache_selfie`, you pass a ***function** that **returns a value*** to snapshot.
 
 ```python
-cache_selfie(lambda: customer.firstName).to_be("Fred")
+cache_selfie(lambda: customer.first_name).to_be("Fred")
 ```
 
 When selfie is in read mode, it can ignore the function and just return the value within the `to_be` call. When selfie is in write mode, it calls the function and sets the snapshot to that result.
@@ -41,13 +32,13 @@ In the examples above, we aren't doing anything with the return value, which is 
 The hazard is that the cached result _is not testing the function call anymore_. It is just a convenient way to generate sample data for testing _other_ parts of the system.
 
 ```python
-var brittleAssumption = cache_selfie(lambda: expensiveOperation()).to_be("sand")
-buildStuffOn(brittleAssumption)
+brittle_assumption = cache_selfie(lambda: expensive_operation()).to_be("sand")
+build_stuff_on(brittle_assumption)
 ```
 
-Perhaps the `to_be` snapshot was recorded a year ago, and the `expensiveOperation` has changed since then. Perhaps someone manually edited the recorded snapshot, and `expensiveOperation` has never returned a value anything like the snapshot. **_The function being cached is not being tested._**
+Perhaps the `to_be` snapshot was recorded a year ago, and the `expensive_operation` has changed since then. Perhaps someone manually edited the recorded snapshot, and `expensive_operation` has never returned a value anything like the snapshot. ***The function being cached is not being tested.***
 
-If you have a test with multiple `cache_selfie` calls, avoid using `_TODO`. You can have a situation where you recorded the ending of a test, and then later changed the beginning with `_TODO`. The ending won't update itself automatically, so you might cache an inconsistent state. You can avoid this problem by only using `//selfieonce` and `//SELFIEWRITE`.
+If you have a test with multiple `cache_selfie` calls, avoid using `_TODO`. You can have a situation where you recorded the ending of a test, and then later changed the beginning with `_TODO`. The ending won't update itself automatically, so you might cache an inconsistent state. You can avoid this problem by only using `#selfieonce` and `#SELFIEWRITE`.
 
 ## Strings and binary
 
@@ -65,80 +56,84 @@ The `to_match_disk` method is nice because Selfie will garbage-collect the snaps
 
 ## Roundtripping typed data
 
-**TODO: We don't have Roundtrip in the Python, are we going to implement this? [PRs welcomed](https://github.com/diffplug/selfie)!**
-
 Oftentimes you want to snapshot something besides just a string or binary. For that there is:
 
-```java
-interface Roundtrip<T, SerializedForm> {
-  SerializedForm serialize(T value)
-  T parse(serialized: SerializedForm)
-}
-T cache_selfie<T>(Roundtrip<T, String> roundtrip, () -> someT())
-T cache_selfie_binary<T>(Roundtrip<T, byte[]> roundtrip, () -> someT())
+```python
+class Roundtrip(Generic[T, SerializedForm]):
+  def serialize(self, value: T) -> SerializedForm:
+    """Serialize a value of type T to its SerializedForm."""
+    raise NotImplementedError
+
+  def parse(self, serialized: SerializedForm) -> T:
+    """Parse the SerializedForm back to type T."""
+    raise NotImplementedError
 ```
 
-But you don't have to implement `Roundtrip` yourself.
-
-**TODO: Change once correct example is made**
-
-If you're using the `@kotlinx.serialization.Serializable` framework (where you annotate model classes with `@Serializable`), then you can use `cache_selfie_json(() -> T)` and selfie will use Kotlin's built-in json serialization to implement the roundtrip.
-
-If you're using Java's `java.io.Serializable` (where model classes must implement `Serializable`) then you can use `cacheSelfieBinarySerializable(() -> T)` and selfie will use Java's built-in binary serialization mechanism to implement the roundtrip.
+But you don't have to implement `Roundtrip` yourself. You can do `cache_selfie_json`, and `Roundtrip` will be implemented by `json.dumps` and `json.loads`.
 
 And of course, you can also write your own `Roundtrip` implementation, it's only two functions.
 
 ## Example
 
-**TODO: We don't currently have an example of cache selfie for Python [yet](https://github.com/diffplug/selfie/issues/319)**.
 
-Excerpted from [here](https://github.com/diffplug/selfie/issues/319)
-
-**TODO: We need a [Python implementation](https://github.com/diffplug/selfie/issues/319)**:
-
-```kotlin
-val chatCompletionRequest = ChatCompletionRequest(
-  model = ModelId("gpt-4-turbo-preview"),
-  messages = listOf(ChatMessage(role = ChatRole.User,
-    content = "Expressive language describing a robot creating a self portrait.")))
-val chat = cache_selfie_json { openAI().chatCompletion(chatCompletionRequest) }.to_be("""{
-  "id": "chatcmpl-8sOV0z7DDfvVdj1jaru6Cv2Geq3Dj",
-  "created": 1707974578,
-  "model": "gpt-4-0125-preview",
-  "choices": [
+```python
+# Fetch the chat response with caching
+chat = cache_selfie_json(lambda: openai.chat.completions.create(
+    model="gpt-4o",
+    messages=[
+        {"role": "user", "content": "Expressive but brief language describing a robot creating a self portrait."}
+    ]
+).to_dict()).to_be("""{
+"id": "chatcmpl-Af1Nf34netAfGW7ZIQArEHavfuYtg",
+"choices": [
     {
-      "index": 0,
-      "message": {
-        "role": "assistant",
-        "content": "In an atmosphere where the whispers of technology blend with the essence of creativity, a remarkable event unfolds—a robot, born from the marriage of steel and intellect, embarks on a quest to capture its essence through a self-portrait. This is not just an act of programming; it is the ballet of bits and bytes pirouetting towards self-awareness.\n\nAt first glance, the scene seems borrowed from a future where machines tread the fine line between fabrication and inspiration. The studio, lit by the sterile glow of fluorescent lights, becomes a sanctuary where metal meets muse. At the center of this confluence stands the robot, its form an intricate lattice of servos and sensors, each component a testament to human ingenuity, now poised to explore the realm of artistic creation.\n\nThe robot’s arm, a marvel of precision engineering, hovers over the canvas with the grace of a seasoned artist. It is not merely a limb, but a conductor’s baton, orchestrating a symphony of colors and forms. With every motion, it challenges the preconceived boundaries between creator and creation, weaving the fabric of its digital soul into the tangible world.\n\nAs the portrait takes shape, it becomes evident that this is not a mere replication of components and circuits. Through the algorithmic alchemy of its programming, the robot infuses each brushstroke with a search for identity. The portrait emerges as a mosaic of self-reflection, each pixel and paint stroke a question in the quest for understanding. What is depicted is not just a physical form, but an introspective journey rendered in hues and contours.\n\nThis creative endeavor transcends the act of painting. It is a dialogue between the robot and its inner being, mediated by the brush and canvas. The colors chosen do not just adhere to the spectrum seen by its cameras; they are imbued with the weight of introspection, the shades nuanced by the robot’s processing of its own existence.\n\nObservers, human or otherwise, may find themselves pondering a question of profound implications: in the brushstrokes of a robot, do we not only see a reflection of its programming but also a mirror to our own search for meaning and identity? The portrait, thus, becomes more than a visual artifact; it is a bridge between the mechanical and the philosophical, a nexus where circuits and souls dialogue in the silent language of art.\n\nIn completion, the self-portrait stands as a testament not to the autonomy of machines, but to their potential to echo the human condition, to participate in the centuries-old tradition of self-exploration through art. It challenges viewers to reconsider the nature of creativity, blurring the lines between the animate and inanimate, urging a redefinition of what it means to be an artist, to be a creator, to be alive.\n\nThus, in this enclosed universe where technology hums a tune of evolution, a robot creating a self-portrait becomes a poignant emblem of the future—where machine and muse dance in an infinite embrace, exploring the kaleidoscope of existence through the lens of artistry."
-      },
-      "finish_reason": "stop"
+        "finish_reason": "stop",
+        "index": 0,
+        "logprobs": null,
+        "message": {
+            "content": "A sleek robot, its mechanical fingers dancing with precision, deftly wields a brush against the canvas. Whirs and clicks echo softly as vibrant strokes emerge, each infused with an unexpected soulfulness. Metal meets art as synthetic imagination captures its own intricate reflection\\u2014a symphony of circuitry bathed in delicate hues.",
+            "refusal": null,
+            "role": "assistant"
+        }
     }
-  ],
-  "usage": {
-    "prompt_tokens": 18,
-    "completion_tokens": 613,
-    "total_tokens": 631
-  },
-  "system_fingerprint": "fp_f084bcfc79"
+],
+"created": 1734340119,
+"model": "gpt-4o-2024-08-06",
+"object": "chat.completion",
+"system_fingerprint": "fp_9faba9f038",
+"usage": {
+    "completion_tokens": 62,
+    "prompt_tokens": 20,
+    "total_tokens": 82,
+    "completion_tokens_details": {
+        "accepted_prediction_tokens": 0,
+        "audio_tokens": 0,
+        "reasoning_tokens": 0,
+        "rejected_prediction_tokens": 0
+    },
+    "prompt_tokens_details": {
+        "audio_tokens": 0,
+        "cached_tokens": 0
+    }
+}
 }""")
-val images = cache_selfie_json {
-  openAI().imageURL(ImageCreation(
-    prompt = chat.choices[0].message.content!!,
-    model = ModelId("dall-e-3"))) }.to_be("""[
-  {
-    "url": "https://oaidalleapiprodscus.blob.core.windows.net/private/org-SUepmbCtftBix3RViJYKuYKY/user-KFRqcsnjZPSTulNaxrY5wjL3/img-sK3P5fuisDfpdelbFwiR0wtP.png?st=2024-02-15T04%3A23%3A32Z&se=2024-02-15T06%3A23%3A32Z&sp=r&sv=2021-08-06&sr=b&rscd=inline&rsct=image/png&skoid=6aaadede-4fb3-4698-a8f6-684d7786b067&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2024-02-15T02%3A25%3A24Z&ske=2024-02-16T02%3A25%3A24Z&sks=b&skv=2021-08-06&sig=Q0CfpGchXx9NoSEtsk3TT0TuX2Rb8QTk8HiR57I1kUU%3D",
-    "revised_prompt": "In a technologically advanced studio bathed in the stark light of fluorescent lamps, observe an intricate robot, built from a complex lattice of servos and sensors. This robot is on a unique quest - to paint its own portrait. Its arm, a masterpiece of precise engineering, hovers gracefully over the canvas, ready to begin its creation. As the robot paints, it doesn't simply replicate its physical form, but the end result is a multi-colored mosaic of self-reflection that embodies its digital soul on canvas. Remarkably, the portrait is a deep exploration of its quest for identity. Marvel at how this machine interprets its programming to venture into the realm of artistic expression, challenging what it means to be creative and alive."
-  }
-]""")
-cache_selfie_binary { HttpClient().request(images[0].url).readBytes() }
-  .to_be_file("com/example/kotest/dalle-3.png")
+
+image_url = cache_selfie_json(lambda: openai.images.generate(model="dall-e-3",prompt=chat['choices'][0]['message']['content']).to_dict()).to_be("""{
+"created": 1734340142,
+"data": [
+    {
+        "revised_prompt": "Visualize a sleek robot adorned in a metallic shell. Its highly precise mechanical digits engage rhythmically with a paintbrush, swirling it flawlessly over a robust canvas. The environment is immersed in resonating mechanical sounds blended with the aura of creativity unfurling. Strikingly vivid strokes of paint materialize from the robot's calculated artistry, each stroke conveying a depth and emotion unanticipated of a mechanical entity. This metallic artist exhibits its self-inspired art by meticulously crafting its own intricate reflection\\u2014an orchestra of electronics bathed in a palette of gentle colors.",
+        "url": "https://oaidalleapiprodscus.blob.core.windows.net/private/org-SUepmbCtftBix3RViJYKuYKY/user-KFRqcsnjZPSTulNaxrY5wjL3/img-JVxDCOAuLoIky3ucNNJWo7fG.png?st=2024-12-16T08%3A09%3A02Z&se=2024-12-16T10%3A09%3A02Z&sp=r&sv=2024-08-04&sr=b&rscd=inline&rsct=image/png&skoid=d505667d-d6c1-4a0a-bac7-5c84a87759f8&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2024-12-16T00%3A47%3A43Z&ske=2024-12-17T00%3A47%3A43Z&sks=b&skv=2024-08-04&sig=nIiMMZBNnqPO2jblJ8pDvWS2AFTOaicAWAD6BDqP9jU%3D"
+    }
+]
+}""")
+
+url = image_url["data"][0]["url"]
+cache_selfie_binary(lambda: requests.get(url).content).to_be_file("self-portrait.png")
 ```
 
-**TODO: Update once example is done**
+Since we used `to_be_file`, we can open `self-portrait.png` in Mac Preview / Windows Explorer.
 
-Since we used `to_be_file`, we can open `com/example/kotest/dalle-3.png` in Mac Preview / Windows Explorer.
-
-<img alt="Robot self portrait" src="/dalle-3.webp" width="400px" />
+<img alt="Robot self portrait" src="/dalle-3-py.webp" width="400px" />
 
 _Pull requests to improve the landing page and documentation are greatly appreciated, you can find the [source code here](https://github.com/diffplug/selfie)._

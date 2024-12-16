@@ -13,7 +13,6 @@ readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
     "flask>=3.0.3",
-    "openai>=1.0.0",
 ]
 
 [tool.uv.sources]
@@ -24,9 +23,11 @@ pytest-selfie = { path = "../pytest-selfie", editable = true }
 dev = [
     "beautifulsoup4>=4.12.3",
     "markdownify>=0.12.1",
+    "openai>=1.0.0",
     "pyright>=1.1.350",
     "pytest-selfie>=0.1.0",
     "pytest>=8.0.0",
+    "requests>=2.32.3",
     "ruff>=0.5.0",
     "selfie-lib>=0.1.0",
     "werkzeug>=3.0.3",
