@@ -1,23 +1,24 @@
-import random
 import os
+import random
+
 import requests
-
-from selfie_lib import cache_selfie, cache_selfie_binary, cache_selfie_json
-
 from openai import OpenAI
+from selfie_lib import cache_selfie, cache_selfie_binary, cache_selfie_json
 
 
 def test_cache_selfie():
     cache_selfie(lambda: str(random.random())).to_be("0.06699295946441819")
 
 
-def test_gen_ai():
-    # Initialize OpenAI API client
-    openai = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+def openai():
+    return OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
+
+def test_gen_ai():
     # Fetch the chat response with caching
     chat = cache_selfie_json(
-        lambda: openai.chat.completions.create(
+        lambda: openai()
+        .chat.completions.create(
             model="gpt-4o",
             messages=[
                 {
@@ -25,7 +26,8 @@ def test_gen_ai():
                     "content": "Expressive but brief language describing a robot creating a self portrait.",
                 }
             ],
-        ).to_dict()
+        )
+        .to_dict()
     ).to_be("""{
     "id": "chatcmpl-Af1Nf34netAfGW7ZIQArEHavfuYtg",
     "choices": [
@@ -62,9 +64,11 @@ def test_gen_ai():
 }""")
     # raise ValueError(f"KEYS={chat.keys()} TYPE={type(chat)}")
     image_url = cache_selfie_json(
-        lambda: openai.images.generate(
+        lambda: openai()
+        .images.generate(
             model="dall-e-3", prompt=chat["choices"][0]["message"]["content"]
-        ).to_dict()
+        )
+        .to_dict()
     ).to_be("""{
     "created": 1734340142,
     "data": [
