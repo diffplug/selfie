@@ -1,10 +1,12 @@
+# Selfie snapshot testing for Python
+
 - High-level documentation - [selfie.dev](https://selfie.dev/py/get-started).
 - API documentation - [pydoc.selfie.dev](https://pydoc.selfie.dev/namespaces).
 - Source code - [github.com/diffplug/selfie](https://github.com/diffplug/selfie)
 
 ## Contributing
 
-Dependencies are managed using uv:
+PR's welcome! Dependencies are managed using uv:
 
 - https://docs.astral.sh/uv/getting-started/installation/
 - then cd into `selfie-lib` and run `uv sync` to get the dependencies
