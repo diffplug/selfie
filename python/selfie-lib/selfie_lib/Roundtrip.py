@@ -26,3 +26,17 @@ class Roundtrip(Generic[T, SerializedForm]):
                 return serialized
 
         return Identity()
+
+    @classmethod
+    def json(cls) -> "Roundtrip[T, str]":
+        """Return a Roundtrip that serializes to/from JSON strings."""
+        import json
+
+        class JsonRoundtrip(Roundtrip[Any, str]):
+            def serialize(self, value: Any) -> str:
+                return json.dumps(value, indent=4)
+
+            def parse(self, serialized: str) -> Any:
+                return json.loads(serialized)
+
+        return JsonRoundtrip()

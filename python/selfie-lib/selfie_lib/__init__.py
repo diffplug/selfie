@@ -3,6 +3,8 @@ from .ArrayMap import ArrayMap as ArrayMap
 from .ArrayMap import ArraySet as ArraySet
 from .Atomic import AtomicReference as AtomicReference
 from .CacheSelfie import cache_selfie as cache_selfie
+from .CacheSelfie import cache_selfie_binary as cache_selfie_binary
+from .CacheSelfie import cache_selfie_json as cache_selfie_json
 from .CommentTracker import CommentTracker as CommentTracker
 from .FS import FS as FS
 from .Lens import Camera as Camera
