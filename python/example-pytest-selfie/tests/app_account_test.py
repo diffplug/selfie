@@ -71,8 +71,5 @@ login=user@domain.com|29Xwa32OsHUoHm4TRitwQMWpuynz3r1aw3BcB5pPGdY=; Path=/""")
   web_selfie(client.get("/")).to_match_disk("4. log in fails with fake cookies") \
     .facet("status").to_be("401 UNAUTHORIZED")
 
-
-#SELFIEWRITE
-
 if __name__ == "__main__":
     pytest.main()
