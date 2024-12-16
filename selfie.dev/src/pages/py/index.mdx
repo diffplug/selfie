@@ -43,8 +43,6 @@ And from now on it's a proper assertion, but you didn't have to spend any time w
 
 <NavHeading text="like-a-filesystem" popout="/py/get-started#disk" />
 
-## NOT READY YET - WIP
-
 That `primes_below(100)` snapshot above is almost too long. Something bigger, such as `primes_below(10_000)` is definitely too big. To handle this, selfie lets you put your snapshots on disk.
 
 ```python
@@ -86,8 +84,6 @@ You can treat your snapshot files as an output deliverable of your code, and use
 
 <NavHeading text="lensable" popout="/py/facets" />
 
-## NOT READY YET - WIP
-
 A problem with the snapshots we've shown so far is that they are one dimensional. What about headers and cookies? What about the content the user actually sees, without all the markup? What if we could do this?
 
 ```
@@ -116,7 +112,7 @@ def test_order_flow():
     .facet("md").to_be("Thanks for your business!")
 ```
 
-Selfie's faceting is built around [Camera](https://kdoc.selfie.dev/selfie-lib/com.diffplug.selfie/-camera/), [Lens](https://kdoc.selfie.dev/selfie-lib/com.diffplug.selfie/-lens/), and [Snapshot](https://kdoc.selfie.dev/selfie-lib/com.diffplug.selfie/-snapshot/), whose API is roughly:
+Selfie's faceting is built around [Camera, Lens](https://pydoc.selfie.dev/Lens_8py_source), and [Snapshot](https://pydoc.selfie.dev/classselfie__lib_1_1Snapshot_1_1Snapshot/), whose API is roughly:
 
 ```python
 class Snapshot:
@@ -134,11 +130,9 @@ class Camera(Generic [T]):
     # returns a new Camera which applies the given lens to every snapshot
 ```
 
-See the [facets section](/py/facets) for more details on how you can use Selfie for snapshot testing with Java, Kotlin, or any JVM language.
+See the [facets section](/py/facets) for more details and example code.
 
 <NavHeading text="cacheable" popout="/py/cache" />
-
-## NOT READY YET - WIP
 
 Sometimes a test has a component which is slow, expensive, or non-deterministic. In cases like this, it can be useful to save the result of a previous execution of the API call, and use that as a mock for future tests.
 

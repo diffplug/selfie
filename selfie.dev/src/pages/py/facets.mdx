@@ -11,7 +11,7 @@ Assuming you have [installed selfie](/py/get-started#installation) and glanced t
 
 ## Our toy project
 
-We'll be using the [`example-pytest-selfie`](https://github.com/diffplug/selfie/tree/main/python/example-pytest-selfie) project from the selfie GitHub repo. You can clone the code and follow along, but there's no need to. If you did clone the project, you could run `poetry run python app.py` and you'd have a little flask webapp running at `127.0.0.1:5000`.
+We'll be using the [`example-pytest-selfie`](https://github.com/diffplug/selfie/tree/main/python/example-pytest-selfie) project from the selfie GitHub repo. You can clone the code and follow along, but there's no need to. If you did clone the project, you could run `uv run python app.py` and you'd have a little flask webapp running at `127.0.0.1:5000 ` (`localhost` might not work, make sure to use `127.0.0.1`!).
 
 It has a homepage where we can login. We can go to `/email` to see the emails the server has sent and click our login link, and boom we've got some auth cookies.
 
@@ -28,7 +28,7 @@ def client():
   with app.test_client() as client:
     yield client
 
-def test_homepage(client):
+def test_homepage_v1(client):
   expect_selfie(client.get("/").data.decode()).to_be("""
 <html><body>
   <h1>Please login</h1>
@@ -52,7 +52,7 @@ from werkzeug.test import TestResponse # this is what `app.test_client().get` re
 def web_selfie(response: TestResponse) -> StringSelfie:
   return expect_selfie(response.data.decode())
 
-def test_homepage(client):
+def test_homepage_v2(client):
   web_selfie(client.get("/")).to_be("""
 <html><body>
   <h1>Please login</h1>
@@ -79,7 +79,7 @@ def web_selfie(response: TestResponse) -> StringSelfie:
 And now our snapshot has `status` at the bottom, which we can use in both literal and disk snapshots.
 
 ```python
-def test_homepage():
+def test_homepage_v2():
   expect_selfie(get("/")).toBe("""
 <html><body>
   <h1>Please login</h1>
@@ -243,7 +243,7 @@ login=user@domain.com|JclThw==;Path=/""")
 status code: 401""")
 ```
 
-We just wrote a high-level specification of a realistic login flow, and it only took TODO lines of python code — most of which were generated for us, and could be regenerated on a whim if we want to change our copywriting. The [corresponding disk snapshot TODO](https://github.com/diffplug/selfie/issues/322) gives us an exhaustive specification and description of the server's behavior.
+We just wrote a high-level specification of a realistic login flow, and it only took 24 lines of python code — most of which were generated for us, and could be regenerated on a whim if we want to change our copywriting. The [corresponding disk snapshot](https://github.com/diffplug/selfie/blob/main/python/example-pytest-selfie/tests/facets_test.ss) gives us an exhaustive specification and description of the server's behavior.
 
 Didn't think that adopting a bugfixed version of your internationalization lib would cause any changes to your website whatsever? Oops. Don't wade through failed assertions, get a diff in every failure. If you want, regenerate all the snapshots to get a full view of the problem across the whole codebase in your git client.
 

@@ -9,6 +9,7 @@ from random import Random
 
 from flask import (
     Flask,
+    abort,
     jsonify,
     make_response,
     redirect,
@@ -86,7 +87,7 @@ def auth_user():
         return None
     email, signature = login_cookie.split("|")
     if signature != sign_email(email):
-        return None
+        return abort(401)
     return {"email": email}
 
 

@@ -16,12 +16,20 @@ REDIRECTS = {
 def _web_camera(response: TestResponse) -> Snapshot:
     redirect_reason = REDIRECTS.get(response.status_code)
     if redirect_reason is not None:
-        return Snapshot.of(
+        snapshot = Snapshot.of(
             f"REDIRECT {response.status_code} {redirect_reason} to "
             + response.headers.get("Location", "<unknown>")
         )
     else:
-        return Snapshot.of(response.data.decode()).plus_facet("status", response.status)
+        snapshot = Snapshot.of(response.data.decode()).plus_facet(
+            "status", response.status
+        )
+
+    if response.headers.get("Set-Cookie"):
+        snapshot = snapshot.plus_facet(
+            "cookies", response.headers.get("Set-Cookie", "")
+        )
+    return snapshot
 
 
 def _pretty_print_html(html: str):

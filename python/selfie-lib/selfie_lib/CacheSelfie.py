@@ -171,7 +171,7 @@ class CacheSelfieBinary(Generic[T]):
             return actual
         else:
             if is_todo:
-                raise Exception("Can't call `toBeFile_TODO` in read-only mode!")
+                raise Exception("Can't call `to_be_file_TODO` in read-only mode!")
             else:
                 with open(subpath, "rb") as file:
                     serialized_data = file.read()
@@ -201,7 +201,7 @@ class CacheSelfieBinary(Generic[T]):
             return actual
         else:
             if snapshot is None:
-                raise Exception("Can't call `toBe_TODO` in read-only mode!")
+                raise Exception("Can't call `to_be_TODO` in read-only mode!")
             else:
                 decoded_data = base64.b64decode(snapshot.encode("utf-8"))
                 return self.roundtrip.parse(decoded_data)

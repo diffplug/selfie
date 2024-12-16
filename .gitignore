@@ -11,3 +11,4 @@ python/latex/
 python/selfie-lib/selfie_lib.egg-info/
 python/pytest-selfie/pytest_selfie.egg-info/
 node_modules/
+.pytest_cache/
