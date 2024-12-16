@@ -33,16 +33,22 @@ def cache_selfie(
     else:
         raise TypeError("Invalid arguments provided to cache_selfie")
 
+
 def cache_selfie_json(to_cache: Callable[..., T]) -> "CacheSelfie[T]":
     return cache_selfie(to_cache, Roundtrip.json())
 
+
 @overload
-def cache_selfie_binary(to_cache: Callable[..., bytes]) -> "CacheSelfieBinary[bytes]": ...
+def cache_selfie_binary(
+    to_cache: Callable[..., bytes],
+) -> "CacheSelfieBinary[bytes]": ...
+
 
 @overload
 def cache_selfie_binary(
     to_cache: Callable[..., T], roundtrip: Roundtrip[T, bytes]
 ) -> "CacheSelfieBinary[T]": ...
+
 
 def cache_selfie_binary(
     to_cache: Union[Callable[..., bytes], Callable[..., T]],
@@ -56,6 +62,7 @@ def cache_selfie_binary(
         return CacheSelfieBinary(deferred_disk_storage, roundtrip, to_cache)  # type: ignore
     else:
         raise TypeError("Invalid arguments provided to cache_selfie")
+
 
 class CacheSelfie(Generic[T]):
     def __init__(
