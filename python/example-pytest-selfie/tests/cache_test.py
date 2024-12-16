@@ -62,7 +62,6 @@ def test_gen_ai():
         }
     }
 }""")
-    # raise ValueError(f"KEYS={chat.keys()} TYPE={type(chat)}")
     image_url: dict = cache_selfie_json(
         lambda: openai()
         .images.generate(
