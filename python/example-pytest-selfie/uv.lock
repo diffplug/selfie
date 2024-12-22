@@ -171,7 +171,7 @@ wheels = [
 
 [[package]]
 name = "example-pytest-selfie"
-version = "0.1.0"
+version = "1.0.0.dev0"
 source = { virtual = "." }
 dependencies = [
     { name = "flask" },
@@ -663,7 +663,7 @@ wheels = [
 
 [[package]]
 name = "pytest-selfie"
-version = "0.1.0"
+version = "1.0.0"
 source = { editable = "../pytest-selfie" }
 dependencies = [
     { name = "pytest" },
@@ -725,7 +725,7 @@ wheels = [
 
 [[package]]
 name = "selfie-lib"
-version = "0.1.0"
+version = "1.0.0"
 source = { editable = "../selfie-lib" }
 
 [package.metadata]
