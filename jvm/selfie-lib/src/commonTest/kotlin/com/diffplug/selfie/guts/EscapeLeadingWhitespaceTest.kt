@@ -29,9 +29,9 @@ class EscapeLeadingWhitespaceTest {
     appropriateFor("abc\nabc") shouldBe ALWAYS
 
     // all spaces -> only tabs need escape
-    appropriateFor(" ") shouldBe ONLY_ON_TAB
+    appropriateFor(" ") shouldBe ALWAYS
     appropriateFor("  ") shouldBe ONLY_ON_TAB
-    appropriateFor(" \n ") shouldBe ONLY_ON_TAB
+    appropriateFor("  \n  ") shouldBe ONLY_ON_TAB
 
     // all tabs -> only space needs escape
     appropriateFor("\t") shouldBe ONLY_ON_SPACE
@@ -39,6 +39,18 @@ class EscapeLeadingWhitespaceTest {
     appropriateFor("\t\n\t") shouldBe ONLY_ON_SPACE
 
     // it's a mess -> everything needs escape
-    appropriateFor("\t\n ") shouldBe ALWAYS
+    appropriateFor("\t\n  ") shouldBe ALWAYS
+
+    // single spaces and tabs -> only tabs need escape
+    appropriateFor(
+        """
+/*
+${' '}* Copyright
+${' '}*/
+interface Foo {
+${'\t'}fun bar()
+}
+""") shouldBe
+        ONLY_ON_SPACE
   }
 }

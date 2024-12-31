@@ -35,7 +35,7 @@ internal enum class EscapeLeadingWhitespace {
               .lineSequence()
               .mapNotNull { line ->
                 val whitespace = line.takeWhile { it.isWhitespace() }
-                if (whitespace.isEmpty()) null
+                if (whitespace.isEmpty() || whitespace == " ") null
                 else if (whitespace.all { it == ' ' }) ' '
                 else if (whitespace.all { it == '\t' }) '\t' else MIXED
               }
