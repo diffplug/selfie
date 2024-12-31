@@ -6,6 +6,7 @@ from .CacheSelfie import cache_selfie as cache_selfie
 from .CacheSelfie import cache_selfie_binary as cache_selfie_binary
 from .CacheSelfie import cache_selfie_json as cache_selfie_json
 from .CommentTracker import CommentTracker as CommentTracker
+from .EscapeLeadingWhitespace import EscapeLeadingWhitespace as EscapeLeadingWhitespace
 from .FS import FS as FS
 from .Lens import Camera as Camera
 from .Lens import CompoundLens as CompoundLens
