@@ -34,7 +34,7 @@ class EscapeLeadingWhitespace(Enum):
 
         for line in file_content.splitlines():
             whitespace = "".join(c for c in line if c.isspace())
-            if not whitespace:
+            if whitespace == "" or whitespace == " ":
                 continue
             elif all(c == " " for c in whitespace):
                 whitespace = " "
