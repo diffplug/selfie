@@ -46,13 +46,14 @@ def test_detection():
     )
 
     # single spaces and tabs -> only tabs need escape
+    tab = "\t"
     test_string = f"""/*
  * Copyright
  */
 interface Foo [
-{'\t'} bar()
+{tab}bar()
 ]"""
     assert (
         EscapeLeadingWhitespace.appropriate_for(test_string)
-        == EscapeLeadingWhitespace.ALWAYS
+        == EscapeLeadingWhitespace.ONLY_ON_SPACE
     )
