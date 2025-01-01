@@ -33,8 +33,8 @@ class EscapeLeadingWhitespace(Enum):
         common_whitespace = None
 
         for line in file_content.splitlines():
-            whitespace = "".join(c for c in line if c.isspace())
-            if not whitespace:
+            whitespace = line[0 : len(line) - len(line.lstrip())]
+            if whitespace == "" or whitespace == " ":
                 continue
             elif all(c == " " for c in whitespace):
                 whitespace = " "

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 DiffPlug
+ * Copyright (C) 2024-2025 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,7 +35,7 @@ internal enum class EscapeLeadingWhitespace {
               .lineSequence()
               .mapNotNull { line ->
                 val whitespace = line.takeWhile { it.isWhitespace() }
-                if (whitespace.isEmpty()) null
+                if (whitespace.isEmpty() || whitespace == " ") null
                 else if (whitespace.all { it == ' ' }) ' '
                 else if (whitespace.all { it == '\t' }) '\t' else MIXED
               }
