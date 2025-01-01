@@ -2,18 +2,16 @@
 
 Changelog for the selfie Python libraries.
 
-- [`com.diffplug.selfie:selfie-lib:VERSION`](https://pypi.org/project/selfie-lib/)
-- [`com.diffplug.selfie:selfie-runner-pytest:VERSION`](https://pypi.org/project/pytest-selfie/)
-  The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-  and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+- [`selfie-lib:VERSION`](https://pypi.org/project/selfie-lib/)
+- [`pytest-selfie:VERSION`](https://pypi.org/project/pytest-selfie/)
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+Allowable headings are `Added`, `Fixed`, and `Changed`.
 
 ## [Unreleased]
-### Added
-- TODO
 ### Fixed
-- TODO
-### Changed
-- TODO
+- A single leading space (such as in the copyright header) should not override an otherwise 100% tab-indented file. ([#506](https://github.com/diffplug/selfie/issues/506))
 
 ## [1.0.0] - 2024-12-16
 
