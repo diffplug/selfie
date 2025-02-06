@@ -17,15 +17,45 @@ package com.diffplug.selfie.junit4
 
 import org.junit.runner.Description
 import org.junit.runner.notification.RunListener
+import org.junit.runner.notification.Failure
 
+/** This is automatically registered at runtime thanks to `META-INF/services`. */
 class SelfieTestListener : RunListener() {
+  private val system = SnapshotSystemJUnit4
+  private val activeTests = mutableMapOf<String, Boolean>()
+
   override fun testStarted(description: Description) {
-    TODO("Coroutine support not implemented for JUnit4")
+    try {
+      system.testListenerRunning.set(true)
+      val className = description.className
+      val testName = description.methodName
+      val key = "$className#$testName"
+      activeTests[key] = true
+      system.forClass(className).startTest(testName, false)
+    } catch (e: Throwable) {
+      system.smuggledError.set(e)
+    }
   }
+
   override fun testFinished(description: Description) {
-    TODO("Coroutine support not implemented for JUnit4")
+    try {
+      val className = description.className
+      val testName = description.methodName
+      val key = "$className#$testName"
+      val wasSuccessful = activeTests.remove(key) ?: false
+      system.forClass(className).finishedTestWithSuccess(testName, false, wasSuccessful)
+    } catch (e: Throwable) {
+      system.smuggledError.set(e)
+    }
   }
+
+  override fun testFailure(failure: Failure) {
+    val description = failure.description
+    val key = "${description.className}#${description.methodName}"
+    activeTests[key] = false
+  }
+
   override fun testRunFinished(result: org.junit.runner.Result) {
-    TODO("Coroutine support not implemented for JUnit4")
+    system.finishedAllTests()
   }
 }

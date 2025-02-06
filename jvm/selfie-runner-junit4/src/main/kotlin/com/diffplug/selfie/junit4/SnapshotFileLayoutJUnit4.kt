@@ -15,17 +15,49 @@
  */
 package com.diffplug.selfie.junit4
 
-class SnapshotFileLayoutJUnit4(className: String) {
+import com.diffplug.selfie.guts.FS
+import com.diffplug.selfie.guts.TypedPath
+import java.util.concurrent.atomic.AtomicReference
+
+class SnapshotFileLayoutJUnit4(val className: String) {
+  val smuggledError = AtomicReference<Throwable>()
+  private val extension: String = ".ss"
+
+  fun snapshotPathForClass(className: String): TypedPath {
+    val lastDot = className.lastIndexOf('.')
+    val classFolder: TypedPath
+    val filename: String
+    if (lastDot == -1) {
+      classFolder = rootFolder
+      filename = className + extension
+    } else {
+      classFolder = rootFolder.resolveFolder(className.substring(0, lastDot).replace('.', '/'))
+      filename = className.substring(lastDot + 1) + extension
+    }
+    val parentFolder = snapshotFolderName?.let { classFolder.resolveFolder(it) } ?: classFolder
+    return parentFolder.resolveFile(filename)
+  }
+
   fun incrementContainers() {
     TODO("Coroutine support not implemented for JUnit4")
   }
+
   fun startTest(testName: String, isContainer: Boolean) {
-    TODO("Coroutine support not implemented for JUnit4")
+    checkForSmuggledError()
+    // Basic test tracking without coroutine support
   }
+
   fun finishedTestWithSuccess(testName: String, isContainer: Boolean, wasSuccessful: Boolean) {
-    TODO("Coroutine support not implemented for JUnit4")
+    checkForSmuggledError()
+    // Basic test completion tracking without coroutine support
   }
-  fun decrementContainersWithSuccess(wasSuccessful: Boolean) {
-    TODO("Coroutine support not implemented for JUnit4")
+
+  private fun checkForSmuggledError() {
+    smuggledError.get()?.let { throw it }
+  }
+
+  companion object {
+    private val rootFolder = TypedPath.ofFolder(System.getProperty("user.dir"))
+    private val snapshotFolderName: String? = null
   }
 }
