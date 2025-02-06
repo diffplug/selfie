@@ -37,6 +37,7 @@ blowdryerSetup {
 // Core library
 include 'selfie-lib'
 // JUnit 4 & 5
+include 'selfie-runner-junit4'
 include 'selfie-runner-junit5'
 include 'undertest-junit5'
 include 'undertest-junit5-kotest'
