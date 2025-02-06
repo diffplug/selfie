@@ -24,9 +24,7 @@ dependencies {
 }
 test {
   useJUnit()
-  getInputs().dir('../undertest-junit5/src/test')
-  getInputs().dir('../undertest-junit-vintage/src/test')
-  getInputs().dir('../undertest-junit5-kotest/src/test')
+  getInputs().dir('../undertest-junit4/src/test')
 }
 // it all needs to get published and formatted
 apply from: 干.file('base/maven.gradle')
