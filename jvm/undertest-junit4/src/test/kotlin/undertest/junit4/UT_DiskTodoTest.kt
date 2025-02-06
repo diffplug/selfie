@@ -1,4 +1,4 @@
-package undertest.junit5
+package undertest.junit4
 
 import com.diffplug.selfie.Selfie.expectSelfie
 import kotlin.test.Test

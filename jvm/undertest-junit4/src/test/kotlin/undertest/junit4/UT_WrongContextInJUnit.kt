@@ -1,4 +1,4 @@
-package undertest.junit5
+package undertest.junit4
 
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Test

@@ -1,4 +1,4 @@
-package undertest.junit5;
+package undertest.junit4;
 
 import org.junit.jupiter.api.Test;
 import static com.diffplug.selfie.Selfie.expectSelfie;

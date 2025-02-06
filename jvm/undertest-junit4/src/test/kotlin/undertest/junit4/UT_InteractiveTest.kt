@@ -1,11 +1,11 @@
-package undertest.junit5
+package undertest.junit4
 // spotless:off
 import com.diffplug.selfie.Selfie.expectSelfie
 import kotlin.test.Test
 // spotless:on
 
-class UT_ReadOnlyTest {
+class UT_InteractiveTest {
   @Test fun example() {
-    expectSelfie(5).toBe(5) // selfieonce
+    expectSelfie(10).toBe(10)
   }
 }
