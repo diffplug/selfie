@@ -1,7 +1,7 @@
 package undertest.junit4
 
 import com.diffplug.selfie.Selfie.expectSelfie
-import org.junit.jupiter.api.Test
+import org.junit.Test
 
 class UT_DuplicateWriteToBeFileTest {
 //  @Test fun shouldFail() {

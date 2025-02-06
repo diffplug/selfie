@@ -2,8 +2,7 @@ package undertest.junit4
 
 import com.diffplug.selfie.Selfie.expectSelfie
 import com.diffplug.selfie.Snapshot
-import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertThrows
+import org.junit.Test
 
 class UT_InlineFacetTest {
   @Test fun singleFacet() {
@@ -11,9 +10,22 @@ class UT_InlineFacetTest {
     expectSelfie(zero).toBe("no facets")
     expectSelfie(zero).facet("").toBe("no facets")
     expectSelfie(zero).facets("").toBe("no facets")
-    assertThrows<Throwable> { expectSelfie(zero).toBe("WRONG") }
-    assertThrows<Throwable> { expectSelfie(zero).facet("").toBe("WRONG") }
-    assertThrows<Throwable> { expectSelfie(zero).facets("").toBe("WRONG") }
+
+    // Test expected exceptions
+    try {
+      expectSelfie(zero).toBe("WRONG")
+      throw AssertionError("Expected exception was not thrown")
+    } catch (e: Throwable) {}
+
+    try {
+      expectSelfie(zero).facet("").toBe("WRONG")
+      throw AssertionError("Expected exception was not thrown")
+    } catch (e: Throwable) {}
+
+    try {
+      expectSelfie(zero).facets("").toBe("WRONG")
+      throw AssertionError("Expected exception was not thrown")
+    } catch (e: Throwable) {}
 
     val one = Snapshot.of("subject").plusFacet("facet", "facetValue")
     expectSelfie(one).facet("").toBe("subject")
@@ -21,10 +33,25 @@ class UT_InlineFacetTest {
     expectSelfie(one).facet("facet").toBe("facetValue")
     expectSelfie(one).facets("facet").toBe("facetValue")
 
-    assertThrows<Throwable> { expectSelfie(one).facet("").toBe("WRONG") }
-    assertThrows<Throwable> { expectSelfie(one).facets("").toBe("WRONG") }
-    assertThrows<Throwable> { expectSelfie(one).facet("facet").toBe("WRONG") }
-    assertThrows<Throwable> { expectSelfie(one).facets("facet").toBe("WRONG") }
+    try {
+      expectSelfie(one).facet("").toBe("WRONG")
+      throw AssertionError("Expected exception was not thrown")
+    } catch (e: Throwable) {}
+
+    try {
+      expectSelfie(one).facets("").toBe("WRONG")
+      throw AssertionError("Expected exception was not thrown")
+    } catch (e: Throwable) {}
+
+    try {
+      expectSelfie(one).facet("facet").toBe("WRONG")
+      throw AssertionError("Expected exception was not thrown")
+    } catch (e: Throwable) {}
+
+    try {
+      expectSelfie(one).facets("facet").toBe("WRONG")
+      throw AssertionError("Expected exception was not thrown")
+    } catch (e: Throwable) {}
   }
 
   @Test fun multipleFacets() {
@@ -45,7 +72,12 @@ class UT_InlineFacetTest {
             facetValue3
         """
                 .trimIndent())
-    assertThrows<Throwable> { expectSelfie(multiple).toBe("WRONG") }
+
+    try {
+      expectSelfie(multiple).toBe("WRONG")
+      throw AssertionError("Expected exception was not thrown")
+    } catch (e: Throwable) {}
+
     expectSelfie(multiple)
         .facets("", "facet1")
         .toBe(
@@ -55,7 +87,12 @@ class UT_InlineFacetTest {
             facetValue1
         """
                 .trimIndent())
-    assertThrows<Throwable> { expectSelfie(multiple).facets("", "facet1").toBe("WRONG") }
+
+    try {
+      expectSelfie(multiple).facets("", "facet1").toBe("WRONG")
+      throw AssertionError("Expected exception was not thrown")
+    } catch (e: Throwable) {}
+
     expectSelfie(multiple)
         .facets("facet3", "facet2")
         .toBe(
@@ -66,20 +103,28 @@ class UT_InlineFacetTest {
             facetValue2
         """
                 .trimIndent())
-    assertThrows<Throwable> { expectSelfie(multiple).facets("facet3", "facet2").toBe("WRONG") }
-    expectSelfie(
-            assertThrows<Throwable> {
-                  expectSelfie(multiple)
-                      .facets("facet1", "")
-                      .toBe(
-                          """
-                    subject
-                    ╔═ [facet1] ═╗
-                    facetValue1
-                """
-                              .trimIndent())
-                }
-                .message!!)
+
+    try {
+      expectSelfie(multiple).facets("facet3", "facet2").toBe("WRONG")
+      throw AssertionError("Expected exception was not thrown")
+    } catch (e: Throwable) {}
+
+    var exceptionMessage: String? = null
+    try {
+      expectSelfie(multiple)
+          .facets("facet1", "")
+          .toBe(
+              """
+              subject
+              ╔═ [facet1] ═╗
+              facetValue1
+          """
+                  .trimIndent())
+    } catch (e: Throwable) {
+      exceptionMessage = e.message
+    }
+
+    expectSelfie(exceptionMessage!!)
         .toBe(
             "If you're going to specify the subject facet (\"\"), you have to list it first, this was [facet1, ]")
   }

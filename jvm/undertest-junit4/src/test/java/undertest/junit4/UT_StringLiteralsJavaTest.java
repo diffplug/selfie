@@ -1,6 +1,6 @@
 package undertest.junit4;
 
-import org.junit.jupiter.api.Test;
+import org.junit.Test;
 import static com.diffplug.selfie.Selfie.expectSelfie;
 
 public class UT_StringLiteralsJavaTest {

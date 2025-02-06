@@ -1,7 +1,7 @@
 package undertest.junit4
 
 import com.diffplug.selfie.Selfie.expectSelfie
-import kotlin.test.Test
+import org.junit.Test
 
 class UT_BinaryTest {
   @Test fun emptyOnDisk() {
