@@ -10,8 +10,7 @@ class UT_InlineFacetTest {
     expectSelfie(zero).toBe("no facets")
     expectSelfie(zero).facet("").toBe("no facets")
     expectSelfie(zero).facets("").toBe("no facets")
-
-    // Test expected exceptions
+// Test expected exceptions
     try {
       expectSelfie(zero).toBe("WRONG")
       throw AssertionError("Expected exception was not thrown")

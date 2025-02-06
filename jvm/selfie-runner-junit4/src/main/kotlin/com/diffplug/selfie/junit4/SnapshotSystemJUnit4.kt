@@ -15,24 +15,21 @@
  */
 package com.diffplug.selfie.junit4
 
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
-import java.util.concurrent.ConcurrentHashMap
 
 object SnapshotSystemJUnit4 {
   val testListenerRunning = AtomicBoolean(false)
   val smuggledError = AtomicReference<Throwable>()
   private val fileLayouts = ConcurrentHashMap<String, SnapshotFileLayoutJUnit4>()
-
   fun forClass(className: String): SnapshotFileLayoutJUnit4 {
     return fileLayouts.computeIfAbsent(className) { SnapshotFileLayoutJUnit4(it) }
   }
-
   fun finishedAllTests() {
     testListenerRunning.set(false)
     fileLayouts.clear()
   }
-
   fun checkForSmuggledError() {
     smuggledError.get()?.let { throw it }
   }

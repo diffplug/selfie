@@ -16,14 +16,13 @@
 package com.diffplug.selfie.junit4
 
 import org.junit.runner.Description
-import org.junit.runner.notification.RunListener
 import org.junit.runner.notification.Failure
+import org.junit.runner.notification.RunListener
 
 /** This is automatically registered at runtime thanks to `META-INF/services`. */
 class SelfieTestListener : RunListener() {
   private val system = SnapshotSystemJUnit4
   private val activeTests = mutableMapOf<String, Boolean>()
-
   override fun testStarted(description: Description) {
     try {
       system.testListenerRunning.set(true)
@@ -36,7 +35,6 @@ class SelfieTestListener : RunListener() {
       system.smuggledError.set(e)
     }
   }
-
   override fun testFinished(description: Description) {
     try {
       val className = description.className
@@ -48,13 +46,11 @@ class SelfieTestListener : RunListener() {
       system.smuggledError.set(e)
     }
   }
-
   override fun testFailure(failure: Failure) {
     val description = failure.description
     val key = "${description.className}#${description.methodName}"
     activeTests[key] = false
   }
-
   override fun testRunFinished(result: org.junit.runner.Result) {
     system.finishedAllTests()
   }

@@ -62,7 +62,6 @@ open class SelfieSettingsAPI {
             "src/test/groovy",
             "src/test/scala",
             "src/test/resources")
-
     internal fun initialize(): SelfieSettingsAPI {
       try {
         val settings = System.getProperty("selfie.settings")
@@ -84,7 +83,6 @@ open class SelfieSettingsAPI {
         return SelfieSettingsSmuggleError(e)
       }
     }
-
     private fun instantiate(clazz: Class<*>): SelfieSettingsAPI {
       try {
         return clazz.getDeclaredConstructor().newInstance() as SelfieSettingsAPI

@@ -15,14 +15,12 @@
  */
 package com.diffplug.selfie.junit4
 
-import com.diffplug.selfie.guts.FS
 import com.diffplug.selfie.guts.TypedPath
 import java.util.concurrent.atomic.AtomicReference
 
 class SnapshotFileLayoutJUnit4(val className: String) {
   val smuggledError = AtomicReference<Throwable>()
   private val extension: String = ".ss"
-
   fun snapshotPathForClass(className: String): TypedPath {
     val lastDot = className.lastIndexOf('.')
     val classFolder: TypedPath
@@ -37,21 +35,17 @@ class SnapshotFileLayoutJUnit4(val className: String) {
     val parentFolder = snapshotFolderName?.let { classFolder.resolveFolder(it) } ?: classFolder
     return parentFolder.resolveFile(filename)
   }
-
   fun incrementContainers() {
     TODO("Coroutine support not implemented for JUnit4")
   }
-
   fun startTest(testName: String, isContainer: Boolean) {
     checkForSmuggledError()
     // Basic test tracking without coroutine support
   }
-
   fun finishedTestWithSuccess(testName: String, isContainer: Boolean, wasSuccessful: Boolean) {
     checkForSmuggledError()
     // Basic test completion tracking without coroutine support
   }
-
   private fun checkForSmuggledError() {
     smuggledError.get()?.let { throw it }
   }
