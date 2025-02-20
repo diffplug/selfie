@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024 DiffPlug
+ * Copyright (C) 2023-2025 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -88,4 +88,5 @@ object Selfie {
   @JvmStatic
   fun <T> cacheSelfieBinary(roundtrip: Roundtrip<T, ByteArray>, toCache: Cacheable<T>) =
       CacheSelfieBinary<T>(deferredDiskStorage, roundtrip, toCache)
+  @JvmStatic fun vcrTestLocator(sub: String = "") = VcrSelfie.TestLocator(sub, deferredDiskStorage)
 }
