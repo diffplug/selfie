@@ -70,33 +70,21 @@ class VcrSelfie(
       disk.writeDisk(snapshot, sub, call)
     }
   }
-  fun <K, V> next(
-      roundtripKey: Roundtrip<K, String>,
-      key: K,
-      roundtripValue: Roundtrip<V, String>,
-      value: Cacheable<V>
-  ): V {
+  fun <V> next(key: String, roundtripValue: Roundtrip<V, String>, value: Cacheable<V>): V {
     if (state.readMode) {
       val expected = state.sequence[state.count++]
-      val keyString = roundtripKey.serialize(key)
-      if (expected.first != keyString) {
+      if (expected.first != key) {
         throw Selfie.system.fs.assertFailed(
-            "vcr key mismatch at index ${state.count - 1}", expected, keyString)
+            "vcr key mismatch at index ${state.count - 1}", expected.first, key)
       }
       return roundtripValue.parse(expected.second.valueString())
     } else {
       val value = value.get()
-      state.sequence.add(
-          roundtripKey.serialize(key) to SnapshotValue.of(roundtripValue.serialize(value)))
+      state.sequence.add(key to SnapshotValue.of(roundtripValue.serialize(value)))
       return value
     }
   }
-  fun next(key: String, value: Cacheable<String>): String =
-      next(Roundtrip.identity(), key, Roundtrip.identity(), value)
-  fun <K> next(roundtripKey: Roundtrip<K, String>, key: K, value: Cacheable<String>): String =
-      next(roundtripKey, key, Roundtrip.identity(), value)
-  fun <V> next(key: String, roundtripValue: Roundtrip<V, String>, value: Cacheable<V>): V =
-      next(Roundtrip.identity(), key, roundtripValue, value)
-  inline fun <reified K, reified V> nextJson(key: K, value: Cacheable<V>): V =
-      next(RoundtripJson.of<K>(), key, RoundtripJson.of<V>(), value)
+  fun next(key: String, value: Cacheable<String>): String = next(key, Roundtrip.identity(), value)
+  inline fun <reified V> nextJson(key: String, value: Cacheable<V>): V =
+      next(key, RoundtripJson.of<V>(), value)
 }
