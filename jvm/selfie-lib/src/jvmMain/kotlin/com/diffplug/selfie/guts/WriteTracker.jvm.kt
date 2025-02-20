@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 DiffPlug
+ * Copyright (C) 2024-2025 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -55,7 +55,10 @@ actual data class CallLocation(
 /** Generates a CallLocation and the CallStack behind it. */
 internal actual fun recordCall(callerFileOnly: Boolean): CallStack =
     StackWalker.getInstance().walk { frames ->
-      val framesWithDrop = frames.dropWhile { it.className.startsWith("com.diffplug.selfie") }
+      val framesWithDrop =
+          frames.dropWhile {
+            it.className.startsWith("com.diffplug.selfie.") || it.className.startsWith("selfie.")
+          }
       if (callerFileOnly) {
         val caller =
             framesWithDrop
