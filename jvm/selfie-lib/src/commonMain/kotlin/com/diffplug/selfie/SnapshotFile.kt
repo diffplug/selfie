@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024 DiffPlug
+ * Copyright (C) 2023-2025 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -249,7 +249,7 @@ class SnapshotReader(val valueReader: SnapshotValueReader) {
     require(next.indexOf('[') == -1) {
       "Missing root snapshot, square brackets not allowed: '$next'"
     }
-    return next
+    return SnapshotValueReader.nameEsc.unescape(next)
   }
   fun nextSnapshot(): Snapshot {
     val rootName = peekKey()
@@ -267,7 +267,9 @@ class SnapshotReader(val valueReader: SnapshotValueReader) {
       val facetEndIdx = nextKey.indexOf(']', facetIdx + 1)
       require(facetEndIdx != -1) { "Missing ] in $nextKey" }
       val facetName = nextKey.substring(facetIdx + 1, facetEndIdx)
-      snapshot = snapshot.plusFacet(facetName, valueReader.nextValue())
+      snapshot =
+          snapshot.plusFacet(
+              SnapshotValueReader.nameEsc.unescape(facetName), valueReader.nextValue())
     }
   }
   fun skipSnapshot() {
@@ -357,7 +359,7 @@ class SnapshotValueReader(val lineReader: LineReader) {
     } else if (key.endsWith(" ")) {
       throw ParseException(lineReader, "Trailing spaces are disallowed: '$key'")
     } else {
-      nameEsc.unescape(key)
+      key
     }
   }
   private fun nextLine(): String? {
