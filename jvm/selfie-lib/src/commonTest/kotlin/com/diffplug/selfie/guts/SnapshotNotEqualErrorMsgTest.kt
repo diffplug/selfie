@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 DiffPlug
+ * Copyright (C) 2024-2025 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,12 +22,12 @@ class SnapshotNotEqualErrorMsgTest {
   @Test
   fun errorLine1() {
     SnapshotNotEqualErrorMsg.forUnequalStrings("Testing 123", "Testing ABC") shouldBe
-        """Snapshot mismatch at L1:C9
+        """mismatch at L1:C9
 -Testing 123
 +Testing ABC"""
 
     SnapshotNotEqualErrorMsg.forUnequalStrings("123 Testing", "ABC Testing") shouldBe
-        """Snapshot mismatch at L1:C1
+        """mismatch at L1:C1
 -123 Testing
 +ABC Testing"""
   }
@@ -35,12 +35,12 @@ class SnapshotNotEqualErrorMsgTest {
   @Test
   fun errorLine2() {
     SnapshotNotEqualErrorMsg.forUnequalStrings("Line\nTesting 123", "Line\nTesting ABC") shouldBe
-        """Snapshot mismatch at L2:C9
+        """mismatch at L2:C9
 -Testing 123
 +Testing ABC"""
 
     SnapshotNotEqualErrorMsg.forUnequalStrings("Line\n123 Testing", "Line\nABC Testing") shouldBe
-        """Snapshot mismatch at L2:C1
+        """mismatch at L2:C1
 -123 Testing
 +ABC Testing"""
   }
@@ -48,11 +48,11 @@ class SnapshotNotEqualErrorMsgTest {
   @Test
   fun extraLine1() {
     SnapshotNotEqualErrorMsg.forUnequalStrings("123", "123ABC") shouldBe
-        """Snapshot mismatch at L1:C4
+        """mismatch at L1:C4
 -123
 +123ABC"""
     SnapshotNotEqualErrorMsg.forUnequalStrings("123ABC", "123") shouldBe
-        """Snapshot mismatch at L1:C4
+        """mismatch at L1:C4
 -123ABC
 +123"""
   }
@@ -60,11 +60,11 @@ class SnapshotNotEqualErrorMsgTest {
   @Test
   fun extraLine2() {
     SnapshotNotEqualErrorMsg.forUnequalStrings("line\n123", "line\n123ABC") shouldBe
-        """Snapshot mismatch at L2:C4
+        """mismatch at L2:C4
 -123
 +123ABC"""
     SnapshotNotEqualErrorMsg.forUnequalStrings("line\n123ABC", "line\n123") shouldBe
-        """Snapshot mismatch at L2:C4
+        """mismatch at L2:C4
 -123ABC
 +123"""
   }
@@ -72,26 +72,26 @@ class SnapshotNotEqualErrorMsgTest {
   @Test
   fun extraLine() {
     SnapshotNotEqualErrorMsg.forUnequalStrings("line", "line\nnext") shouldBe
-        """Snapshot mismatch at L2:C1 - line(s) added
+        """mismatch at L2:C1 - line(s) added
 +next"""
     SnapshotNotEqualErrorMsg.forUnequalStrings("line\nnext", "line") shouldBe
-        """Snapshot mismatch at L2:C1 - line(s) removed
+        """mismatch at L2:C1 - line(s) removed
 -next"""
   }
 
   @Test
   fun extraNewline() {
     SnapshotNotEqualErrorMsg.forUnequalStrings("line", "line\n") shouldBe
-        """Snapshot mismatch at L2:C1 - line(s) added
+        """mismatch at L2:C1 - line(s) added
 +"""
     SnapshotNotEqualErrorMsg.forUnequalStrings("line\n", "line") shouldBe
-        """Snapshot mismatch at L2:C1 - line(s) removed
+        """mismatch at L2:C1 - line(s) removed
 -"""
     SnapshotNotEqualErrorMsg.forUnequalStrings("", "\n") shouldBe
-        """Snapshot mismatch at L2:C1 - line(s) added
+        """mismatch at L2:C1 - line(s) added
 +"""
     SnapshotNotEqualErrorMsg.forUnequalStrings("\n", "") shouldBe
-        """Snapshot mismatch at L2:C1 - line(s) removed
+        """mismatch at L2:C1 - line(s) removed
 -"""
   }
 }

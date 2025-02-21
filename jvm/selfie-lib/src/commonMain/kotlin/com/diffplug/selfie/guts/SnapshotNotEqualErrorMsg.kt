@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 DiffPlug
+ * Copyright (C) 2024-2025 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@ object SnapshotNotEqualErrorMsg {
             actual.indexOf('\n', index).let { if (it == -1) actual.length else it }
         val expectedLine = expected.substring(index - columnNumber + 1, endOfLineExpected)
         val actualLine = actual.substring(index - columnNumber + 1, endOfLineActual)
-        return "Snapshot mismatch at L$lineNumber:C$columnNumber\n-$expectedLine\n+$actualLine"
+        return "mismatch at L$lineNumber:C$columnNumber\n-$expectedLine\n+$actualLine"
       }
       if (expectedChar == '\n') {
         lineNumber++
@@ -53,11 +53,11 @@ object SnapshotNotEqualErrorMsg {
       val endIdx =
           longer.indexOf('\n', endOfLineActual + 1).let { if (it == -1) longer.length else it }
       val line = longer.substring(endOfLineActual + 1, endIdx)
-      return "Snapshot mismatch at L${lineNumber+1}:C1 - line(s) ${if (added == "+") "added" else "removed"}\n${added}$line"
+      return "mismatch at L${lineNumber+1}:C1 - line(s) ${if (added == "+") "added" else "removed"}\n${added}$line"
     } else {
       val expectedLine = expected.substring(index - columnNumber + 1, endOfLineExpected)
       val actualLine = actual.substring(index - columnNumber + 1, endOfLineActual)
-      return "Snapshot mismatch at L$lineNumber:C$columnNumber\n-$expectedLine\n+$actualLine"
+      return "mismatch at L$lineNumber:C$columnNumber\n-$expectedLine\n+$actualLine"
     }
   }
 }

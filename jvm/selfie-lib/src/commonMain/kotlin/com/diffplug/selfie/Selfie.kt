@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024 DiffPlug
+ * Copyright (C) 2023-2025 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -88,4 +88,20 @@ object Selfie {
   @JvmStatic
   fun <T> cacheSelfieBinary(roundtrip: Roundtrip<T, ByteArray>, toCache: Cacheable<T>) =
       CacheSelfieBinary<T>(deferredDiskStorage, roundtrip, toCache)
+
+  /**
+   * Whichever file calls this method is where Selfie will look for `//selfieonce` comments to
+   * control whether the VCR is writing or reading. If the caller lives in a package called
+   * `selfie.*` it will keep looking up the stack trace until a caller is not inside `selfie.*`.
+   */
+  @JvmStatic
+  @ExperimentalSelfieVcr
+  fun vcrTestLocator(sub: String = "") = VcrSelfie.TestLocator(sub, deferredDiskStorage)
 }
+
+@RequiresOptIn(
+    level = RequiresOptIn.Level.WARNING,
+    message = "This API is in beta and may change in the future.")
+@Retention(AnnotationRetention.BINARY)
+@Target(AnnotationTarget.CLASS, AnnotationTarget.FUNCTION, AnnotationTarget.PROPERTY)
+annotation class ExperimentalSelfieVcr

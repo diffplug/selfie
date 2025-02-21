@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024 DiffPlug
+ * Copyright (C) 2023-2025 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -44,9 +44,16 @@ enum class Mode {
   internal fun msgSnapshotNotFoundNoSuchFile(file: TypedPath) =
       msg("Snapshot not found: no such file $file")
   internal fun msgSnapshotMismatch(expected: String, actual: String) =
-      msg(SnapshotNotEqualErrorMsg.forUnequalStrings(expected, actual))
+      msg("Snapshot " + SnapshotNotEqualErrorMsg.forUnequalStrings(expected, actual))
   internal fun msgSnapshotMismatchBinary(expected: ByteArray, actual: ByteArray) =
       msgSnapshotMismatch(expected.toQuotedPrintable(), actual.toQuotedPrintable())
+  internal fun msgVcrMismatch(key: String, expected: String, actual: String) =
+      msg("VCR frame $key " + SnapshotNotEqualErrorMsg.forUnequalStrings(expected, actual))
+  internal fun msgVcrUnread(expected: Int, actual: Int) =
+      msg("VCR frames unread - only $actual were read out of $expected")
+  internal fun msgVcrUnderflow(expected: Int) =
+      msg(
+          "VCR frames exhausted - only $expected are available but you tried to read ${expected + 1}")
   private fun ByteArray.toQuotedPrintable(): String {
     val sb = StringBuilder()
     for (byte in this) {
@@ -63,7 +70,9 @@ enum class Mode {
       when (this) {
         interactive ->
             "$headline\n" +
-                "‣ update this snapshot by adding `_TODO` to the function name\n" +
+                (if (headline.startsWith("Snapshot "))
+                    "‣ update this snapshot by adding `_TODO` to the function name\n"
+                else "") +
                 "‣ update all snapshots in this file by adding `//selfieonce` or `//SELFIEWRITE`"
         readonly -> headline
         overwrite -> "$headline\n(didn't expect this to ever happen in overwrite mode)"
