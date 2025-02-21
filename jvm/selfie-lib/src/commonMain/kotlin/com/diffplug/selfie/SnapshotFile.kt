@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024 DiffPlug
+ * Copyright (C) 2023-2025 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -242,20 +242,20 @@ class SnapshotFile {
 
 class SnapshotReader(val valueReader: SnapshotValueReader) {
   fun peekKey(): String? {
-    val next = valueReader.peekKey() ?: return null
+    val next = valueReader.peekKeyRaw() ?: return null
     if (next == SnapshotFile.END_OF_FILE) {
       return null
     }
     require(next.indexOf('[') == -1) {
       "Missing root snapshot, square brackets not allowed: '$next'"
     }
-    return next
+    return SnapshotValueReader.nameEsc.unescape(next)
   }
   fun nextSnapshot(): Snapshot {
     val rootName = peekKey()
     var snapshot = Snapshot.of(valueReader.nextValue())
     while (true) {
-      val nextKey = valueReader.peekKey() ?: return snapshot
+      val nextKey = valueReader.peekKeyRaw() ?: return snapshot
       val facetIdx = nextKey.indexOf('[')
       if (facetIdx == -1 || (facetIdx == 0 && nextKey == SnapshotFile.END_OF_FILE)) {
         return snapshot
@@ -267,7 +267,9 @@ class SnapshotReader(val valueReader: SnapshotValueReader) {
       val facetEndIdx = nextKey.indexOf(']', facetIdx + 1)
       require(facetEndIdx != -1) { "Missing ] in $nextKey" }
       val facetName = nextKey.substring(facetIdx + 1, facetEndIdx)
-      snapshot = snapshot.plusFacet(facetName, valueReader.nextValue())
+      snapshot =
+          snapshot.plusFacet(
+              SnapshotValueReader.nameEsc.unescape(facetName), valueReader.nextValue())
     }
   }
   fun skipSnapshot() {
@@ -285,15 +287,15 @@ class SnapshotValueReader(val lineReader: LineReader) {
   val unixNewlines = lineReader.unixNewlines()
 
   /** The key of the next value, does not increment anything about the reader's state. */
-  fun peekKey(): String? {
-    return nextKey()
+  fun peekKeyRaw(): String? {
+    return nextKeyRaw()
   }
 
   /** Reads the next value. */
   @OptIn(ExperimentalEncodingApi::class)
   fun nextValue(): SnapshotValue {
     // validate key
-    nextKey()
+    nextKeyRaw()
     val isBase64 = nextLine()!!.contains(FLAG_BASE64)
     resetLine()
 
@@ -321,7 +323,7 @@ class SnapshotValueReader(val lineReader: LineReader) {
   /** Same as nextValue, but faster. */
   fun skipValue() {
     // Ignore key
-    nextKey()
+    nextKeyRaw()
     resetLine()
 
     scanValue {
@@ -340,7 +342,7 @@ class SnapshotValueReader(val lineReader: LineReader) {
       nextLine = nextLine()
     }
   }
-  private fun nextKey(): String? {
+  private fun nextKeyRaw(): String? {
     val line = nextLine() ?: return null
     val startIndex = line.indexOf(KEY_START)
     val endIndex = line.indexOf(KEY_END)
@@ -357,7 +359,7 @@ class SnapshotValueReader(val lineReader: LineReader) {
     } else if (key.endsWith(" ")) {
       throw ParseException(lineReader, "Trailing spaces are disallowed: '$key'")
     } else {
-      nameEsc.unescape(key)
+      key
     }
   }
   private fun nextLine(): String? {

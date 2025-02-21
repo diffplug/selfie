@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024 DiffPlug
+ * Copyright (C) 2023-2025 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -46,42 +46,42 @@ class SnapshotValueReaderTest {
             ╔═ 05_notSureHowKotlinMultilineWorks ═╗
             """
                 .trimIndent())
-    reader.peekKey() shouldBe "00_empty"
-    reader.peekKey() shouldBe "00_empty"
+    reader.peekKeyRaw() shouldBe "00_empty"
+    reader.peekKeyRaw() shouldBe "00_empty"
     reader.nextValue().valueString() shouldBe ""
-    reader.peekKey() shouldBe "01_singleLineString"
-    reader.peekKey() shouldBe "01_singleLineString"
+    reader.peekKeyRaw() shouldBe "01_singleLineString"
+    reader.peekKeyRaw() shouldBe "01_singleLineString"
     reader.nextValue().valueString() shouldBe "this is one line"
-    reader.peekKey() shouldBe "01a_singleLineLeadingSpace"
+    reader.peekKeyRaw() shouldBe "01a_singleLineLeadingSpace"
     reader.nextValue().valueString() shouldBe " the leading space is significant"
-    reader.peekKey() shouldBe "01b_singleLineTrailingSpace"
+    reader.peekKeyRaw() shouldBe "01b_singleLineTrailingSpace"
     reader.nextValue().valueString() shouldBe "the trailing space is significant "
-    reader.peekKey() shouldBe "02_multiLineStringTrimmed"
+    reader.peekKeyRaw() shouldBe "02_multiLineStringTrimmed"
     reader.nextValue().valueString() shouldBe "Line 1\nLine 2"
     // note that leading and trailing newlines in the snapshots are significant
     // this is critical so that snapshots can accurately capture the exact number of newlines
-    reader.peekKey() shouldBe "03_multiLineStringTrailingNewline"
+    reader.peekKeyRaw() shouldBe "03_multiLineStringTrailingNewline"
     reader.nextValue().valueString() shouldBe "Line 1\nLine 2\n"
-    reader.peekKey() shouldBe "04_multiLineStringLeadingNewline"
+    reader.peekKeyRaw() shouldBe "04_multiLineStringLeadingNewline"
     reader.nextValue().valueString() shouldBe "\nLine 1\nLine 2"
-    reader.peekKey() shouldBe "05_notSureHowKotlinMultilineWorks"
+    reader.peekKeyRaw() shouldBe "05_notSureHowKotlinMultilineWorks"
     reader.nextValue().valueString() shouldBe ""
   }
 
   @Test
   fun invalidNames() {
-    shouldThrow<ParseException> { SnapshotValueReader.of("╔═name ═╗").peekKey() }
+    shouldThrow<ParseException> { SnapshotValueReader.of("╔═name ═╗").peekKeyRaw() }
         .let { it.message shouldBe "L1:Expected to start with '╔═ '" }
-    shouldThrow<ParseException> { SnapshotValueReader.of("╔═ name═╗").peekKey() }
+    shouldThrow<ParseException> { SnapshotValueReader.of("╔═ name═╗").peekKeyRaw() }
         .let { it.message shouldBe "L1:Expected to contain ' ═╗'" }
-    shouldThrow<ParseException> { SnapshotValueReader.of("╔═  name ═╗").peekKey() }
+    shouldThrow<ParseException> { SnapshotValueReader.of("╔═  name ═╗").peekKeyRaw() }
         .let { it.message shouldBe "L1:Leading spaces are disallowed: ' name'" }
-    shouldThrow<ParseException> { SnapshotValueReader.of("╔═ name  ═╗").peekKey() }
+    shouldThrow<ParseException> { SnapshotValueReader.of("╔═ name  ═╗").peekKeyRaw() }
         .let { it.message shouldBe "L1:Trailing spaces are disallowed: 'name '" }
-    SnapshotValueReader.of("╔═ name ═╗ comment okay").peekKey() shouldBe "name"
-    SnapshotValueReader.of("╔═ name ═╗okay here too").peekKey() shouldBe "name"
+    SnapshotValueReader.of("╔═ name ═╗ comment okay").peekKeyRaw() shouldBe "name"
+    SnapshotValueReader.of("╔═ name ═╗okay here too").peekKeyRaw() shouldBe "name"
     SnapshotValueReader.of("╔═ name ═╗ okay  ╔═ ═╗ (it's the first ' ═╗' that counts)")
-        .peekKey() shouldBe "name"
+        .peekKeyRaw() shouldBe "name"
   }
 
   @Test
@@ -96,21 +96,15 @@ class SnapshotValueReaderTest {
             ╔═ test with \┌\─ ascii art \─\┐ in name ═╗
             """
                 .trimIndent())
-    reader.peekKey() shouldBe "test with [square brackets] in name"
+    reader.peekKeyRaw() shouldBe "test with \\(square brackets\\) in name"
     reader.nextValue().valueString() shouldBe ""
-    reader.peekKey() shouldBe """test with \backslash\ in name"""
+    reader.peekKeyRaw() shouldBe """test with \\backslash\\ in name"""
     reader.nextValue().valueString() shouldBe ""
-    reader.peekKey() shouldBe
-        """
-        test with
-        newline
-        in name
-         """
-            .trimIndent()
+    reader.peekKeyRaw() shouldBe "test with\\nnewline\\nin name"
     reader.nextValue().valueString() shouldBe ""
-    reader.peekKey() shouldBe "test with \ttab\t in name"
+    reader.peekKeyRaw() shouldBe "test with \\ttab\\t in name"
     reader.nextValue().valueString() shouldBe ""
-    reader.peekKey() shouldBe "test with ╔═ ascii art ═╗ in name"
+    reader.peekKeyRaw() shouldBe "test with \\┌\\─ ascii art \\─\\┐ in name"
     reader.nextValue().valueString() shouldBe ""
   }
 
@@ -127,11 +121,11 @@ class SnapshotValueReaderTest {
           𐝃𐝁𐝃𐝃 linear a is dead
         """
                 .trimIndent())
-    reader.peekKey() shouldBe "ascii art okay"
+    reader.peekKeyRaw() shouldBe "ascii art okay"
     reader.nextValue().valueString() shouldBe """ ╔══╗"""
-    reader.peekKey() shouldBe "escaped iff on first line"
+    reader.peekKeyRaw() shouldBe "escaped iff on first line"
     reader.nextValue().valueString() shouldBe """╔══╗"""
-    reader.peekKey() shouldBe "body escape characters"
+    reader.peekKeyRaw() shouldBe "body escape characters"
     reader.nextValue().valueString() shouldBe """𐝁𐝃 linear a is dead"""
   }
 
@@ -154,12 +148,12 @@ class SnapshotValueReaderTest {
   }
   private fun assertKeyValueWithSkip(input: String, key: String, value: String) {
     val reader = SnapshotValueReader.of(input)
-    while (reader.peekKey() != key) {
+    while (reader.peekKeyRaw() != key) {
       reader.skipValue()
     }
-    reader.peekKey() shouldBe key
+    reader.peekKeyRaw() shouldBe key
     reader.nextValue().valueString() shouldBe value
-    while (reader.peekKey() != null) {
+    while (reader.peekKeyRaw() != null) {
       reader.skipValue()
     }
   }
@@ -169,7 +163,7 @@ class SnapshotValueReaderTest {
     val reader = SnapshotValueReader.of("""╔═ Apple ═╗ base64 length 3 bytes
 c2Fk
 """)
-    reader.peekKey() shouldBe "Apple"
+    reader.peekKeyRaw() shouldBe "Apple"
     reader.nextValue().valueBinary() shouldBe "sad".encodeToByteArray()
   }
 }

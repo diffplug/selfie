@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024 DiffPlug
+ * Copyright (C) 2023-2025 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -206,7 +206,7 @@ open class HarnessKotest() : FunSpec() {
       argList.add("-c")
     }
     argList.add(
-        "${if (IS_WINDOWS) "" else "./"}gradlew :undertest-kotest:$actualTask --configuration-cache ${args.joinToString(" ")}")
+        "${if (IS_WINDOWS) "" else "./"}gradlew :undertest-kotest:$actualTask --configuration-cache --console=plain ${args.joinToString(" ")}")
     val output =
         exec(TypedPath.ofFolder(subprojectFolder.parent.toString()), *argList.toTypedArray())
     if (output.contains("BUILD SUCCESSFUL")) {

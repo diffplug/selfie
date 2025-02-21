@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024 DiffPlug
+ * Copyright (C) 2023-2025 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -90,5 +90,34 @@ class SnapshotFileTest {
             
       """
             .trimIndent()
+  }
+
+  @Test
+  fun escapingBug() {
+    val file =
+        SnapshotFile.parse(
+            SnapshotValueReader.of(
+                """
+╔═ trialStarted/stripe ═╗
+
+╔═ trialStarted/stripe[«1»{\n    "params": {\n        "line_items": "line_items=\({quantity=1, price=price_xxxx}\)"\n    },\n    "apiMode": "V1"\n}] ═╗
+{}
+╔═ [end of file] ═╗
+
+"""
+                    .trimIndent()))
+    val keys = file.snapshots.keys.toList()
+    keys.size shouldBe 1
+    keys[0] shouldBe "trialStarted/stripe"
+    val snapshot = file.snapshots.get(keys[0])!!
+
+    snapshot.facets.keys.size shouldBe 1
+    snapshot.facets.keys.first() shouldBe
+        """«1»{
+    "params": {
+        "line_items": "line_items=[{quantity=1, price=price_xxxx}]"
+    },
+    "apiMode": "V1"
+}"""
   }
 }
