@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024 DiffPlug
+ * Copyright (C) 2023-2025 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -96,21 +96,15 @@ class SnapshotValueReaderTest {
             ╔═ test with \┌\─ ascii art \─\┐ in name ═╗
             """
                 .trimIndent())
-    reader.peekKey() shouldBe "test with [square brackets] in name"
+    reader.peekKey() shouldBe "test with \\(square brackets\\) in name"
     reader.nextValue().valueString() shouldBe ""
-    reader.peekKey() shouldBe """test with \backslash\ in name"""
+    reader.peekKey() shouldBe """test with \\backslash\\ in name"""
     reader.nextValue().valueString() shouldBe ""
-    reader.peekKey() shouldBe
-        """
-        test with
-        newline
-        in name
-         """
-            .trimIndent()
+    reader.peekKey() shouldBe "test with\\nnewline\\nin name"
     reader.nextValue().valueString() shouldBe ""
-    reader.peekKey() shouldBe "test with \ttab\t in name"
+    reader.peekKey() shouldBe "test with \\ttab\\t in name"
     reader.nextValue().valueString() shouldBe ""
-    reader.peekKey() shouldBe "test with ╔═ ascii art ═╗ in name"
+    reader.peekKey() shouldBe "test with \\┌\\─ ascii art \\─\\┐ in name"
     reader.nextValue().valueString() shouldBe ""
   }
 
