@@ -87,4 +87,22 @@ class VcrSelfie(
   fun next(key: String, value: Cacheable<String>): String = next(key, Roundtrip.identity(), value)
   inline fun <reified V> nextJson(key: String, value: Cacheable<V>): V =
       next(key, RoundtripJson.of<V>(), value)
+
+  fun <V> nextBinary(key: String, roundtripValue: Roundtrip<V, ByteArray>, value: Cacheable<V>): V {
+    if (state.readMode) {
+      val expected = state.sequence[state.count++]
+      if (expected.first != key) {
+        throw Selfie.system.fs.assertFailed(
+          "vcr key mismatch at index ${state.count - 1}", expected.first, key)
+      }
+      return roundtripValue.parse(expected.second.valueBinary())
+    } else {
+      val value = value.get()
+      state.sequence.add(key to SnapshotValue.of(roundtripValue.serialize(value)))
+      return value
+    }
+  }
+
+  fun <V> nextBinary(key: String, value: Cacheable<ByteArray>): ByteArray
+    = nextBinary(key, Roundtrip.identity(), value)
 }
