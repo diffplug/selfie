@@ -91,4 +91,32 @@ class SnapshotFileTest {
       """
             .trimIndent()
   }
+
+    @Test
+    fun escapingBug() {
+        val file =
+            SnapshotFile.parse(
+                SnapshotValueReader.of(
+"""
+╔═ trialStarted/stripe ═╗
+
+╔═ trialStarted/stripe[«1»{\n    "params": {\n        "line_items": "line_items=\({quantity=1, price=price_xxxx}\)"\n    },\n    "apiMode": "V1"\n}] ═╗
+{}
+╔═ [end of file] ═╗
+
+"""
+                        .trimIndent()))
+        val keys = file.snapshots.keys.toList()
+        keys.size shouldBe 1
+        keys[0] shouldBe "trialStarted/stripe"
+        val snapshot = file.snapshots.get(keys[0])!!
+
+        snapshot.facets.keys.size shouldBe 1
+        snapshot.facets.keys.first() shouldBe """«1»{
+    "params": {
+        "line_items": "line_items=[{quantity=1, price=price_xxxx}]"
+    },
+    "apiMode": "V1"
+}"""
+    }
 }
