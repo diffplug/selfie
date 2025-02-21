@@ -242,7 +242,7 @@ class SnapshotFile {
 
 class SnapshotReader(val valueReader: SnapshotValueReader) {
   fun peekKey(): String? {
-    val next = valueReader.peekKey() ?: return null
+    val next = valueReader.peekKeyRaw() ?: return null
     if (next == SnapshotFile.END_OF_FILE) {
       return null
     }
@@ -255,7 +255,7 @@ class SnapshotReader(val valueReader: SnapshotValueReader) {
     val rootName = peekKey()
     var snapshot = Snapshot.of(valueReader.nextValue())
     while (true) {
-      val nextKey = valueReader.peekKey() ?: return snapshot
+      val nextKey = valueReader.peekKeyRaw() ?: return snapshot
       val facetIdx = nextKey.indexOf('[')
       if (facetIdx == -1 || (facetIdx == 0 && nextKey == SnapshotFile.END_OF_FILE)) {
         return snapshot
@@ -287,15 +287,15 @@ class SnapshotValueReader(val lineReader: LineReader) {
   val unixNewlines = lineReader.unixNewlines()
 
   /** The key of the next value, does not increment anything about the reader's state. */
-  fun peekKey(): String? {
-    return nextKey()
+  fun peekKeyRaw(): String? {
+    return nextKeyRaw()
   }
 
   /** Reads the next value. */
   @OptIn(ExperimentalEncodingApi::class)
   fun nextValue(): SnapshotValue {
     // validate key
-    nextKey()
+    nextKeyRaw()
     val isBase64 = nextLine()!!.contains(FLAG_BASE64)
     resetLine()
 
@@ -323,7 +323,7 @@ class SnapshotValueReader(val lineReader: LineReader) {
   /** Same as nextValue, but faster. */
   fun skipValue() {
     // Ignore key
-    nextKey()
+    nextKeyRaw()
     resetLine()
 
     scanValue {
@@ -342,7 +342,7 @@ class SnapshotValueReader(val lineReader: LineReader) {
       nextLine = nextLine()
     }
   }
-  private fun nextKey(): String? {
+  private fun nextKeyRaw(): String? {
     val line = nextLine() ?: return null
     val startIndex = line.indexOf(KEY_START)
     val endIndex = line.indexOf(KEY_END)
