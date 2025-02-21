@@ -95,7 +95,7 @@ object Selfie {
    * `selfie.*` it will keep looking up the stack trace until a caller is not inside `selfie.*`.
    */
   @JvmStatic
-  @VcrBeta
+  @ExperimentalSelfieVcr
   fun vcrTestLocator(sub: String = "") = VcrSelfie.TestLocator(sub, deferredDiskStorage)
 }
 
@@ -104,4 +104,4 @@ object Selfie {
     message = "This API is in beta and may change in the future.")
 @Retention(AnnotationRetention.BINARY)
 @Target(AnnotationTarget.CLASS, AnnotationTarget.FUNCTION, AnnotationTarget.PROPERTY)
-annotation class VcrBeta
+annotation class ExperimentalSelfieVcr
