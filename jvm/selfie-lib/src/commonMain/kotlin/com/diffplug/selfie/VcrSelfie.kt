@@ -22,7 +22,8 @@ import com.diffplug.selfie.guts.recordCall
 private const val OPEN = "«"
 private const val CLOSE = "»"
 
-class VcrSelfie(
+class VcrSelfie
+internal constructor(
     private val sub: String,
     private val call: CallStack,
     private val disk: DiskStorage,
@@ -60,7 +61,10 @@ class VcrSelfie(
   }
   override fun close() {
     if (state.readMode) {
-      check(state.count == state.sequence.size)
+      if (state.sequence.size != state.count) {
+        throw Selfie.system.fs.assertFailed(
+            Selfie.system.mode.msgVcrKeyUnread(state.sequence.size, state.count))
+      }
     } else {
       var snapshot = Snapshot.of("")
       var idx = 1
@@ -70,18 +74,24 @@ class VcrSelfie(
       disk.writeDisk(snapshot, sub, call)
     }
   }
-  private fun keyMismatch(expected: String, actual: String): Throwable =
-      Selfie.system.fs.assertFailed(
-          Selfie.system.mode.msgVcrKeyMismatch("$sub[$OPEN${state.count}$CLOSE]", expected, actual),
-          expected,
-          actual)
+  private fun nextValue(key: String): SnapshotValue {
+    val mode = Selfie.system.mode
+    val fs = Selfie.system.fs
+    if (state.sequence.size <= state.count) {
+      throw fs.assertFailed(mode.msgVcrKeyUnderflow(state.sequence.size))
+    }
+    val expected = state.sequence[state.count++]
+    if (expected.first != key) {
+      throw fs.assertFailed(
+          mode.msgVcrKeyMismatch("$sub[$OPEN${state.count}$CLOSE]", expected.first, key),
+          expected.first,
+          key)
+    }
+    return expected.second
+  }
   fun <V> next(key: String, roundtripValue: Roundtrip<V, String>, value: Cacheable<V>): V {
     if (state.readMode) {
-      val expected = state.sequence[state.count++]
-      if (expected.first != key) {
-        throw keyMismatch(expected.first, key)
-      }
-      return roundtripValue.parse(expected.second.valueString())
+      return roundtripValue.parse(nextValue(key).valueString())
     } else {
       val value = value.get()
       state.sequence.add(key to SnapshotValue.of(roundtripValue.serialize(value)))
@@ -93,11 +103,7 @@ class VcrSelfie(
       next(key, RoundtripJson.of<V>(), value)
   fun <V> nextBinary(key: String, roundtripValue: Roundtrip<V, ByteArray>, value: Cacheable<V>): V {
     if (state.readMode) {
-      val expected = state.sequence[state.count++]
-      if (expected.first != key) {
-        throw keyMismatch(expected.first, key)
-      }
-      return roundtripValue.parse(expected.second.valueBinary())
+      return roundtripValue.parse(nextValue(key).valueBinary())
     } else {
       val value = value.get()
       state.sequence.add(key to SnapshotValue.of(roundtripValue.serialize(value)))
