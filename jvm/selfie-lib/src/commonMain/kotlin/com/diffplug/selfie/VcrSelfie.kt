@@ -34,8 +34,8 @@ internal constructor(
   }
 
   private class State(val readMode: Boolean) {
-    var count = 0
-    val sequence = mutableListOf<Pair<String, SnapshotValue>>()
+    var currentFrame = 0
+    val frames = mutableListOf<Pair<String, SnapshotValue>>()
   }
   private val state: State
 
@@ -55,61 +55,66 @@ internal constructor(
         check(num == idx)
         ++idx
         val keyAfterNum = key.substring(nextClose + 1)
-        state.sequence.add(keyAfterNum to value)
+        state.frames.add(keyAfterNum to value)
       }
     }
   }
   override fun close() {
     if (state.readMode) {
-      if (state.sequence.size != state.count) {
+      if (state.frames.size != state.currentFrame) {
         throw Selfie.system.fs.assertFailed(
-            Selfie.system.mode.msgVcrKeyUnread(state.sequence.size, state.count))
+            Selfie.system.mode.msgVcrUnread(state.frames.size, state.currentFrame))
       }
     } else {
       var snapshot = Snapshot.of("")
       var idx = 1
-      for ((key, value) in state.sequence) {
+      for ((key, value) in state.frames) {
         snapshot = snapshot.plusFacet("$OPEN$idx$CLOSE$key", value)
       }
       disk.writeDisk(snapshot, sub, call)
     }
   }
-  private fun nextValue(key: String): SnapshotValue {
+  private fun nextFrameValue(key: String): SnapshotValue {
     val mode = Selfie.system.mode
     val fs = Selfie.system.fs
-    if (state.sequence.size <= state.count) {
-      throw fs.assertFailed(mode.msgVcrKeyUnderflow(state.sequence.size))
+    if (state.frames.size <= state.currentFrame) {
+      throw fs.assertFailed(mode.msgVcrUnderflow(state.frames.size))
     }
-    val expected = state.sequence[state.count++]
+    val expected = state.frames[state.currentFrame++]
     if (expected.first != key) {
       throw fs.assertFailed(
-          mode.msgVcrKeyMismatch("$sub[$OPEN${state.count}$CLOSE]", expected.first, key),
+          mode.msgVcrMismatch("$sub[$OPEN${state.currentFrame}$CLOSE]", expected.first, key),
           expected.first,
           key)
     }
     return expected.second
   }
-  fun <V> next(key: String, roundtripValue: Roundtrip<V, String>, value: Cacheable<V>): V {
+  fun <V> nextFrame(key: String, roundtripValue: Roundtrip<V, String>, value: Cacheable<V>): V {
     if (state.readMode) {
-      return roundtripValue.parse(nextValue(key).valueString())
+      return roundtripValue.parse(nextFrameValue(key).valueString())
     } else {
       val value = value.get()
-      state.sequence.add(key to SnapshotValue.of(roundtripValue.serialize(value)))
+      state.frames.add(key to SnapshotValue.of(roundtripValue.serialize(value)))
       return value
     }
   }
-  fun next(key: String, value: Cacheable<String>): String = next(key, Roundtrip.identity(), value)
-  inline fun <reified V> nextJson(key: String, value: Cacheable<V>): V =
-      next(key, RoundtripJson.of<V>(), value)
-  fun <V> nextBinary(key: String, roundtripValue: Roundtrip<V, ByteArray>, value: Cacheable<V>): V {
+  fun nextFrame(key: String, value: Cacheable<String>): String =
+      nextFrame(key, Roundtrip.identity(), value)
+  inline fun <reified V> nextFrameJson(key: String, value: Cacheable<V>): V =
+      nextFrame(key, RoundtripJson.of<V>(), value)
+  fun <V> nextFrameBinary(
+      key: String,
+      roundtripValue: Roundtrip<V, ByteArray>,
+      value: Cacheable<V>
+  ): V {
     if (state.readMode) {
-      return roundtripValue.parse(nextValue(key).valueBinary())
+      return roundtripValue.parse(nextFrameValue(key).valueBinary())
     } else {
       val value = value.get()
-      state.sequence.add(key to SnapshotValue.of(roundtripValue.serialize(value)))
+      state.frames.add(key to SnapshotValue.of(roundtripValue.serialize(value)))
       return value
     }
   }
-  fun <V> nextBinary(key: String, value: Cacheable<ByteArray>): ByteArray =
-      nextBinary(key, Roundtrip.identity(), value)
+  fun <V> nextFrameBinary(key: String, value: Cacheable<ByteArray>): ByteArray =
+      nextFrameBinary(key, Roundtrip.identity(), value)
 }

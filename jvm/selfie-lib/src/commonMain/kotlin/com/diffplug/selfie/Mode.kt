@@ -47,13 +47,13 @@ enum class Mode {
       msg("Snapshot " + SnapshotNotEqualErrorMsg.forUnequalStrings(expected, actual))
   internal fun msgSnapshotMismatchBinary(expected: ByteArray, actual: ByteArray) =
       msgSnapshotMismatch(expected.toQuotedPrintable(), actual.toQuotedPrintable())
-  internal fun msgVcrKeyMismatch(key: String, expected: String, actual: String) =
-      msg("VCR key $key " + SnapshotNotEqualErrorMsg.forUnequalStrings(expected, actual))
-  internal fun msgVcrKeyUnread(expected: Int, actual: Int) =
-      msg("VCR entries unread - only $actual were read out of $expected")
-  internal fun msgVcrKeyUnderflow(expected: Int) =
+  internal fun msgVcrMismatch(key: String, expected: String, actual: String) =
+      msg("VCR frame $key " + SnapshotNotEqualErrorMsg.forUnequalStrings(expected, actual))
+  internal fun msgVcrUnread(expected: Int, actual: Int) =
+      msg("VCR frames unread - only $actual were read out of $expected")
+  internal fun msgVcrUnderflow(expected: Int) =
       msg(
-          "VCR entries exhausted - only $expected are available but you tried to read ${expected + 1}")
+          "VCR frames exhausted - only $expected are available but you tried to read ${expected + 1}")
   private fun ByteArray.toQuotedPrintable(): String {
     val sb = StringBuilder()
     for (byte in this) {
