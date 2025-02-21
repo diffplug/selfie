@@ -70,12 +70,16 @@ class VcrSelfie(
       disk.writeDisk(snapshot, sub, call)
     }
   }
+  private fun keyMismatch(expected: String, actual: String): Throwable =
+      Selfie.system.fs.assertFailed(
+          Selfie.system.mode.msgVcrKeyMismatch("$sub[$OPEN${state.count}$CLOSE]", expected, actual),
+          expected,
+          actual)
   fun <V> next(key: String, roundtripValue: Roundtrip<V, String>, value: Cacheable<V>): V {
     if (state.readMode) {
       val expected = state.sequence[state.count++]
       if (expected.first != key) {
-        throw Selfie.system.fs.assertFailed(
-            "vcr key mismatch at index ${state.count - 1}", expected.first, key)
+        throw keyMismatch(expected.first, key)
       }
       return roundtripValue.parse(expected.second.valueString())
     } else {
@@ -87,13 +91,11 @@ class VcrSelfie(
   fun next(key: String, value: Cacheable<String>): String = next(key, Roundtrip.identity(), value)
   inline fun <reified V> nextJson(key: String, value: Cacheable<V>): V =
       next(key, RoundtripJson.of<V>(), value)
-
   fun <V> nextBinary(key: String, roundtripValue: Roundtrip<V, ByteArray>, value: Cacheable<V>): V {
     if (state.readMode) {
       val expected = state.sequence[state.count++]
       if (expected.first != key) {
-        throw Selfie.system.fs.assertFailed(
-          "vcr key mismatch at index ${state.count - 1}", expected.first, key)
+        throw keyMismatch(expected.first, key)
       }
       return roundtripValue.parse(expected.second.valueBinary())
     } else {
@@ -102,7 +104,6 @@ class VcrSelfie(
       return value
     }
   }
-
-  fun <V> nextBinary(key: String, value: Cacheable<ByteArray>): ByteArray
-    = nextBinary(key, Roundtrip.identity(), value)
+  fun <V> nextBinary(key: String, value: Cacheable<ByteArray>): ByteArray =
+      nextBinary(key, Roundtrip.identity(), value)
 }
