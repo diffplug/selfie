@@ -45,7 +45,7 @@ internal constructor(
     if (state.readMode) {
       val snapshot =
           disk.readDisk(sub, call)
-              ?: throw Selfie.system.fs.assertFailed(Selfie.system.mode.msgSnapshotNotFound())
+              ?: throw Selfie.system.fs.assertFailed(Selfie.system.mode.msgVcrSnapshotNotFound())
       var idx = 1
       for ((key, value) in snapshot.facets) {
         check(key.startsWith(OPEN))

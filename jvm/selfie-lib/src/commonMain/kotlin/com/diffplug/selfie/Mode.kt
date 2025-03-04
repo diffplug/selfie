@@ -47,6 +47,7 @@ enum class Mode {
       msg("Snapshot " + SnapshotNotEqualErrorMsg.forUnequalStrings(expected, actual))
   internal fun msgSnapshotMismatchBinary(expected: ByteArray, actual: ByteArray) =
       msgSnapshotMismatch(expected.toQuotedPrintable(), actual.toQuotedPrintable())
+  internal fun msgVcrSnapshotNotFound() = msg("VCR snapshot not found")
   internal fun msgVcrMismatch(key: String, expected: String, actual: String) =
       msg("VCR frame $key " + SnapshotNotEqualErrorMsg.forUnequalStrings(expected, actual))
   internal fun msgVcrUnread(expected: Int, actual: Int) =
