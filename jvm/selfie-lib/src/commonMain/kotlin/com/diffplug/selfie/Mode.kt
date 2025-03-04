@@ -72,9 +72,11 @@ enum class Mode {
         interactive ->
             "$headline\n" +
                 (if (headline.startsWith("Snapshot "))
-                    "‣ update this snapshot by adding `_TODO` to the function name\n"
-                else "") +
-                "‣ update all snapshots in this file by adding `//selfieonce` or `//SELFIEWRITE`"
+                    "‣ update this snapshot by adding `_TODO` to the function name\n" +
+                        "‣ update all snapshots in this file by adding `//selfieonce` or `//SELFIEWRITE`"
+                else
+                    "‣ update all snapshots in this file by adding `//selfieonce` or `//SELFIEWRITE`\n" +
+                        "‣ if that doesn't work remember to put your test rule into the `selfie` package")
         readonly -> headline
         overwrite -> "$headline\n(didn't expect this to ever happen in overwrite mode)"
       }
