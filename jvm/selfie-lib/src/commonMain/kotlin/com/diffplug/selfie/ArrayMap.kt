@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024 DiffPlug
+ * Copyright (C) 2023-2025 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,16 +23,48 @@ private val STRING_SLASHFIRST =
         val charA = a[i]
         val charB = b[i]
         if (charA != charB) {
-          return@Comparator ( // treat
-          if (charA == '/') -1 // slash as
-          else if (charB == '/') 1 // the lowest
-          else charA.compareTo(charB) // character
-          )
+          // Check for slash first as it's special
+          if (charA == '/') return@Comparator -1 // treat slash as the lowest character
+          if (charB == '/') return@Comparator 1
+
+          // Check for embedded numbers
+          if (charA.isDigit() && charB.isDigit()) {
+            // Extract the complete numbers from both strings
+            val numA = extractNumber(a, i)
+            val numB = extractNumber(b, i)
+
+            // Compare the numeric values
+            val numCompare = numA.first.compareTo(numB.first)
+            if (numCompare != 0) return@Comparator numCompare
+
+            // If the numbers are equal, adjust index to after the numbers
+            // and continue comparing the rest of the string
+            i =
+                maxOf(numA.second, numB.second) -
+                    1 // -1 because we increment i at the end of the loop
+          } else {
+            // Regular character comparison
+            return@Comparator charA.compareTo(charB)
+          }
         }
         i++
       }
       a.length.compareTo(b.length)
     }
+
+/**
+ * Extracts a numeric substring starting at the given index.
+ *
+ * @return Pair of (numeric value, index after the last digit)
+ */
+private fun extractNumber(s: String, startIndex: Int): Pair<Int, Int> {
+  var endIndex = startIndex
+  while (endIndex < s.length && s[endIndex].isDigit()) {
+    endIndex++
+  }
+  val number = s.substring(startIndex, endIndex).toInt()
+  return Pair(number, endIndex)
+}
 private val PAIR_STRING_SLASHFIRST =
     Comparator<Pair<String, Any>> { a, b -> STRING_SLASHFIRST.compare(a.first, b.first) }
 
