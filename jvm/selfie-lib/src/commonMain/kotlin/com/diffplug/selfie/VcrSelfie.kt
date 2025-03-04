@@ -28,9 +28,13 @@ private const val CLOSE = "»"
 class VcrSelfie
 internal constructor(
     private val sub: String,
+    private val call: CallStack,
     private val disk: DiskStorage,
 ) : AutoCloseable {
-  private val call: CallStack = recordCall(false)
+  class TestLocator internal constructor(private val sub: String, private val disk: DiskStorage) {
+    private val call = recordCall(false)
+    fun createVcr() = VcrSelfie(sub, call, disk)
+  }
   private val state: State
 
   internal sealed class State {

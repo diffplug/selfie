@@ -96,7 +96,7 @@ object Selfie {
    */
   @JvmStatic
   @ExperimentalSelfieVcr
-  fun vcrSelfie(sub: String = "") = VcrSelfie(sub, deferredDiskStorage)
+  fun vcrTestLocator(sub: String = "") = VcrSelfie.TestLocator(sub, deferredDiskStorage)
 }
 
 @RequiresOptIn(
