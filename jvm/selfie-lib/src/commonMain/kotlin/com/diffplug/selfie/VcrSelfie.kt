@@ -18,6 +18,7 @@ package com.diffplug.selfie
 import com.diffplug.selfie.guts.CallStack
 import com.diffplug.selfie.guts.DiskStorage
 import com.diffplug.selfie.guts.atomic
+import com.diffplug.selfie.guts.recordCall
 import com.diffplug.selfie.guts.reentrantLock
 import com.diffplug.selfie.guts.withLock
 
@@ -27,9 +28,9 @@ private const val CLOSE = "»"
 class VcrSelfie
 internal constructor(
     private val sub: String,
-    private val call: CallStack,
     private val disk: DiskStorage,
 ) : AutoCloseable {
+  private val call: CallStack = recordCall(false)
   private val state: State
 
   internal sealed class State {

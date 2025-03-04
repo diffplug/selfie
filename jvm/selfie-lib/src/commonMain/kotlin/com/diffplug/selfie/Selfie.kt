@@ -19,7 +19,6 @@ import com.diffplug.selfie.guts.CallStack
 import com.diffplug.selfie.guts.DiskStorage
 import com.diffplug.selfie.guts.SnapshotSystem
 import com.diffplug.selfie.guts.initSnapshotSystem
-import com.diffplug.selfie.guts.recordCall
 import kotlin.jvm.JvmStatic
 
 /** A getter which may or may not be run. */
@@ -97,7 +96,7 @@ object Selfie {
    */
   @JvmStatic
   @ExperimentalSelfieVcr
-  fun vcrSelfie(sub: String = "") = VcrSelfie(sub, recordCall(false), deferredDiskStorage)
+  fun vcrSelfie(sub: String = "") = VcrSelfie(sub, deferredDiskStorage)
 }
 
 @RequiresOptIn(
