@@ -65,6 +65,8 @@ internal constructor(
   init {
     val canWrite = Selfie.system.mode.canWrite(isTodo = false, call, Selfie.system)
     if (canWrite) {
+      state = State.Write()
+    } else {
       val snapshot =
           disk.readDisk(sub, call)
               ?: throw Selfie.system.fs.assertFailed(Selfie.system.mode.msgVcrSnapshotNotFound())
@@ -81,8 +83,6 @@ internal constructor(
         frames.add(keyAfterNum to value)
       }
       state = State.Read(frames)
-    } else {
-      state = State.Write()
     }
   }
   override fun close() {
