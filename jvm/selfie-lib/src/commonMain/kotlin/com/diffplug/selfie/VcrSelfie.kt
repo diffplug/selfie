@@ -17,7 +17,10 @@ package com.diffplug.selfie
 
 import com.diffplug.selfie.guts.CallStack
 import com.diffplug.selfie.guts.DiskStorage
+import com.diffplug.selfie.guts.atomic
 import com.diffplug.selfie.guts.recordCall
+import com.diffplug.selfie.guts.reentrantLock
+import com.diffplug.selfie.guts.withLock
 
 private const val OPEN = "«"
 private const val CLOSE = "»"
@@ -28,73 +31,98 @@ internal constructor(
     private val call: CallStack,
     private val disk: DiskStorage,
 ) : AutoCloseable {
+  /** Creates VCRs who store their data based on where this TestLocator was created. */
   class TestLocator internal constructor(private val sub: String, private val disk: DiskStorage) {
     private val call = recordCall(false)
     fun createVcr() = VcrSelfie(sub, call, disk)
   }
-
-  private class State(val readMode: Boolean) {
-    var currentFrame = 0
-    val frames = mutableListOf<Pair<String, SnapshotValue>>()
-  }
   private val state: State
+
+  internal sealed class State {
+    class Read(val frames: List<Pair<String, SnapshotValue>>) : State() {
+      fun currentFrameThenAdvance(): Int = cf.getAndUpdate { it + 1 }
+      fun framesReadSoFar(): Int = cf.get()
+      private val cf = atomic(0)
+    }
+
+    class Write : State() {
+      private val lock = reentrantLock()
+      private var frames: MutableList<Map.Entry<String, SnapshotValue>>? =
+          mutableListOf<Map.Entry<String, SnapshotValue>>()
+      fun add(key: String, value: SnapshotValue) {
+        lock.withLock {
+          frames?.apply {
+            val idx = size + 1
+            add(entry("$OPEN$idx$CLOSE$key", value))
+          } ?: throw IllegalStateException("This VCR was already closed.")
+        }
+      }
+      fun closeAndGetSnapshot(): Snapshot =
+          Snapshot.ofEntries(
+              lock.withLock {
+                val frozen = frames ?: throw IllegalStateException("This VCR was already closed.")
+                frames = null
+                frozen
+              })
+    }
+  }
 
   init {
     val canWrite = Selfie.system.mode.canWrite(isTodo = false, call, Selfie.system)
-    state = State(readMode = !canWrite)
-    if (state.readMode) {
+    if (canWrite) {
+      state = State.Write()
+    } else {
       val snapshot =
           disk.readDisk(sub, call)
-              ?: throw Selfie.system.fs.assertFailed(Selfie.system.mode.msgSnapshotNotFound())
+              ?: throw Selfie.system.fs.assertFailed(
+                  Selfie.system.mode.msgVcrSnapshotNotFound(call))
       var idx = 1
+      val frames = mutableListOf<Pair<String, SnapshotValue>>()
       for ((key, value) in snapshot.facets) {
         check(key.startsWith(OPEN))
         val nextClose = key.indexOf(CLOSE)
         check(nextClose != -1)
         val num = key.substring(OPEN.length, nextClose).toInt()
-        check(num == idx)
+        check(num == idx) { "expected $idx in $key" }
         ++idx
         val keyAfterNum = key.substring(nextClose + 1)
-        state.frames.add(keyAfterNum to value)
+        frames.add(keyAfterNum to value)
       }
+      state = State.Read(frames)
     }
   }
   override fun close() {
-    if (state.readMode) {
-      if (state.frames.size != state.currentFrame) {
+    if (state is State.Read) {
+      if (state.frames.size != state.framesReadSoFar()) {
         throw Selfie.system.fs.assertFailed(
-            Selfie.system.mode.msgVcrUnread(state.frames.size, state.currentFrame))
+            Selfie.system.mode.msgVcrUnread(state.frames.size, state.framesReadSoFar(), call))
       }
     } else {
-      var snapshot = Snapshot.of("")
-      var idx = 1
-      for ((key, value) in state.frames) {
-        snapshot = snapshot.plusFacet("$OPEN$idx$CLOSE$key", value)
-      }
-      disk.writeDisk(snapshot, sub, call)
+      disk.writeDisk((state as State.Write).closeAndGetSnapshot(), sub, call)
     }
   }
-  private fun nextFrameValue(key: String): SnapshotValue {
+  private fun nextFrameValue(state: State.Read, key: String): SnapshotValue {
     val mode = Selfie.system.mode
     val fs = Selfie.system.fs
-    if (state.frames.size <= state.currentFrame) {
-      throw fs.assertFailed(mode.msgVcrUnderflow(state.frames.size))
+    val currentFrame = state.currentFrameThenAdvance()
+    if (state.frames.size <= currentFrame) {
+      throw fs.assertFailed(mode.msgVcrUnderflow(state.frames.size, call), call)
     }
-    val expected = state.frames[state.currentFrame++]
+    val expected = state.frames[currentFrame]
     if (expected.first != key) {
       throw fs.assertFailed(
-          mode.msgVcrMismatch("$sub[$OPEN${state.currentFrame}$CLOSE]", expected.first, key),
+          mode.msgVcrMismatch("$sub[$OPEN${currentFrame}$CLOSE]", expected.first, key, call),
           expected.first,
           key)
     }
     return expected.second
   }
   fun <V> nextFrame(key: String, roundtripValue: Roundtrip<V, String>, value: Cacheable<V>): V {
-    if (state.readMode) {
-      return roundtripValue.parse(nextFrameValue(key).valueString())
+    if (state is State.Read) {
+      return roundtripValue.parse(nextFrameValue(state, key).valueString())
     } else {
       val value = value.get()
-      state.frames.add(key to SnapshotValue.of(roundtripValue.serialize(value)))
+      (state as State.Write).add(key, SnapshotValue.of(roundtripValue.serialize(value)))
       return value
     }
   }
@@ -107,11 +135,11 @@ internal constructor(
       roundtripValue: Roundtrip<V, ByteArray>,
       value: Cacheable<V>
   ): V {
-    if (state.readMode) {
-      return roundtripValue.parse(nextFrameValue(key).valueBinary())
+    if (state is State.Read) {
+      return roundtripValue.parse(nextFrameValue(state, key).valueBinary())
     } else {
       val value = value.get()
-      state.frames.add(key to SnapshotValue.of(roundtripValue.serialize(value)))
+      (state as State.Write).add(key, SnapshotValue.of(roundtripValue.serialize(value)))
       return value
     }
   }

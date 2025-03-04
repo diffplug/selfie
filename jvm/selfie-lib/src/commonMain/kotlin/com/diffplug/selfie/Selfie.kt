@@ -94,14 +94,5 @@ object Selfie {
    * control whether the VCR is writing or reading. If the caller lives in a package called
    * `selfie.*` it will keep looking up the stack trace until a caller is not inside `selfie.*`.
    */
-  @JvmStatic
-  @ExperimentalSelfieVcr
-  fun vcrTestLocator(sub: String = "") = VcrSelfie.TestLocator(sub, deferredDiskStorage)
+  @JvmStatic fun vcrTestLocator(sub: String = "") = VcrSelfie.TestLocator(sub, deferredDiskStorage)
 }
-
-@RequiresOptIn(
-    level = RequiresOptIn.Level.WARNING,
-    message = "This API is in beta and may change in the future.")
-@Retention(AnnotationRetention.BINARY)
-@Target(AnnotationTarget.CLASS, AnnotationTarget.FUNCTION, AnnotationTarget.PROPERTY)
-annotation class ExperimentalSelfieVcr

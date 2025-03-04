@@ -47,13 +47,15 @@ enum class Mode {
       msg("Snapshot " + SnapshotNotEqualErrorMsg.forUnequalStrings(expected, actual))
   internal fun msgSnapshotMismatchBinary(expected: ByteArray, actual: ByteArray) =
       msgSnapshotMismatch(expected.toQuotedPrintable(), actual.toQuotedPrintable())
-  internal fun msgVcrMismatch(key: String, expected: String, actual: String) =
-      msg("VCR frame $key " + SnapshotNotEqualErrorMsg.forUnequalStrings(expected, actual))
-  internal fun msgVcrUnread(expected: Int, actual: Int) =
-      msg("VCR frames unread - only $actual were read out of $expected")
-  internal fun msgVcrUnderflow(expected: Int) =
-      msg(
-          "VCR frames exhausted - only $expected are available but you tried to read ${expected + 1}")
+  internal fun msgVcrSnapshotNotFound(call: CallStack) = msgVcr("VCR snapshot not found", call)
+  internal fun msgVcrMismatch(key: String, expected: String, actual: String, call: CallStack) =
+      msgVcr("VCR frame $key " + SnapshotNotEqualErrorMsg.forUnequalStrings(expected, actual), call)
+  internal fun msgVcrUnread(expected: Int, actual: Int, call: CallStack) =
+      msgVcr("VCR frames unread - only $actual were read out of $expected", call)
+  internal fun msgVcrUnderflow(expected: Int, call: CallStack) =
+      msgVcr(
+          "VCR frames exhausted - only $expected are available but you tried to read ${expected + 1}",
+          call)
   private fun ByteArray.toQuotedPrintable(): String {
     val sb = StringBuilder()
     for (byte in this) {
@@ -70,10 +72,18 @@ enum class Mode {
       when (this) {
         interactive ->
             "$headline\n" +
-                (if (headline.startsWith("Snapshot "))
-                    "‣ update this snapshot by adding `_TODO` to the function name\n"
-                else "") +
+                "‣ update this snapshot by adding `_TODO` to the function name\n" +
                 "‣ update all snapshots in this file by adding `//selfieonce` or `//SELFIEWRITE`"
+        readonly -> headline
+        overwrite -> "$headline\n(didn't expect this to ever happen in overwrite mode)"
+      }
+  private fun msgVcr(headline: String, call: CallStack) =
+      when (this) {
+        interactive ->
+            "$headline\n" +
+                "‣ update all snapshots in this file by adding `//selfieonce` or `//SELFIEWRITE`\n" +
+                "‣ could not find control comment in ${call.location.ideLink(Selfie.system.layout)}\n" +
+                "‣ remember to call `Selfie.vcrTestLocator()` in the test itself, or put the file above into the `selfie` package to mark that it is not the test file"
         readonly -> headline
         overwrite -> "$headline\n(didn't expect this to ever happen in overwrite mode)"
       }

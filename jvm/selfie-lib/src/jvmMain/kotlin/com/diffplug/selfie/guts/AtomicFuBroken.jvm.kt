@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 DiffPlug
+ * Copyright (C) 2024-2025 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ actual class AtomicRef<T>(value: T) {
   actual fun updateAndGet(update: (T) -> T): T = ref.updateAndGet(update)
   actual fun getAndUpdate(update: (T) -> T) = ref.getAndUpdate(update)
 }
-actual inline fun reentrantLock() = ReentrantLock()
+actual fun reentrantLock() = ReentrantLock()
 
 actual typealias ReentrantLock = java.util.concurrent.locks.ReentrantLock
 actual inline fun <T> ReentrantLock.withLock(block: () -> T): T {

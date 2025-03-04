@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 DiffPlug
+ * Copyright (C) 2024-2025 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,12 +24,8 @@ expect class AtomicRef<T> {
 /** Replace with atomicfu when stable. */
 expect fun <T> atomic(initial: T): AtomicRef<T>
 
-expect fun reentrantLock(): ReentrantLock
+expect class ReentrantLock
 
-expect class ReentrantLock {
-  fun lock(): Unit
-  fun tryLock(): Boolean
-  fun unlock(): Unit
-}
+expect fun reentrantLock(): ReentrantLock
 
 expect inline fun <T> ReentrantLock.withLock(block: () -> T): T
