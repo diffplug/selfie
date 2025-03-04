@@ -11,6 +11,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- Selfie VCR is now out of beta, no opt-in required. ([#525](https://github.com/diffplug/selfie/pull/525))
+  - ArrayMap now sorts strings with multi-digit numbers as `1 2 ... 9 10 11` instead of `1 11 2 ...`.
+  - Improved VCR-specific error messages for determining why `//selfieonce` might not be working for a test rule.
+  - Fixed some bugs in VCR data storage (specifically concurrency and multiple frames).
 
 ## [2.5.0] - 2025-02-21
 ### Added
