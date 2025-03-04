@@ -33,20 +33,37 @@ internal constructor(
     fun createVcr() = VcrSelfie(sub, call, disk)
   }
 
-  private class State(val readMode: Boolean) {
-    var currentFrame = 0
-    val frames = mutableListOf<Pair<String, SnapshotValue>>()
+  internal sealed class State {
+    class Read(val frames: List<Pair<String, SnapshotValue>>) : State() {
+      var currentFrame = 0
+    }
+
+    class Write : State() {
+      private val frames = mutableListOf<Pair<String, SnapshotValue>>()
+      fun add(key: String, value: SnapshotValue) {
+        frames.add(key to value)
+      }
+      fun toSnapshot(): Snapshot {
+        var snapshot = Snapshot.of("")
+        var idx = 1
+        for ((key, value) in frames) {
+          snapshot = snapshot.plusFacet("$OPEN$idx$CLOSE$key", value)
+          ++idx
+        }
+        return snapshot
+      }
+    }
   }
   private val state: State
 
   init {
     val canWrite = Selfie.system.mode.canWrite(isTodo = false, call, Selfie.system)
-    state = State(readMode = !canWrite)
-    if (state.readMode) {
+    if (canWrite) {
       val snapshot =
           disk.readDisk(sub, call)
               ?: throw Selfie.system.fs.assertFailed(Selfie.system.mode.msgVcrSnapshotNotFound())
       var idx = 1
+      val frames = mutableListOf<Pair<String, SnapshotValue>>()
       for ((key, value) in snapshot.facets) {
         check(key.startsWith(OPEN))
         val nextClose = key.indexOf(CLOSE)
@@ -55,27 +72,24 @@ internal constructor(
         check(num == idx) { "expected $idx in $key" }
         ++idx
         val keyAfterNum = key.substring(nextClose + 1)
-        state.frames.add(keyAfterNum to value)
+        frames.add(keyAfterNum to value)
       }
+      state = State.Read(frames)
+    } else {
+      state = State.Write()
     }
   }
   override fun close() {
-    if (state.readMode) {
+    if (state is State.Read) {
       if (state.frames.size != state.currentFrame) {
         throw Selfie.system.fs.assertFailed(
             Selfie.system.mode.msgVcrUnread(state.frames.size, state.currentFrame))
       }
     } else {
-      var snapshot = Snapshot.of("")
-      var idx = 1
-      for ((key, value) in state.frames) {
-        snapshot = snapshot.plusFacet("$OPEN$idx$CLOSE$key", value)
-        ++idx
-      }
-      disk.writeDisk(snapshot, sub, call)
+      disk.writeDisk((state as State.Write).toSnapshot(), sub, call)
     }
   }
-  private fun nextFrameValue(key: String): SnapshotValue {
+  private fun nextFrameValue(state: State.Read, key: String): SnapshotValue {
     val mode = Selfie.system.mode
     val fs = Selfie.system.fs
     if (state.frames.size <= state.currentFrame) {
@@ -91,11 +105,11 @@ internal constructor(
     return expected.second
   }
   fun <V> nextFrame(key: String, roundtripValue: Roundtrip<V, String>, value: Cacheable<V>): V {
-    if (state.readMode) {
-      return roundtripValue.parse(nextFrameValue(key).valueString())
+    if (state is State.Read) {
+      return roundtripValue.parse(nextFrameValue(state, key).valueString())
     } else {
       val value = value.get()
-      state.frames.add(key to SnapshotValue.of(roundtripValue.serialize(value)))
+      (state as State.Write).add(key, SnapshotValue.of(roundtripValue.serialize(value)))
       return value
     }
   }
@@ -108,11 +122,11 @@ internal constructor(
       roundtripValue: Roundtrip<V, ByteArray>,
       value: Cacheable<V>
   ): V {
-    if (state.readMode) {
-      return roundtripValue.parse(nextFrameValue(key).valueBinary())
+    if (state is State.Read) {
+      return roundtripValue.parse(nextFrameValue(state, key).valueBinary())
     } else {
       val value = value.get()
-      state.frames.add(key to SnapshotValue.of(roundtripValue.serialize(value)))
+      (state as State.Write).add(key, SnapshotValue.of(roundtripValue.serialize(value)))
       return value
     }
   }
