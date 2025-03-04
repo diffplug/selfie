@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 DiffPlug
+ * Copyright (C) 2024-2025 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,12 +29,7 @@ actual class AtomicRef<T>(private var value: T) {
   }
 }
 val Lock = ReentrantLock()
-actual inline fun reentrantLock() = Lock
+actual fun reentrantLock() = Lock
 
-@Suppress("NOTHING_TO_INLINE")
-actual class ReentrantLock {
-  actual inline fun lock(): Unit {}
-  actual inline fun tryLock() = true
-  actual inline fun unlock(): Unit {}
-}
+@Suppress("NOTHING_TO_INLINE") actual class ReentrantLock
 actual inline fun <T> ReentrantLock.withLock(block: () -> T) = block()
