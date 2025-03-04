@@ -17,7 +17,10 @@ package com.diffplug.selfie
 
 import com.diffplug.selfie.guts.CallStack
 import com.diffplug.selfie.guts.DiskStorage
+import com.diffplug.selfie.guts.atomic
 import com.diffplug.selfie.guts.recordCall
+import com.diffplug.selfie.guts.reentrantLock
+import com.diffplug.selfie.guts.withLock
 
 private const val OPEN = "«"
 private const val CLOSE = "»"
@@ -32,29 +35,34 @@ internal constructor(
     private val call = recordCall(false)
     fun createVcr() = VcrSelfie(sub, call, disk)
   }
+  private val state: State
 
   internal sealed class State {
     class Read(val frames: List<Pair<String, SnapshotValue>>) : State() {
-      var currentFrame = 0
+      fun currentFrameThenAdvance(): Int = cf.getAndUpdate { it + 1 }
+      fun framesReadSoFar(): Int = cf.get()
+      private val cf = atomic(0)
     }
 
     class Write : State() {
-      private val frames = mutableListOf<Pair<String, SnapshotValue>>()
+      private val lock = reentrantLock()
+      private var frames: MutableList<Map.Entry<String, SnapshotValue>>? =
+          mutableListOf<Map.Entry<String, SnapshotValue>>()
       fun add(key: String, value: SnapshotValue) {
-        frames.add(key to value)
-      }
-      fun toSnapshot(): Snapshot {
-        var snapshot = Snapshot.of("")
-        var idx = 1
-        for ((key, value) in frames) {
-          snapshot = snapshot.plusFacet("$OPEN$idx$CLOSE$key", value)
-          ++idx
+        lock.withLock {
+          frames?.add(entry(key, value))
+              ?: throw IllegalStateException("This VCR was already closed.")
         }
-        return snapshot
       }
+      fun closeAndGetSnapshot(): Snapshot =
+          Snapshot.ofEntries(
+              lock.withLock {
+                val frozen = frames ?: throw IllegalStateException("This VCR was already closed.")
+                frames = null
+                frozen
+              })
     }
   }
-  private val state: State
 
   init {
     val canWrite = Selfie.system.mode.canWrite(isTodo = false, call, Selfie.system)
@@ -81,24 +89,25 @@ internal constructor(
   }
   override fun close() {
     if (state is State.Read) {
-      if (state.frames.size != state.currentFrame) {
+      if (state.frames.size != state.framesReadSoFar()) {
         throw Selfie.system.fs.assertFailed(
-            Selfie.system.mode.msgVcrUnread(state.frames.size, state.currentFrame))
+            Selfie.system.mode.msgVcrUnread(state.frames.size, state.framesReadSoFar()))
       }
     } else {
-      disk.writeDisk((state as State.Write).toSnapshot(), sub, call)
+      disk.writeDisk((state as State.Write).closeAndGetSnapshot(), sub, call)
     }
   }
   private fun nextFrameValue(state: State.Read, key: String): SnapshotValue {
     val mode = Selfie.system.mode
     val fs = Selfie.system.fs
-    if (state.frames.size <= state.currentFrame) {
+    val currentFrame = state.currentFrameThenAdvance()
+    if (state.frames.size <= currentFrame) {
       throw fs.assertFailed(mode.msgVcrUnderflow(state.frames.size))
     }
-    val expected = state.frames[state.currentFrame++]
+    val expected = state.frames[currentFrame]
     if (expected.first != key) {
       throw fs.assertFailed(
-          mode.msgVcrMismatch("$sub[$OPEN${state.currentFrame}$CLOSE]", expected.first, key),
+          mode.msgVcrMismatch("$sub[$OPEN${currentFrame}$CLOSE]", expected.first, key),
           expected.first,
           key)
     }
