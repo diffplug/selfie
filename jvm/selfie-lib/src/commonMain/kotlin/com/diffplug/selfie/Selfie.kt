@@ -97,10 +97,6 @@ object Selfie {
    */
   @JvmStatic
   @ExperimentalSelfieVcr
-  fun vcrTestLocator(sub: String = "") = VcrSelfie.TestLocator(sub, deferredDiskStorage)
-
-  @JvmStatic
-  @ExperimentalSelfieVcr
   fun vcrSelfie(sub: String = "") = VcrSelfie(sub, recordCall(false), deferredDiskStorage)
 }
 

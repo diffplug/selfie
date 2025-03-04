@@ -18,7 +18,6 @@ package com.diffplug.selfie
 import com.diffplug.selfie.guts.CallStack
 import com.diffplug.selfie.guts.DiskStorage
 import com.diffplug.selfie.guts.atomic
-import com.diffplug.selfie.guts.recordCall
 import com.diffplug.selfie.guts.reentrantLock
 import com.diffplug.selfie.guts.withLock
 
@@ -31,10 +30,6 @@ internal constructor(
     private val call: CallStack,
     private val disk: DiskStorage,
 ) : AutoCloseable {
-  class TestLocator internal constructor(private val sub: String, private val disk: DiskStorage) {
-    private val call = recordCall(false)
-    fun createVcr() = VcrSelfie(sub, call, disk)
-  }
   private val state: State
 
   internal sealed class State {
