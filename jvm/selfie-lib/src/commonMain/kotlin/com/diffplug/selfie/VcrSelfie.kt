@@ -46,8 +46,10 @@ internal constructor(
           mutableListOf<Map.Entry<String, SnapshotValue>>()
       fun add(key: String, value: SnapshotValue) {
         lock.withLock {
-          frames?.add(entry(key, value))
-              ?: throw IllegalStateException("This VCR was already closed.")
+          frames?.apply {
+            val idx = size + 1
+            add(entry("$OPEN$idx$CLOSE$key", value))
+          } ?: throw IllegalStateException("This VCR was already closed.")
         }
       }
       fun closeAndGetSnapshot(): Snapshot =
