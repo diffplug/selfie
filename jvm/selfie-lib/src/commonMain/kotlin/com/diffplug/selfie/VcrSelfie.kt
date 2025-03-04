@@ -31,6 +31,7 @@ internal constructor(
     private val call: CallStack,
     private val disk: DiskStorage,
 ) : AutoCloseable {
+  /** Creates VCRs who store their data based on where this TestLocator was created. */
   class TestLocator internal constructor(private val sub: String, private val disk: DiskStorage) {
     private val call = recordCall(false)
     fun createVcr() = VcrSelfie(sub, call, disk)
@@ -73,7 +74,8 @@ internal constructor(
     } else {
       val snapshot =
           disk.readDisk(sub, call)
-              ?: throw Selfie.system.fs.assertFailed(Selfie.system.mode.msgVcrSnapshotNotFound())
+              ?: throw Selfie.system.fs.assertFailed(
+                  Selfie.system.mode.msgVcrSnapshotNotFound(call))
       var idx = 1
       val frames = mutableListOf<Pair<String, SnapshotValue>>()
       for ((key, value) in snapshot.facets) {
@@ -93,7 +95,7 @@ internal constructor(
     if (state is State.Read) {
       if (state.frames.size != state.framesReadSoFar()) {
         throw Selfie.system.fs.assertFailed(
-            Selfie.system.mode.msgVcrUnread(state.frames.size, state.framesReadSoFar()))
+            Selfie.system.mode.msgVcrUnread(state.frames.size, state.framesReadSoFar(), call))
       }
     } else {
       disk.writeDisk((state as State.Write).closeAndGetSnapshot(), sub, call)
@@ -104,12 +106,12 @@ internal constructor(
     val fs = Selfie.system.fs
     val currentFrame = state.currentFrameThenAdvance()
     if (state.frames.size <= currentFrame) {
-      throw fs.assertFailed(mode.msgVcrUnderflow(state.frames.size))
+      throw fs.assertFailed(mode.msgVcrUnderflow(state.frames.size, call), call)
     }
     val expected = state.frames[currentFrame]
     if (expected.first != key) {
       throw fs.assertFailed(
-          mode.msgVcrMismatch("$sub[$OPEN${currentFrame}$CLOSE]", expected.first, key),
+          mode.msgVcrMismatch("$sub[$OPEN${currentFrame}$CLOSE]", expected.first, key, call),
           expected.first,
           key)
     }
