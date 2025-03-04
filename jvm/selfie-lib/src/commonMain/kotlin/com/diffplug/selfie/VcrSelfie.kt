@@ -52,7 +52,7 @@ internal constructor(
         val nextClose = key.indexOf(CLOSE)
         check(nextClose != -1)
         val num = key.substring(OPEN.length, nextClose).toInt()
-        check(num == idx)
+        check(num == idx) { "expected $idx in $key" }
         ++idx
         val keyAfterNum = key.substring(nextClose + 1)
         state.frames.add(keyAfterNum to value)
@@ -70,6 +70,7 @@ internal constructor(
       var idx = 1
       for ((key, value) in state.frames) {
         snapshot = snapshot.plusFacet("$OPEN$idx$CLOSE$key", value)
+        ++idx
       }
       disk.writeDisk(snapshot, sub, call)
     }
