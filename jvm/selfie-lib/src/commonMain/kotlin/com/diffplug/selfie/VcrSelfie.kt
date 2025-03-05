@@ -111,7 +111,7 @@ internal constructor(
     val expected = state.frames[currentFrame]
     if (expected.first != key) {
       throw fs.assertFailed(
-          mode.msgVcrMismatch("$sub[$OPEN${currentFrame}$CLOSE]", expected.first, key, call),
+          mode.msgVcrMismatch("$sub[$OPEN${currentFrame+1}$CLOSE]", expected.first, key, call),
           expected.first,
           key)
     }
