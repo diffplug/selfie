@@ -212,7 +212,7 @@ class StringSelfie(
  * Returns a serialized form of only the given facets if they are available, silently omits missing
  * facets.
  */
-private fun serializeOnlyFacets(snapshot: Snapshot, keys: Collection<String>): String {
+internal fun serializeOnlyFacets(snapshot: Snapshot, keys: Collection<String>): String {
   val writer = StringBuilder()
   for (key in keys) {
     if (key.isEmpty()) {
