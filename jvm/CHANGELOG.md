@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Fixed
 - Off-by-one in the error message for a VCR key mismatch. ([#526](https://github.com/diffplug/selfie/pull/526))
+- Fix `StringIndexOutOfBoundsException` when an empty snapshot had a facet added. (fixes [#529](https://github.com/diffplug/selfie/issues/529))
 
 ## [2.5.1] - 2025-03-04
 ### Fixed
