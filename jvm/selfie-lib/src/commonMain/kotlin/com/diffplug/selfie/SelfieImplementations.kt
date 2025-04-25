@@ -226,7 +226,10 @@ internal fun serializeOnlyFacets(snapshot: Snapshot, keys: Collection<String>): 
     // this codepath is triggered by the `key.isEmpty()` line above
     writer.subSequence(EMPTY_KEY_AND_FACET.length, writer.length - 1).toString()
   } else {
-    writer.setLength(writer.length - 1)
+    // Check if the writer is empty to avoid StringIndexOutOfBoundsException
+    if (writer.length > 0) {
+      writer.setLength(writer.length - 1)
+    }
     writer.toString()
   }
 }
@@ -249,7 +252,7 @@ private fun <T : Any> toBeDidntMatch(expected: T?, actual: T, format: LiteralFor
     }
   }
 }
-internal fun assertEqual(expected: Snapshot?, actual: Snapshot, storage: SnapshotSystem) {
+private fun assertEqual(expected: Snapshot?, actual: Snapshot, storage: SnapshotSystem) {
   when (expected) {
     null -> throw storage.fs.assertFailed(storage.mode.msgSnapshotNotFound())
     actual -> return
