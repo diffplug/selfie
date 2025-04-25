@@ -15,7 +15,6 @@
  */
 package com.diffplug.selfie
 
-import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import kotlin.test.Test
 
@@ -24,10 +23,8 @@ class SelfieImplementationsTest {
   fun issue_529() {
     val empty = Snapshot.of("")
     val emptyPlusFacet = Snapshot.of("").plusFacet("new-facet", "new-facet-value")
-    val exception =
-        shouldThrow<StringIndexOutOfBoundsException> {
-          serializeOnlyFacets(empty, listOf("new-facet"))
-        }
-    exception.message shouldBe "String index out of range: -1"
+    val mismathedKeys = listOf("new-facet")
+    serializeOnlyFacets(empty, mismathedKeys) shouldBe ""
+    serializeOnlyFacets(emptyPlusFacet, mismathedKeys) shouldBe "╔═ [new-facet] ═╗\nnew-facet-value"
   }
 }
