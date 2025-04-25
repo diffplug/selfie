@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 DiffPlug
+ * Copyright (C) 2024-2025 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -249,7 +249,7 @@ private fun <T : Any> toBeDidntMatch(expected: T?, actual: T, format: LiteralFor
     }
   }
 }
-private fun assertEqual(expected: Snapshot?, actual: Snapshot, storage: SnapshotSystem) {
+internal fun assertEqual(expected: Snapshot?, actual: Snapshot, storage: SnapshotSystem) {
   when (expected) {
     null -> throw storage.fs.assertFailed(storage.mode.msgSnapshotNotFound())
     actual -> return
