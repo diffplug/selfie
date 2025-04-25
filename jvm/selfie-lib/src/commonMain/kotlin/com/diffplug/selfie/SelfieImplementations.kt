@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 DiffPlug
+ * Copyright (C) 2024-2025 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -212,7 +212,7 @@ class StringSelfie(
  * Returns a serialized form of only the given facets if they are available, silently omits missing
  * facets.
  */
-private fun serializeOnlyFacets(snapshot: Snapshot, keys: Collection<String>): String {
+internal fun serializeOnlyFacets(snapshot: Snapshot, keys: Collection<String>): String {
   val writer = StringBuilder()
   for (key in keys) {
     if (key.isEmpty()) {
@@ -226,7 +226,10 @@ private fun serializeOnlyFacets(snapshot: Snapshot, keys: Collection<String>): S
     // this codepath is triggered by the `key.isEmpty()` line above
     writer.subSequence(EMPTY_KEY_AND_FACET.length, writer.length - 1).toString()
   } else {
-    writer.setLength(writer.length - 1)
+    // Check if the writer is empty to avoid StringIndexOutOfBoundsException
+    if (writer.length > 0) {
+      writer.setLength(writer.length - 1)
+    }
     writer.toString()
   }
 }
