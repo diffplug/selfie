@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024 DiffPlug
+ * Copyright (C) 2023-2025 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -171,5 +171,42 @@ class ArrayMapTest {
   fun wasBroken() {
     val map = ArrayMap.of(0.rangeTo(8).map { it to it.toString() }.toMutableList())
     map.minusSortedIndices(listOf(0, 2, 3, 6, 7, 8)).toString() shouldBe "{1=1, 4=4, 5=5}"
+  }
+}
+
+class ArraySetTest() {
+  @Test
+  fun empty() {
+    val empty = ArraySet.empty<String>()
+    assertEmpty(empty)
+  }
+
+  @Test
+  fun addition() {
+    var mySet = ArraySet.empty<String>()
+    assertEmpty(mySet)
+
+    mySet = mySet.plusOrThis("one")
+    assertSingle(mySet, "one")
+    mySet = mySet.plusOrThis("one")
+    assertSingle(mySet, "one")
+    mySet = mySet.plusOrThis("two")
+    assertDouble(mySet, "one", "two")
+  }
+  private fun assertEmpty(map: ArraySet<String>) {
+    map.size shouldBe 0
+  }
+  private fun assertSingle(map: ArraySet<String>, key: String) {
+    map.size shouldBe 1
+    map.contains(key) shouldBe true
+  }
+  private fun assertDouble(
+      map: ArraySet<String>,
+      key1: String,
+      key2: String,
+  ) {
+    map.size shouldBe 2
+    map.contains(key1) shouldBe true
+    map.contains(key2) shouldBe true
   }
 }

@@ -287,10 +287,12 @@ class ArraySet<K : Comparable<K>>(private val data: Array<Any>) : ListBackedSet<
       else -> {
         // TODO: use idxInsert and arrayCopy to do this faster, see ArrayMap#insert
         val array = Array(size + 1) { if (it < size) data[it] else key }
+
         if (key is String) {
           array.sortWith(STRING_SLASHFIRST as Comparator<Any>)
         } else {
-          (array as Array<K>).sort()
+          array.sortWith(
+              Comparator { a, b -> @Suppress("UNCHECKED_CAST") (a as K).compareTo(b as K) })
         }
         ArraySet(array)
       }
