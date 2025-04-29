@@ -1,0 +1,29 @@
+if (plugins.hasPlugin('org.jetbrains.kotlin.jvm')) {
+    kotlin {
+        compileKotlin {
+            kotlinOptions {
+                jvmTarget = "$ver_JVM_TARGET"
+            }
+        }
+    }
+    tasks.named('compileJava', JavaCompile) {
+        options.release = Integer.parseInt(ver_JVM_TARGET)
+    }
+} else if (plugins.hasPlugin('org.jetbrains.kotlin.multiplatform')) {
+    kotlin {
+        jvm {
+            compilations.all {
+                kotlinOptions {
+                    jvmTarget = "$ver_JVM_TARGET"
+                }
+            }
+        }
+        targets.withType(org.jetbrains.kotlin.gradle.targets.jvm.KotlinJvmTarget) {
+            compilations.all {
+                kotlinOptions {
+                    jvmTarget = "$ver_JVM_TARGET"
+                }
+            }
+        }
+    }
+}
