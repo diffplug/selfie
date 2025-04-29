@@ -24,3 +24,8 @@ if (plugins.hasPlugin('org.jetbrains.kotlin.jvm')) {
         }
     }
 }
+
+// Set Java compilation target to match Kotlin
+tasks.withType(JavaCompile) {
+    options.release = Integer.parseInt(ver_JVM_TARGET)
+}
