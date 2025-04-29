@@ -6,6 +6,9 @@ if (plugins.hasPlugin('org.jetbrains.kotlin.jvm')) {
             }
         }
     }
+    tasks.named('compileJava', JavaCompile) {
+        options.release = Integer.parseInt(ver_JVM_TARGET)
+    }
 } else if (plugins.hasPlugin('org.jetbrains.kotlin.multiplatform')) {
     kotlin {
         jvm {
@@ -23,9 +26,4 @@ if (plugins.hasPlugin('org.jetbrains.kotlin.jvm')) {
             }
         }
     }
-}
-
-// Set Java compilation target to match Kotlin
-tasks.withType(JavaCompile) {
-    options.release = Integer.parseInt(ver_JVM_TARGET)
 }
