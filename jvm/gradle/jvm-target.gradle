@@ -5,15 +5,6 @@ if (plugins.hasPlugin('org.jetbrains.kotlin.jvm')) {
                 jvmTarget = "$ver_JVM_TARGET"
             }
         }
-        compileTestKotlin {
-            kotlinOptions {
-                jvmTarget = "$ver_JVM_TARGET"
-            }
-        }
-    }
-    java {
-        sourceCompatibility = JavaVersion.toVersion("$ver_JVM_TARGET")
-        targetCompatibility = JavaVersion.toVersion("$ver_JVM_TARGET")
     }
 } else if (plugins.hasPlugin('org.jetbrains.kotlin.multiplatform')) {
     kotlin {
