@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 DiffPlug
+ * Copyright (C) 2024-2025 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,7 +39,8 @@ class CommentTracker {
       comment.writable
     } else {
       val newComment = commentAndLine(path, layout.fs).first
-      cache.updateAndGet { it.plus(path, newComment) }
+      // may race get(), ignore if already present
+      cache.updateAndGet { it.plusOrNoOp(path, newComment) }
       newComment.writable
     }
   }
