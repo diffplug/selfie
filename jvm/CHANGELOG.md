@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Fixed
 - Restore support for JRE 11. (fixes [#528](https://github.com/diffplug/selfie/issues/528))
+- snapshots created by `junit.jupiter.api.TestFactory` are no longer garbage-collected (#534)
 
 ## [2.5.2] - 2025-04-28
 ### Fixed
