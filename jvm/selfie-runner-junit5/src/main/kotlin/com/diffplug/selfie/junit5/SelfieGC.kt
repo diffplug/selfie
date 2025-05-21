@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024 DiffPlug
+ * Copyright (C) 2023-2025 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import com.diffplug.selfie.guts.WithinTestGC
 private val testAnnotations =
     listOf(
             "org.junit.jupiter.api.Test", // junit5,
+            "org.junit.jupiter.api.TestFactory", // junit5,
             "org.junit.jupiter.params.ParameterizedTest",
             "org.junit.Test" // junit4
             )

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024 DiffPlug
+ * Copyright (C) 2023-2025 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -177,9 +177,9 @@ internal class SnapshotFileProgress(val system: SnapshotSystemJUnit5, val classN
     require(tests.get() !== TERMINATED) { "Cannot call methods on a terminated ClassProgress" }
   }
 
-  private var file: SnapshotFile? = null
+  private var file = atomic<SnapshotFile?>(null)
   private val tests = atomic(ArrayMap.empty<String, WithinTestGC>())
-  private var diskWriteTracker: DiskWriteTracker? = DiskWriteTracker()
+  private var diskWriteTracker = atomic<DiskWriteTracker?>(DiskWriteTracker())
   private val timesStarted = AtomicInteger(0)
   private val hasFailed = AtomicBoolean(false)
 
@@ -209,23 +209,24 @@ internal class SnapshotFileProgress(val system: SnapshotSystemJUnit5, val classN
   }
   private fun finishedClassWithSuccess(success: Boolean) {
     assertNotTerminated()
-    diskWriteTracker = null // don't need this anymore
+    diskWriteTracker.updateAndGet { null } // don't need this anymore
     val tests = tests.getAndUpdate { TERMINATED }
     require(tests !== TERMINATED) { "Snapshot $className already terminated!" }
+    val file = file.getAndUpdate { null }
     if (file != null) {
       val staleSnapshotIndices =
           WithinTestGC.findStaleSnapshotsWithin(
-              file!!.snapshots, tests, findTestMethodsThatDidntRun(className, tests))
-      if (staleSnapshotIndices.isNotEmpty() || file!!.wasSetAtTestTime) {
-        file!!.removeAllIndices(staleSnapshotIndices)
+              file.snapshots, tests, findTestMethodsThatDidntRun(className, tests))
+      if (staleSnapshotIndices.isNotEmpty() || file.wasSetAtTestTime) {
+        file.removeAllIndices(staleSnapshotIndices)
         val snapshotPath = system.layout.snapshotPathForClass(className)
-        if (file!!.snapshots.isEmpty()) {
+        if (file.snapshots.isEmpty()) {
           deleteFileAndParentDirIfEmpty(snapshotPath)
         } else {
           system.markPathAsWritten(system.layout.snapshotPathForClass(className))
           Files.createDirectories(snapshotPath.toPath().parent)
           Files.newBufferedWriter(snapshotPath.toPath(), StandardCharsets.UTF_8).use { writer ->
-            file!!.serialize(writer)
+            file.serialize(writer)
           }
         }
       }
@@ -239,8 +240,6 @@ internal class SnapshotFileProgress(val system: SnapshotSystemJUnit5, val classN
         deleteFileAndParentDirIfEmpty(snapshotFile)
       }
     }
-    // now that we are done, allow our contents to be GC'ed
-    file = null
   }
   // the methods below are called from the test thread for I/O on snapshots
   fun keep(test: String, suffixOrAll: String?) {
@@ -260,7 +259,7 @@ internal class SnapshotFileProgress(val system: SnapshotSystemJUnit5, val classN
   ) {
     assertNotTerminated()
     val key = "$test$suffix"
-    diskWriteTracker!!.record(key, snapshot, callStack, layout)
+    diskWriteTracker.get()!!.record(key, snapshot, callStack, layout)
     tests.get()[test]!!.keepSuffix(suffix)
     read().setAtTestTime(key, snapshot)
   }
@@ -273,17 +272,22 @@ internal class SnapshotFileProgress(val system: SnapshotSystemJUnit5, val classN
     return snapshot
   }
   private fun read(): SnapshotFile {
-    if (file == null) {
-      val snapshotPath = system.layout.snapshotPathForClass(className).toPath()
-      file =
-          if (Files.exists(snapshotPath) && Files.isRegularFile(snapshotPath)) {
-            val content = Files.readAllBytes(snapshotPath)
-            SnapshotFile.parse(SnapshotValueReader.of(content))
-          } else {
-            SnapshotFile.createEmptyWithUnixNewlines(system.layout.unixNewlines)
-          }
-    }
-    return file!!
+    val file = this.file.get()
+    if (file != null) return file
+
+    return this.file.updateAndGet { file ->
+      if (file != null) {
+        file
+      } else {
+        val snapshotPath = system.layout.snapshotPathForClass(className).toPath()
+        if (Files.exists(snapshotPath) && Files.isRegularFile(snapshotPath)) {
+          val content = Files.readAllBytes(snapshotPath)
+          SnapshotFile.parse(SnapshotValueReader.of(content))
+        } else {
+          SnapshotFile.createEmptyWithUnixNewlines(system.layout.unixNewlines)
+        }
+      }
+    }!!
   }
   fun incrementContainers() {
     assertNotTerminated()
