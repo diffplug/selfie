@@ -31,6 +31,11 @@ const subNavButtonList: SubNavButton[] = [
     hrefSubpath: "/cache",
     isPressed: (subpathName) => subpathName === "cache",
   },
+  {
+    text: "vcr",
+    hrefSubpath: "/vcr",
+    isPressed: (subpathName) => subpathName === "vcr",
+  },
 ];
 
 type SubNavigationProps = {
