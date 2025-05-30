@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024 DiffPlug
+ * Copyright (C) 2023-2025 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -88,9 +88,7 @@ class SourceFile(filename: String, content: String, val language: Language) {
     }
   }
   fun removeSelfieOnceComments() {
-    // TODO: there is a bug here due to string constants, and non-C file comments
-    contentSlice =
-        Slice(contentSlice.toString().replace("//selfieonce", "").replace("// selfieonce", ""))
+    contentSlice = Slice(RemoveSelfieOnceComment.removeSelfieComment(contentSlice.toString()))
   }
   private fun findOnLine(toFind: String, lineOneIndexed: Int): Slice {
     val lineContent = contentSlice.unixLine(lineOneIndexed)
