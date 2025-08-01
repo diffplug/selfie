@@ -30,7 +30,7 @@ plugins {
 }
 
 blowdryerSetup {
-  github 'diffplug/blowdryer-diffplug', 'tag', '8.0.2'
+  github 'diffplug/blowdryer-diffplug', 'tag', '9.0.0'
   //devLocal '../blowdryer-diffplug'
 }
 
