@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024 DiffPlug
+ * Copyright (C) 2023-2025 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,8 @@
  */
 package com.diffplug.selfie.junit5
 
+import java.util.logging.Level
+import java.util.logging.Logger
 import org.junit.platform.engine.TestExecutionResult
 import org.junit.platform.engine.support.descriptor.ClassSource
 import org.junit.platform.engine.support.descriptor.MethodSource
@@ -24,12 +26,14 @@ import org.junit.platform.launcher.TestPlan
 
 /** This is automatically registered at runtime thanks to `META-INF/services`. */
 class SelfieTestExecutionListener : TestExecutionListener {
+  private val logger: Logger = Logger.getLogger(SelfieTestExecutionListener::class.java.name)
   private val system = SnapshotSystemJUnit5
   override fun executionStarted(testIdentifier: TestIdentifier) {
     try {
       system.testListenerRunning.set(true)
       if (isRootOrKotest(testIdentifier)) return
-      val (clazz, test) = parseClassTest(testIdentifier)
+      val parsed = parseClassTest(testIdentifier) ?: return
+      val (clazz, test) = parsed
       val snapshotFile = system.forClass(clazz)
       if (test == null) {
         snapshotFile.incrementContainers()
@@ -42,7 +46,8 @@ class SelfieTestExecutionListener : TestExecutionListener {
   }
   override fun executionSkipped(testIdentifier: TestIdentifier, reason: String) {
     try {
-      val (clazz, test) = parseClassTest(testIdentifier)
+      val parsed = parseClassTest(testIdentifier) ?: return
+      val (clazz, test) = parsed
       if (test == null) {
         system.forClass(clazz).incrementContainers()
         system.forClass(clazz).decrementContainersWithSuccess(false)
@@ -59,7 +64,8 @@ class SelfieTestExecutionListener : TestExecutionListener {
   ) {
     try {
       if (isRootOrKotest(testIdentifier)) return
-      val (clazz, test) = parseClassTest(testIdentifier)
+      val parsed = parseClassTest(testIdentifier) ?: return
+      val (clazz, test) = parsed
       val isSuccess = testExecutionResult.status == TestExecutionResult.Status.SUCCESSFUL
       val snapshotFile = system.forClass(clazz)
       if (test == null) {
@@ -76,13 +82,16 @@ class SelfieTestExecutionListener : TestExecutionListener {
   }
   private fun isRootOrKotest(testIdentifier: TestIdentifier) =
       testIdentifier.parentId.isEmpty || testIdentifier.uniqueId.startsWith("[engine:kotest]")
-  private fun parseClassTest(testIdentifier: TestIdentifier): Pair<String, String?> {
+  private fun parseClassTest(testIdentifier: TestIdentifier): Pair<String, String?>? {
     return when (val source = testIdentifier.source.get()) {
       is ClassSource ->
           Pair(source.className, if (testIdentifier.isTest) testIdentifier.displayName else null)
       is MethodSource ->
           Pair(source.className, if (testIdentifier.isTest) source.methodName else null)
-      else -> throw AssertionError("Unexpected source $source")
+      else -> {
+        logger.log(Level.FINE, "Skipping unsupported source $source")
+        return null
+      }
     }
   }
 }
