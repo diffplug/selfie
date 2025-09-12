@@ -15,10 +15,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        jre: [11]
+        jre: [17]
         os: [ubuntu-latest, windows-latest]
         include:
-          - jre: 17
+          - jre: 21
             os: ubuntu-latest
     runs-on: ${{ matrix.os }}
     steps:
