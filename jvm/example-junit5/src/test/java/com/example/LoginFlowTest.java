@@ -17,7 +17,8 @@ public class LoginFlowTest {
   public void loginFlow(Jooby app) {
     expectSelfie(get("/")).toMatchDisk("1. not logged in").facet("md").toBe("Please login");
     expectSelfie(given().param("email", "user@domain.com").post("/login")).toMatchDisk("2. post login form")
-        .facet("md").toBe("""
+        .facet("md").toBe(
+            """
 Email sent!
 
 Check your email for your login link.""");
@@ -27,7 +28,8 @@ Check your email for your login link.""");
         .facet("md").toBe("Click [here](https://www.example.com/login-confirm/erjchFY=) to login.");
 
     expectSelfie(get("/login-confirm/erjchFY=")).toMatchDisk("4. open login email link")
-        .facets("", "cookies").toBe("""
+        .facets("", "cookies").toBe(
+            """
 REDIRECT 302 Found to /
 ╔═ [cookies] ═╗
 login=user@domain.com|JclThw==;Path=/""");
@@ -35,7 +37,8 @@ login=user@domain.com|JclThw==;Path=/""");
         .facet("md").toBe("Welcome back user@domain.com");
 
     expectSelfie(given().cookie("login", "user@domain.com|badsignature").get("/")).toMatchDisk("6. bad signature should fail")
-        .facets("md").toBe("""
+        .facets("md").toBe(
+            """
 Unauthorized
 
 status code: 401""");

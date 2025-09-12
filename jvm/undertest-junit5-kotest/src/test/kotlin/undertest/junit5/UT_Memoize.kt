@@ -18,7 +18,8 @@ class UT_Memoize :
       }
       test("kotlinx.serialization.Serializable") {
         cacheSelfieJson { Book("Cat in the Hat", "Dr. Seuss") }
-            .toBe("""{
+            .toBe(
+                """{
 ${' '} "title": "Cat in the Hat",
 ${' '} "author": "Dr. Seuss"
 }""")
