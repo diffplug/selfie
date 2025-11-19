@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024 DiffPlug
+ * Copyright (C) 2023-2025 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,13 +27,16 @@ class SnapshotFileLayoutJUnit5(settings: SelfieSettingsAPI, override val fs: FS)
   internal val smuggledError =
       AtomicReference<Throwable?>(
           if (settings is SelfieSettingsSmuggleError) settings.error else null)
-  override val rootFolder = TypedPath.ofFolder(settings.rootFolder.absolutePath)
-  private val otherSourceRoots = settings.otherSourceRoots
+  internal val settings = settings
+  override val rootFolder: TypedPath by lazy {
+    TypedPath.ofFolder(settings.rootFolder.absolutePath)
+  }
+  private val otherSourceRoots: List<java.io.File> by lazy { settings.otherSourceRoots }
   override val allowMultipleEquivalentWritesToOneLocation =
       settings.allowMultipleEquivalentWritesToOneLocation
   override val javaDontUseTripleQuoteLiterals = settings.javaDontUseTripleQuoteLiterals
   val snapshotFolderName = settings.snapshotFolderName
-  internal val unixNewlines = inferDefaultLineEndingIsUnix(rootFolder, fs)
+  internal val unixNewlines: Boolean by lazy { inferDefaultLineEndingIsUnix(rootFolder, fs) }
   val extension: String = ".ss"
   private val cache =
       SourcePathCache(this::computePathForCall, Runtime.getRuntime().availableProcessors() * 4)

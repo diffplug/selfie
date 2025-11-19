@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Fixed
 - Unsupported test sources (such as `FieldSource`) no longer cause the JUnit5 runner to crash. ([#550](https://github.com/diffplug/selfie/pull/550) fixes [#549](https://github.com/diffplug/selfie/issues/549))
+- Partly allow parallel Maven execution with surefire and failsafe plugins with `forkCount` greater than one by making evaluation of few properties lazy. This postpones evaluation into the forks. Still, due to internal Selfie state tracking, this needs to be run with `reuseForks` set to `false`. ([#557](https://github.com/diffplug/selfie/pull/557) partly fixes [#551](https://github.com/diffplug/selfie/issues/551))
 ### Changed
 - Bump minimum required Kotest from `5.4.0` to `5.6.0` ([#535](https://github.com/diffplug/selfie/pull/535))
   - required to fix `java.lang.NoSuchMethodError: 'long kotlin.time.Duration$Companion.milliseconds-UwyO8pc(long)'`
