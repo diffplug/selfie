@@ -13,7 +13,7 @@ dependencies {
   testImplementation "org.junit.jupiter:junit-jupiter:$ver_JUNIT_USE"
   testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
   testImplementation 'io.rest-assured:rest-assured:5.5.6'
-  testImplementation 'org.assertj:assertj-core:3.27.3'
+  testImplementation 'org.assertj:assertj-core:3.27.6'
   testImplementation project(':selfie-runner-junit5')
   testImplementation 'org.jsoup:jsoup:1.17.2'
   testImplementation 'com.vladsch.flexmark:flexmark-html2md-converter:0.64.8'
