@@ -26,7 +26,7 @@ import io.kotest.core.listeners.FinalizeSpecListener
 import io.kotest.core.source.SourceRef
 import io.kotest.core.spec.Spec
 import io.kotest.core.test.TestCase
-import io.kotest.core.test.TestResult
+import io.kotest.engine.test.TestResult
 import kotlin.jvm.JvmStatic
 import kotlin.reflect.KClass
 import kotlinx.coroutines.currentCoroutineContext
@@ -62,7 +62,7 @@ class SelfieExtension(
     val classOrFilename: String =
         when (val source = testCase.source) {
           is SourceRef.ClassSource -> source.fqn
-          is SourceRef.FileSource -> source.fileName
+          is SourceRef.ClassLineSource -> source.fqn
           is SourceRef.None -> TODO("Handle SourceRef.None")
         }
     return system.forClassOrFilename(classOrFilename)
@@ -73,7 +73,7 @@ class SelfieExtension(
       execute: suspend (TestCase) -> TestResult
   ): TestResult {
     val file = snapshotFileFor(testCase)
-    val testName = testCase.name.testName
+    val testName = testCase.name.name
     val coroutineLocal = CoroutineDiskStorage(DiskStorageKotest(file, testName))
     return withContext(currentCoroutineContext() + coroutineLocal) {
       file.startTest(testName)
@@ -89,8 +89,8 @@ class SelfieExtension(
     val file = results.keys.map { snapshotFileFor(it) }.firstOrNull() ?: return
     results.entries.forEach {
       if (it.value.isIgnored) {
-        file.startTest(it.key.name.testName)
-        file.finishedTestWithSuccess(it.key.name.testName, false)
+        file.startTest(it.key.name.name)
+        file.finishedTestWithSuccess(it.key.name.name, false)
       }
     }
     file.finishedClassWithSuccess(results.entries.all { it.value.isSuccess })

@@ -18,13 +18,13 @@ package com.diffplug.selfie.kotest
 import com.diffplug.selfie.guts.FS
 import com.diffplug.selfie.guts.TypedPath
 import io.kotest.assertions.Actual
-import io.kotest.assertions.Exceptions
+import io.kotest.assertions.AssertionErrorBuilder
 import io.kotest.assertions.Expected
 import io.kotest.assertions.print.Printed
 import okio.FileSystem
 import okio.Path.Companion.toPath
 
-expect internal val FS_SYSTEM: FileSystem
+internal expect val FS_SYSTEM: FileSystem
 internal fun TypedPath.toPath(): okio.Path = absolutePath.toPath()
 
 internal object FSOkio : FS {
@@ -42,7 +42,7 @@ internal object FSOkio : FS {
       FS_SYSTEM.write(typedPath.toPath()) { write(content) }
   /** Creates an assertion failed exception to throw. */
   override fun assertFailed(message: String, expected: Any?, actual: Any?): Throwable =
-      if (expected == null && actual == null) Exceptions.createAssertionError(message, null)
+      if (expected == null && actual == null) AssertionErrorBuilder.create().withMessage(message).build()
       else {
         val expectedStr = nullableToString(expected, "")
         val actualStr = nullableToString(actual, "")
@@ -56,9 +56,11 @@ internal object FSOkio : FS {
         }
       }
   private fun nullableToString(any: Any?, onNull: String): String =
-      any?.let { it.toString() } ?: onNull
+      any?.toString() ?: onNull
   private fun comparisonAssertion(message: String, expected: String, actual: String): Throwable {
-    return Exceptions.createAssertionError(
-        message, null, Expected(Printed((expected))), Actual(Printed((actual))))
+    return AssertionErrorBuilder.create()
+      .withMessage(message)
+      .withValues(Expected(Printed((expected))), Actual(Printed((actual))))
+      .build()
   }
 }
