@@ -1,0 +1,31 @@
+plugins {
+  id 'org.jetbrains.kotlin.jvm'
+}
+repositories {
+  mavenCentral()
+}
+ext {
+  maven_name = 'selfie-runner-junit4'
+  maven_desc = 'JUnit 4 test runner for Selfie'
+}
+
+apply from: 干.file('base/changelog.gradle')
+apply from: rootProject.file('gradle/spotless.gradle')
+apply plugin: 'java-library'
+dependencies {
+  api project(':selfie-lib')
+  implementation 'junit:junit:4.13.2'
+  compileOnly "io.kotest:kotest-framework-engine:$ver_KOTEST"
+
+  testImplementation "com.squareup.okio:okio:$ver_OKIO"
+  testImplementation "org.jetbrains.kotlin:kotlin-test-junit:$ver_KOTLIN_TEST"
+  testImplementation "io.kotest:kotest-assertions-core:$ver_KOTEST"
+  testImplementation gradleTestKit()
+}
+test {
+  useJUnit()
+  getInputs().dir('../undertest-junit4/src/test')
+}
+// it all needs to get published and formatted
+apply from: 干.file('base/maven.gradle')
+apply from: 干.file('base/sonatype.gradle')
