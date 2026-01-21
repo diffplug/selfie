@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 DiffPlug
+ * Copyright (C) 2024-2026 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,6 +30,7 @@ internal fun TypedPath.toPath(): okio.Path = absolutePath.toPath()
 internal object FSOkio : FS {
   override fun fileExists(typedPath: TypedPath): Boolean =
       FS_SYSTEM.metadataOrNull(typedPath.toPath())?.isRegularFile ?: false
+
   /** Walks the files (not directories) which are children and grandchildren of the given path. */
   override fun <T> fileWalk(typedPath: TypedPath, walk: (Sequence<TypedPath>) -> T): T =
       walk(
@@ -40,9 +41,11 @@ internal object FSOkio : FS {
       FS_SYSTEM.read(typedPath.toPath()) { readByteArray() }
   override fun fileWriteBinary(typedPath: TypedPath, content: ByteArray): Unit =
       FS_SYSTEM.write(typedPath.toPath()) { write(content) }
+
   /** Creates an assertion failed exception to throw. */
   override fun assertFailed(message: String, expected: Any?, actual: Any?): Throwable =
-      if (expected == null && actual == null) AssertionErrorBuilder.create().withMessage(message).build()
+      if (expected == null && actual == null)
+          AssertionErrorBuilder.create().withMessage(message).build()
       else {
         val expectedStr = nullableToString(expected, "")
         val actualStr = nullableToString(actual, "")
@@ -55,12 +58,11 @@ internal object FSOkio : FS {
           comparisonAssertion(message, expectedStr, actualStr)
         }
       }
-  private fun nullableToString(any: Any?, onNull: String): String =
-      any?.toString() ?: onNull
+  private fun nullableToString(any: Any?, onNull: String): String = any?.toString() ?: onNull
   private fun comparisonAssertion(message: String, expected: String, actual: String): Throwable {
     return AssertionErrorBuilder.create()
-      .withMessage(message)
-      .withValues(Expected(Printed((expected))), Actual(Printed((actual))))
-      .build()
+        .withMessage(message)
+        .withValues(Expected(Printed((expected))), Actual(Printed((actual))))
+        .build()
   }
 }

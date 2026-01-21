@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 DiffPlug
+ * Copyright (C) 2024-2026 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -67,6 +67,7 @@ class SelfieExtension(
         }
     return system.forClassOrFilename(classOrFilename)
   }
+
   /** Called for every test method. */
   override suspend fun intercept(
       testCase: TestCase,
