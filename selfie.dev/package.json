@@ -37,7 +37,7 @@
     "zustand": "^4.3.2"
   },
   "devDependencies": {
-    "@types/node": "20.14.9",
+    "@types/node": "20.19.30",
     "prettier": "^3.0.0",
     "prettier-plugin-tailwindcss": "^0.6.0",
     "typescript": "5.5.2"
