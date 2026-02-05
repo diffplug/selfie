@@ -39,4 +39,5 @@ test {
   // defaults to 'write'
   systemProperty 'selfie', findProperty('selfie')
   systemProperty 'selfie.settings', findProperty('selfie.settings')
+  systemProperty 'kotest.framework.config.fqn', 'undertest.junit5.JunitKotestProjectConfig'
 }

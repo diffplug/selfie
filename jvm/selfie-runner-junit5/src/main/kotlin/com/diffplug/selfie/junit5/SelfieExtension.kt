@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 DiffPlug
+ * Copyright (C) 2024-2026 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ import io.kotest.core.listeners.BeforeSpecListener
 import io.kotest.core.listeners.FinalizeSpecListener
 import io.kotest.core.spec.Spec
 import io.kotest.core.test.TestCase
-import io.kotest.core.test.TestResult
+import io.kotest.engine.test.TestResult
 import kotlin.reflect.KClass
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.withContext
@@ -43,11 +43,11 @@ class SelfieExtension(projectConfig: AbstractProjectConfig) :
       execute: suspend (TestCase) -> TestResult
   ): TestResult {
     val file = SnapshotSystemJUnit5.forClass(testCase.spec::class.java.name)
-    val coroutineLocal = CoroutineDiskStorage(DiskStorageJUnit5(file, testCase.name.testName))
+    val coroutineLocal = CoroutineDiskStorage(DiskStorageJUnit5(file, testCase.name.name))
     return withContext(currentCoroutineContext() + coroutineLocal) {
-      file.startTest(testCase.name.testName, false)
+      file.startTest(testCase.name.name, false)
       val result = execute(testCase)
-      file.finishedTestWithSuccess(testCase.name.testName, false, result.isSuccess)
+      file.finishedTestWithSuccess(testCase.name.name, false, result.isSuccess)
       result
     }
   }
@@ -58,8 +58,8 @@ class SelfieExtension(projectConfig: AbstractProjectConfig) :
     val file = SnapshotSystemJUnit5.forClass(kclass.java.name)
     results.entries.forEach {
       if (it.value.isIgnored) {
-        file.startTest(it.key.name.testName, false)
-        file.finishedTestWithSuccess(it.key.name.testName, false, false)
+        file.startTest(it.key.name.name, false)
+        file.finishedTestWithSuccess(it.key.name.name, false, false)
       }
     }
     SnapshotSystemJUnit5.forClass(kclass.java.name)
