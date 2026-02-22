@@ -90,8 +90,9 @@ class SelfieExtension(
     val file = results.keys.map { snapshotFileFor(it) }.firstOrNull() ?: return
     results.entries.forEach {
       if (it.value.isIgnored) {
-        file.startTest(it.key.name.name)
-        file.finishedTestWithSuccess(it.key.name.name, false)
+        val name = it.key.name.name
+        file.startTest(name)
+        file.finishedTestWithSuccess(name, false)
       }
     }
     file.finishedClassWithSuccess(results.entries.all { it.value.isSuccess })
