@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2025 DiffPlug
+ * Copyright (C) 2023-2026 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -177,13 +177,13 @@ open class HarnessKotest() : FunSpec() {
       fun content() = lines.subList(startInclusive, endInclusive + 1).joinToString("\n")
       fun setContent(mustBe: String) {
         FS_SYSTEM.write(subprojectFolder.resolve(subpath)) {
-          for (i in 0 ..< startInclusive) {
+          for (i in 0..<startInclusive) {
             writeUtf8(lines[i])
             writeUtf8("\n")
           }
           writeUtf8(mustBe)
           writeUtf8("\n")
-          for (i in endInclusive + 1 ..< lines.size) {
+          for (i in endInclusive + 1..<lines.size) {
             writeUtf8(lines[i])
             writeUtf8("\n")
           }
@@ -223,7 +223,25 @@ open class HarnessKotest() : FunSpec() {
       return FS_SYSTEM.read(pathStr.toPath()) { AssertionError(readUtf8()) }
     }
   }
-  private fun testName() = "UT_${thisClassName()}"
+  private fun testName(): String {
+    val simpleClassName = "UT_${thisClassName()}"
+    val matches =
+        FS_SYSTEM.listRecursively(subprojectFolder)
+            .filter { it.name == "$simpleClassName.kt" && !it.toString().contains("build") }
+            .toList()
+    if (matches.size == 1) {
+      FS_SYSTEM.read(matches[0]) {
+        while (!exhausted()) {
+          val line = readUtf8Line() ?: break
+          if (line.startsWith("package ")) {
+            val pkg = line.removePrefix("package ").trim()
+            return "$pkg.$simpleClassName"
+          }
+        }
+      }
+    }
+    return simpleClassName
+  }
   fun gradleWriteSS() {
     gradlew("test", "-PunderTest=true", "-Pselfie=overwrite", "--tests", testName())?.let {
       throw AssertionError("Expected write snapshots to succeed, but it failed", it)
