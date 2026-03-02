@@ -11,6 +11,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- **BREAKING** Bumped Kotest from `5.x` to `6.x`. If you need Kotest `5.x` compatibility, stick with `2.5.5`. ([#559](https://github.com/diffplug/selfie/pull/559))
+  - This breaking change only affects Kotest users.
+  - As part of the Kotest `6.x` migration, your `AbstractProjectConfig` must either have the fully qualified name of `io.kotest.provided.ProjectConfig` or the system property `kotest.framework.config.fqn` must be set. See [Kotest docs](https://kotest.io/docs/framework/project-config.html) for more info.
+  - The breaking changes are only within `selfie-runner-kotest`. So if you are stuck on Kotest `5.x` but want some feature or bugfix only available in a `3.x` version of Selfie, you can probably get it by grabbing the latest Selfie but using `2.5.5` for the `selfie-runner-kotest` artifact. But in the long-term, we recommend using the latest supported version of all dependencies.
 
 ## [2.5.5] - 2025-11-22
 ### Fixed
