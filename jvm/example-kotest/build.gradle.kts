@@ -17,6 +17,7 @@ dependencies {
 }
 tasks.test {
   useJUnitPlatform()
+  systemProperty("kotest.framework.config.fqn", "com.example.kotest.KotestConfig")
   environment(properties.filter { it.key == "selfie" || it.key == "OPENAI_API_KEY" })
   inputs.files(fileTree("src/test") {
     include("**/*.ss")

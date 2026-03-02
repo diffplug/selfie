@@ -1,6 +1,7 @@
 plugins {
   id 'org.jetbrains.kotlin.multiplatform'
   id 'com.diffplug.spotless'
+  id 'io.kotest'
 }
 repositories {
   mavenCentral()
@@ -46,6 +47,7 @@ tasks.named('jvmTest').configure {
   testLogging.showStandardStreams = true
   // the snapshots are both output and input, for this harness best if the test just always runs
   outputs.upToDateWhen { false }
+  systemProperty "kotest.framework.config.fqn", "kotest.KotestProjectConfig"
   // defaults to 'write'
   String SELFIE = findProperty('selfie')
   if (SELFIE != null) {

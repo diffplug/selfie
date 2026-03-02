@@ -40,6 +40,9 @@ class ProjectConfig : AbstractProjectConfig() {
 }
 ```
 
+Note that your `AbstractProjectConfig` must either have the fully qualified name of `io.kotest.provided.ProjectConfig` or the system property `kotest.framework.config.fqn` must be set.
+See [Kotest docs](https://kotest.io/docs/framework/project-config.html) for more info.
+
 ## Selfie and coroutines
 
 In a regular JUnit 5 test, you call `Selfie.expectSelfie(...)`, like so
