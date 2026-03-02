@@ -11,6 +11,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [3.0.0] - 2026-03-02
 ### Changed
 - **BREAKING** Bumped Kotest from `5.x` to `6.x`. If you need Kotest `5.x` compatibility, stick with `2.5.5`. ([#559](https://github.com/diffplug/selfie/pull/559))
   - This breaking change only affects Kotest users.
