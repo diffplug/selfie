@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024 DiffPlug
+ * Copyright (C) 2023-2026 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -108,6 +108,31 @@ open class SelfieSettingsAPI {
    */
   open val javaDontUseTripleQuoteLiterals: Boolean
     get() = false
+
+  /**
+   * The fully-qualified class names of annotations that mark a method as a test method. Selfie uses
+   * this list to determine which snapshots are stale.
+   *
+   * Override this property to add custom test annotations or replace the defaults entirely. The
+   * default list includes JUnit 5 and JUnit 4 test annotations.
+   */
+  open val testAnnotations: List<String>
+    get() =
+        listOf(
+            "org.junit.jupiter.api.Test",
+            "org.junit.jupiter.api.TestFactory",
+            "org.junit.jupiter.params.ParameterizedTest",
+            "org.junit.Test")
+
+  /**
+   * The fully-qualified class names of superclasses whose subclasses are considered test classes.
+   * Selfie uses this list to determine which snapshot files are stale.
+   *
+   * Override this property to add custom test superclasses or replace the defaults entirely. The
+   * default list includes Kotest's `Spec`.
+   */
+  open val testSuperclasses: List<String>
+    get() = listOf("io.kotest.core.spec.Spec")
 
   internal companion object {
     private val STANDARD_DIRS =
