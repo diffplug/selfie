@@ -11,6 +11,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [3.1.0] - 2026-05-09
 ### Added
 - `SelfieSettingsAPI` now has overridable `testAnnotations` and `testSuperclasses` properties which allow users with custom composed annotations or Spec-like base classes to register them. ([#573](https://github.com/diffplug/selfie/pull/573))
 
