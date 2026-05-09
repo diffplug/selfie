@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2025 DiffPlug
+ * Copyright (C) 2023-2026 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -45,6 +45,7 @@ internal object FSJava : FS {
   override fun fileWriteBinary(typedPath: TypedPath, content: ByteArray) =
       typedPath.toPath().writeBytes(content)
   override fun fileReadBinary(typedPath: TypedPath) = typedPath.toPath().readBytes()
+
   /** Walks the files (not directories) which are children and grandchildren of the given path. */
   override fun <T> fileWalk(typedPath: TypedPath, walk: (Sequence<TypedPath>) -> T): T =
       Files.walk(typedPath.toPath()).use { paths ->
@@ -192,6 +193,7 @@ internal class SnapshotFileProgress(val system: SnapshotSystemJUnit5, val classN
       system.startThreadLocal(this, test)
     }
   }
+
   /**
    * Stops assigning this thread to store snapshots within this file at `test`, and if successful
    * marks that all other snapshots of this test can be pruned. A single test can be run multiple
@@ -216,7 +218,7 @@ internal class SnapshotFileProgress(val system: SnapshotSystemJUnit5, val classN
     if (file != null) {
       val staleSnapshotIndices =
           WithinTestGC.findStaleSnapshotsWithin(
-              file.snapshots, tests, findTestMethodsThatDidntRun(className, tests))
+              file.snapshots, tests, findTestMethodsThatDidntRun(className, tests, system.layout))
       if (staleSnapshotIndices.isNotEmpty() || file.wasSetAtTestTime) {
         file.removeAllIndices(staleSnapshotIndices)
         val snapshotPath = system.layout.snapshotPathForClass(className)
@@ -232,7 +234,7 @@ internal class SnapshotFileProgress(val system: SnapshotSystemJUnit5, val classN
       }
     } else {
       // we never read or wrote to the file
-      val everyTestInClassRan = findTestMethodsThatDidntRun(className, tests).none()
+      val everyTestInClassRan = findTestMethodsThatDidntRun(className, tests, system.layout).none()
       val isStale =
           everyTestInClassRan && success && tests.values.all { it.succeededAndUsedNoSnapshots() }
       if (isStale) {
@@ -241,6 +243,7 @@ internal class SnapshotFileProgress(val system: SnapshotSystemJUnit5, val classN
       }
     }
   }
+
   // the methods below are called from the test thread for I/O on snapshots
   fun keep(test: String, suffixOrAll: String?) {
     assertNotTerminated()

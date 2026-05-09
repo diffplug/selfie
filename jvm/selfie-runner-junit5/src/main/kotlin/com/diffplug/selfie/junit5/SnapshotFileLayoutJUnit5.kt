@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2025 DiffPlug
+ * Copyright (C) 2023-2026 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,6 +28,24 @@ class SnapshotFileLayoutJUnit5(settings: SelfieSettingsAPI, override val fs: FS)
       AtomicReference<Throwable?>(
           if (settings is SelfieSettingsSmuggleError) settings.error else null)
   internal val settings = settings
+  internal val resolvedTestAnnotations: List<Class<out Annotation>> by lazy {
+    settings.testAnnotations.mapNotNull {
+      try {
+        Class.forName(it).asSubclass(Annotation::class.java)
+      } catch (e: ClassNotFoundException) {
+        null
+      }
+    }
+  }
+  internal val resolvedTestSuperclasses: List<Class<*>> by lazy {
+    settings.testSuperclasses.mapNotNull {
+      try {
+        Class.forName(it)
+      } catch (e: ClassNotFoundException) {
+        null
+      }
+    }
+  }
   override val rootFolder: TypedPath by lazy {
     TypedPath.ofFolder(settings.rootFolder.absolutePath)
   }
