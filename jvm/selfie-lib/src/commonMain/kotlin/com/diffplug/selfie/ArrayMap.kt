@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2025 DiffPlug
+ * Copyright (C) 2023-2026 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,7 +34,7 @@ private val STRING_SLASHFIRST =
             val numB = extractNumber(b, i)
 
             // Compare the numeric values
-            val numCompare = numA.first.compareTo(numB.first)
+            val numCompare = compareDigitStrings(numA.first, numB.first)
             if (numCompare != 0) return@Comparator numCompare
 
             // If the numbers are equal, adjust index to after the numbers
@@ -55,15 +55,23 @@ private val STRING_SLASHFIRST =
 /**
  * Extracts a numeric substring starting at the given index.
  *
- * @return Pair of (numeric value, index after the last digit)
+ * @return Pair of (numeric substring, index after the last digit)
  */
-private fun extractNumber(s: String, startIndex: Int): Pair<Int, Int> {
+private fun extractNumber(s: String, startIndex: Int): Pair<String, Int> {
   var endIndex = startIndex
   while (endIndex < s.length && s[endIndex].isDigit()) {
     endIndex++
   }
-  val number = s.substring(startIndex, endIndex).toInt()
+  val number = s.substring(startIndex, endIndex)
   return Pair(number, endIndex)
+}
+
+/** Compares two digit-only strings numerically without parsing to a numeric type. */
+private fun compareDigitStrings(a: String, b: String): Int {
+  val aStripped = a.trimStart('0').ifEmpty { "0" }
+  val bStripped = b.trimStart('0').ifEmpty { "0" }
+  if (aStripped.length != bStripped.length) return aStripped.length.compareTo(bStripped.length)
+  return aStripped.compareTo(bStripped)
 }
 private val PAIR_STRING_SLASHFIRST =
     Comparator<Pair<String, Any>> { a, b -> STRING_SLASHFIRST.compare(a.first, b.first) }
@@ -138,6 +146,7 @@ class ArrayMap<K : Comparable<K>, V : Any>(private val data: Array<Any>) : Map<K
     }
     return next
   }
+
   /**
    * Returns a new ArrayMap which has added the given key, or the current map if the key was already
    * in the map.
@@ -150,6 +159,7 @@ class ArrayMap<K : Comparable<K>, V : Any>(private val data: Array<Any>) : Map<K
       insert(idxInsert, key, value)
     }
   }
+
   /**
    * Returns an ArrayMap which has added or overwritten the given key/value. If the map already
    * contained that mapping (equal keys and values) then it returns the identically same map.
@@ -184,6 +194,7 @@ class ArrayMap<K : Comparable<K>, V : Any>(private val data: Array<Any>) : Map<K
               })
     }
   }
+
   /** list-backed set of guaranteed-sorted keys at even indices. */
   private val dataAsKeys =
       object : ListBackedSet<K>() {
@@ -200,6 +211,7 @@ class ArrayMap<K : Comparable<K>, V : Any>(private val data: Array<Any>) : Map<K
     return if (idx < 0) null else data[idx * 2 + 1] as V
   }
   override fun containsKey(key: K): Boolean = dataAsKeys.binarySearch(key) >= 0
+
   /** list-backed collection of values at odd indices. */
   override val values: List<V>
     get() =
@@ -209,6 +221,7 @@ class ArrayMap<K : Comparable<K>, V : Any>(private val data: Array<Any>) : Map<K
           override fun get(index: Int): V = data[index * 2 + 1] as V
         }
   override fun containsValue(value: V): Boolean = values.contains(value)
+
   /** list-backed set of entries. */
   override val entries: ListBackedSet<Map.Entry<K, V>>
     get() =

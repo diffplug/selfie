@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2025 DiffPlug
+ * Copyright (C) 2023-2026 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -171,6 +171,25 @@ class ArrayMapTest {
   fun wasBroken() {
     val map = ArrayMap.of(0.rangeTo(8).map { it to it.toString() }.toMutableList())
     map.minusSortedIndices(listOf(0, 2, 3, 6, 7, 8)).toString() shouldBe "{1=1, 4=4, 5=5}"
+  }
+
+  @Test
+  fun wasBrokenWithArbitrarilyLargeNumbersInStrings() {
+    val map =
+        ArrayMap.empty<String, String>()
+            // Numbers larger than Long.MAX_VALUE (9223372036854775807)
+            .plus("1234567890123456789012345678901234567890", "first")
+            .plus("9999999999999999999999999999999999999999", "second")
+            .plus("5000000000000000000000000000000000000000", "third")
+            // Varying-length digit strings sorted by number of digits (then lexicographic)
+            .plus("item100", "hundred")
+            .plus("item8", "eight")
+            .plus("item42", "forty-two")
+            // Leading zeros: strip so 007 == 7, then fall through to string-length tiebreak
+            .plus("key007", "seven")
+            .plus("key7", "also-seven")
+    map.toString() shouldBe
+        "{1234567890123456789012345678901234567890=first, 5000000000000000000000000000000000000000=third, 9999999999999999999999999999999999999999=second, item8=eight, item42=forty-two, item100=hundred, key7=also-seven, key007=seven}"
   }
 }
 
