@@ -3,8 +3,9 @@ package kotest
 import com.diffplug.selfie.coroutines.expectSelfie
 import io.kotest.core.spec.style.StringSpec
 
-class UT_StringSpecTest : StringSpec({
-  "a" { expectSelfie("a").toMatchDisk() }
-  "b" { expectSelfie("b").toMatchDisk() }
-  "c" { expectSelfie("c").toMatchDisk() }
-})
+class UT_StringSpecTest :
+    StringSpec({
+      "a" { expectSelfie("a").toMatchDisk() }
+      "b" { expectSelfie("b").toMatchDisk() }
+      "c" { expectSelfie("c").toMatchDisk() }
+    })

@@ -9,7 +9,8 @@ class UT_CustomAnnotationGCTest {
     expectSelfie("standard").toMatchDisk()
   }
 
-  @MyTest fun withCustomAnnotation() {
+  @MyTest
+  fun withCustomAnnotation() {
     expectSelfie("custom").toMatchDisk()
   }
 }
