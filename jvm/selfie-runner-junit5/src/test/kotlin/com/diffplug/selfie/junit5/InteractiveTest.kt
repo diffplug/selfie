@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 DiffPlug
+ * Copyright (C) 2024-2025 DiffPlug
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -66,7 +66,7 @@ class InteractiveTest : HarnessJUnit() {
   fun inlineMismatchOnceComment() {
     ut_mirrorKt().lineWith("expectSelfie(").setContent("    expectSelfie(5).toBe(10) // selfieonce")
     gradleInteractivePass()
-    ut_mirrorKt().lineWith("expectSelfie(").content() shouldBe "    expectSelfie(5).toBe(5) "
+    ut_mirrorKt().lineWith("expectSelfie(").content() shouldBe "    expectSelfie(5).toBe(5)"
   }
 
   @Test @Order(6)
