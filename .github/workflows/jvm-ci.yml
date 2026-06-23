@@ -32,6 +32,9 @@ jobs:
       - name: gradle caching
         uses: gradle/actions/setup-gradle@v4
       - run: git fetch origin main
+      # workaround parallel test suite bugs
+      - run: ./gradlew :selfie-runner-junit5:test --no-configuration-cache
+      - run: ./gradlew :selfie-runner-junit4:test --no-configuration-cache
       - run: ./gradlew build --no-configuration-cache
       - name: junit result
         uses: mikepenz/action-junit-report@v4
