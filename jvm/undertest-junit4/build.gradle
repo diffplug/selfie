@@ -1,0 +1,37 @@
+plugins {
+  id 'org.jetbrains.kotlin.jvm'
+  id 'com.diffplug.spotless'
+}
+repositories {
+  mavenCentral()
+}
+spotless {
+  enforceCheck false
+  kotlin {
+    target 'src/**/*.kt'
+    toggleOffOn()
+    licenseHeader ''
+    ktfmt()
+    replaceRegex("test one-liner", "@Test\n(\\s*)fun ", "@Test fun ")
+    replaceRegex("test harness comments", "\n(\\s)*//", "\n//")
+  }
+}
+
+dependencies {
+  testImplementation project(':selfie-runner-junit4')
+  testImplementation "org.jetbrains.kotlin:kotlin-test-junit:$ver_KOTLIN_TEST"
+  testImplementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1"
+  testImplementation "junit:junit:4.13.2"
+}
+// this project is just a test environment for a different project
+test {
+  useJUnit()
+  enabled = findProperty("underTest") == "true"
+
+  testLogging.showStandardStreams = true
+  // the snapshots are both output and input, for this harness best if the test just always runs
+  outputs.upToDateWhen { false }
+  // defaults to 'write'
+  systemProperty 'selfie', findProperty('selfie')
+  systemProperty 'selfie.settings', findProperty('selfie.settings')
+}
