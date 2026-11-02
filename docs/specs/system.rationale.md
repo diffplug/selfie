@@ -18,6 +18,6 @@
 
 **What decides the pixels.** Chrome for Testing is the same binary as Playwright's headless shell, and gave identical output. No Chromium flag tested closed any cross-machine gap, including `--disable-skia-runtime-opts`, `--force-color-profile=srgb`, and `--disable-font-subpixel-positioning`. Forcing one font on every element didn't either. Text is the main difference, and the x86-64 difference is mostly 1 color level per channel, on the same 15 stories natively and under emulation. Emulated x86-64 in a container matched native x86-64 in the same image 30/30.
 
-**Limits.** One app's stories, and each hardware type measured on one or two machines. GitHub's Macs are virtualized M1s, and a macOS version difference can't be separated from the M1 and M4 difference here. An x86-64 machine emulating arm64 is untested.
+**Limits.** One app's stories, and each hardware type measured on one or two machines. GitHub's Macs are virtualized M1s, and a macOS version difference can't be separated from the M1 and M4 difference here. An x86-64 machine emulating arm64 is untested. This table predates `--disable-partial-raster`, the default since [render.rationale.md](render.rationale.md) → Environment, and hasn't been measured across machines with it.
 
 **Timers.** Playwright's `animations: 'disabled'` and `caret: 'hide'` didn't stop a terminal cursor's JavaScript blink, which changed 2 of 30 stories between runs. Dormouse's snapshot flag did. A blinking cursor can also match by luck, so one repeat that matches is weak evidence.

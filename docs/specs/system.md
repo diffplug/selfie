@@ -9,7 +9,7 @@
 
 Source of truth: `render/src/environment.ts`, `render/src/capture.ts`. `docs/specs/render.md` owns how the package does this.
 
-- **Must make the rendering environment configurable, and record it with every capture.** An environment is everything that decides the pixels: the container image digest or other runner, its CPU architecture, and the browser and its flags.
+- **Must make the rendering environment configurable, and record it with every capture.** An environment is what decides the pixels apart from the project's own input: the container image digest or other runner, its CPU architecture, the browser and its flags, the viewport and scale, and the fixed capture recipe. Project input, such as story code, a settle time, or an init script, is not part of it (`docs/specs/render.md` → Environment).
 - **Must default to one pinned Linux arm64 container image**, the only setup measured to match across machines (rationale).
 - **Must let a project freeze its own timers, and flag a story that renders differently twice in a row**, since browser options alone don't stop a blinking cursor (rationale).
 
