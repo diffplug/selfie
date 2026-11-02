@@ -1,5 +1,7 @@
 node_modules/
 ui/dist/
+ui/storybook-static/
+ui/storybook-fixtures/
 .pnpm-store/
 *.tsbuildinfo
 .claude/worktrees/

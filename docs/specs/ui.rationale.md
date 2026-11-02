@@ -37,6 +37,10 @@ Evidence and reasoning for `docs/specs/ui.md`, keyed by its headings.
 - **Why ignore repeats.** With `a` moving on to the next story, a held key would approve one image every few milliseconds. `j` and `k` lose little by it.
 - **Why no arrow keys.** They scroll the stacked viewport, which is how it pans from the keyboard.
 
+## Stories
+
+**What reviewing itself found, the first time.** 59 stories in about 8 s, and two renders matched on all 59. A change to the run screen's list and headings flagged exactly the 18 run screen stories and left the other 41 unchanged, and 5 of the 18 were `size-differs`, because a heading or row moving changed the page's height. The stories first showed dark mode broken, which was the preview missing what `ui/index.html` sets, and not the app: a stable image isn't a correct one, so look at them.
+
 ## Accessibility
 
 axe-core 4.10.3 was run on the no runs, no commits, run, filtered run, accept, side by side, stacked, and shortcuts screens in a real browser. It found one issue, a link in text told apart only by color. Primer's `inline` underlines one only under `data-a11y-link-underlines="true"`, so `ui/index.html` sets that on the body. Primer's own components passed.

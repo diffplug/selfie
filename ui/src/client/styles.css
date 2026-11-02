@@ -164,6 +164,8 @@ code {
 
 .selfie-thumb {
   display: block;
+  /* In a table cell, a tall image would otherwise squeeze it narrower than the others. */
+  flex: none;
   width: 64px;
   height: 48px;
   /* The top of a tall page, rather than all of it as a sliver. */

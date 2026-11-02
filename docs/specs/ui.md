@@ -16,6 +16,8 @@ Source of truth: `ui/`.
 | `ui/src/server/local.ts`, exported as `selfie-ui/local` | Node's serving, and the allowed hosts |
 | `ui/src/client/` | The React client, on Primer, built by Vite into `ui/dist/` |
 | `cli/src/ui.ts` | `localReviewSource`: a `ReviewSource` over a repository, through the CLI's library |
+| `ui/.storybook/`, `ui/src/client/*.stories.tsx`, `ui/src/client/stories/` | Every screen as a story, which Selfie reviews itself by ([Stories](#stories)) |
+| `ui/storybook-fixtures/` | Images generated before each Storybook build, at the paths the server answers. Not in Git |
 
 - **Must keep `ui/src/server/app.ts` free of anything specific to a platform**: no Node, no file, no Git. It knows Hono, `selfie-store`'s core, and `ReviewSource`. `cli/test/ui.test.ts` checks what it loads.
 - **Must have `selfie-cli` depend on `selfie-ui`, never the reverse** (rationale). `docs/specs/cli.md` → ui owns how it loads it.
@@ -146,6 +148,17 @@ Source of truth: `useHotkeys` in `ui/src/client/hooks.ts`.
 
 - **Must show each key on screen beside what it does.**
 - **Must ignore a key while someone is typing, a dialog is open, or a modifier is held, and ignore a held key's repeats**, so holding `a` can't approve one image after another unseen (rationale).
+
+## Stories
+
+Source of truth: `ui/src/client/*.stories.tsx`, `ui/src/client/stories/fixtures.ts`.
+
+`pnpm selfie:storybook` builds them, and `pnpm selfie review --storybook-dir ui/storybook-static` reviews them with Selfie.
+
+- **Must have a story for every screen and state this spec lists**, including empty and failed ones, dialogs, and keyboard flows, which are play functions.
+- **Must show a screen through its props and fixtures, with no server.** Images come from `ui/storybook-fixtures/`, at the paths the server answers, so a screen doesn't know the difference.
+- **Must make fixture images real**, with their real hashes and pixel diffs, from `cli/scripts/generate-storybook-fixtures.ts`, which uses the CLI's own diff, so `selfie-ui` still doesn't depend on `selfie-cli`.
+- **Must set on `<html>` and `<body>` what `ui/index.html` sets**, since Primer's themes read it (rationale).
 
 ## Accessibility
 

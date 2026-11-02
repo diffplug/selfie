@@ -3,5 +3,5 @@
   "compilerOptions": {
     "lib": ["ES2023", "ESNext"]
   },
-  "include": ["src", "test", "vitest.config.ts"]
+  "include": ["src", "scripts", "test", "vitest.config.ts"]
 }

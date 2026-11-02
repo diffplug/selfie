@@ -5,5 +5,5 @@
     "types": ["node", "vite/client"],
     "jsx": "react-jsx"
   },
-  "include": ["src", "test", "vite.config.ts", "vitest.config.ts"]
+  "include": ["src", "test", ".storybook", "vite.config.ts", "vitest.config.ts"]
 }
