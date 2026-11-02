@@ -1,7 +1,7 @@
 export { Blobs, isBlobKeySegment, type BlobStorage } from "./blob.ts";
 export { sha256, toHex, truncateHash, type HashFunction } from "./image-hash.ts";
+export { decodeImage, ImageDecodeError, imageMediaType } from "./image-file.ts";
 export { encodePam, type RawImage } from "./pam.ts";
-export { decodePng, encodePng, ImageDecodeError, imageMediaType } from "./png.ts";
 export {
   Sql,
   SqlInterfaceError,
@@ -15,7 +15,6 @@ export {
   imageInsertStatement,
   initStoreSchema,
   Store,
-  type PngImage,
   type StoredImage,
   type StoreOptions,
 } from "./store.ts";

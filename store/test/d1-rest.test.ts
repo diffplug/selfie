@@ -9,6 +9,8 @@ import {
   type SqlRow,
   type SqlStatement,
 } from "../src/core/index.ts";
+import { image } from "./support/colliding-hash.ts";
+import { pngOf } from "./support/png-builder.ts";
 import { hashOf } from "./support/sql-params.ts";
 import { createTempStore } from "./support/temp-store.ts";
 
@@ -378,9 +380,8 @@ describe("D1RestAdapter replay against a real SQL engine", () => {
     const { sql, sent } = await losingResponses((request) => request % 2 === 0);
     await initStoreSchema(sql);
     const store = new Store({ sql, blob: temp.blob });
-    const pixels = new Uint8Array([1, 2, 3]);
-    const { hash: imageHash, key } = await store.putImage({ width: 1, height: 1, pixels });
+    const { hash: imageHash, key } = await store.putImage(pngOf(image(1)));
     expect(await store.lookupKey(imageHash)).toBe(key);
-    expect(sent).toHaveLength(6);
+    expect(sent).toHaveLength(8);
   });
 });

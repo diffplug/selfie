@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { encodePam, sha256, toHex, truncateHash } from "../src/core/index.ts";
+import { imageHashOf } from "./support/image-hash-of.ts";
 
-const hashOf = async (width: number, height: number, pixels: Uint8Array) =>
-  toHex(await sha256(encodePam({ width, height, pixels })));
+const hashOf = (width: number, height: number, pixels: Uint8Array) =>
+  imageHashOf({ width, height, pixels });
 
 describe("encodePam", () => {
   it("writes the one canonical header followed by the pixels", () => {

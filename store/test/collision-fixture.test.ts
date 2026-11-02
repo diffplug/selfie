@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
-  decodePng,
+  decodeImage,
   encodePam,
   sha256,
   Store,
@@ -9,6 +9,7 @@ import {
   truncateHash,
   type RawImage,
 } from "../src/core/index.ts";
+import { pngOf } from "./support/png-builder.ts";
 import { createTempStore } from "./support/temp-store.ts";
 
 // Real images from scripts/find-collision.ts. Nothing about them is trusted:
@@ -64,25 +65,25 @@ describe("committed 53-bit collision", () => {
     });
 
     it("gives the first image its truncated value and the second key -1", async () => {
-      const first = await store.putImage(a.image);
-      const second = await store.putImage(b.image);
+      const first = await store.putImage(pngOf(a.image));
+      const second = await store.putImage(pngOf(b.image));
       expect(first.key).toBe(truncateHash(await sha256(a.file as Uint8Array<ArrayBuffer>)));
       expect(second.key).toBe(-1);
     });
 
     it("keeps each image's key and bytes separate", async () => {
-      const first = await store.putImage(a.image);
-      const second = await store.putImage(b.image);
-      expect(await store.putImage(a.image)).toEqual(first);
-      expect(await store.putImage(b.image)).toEqual(second);
+      const first = await store.putImage(pngOf(a.image));
+      const second = await store.putImage(pngOf(b.image));
+      expect(await store.putImage(pngOf(a.image))).toEqual(first);
+      expect(await store.putImage(pngOf(b.image))).toEqual(second);
       expect(await store.lookupKey(first.hash)).toBe(first.key);
       expect(await store.lookupKey(second.hash)).toBe(-1);
-      expect(encodePam(await decodePng((await store.getImage(first.hash))!))).toEqual(a.file);
-      expect(encodePam(await decodePng((await store.getImage(second.hash))!))).toEqual(b.file);
+      expect(encodePam(await decodeImage((await store.getImage(first.hash))!))).toEqual(a.file);
+      expect(encodePam(await decodeImage((await store.getImage(second.hash))!))).toEqual(b.file);
     });
 
     it("does not resolve the second image before it is stored", async () => {
-      await store.putImage(a.image);
+      await store.putImage(pngOf(a.image));
       const hash = toHex(await sha256(encodePam(b.image)));
       expect(await store.lookupKey(hash)).toBeNull();
     });

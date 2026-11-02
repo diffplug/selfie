@@ -8,47 +8,32 @@
 
 ## Image decoding
 
-**No PNG library.** `store/src/core/png.ts` is about 500 lines over the platform's own `DecompressionStream` and `CompressionStream`, and adds no dependency. Every candidate was weighed against what the store must do: refuse what isn't exact, and run in Node and in Workers.
+**Why so narrow.** All 746 real Chromium screenshots checked, from Linux and macOS at 1× and 2× scale, are 8-bit RGB holding only `IHDR`, `IDAT`, and `IEND`. PNG is a stand-in and uploads are untrusted, so breadth nobody uses is only parser surface. All-255 RGBA stays because rendering environments are configurable. This can be widened later without changing any hash, since the hash covers decoded pixels.
 
-| Option | License | Last release | Why not |
-|---|---|---|---|
-| `fast-png` 8.0.0 | MIT | 2025-12 | Runs everywhere, and decoded all 746 real screenshots exactly, but is wrong on the rest (below), and its API exposes neither the inflate nor the chunks |
-| `sharp` 0.35.5 | Apache-2.0, shipping LGPL-3.0-or-later libvips | current | The fastest, at 2.3 ms against 7.7 ms, but native, so it can't be in the core or run in a Worker. Asked for 8-bit output, it reduces 16-bit samples silently. Its license would also need weighing against this repo's FSL-1.1-MIT |
-| `@jsquash/png` 3.1.1 | Apache-2.0 | 2025-05 | The strongest alternative: WASM that decoded exactly in workerd in the benchmark, with a 16-bit mode that could support the exactness rule. But a Worker and Node must each load its 181 KB of WASM their own way, which the core can't express, so it would need injecting. It would still need a chunk scan for the color and animation refusals, and its handling of malformed files was not tested |
-| `pngjs` 7.0.0 | MIT | 2023-02 | Node streams and `node:zlib`, unmaintained |
+**No library.** `store/src/core/image-file.ts` runs on the platform's own `DecompressionStream`, and adds no dependency.
 
-Measured on `fast-png` 8.0.0, with `checkCrc: true` except where noted, 2026-11:
+| Option | License | Why not |
+|---|---|---|
+| `fast-png` 8.0.0 | MIT | Decoded every screenshot exactly, but silently accepted a row cut short, 256 MiB of image data declared as 1×1, and an animated file, with `checkCrc: true`. Its API exposes neither the inflate nor the chunks, so a wrapper can't fix this |
+| `sharp` 0.35.5 | Apache-2.0, with LGPL-3.0-or-later libvips | Native, so it can't be in the core or run in a Worker |
+| `@jsquash/png` 3.1.1 | Apache-2.0 | Exact in workerd in the benchmark, but Node and Workers load its WASM differently, so it would need injecting, and it would still need a chunk scan |
+| `pngjs` 7.0.0 | MIT | Needs Node streams and `node:zlib`, with no release since 2023 |
 
-- Interlaced below 8 bits throws, on PngSuite's `basi3p01`, `basi3p02`, and `basi3p04`: its Adam7 reads whole bytes per pixel.
-- A row cut short inside a valid zlib stream decodes silently, with the missing samples as zero. A 2×2 image with 11 of its 14 bytes returned `9,9,9,9,9,9,9,9,9,0,0,0`.
-- 256 MiB of image data in a 261 KB file declaring 1×1 decodes silently in 678 ms. The store refuses it in 6 ms.
-- An animated file decodes silently as its first frame.
-- With its default `checkCrc: false`, a flipped image byte decodes silently to other pixels.
+**Checked against `sharp`.** Every pixel of those 746 screenshots matches, in a one-off run outside the test suite. The suite pins 2 of them and 8 PngSuite files to hashes `sharp` computed.
 
-**How the decoder was checked.** Against `sharp`, outside the test suite, 2026-11:
+**Speed.** Over those 746 in Node, mostly 1200×900, the median decode was 6.7 ms (p95 25 ms), against about 10 ms for `fast-png` and about 2 ms for `sharp`. No test has run on a real Worker.
 
-- All 176 files of [PngSuite](http://www.schaik.com/pngsuite/) with their color chunks removed: 118 decode to the same pixels, 44 are refused for alpha or inexact 16-bit samples, and all 14 of its corrupt files are refused. None disagree.
-- All 746 real Chromium screenshots on hand, from Linux and macOS at 1× and 2× scale: every pixel matches, and none is refused.
+**The pixel limit.** 100,000,000 is a judgment call, and what a Worker does near its 128 MB limit was not tested.
 
-The test suite pins 29 PngSuite files and two screenshots to hashes `sharp` computed, so the expected values don't come from this decoder. Its other test files come from `store/test/support/png-builder.ts`, which shares no code with it.
-
-**Speed.** Over those 746 screenshots in Node, mostly 1200×900, the median decode was 7.7 ms (p95 27 ms), against `fast-png` at 10.3 ms and `sharp` at 2.3 ms. Inside local workerd, two 1200×900 screenshots took 8 to 9 ms, a figure that includes one R2 call, and no test has run on a real Worker.
-
-**Encoding.** Every row uses filter type 0, since on this corpus the benchmark's `sharp` runs with no filter gave smaller files than adaptive filtering, at compression level 6: 0.95 against 1.08 of Playwright's size. Over a sample of 149 screenshots, `encodePng` took a median of 9.1 ms and came to 0.90 of Chromium's size, against `fast-png`'s 32 ms and 0.91. The compression level is whatever the platform's `CompressionStream` uses, so bytes may differ across platforms, which nothing relies on.
-
-**Exact 16-bit samples.** The PNG spec scales 8 bits to 16 by 257, so a sample with matching bytes is exactly that 8-bit value. A library rounding any other sample to 8 bits would give different images one hash.
-
-**Refusing color chunks.** All 746 screenshots above hold only `IHDR`, `IDAT`, and `IEND`, so this refuses nothing Selfie renders. Accepting them would let one hash look different depending on which encoding was stored first, since the first stays. Refusing can be relaxed later without changing any hash, where accepting couldn't be undone. The cost is that a file tagged by another tool, such as ImageMagick by default or a macOS screenshot, needs its tags stripped first.
-
-**The pixel limit.** 100,000,000 pixels is a judgment call, about twice an imagined 2560×20,000 full-page screenshot. The largest on hand is 4,320,000. A Worker's 128 MB can't hold an image anywhere near the limit, so it protects Node, and what a Worker does near its memory limit was not tested.
-
-**Where decoding runs.** Inside a Worker for any upload through `Store`, since taking the hash from the decoded file is what guarantees bytes match their hash. Serving doesn't decode, since `Store.getImage` returns the stored file. No cloud flow encodes: a client uploads what Chromium wrote. `encodePng` runs in workerd only because the contract does. The benchmark found encoding inside a Worker unsafe at 2× scale, on WASM WebP and JPEG XL encoders, so nothing should come to rely on encoding there. `encodePng` wasn't part of that test.
+**Where decoding runs.** In a Worker for any upload through `Store`, since taking the hash from the decoded file is what ties bytes to their hash. Serving doesn't decode.
 
 ## Storage
 
 **Format in the bytes, not in a column.** PNG, WebP, and JPEG XL all open with a fixed signature, so reading the first bytes needs no schema change and can't drift from what's stored. A column would need a migration ([Open questions](store.md#open-questions)), and a suffix on the blob key would make `has` check every format.
 
 **No migration of PAM blobs.** Before this change a blob held a PAM file. No store has held real images yet: the only data is test data, so nothing converts them.
+
+**A row means the bytes exist.** Bytes are always written before the row, so a group already stored costs one SQL request and no blob calls. The cost is that putting an image again no longer repairs a blob lost some other way: `Store.getImage` still reports a row with no bytes as an error.
 
 **First bytes, not strictly.** The store checks and then writes, so concurrent first puts can both write, and the blob ends as either. Making that strict would take a conditional put in every adapter, for no change in what the bytes decode to.
 
@@ -58,7 +43,7 @@ Evidence for the open question, from a lossless comparison over 434 screenshots 
 
 - Storing Playwright's PNG as it is costs no encoding time, at about 508 MB per 10,000 images.
 - Lossless WebP through `sharp`, at `webp({ lossless: true, effort: 4 })`, is about 3× smaller and adds about 18 ms per 1200×900 image. It is the comparison's recommendation.
-- A switch would mean an encoder where blobs are written, and a signature in `imageMediaType`. `sharp` is native, so it couldn't sit in the core, and would have to run on the machine rendering. PNG input stays, since that's what Chromium writes, and the hash wouldn't change.
+- A switch changes the write path: something must encode before `Store.putImage`, on the machine rendering, since `sharp` is native and the benchmark found encoding inside a Worker unsafe at 2× scale. `decodeImage` would then need a WebP decoder that runs in Workers, and `imageMediaType` its signature. The hash wouldn't change.
 
 ## Adapters
 
