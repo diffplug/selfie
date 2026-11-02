@@ -1,4 +1,4 @@
-import { decodeImage, type RawImage } from "selfie-store";
+import type { RawImage } from "selfie-store";
 import type { BoundingBox, PixelDiff } from "selfie-ui/app";
 import { encodePng } from "./png.ts";
 
@@ -76,11 +76,11 @@ export function diffImages(
   };
 }
 
-/** Two stored files compared: what `selfie review` exports, and what the review UI serves. */
-export async function diffFiles(
-  currentFile: Uint8Array,
-  goldenFile: Uint8Array,
+/** Two stored images compared: what `selfie review` exports, and what the review UI serves. */
+export async function diffToPng(
+  current: RawImage,
+  golden: RawImage,
 ): Promise<{ readonly diff: PixelDiff; readonly png: Uint8Array | null }> {
-  const { diff, highlighted } = diffImages(await decodeImage(currentFile), await decodeImage(goldenFile));
+  const { diff, highlighted } = diffImages(current, golden);
   return { diff, png: highlighted === null ? null : await encodePng(highlighted) };
 }

@@ -8,7 +8,7 @@
 
 ## Image decoding
 
-**Why so narrow.** All 746 real Chromium screenshots checked, from Linux and macOS at 1× and 2× scale, are 8-bit RGB holding only `IHDR`, `IDAT`, and `IEND`. PNG is a stand-in and uploads are untrusted, so breadth nobody uses is only parser surface. All-255 RGBA stays because rendering environments are configurable. This can be widened later without changing any hash, since the hash covers decoded pixels.
+**Why so narrow.** All 746 real Chromium screenshots checked, from Linux and macOS at 1× and 2× scale, are 8-bit RGB holding only `IHDR`, `IDAT`, and `IEND`. PNG is only what Chromium hands over and uploads are untrusted, so breadth nobody uses is only parser surface. All-255 RGBA stays because rendering environments are configurable. This can be widened later without changing any hash, since the hash covers decoded pixels.
 
 **No library.** `store/src/core/image-file.ts` runs on the platform's own `DecompressionStream`, and adds no dependency.
 
@@ -37,13 +37,38 @@
 
 **First bytes, not strictly.** The store checks and then writes, so concurrent first puts can both write, and the blob ends as either. Making that strict would take a conditional put in every adapter, for no change in what the bytes decode to.
 
-## Stored encoding
+**Why WebP.** A lossless comparison over 434 screenshots at 1× and 2×, 2026-11, recommended it over keeping PNG and over JPEG XL. Its full report isn't in the repo. On dormouse's 541 stories captured as whole pages, in the same comparison's terms:
 
-Evidence for the open question, from a lossless comparison over 434 screenshots at 1× and 2×, 2026-11. Its full report isn't in the repo.
+| | 1× | 1.5× | 2× |
+|---|---|---|---|
+| PNG as written | 25.2 MB | 44.6 MB | 62.1 MB |
+| WebP at `effort: 4` | 8.0 MB | 13.6 MB | 18.7 MB |
+| Encoding, average per image | 28 ms | 52 ms | 83 ms |
+| Decoding, average per image | 5 ms | 9 ms | 13 ms |
 
-- Storing Playwright's PNG as it is costs no encoding time, at about 508 MB per 10,000 images.
-- Lossless WebP through `sharp`, at `webp({ lossless: true, effort: 4 })`, is about 3× smaller and adds about 18 ms per 1200×900 image. It is the comparison's recommendation.
-- A switch changes the write path: something must encode before `Store.putImage`, on the machine rendering, since `sharp` is native and the benchmark found encoding inside a Worker unsafe at 2× scale. `decodeImage` would then need a WebP decoder that runs in Workers, and `imageMediaType` its signature. The hash wouldn't change.
+All 1,623 of those images came back from `sharp` with exactly the same pixels, in the simple `VP8L` form, with the alpha bit clear.
+
+**What a review pays.** On those 541 stories at 1×, on one Mac, the store step of a review took about 20 s with every image new, writing 4 at a time, and about 6 s with every image already stored. It took about 36 s with every image new when writing one at a time. Blobs took 8.8 MB, against 25.2 MB of PNG.
+
+**The fallback.** 16,384 on either side was refused by `sharp`, with 16,383 accepted. The tallest of those stories is 9,898, so it stays rare, but it's only a few lines since PNG decoding has to exist anyway for what Chromium writes.
+
+**Encoding in the store.** The rule was once that the store never encodes. Encoding before `Store.putImages` would encode every image of every run, when nearly all of them are already stored, since only the store knows which are new. So it asks an injected codec, for new images only.
+
+**`sharp`'s license.** `sharp` is Apache-2.0. Its prebuilt `@img/sharp-libvips-*` packages are LGPL-3.0-or-later, installed as separate npm packages and linked dynamically. That was read from their `package.json` files, and isn't legal advice.
+
+## A Worker reading a WebP
+
+`@jsquash/webp` 1.5.0 (Apache-2.0, libwebp as WebAssembly) decoded real images inside `workerd` 1.20261023.1, run locally, and its pixels hashed the same as `sharp`'s:
+
+| Image | Took | Process memory, before and at its peak |
+|---|---|---|
+| 1200×900 | 14 ms | 37 to 62 MB |
+| 1200×4949 | 42 ms | 62 to 140 MB |
+| 2400×1800 | 30 ms | 140 to 170 MB |
+| 2400×5898 | 96 ms | 170 to 328 MB |
+| 2400×9898 | 169 ms | 305 to 531 MB |
+
+That prototype held RGBA and then RGB, in one process that didn't return memory between images, and nothing ran on real Cloudflare. Cloudflare's docs list a Worker's memory at 128 MB. So a very tall page at 2× likely won't fit, and PNG would have the same trouble, since hashing needs all the raw pixels whatever the format.
 
 ## Adapters
 

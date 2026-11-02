@@ -4,7 +4,7 @@ import type { Comparison, DecisionKind } from "selfie-store";
 import type { AcceptOutcome, CurrentView, DecisionTarget, ReviewSource, RunView, SnapshotRow } from "selfie-ui/app";
 import { resolveCaptureSettings } from "./config.ts";
 import { accept, checkAccept, decide } from "./decisions.ts";
-import { diffFiles, type PixelDiff } from "./diff.ts";
+import { diffToPng, type PixelDiff } from "./diff.ts";
 import { SelfieError } from "./errors.ts";
 import { gitUserEmail, headSha, type BaselineSearch } from "./git.ts";
 import { compareAsReviewed, findBaseline, readReviewCache, type Project } from "./project.ts";
@@ -112,9 +112,9 @@ export function localReviewSource(project: Project, { native }: { readonly nativ
         diffs.set(key, known);
         return known;
       }
-      const [currentFile, goldenFile] = await Promise.all([store.getImage(current), store.getImage(golden)]);
-      if (currentFile === null || goldenFile === null) return null;
-      const result = await diffFiles(currentFile, goldenFile);
+      const [currentImage, goldenImage] = await Promise.all([store.getPixels(current), store.getPixels(golden)]);
+      if (currentImage === null || goldenImage === null) return null;
+      const result = await diffToPng(currentImage, goldenImage);
       diffs.set(key, result);
       for (const oldest of diffs.keys()) {
         if (diffs.size <= DIFFS_KEPT) break;

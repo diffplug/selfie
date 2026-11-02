@@ -53,7 +53,7 @@ Source of truth: `ui/src/server/app.ts`; tests in `cli/test/ui.test.ts`.
 | `GET /api/runs/:id/unchanged` | `{ rows }` |
 | `POST /api/runs/:id/decisions` | `{ decision, snapshots: [{ story, imageHash }] }` |
 | `POST /api/runs/:id/accept` | `{ removedSeen? }` |
-| `GET /api/images/:hash` | The stored PNG |
+| `GET /api/images/:hash` | The stored file, with its media type |
 | `GET /api/diffs/:current/:golden` | The `PixelDiff` |
 | `GET /api/diffs/:current/:golden/image` | The diff PNG |
 

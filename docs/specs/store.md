@@ -1,6 +1,6 @@
 # Store
 
-> Status: built — the store core, image decoding, PNG storage, its local SQLite and filesystem adapters, and the D1 REST and R2 adapters exist. Two questions stay open; see `## Future`.
+> Status: built — the store core, image decoding, WebP storage with PNG as its fallback, its local SQLite and filesystem adapters, and the D1 REST and R2 adapters exist. A question stays open, and a Worker can't yet read a WebP; see `## Future`.
 >
 > - See `docs/specs/glossary.md` for image, image hash, image key, and store.
 > - Owns image identity, image decoding, image keys, and hash collisions. The build order belongs to `docs/specs/system.md`. Snapshots, runs, and goldens belong to `docs/specs/snapshots.md`.
@@ -23,7 +23,9 @@ Source of truth: `store/src/core/image-file.ts`; the contract suite is `store/te
 - **Must allow only `IHDR`, then `IDAT`, then `IEND`, with nothing after, and refuse any other chunk**, even harmless metadata.
 - **Must refuse a corrupt file, never repair it**: a failed checksum on any chunk or the zlib stream, an invalid filter type, or image data that doesn't inflate to exactly the expected length.
 - **Must refuse a PNG over 100,000,000 pixels before allocating for it, and stop inflating as soon as the data runs past the expected length**, so a small file can't exhaust memory.
-- **Must run unchanged in Node and in Workers**, on Web-standard APIs and no library (rationale), since `Store` decodes on both. The whole contract runs in workerd as part of `pnpm test`.
+- **Must accept a WebP only in its simple lossless form:** `RIFF`, `WEBP`, then one `VP8L` chunk with nothing after, version 0, and the alpha bit clear. It refuses a lossy or extended WebP, including any metadata, and any transparency. It checks all this and the 100,000,000 pixel limit in the header, before anything decodes the body.
+- **Must decode a WebP's body through an injected `WebpCodec`, and check the answer against the header**, since no one library runs on every platform. With no codec, a WebP is refused. `sharpWebp` in `store/src/adapters/sharp-webp.ts` is the Node one.
+- **Must run PNG decoding and the WebP header check unchanged in Node and in Workers**, on Web-standard APIs and no library (rationale), since `Store` decodes on both. The whole contract runs in workerd as part of `pnpm test`.
 
 ## Image keys
 
@@ -40,9 +42,12 @@ Source of truth: `store/src/core/store.ts`.
 
 Source of truth: `store/src/core/store.ts`, `store/src/core/image-file.ts`; tests in `store/test/store.test.ts` and `store/test/collision-fixture.test.ts`.
 
-- **Must keep image bytes in blob storage, never in SQL**, since D1 caps a row at 2 MB. A blob holds the image file a caller gave, a PNG today, which `Store.getImage` returns ready to serve.
-- **Must keep the file format behind `store/src/core/image-file.ts`, and never let it reach the hash or a key**, since compressed bytes differ between tools and the format may change. See [Open questions](#open-questions).
-- **Must store the file it is given as those exact bytes, and take its hash from decoding them**, so they always decode to the pixels that were hashed. The store never encodes.
+- **Must keep image bytes in blob storage, never in SQL**, since D1 caps a row at 2 MB. A blob holds an image file, which `Store.getImage` returns ready to serve, and `Store.getPixels` decodes.
+- **Must keep the file format behind `store/src/core/image-file.ts`, and never let it reach the hash or a key**, since compressed bytes differ between tools and the format may change.
+- **Must take a file's hash from decoding it, and with a `WebpCodec`, keep a new PNG as a lossless WebP** (rationale). Anything else stays as the exact bytes given: a WebP it's handed, and every file in a store with no codec.
+- **Must keep a PNG whose width or height is over 16,383**, WebP's limit, so an image of any size the decoder accepts can be stored.
+- **Must decode the WebP and compare its hash before storing it, and store nothing if they differ**, so what's stored always decodes to the pixels that were hashed.
+- **Must encode only an image not yet stored**, so an unchanged image costs no encoding. **May write at most 4 images at once within a group**, each holding a whole image while it encodes.
 - **Must keep the first bytes stored for a hash.** A later encoding of the same pixels changes nothing, and neither does a retry that finds an orphan. Concurrent first puts may leave either one, and both decode to the same pixels.
 - **Must make a blob state its own format in its first bytes**, so a store can hold more than one format, with no schema change. `imageMediaType` reads it.
 - **Must key blobs by image hash, never by image key.** The key is `images/<image hash>`; the [R2 adapter](#r2-adapter) adds the project.
@@ -110,7 +115,13 @@ Source of truth: `store/src/adapters/r2.ts`; tests in `store/test/workerd/r2.wor
 
 **Scope: store**
 
+### A Worker reading a WebP
+
+`Store` in a Worker can't read a WebP until it has a `WebpCodec` of its own, since `sharpWebp` is native. `@jsquash/webp` decoded real images correctly in local `workerd` (rationale). Two things to settle with **Scope: cloud-deploy**, defined in `docs/specs/system.md` → Build order:
+
+- Hashing needs an image's raw pixels in memory, in either format, so a very tall page at 2× likely doesn't fit a Worker's 128 MB. Something must verify those another way, or refuse them.
+- A Worker has no encoder, so whatever uploads must send WebP itself.
+
 ### Open questions
 
 - **Schema migrations.** How a schema change reaches every project database, and how the app treats a database still on the older schema. Until then a change may only add tables and indexes, through `initStoreSchema`, with one exception made before any project database existed (`docs/specs/snapshots.md` → Schema).
-- **Stored encoding.** PNG is a stand-in, and lossless WebP is the comparison's recommendation (rationale). A switch changes the write path, and needs a decoder behind `decodeImage` that runs in Workers. Whatever stores images must decode to the exact RGB pixels that were hashed, with no alpha, and identify itself by its first bytes.

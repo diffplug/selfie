@@ -9,7 +9,8 @@
     "./adapters/d1-rest": "./src/adapters/d1-rest.ts",
     "./adapters/r2": "./src/adapters/r2.ts",
     "./adapters/sqlite": "./src/adapters/sqlite.ts",
-    "./adapters/filesystem-blob": "./src/adapters/filesystem-blob.ts"
+    "./adapters/filesystem-blob": "./src/adapters/filesystem-blob.ts",
+    "./adapters/sharp-webp": "./src/adapters/sharp-webp.ts"
   },
   "scripts": {
     "test": "pnpm typecheck && vitest run",
@@ -18,6 +19,9 @@
     "test:d1:workerd": "SELFIE_D1_WORKERD=1 vitest run --project workerd --silent=false test/workerd/d1.real.workerd.test.ts",
     "typecheck": "tsc -p tsconfig.core.json && tsc -p tsconfig.json && tsc -p tsconfig.workerd.json",
     "find-collision": "node scripts/find-collision.ts"
+  },
+  "dependencies": {
+    "sharp": "0.35.5"
   },
   "devDependencies": {
     "@cloudflare/vitest-plugin": "^1.4.11",

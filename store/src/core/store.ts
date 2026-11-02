@@ -1,5 +1,5 @@
 import type { Blobs } from "./blob.ts";
-import { chunks } from "./chunks.ts";
+import { chunks, mapConcurrently } from "./chunks.ts";
 import {
   assertImageHash,
   SHA256_BYTES,
@@ -8,8 +8,8 @@ import {
   truncateHash,
   type HashFunction,
 } from "./image-hash.ts";
-import { decodeImage } from "./image-file.ts";
-import { encodePam } from "./pam.ts";
+import { decodeImage, webpToKeep, type WebpCodec } from "./image-file.ts";
+import { encodePam, type RawImage } from "./pam.ts";
 import { CREATE_SNAPSHOT_TABLES } from "./snapshots.ts";
 import type { Sql, SqlStatement } from "./sql.ts";
 
@@ -40,6 +40,8 @@ const SELECT_IMAGE_KEY = "SELECT key FROM images WHERE hash = ?1";
 // every project shares. A group this size stays far inside what real D1 was measured
 // to accept in one batch, and its lookup fits the limit of 100 bound parameters.
 const IMAGES_PER_GROUP = 100;
+// Encoding is most of a first review. Each one holds a whole image, so this also bounds memory.
+const BLOBS_AT_ONCE = 4;
 
 /** The insert statement for one image, given its hash and its truncated hash. */
 export function imageInsertStatement(hash: string, truncated: number): SqlStatement {
@@ -65,6 +67,8 @@ export interface StoreOptions {
   readonly blob: Blobs;
   /** Defaults to SHA-256. Tests inject one to force collisions. */
   readonly hash?: HashFunction;
+  /** Reads a stored WebP, and stores a new PNG as one. Without it, files stay as they arrive. */
+  readonly webp?: WebpCodec;
 }
 
 export interface StoredImage {
@@ -78,18 +82,22 @@ export class Store {
   readonly #sql: Sql;
   readonly #blob: Blobs;
   readonly #hash: HashFunction;
+  readonly #webp: WebpCodec | undefined;
 
-  constructor({ sql, blob, hash = sha256 }: StoreOptions) {
+  constructor({ sql, blob, hash = sha256, webp }: StoreOptions) {
     this.#sql = sql;
     this.#blob = blob;
     this.#hash = hash;
+    this.#webp = webp;
   }
 
   /**
-   * Stores an image file, or finds it if it is already stored. These exact bytes are
-   * stored, and the hash comes from decoding them, so they always decode to the pixels
-   * that were hashed. The first bytes stored stay: a later encoding of the same pixels
-   * changes nothing. Throws `ImageDecodeError` for a file the store doesn't accept.
+   * Stores an image file, or finds it if it is already stored. The hash comes from
+   * decoding it. With a WebP codec a new PNG is kept as a WebP, checked to decode to the
+   * same hash, unless it is too large for one. Anything else is kept as these exact bytes,
+   * so what's stored always decodes to the pixels that were hashed. The first bytes stored
+   * stay: a later encoding of the same pixels changes nothing. Throws `ImageDecodeError`
+   * for a file the store doesn't accept.
    */
   async putImage(file: Uint8Array): Promise<StoredImage> {
     const [stored] = await this.putImages([file]);
@@ -113,10 +121,7 @@ export class Store {
     const hashes: string[] = [];
     const firstByHash = new Map<string, { file: Uint8Array; digest: Uint8Array }>();
     for (const file of files) {
-      const digest = await this.#hash(encodePam(await decodeImage(file)));
-      if (digest.length !== SHA256_BYTES) {
-        throw new RangeError(`Image hash must be ${SHA256_BYTES} bytes, got ${digest.length}`);
-      }
+      const digest = await this.#digestOf(file);
       const hash = toHex(digest);
       hashes.push(hash);
       if (!firstByHash.has(hash)) firstByHash.set(hash, { file, digest });
@@ -127,10 +132,10 @@ export class Store {
     const missing = [...firstByHash].filter(([hash]) => !keys.has(hash));
 
     // Bytes first: a failure here or later can orphan bytes, but can never leave a row without them.
-    for (const [hash, { file }] of missing) {
+    await mapConcurrently(missing, BLOBS_AT_ONCE, async ([hash, { file }]) => {
       const blobKey = imageBlobKey(hash);
-      if (!(await this.#blob.has(blobKey))) await this.#blob.put(blobKey, file);
-    }
+      if (!(await this.#blob.has(blobKey))) await this.#blob.put(blobKey, await this.#fileToKeep(file, hash));
+    });
     if (missing.length > 0) {
       const statements = missing.map(([hash, { digest }]) =>
         imageInsertStatement(hash, truncateHash(digest)),
@@ -139,6 +144,22 @@ export class Store {
       results.forEach((rows, i) => keys.set(missing[i]![0], checkedKey(rows[0]?.key)));
     }
     return hashes.map((hash) => ({ hash, key: keys.get(hash)! }));
+  }
+
+  async #digestOf(file: Uint8Array): Promise<Uint8Array> {
+    const digest = await this.#hash(encodePam(await decodeImage(file, this.#webp)));
+    if (digest.length !== SHA256_BYTES) {
+      throw new RangeError(`Image hash must be ${SHA256_BYTES} bytes, got ${digest.length}`);
+    }
+    return digest;
+  }
+
+  /** Only for an image not yet stored, so an unchanged image costs no encoding. */
+  async #fileToKeep(file: Uint8Array, hash: string): Promise<Uint8Array> {
+    const encoded = this.#webp === undefined ? null : await webpToKeep(file, this.#webp);
+    if (encoded === null) return file;
+    if (toHex(await this.#digestOf(encoded)) !== hash) throw new Error("The WebP encoder changed an image's pixels");
+    return encoded;
   }
 
   /** The key of each of these distinct hashes that has a row. */
@@ -177,6 +198,12 @@ export class Store {
       throw new Error(`Image ${hash} has a row but no bytes`);
     }
     return bytes;
+  }
+
+  /** The exact pixels of a stored image, or null if the image is not stored. */
+  async getPixels(hash: string): Promise<RawImage | null> {
+    const file = await this.getImage(hash);
+    return file === null ? null : decodeImage(file, this.#webp);
   }
 }
 
