@@ -96,6 +96,8 @@ export interface RunView {
   readonly run: Run;
   /** With no baseline, the nearest goldens on the run's branch, which `rows` compares with. Only to look at. */
   readonly branchGoldens: string | null;
+  /** How close a diff's regions group here, in CSS pixels. */
+  readonly regionMergeDistance: number;
   /** The run whose images are the goldens of this run's Git SHA, which may be this one. */
   readonly acceptedRunId: string | null;
   /** Who a decision made here is recorded as, or null if Git doesn't say. */

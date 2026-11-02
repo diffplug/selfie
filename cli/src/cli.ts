@@ -49,7 +49,7 @@ const USAGE = `Usage: selfie <command>
 
 Local data lives under ~/.config/selfie/<git-origin-slugified>/, or $SELFIE_HOME instead of
 ~/.config/selfie. A project configures Selfie in selfie.config.json at its Git top level:
-environment, initScript, and storybookDir, which --storybook-dir overrides. A build command
+environment, initScript, regionMergeDistance, and storybookDir, which --storybook-dir overrides. A build command
 is never read from a file. A story pattern matches IDs, where * matches any run of characters.
 `;
 

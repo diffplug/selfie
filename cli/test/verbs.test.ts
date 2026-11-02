@@ -258,6 +258,32 @@ describe("the config's storybookDir", () => {
   });
 });
 
+describe("regionMergeDistance", () => {
+  const config = (value: unknown) => writeFile(path.join(h.repo, "selfie.config.json"), JSON.stringify(value));
+
+  test("groups what a review shows, and never what it compares", async () => {
+    const one = await record();
+    h.stories = [{ id: "a--one", patch: [1, 1, 2, 2, [1, 2, 3]] }, { id: "a--two" }];
+    const two = await record();
+    const review = async () => (await h.cli("review", two.json.runId, "--baseline", one.json.runId)).json.differences[0];
+
+    const standard = await review();
+    expect(standard.regionGroups).toEqual([{ current: { x: 1, y: 1, width: 2, height: 2 }, golden: { x: 1, y: 1, width: 2, height: 2 } }]);
+    await config({ regionMergeDistance: 100 });
+    const wide = await review();
+    expect(wide.pixelDiff).toEqual(standard.pixelDiff);
+    expect(wide.diff.endsWith("diff.png")).toBe(true);
+  });
+
+  test.each([-1, "12"])("refuses %s", async (regionMergeDistance) => {
+    const { json } = await record();
+    await config({ regionMergeDistance });
+    const refused = await h.cli("review", json.runId);
+    expect(refused.code).toBe(2);
+    expect(refused.json.error.code).toBe("bad-config");
+  });
+});
+
 describe("selfie review --baseline", () => {
   describe("with a run, which is how to look for flakiness", () => {
     test("exits 0 when two renders match", async () => {

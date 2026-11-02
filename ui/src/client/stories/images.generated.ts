@@ -26,15 +26,15 @@ export const PIXEL_DIFFS = {
     "regions": [
       {
         "current": {
-          "x": 0,
+          "x": 32,
           "y": 450,
-          "width": 1200,
+          "width": 160,
           "height": 36
         },
         "golden": {
-          "x": 0,
+          "x": 32,
           "y": 450,
-          "width": 1200,
+          "width": 160,
           "height": 36
         }
       }
@@ -65,15 +65,15 @@ export const PIXEL_DIFFS = {
     "regions": [
       {
         "current": {
-          "x": 0,
+          "x": 32,
           "y": 2340,
-          "width": 1200,
+          "width": 1136,
           "height": 36
         },
         "golden": {
-          "x": 0,
+          "x": 32,
           "y": 2340,
-          "width": 1200,
+          "width": 1136,
           "height": 36
         }
       }
@@ -182,15 +182,15 @@ export const PIXEL_DIFFS = {
     "regions": [
       {
         "current": {
-          "x": 0,
+          "x": 64,
           "y": 900,
-          "width": 2400,
+          "width": 320,
           "height": 72
         },
         "golden": {
-          "x": 0,
+          "x": 64,
           "y": 900,
-          "width": 2400,
+          "width": 320,
           "height": 72
         }
       }

@@ -13,6 +13,7 @@ import { Keys } from "./Keys.tsx";
 import { acceptPath, AppLink, navigate, runPath, storyPath } from "./router.tsx";
 import { ActionFailure } from "./RunNotes.tsx";
 import { LoadFailure, Loading } from "./Status.tsx";
+import { groupRegions } from "../shared/regions.ts";
 import { AdvisoryLabels, DecisionLabel, describePixels, plural, sizeChanged, StateLabel } from "./words.tsx";
 
 const SHORTCUTS: readonly (readonly [string, string])[] = [
@@ -46,13 +47,13 @@ function ShortcutsDialog({ onClose }: { readonly onClose: () => void }) {
   );
 }
 
-function PixelStats({ stats }: { stats: PixelDiff }) {
+function PixelStats({ stats, mergeDistance }: { stats: PixelDiff; mergeDistance: number }) {
   const box = stats.boundingBox;
   return (
     <Text className="selfie-muted">
       <strong>{describePixels(stats)}</strong> of {stats.totalPixels.toLocaleString()} changed
       {box === null ? "" : `, within ${box.width}×${box.height} at ${box.x}, ${box.y}`}.{" "}
-      {`${plural(stats.regions.length, "changed region")}. `}
+      {`${plural(groupRegions(stats.regions, mergeDistance).length, "changed region")}. `}
       {stats.maxChannelDelta > 0 && ` The largest difference in a channel is ${stats.maxChannelDelta} of 255.`}
     </Text>
   );
@@ -206,7 +207,7 @@ export function DetailScreen({ state, view, story, search }: { state: RunState; 
             by {row.decision.actor}, <RelativeTime date={new Date(row.decision.at)} />.
           </Text>
         )}
-        {diff !== null && <PixelStats stats={diff} />}
+        {diff !== null && <PixelStats stats={diff} mergeDistance={view.regionMergeDistance * view.run.scale} />}
         {changedPair && diff === null && diffError === null && <Text className="selfie-muted">Comparing pixels…</Text>}
         {diffError !== null && <Text className="selfie-muted">The pixels couldn't be compared: {diffError.message}</Text>}
       </Stack>

@@ -34,7 +34,15 @@
 
 **A branch's goldens, only to look at.** Reviewing Selfie's own stories on a branch read every story as new, until a run was compared with the branch's own earlier goldens by hand. So a run with no baseline is shown against them. Nothing about acceptance moves: every image still needs its own approval, so an image matching a golden that someone has since rejected is still refused. So what's shown and what's checked can differ. Blockers and the exit code stay with what's checked, or a review could exit 0 before `accept` refused it, and the document's `baseline` stays the real one, with `comparedWith` saying what this review showed.
 
-**Regions, starting from the edges.** Whole-page capture made any change in a page's height a size change, and a size change once compared nothing: on Selfie's own stories, moving one row put 5 of 18 changed stories there with nothing highlighted. Matching rows from each edge costs little, since a row compares in one call, and takes in every size. It's reported as a list of rectangles, though there's at most one and it's as wide as the image, because the JSON is what agents read, and two numbers for the matching rows couldn't grow into what a 9-slice finds. Its limit is real: a heading changed near the top and rows moved near the bottom put everything between in one region, where shifted rows ghost (`docs/specs/cli.md` → Future).
+**Regions, by a recursive 9-slice.** Whole-page capture made any change in a page's height a size change, and a size change once compared nothing: on Selfie's own stories, moving one row put 5 of 18 changed stories there with nothing highlighted. Matching from the edges fixed that, but a heading changed near the top and rows moved near the bottom were then one band, where shifted rows ghost. Trimming all four sides and recursing gives the heading its own 182×18 box, and separates changes side by side, which rows alone can't.
+
+**Why anchors must be unique.** The first prototype cut at the longest run of identical rows, and table rows matched the wrong table rows, pairing 27 rows of one image with 153 of the other. Requiring a row that appears once in each stopped that on Selfie's stories, and a story that had split into 11 regions came out as 2.
+
+**Why the merge distance only groups.** It first changed the regions themselves, which meant it changed diff images, two caches keyed without it, and any approval keyed by a region's content. So regions are now a pure result of two images, and grouping happens when something is shown, so a project can change its distance freely.
+
+**Why the cut sizes don't follow the scale.** A 2x capture cuts at half the CSS size, which only makes regions finer, and grouping follows the scale. Scaling the cuts would make a diff depend on more than its two images.
+
+**Why the distance leans small.** On a style tweak to dormouse changing 290 of 541 stories, groups by distance totaled 1,694 at 12 px, 1,061 at 48, 693 at 96, and 467 at 200, with the most in one story falling from 19 to 6. Selfie's own two-edit change gave 2 at every distance. Much of dormouse's count is the four corners of a rounded button, whose middle didn't change. Someone can select groups to join them, and nothing yet splits one, so too many is the error to prefer.
 
 ### What blocks
 

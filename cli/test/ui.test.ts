@@ -399,7 +399,7 @@ describe("images", () => {
     expect(await stats.json()).toEqual({
       current: { width: 8, height: 8 },
       golden: { width: 8, height: 8 },
-      regions: [{ current: { x: 0, y: 2, width: 8, height: 1 }, golden: { x: 0, y: 2, width: 8, height: 1 } }],
+      regions: [{ current: { x: 1, y: 2, width: 1, height: 1 }, golden: { x: 1, y: 2, width: 1, height: 1 } }],
       changedPixels: 1,
       totalPixels: 64,
       boundingBox: { x: 1, y: 2, width: 1, height: 1 },
@@ -703,7 +703,7 @@ describe("what each entry point loads", () => {
   test("the CLI loads no web server until selfie ui asks for one", () => {
     const loaded = modulesLoadedBy(path.join(root, "cli/src/cli.ts"));
     expect(loaded.length).toBeGreaterThan(5);
-    expect(loaded.filter((url) => url.includes("hono") || url.includes("/ui/src/"))).toEqual([]);
+    expect(loaded.filter((url) => url.includes("hono") || url.includes("/ui/src/server/") || url.includes("/ui/src/client/"))).toEqual([]);
   });
 
   test("the routes and their protections need nothing of a platform", () => {

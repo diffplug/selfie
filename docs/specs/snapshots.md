@@ -133,9 +133,9 @@ Source of truth: `store/src/core/snapshots.ts`; `store/test/snapshots.test.ts` m
 
 A decision is on a name and a whole image today ([Decisions](#decisions)). **Scope: regions** (`docs/specs/cli.md` → Future) makes a whole-image decision the case of one region, and needs a key that survives what regions are for:
 
-- Keyed by the content of both sides of a region, never by its position or by what the aligner made of it, so a shift or a better aligner doesn't orphan an approval.
+- Keyed by the content of both sides of a region, never by its position, so a shift doesn't orphan an approval, and a group's distance can't. A change to how regions are found can ask again, which fails safe.
 - With the change it belongs to, as a branch and when it started, so an approval doesn't carry to another pull request.
-- Taking any set of an image's regions, and approving their union, so a person can undo a split the differ got wrong, with no special case for one region or for all of them.
+- Taking any set of an image's regions, and approving their union, so a person can undo a split the differ got wrong, with no special case for one region or for all of them. Each region's approval stands on its own, so if a later push changes one of them, only that one asks again.
 - With acceptance worked out from whether every region of an image is approved. A removed story becomes a region with no `after`, in place of the `--removed` count.
 
 ### Storing only what changed

@@ -47,7 +47,7 @@ Selfie has the following commands:
 - accept - makes a run's snapshots the goldens for its Git sha, on a clean tree
 - ui - serves a local review page in the browser, to look at a run's images, approve, reject, and accept. It shows what's recorded, and never renders
 
-An agent's loop is `selfie review`, then look at the diff images it names, then `selfie approve <run> --all`, commit, `selfie review`, and `selfie accept <run>`. A project sets its environment, init script, and Storybook directory in `selfie.config.json` at its Git top level. A person's loop is the same with `selfie ui` for the looking and deciding. These work on local data for now: pushing and pulling goldens, and with them the cloud half of find-baseline, are still to come. See `docs/specs/cli.md` and `docs/specs/ui.md`.
+An agent's loop is `selfie review`, then look at the diff images it names, then `selfie approve <run> --all`, commit, `selfie review`, and `selfie accept <run>`. A project sets its environment, init script, Storybook directory, and how close changed regions join in `selfie.config.json` at its Git top level. A person's loop is the same with `selfie ui` for the looking and deciding. These work on local data for now: pushing and pulling goldens, and with them the cloud half of find-baseline, are still to come. See `docs/specs/cli.md` and `docs/specs/ui.md`.
 
 ## Implementation details
 

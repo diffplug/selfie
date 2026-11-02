@@ -155,7 +155,7 @@ describe("diffImages", () => {
     expect(diff).toEqual({
       current: { width: 4, height: 3 },
       golden: { width: 4, height: 3 },
-      regions: [{ current: { x: 0, y: 1, width: 4, height: 2 }, golden: { x: 0, y: 1, width: 4, height: 2 } }],
+      regions: [{ current: { x: 1, y: 1, width: 3, height: 2 }, golden: { x: 1, y: 1, width: 3, height: 2 } }],
       changedPixels: 2,
       totalPixels: 12,
       boundingBox: { x: 1, y: 1, width: 3, height: 2 },
@@ -239,9 +239,14 @@ describe("diffImages", () => {
     expect(highlightedRows(highlighted)).toEqual([]);
   });
 
-  test("different widths match no row, and compare from the top left", () => {
+  test("different widths match from the sides", () => {
     const wider = diffImages(rowsOf(3, "rg"), rowsOf(2, "rg")).diff;
-    expect(wider).toMatchObject({ regions: [rowRegion(3, [0, 2], [0, 2], 2)], changedPixels: 2, totalPixels: 6, boundingBox: { x: 2, y: 0, width: 1, height: 2 } });
+    expect(wider).toMatchObject({
+      regions: [{ current: { x: 2, y: 0, width: 1, height: 2 }, golden: { x: 2, y: 0, width: 0, height: 2 } }],
+      changedPixels: 2,
+      totalPixels: 6,
+      boundingBox: { x: 2, y: 0, width: 1, height: 2 },
+    });
     const narrower = diffImages(rowsOf(2, "rg"), rowsOf(3, "rg")).diff;
     expect(narrower).toMatchObject({ changedPixels: 2, totalPixels: 6 });
     // Nothing visible changed here, so it marks where.

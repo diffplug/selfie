@@ -6,6 +6,7 @@
   "type": "module",
   "exports": {
     "./app": "./src/server/app.ts",
+    "./regions": "./src/shared/regions.ts",
     "./local": "./src/server/local.ts"
   },
   "scripts": {

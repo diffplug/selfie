@@ -80,7 +80,7 @@ Source of truth: `cli/src/paths.ts`, `cli/src/project.ts`; tests in `cli/test/un
 
 ## Review
 
-Source of truth: `cli/src/review.ts`, `cli/src/diff.ts`, `cli/src/png.ts`; tests in `cli/test/commands.test.ts` with a stand-in for `capture`, and `cli/test/review.container.test.ts` with the real one.
+Source of truth: `cli/src/review.ts`, `cli/src/diff.ts`, `cli/src/regions.ts`, `cli/src/png.ts`; tests in `cli/test/commands.test.ts` with a stand-in for `capture`, and `cli/test/review.container.test.ts` with the real one.
 
 A review of a named run starts at step 6. `selfie record` is steps 1 to 5, always captures, and prints what it recorded. Otherwise, in order, a review:
 
@@ -99,7 +99,9 @@ A review of a named run starts at step 6. `selfie record` is steps 1 to 5, alway
 - **Must keep `--baseline` to this one review.** It changes nothing about the run: `selfie approve` and `selfie accept` still compare with the baseline the run recorded, its exports go under `runs/<run id>/against/<baseline>/`, and `review.json` isn't written. It exits 1 if anything differs, even when every image is approved, since the question was what differs (rationale).
 - **Must do diff work only on a `changed` snapshot.** A `new` or `removed` one exports its one image, and an unchanged one nothing, unless it has an advisory.
 - **Must write every exported image as a PNG, whatever the store keeps**, so a document's paths stay what they say and any agent can open them.
-- **Must report what changed as regions:** rectangles of each image that correspond and differ, with everything outside them matching (rationale). Today there's at most one, as wide as the image, from the edges inward: rows that match from the top, then from the bottom, are outside it, so adding a row marks only that row. Rows compare whole, so with different widths none match.
+- **Must report what changed as regions:** rectangles of each image that correspond and differ, with everything outside them matching once what's between them is lined up, found by a recursive 9-slice in `cli/src/regions.ts` (rationale).
+- **Must make regions depend on the two images alone**, so the same pair always gives the same regions, and a decision or a cache can rely on it.
+- **Must keep `regionMergeDistance` to grouping what's shown**, as `regionGroups` in the document, and never let it change a comparison, a diff image, or what a decision is on (rationale).
 - **Must compare a region's pixels from its top left, and count what only one image has as changed**, whether rows or columns, so images of any two sizes have stats and a diff image.
 - **Must mark a seam for a region whose only change is what was removed**, one highlighted row where it was, so every region has a place in the current image.
 - **Must make the diff image from the current image, faded to light gray, with changed pixels solid `#ff0050`.**
@@ -163,7 +165,7 @@ Every path is absolute, and names a file that exists until it is pruned.
 | `filter` | `patterns` and `notRendered`, or null with no `--story` |
 | `counts` | `stories`, `unchanged`, `changed`, `new`, `removed`, `undecided`, and `advisories` |
 | `blockers[]`, `advisories[]` | `story`, `reason`, `detail` |
-| `differences[]` | `story`, `state`, `decision`, `imageHash`, `goldenHash`, `current`, `golden`, `diff`, `pixelDiff` |
+| `differences[]` | `story`, `state`, `decision`, `imageHash`, `goldenHash`, `current`, `golden`, `diff`, `pixelDiff`, `regionGroups` |
 | `playErrors[]` | `story`, `playError`, `current` |
 | `warnings[]` | The manifest's |
 | `next[]` | What to do next, in words and commands |
@@ -261,6 +263,7 @@ Source of truth: `cli/src/config.ts`.
 | `environment` | Overrides for `defineEnvironment` (`docs/specs/render.md` → Environment) |
 | `initScript` | A file inside the Git top level, used as `capture`'s `initScript` |
 | `storybookDir` | A directory inside the Git top level, the build to capture. `--storybook-dir` overrides it |
+| `regionMergeDistance` | How close changed regions group for showing, in CSS pixels, multiplied by the run's scale. Default 12 |
 
 - **May let `--native` win over its `runner`.**
 - **Must refuse an unknown key**, so a typo can't silently render the wrong environment.
@@ -287,13 +290,10 @@ Story IDs come from a project's build, and a manifest's paths from a directory i
 
 ### Regions
 
-One region covers everything between the first and last difference, so a page with a change near the top and rows shifted near the bottom compares everything between them from the top, and the shifted rows ghost like a double exposure. To split it, a recursive 9-slice:
-
-- Trim matching rows and columns from all four sides, so what's left is the center, and every outer cell matches.
-- Cut the center at a long span of rows or columns that's identical in both images and appears once in each, since table rows, blank space, and borders repeat. Slice each side again.
-- Merge regions separated only by a sliver, so one change isn't several approvals.
-- A replaced part compares as a region does now, an inserted one is all highlight, and a deleted one is a seam.
-- Decisions on regions, where someone may select several and approve their union, and a whole-image approval is just the case of one region (`docs/specs/snapshots.md` → Future).
+- Showing and selecting them in the UI.
+- Decisions on them (`docs/specs/snapshots.md` → Future).
+- A change in one column defeats row matching, so a list whose thumbnails changed height has its text only moved, in a region as wide as the list, where the shifted rows can still ghost.
+- Pixels alone can't tell that a button's four rounded corners are one thing. The renderer could record each element's box, so regions snap to them, at the cost of tying the differ to the browser.
 
 ### A render that does change
 
