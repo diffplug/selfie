@@ -1,6 +1,6 @@
 # CLI
 
-> Status: built — the `selfie-cli` library and the `selfie` binary: `review`, `approve`, `reject`, `accept`, and `find-baseline`, on the local store. Nothing here reaches the cloud; see `## Future`.
+> Status: built — the `selfie-cli` library and the `selfie` binary: `review`, `approve`, `reject`, `accept`, `find-baseline`, and `ui`, on the local store. Nothing here reaches the cloud; see `## Future`.
 >
 > - See `docs/specs/glossary.md` for run, snapshot, golden, baseline, decision, and environment.
 > - Owns local data's layout, each command's checks and exit code, and the shape of what they print and return. `docs/specs/snapshots.md` owns what a run, a decision, and a golden are. `docs/specs/render.md` owns capture. `docs/specs/store.md` owns images.
@@ -15,15 +15,16 @@ Source of truth: `cli/src/cli.ts`, `cli/src/document.ts`; the real binary's test
 | `selfie approve <run>`, `selfie reject <run>` | Records a decision on a run's changed and new images, with `--all` or `--story <pattern>` |
 | `selfie accept <run>` | Makes a run the goldens of its Git SHA |
 | `selfie find-baseline` | Prints the baseline this repository and environment would use |
+| `selfie ui [<run>]` | Serves the review UI until stopped, and prints its URL ([ui](#ui)) |
 
 - **Must print exactly one document on stdout, whatever happens,** and everything for people on stderr, including a review's one line of timings. A command that couldn't run prints `{ "error": { "code", "message" } }`. `--help` prints usage.
 - **Must use these exit codes:**
 
 | Code | Meaning | Examples |
 |---|---|---|
-| 0 | Nothing blocks | A review with no blockers, a decision recorded, a run accepted, any `find-baseline` result |
+| 0 | Nothing blocks | A review with no blockers, a decision recorded, a run accepted, any `find-baseline` result, `ui` stopped by a signal |
 | 1 | The command ran, and something blocks | A review listing anything in `blockers`, `accept` refusing, a `--story` pattern on `approve` or `reject` that matched nothing |
-| 2 | The command couldn't run | Not a Git repository, no commits, no Storybook, no Docker, a failed `--build-command`, a bad flag, an unknown run, `--story` matching no story at all |
+| 2 | The command couldn't run | Not a Git repository, no commits, no Storybook, no Docker, a failed `--build-command`, a bad flag, an unknown run, `--story` matching no story at all, a `ui` that can't start |
 
 - **Decision for the user to review: advisories don't change the exit code.** A project with two known `play` errors can reach exit 0, so 1 keeps its meaning of "something here stops you". It also means **an agent checking only the exit code won't see a `play` failure or an unstable story**: it has to read `advisories`, which is why the document always carries the list and its count ([What blocks](#what-blocks)) (rationale).
 - **Must take a story pattern as `docs/specs/render.md` → Capture defines it:** an ID, where `*` matches any run of characters.
@@ -38,8 +39,9 @@ Source of truth: `cli/src/index.ts`; tests in `cli/test/library.test.ts`.
 |---|---|
 | `openProject({ cwd, env })` | The repository's `Project`: its `repo`, `directory`, `store`, `snapshots`, and `close()` |
 | `review(project, options)` | Returns a `ReviewResult`: the `comparison`, `dirtyPaths`, `baseline`, `stabilityChecked`, `differences`, `playErrors`, `unstable`, `warnings`, and `timings` |
-| `decide(project, { runId, decision, actor, stories })` | `stories` is `"all"` or patterns. Returns `decided`, `skipped`, `unmatchedPatterns`, and the `comparison` after it |
+| `decide(project, { runId, decision, actor, stories })` | `stories` is `"all"`, patterns, or `{ ids }`: exact story IDs, for a caller that showed a list. Returns `decided`, `skipped`, `unmatchedPatterns`, and the `comparison` after it |
 | `accept(project, { runId, removedSeen })` | Returns `accepted`, `refusals`, `usableAsBaseline`, and the `comparison` |
+| `checkAccept(project, { runId, removedSeen })` | What `accept` would refuse, changing nothing, with `removalFacts` |
 | `summarizeRun(comparison)` | Returns `blockers`, `advisories`, `counts`, `undecided`, `unapproved`, `failed`, `removed`, and `notRendered` |
 | `isDecidable(state)` | Whether a snapshot in this state can take a decision: `changed` or `new` |
 | `compareAsReviewed(project, runId, options)` | A run compared with the baseline its reviewer saw |
@@ -136,7 +138,7 @@ Every path is absolute, and names a file that exists until it is pruned.
 | `warnings[]` | The manifest's |
 | `next[]` | What to do next, in words and commands |
 
-`pixelDiff` is `{ kind: "pixels", changedPixels, totalPixels, boundingBox, maxChannelDelta }`, or `{ kind: "size-differs", current, golden }` with their widths and heights, and is null unless `changed`.
+`pixelDiff` is `{ kind: "pixels", changedPixels, totalPixels, boundingBox, firstChanged, maxChannelDelta }`, where `firstChanged` is the first changed pixel in reading order, or `{ kind: "size-differs", current, golden }` with their widths and heights, and is null unless `changed`.
 
 - **Must keep a difference's hashes**, so a UI can cache images by content.
 - **Must say, when the baseline is null and HEAD isn't the merge-base, that the next step is to review and accept at the merge-base on the default branch**, since goldens accepted on a feature branch aren't read by later reviews.
@@ -206,6 +208,17 @@ It prints `sha`, `reason`, `message`, `defaultBranch`, `mergeBase`, and `environ
 
 - **Must use local data only.** `sync` adds the cloud's goldens ([Future](#future)).
 
+## ui
+
+Source of truth: `cli/src/ui.ts`, and `selfie ui` in `cli/src/cli.ts`; tests in `cli/test/ui.test.ts`. `docs/specs/ui.md` owns what it serves.
+
+- **Must print `{ url, port, runId }` once it is listening, then keep serving until a signal**, and exit 0. `runId` is the run it was asked to open, or null.
+- **Must take an optional run**, and refuse a bad or unknown one with exit 2 before listening. With none, the page opens at the newest finished run at HEAD in this project's environment, or `--native`'s.
+- **Must ask the system for a free port unless given `--port`**, so two projects can both be served.
+- **Never open a browser.** Whoever ran it decides what to do with the URL.
+- **Must fail with `ui-not-built` and exit 2 if the client isn't built**, saying what to run: `pnpm --filter selfie-ui build`.
+- **Must take a decision's actor from `git config user.email`, or refuse with `no-actor`.** There's no `--actor` here, since a page has no way to be anyone else.
+
 ## Configuration
 
 Source of truth: `cli/src/config.ts`.
@@ -238,8 +251,6 @@ Story IDs come from a project's build, and a manifest's paths from a directory i
 - `find-baseline` asking the cloud's goldens as well as local ones.
 - `selfie push` and `selfie pull`, and carrying decisions through them (`docs/specs/snapshots.md` → Future).
 - A way for a branch's reviewer to have a baseline when only other machines accepted the default branch's goldens.
-
-**Scope: local-review** is defined in `docs/specs/system.md` → Build order. It reads the store through [the library](#library), and images from `Store.getImage` or the run directories.
 
 ### Recording only if necessary
 

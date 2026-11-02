@@ -168,6 +168,7 @@ describe("comparing with a baseline", () => {
       changedPixels: 8,
       totalPixels: 64,
       boundingBox: { x: 2, y: 3, width: 4, height: 2 },
+      firstChanged: { x: 2, y: 3 },
       maxChannelDelta: 110,
     });
     expect((await decodeImage(await readFile(difference.current))).pixels[(3 * 8 + 2) * 3]).toBe(90);

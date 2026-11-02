@@ -1,0 +1,36 @@
+{
+  "name": "selfie-ui",
+  "version": "0.0.0",
+  "private": true,
+  "license": "FSL-1.1-MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "vite build",
+    "test": "pnpm typecheck && vite build --logLevel warn && vitest run",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@hono/node-server": "2.1.5",
+    "hono": "4.13.16",
+    "selfie-store": "workspace:*"
+  },
+  "devDependencies": {
+    "@primer/octicons-react": "19.42.0",
+    "@primer/primitives": "11.10.0",
+    "@primer/react": "38.43.0",
+    "@types/node": "catalog:",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@types/react-is": "19.3.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "react-is": "19.3.1",
+    "typescript": "catalog:",
+    "vite": "8.3.5",
+    "vitest": "catalog:"
+  }
+}

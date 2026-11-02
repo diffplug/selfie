@@ -1,0 +1,52 @@
+# UI rationale
+
+Evidence and reasoning for `docs/specs/ui.md`, keyed by its headings.
+
+## Package
+
+- **Why the CLI depends on the UI.** `selfie ui` has to start the server, so `selfie-cli` needs `selfie-ui`. The Hono app must not import `selfie-cli`, whose library reaches Git, Docker, and the filesystem, and which a Worker can't load. So the app states what it needs as `ReviewSource`, in its own package, and `cli/src/ui.ts` implements it. TypeScript checks that the library's results fit the wire types at that one file.
+- **Why wire types rather than the library's.** Sharing them would need the same dependency in reverse, and pnpm would have a cycle. Only `selfie-store`'s types cross over, and the store has no such reach.
+- **Why `dist/` is built by `pnpm test`.** `vite build` takes about 0.2 s here, against about 0.9 s for the package's typecheck, so it stays a real check that the client builds and costs nothing noticeable.
+- **Why no build on install or on first run.** A `prepare` script would slow every `pnpm install`, for every package's users, and building inside `selfie ui` would need Vite at runtime in a command that otherwise needs nothing but Node. An error saying what to run is enough for a source checkout. Packaging for others can make it go away.
+- **Why no router or state package.** There are four routes, and one piece of shared state, a run's `RunView`. `router.tsx` and `useRun` together are about 150 lines, and a router would add more than that to the bundle and the dependency list.
+
+## Routes
+
+- **Why IDs are passed exactly.** `decide` also takes patterns, where `*` matches anything, and a story's ID comes from a project's build. An ID `a*` passed as a pattern also approves `ab`, which the reviewer never saw. `cli/test/ui.test.ts` checks this with those two IDs.
+- **Why a request names hashes.** A decision belongs to a name and a hash, so naming them says what the reviewer saw. A later accepted run can change a baseline's goldens, and so a run's differences, while a page is open. `stale-decision` is the difference between a confused screen and a wrong approval.
+- **Why bulk has no route of its own.** A server-side "all" would approve whatever is there at that moment, and the dialog would describe something else.
+
+## Screens
+
+- **Why actual pixels recenters.** A real change in the end-to-end Storybook, 278 pixels at the two ends of a 1186×30 box, showed nothing at all at the box's center at 8×. The first changed pixel always shows one.
+- **Why `firstChanged` is in `PixelDiff`.** The diff loop already visits every pixel, and only the server has the pixels at no extra cost. It adds one field to `selfie review`'s document.
+- **Why 1× is one CSS pixel.** On a 2× display that is two device pixels, which `image-rendering: pixelated` keeps crisp. Going to true device pixels would make a 1× image half the width on some screens and not others, which reads as a bug.
+- **Why the layers stay stacked.** A reviewer finding a 1 px change flips between two images and watches for what moves, which only works with no shift and no flash. Each layer's key is its URL, so moving to another story can't show the last story's image while its own loads, which could otherwise get the wrong image approved.
+- **Why thumbnails, given they cost a read each.** They're lazy, and 30 load on opening a 512 row list. They let someone scan for the one that's different, which pixel counts don't.
+
+## Keyboard
+
+- **Why ignore repeats.** With `a` moving on to the next story, a held key would approve one image every few milliseconds. `j` and `k` lose little by it.
+- **Why no arrow keys.** They scroll the actual pixels viewport, which is how it pans from the keyboard.
+
+## Accessibility
+
+axe-core 4.10.3 was run on the no runs, no commits, run, filtered run, accept, side by side, actual pixels, and shortcuts screens in a real browser. It found one issue, a link in text told apart only by color, now underlined with Primer's `inline`. Primer's own components passed.
+
+## Scale
+
+Measured in headless Chromium through Playwright on a Mac, on a copy of the end-to-end store, against a run of 541 stories with 512 listed, all new, and its run directory pruned:
+
+| What | Measured |
+|---|---|
+| Opening the run, to the table on screen | 131 ms |
+| Elements on the page | 10,938 |
+| Image requests before scrolling | 30 |
+| Image requests after scrolling 9,000 px | 120 |
+| A keystroke in the filter, to the next frame | 14 to 28 ms |
+| 10 presses of `j` | 47 ms |
+| Reject 512 at once, to the screen recomputed | 140 ms |
+| Approve 512 at once, to the screen recomputed | 363 ms |
+
+- **Why no virtualized list.** These numbers leave nothing for one to fix, and a real table keeps find-in-page and screen readers working. It's worth revisiting at far more than 541 rows.
+- **Why decide takes no shortcut.** `decide` compares the run, the source compares it again to check the request, and again to answer. Each compare is a few milliseconds locally, and 363 ms for 512 images is well within what a dialog's click may take.

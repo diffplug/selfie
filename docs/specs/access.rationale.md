@@ -17,3 +17,9 @@
 ## CI uploads
 
 **Verification.** GitHub's discovery document at `https://token.actions.githubusercontent.com/.well-known/openid-configuration`, read 2026-11, names that issuer, a `jwks_uri` of `/.well-known/jwks` under it, and RS256 only. Its claims include `repository_id`, `aud`, and `event_name`. By default `aud` is the repository owner's URL, and a workflow sets its own through `core.getIDToken(audience)`. A workflow needs `id-token: write` to request a token. GitHub's docs state no token lifetime, so verification relies on the token's own `exp`.
+
+## Local review server
+
+- **Why `Host`, on top of loopback.** A site can make its own name resolve to `127.0.0.1` after the browser has loaded its page. The browser then treats requests to the server as same-origin with that site, and sends that site's name as `Host`. Loopback alone doesn't stop that, and this check does.
+- **Why both a custom header and JSON.** A form can send neither, and a page's `fetch` can only send them after a preflight, which this server never answers with CORS headers. `Origin` then covers a client that does send them from another site. Checked by `cli/test/ui.test.ts` with a foreign `Origin` plus the header and the type, and with each form content type.
+- **Why refuse framing.** Without it, a site could put the page in an invisible frame and steer a click onto Approve, and every check above would pass.

@@ -157,6 +157,7 @@ describe("diffImages", () => {
       changedPixels: 2,
       totalPixels: 12,
       boundingBox: { x: 1, y: 1, width: 3, height: 2 },
+      firstChanged: { x: 1, y: 1 },
       maxChannelDelta: 190,
     });
     expect([...highlighted!.pixels.subarray((1 * 4 + 1) * 3, (1 * 4 + 1) * 3 + 3)]).toEqual([255, 0, 80]);

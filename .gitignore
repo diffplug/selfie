@@ -1,4 +1,5 @@
 node_modules/
+ui/dist/
 .pnpm-store/
 *.tsbuildinfo
 .claude/worktrees/

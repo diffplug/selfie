@@ -587,6 +587,18 @@ ON CONFLICT(environment, story, image_hash) DO UPDATE SET
     return rows.length > 0;
   }
 
+  /** The ID of the run whose images are this SHA's goldens in this environment, or null. */
+  async acceptedRunAt(gitSha: string, environment: string): Promise<string | null> {
+    assertGitSha(gitSha);
+    const [row] = await this.#sql.run({
+      sql: `SELECT runs.id AS id FROM goldens JOIN runs ON runs.key = goldens.run_key
+WHERE goldens.git_sha = ?1 AND goldens.environment = ?2`,
+      params: [gitSha, environment],
+      idempotent: true,
+    });
+    return row === undefined ? null : (row.id as string);
+  }
+
   /**
    * The first of these SHAs, in the order given, with complete goldens in this environment,
    * or null. One query per group, and none after the group that holds it.

@@ -10,8 +10,11 @@ export interface DecideRequest {
   readonly runId: string;
   readonly decision: DecisionKind;
   readonly actor: string;
-  /** Every changed and new image, or those whose story IDs match these patterns. */
-  readonly stories: "all" | readonly string[];
+  /**
+   * Every changed and new image, those whose story IDs match these patterns, or exactly these
+   * story IDs, with no pattern matching, for a caller that showed a list of them.
+   */
+  readonly stories: "all" | readonly string[] | { readonly ids: readonly string[] };
 }
 
 export interface DecideResult {
@@ -25,16 +28,28 @@ export interface DecideResult {
   readonly comparison: Comparison;
 }
 
+function select(
+  snapshots: readonly ComparedSnapshot[],
+  stories: readonly string[] | { readonly ids: readonly string[] },
+): { readonly stories: readonly ComparedSnapshot[]; readonly unmatched: readonly string[] } {
+  if ("ids" in stories) {
+    const wanted = new Set(stories.ids);
+    const known = new Set(snapshots.map(({ story }) => story));
+    return {
+      stories: snapshots.filter(({ story }) => wanted.has(story)),
+      unmatched: stories.ids.filter((id) => !known.has(id)),
+    };
+  }
+  return filterStories(
+    snapshots.map((snapshot) => ({ ...snapshot, id: snapshot.story })),
+    stories,
+  );
+}
+
 export async function decide(project: Project, request: DecideRequest): Promise<DecideResult> {
   const { runId, decision, actor, stories } = request;
   const before = await compareAsReviewed(project, runId, { includeUnchanged: true });
-  const matching =
-    stories === "all"
-      ? null
-      : filterStories(
-          before.snapshots.map((snapshot) => ({ ...snapshot, id: snapshot.story })),
-          stories,
-        );
+  const matching = stories === "all" ? null : select(before.snapshots, stories);
   const chosen: readonly ComparedSnapshot[] = matching?.stories ?? before.snapshots;
   const decided = chosen.filter(({ state }) => isDecidable(state));
   await project.snapshots.decide({
@@ -82,16 +97,22 @@ export interface AcceptRequest {
   readonly removedSeen?: number | undefined;
 }
 
-export interface AcceptResult {
-  readonly accepted: boolean;
-  /** Empty if accepted. Every reason at once, so a caller doesn't fix them one run at a time. */
+export interface AcceptCheck {
+  /** Every reason at once, so a caller doesn't fix them one run at a time. */
   readonly refusals: readonly AcceptRefusal[];
   /** Whether the run's SHA is where a later review could read goldens from. */
   readonly usableAsBaseline: boolean;
   readonly comparison: Comparison;
+  /** The goldens accepting would drop, including those only outside the run's filter. */
+  readonly removalFacts: { readonly stories: readonly string[]; readonly outsideFilter: number };
 }
 
-export async function accept(project: Project, { runId, removedSeen }: AcceptRequest): Promise<AcceptResult> {
+export interface AcceptResult extends Omit<AcceptCheck, "removalFacts"> {
+  readonly accepted: boolean;
+}
+
+/** What `accept` would refuse, changing nothing, so a UI can show it before anyone asks. */
+export async function checkAccept(project: Project, { runId, removedSeen }: AcceptRequest): Promise<AcceptCheck> {
   const comparison = await compareAsReviewed(project, runId);
   const { run } = comparison;
   const { failed, unapproved, removed, notRendered } = summarizeRun(comparison);
@@ -117,7 +138,18 @@ export async function accept(project: Project, { runId, removedSeen }: AcceptReq
     refusals.push({ reason: "wrong-removed-count", ...removalFacts, seen: removedSeen });
   }
 
-  const usableAsBaseline = await isOnBaselineHistory(project.repo, run.gitSha);
+  return {
+    refusals,
+    usableAsBaseline: await isOnBaselineHistory(project.repo, run.gitSha),
+    comparison,
+    removalFacts,
+  };
+}
+
+export async function accept(project: Project, request: AcceptRequest): Promise<AcceptResult> {
+  const { runId, removedSeen } = request;
+  const { refusals, usableAsBaseline, comparison, removalFacts } = await checkAccept(project, request);
+  const { run } = comparison;
   const result = (list: readonly AcceptRefusal[], accepted: boolean): AcceptResult => ({
     accepted,
     refusals: list,

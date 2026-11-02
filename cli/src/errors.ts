@@ -9,6 +9,8 @@ export type SelfieErrorCode =
   | "bad-run-id"
   | "unknown-run"
   | "missing-image"
+  | "no-actor"
+  | "stale-decision"
   | "usage";
 
 /** The work couldn't be done. `code` says which case this is, for a caller that isn't reading the message. */

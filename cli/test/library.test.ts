@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import {
   accept,
+  checkAccept,
   decide,
   findBaseline,
   isDecidable,
@@ -35,6 +36,23 @@ test("isDecidable is true only of what has a new image", () => {
     "changed",
     "new",
   ]);
+});
+
+test("a decision on exact IDs takes each as itself, and checkAccept changes nothing", async () => {
+  h.stories = [{ id: "a*" }, { id: "ab" }];
+  const { id: runId } = (await review(project, options())).comparison.run;
+  const decided = await decide(project, { runId, decision: "approved", actor: "ui", stories: { ids: ["a*", "nobody"] } });
+  expect(decided.decided.map(({ story }) => story)).toEqual(["a*"]);
+  expect(decided.unmatchedPatterns).toEqual(["nobody"]);
+  expect(summarizeRun(decided.comparison).counts.undecided).toBe(1);
+
+  await decide(project, { runId, decision: "approved", actor: "ui", stories: "all" });
+  const check = await checkAccept(project, { runId });
+  expect(check.refusals).toEqual([]);
+  const { gitSha, environment } = check.comparison.run;
+  expect(await project.snapshots.acceptedRunAt(gitSha, environment)).toBeNull();
+  expect((await accept(project, { runId })).accepted).toBe(true);
+  expect(await project.snapshots.acceptedRunAt(gitSha, environment)).toBe(runId);
 });
 
 test("openProject needs only a directory and an environment, and fails with a code", async () => {

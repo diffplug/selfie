@@ -3,7 +3,9 @@
 export { resolveCaptureSettings, type CaptureSettings } from "./config.ts";
 export {
   accept,
+  checkAccept,
   decide,
+  type AcceptCheck,
   type AcceptRefusal,
   type AcceptRequest,
   type AcceptResult,
