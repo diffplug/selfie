@@ -36,6 +36,8 @@ Selfie stores data in two places:
 - a cloud service holding golden snapshot data, as well as runs which are pending approval before being accepted as golden
 - local data stored at `~/.config/selfie/<git-origin-slugified>/`, Selfie stores locally generated snapshots here, and also mirrors data from the cloud service as necessary to improve performance
 
+Access follows GitHub through a GitHub App: anyone can view a public repository's snapshots, and a private repository's are visible only to people with access to it on GitHub.
+
 Selfie has the following commands:
 
 - find-baseline - returns the Git sha of the nearest merge-base with a complete set of goldens

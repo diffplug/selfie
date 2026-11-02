@@ -19,7 +19,7 @@ Selfie is for fully opaque images, and transparency is never allowed: `docs/spec
 
 | Data | Lives in |
 |---|---|
-| User accounts, and which D1 database belongs to each project | Neon Postgres |
+| User accounts and their GitHub tokens, app installations, and which D1 database belongs to each project | Neon Postgres |
 | A project's snapshot metadata | That project's own D1 database |
 | Image bytes | R2 |
 
@@ -35,7 +35,9 @@ Selfie is for fully opaque images, and transparency is never allowed: `docs/spec
 
 **Scope: local-review** — A review UI with approval, built as a Hono app running locally. The UI uses GitHub Primer.
 
-**Scope: cloud-deploy** — The same Hono app deployed at `hackathon.selfie.dev`, with accounts in Neon through pgstencil and Hyperdrive, per-project D1, R2, and auth ([Cloud data](#cloud-data)).
+**Scope: cloud-deploy** — The same Hono app deployed at `hackathon.selfie.dev`, with accounts in Neon through pgstencil and Hyperdrive, per-project D1, and R2 ([Cloud data](#cloud-data)). Serves no image before `github-access`.
+
+**Scope: github-access** — The GitHub App, sign-in, and access checks (`docs/specs/access.md`). Ships with `cloud-deploy`, since a deployed service needs them before it holds anyone's images.
 
 **Scope: sync** — Push and pull between stores, and `find-baseline`. Local approvals carry through here ([Approvals](#approvals)).
 
