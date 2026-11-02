@@ -29,6 +29,7 @@ A run is one recording of a set of snapshots against one full Git SHA in one env
 | `complete` | Finished, and every story rendered | Yes | If approved and not `dirty` |
 
 - **Must be told when it begins whether the working tree was dirty, and the baseline its reviewer saw**, and may be told any story filter, as `patterns` and the `unmatched` among them, and which run really rendered its images, as `reusedFromRun` (`docs/specs/cli.md` → Recording only if necessary). A run keeps these for good, so nothing about it depends on a file outside the store.
+- **Must be told its environment's scale when it begins**, as image pixels per CSS pixel, a positive number that need not be whole. The environment's ID is a hash, and the run's images hold only pixels, so this is the only place the store or a viewer can read it. It changes no state, comparison, or acceptance, since the ID already separates scales. **Must keep one image at its real pixels, and never a copy at another size**: a viewer calculates every size from the image and this.
 - **Must treat `reusedFromRun` as a fact about where the pixels came from, and nothing more.** It changes no state, comparison, or acceptance, and it's an ID, not a reference, since sync may move a run without the one it names.
 - **Must record a story that failed to render as a row with its failure message**, never leave it absent, so only a `recording` run can lack a story. A message is cut to 2,000 characters.
 - **Must record a story's play error as a message, cut the same way, whether or not it also has an image.** It changes no state and no acceptance ([Open questions](#open-questions)).
@@ -101,7 +102,7 @@ Goldens are per Git SHA and environment, and are the images of the one run accep
 Source of truth: `CREATE_SNAPSHOT_TABLES` in `store/src/core/snapshots.ts`, `initStoreSchema` in `store/src/core/store.ts`.
 
 ```sql
-runs(key PK, id UNIQUE, git_sha, environment, started_at, finished_at, failed_count, dirty, baseline_sha, story_filter, reused_from_run)
+runs(key PK, id UNIQUE, git_sha, environment, started_at, finished_at, failed_count, dirty, baseline_sha, story_filter, reused_from_run, scale)
   INDEX runs_by_sha(git_sha, environment, started_at)
 run_snapshots(run_key, story, image_key, failure, unstable, play_error)  PK (run_key, story)  WITHOUT ROWID
 decisions(environment, story, image_hash, decision, actor, decided_at)  PK (environment, story, image_hash)  WITHOUT ROWID

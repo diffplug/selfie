@@ -219,6 +219,7 @@ describe("which run", () => {
     const recording = await project.snapshots.beginRun({
       gitSha: git(h.repo, "rev-parse", "HEAD"),
       environment,
+      scale: 1,
       dirty: false,
       baselineSha: null,
     });
@@ -321,6 +322,18 @@ describe("the run view", () => {
     expect((await viewOf(first)).acceptedRunId).toBe(first);
     const { runId: second } = (await review()).json;
     expect((await viewOf(second)).acceptedRunId).toBe(first);
+  });
+});
+
+describe("a run's scale", () => {
+  test("comes from the project's environment and reaches the view", async () => {
+    h.stories = [{ id: "a--one" }];
+    const standard = (await review()).json;
+    expect((await viewOf(standard.runId)).run.scale).toBe(1);
+    await writeFile(path.join(h.repo, "selfie.config.json"), JSON.stringify({ environment: { scale: 1.5 } }));
+    const scaled = (await review()).json;
+    expect(scaled.environment).not.toBe(standard.environment);
+    expect((await viewOf(scaled.runId)).run.scale).toBe(1.5);
   });
 });
 

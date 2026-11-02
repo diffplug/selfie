@@ -231,7 +231,7 @@ code {
   cursor: zoom-in;
 }
 
-/* A tall story still fits on a screen with the buttons, and actual pixels shows the rest. */
+/* A tall story still fits on a screen with the buttons, and actual size shows the rest. */
 .selfie-pane-button img {
   display: block;
   width: 100%;
@@ -260,14 +260,12 @@ code {
   position: relative;
 }
 
-/* One image pixel must stay one crisp block at every zoom and on every display. */
 .selfie-layer {
   position: absolute;
   top: 0;
   left: 0;
   display: block;
   max-width: none;
-  image-rendering: pixelated;
 }
 
 .selfie-outline {

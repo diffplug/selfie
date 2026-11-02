@@ -81,7 +81,7 @@ export function describeSnapshotContract(
         Array.from({ length: 12 }, (_, i) => imageInsertStatement(hashOf(i + 1), 1000 + i)),
       );
 
-      const golden = await snapshots.beginRun({ gitSha: SHA_0, environment: "shared", dirty: false, baselineSha: null });
+      const golden = await snapshots.beginRun({ gitSha: SHA_0, environment: "shared", scale: 1, dirty: false, baselineSha: null });
       await snapshots.recordSnapshots(golden.id, GOLDENS);
       await snapshots.finishRun(golden.id, GOLDENS.length);
       await snapshots.decide({
@@ -93,7 +93,7 @@ export function describeSnapshotContract(
       expect(await snapshots.acceptRun(golden.id, null, 0)).toBe(true);
 
       // Against those goldens: a is unchanged, b changed, c failed, d removed, and e new.
-      const head = await snapshots.beginRun({ gitSha: SHA_1, environment: "shared", dirty: false, baselineSha: null });
+      const head = await snapshots.beginRun({ gitSha: SHA_1, environment: "shared", scale: 1, dirty: false, baselineSha: null });
       headRun = head.id;
       await snapshots.recordSnapshots(headRun, [
         rendered("a", 1),
@@ -104,7 +104,7 @@ export function describeSnapshotContract(
       await snapshots.finishRun(headRun, 4);
 
       // The same SHA again, where b came out differently and c rendered, unstably.
-      const again = await snapshots.beginRun({ gitSha: SHA_1, environment: "shared", dirty: false, baselineSha: null });
+      const again = await snapshots.beginRun({ gitSha: SHA_1, environment: "shared", scale: 1, dirty: false, baselineSha: null });
       rerun = again.id;
       await snapshots.recordSnapshots(rerun, [
         rendered("a", 1),
@@ -159,7 +159,7 @@ export function describeSnapshotContract(
     });
 
     it("never compares across environments", async () => {
-      const other = await snapshots.beginRun({ gitSha: SHA_1, environment: "other", dirty: false, baselineSha: null });
+      const other = await snapshots.beginRun({ gitSha: SHA_1, environment: "other", scale: 1, dirty: false, baselineSha: null });
       await snapshots.recordSnapshots(other.id, [rendered("a", 1)]);
       await snapshots.finishRun(other.id, 1);
       // `SHA_0` has goldens, and the same image for the same story, in another environment.
@@ -171,7 +171,7 @@ export function describeSnapshotContract(
 
     it("leaves a crashed run recording, beside the new run that replaces it", async () => {
       const environment = "crash";
-      const crashed = await snapshots.beginRun({ gitSha: SHA_1, environment, dirty: false, baselineSha: null });
+      const crashed = await snapshots.beginRun({ gitSha: SHA_1, environment, scale: 1, dirty: false, baselineSha: null });
       await snapshots.recordSnapshots(crashed.id, [rendered("a", 1)]);
 
       const dying = over((adapter) => failing(adapter, () => true));
@@ -180,7 +180,7 @@ export function describeSnapshotContract(
       await expect(snapshots.finishRun(crashed.id, 2)).rejects.toMatchObject({ code: "wrong-snapshot-count" });
       await expect(snapshots.compareRun(crashed.id, null)).rejects.toMatchObject({ code: "run-not-finished" });
 
-      const fresh = await snapshots.beginRun({ gitSha: SHA_1, environment, dirty: false, baselineSha: null });
+      const fresh = await snapshots.beginRun({ gitSha: SHA_1, environment, scale: 1, dirty: false, baselineSha: null });
       await snapshots.recordSnapshots(fresh.id, [rendered("a", 1), rendered("b", 2)]);
       expect(await snapshots.finishRun(fresh.id, 2)).toMatchObject({ status: "complete", failedCount: 0 });
     });
@@ -188,7 +188,7 @@ export function describeSnapshotContract(
     it("survives writes being resent, and ends with a complete set of goldens", async () => {
       const environment = "retried";
       const replayed = over(replaying);
-      const run = await snapshots.beginRun({ gitSha: SHA_2, environment, dirty: false, baselineSha: null });
+      const run = await snapshots.beginRun({ gitSha: SHA_2, environment, scale: 1, dirty: false, baselineSha: null });
       await replayed.recordSnapshots(run.id, [rendered("a", 8)]);
       expect(await replayed.finishRun(run.id, 1)).toMatchObject({ status: "complete" });
       await snapshots.decide({
@@ -210,6 +210,7 @@ export function describeSnapshotContract(
       const run = await snapshots.beginRun({
         gitSha: SHA_2,
         environment,
+        scale: 1,
         dirty: true,
         baselineSha: SHA_0,
         storyFilter,
@@ -227,20 +228,31 @@ export function describeSnapshotContract(
       await expect(snapshots.acceptRun(run.id, null, 0)).rejects.toMatchObject({ code: "run-dirty" });
       expect(await snapshots.hasCompleteGoldens(SHA_2, environment)).toBe(false);
 
-      const clean = await snapshots.beginRun({ gitSha: SHA_2, environment, dirty: false, baselineSha: null });
+      const clean = await snapshots.beginRun({ gitSha: SHA_2, environment, scale: 1, dirty: false, baselineSha: null });
       expect(clean).toMatchObject({ dirty: false, baselineSha: null, storyFilter: null });
       expect(await snapshots.getRun(clean.id)).toMatchObject({ dirty: false, baselineSha: null, storyFilter: null });
     });
 
+    it("keeps a run's scale, whole or not", async () => {
+      for (const scale of [1, 1.5, 2]) {
+        const run = await snapshots.beginRun({ gitSha: SHA_0, environment: "scaled", scale, dirty: false, baselineSha: null });
+        expect(run.scale).toBe(scale);
+        expect((await snapshots.getRun(run.id))?.scale).toBe(scale);
+        expect((await snapshots.finishRun(run.id, 0)).scale).toBe(scale);
+        expect((await snapshots.compareRun(run.id, null)).run.scale).toBe(scale);
+      }
+    });
+
     it("keeps which run really rendered a run's images, and which didn't", async () => {
       const environment = "reused";
-      const rendered_ = await snapshots.beginRun({ gitSha: SHA_0, environment, dirty: false, baselineSha: null });
+      const rendered_ = await snapshots.beginRun({ gitSha: SHA_0, environment, scale: 1, dirty: false, baselineSha: null });
       expect(rendered_.reusedFromRun).toBeNull();
       expect((await snapshots.getRun(rendered_.id))?.reusedFromRun).toBeNull();
 
       const reused = await snapshots.beginRun({
         gitSha: SHA_1,
         environment,
+        scale: 1,
         dirty: false,
         baselineSha: null,
         reusedFromRun: rendered_.id,
@@ -255,7 +267,7 @@ export function describeSnapshotContract(
 
     it("keeps a play error, and lists its snapshot even when unchanged", async () => {
       const environment = "play";
-      const run = await snapshots.beginRun({ gitSha: SHA_0, environment, dirty: false, baselineSha: null });
+      const run = await snapshots.beginRun({ gitSha: SHA_0, environment, scale: 1, dirty: false, baselineSha: null });
       const played = [
         { ...rendered("a", 10), playError: "play threw" },
         rendered("b", 11),
@@ -270,7 +282,7 @@ export function describeSnapshotContract(
         ["c", "play threw too"],
       ]);
 
-      const golden = await snapshots.beginRun({ gitSha: SHA_1, environment, dirty: false, baselineSha: null });
+      const golden = await snapshots.beginRun({ gitSha: SHA_1, environment, scale: 1, dirty: false, baselineSha: null });
       const clean = [rendered("a", 10), rendered("b", 11)];
       await snapshots.recordSnapshots(golden.id, clean);
       await snapshots.finishRun(golden.id, 2);
@@ -282,7 +294,7 @@ export function describeSnapshotContract(
       });
       expect(await snapshots.acceptRun(golden.id, null, 0)).toBe(true);
 
-      const next = await snapshots.beginRun({ gitSha: SHA_2, environment, dirty: false, baselineSha: SHA_1 });
+      const next = await snapshots.beginRun({ gitSha: SHA_2, environment, scale: 1, dirty: false, baselineSha: SHA_1 });
       await snapshots.recordSnapshots(next.id, [played[0]!, played[1]!]);
       await snapshots.finishRun(next.id, 2);
       const compared = await snapshots.compareRun(next.id, SHA_1);
@@ -292,7 +304,7 @@ export function describeSnapshotContract(
 
     it("fits a whole statement of the longest play errors and failures", async () => {
       const environment = "long-play";
-      const run = await snapshots.beginRun({ gitSha: SHA_0, environment, dirty: false, baselineSha: null });
+      const run = await snapshots.beginRun({ gitSha: SHA_0, environment, scale: 1, dirty: false, baselineSha: null });
       const count = 100;
       const long = "x".repeat(2_000);
       await snapshots.recordSnapshots(

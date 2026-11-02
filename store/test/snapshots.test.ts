@@ -67,7 +67,7 @@ describe("Snapshots", () => {
     environment = ENV,
     model = snapshots,
   ) => {
-    const run = await model.beginRun({ gitSha, environment, dirty: false, baselineSha: null });
+    const run = await model.beginRun({ gitSha, environment, scale: 1, dirty: false, baselineSha: null });
     await model.recordSnapshots(run.id, items);
     return model.finishRun(run.id, items.length);
   };
@@ -131,7 +131,7 @@ describe("Snapshots", () => {
 
   describe("recording a play error", () => {
     it("cuts it as a failure is cut, by code point", async () => {
-      const run = await snapshots.beginRun({ gitSha: SHA_A, environment: ENV, dirty: false, baselineSha: null });
+      const run = await snapshots.beginRun({ gitSha: SHA_A, environment: ENV, scale: 1, dirty: false, baselineSha: null });
       await snapshots.recordSnapshots(run.id, [{ story: "a", failure: "boom", playError: `${"x".repeat(1999)}😀😀\0` }]);
       await snapshots.finishRun(run.id, 1);
       const { snapshots: compared } = await snapshots.compareRun(run.id, null);
@@ -141,7 +141,7 @@ describe("Snapshots", () => {
     it("keeps a statement inside the parameter limit when only some rows have one", async () => {
       const { sent, adapter: counted } = counting(adapter);
       const model = new Snapshots({ sql: new Sql(counted) });
-      const run = await snapshots.beginRun({ gitSha: SHA_A, environment: ENV, dirty: false, baselineSha: null });
+      const run = await snapshots.beginRun({ gitSha: SHA_A, environment: ENV, scale: 1, dirty: false, baselineSha: null });
       const rows = Array.from({ length: 200 }, (_, i) => ({
         story: `s${i}`,
         failure: "boom",
@@ -161,11 +161,17 @@ describe("Snapshots", () => {
       expect(held.map(({ story }) => story).sort()).toEqual([...stories].sort());
     });
 
+    it("refuses a scale that isn't a positive number", async () => {
+      for (const scale of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+        await expect(snapshots.beginRun({ gitSha: SHA_A, environment: ENV, scale, dirty: false, baselineSha: null })).rejects.toThrow(RangeError);
+      }
+    });
+
     it("refuses what can't name a snapshot", async () => {
-      const run = await snapshots.beginRun({ gitSha: SHA_A, environment: ENV, dirty: false, baselineSha: null });
+      const run = await snapshots.beginRun({ gitSha: SHA_A, environment: ENV, scale: 1, dirty: false, baselineSha: null });
       for (const bad of ["", "a\0b"]) {
         await expect(snapshots.recordSnapshots(run.id, [rendered(bad, 1)])).rejects.toThrow(RangeError);
-        await expect(snapshots.beginRun({ gitSha: SHA_A, environment: bad, dirty: false, baselineSha: null })).rejects.toThrow(RangeError);
+        await expect(snapshots.beginRun({ gitSha: SHA_A, environment: bad, scale: 1, dirty: false, baselineSha: null })).rejects.toThrow(RangeError);
       }
       await expect(
         snapshots.recordSnapshots(run.id, [{ story: "a", imageHash: "abc" }]),
@@ -174,7 +180,7 @@ describe("Snapshots", () => {
         "recorded twice",
       );
       for (const sha of ["abc123", SHA_A.toUpperCase()]) {
-        await expect(snapshots.beginRun({ gitSha: sha, environment: ENV, dirty: false, baselineSha: null })).rejects.toThrow("Git SHA");
+        await expect(snapshots.beginRun({ gitSha: sha, environment: ENV, scale: 1, dirty: false, baselineSha: null })).rejects.toThrow("Git SHA");
       }
       await expect(snapshots.finishRun(run.id, 0)).resolves.toMatchObject({ status: "complete" });
     });
@@ -182,7 +188,7 @@ describe("Snapshots", () => {
 
   describe("recording", () => {
     it("takes the newer result for a name, until the run is finished", async () => {
-      const run = await snapshots.beginRun({ gitSha: SHA_A, environment: ENV, dirty: false, baselineSha: null });
+      const run = await snapshots.beginRun({ gitSha: SHA_A, environment: ENV, scale: 1, dirty: false, baselineSha: null });
       await snapshots.recordSnapshots(run.id, [{ story: "a", failure: "Timeout" }, rendered("b", 1)]);
       await snapshots.recordSnapshots(run.id, [rendered("a", 2), { story: "b", failure: "Crash" }]);
       expect(await snapshots.finishRun(run.id, 2)).toMatchObject({ status: "failed", failedCount: 1 });
@@ -206,7 +212,7 @@ describe("Snapshots", () => {
     it("records a mix of results in one statement", async () => {
       const { adapter: counted, sent } = counting(adapter);
       const model = new Snapshots({ sql: new Sql(counted) });
-      const run = await model.beginRun({ gitSha: SHA_A, environment: ENV, dirty: false, baselineSha: null });
+      const run = await model.beginRun({ gitSha: SHA_A, environment: ENV, scale: 1, dirty: false, baselineSha: null });
       sent.length = 0;
       await model.recordSnapshots(run.id, [
         rendered("a", 1),
@@ -227,14 +233,14 @@ describe("Snapshots", () => {
     });
 
     it("bounds a failure message without splitting a character", async () => {
-      const run = await snapshots.beginRun({ gitSha: SHA_A, environment: ENV, dirty: false, baselineSha: null });
+      const run = await snapshots.beginRun({ gitSha: SHA_A, environment: ENV, scale: 1, dirty: false, baselineSha: null });
       await snapshots.recordSnapshots(run.id, [{ story: "a", failure: "\0\u{1F600}".repeat(5_000) }]);
       await snapshots.finishRun(run.id, 1);
       expect((await heldBy(run.id))[0]?.failure).toBe("\u{1F600}".repeat(2_000));
     });
 
     it("refuses an image that isn't stored, and a run that doesn't exist", async () => {
-      const run = await snapshots.beginRun({ gitSha: SHA_A, environment: ENV, dirty: false, baselineSha: null });
+      const run = await snapshots.beginRun({ gitSha: SHA_A, environment: ENV, scale: 1, dirty: false, baselineSha: null });
       await expect(snapshots.recordSnapshots(run.id, [rendered("a", 9_999)])).rejects.toMatchObject({
         code: "unknown-image",
       });
@@ -248,7 +254,7 @@ describe("Snapshots", () => {
     });
 
     it("keeps the good rows of a statement that also names an unstored image", async () => {
-      const run = await snapshots.beginRun({ gitSha: SHA_A, environment: ENV, dirty: false, baselineSha: null });
+      const run = await snapshots.beginRun({ gitSha: SHA_A, environment: ENV, scale: 1, dirty: false, baselineSha: null });
       await expect(
         snapshots.recordSnapshots(run.id, [rendered("a", 1), rendered("b", 9_999)]),
       ).rejects.toMatchObject({ code: "unknown-image", message: expect.stringContaining("1 snapshots") });
@@ -260,7 +266,7 @@ describe("Snapshots", () => {
     it("finishes an empty run, and sends nothing for an empty call", async () => {
       const { adapter: counted, sent } = counting(adapter);
       const model = new Snapshots({ sql: new Sql(counted) });
-      const run = await model.beginRun({ gitSha: SHA_A, environment: ENV, dirty: false, baselineSha: null });
+      const run = await model.beginRun({ gitSha: SHA_A, environment: ENV, scale: 1, dirty: false, baselineSha: null });
       await model.recordSnapshots(run.id, []);
       await model.decide({ environment: ENV, decision: "approved", actor: "ned", snapshots: [] });
       expect(sent).toHaveLength(1);
@@ -268,7 +274,7 @@ describe("Snapshots", () => {
     });
 
     it("lists runs at a SHA, crashed ones included, for one environment", async () => {
-      const crashed = await snapshots.beginRun({ gitSha: SHA_A, environment: ENV, dirty: false, baselineSha: null });
+      const crashed = await snapshots.beginRun({ gitSha: SHA_A, environment: ENV, scale: 1, dirty: false, baselineSha: null });
       const later = await recordRun(SHA_A, []);
       await recordRun(SHA_A, [], "other");
       await recordRun(SHA_B, []);
@@ -290,7 +296,7 @@ describe("Snapshots", () => {
     it("sends a large run in as few requests as the limits allow", async () => {
       const { adapter: counted, sent } = counting(adapter);
       const model = new Snapshots({ sql: new Sql(counted) });
-      const run = await model.beginRun({ gitSha: SHA_A, environment: ENV, dirty: false, baselineSha: null });
+      const run = await model.beginRun({ gitSha: SHA_A, environment: ENV, scale: 1, dirty: false, baselineSha: null });
       sent.length = 0;
       await model.recordSnapshots(run.id, items);
       expect(sent.map((statements) => statements.length)).toEqual([400, 9]);
@@ -300,7 +306,7 @@ describe("Snapshots", () => {
       ["nothing landed", 0, 19_600],
       ["its statements landed in part", 5, 19_600 + 5 * 49],
     ])("leaves a run that says so when a batch dies and %s", async (_, ran, stored) => {
-      const run = await snapshots.beginRun({ gitSha: SHA_A, environment: ENV, dirty: false, baselineSha: null });
+      const run = await snapshots.beginRun({ gitSha: SHA_A, environment: ENV, scale: 1, dirty: false, baselineSha: null });
       let requests = 0;
       const dying = over((inner) => failing(inner, () => ++requests === 2, ran));
 
@@ -329,7 +335,7 @@ describe("Snapshots", () => {
     });
 
     it("can send a failed call again, whatever of it landed", async () => {
-      const run = await snapshots.beginRun({ gitSha: SHA_A, environment: ENV, dirty: false, baselineSha: null });
+      const run = await snapshots.beginRun({ gitSha: SHA_A, environment: ENV, scale: 1, dirty: false, baselineSha: null });
       let requests = 0;
       const dying = over((inner) => failing(inner, () => ++requests === 2, 5));
       await expect(dying.recordSnapshots(run.id, items)).rejects.toThrow("Simulated");
@@ -338,7 +344,7 @@ describe("Snapshots", () => {
     });
 
     it("keeps one row per name when a request commits and its response is lost", async () => {
-      const run = await snapshots.beginRun({ gitSha: SHA_A, environment: ENV, dirty: false, baselineSha: null });
+      const run = await snapshots.beginRun({ gitSha: SHA_A, environment: ENV, scale: 1, dirty: false, baselineSha: null });
       let lost = false;
       const losing = over((inner) => ({
         execute: async (statements) => {
@@ -549,7 +555,7 @@ describe("Snapshots", () => {
       await expect(snapshots.acceptRun(failed.id, null, 0)).rejects.toMatchObject({
         code: "run-has-failures",
       });
-      const recording = await snapshots.beginRun({ gitSha: SHA_A, environment: ENV, dirty: false, baselineSha: null });
+      const recording = await snapshots.beginRun({ gitSha: SHA_A, environment: ENV, scale: 1, dirty: false, baselineSha: null });
       await expect(snapshots.acceptRun(recording.id, null, 0)).rejects.toMatchObject({
         code: "run-not-finished",
       });
@@ -729,7 +735,7 @@ describe("Snapshots", () => {
       };
 
       const goldenItems = Array.from({ length: N }, (_, i) => rendered(pad(i), 1_000_000 + i));
-      const golden = await measure("beginRun", () => model.beginRun({ gitSha: SHA_A, environment: ENV, dirty: false, baselineSha: null }));
+      const golden = await measure("beginRun", () => model.beginRun({ gitSha: SHA_A, environment: ENV, scale: 1, dirty: false, baselineSha: null }));
       await measure("recordSnapshots", () => model.recordSnapshots(golden.id, goldenItems));
       await measure("finishRun", () => model.finishRun(golden.id, N));
       await measure("decide (all)", () => approve(goldenItems, ENV, model));
@@ -745,7 +751,7 @@ describe("Snapshots", () => {
             : item,
       );
       for (let i = 0; i < 50; i++) head.push(rendered(`zz-new-${i}`, 1_000_000 + N + 500 + i));
-      const run = await measure("beginRun (head)", () => model.beginRun({ gitSha: SHA_B, environment: ENV, dirty: false, baselineSha: null }));
+      const run = await measure("beginRun (head)", () => model.beginRun({ gitSha: SHA_B, environment: ENV, scale: 1, dirty: false, baselineSha: null }));
       await measure("recordSnapshots (head)", () => model.recordSnapshots(run.id, head));
       const finished = await measure("finishRun (head)", () => model.finishRun(run.id, head.length));
       expect(finished.failedCount).toBe(50);
