@@ -10,17 +10,19 @@ export async function createTempStore() {
   const directory = await mkdtemp(join(tmpdir(), "selfie-store-"));
   const path = join(directory, "store.db");
   const adapters: SqliteAdapter[] = [];
-  const connect = () => {
+  const connectAdapter = () => {
     const adapter = new SqliteAdapter(path);
     adapters.push(adapter);
-    return new Sql(adapter);
+    return adapter;
   };
+  const connect = () => new Sql(connectAdapter());
   const sql = connect();
   await initStoreSchema(sql);
   return {
     path,
     sql,
     connect,
+    connectAdapter,
     blob: new Blobs(new FilesystemBlobStorage(join(directory, "blobs"))),
     destroy: async () => {
       for (const adapter of adapters) adapter.close();

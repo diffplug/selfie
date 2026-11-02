@@ -1,9 +1,17 @@
 # System
 
-> Status: design — nothing here is implemented yet.
+> Status: partly built — local approvals are built in `docs/specs/snapshots.md`; everything under `## Future` is design.
 >
 > - See `docs/specs/glossary.md` for vocabulary.
 > - Owns the staged build order and the behavior spanning the local app and the cloud. Image storage belongs to `docs/specs/store.md`.
+
+## Approvals
+
+Source of truth: `store/src/core/snapshots.ts`. `docs/specs/snapshots.md` → Decisions owns how they are recorded.
+
+- **Must not make a user re-approve a snapshot change at a new Git SHA in the same store.** An approval holds for a snapshot's name and image hash, so a run after a commit, rebase, or amend finds it if the pixels are the same.
+
+Reserved: this is the local half of [carrying approvals through a push](#approvals-across-stores).
 
 ## Future
 
@@ -20,9 +28,9 @@ Selfie is for fully opaque images, and transparency is never allowed: `docs/spec
 
 **Later:** an agent skill could help a project test its own setup and find an environment that works for it.
 
-### Approvals
+### Approvals across stores
 
-- **Must not make a user re-approve at push a snapshot change they already approved locally.** A user can approve changes on an unpushed PR, and those approvals carry through the push. The mechanism is undecided.
+- **Must not make a user re-approve at push a snapshot change they already approved locally.** A user can approve changes on an unpushed PR, and those approvals carry through the push. The record is built ([Approvals](#approvals)) and keyed so it can move between stores. Moving it is `sync`'s job, as `docs/specs/snapshots.md` → Future says.
 
 ### Cloud data
 
@@ -46,7 +54,7 @@ Selfie is for fully opaque images, and transparency is never allowed: `docs/spec
 
 **Scope: github-access** — The GitHub App, sign-in, and access checks (`docs/specs/access.md`). Ships with `cloud-deploy`, since a deployed service needs them before it holds anyone's images.
 
-**Scope: sync** — Push and pull between stores, and `find-baseline`. Local approvals carry through here ([Approvals](#approvals)).
+**Scope: sync** — Push and pull between stores, and `find-baseline`. Local approvals carry through here ([Approvals across stores](#approvals-across-stores)).
 
 **Scope: trust** — The cloud accepts local results without re-rendering.
 

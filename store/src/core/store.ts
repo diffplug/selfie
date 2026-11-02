@@ -1,7 +1,15 @@
 import type { Blobs } from "./blob.ts";
-import { SHA256_BYTES, sha256, toHex, truncateHash, type HashFunction } from "./image-hash.ts";
+import {
+  assertImageHash,
+  SHA256_BYTES,
+  sha256,
+  toHex,
+  truncateHash,
+  type HashFunction,
+} from "./image-hash.ts";
 import { decodeImage } from "./image-file.ts";
 import { encodePam } from "./pam.ts";
+import { CREATE_SNAPSHOT_TABLES } from "./snapshots.ts";
 import type { Sql, SqlStatement } from "./sql.ts";
 
 const CREATE_IMAGES_TABLE = `CREATE TABLE IF NOT EXISTS images (
@@ -27,8 +35,6 @@ RETURNING key`;
 
 const SELECT_IMAGE_KEY = "SELECT key FROM images WHERE hash = ?1";
 
-const IMAGE_HASH = /^[0-9a-f]{64}$/;
-
 // Each group's lookup and each group's inserts are one request on D1, whose API limit
 // every project shares. A group this size stays far inside what real D1 was measured
 // to accept in one batch, and its lookup fits the limit of 100 bound parameters.
@@ -40,9 +46,17 @@ export function imageInsertStatement(hash: string, truncated: number): SqlStatem
   return { sql: INSERT_IMAGE, params: [truncated, hash], idempotent: true };
 }
 
-/** Creates the store's tables if they are missing. Safe to call concurrently. */
+/**
+ * Creates the store's tables if they are missing, in one request. Safe to call
+ * concurrently. It only ever adds: see `docs/specs/snapshots.md` -> Schema.
+ */
 export async function initStoreSchema(sql: Sql): Promise<void> {
-  await sql.run({ sql: CREATE_IMAGES_TABLE, idempotent: true });
+  await sql.batch(
+    [CREATE_IMAGES_TABLE, ...CREATE_SNAPSHOT_TABLES].map((statement) => ({
+      sql: statement,
+      idempotent: true,
+    })),
+  );
 }
 
 export interface StoreOptions {
@@ -174,10 +188,4 @@ function checkedKey(key: unknown): number {
 
 function imageBlobKey(hash: string): string {
   return `images/${hash}`;
-}
-
-function assertImageHash(hash: string): void {
-  if (!IMAGE_HASH.test(hash)) {
-    throw new RangeError(`Not an image hash: ${JSON.stringify(hash)}`);
-  }
 }
