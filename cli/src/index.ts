@@ -23,7 +23,16 @@ export {
   type Project,
   type ReviewCache,
 } from "./project.ts";
-export { review, type Difference, type ReviewOptions, type ReviewResult } from "./review.ts";
+export {
+  record,
+  review,
+  type Difference,
+  type RecordOptions,
+  type RecordResult,
+  type GivenBaseline,
+  type ReviewOptions,
+  type ReviewResult,
+} from "./review.ts";
 export {
   isDecidable,
   summarizeRun,

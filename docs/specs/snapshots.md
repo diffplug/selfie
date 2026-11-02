@@ -54,7 +54,7 @@ A run is one recording of a set of snapshots against one full Git SHA in one env
 
 ## Compare
 
-Source of truth: `Snapshots.compareRun` in `store/src/core/snapshots.ts`.
+Source of truth: `Snapshots.compareRun` and `compareWithRun` in `store/src/core/snapshots.ts`.
 
 - **Must compare by image alone: the same hash is the same image.** Pixel diffs belong to `selfie review` (`docs/specs/cli.md` → Review).
 - **Must give each snapshot exactly one state**, of which `changed` and `new` are the ones `isDecidable`, having an image to decide on:
@@ -68,6 +68,7 @@ Source of truth: `Snapshots.compareRun` in `store/src/core/snapshots.ts`.
 | `removed` | Nothing | An image |
 
 - **Must list only what isn't `unchanged`, and anything with a play error, by default, with a count of every `unchanged` snapshot.** `includeUnchanged` lists them all (rationale).
+- **`compareWithRun` must compare with a finished run in the run's environment**, whose images stand in for the goldens, and refuse any other with `no-baseline-run`. A story that run left out by a filter reads as `new`. **Never let `acceptRun` take a run as its baseline.**
 - **Must refuse a baseline SHA that has no goldens in the run's environment**, rather than report everything as new. A null baseline means there are none yet, and gives `new` and `failed` only. That is what changing the environment starts from (`docs/specs/system.md`).
 - **Must return the decision on exactly the run's image for that name**, whatever the state, so `selfie review` can show what is already approved.
 

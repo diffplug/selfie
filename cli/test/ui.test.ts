@@ -345,6 +345,7 @@ describe("a run that reused an earlier render", () => {
     await writeFile(path.join(build, "iframe.html"), "<html></html>");
     h.stories = [{ id: "a--one" }];
     const rendered = (await h.cli("review", "--storybook-dir", build)).json;
+    await commit(h.repo, "elsewhere");
     const reused = (await h.cli("review", "--storybook-dir", build)).json;
     expect(reused.reusedFromRun).toBe(rendered.runId);
     expect((await viewOf(rendered.runId)).run.reusedFromRun).toBeNull();

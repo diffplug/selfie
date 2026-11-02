@@ -90,6 +90,12 @@ export async function gitUserEmail(repo: Repo): Promise<string | null> {
   return (await ask(repo.root, ["config", "user.email"])) || null;
 }
 
+/** The commit a name means here, or null. */
+export async function resolveCommit(repo: Repo, ref: string): Promise<string | null> {
+  if (ref.startsWith("-")) return null;
+  return ask(repo.root, ["rev-parse", "--verify", "--quiet", `${ref}^{commit}`]);
+}
+
 export type NoBaselineReason =
   | "no-commits"
   | "no-merge-base"

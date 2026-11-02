@@ -243,6 +243,32 @@ export function describeSnapshotContract(
       }
     });
 
+    it("compares with a finished run in its environment, and refuses any other", async () => {
+      const environment = "against-a-run";
+      const begin = (env = environment) => snapshots.beginRun({ gitSha: SHA_0, environment: env, scale: 1, dirty: false, baselineSha: null });
+      const finished = async (env: string | undefined, rows: readonly RecordedSnapshot[]) => {
+        const run = await begin(env);
+        await snapshots.recordSnapshots(run.id, rows);
+        return snapshots.finishRun(run.id, rows.length);
+      };
+      const first = await finished(undefined, [rendered("a", 1), rendered("b", 2), rendered("gone", 4)]);
+      const second = await finished(undefined, [rendered("a", 1), rendered("b", 3), rendered("fresh", 5)]);
+
+      const { snapshots: compared, unchangedCount } = await snapshots.compareWithRun(second.id, first.id);
+      expect(unchangedCount).toBe(1);
+      expect(compared.map(({ story, state, goldenHash }) => [story, state, goldenHash])).toEqual([
+        ["b", "changed", hashOf(2)],
+        ["fresh", "new", null],
+        ["gone", "removed", hashOf(4)],
+      ]);
+
+      const elsewhere = await finished("against-a-run-elsewhere", [rendered("a", 1)]);
+      const recording = await begin();
+      for (const baseline of [elsewhere.id, recording.id, "00000000-0000-4000-8000-000000000000"]) {
+        await expect(snapshots.compareWithRun(second.id, baseline)).rejects.toMatchObject({ code: "no-baseline-run" });
+      }
+    });
+
     it("keeps which run really rendered a run's images, and which didn't", async () => {
       const environment = "reused";
       const rendered_ = await snapshots.beginRun({ gitSha: SHA_0, environment, scale: 1, dirty: false, baselineSha: null });
