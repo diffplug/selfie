@@ -10,8 +10,8 @@
   },
   "scripts": {
     "build": "vite build",
-    "build-storybook": "storybook build --quiet",
-    "storybook": "storybook dev -p 6007",
+    "build-storybook": "node --disable-warning=ExperimentalWarning ../cli/scripts/generate-storybook-fixtures.ts && storybook build --quiet",
+    "storybook": "node --disable-warning=ExperimentalWarning ../cli/scripts/generate-storybook-fixtures.ts && storybook dev -p 6007",
     "prepare": "vite build",
     "test": "pnpm typecheck && vite build --logLevel warn && vitest run",
     "typecheck": "tsc -p tsconfig.json"

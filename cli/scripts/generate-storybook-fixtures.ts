@@ -1,6 +1,7 @@
 // Writes the images the review UI's stories show, at the paths the server would answer, and their
 // real hashes and pixel diffs. Here, since `selfie-cli` may depend on `selfie-ui` and never the
-// reverse. Run it by hand if they need to change: node cli/scripts/generate-storybook-fixtures.ts
+// reverse. Every Storybook build runs it. The images are build output, and the hashes and diffs are
+// committed, since stories import them and typechecking needs them on a fresh clone.
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -78,8 +79,6 @@ const DIFFS = [
 
 const ui = fileURLToPath(new URL("../../ui/", import.meta.url));
 const output = path.join(ui, "storybook-fixtures/api");
-// These stay in Git history, so they get the smallest deflate.
-const png = (image: RawImage) => encodePng(image, 9);
 await rm(output, { recursive: true, force: true });
 await mkdir(path.join(output, "images"), { recursive: true });
 
@@ -87,7 +86,7 @@ const hashes: Record<string, string> = {};
 for (const [name, image] of Object.entries(IMAGES)) {
   const hash = toHex(await sha256(encodePam(image)));
   hashes[name] = hash;
-  await writeFile(path.join(output, "images", hash), await png(image));
+  await writeFile(path.join(output, "images", hash), await encodePng(image));
 }
 
 const pixelDiffs: Record<string, unknown> = {};
@@ -97,7 +96,7 @@ for (const [current, golden] of DIFFS) {
   if (highlighted !== null) {
     const directory = path.join(output, "diffs", hashes[current]!, hashes[golden]!);
     await mkdir(directory, { recursive: true });
-    await writeFile(path.join(directory, "image"), await png(highlighted));
+    await writeFile(path.join(directory, "image"), await encodePng(highlighted));
   }
 }
 

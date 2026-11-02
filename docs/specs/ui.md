@@ -17,7 +17,7 @@ Source of truth: `ui/`.
 | `ui/src/client/` | The React client, on Primer, built by Vite into `ui/dist/` |
 | `cli/src/ui.ts` | `localReviewSource`: a `ReviewSource` over a repository, through the CLI's library |
 | `ui/.storybook/`, `ui/src/client/*.stories.tsx`, `ui/src/client/stories/` | Every screen as a story, which Selfie reviews itself by ([Stories](#stories)) |
-| `ui/storybook-fixtures/` | Generated images, at the paths the server answers |
+| `ui/storybook-fixtures/` | Images generated before each Storybook build, at the paths the server answers. Not in Git |
 
 - **Must keep `ui/src/server/app.ts` free of anything specific to a platform**: no Node, no file, no Git. It knows Hono, `selfie-store`'s core, and `ReviewSource`. `cli/test/ui.test.ts` checks what it loads.
 - **Must have `selfie-cli` depend on `selfie-ui`, never the reverse** (rationale). `docs/specs/cli.md` → ui owns how it loads it.

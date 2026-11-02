@@ -2,5 +2,3 @@
 *.pam binary
 # Tests compare these byte for byte too.
 *.png binary
-# Images at the paths the server answers, so they have no extension.
-ui/storybook-fixtures/** binary
