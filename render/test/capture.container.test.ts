@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { capture, type CaptureOptions } from "../src/capture.ts";
-import { defineEnvironment, environmentId } from "../src/environment.ts";
+import { type ContainerRunner, defineEnvironment, environmentId } from "../src/environment.ts";
 import type { Manifest, ManifestStory } from "../src/manifest.ts";
 
 const STORYBOOK = fileURLToPath(new URL("./fixtures/storybook", import.meta.url));
@@ -33,15 +33,21 @@ function pngChunkTypes(png: Buffer): string[] {
   return types;
 }
 
+/** The selfie-render containers holding this output directory, so another run's don't count. */
 const containersFor = async (outDir: string) => {
   const { stdout } = await promisify(execFile)("docker", [
     "ps",
     "--all",
-    "--quiet",
+    "--no-trunc",
     "--filter",
-    `label=selfie-render=${outDir}`,
+    "label=selfie-render",
+    "--format",
+    "{{.Mounts}}",
   ]);
-  return stdout.trim();
+  return stdout
+    .split("\n")
+    .filter((mounts) => mounts.includes(outDir))
+    .join("\n");
 };
 
 beforeAll(async () => {
@@ -61,24 +67,28 @@ describe.runIf(process.env.SELFIE_RENDER_CONTAINER === "1")("in the pinned conta
       manifest = await run({ stability: true, storyTimeoutMs: 5_000 }, outDir);
     }, 120_000);
 
-    test("runs on the image it was told to, with the keychain flags, and records it", () => {
+    test("runs on the image it was told to, and records it", () => {
       expect(manifest.environmentId).toBe(environmentId(defineEnvironment()));
       expect(manifest.environment).toEqual(defineEnvironment());
       expect(manifest.runtime).toMatchObject({ platform: "linux", arch: "arm64", playwright: "1.63.0" });
-      expect(manifest.launchArgs).toEqual(
-        expect.arrayContaining([
-          "--disable-lcd-text",
-          "--font-render-hinting=none",
-          "--use-mock-keychain",
-          "--password-store=basic",
-        ]),
-      );
-      expect(manifest.stabilityChecked).toBe(true);
+      expect(manifest.settleMs).toBeGreaterThanOrEqual(0);
+    });
+
+    test("answers from the build, and 404s what's missing or outside it", () => {
+      const served = story(manifest, "basic--serving");
+      expect(served.errors.map((error) => error.message).join()).not.toContain("answered");
+      expect(served.status).toBe("ok");
+    });
+
+    test("reports a play failure as its own source, without failing the story", () => {
+      const played = story(manifest, "play--fails");
+      expect(played.status).toBe("ok");
+      expect(played.errors).toContainEqual({ source: "play", message: "this play function fails" });
     });
 
     test("captures every story and leaves out docs", () => {
       expect(manifest.stories.map((entry) => entry.id)).not.toContain("guide--docs");
-      expect(manifest.totals.stories).toBe(12);
+      expect(manifest.totals.stories).toBe(13);
     });
 
     test("applies the page conditions before story code runs", () => {
@@ -98,7 +108,7 @@ describe.runIf(process.env.SELFIE_RENDER_CONTAINER === "1")("in the pinned conta
       const thrown = story(manifest, "broken--throws");
       expect(thrown).toMatchObject({ status: "failed", file: null, stability: "unchecked" });
       expect(thrown.errors).toContainEqual({ source: "render", message: "this story always throws" });
-      expect(manifest.totals.ok).toBeGreaterThan(0);
+      expect(manifest.totals.failed).toBeLessThan(manifest.totals.stories);
     });
 
     test("bounds a story that never finishes", () => {
@@ -148,7 +158,7 @@ describe.runIf(process.env.SELFIE_RENDER_CONTAINER === "1")("in the pinned conta
       expect(story(manifest, "timers--frozen-by-project").stability).toBe("unstable");
     });
 
-    test("keeps second renders only for unstable stories, and no working directory", async () => {
+    test("keeps second renders only for unstable stories", async () => {
       const unstable = manifest.stories
         .filter((entry) => entry.stability === "unstable")
         .map((entry) => path.basename(entry.repeatFile as string));
@@ -178,21 +188,31 @@ describe.runIf(process.env.SELFIE_RENDER_CONTAINER === "1")("in the pinned conta
     expect(pngChunkTypes(png).filter((type) => type !== "IDAT")).toEqual(["IHDR", "IEND"]);
   });
 
-  test("a project's init script and CSS run before story code", async () => {
-    const stories = ["timers--frozen-by-project", "init--css-applied"];
+  test("a project's init script runs before story code", async () => {
     const frozen = await run({
-      stories,
+      stories: ["timers--frozen-by-project"],
       stability: true,
       initScript: "window.__PROJECT_FREEZE__ = true;",
-      initCss: ":root { --fixture-marker: applied; }",
     });
-    expect(frozen.stories.map((entry) => entry.errors)).toEqual([[], []]);
-    expect(frozen.totals).toMatchObject({ ok: 2, stable: 2 });
-    expect(frozen.init.scriptSha256).toMatch(/^[0-9a-f]{64}$/);
-    expect(frozen.init.cssSha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(story(frozen, "timers--frozen-by-project")).toMatchObject({ errors: [], stability: "stable" });
+    expect(frozen.totals).toEqual({ stories: 1, failed: 0, unstable: 0 });
+    expect(frozen.initScriptSha256).toMatch(/^[0-9a-f]{64}$/);
+  });
 
-    const bare = await run({ stories: ["init--css-applied"] });
-    expect(bare.totals.failed).toBe(1);
+  test("a digest for another platform is refused before the output is touched", async () => {
+    const outDir = newOutDir();
+    await run({ stories: ["basic--detail"] }, outDir);
+    const environment = defineEnvironment({
+      runner: { ...(defineEnvironment().runner as ContainerRunner), platform: "linux/s390x" },
+    });
+    await expect(run({ environment, stories: ["basic--detail"] }, outDir)).rejects.toThrow(/linux\/s390x/);
+    expect(await readdir(outDir)).toContain("manifest.json");
+  });
+
+  test("settling longer doesn't change the environment", async () => {
+    const manifest = await run({ stories: ["basic--detail"], settleMs: 1 });
+    expect(manifest.settleMs).toBe(1);
+    expect(manifest.environmentId).toBe(environmentId(defineEnvironment()));
   });
 
   test("viewport and scale reach the pixels", async () => {
@@ -251,9 +271,6 @@ test("a native runner warns, and its environment never names the container", asy
   expect(manifest.warnings.join()).toMatch(/won't match other machines/);
   expect(manifest.environmentId).toMatch(new RegExp(`^native-${process.platform}-${process.arch}-`));
   expect(manifest.runtime).toMatchObject({ platform: process.platform, arch: process.arch });
-  expect(manifest.launchArgs).toEqual(
-    expect.arrayContaining(["--use-mock-keychain", "--password-store=basic"]),
-  );
   expect(story(manifest, "basic--detail").status).toBe("ok");
 });
 

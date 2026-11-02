@@ -42,28 +42,14 @@ export function filterStories(
   stories: StoryEntry[],
   patterns: string[],
 ): { stories: StoryEntry[]; unmatched: string[] } {
-  const compiled = patterns.map((pattern) => ({
+  const matchers = patterns.map((pattern) => ({
     pattern,
-    regex: new RegExp(
-      `^${pattern
-        .split("*")
-        .map((part) => part.replace(/[.+?^${}()|[\]\\]/g, "\\$&"))
-        .join(".*")}$`,
-    ),
-    matched: false,
+    regex: new RegExp(`^${pattern.split("*").map(RegExp.escape).join(".*")}$`),
   }));
-  const kept = stories.filter((story) => {
-    let keep = false;
-    for (const entry of compiled) {
-      if (entry.regex.test(story.id)) {
-        entry.matched = true;
-        keep = true;
-      }
-    }
-    return keep;
-  });
   return {
-    stories: kept,
-    unmatched: compiled.filter((entry) => !entry.matched).map((entry) => entry.pattern),
+    stories: stories.filter((story) => matchers.some(({ regex }) => regex.test(story.id))),
+    unmatched: matchers
+      .filter(({ regex }) => !stories.some((story) => regex.test(story.id)))
+      .map(({ pattern }) => pattern),
   };
 }

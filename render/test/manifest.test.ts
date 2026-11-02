@@ -114,7 +114,7 @@ describe("withRepeat", () => {
   });
 });
 
-test("totalsOf counts each status", () => {
+test("totalsOf counts stories, failures, and unstable stories", () => {
   const ok = toManifestStory(entry, okResult("aaa"), null);
   const stories = [
     ok,
@@ -122,7 +122,7 @@ test("totalsOf counts each status", () => {
     withRepeat(ok, okResult("bbb"), null),
     toManifestStory(entry, failedResult, null),
   ];
-  expect(totalsOf(stories)).toEqual({ stories: 4, ok: 3, failed: 1, stable: 1, unstable: 1, unchecked: 2 });
+  expect(totalsOf(stories)).toEqual({ stories: 4, failed: 1, unstable: 1 });
 });
 
 test("writeManifest leaves only a complete, parseable manifest", async () => {

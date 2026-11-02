@@ -1,23 +1,18 @@
 import { createHash } from "node:crypto";
-import { createRequire } from "node:module";
 import os from "node:os";
-import { CAPTURE_RECIPE } from "./worker/protocol.ts";
+import { CAPTURE_RECIPE, PLAYWRIGHT_VERSION } from "./worker/protocol.ts";
 
-export const DEFAULT_IMAGE =
+const DEFAULT_IMAGE =
   "mcr.microsoft.com/playwright@sha256:a0f4498920a5dbac63196d9140ed738ef00470f27e2e74029abd8850b7bd5717";
-export const DEFAULT_PLATFORM = "linux/arm64";
-export const DEFAULT_BROWSER_FLAGS: readonly string[] = ["--disable-lcd-text", "--font-render-hinting=none"];
+const DEFAULT_PLATFORM = "linux/arm64";
+const DEFAULT_BROWSER_FLAGS: readonly string[] = ["--disable-lcd-text", "--font-render-hinting=none"];
 
 /** On every browser launch, so nothing prompts for the macOS keychain. They don't affect pixels, so they stay out of the environment. */
-export const HOUSEKEEPING_FLAGS: readonly string[] = ["--use-mock-keychain", "--password-store=basic"];
-
-const PLAYWRIGHT_VERSION = (
-  createRequire(import.meta.url)("playwright-core/package.json") as { version: string }
-).version;
+const HOUSEKEEPING_FLAGS: readonly string[] = ["--use-mock-keychain", "--password-store=basic"];
 
 export interface ContainerRunner {
   kind: "container";
-  /** `name@sha256:<digest>`, optionally `name:tag@sha256:<digest>`. A bare tag is refused. */
+  /** `name@sha256:<digest>`. A tag is refused. */
   image: string;
   /** Docker's platform string, like `linux/arm64`. */
   platform: string;
@@ -35,7 +30,6 @@ export interface RenderEnvironment {
   browserFlags: string[];
   viewport: { width: number; height: number };
   scale: number;
-  settleMs: number;
 }
 
 export interface EnvironmentOverrides extends Partial<Omit<RenderEnvironment, "runner">> {
@@ -63,16 +57,15 @@ export function defineEnvironment(overrides: EnvironmentOverrides = {}): RenderE
     browserFlags: [...(overrides.browserFlags ?? DEFAULT_BROWSER_FLAGS)],
     viewport: { width: 1200, height: 900, ...overrides.viewport },
     scale: overrides.scale ?? 1,
-    settleMs: overrides.settleMs ?? 500,
   };
   validateEnvironment(environment);
   return environment;
 }
 
-export function validateEnvironment(environment: RenderEnvironment): void {
-  const { runner, browserFlags, viewport, scale, settleMs } = environment;
+function validateEnvironment(environment: RenderEnvironment): void {
+  const { runner, browserFlags, viewport, scale } = environment;
   if (runner.kind === "container") {
-    parseImage(runner.image);
+    imageDigest(runner.image);
     if (!/^[a-z0-9]+\/[a-z0-9]+(\/[a-z0-9]+)?$/.test(runner.platform)) {
       throw new EnvironmentError(
         `Invalid container platform "${runner.platform}". Expected a form like linux/arm64.`,
@@ -110,44 +103,47 @@ export function validateEnvironment(environment: RenderEnvironment): void {
   }
   if (!Number.isFinite(scale) || scale <= 0)
     throw new EnvironmentError(`Scale must be a positive number, got ${scale}.`);
-  if (!Number.isInteger(settleMs) || settleMs < 0)
-    throw new EnvironmentError(`settleMs must be a non-negative integer, got ${settleMs}.`);
 }
 
-/** Splits a pinned image reference, refusing one with no digest, since a tag can move. */
-export function parseImage(image: string): { name: string; digest: string } {
-  const match = /^([a-z0-9][^@\s]*)@(sha256:[0-9a-f]{64})$/.exec(image);
-  if (!match) {
+/** The digest of a pinned image, refusing a reference with a tag or no digest, since a tag can move. */
+function imageDigest(image: string): string {
+  const match = /^[a-z0-9][^@\s]*@(sha256:[0-9a-f]{64})$/.exec(image);
+  if (
+    !match ||
+    image
+      .slice(image.lastIndexOf("/") + 1)
+      .split("@", 1)[0]
+      ?.includes(":")
+  ) {
     throw new EnvironmentError(
-      `Container image "${image}" must be pinned as name@sha256:<64 hex digits>. A floating tag can change the pixels without changing the environment ID.`,
+      `Container image "${image}" must be pinned as name@sha256:<64 hex digits>, with no tag. A floating tag can change the pixels without changing the environment ID.`,
     );
   }
-  const lastSlash = (match[1] as string).lastIndexOf("/");
-  const tagColon = (match[1] as string).indexOf(":", lastSlash + 1);
-  return {
-    name: tagColon === -1 ? (match[1] as string) : (match[1] as string).slice(0, tagColon),
-    digest: match[2] as string,
-  };
+  return match[1] as string;
+}
+
+/** Every flag a browser launches with: the environment's, plus housekeeping. */
+export function launchArgs(environment: RenderEnvironment): string[] {
+  return [...environment.browserFlags, ...HOUSEKEEPING_FLAGS];
 }
 
 /**
- * A stable ID for everything that decides the pixels, safe in a snapshot's name. The
- * readable prefix keeps a native run visibly apart from the container. The hash takes only
- * an image's digest, so a mirror or tag of the same image is the same environment. Flag
+ * A stable ID for what decides the pixels independently of the project, safe in a snapshot's
+ * name. The readable prefix keeps a native run visibly apart from the container. The hash
+ * takes only an image's digest, so a mirror of the same image is the same environment. Flag
  * order and property order don't matter. Upgrading Playwright changes the ID.
  */
 export function environmentId(environment: RenderEnvironment): string {
   validateEnvironment(environment);
-  const { runner, browserFlags, viewport, scale, settleMs } = environment;
+  const { runner, browserFlags, viewport, scale } = environment;
   const decidesPixels = {
     runner:
       runner.kind === "container"
-        ? { kind: runner.kind, digest: parseImage(runner.image).digest, platform: runner.platform }
+        ? { kind: runner.kind, digest: imageDigest(runner.image), platform: runner.platform }
         : runner,
     browserFlags: [...browserFlags].sort(),
     viewport: { width: viewport.width, height: viewport.height },
     scale,
-    settleMs,
     recipe: CAPTURE_RECIPE,
     playwright: PLAYWRIGHT_VERSION,
   };

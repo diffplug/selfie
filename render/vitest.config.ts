@@ -1,11 +1,11 @@
 import { defineConfig } from "vitest/config";
-import { defineEnvironment, type ContainerRunner } from "./src/environment.ts";
-import { ensureImage } from "./src/runners.ts";
+import { defineEnvironment } from "./src/environment.ts";
+import { prepareRunner } from "./src/runners.ts";
 
 // Here rather than in the test file, since vitest hides the output of a skipped file.
 if (process.env.SELFIE_RENDER_CONTAINER === undefined) {
   try {
-    await ensureImage(defineEnvironment().runner as ContainerRunner);
+    await prepareRunner(defineEnvironment().runner);
     process.env.SELFIE_RENDER_CONTAINER = "1";
   } catch (error) {
     process.env.SELFIE_RENDER_CONTAINER = "0";

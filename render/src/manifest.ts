@@ -9,6 +9,8 @@ export const STORIES_DIR = "stories";
 /** The second render of each unstable story, so it can be compared with the first. */
 export const REPEAT_DIR = "repeat";
 
+const UNREPORTED = "the worker never reported this story";
+
 export type StabilityStatus = "stable" | "unstable" | "unchecked";
 
 export interface ManifestStory {
@@ -32,11 +34,8 @@ export interface ManifestStory {
 
 export interface ManifestTotals {
   stories: number;
-  ok: number;
   failed: number;
-  stable: number;
   unstable: number;
-  unchecked: number;
 }
 
 export interface Manifest {
@@ -44,11 +43,11 @@ export interface Manifest {
   environmentId: string;
   environment: RenderEnvironment;
   recipe: typeof CAPTURE_RECIPE;
+  /** Project input rather than environment, so outside the environment ID. */
+  settleMs: number;
+  initScriptSha256: string | null;
   /** What actually ran. Null when no story needed a browser. */
   runtime: WorkerRuntime | null;
-  launchArgs: string[];
-  init: { global: string; scriptSha256: string | null; cssSha256: string | null };
-  stabilityChecked: boolean;
   startedAt: string;
   durationMs: number;
   warnings: string[];
@@ -63,39 +62,30 @@ export function storyFileName(id: string): string {
 
 /** The manifest entry for one story, where a missing result means the worker never reported it. */
 export function toManifestStory(
-  story: StoryEntry,
+  { id, title, name }: StoryEntry,
   result: WorkerStoryResult | undefined,
   crash: string | null,
 ): ManifestStory {
-  const base = {
-    id: story.id,
-    title: story.title,
-    name: story.name,
-    stability: "unchecked" as const,
-    repeatFile: null,
+  const { status, width, height, pngSha256, errors, durationMs } = result ?? {
+    status: "failed" as const,
+    width: null,
+    height: null,
+    pngSha256: null,
+    errors: [{ source: "worker" as const, message: crash ?? UNREPORTED }],
+    durationMs: 0,
   };
-  if (!result) {
-    const message = crash ?? "the worker never reported this story";
-    return {
-      ...base,
-      status: "failed",
-      file: null,
-      width: null,
-      height: null,
-      pngSha256: null,
-      errors: [{ source: "worker", message }],
-      durationMs: 0,
-    };
-  }
-  const { status, width, height, pngSha256, errors, durationMs } = result;
   return {
-    ...base,
+    id,
+    title,
+    name,
     status,
-    file: status === "ok" ? path.posix.join(STORIES_DIR, storyFileName(story.id)) : null,
+    file: status === "ok" ? path.posix.join(STORIES_DIR, storyFileName(id)) : null,
     width,
     height,
     pngSha256,
     errors,
+    stability: "unchecked",
+    repeatFile: null,
     durationMs,
   };
 }
@@ -107,31 +97,20 @@ export function withRepeat(
   crash: string | null,
 ): ManifestStory {
   if (story.status === "failed") return story;
-  if (!repeat) {
-    const message = crash ?? "the worker never reported this story";
-    return { ...story, stability: "unstable", errors: [...story.errors, { source: "repeat", message }] };
+  if (repeat?.status === "ok") {
+    return repeat.pngSha256 === story.pngSha256
+      ? { ...story, stability: "stable" }
+      : { ...story, stability: "unstable", repeatFile: path.posix.join(REPEAT_DIR, storyFileName(story.id)) };
   }
-  if (repeat.status === "failed") {
-    const message = repeat.errors.map((error) => error.message).join("; ") || "second render failed";
-    return { ...story, stability: "unstable", errors: [...story.errors, { source: "repeat", message }] };
-  }
-  if (repeat.pngSha256 === story.pngSha256) return { ...story, stability: "stable" };
-  return {
-    ...story,
-    stability: "unstable",
-    repeatFile: path.posix.join(REPEAT_DIR, storyFileName(story.id)),
-  };
+  const message = repeat ? repeat.errors.map((error) => error.message).join("; ") : (crash ?? UNREPORTED);
+  return { ...story, stability: "unstable", errors: [...story.errors, { source: "repeat", message }] };
 }
 
 export function totalsOf(stories: ManifestStory[]): ManifestTotals {
-  const count = (test: (story: ManifestStory) => boolean) => stories.filter(test).length;
   return {
     stories: stories.length,
-    ok: count((story) => story.status === "ok"),
-    failed: count((story) => story.status === "failed"),
-    stable: count((story) => story.stability === "stable"),
-    unstable: count((story) => story.stability === "unstable"),
-    unchecked: count((story) => story.stability === "unchecked"),
+    failed: stories.filter((story) => story.status === "failed").length,
+    unstable: stories.filter((story) => story.stability === "unstable").length,
   };
 }
 

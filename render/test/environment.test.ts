@@ -1,40 +1,35 @@
 import { describe, expect, test } from "vitest";
 import {
-  DEFAULT_IMAGE,
   defineEnvironment,
   environmentId,
   EnvironmentError,
-  parseImage,
+  launchArgs,
   type RenderEnvironment,
 } from "../src/environment.ts";
 
 const DIGEST = `sha256:${"a".repeat(64)}`;
 const OTHER_DIGEST = `sha256:${"b".repeat(64)}`;
+const DEFAULT_IMAGE =
+  "mcr.microsoft.com/playwright@sha256:a0f4498920a5dbac63196d9140ed738ef00470f27e2e74029abd8850b7bd5717";
 const container = (image: string, platform = "linux/arm64") =>
   defineEnvironment({ runner: { kind: "container", image, platform } });
 
 describe("defaults", () => {
   test("pin the arm64 Playwright image and the measured settings", () => {
     expect(defineEnvironment()).toEqual({
-      runner: {
-        kind: "container",
-        image:
-          "mcr.microsoft.com/playwright@sha256:a0f4498920a5dbac63196d9140ed738ef00470f27e2e74029abd8850b7bd5717",
-        platform: "linux/arm64",
-      },
+      runner: { kind: "container", image: DEFAULT_IMAGE, platform: "linux/arm64" },
       browserFlags: ["--disable-lcd-text", "--font-render-hinting=none"],
       viewport: { width: 1200, height: 900 },
       scale: 1,
-      settleMs: 500,
     });
   });
 });
 
 describe("environmentId", () => {
   test("is pinned for the default environment", () => {
-    // Changing this literal restarts every project's goldens. Upgrading Playwright is the
-    // one expected reason, since the ID includes its version.
-    expect(environmentId(defineEnvironment())).toBe("container-linux-arm64-53eae0047730e724");
+    // Changing this literal restarts every project's goldens. Upgrading Playwright or editing
+    // CAPTURE_RECIPE are the expected reasons, since the ID includes both.
+    expect(environmentId(defineEnvironment())).toBe("container-linux-arm64-887186e20373fded");
   });
 
   test("is deterministic and safe in a snapshot name", () => {
@@ -53,18 +48,15 @@ describe("environmentId", () => {
     ["viewport width", defineEnvironment({ viewport: { width: 1201, height: 900 } })],
     ["viewport height", defineEnvironment({ viewport: { width: 1200, height: 901 } })],
     ["scale", defineEnvironment({ scale: 2 })],
-    ["settle time", defineEnvironment({ settleMs: 501 })],
   ])("changes with %s", (_label, changed) => {
     expect(environmentId(changed)).not.toBe(environmentId(defineEnvironment()));
   });
 
-  test("ignores what can't change pixels: flag order, property order, an image's tag and mirror", () => {
+  test("ignores what can't change pixels: flag order, property order, an image's mirror", () => {
     const base = environmentId(container(`mcr.microsoft.com/playwright@${DIGEST}`));
-    expect(environmentId(container(`mcr.microsoft.com/playwright:v1.63.0-noble@${DIGEST}`))).toBe(base);
     expect(environmentId(container(`mirror.example:5000/playwright@${DIGEST}`))).toBe(base);
 
     const reordered: RenderEnvironment = {
-      settleMs: 500,
       scale: 1,
       viewport: { height: 900, width: 1200 },
       browserFlags: ["--font-render-hinting=none", "--disable-lcd-text"],
@@ -107,10 +99,21 @@ describe("native runner", () => {
   });
 });
 
+test("launchArgs adds the keychain flags to the environment's, without changing the ID", () => {
+  const environment = defineEnvironment();
+  expect(launchArgs(environment)).toEqual([
+    "--disable-lcd-text",
+    "--font-render-hinting=none",
+    "--use-mock-keychain",
+    "--password-store=basic",
+  ]);
+});
+
 describe("validation", () => {
   test.each([
     "mcr.microsoft.com/playwright",
     "mcr.microsoft.com/playwright:v1.63.0-noble",
+    `mcr.microsoft.com/playwright:v1.63.0-noble@${DIGEST}`,
     "playwright:latest",
     "playwright@sha256:abc",
     `playwright@sha512:${"a".repeat(64)}`,
@@ -119,15 +122,8 @@ describe("validation", () => {
     expect(() => container(image)).toThrow(/must be pinned/);
   });
 
-  test("parseImage strips a tag but keeps a registry port", () => {
-    expect(parseImage(`registry.example:5000/a/b:tag@${DIGEST}`)).toEqual({
-      name: "registry.example:5000/a/b",
-      digest: DIGEST,
-    });
-    expect(parseImage(`registry.example:5000/a/b@${DIGEST}`)).toEqual({
-      name: "registry.example:5000/a/b",
-      digest: DIGEST,
-    });
+  test("accepts a registry port", () => {
+    expect(() => container(`registry.example:5000/a/b@${DIGEST}`)).not.toThrow();
   });
 
   test.each([
@@ -138,7 +134,6 @@ describe("validation", () => {
     ["a fractional viewport", { viewport: { width: 1.5, height: 900 } }],
     ["a zero viewport", { viewport: { width: 0, height: 900 } }],
     ["a zero scale", { scale: 0 }],
-    ["a negative settle time", { settleMs: -1 }],
   ] as const)("refuses %s", (_label, overrides) => {
     expect(() => defineEnvironment(overrides as never)).toThrow(EnvironmentError);
   });

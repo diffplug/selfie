@@ -4,7 +4,7 @@ import { createRequire } from "node:module";
 import path from "node:path";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
-import { parseImage, type ContainerRunner, type RenderEnvironment } from "./environment.ts";
+import { type ContainerRunner, currentNativeRunner, type RenderEnvironment } from "./environment.ts";
 import { RenderError } from "./storybook.ts";
 import type { WorkerEvent, WorkerJob, WorkerRuntime, WorkerStoryResult } from "./worker/protocol.ts";
 
@@ -15,8 +15,6 @@ const NODE_ARGS = ["--disable-warning=ExperimentalWarning"];
 const CONTAINER_ROOT = "/selfie";
 const CONTAINER_BUILD = `${CONTAINER_ROOT}/build`;
 const CONTAINER_OUT = `${CONTAINER_ROOT}/out`;
-/** The container has its own loopback, so a fixed port can't collide and stays out of the pixels. */
-const CONTAINER_PORT = 6199;
 
 const DOCKER_QUERY_TIMEOUT_MS = 15_000;
 const DOCKER_PULL_TIMEOUT_MS = 15 * 60_000;
@@ -31,43 +29,51 @@ function docker(args: string[], timeoutMs: number): Promise<string> {
   });
 }
 
-/** Makes sure Docker answers and holds the image, pulling it once if needed. Works offline once pulled. */
-export async function ensureImage(runner: ContainerRunner): Promise<void> {
-  const { name, digest } = parseImage(runner.image);
-  const pinned = `${name}@${digest}`;
+/**
+ * Checks a runner can run here, before anything else depends on it. A native environment
+ * must have been recorded on this machine. A container needs Docker, and the image on the
+ * declared platform, which is pulled once if absent and works offline after that.
+ */
+export async function prepareRunner(runner: RenderEnvironment["runner"]): Promise<void> {
+  if (runner.kind === "native") {
+    const here = currentNativeRunner();
+    const { os, osRelease, arch } = runner;
+    if (os !== here.os || osRelease !== here.osRelease || arch !== here.arch) {
+      throw new RenderError(
+        `This native environment records ${os} ${osRelease} ${arch}, but this machine is ${here.os} ${here.osRelease} ${here.arch}.`,
+      );
+    }
+    return;
+  }
+
   try {
     await docker(["version", "--format", "{{.Server.Version}}"], DOCKER_QUERY_TIMEOUT_MS);
   } catch (error) {
     throw new RenderError(`Docker is unavailable: ${(error as Error).message}`);
   }
-  const held = await docker(["image", "inspect", pinned], DOCKER_QUERY_TIMEOUT_MS).then(
-    () => true,
-    () => false,
-  );
-  if (held) return;
+  // With --platform, so a multi-platform digest answers for the platform asked for rather than
+  // the host's, and a digest for another platform is refused.
+  const inspect = () =>
+    docker(["image", "inspect", "--platform", runner.platform, runner.image], DOCKER_QUERY_TIMEOUT_MS);
   try {
-    await docker(["pull", "--platform", runner.platform, pinned], DOCKER_PULL_TIMEOUT_MS);
-  } catch (error) {
-    throw new RenderError(`Can't pull ${pinned}: ${(error as Error).message}`);
+    await inspect();
+  } catch {
+    try {
+      await docker(["pull", "--platform", runner.platform, runner.image], DOCKER_PULL_TIMEOUT_MS);
+      await inspect();
+    } catch (error) {
+      throw new RenderError(`Can't get ${runner.image} for ${runner.platform}: ${(error as Error).message}`);
+    }
   }
-}
-
-export interface ContainerMounts {
-  buildDir: string;
-  outDir: string;
-  /** Identifies this run on the container's labels, so a test can find its own. */
-  runLabel: string;
-  uid?: number | undefined;
-  gid?: number | undefined;
 }
 
 /** Everything `docker run` gets: no network, no capabilities, no host environment, one writable directory. */
 export function containerArgs(
   runner: ContainerRunner,
   containerName: string,
-  mounts: ContainerMounts,
+  buildDir: string,
+  outDir: string,
 ): string[] {
-  const { name, digest } = parseImage(runner.image);
   // --mount rather than -v, since -v splits on the colons a path may hold. --mount parses as
   // CSV, so a comma in a path needs quoting.
   const source = (dir: string) => (dir.includes(",") ? `"src=${dir.replaceAll('"', '""')}"` : `src=${dir}`);
@@ -75,6 +81,8 @@ export function containerArgs(
     "--mount",
     `type=bind,${source(dir)},dst=${target},readonly`,
   ];
+  const uid = process.getuid?.();
+  const gid = process.getgid?.();
   return [
     "run",
     "--rm",
@@ -83,7 +91,7 @@ export function containerArgs(
     "--name",
     containerName,
     "--label",
-    `selfie-render=${mounts.runLabel}`,
+    "selfie-render",
     "--pull=never",
     "--platform",
     runner.platform,
@@ -94,18 +102,16 @@ export function containerArgs(
     "--shm-size=2g",
     "--cap-drop=ALL",
     "--security-opt=no-new-privileges",
-    ...(mounts.uid === undefined || mounts.gid === undefined
-      ? []
-      : ["--user", `${mounts.uid}:${mounts.gid}`]),
+    ...(uid === undefined || gid === undefined ? [] : ["--user", `${uid}:${gid}`]),
     "--env",
     "HOME=/tmp",
-    ...readOnly(mounts.buildDir, CONTAINER_BUILD),
+    ...readOnly(buildDir, CONTAINER_BUILD),
     ...readOnly(path.join(PACKAGE_ROOT, "src", "worker"), `${CONTAINER_ROOT}/src/worker`),
     ...readOnly(path.join(PACKAGE_ROOT, "package.json"), `${CONTAINER_ROOT}/package.json`),
     ...readOnly(PLAYWRIGHT_ROOT, `${CONTAINER_ROOT}/node_modules/playwright-core`),
     "--mount",
-    `type=bind,${source(mounts.outDir)},dst=${CONTAINER_OUT}`,
-    `${name}@${digest}`,
+    `type=bind,${source(outDir)},dst=${CONTAINER_OUT}`,
+    runner.image,
     "node",
     ...NODE_ARGS,
     `${CONTAINER_ROOT}/src/worker/worker.ts`,
@@ -120,14 +126,13 @@ export interface WorkerOutcome {
 }
 
 export interface WorkerRun {
-  environment: RenderEnvironment;
-  /** Everything but the runner-specific paths and port. */
-  job: Omit<WorkerJob, "buildDir" | "outDir" | "port">;
+  runner: RenderEnvironment["runner"];
+  /** Everything but the runner-specific paths. */
+  job: Omit<WorkerJob, "buildDir" | "outDir">;
   buildDir: string;
   outDir: string;
-  runLabel: string;
-  signal?: AbortSignal | undefined;
-  onStory?: ((result: WorkerStoryResult) => void) | undefined;
+  signal: AbortSignal | undefined;
+  onStory: (result: WorkerStoryResult) => void;
 }
 
 /**
@@ -135,28 +140,18 @@ export interface WorkerRun {
  * since then no story was attempted. After that, a crash is reported in the outcome.
  */
 export function runWorker(run: WorkerRun): Promise<WorkerOutcome> {
-  const { runner } = run.environment;
+  const { runner } = run;
   const containerName = `selfie-render-${randomUUID()}`;
   const child =
     runner.kind === "container"
-      ? spawn(
-          "docker",
-          containerArgs(runner, containerName, {
-            buildDir: run.buildDir,
-            outDir: run.outDir,
-            runLabel: run.runLabel,
-            uid: process.getuid?.(),
-            gid: process.getgid?.(),
-          }),
-          { stdio: "pipe" },
-        )
+      ? spawn("docker", containerArgs(runner, containerName, run.buildDir, run.outDir), { stdio: "pipe" })
       : spawn(process.execPath, [...NODE_ARGS, path.join(PACKAGE_ROOT, "src", "worker", "worker.ts")], {
           stdio: "pipe",
         });
   const job: WorkerJob =
     runner.kind === "container"
-      ? { ...run.job, buildDir: CONTAINER_BUILD, outDir: CONTAINER_OUT, port: CONTAINER_PORT }
-      : { ...run.job, buildDir: run.buildDir, outDir: run.outDir, port: 0 };
+      ? { ...run.job, buildDir: CONTAINER_BUILD, outDir: CONTAINER_OUT }
+      : { ...run.job, buildDir: run.buildDir, outDir: run.outDir };
 
   // `rm --force` rather than `kill`, since `--rm` never removes a container that was
   // created but not yet started, which is what an early abort can leave behind.
@@ -178,7 +173,6 @@ export function runWorker(run: WorkerRun): Promise<WorkerOutcome> {
     let runtime: WorkerRuntime | undefined;
     let done = false;
     let fatal: string | undefined;
-    let mismatch: string | null = null;
     let stderrTail = "";
 
     // The worker's own deadline is what fires. This one covers a worker that can't.
@@ -189,12 +183,8 @@ export function runWorker(run: WorkerRun): Promise<WorkerOutcome> {
       },
       job.runTimeoutMs + 2 * KILL_GRACE_MS,
     );
-    const onAbort = () => {
-      fatal = "aborted";
-      stop();
-    };
-    run.signal?.addEventListener("abort", onAbort, { once: true });
-    if (run.signal?.aborted) onAbort();
+    run.signal?.addEventListener("abort", stop, { once: true });
+    if (run.signal?.aborted) stop();
 
     createInterface({ input: child.stdout }).on("line", (line) => {
       let event: WorkerEvent;
@@ -205,11 +195,9 @@ export function runWorker(run: WorkerRun): Promise<WorkerOutcome> {
       }
       if (event.type === "ready") {
         runtime = event.runtime;
-        mismatch = runner.kind === "container" ? platformMismatch(runner, event.runtime) : null;
-        if (mismatch !== null) stop();
       } else if (event.type === "story") {
         results.set(event.result.id, event.result);
-        run.onStory?.(event.result);
+        run.onStory(event.result);
       } else if (event.type === "fatal") {
         fatal = event.message;
       } else {
@@ -224,11 +212,9 @@ export function runWorker(run: WorkerRun): Promise<WorkerOutcome> {
 
     const finish = (exit: string) => {
       clearTimeout(watchdog);
-      run.signal?.removeEventListener("abort", onAbort);
+      run.signal?.removeEventListener("abort", stop);
       if (run.signal?.aborted) {
         reject(new RenderError("Capture aborted."));
-      } else if (mismatch !== null) {
-        reject(new RenderError(mismatch));
       } else if (runtime === undefined || (fatal !== undefined && results.size === 0 && !done)) {
         reject(
           new RenderError(
@@ -251,11 +237,4 @@ export function runWorker(run: WorkerRun): Promise<WorkerOutcome> {
       );
     });
   });
-}
-
-export function platformMismatch(runner: ContainerRunner, runtime: WorkerRuntime): string | null {
-  const [expectedOs, expectedArch] = runner.platform.split("/") as [string, string];
-  const arch = expectedArch === "amd64" ? "x64" : expectedArch;
-  if (runtime.platform === expectedOs && runtime.arch === arch) return null;
-  return `image ${runner.image} runs as ${runtime.platform}/${runtime.arch}, but the environment says ${runner.platform}`;
 }

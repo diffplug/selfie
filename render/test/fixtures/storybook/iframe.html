@@ -97,10 +97,32 @@
         "timers--frozen-by-project"() {
           document.body.style.background = window.__PROJECT_FREEZE__ ? "white" : randomColor();
         },
-        "init--css-applied"() {
-          const marker = getComputedStyle(document.documentElement).getPropertyValue("--fixture-marker").trim();
-          if (marker !== "applied") throw new Error("the init CSS was not applied");
-          root.textContent = "init css applied";
+        // Throws unless the build answers, and nothing outside it does.
+        async "basic--serving"() {
+          const statuses = {
+            "/index.json": 200,
+            "/missing.txt": 404,
+            "/%2e%2e%2fpackage.json": 404,
+            "/..%2f..%2f..%2f..%2fetc%2fpasswd": 404,
+          };
+          for (const [url, expected] of Object.entries(statuses)) {
+            const response = await fetch(url);
+            await response.text();
+            const { status } = response;
+            if (status !== expected) throw new Error(`${url} answered ${status}, expected ${expected}`);
+          }
+          root.textContent = "served";
+        },
+        // The way Storybook handles a failed play function under throwPlayFunctionExceptions:
+        // false, with `errored` held long enough that a waiter is sure to see it.
+        async "play--fails"() {
+          root.textContent = "rendered, then play failed";
+          render.phase = "playing";
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          channel.emit("playFunctionThrewException", { name: "Error", message: "this play function fails" });
+          render.phase = "errored";
+          await new Promise((resolve) => setTimeout(resolve, 300));
+          console.error(new Error("this play function fails"));
         },
         "broken--throws"() {
           throw new Error("this story always throws");
@@ -114,6 +136,13 @@
           }, 0);
         },
       };
+
+      const listeners = new Map();
+      const channel = {
+        on: (event, listener) => listeners.set(event, [...(listeners.get(event) ?? []), listener]),
+        emit: (event, payload) => (listeners.get(event) ?? []).forEach((listener) => listener(payload)),
+      };
+      globalThis.__STORYBOOK_ADDONS_CHANNEL__ = channel;
 
       const render = { phase: "rendering" };
       window.__STORYBOOK_PREVIEW__ = { currentRender: render };
