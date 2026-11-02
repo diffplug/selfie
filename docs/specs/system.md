@@ -29,7 +29,7 @@
 
 **Scope: cli-review** — `selfie review` records snapshots locally and outputs JSON with image paths, so an agent can use the loop without a UI.
 
-**Scope: local-review** — A review UI with approval, built as a Hono app running locally.
+**Scope: local-review** — A review UI with approval, built as a Hono app running locally. The UI uses GitHub Primer.
 
 **Scope: cloud-deploy** — The same Hono app deployed at `hackathon.selfie.dev`, with accounts in Neon through pgstencil and Hyperdrive, per-project D1, R2, and auth ([Cloud data](#cloud-data)).
 
