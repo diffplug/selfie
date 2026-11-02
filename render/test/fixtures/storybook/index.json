@@ -4,6 +4,7 @@
     "guide--docs": { "id": "guide--docs", "title": "Guide", "name": "Docs", "type": "docs", "importPath": "./guide.mdx" },
     "basic--detail": { "id": "basic--detail", "title": "Basic", "name": "Detail", "type": "story", "importPath": "./basic.js" },
     "basic--environment": { "id": "basic--environment", "title": "Basic", "name": "Environment", "type": "story", "importPath": "./basic.js" },
+    "basic--tall": { "id": "basic--tall", "title": "Basic", "name": "Tall", "type": "story", "importPath": "./basic.js" },
     "basic--animation": { "id": "basic--animation", "title": "Basic", "name": "Animation", "type": "story", "importPath": "./basic.js" },
     "basic--external-request": { "id": "basic--external-request", "title": "Basic", "name": "External request", "type": "story", "importPath": "./basic.js" },
     "timers--always-random": { "id": "timers--always-random", "title": "Timers", "name": "Always random", "type": "story", "importPath": "./timers.js" },

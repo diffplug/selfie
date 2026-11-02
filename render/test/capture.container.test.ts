@@ -88,7 +88,7 @@ describe.runIf(process.env.SELFIE_RENDER_CONTAINER === "1")("in the pinned conta
 
     test("captures every story and leaves out docs", () => {
       expect(manifest.stories.map((entry) => entry.id)).not.toContain("guide--docs");
-      expect(manifest.totals.stories).toBe(13);
+      expect(manifest.totals.stories).toBe(14);
     });
 
     test("applies the page conditions before story code runs", () => {
@@ -97,7 +97,12 @@ describe.runIf(process.env.SELFIE_RENDER_CONTAINER === "1")("in the pinned conta
       expect(status).toBe("ok");
     });
 
-    test("writes real PNGs of the viewport's size at the path the manifest names", async () => {
+    test("captures the whole page, not only the viewport", () => {
+      const { width, height, status } = story(manifest, "basic--tall");
+      expect({ status, width, height }).toEqual({ status: "ok", width: 1200, height: 2000 });
+    });
+
+    test("writes real PNGs at the path the manifest names", async () => {
       const { file, width, height, status } = story(manifest, "basic--detail");
       expect({ status, width, height }).toEqual({ status: "ok", width: 1200, height: 900 });
       const png = await readFile(path.join(outDir, file as string));
@@ -217,8 +222,9 @@ describe.runIf(process.env.SELFIE_RENDER_CONTAINER === "1")("in the pinned conta
 
   test("viewport and scale reach the pixels", async () => {
     const environment = defineEnvironment({ viewport: { width: 400, height: 300 }, scale: 2 });
-    const manifest = await run({ environment, stories: ["basic--detail"] });
-    expect(story(manifest, "basic--detail")).toMatchObject({ status: "ok", width: 800, height: 600 });
+    const manifest = await run({ environment, stories: ["basic--tall", "basic--animation"] });
+    expect(story(manifest, "basic--tall")).toMatchObject({ status: "ok", width: 800, height: 4000 });
+    expect(story(manifest, "basic--animation")).toMatchObject({ status: "ok", width: 800, height: 600 });
     expect(manifest.environmentId).not.toBe(environmentId(defineEnvironment()));
   });
 

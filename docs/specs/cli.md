@@ -275,6 +275,10 @@ Story IDs come from a project's build, and a manifest's paths from a directory i
 - A way for a branch's reviewer to have a baseline when only other machines accepted the default branch's goldens.
 - A pushed run carrying `reused_from_run`, since the cloud's `trust` must be able to tell a reused run from one rendered at its SHA. That ID may name a run never pushed. Whether to also record the build's identity can wait for `trust`.
 
+### An edges-in differ
+
+`size-differs` compares no pixels, and with whole-page capture any change in a page's height lands there, such as adding one row to a list. An edges-in differ would match rows inward from the top and from the bottom, so an inserted band is what's marked, rather than everything below it. It replaces `size-differs` for a height change, and may also make a same-size diff smaller when content has shifted.
+
 ### A render that does change
 
 [Recording only if necessary](#recording-only-if-necessary) is all or nothing, so one changed file renders every story, and a render's non-capture time is unchanged:

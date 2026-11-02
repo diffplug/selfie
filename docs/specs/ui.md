@@ -112,6 +112,7 @@ Source of truth: `ui/src/client/`.
 **One snapshot** shows its state and decision, pixel stats, and images.
 
 - **Must always offer the images side by side and stacked.** Stacked, switching layers costs no scroll, and the zoom starts at actual size: the image's width divided by `run.scale`, in CSS pixels, so it's the size the page really was on every display.
+- **Must fit an image's width side by side, and scroll all of them as one**, so a tall page's images stay level.
 - **Must also offer zoom at 1×, 2×, 4×, and 8×, where 1× is one image pixel to one device pixel** (rationale), following the display's `devicePixelRatio`.
 - **Must draw nearest-neighbor only at a whole number of device pixels per image pixel, and smooth anything else**, as with a 2× image on a 1× display or a 1.5× image on a 2× display at actual size, since uneven blocks would look like changes.
 - **Must center a change on stacking the images and on every zoom:** the bounding box if it fits, or else the first changed pixel, since a large box's center may hold no change at all (rationale). A box too small to find is outlined, and the outline can be turned off.

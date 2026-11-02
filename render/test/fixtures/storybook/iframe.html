@@ -73,6 +73,10 @@
           }
           root.textContent = new Date().toISOString();
         },
+        "basic--tall"() {
+          root.style.padding = "0";
+          root.innerHTML = '<div style="height: 2000px; background: teal"></div>';
+        },
         "basic--animation"() {
           root.innerHTML = '<div class="sliding"></div>';
         },

@@ -1,4 +1,9 @@
 /* Layout only, and in Primer's tokens: components bring their own look, and modes come from these. */
+:root {
+  /* Room for what's above the images, so they and the buttons fit on a screen together. */
+  --selfie-images-height: max(360px, calc(100vh - 290px));
+}
+
 body {
   margin: 0;
   background: var(--bgColor-default);
@@ -161,7 +166,8 @@ code {
   display: block;
   width: 64px;
   height: 48px;
-  object-fit: contain;
+  /* The top of a tall page, rather than all of it as a sliver. */
+  object-fit: cover;
   object-position: top left;
   border: var(--borderWidth-thin) solid var(--borderColor-muted);
   border-radius: var(--borderRadius-small);
@@ -193,10 +199,13 @@ code {
   overflow-wrap: anywhere;
 }
 
+/* One scroller, so the images of a tall page stay level with each other. */
 .selfie-panes {
   display: grid;
   gap: var(--base-size-12);
   align-items: start;
+  max-height: var(--selfie-images-height);
+  overflow-y: auto;
 }
 
 .selfie-panes[data-count="1"] {
@@ -217,8 +226,11 @@ code {
 }
 
 .selfie-pane figcaption {
+  position: sticky;
+  top: 0;
+  padding-bottom: var(--base-size-4);
+  background: var(--bgColor-default);
   font-weight: var(--base-text-weight-semibold);
-  margin-bottom: var(--base-size-4);
 }
 
 .selfie-pane-button {
@@ -231,14 +243,10 @@ code {
   cursor: zoom-in;
 }
 
-/* A tall story still fits on a screen with the buttons, and actual size shows the rest. */
 .selfie-pane-button img {
   display: block;
   width: 100%;
   height: auto;
-  max-height: max(360px, calc(100vh - 290px));
-  object-fit: contain;
-  object-position: top left;
 }
 
 .selfie-pane-button:focus-visible,
@@ -249,8 +257,7 @@ code {
 
 .selfie-viewport {
   overflow: auto;
-  /* Room for what's above it, so the whole viewport and the buttons fit on a screen together. */
-  height: max(360px, calc(100vh - 290px));
+  height: var(--selfie-images-height);
   border: var(--borderWidth-thin) solid var(--borderColor-default);
   border-radius: var(--borderRadius-small);
   background: var(--bgColor-muted);

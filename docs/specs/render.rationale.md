@@ -24,6 +24,29 @@ With the flag, 7 full runs of all 541 stories, across the settle times, quiet pe
 
 ## Capture
 
+**The whole page.** All 541 of dormouse's stories, in the default container with the stability check on, on one Mac, 2026-11. Encoding uses `sharp` lossless WebP at effort 4, outside the container.
+
+| | 1× | 1.5× | 2× |
+|---|---|---|---|
+| Time, both passes | 200 s | 222 s | 287 s |
+| Failed or unstable | 0 | 0 | 0 |
+| Median height | 900 | 1,350 | 1,800 |
+| Tallest | 4,949 | 7,424 | 9,898 |
+| PNG total | 25.2 MB | 44.6 MB | 62.1 MB |
+| WebP total | 8.0 MB | 13.6 MB | 18.7 MB |
+| WebP encode, average per image | 29 ms | 56 ms | 94 ms |
+
+Against the viewport capture at 1×:
+
+- **341 were identical.**
+- **184 were taller, and began with the exact viewport image**, so the viewport had hidden everything below.
+- **6 were 5 px wider.** All 6 are app bar or workspace window stories, and the overflow is real: the viewport had cut it off.
+- **10 were taller, with a top that differed.** Of the two inspected, one had scrolled to a focused button in the viewport capture, and the full page starts at the top. The other drew one `→` differently, in a story that's stable in both modes. Why the mode changes that glyph is unknown. The other 8 were not looked at, though 2 of them share that story's exact count of 2,270 changed pixels.
+
+Across machines at 1×, comparing image hashes: 541/541 between two GitHub arm64 runners (Neoverse-N2), and 541/541 between each of them and a local M4 Mac, all with the stability check finding every story stable. At 1.5× and 2×, only the Mac was measured, and stability there is one repeat on one machine.
+
+**How tall a page can be.** A page of a vertical gradient, in the default container at 1×, captured correctly at its top, middle, and bottom at every height tried, up to 120,000 px. So Chromium isn't the limit here. `decodeImage` is, at 100 million pixels, which refused 90,000 px and accepted 83,000 px at 1200 wide.
+
 **One image check, without `--platform`.** GitHub's arm64 runners have Docker 28.0.4, which rejects `docker image inspect --platform` with `unknown flag: --platform`. On Docker 29.9.2 with the containerd store, that flag also exits 0 for a platform with no content, printing an empty OS and architecture. Plain `inspect` reported the right platform for the default arm64 digest on 28.0.4 and 29.9.2, and for an amd64 digest on an arm64 host on 29.9.2. A multi-platform tag on 29.9.2 answered for the host instead, which is why a multi-platform digest for another platform is refused.
 
 **Container isolation doesn't change pixels.** On the 30-story sample with its freeze, before the raster flag, this package's PNGs were byte-identical on 30 of 30 to an earlier experiment's. The experiment ran as root with `--ipc=host`, a writable root, Docker's default capabilities, no request blocking, a static server, and one story at a time.
