@@ -4,7 +4,7 @@ import { fetchCurrent } from "./api.ts";
 import { AcceptScreen } from "./AcceptScreen.tsx";
 import { DetailScreen } from "./DetailScreen.tsx";
 import { useFetched, useRun, useTitle } from "./hooks.ts";
-import { AppLink, navigate, parseRoute, runPath, useLocation } from "./router.tsx";
+import { AppLink, navigate, parseRoute, runPath, useLocation, type Route } from "./router.tsx";
 import { RunScreen } from "./RunScreen.tsx";
 import { LoadFailure, Loading, NoRuns, NotFound } from "./Status.tsx";
 
@@ -20,7 +20,7 @@ function Home() {
 }
 
 /** Holds the run across its screens, so moving between them doesn't read it again. */
-function RunRoutes({ runId, route, search }: { runId: string; route: ReturnType<typeof parseRoute>; search: string }) {
+function RunRoutes({ runId, route, search }: { runId: string; route: Route; search: string }) {
   const state = useRun(runId);
   // Where to put focus on coming back to the list.
   const lastStory = useRef<string | null>(null);

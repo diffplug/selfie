@@ -4,10 +4,11 @@ import {
   REQUEST_HEADER_VALUE,
   type AcceptOutcome,
   type ApiError,
+  type BaselineNote,
   type CurrentView,
   type DecisionKind,
   type DecisionTarget,
-  type DiffView,
+  type PixelDiff,
   type RunView,
   type SnapshotRow,
 } from "../shared/api.ts";
@@ -26,7 +27,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response;
   try {
     response = await fetch(`/api${path}`, init);
-  } catch {
+  } catch (error) {
+    if (init?.signal?.aborted) throw error;
     throw new RequestError("unreachable", "Can't reach the Selfie server. Is selfie ui still running?");
   }
   const body = (await response.json().catch(() => null)) as T | ApiError | null;
@@ -44,16 +46,18 @@ const post = <T>(path: string, body: unknown) =>
     body: JSON.stringify(body),
   });
 
-export const fetchCurrent = () => request<CurrentView>("/current");
-export const fetchRun = (runId: string) => request<RunView>(`/runs/${encodeURIComponent(runId)}`);
-export const fetchUnchanged = async (runId: string) =>
-  (await request<{ rows: readonly SnapshotRow[] }>(`/runs/${encodeURIComponent(runId)}/unchanged`)).rows;
-export const fetchDiff = (current: string, golden: string) => request<DiffView>(`/diffs/${current}/${golden}`);
+const runRoute = (runId: string) => `/runs/${encodeURIComponent(runId)}`;
+
+export const fetchCurrent = (signal: AbortSignal) => request<CurrentView>("/current", { signal });
+export const fetchRun = (runId: string, signal: AbortSignal) => request<RunView>(runRoute(runId), { signal });
+export const fetchBaseline = (runId: string, signal: AbortSignal) => request<BaselineNote>(`${runRoute(runId)}/baseline`, { signal });
+export const fetchUnchanged = async (runId: string) => (await request<{ rows: readonly SnapshotRow[] }>(`${runRoute(runId)}/unchanged`)).rows;
+export const fetchDiff = (current: string, golden: string, signal: AbortSignal) => request<PixelDiff>(`/diffs/${current}/${golden}`, { signal });
 
 export const postDecision = (runId: string, decision: DecisionKind, snapshots: readonly DecisionTarget[]) =>
-  post<RunView>(`/runs/${encodeURIComponent(runId)}/decisions`, { decision, snapshots });
+  post<RunView>(`${runRoute(runId)}/decisions`, { decision, snapshots });
 export const postAccept = (runId: string, removedSeen: number | undefined) =>
-  post<AcceptOutcome>(`/runs/${encodeURIComponent(runId)}/accept`, removedSeen === undefined ? {} : { removedSeen });
+  post<AcceptOutcome>(`${runRoute(runId)}/accept`, removedSeen === undefined ? {} : { removedSeen });
 
 export const imageUrl = (hash: string) => `/api/images/${hash}`;
 export const diffImageUrl = (current: string, golden: string) => `/api/diffs/${current}/${golden}/image`;

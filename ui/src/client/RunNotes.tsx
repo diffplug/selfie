@@ -1,7 +1,8 @@
 // What a run's screens all say about the run as a whole.
 import { Banner } from "@primer/react";
 import type { RunView } from "../shared/api.ts";
-import type { RunState } from "./hooks.ts";
+import { fetchBaseline } from "./api.ts";
+import { useFetched, type RunState } from "./hooks.ts";
 import { shortSha } from "./words.tsx";
 
 export function ActionFailure({ state }: { readonly state: RunState }) {
@@ -15,23 +16,18 @@ export function ActionFailure({ state }: { readonly state: RunState }) {
   return null;
 }
 
-/** Whether these images can ever become goldens, and whether later reviews would read them. */
-export function RunNotes({ view }: { readonly view: RunView }) {
-  const { run, baseline, usableAsBaseline } = view;
+/** Whether later reviews could compare with these images, and what this one compared them with. */
+export function RunNotes({ view: { run, usableAsBaseline } }: { readonly view: RunView }) {
+  // Git says why there's no baseline, and only a run without one needs to ask.
+  const noBaseline = run.baselineSha === null;
+  const { data: baseline } = useFetched(noBaseline ? run.id : null, (signal) => fetchBaseline(run.id, signal));
   return (
     <>
-      {run.dirty && (
-        <Banner
-          variant="warning"
-          title="Recorded on a dirty tree"
-          description={`The tree had uncommitted changes while this rendered, so these images don't describe ${shortSha(run.gitSha)} and can't become its goldens. You can still decide on them. Commit, then run selfie review again: your approvals carry over.`}
-        />
-      )}
-      {baseline.sha === null && (
+      {noBaseline && (
         <Banner
           variant="info"
           title="No baseline"
-          description={`There were no goldens to compare with, so every story reads as new and needs an approval. ${baseline.message ?? ""}`}
+          description={`There were no goldens to compare with, so every story reads as new and needs an approval. ${baseline?.message ?? ""}`}
         />
       )}
       {!usableAsBaseline && (

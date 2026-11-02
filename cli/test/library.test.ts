@@ -38,18 +38,24 @@ test("isDecidable is true only of what has a new image", () => {
   ]);
 });
 
-test("a decision on exact IDs takes each as itself, and checkAccept changes nothing", async () => {
+test("a decision on exact images takes each as itself, and checkAccept changes nothing", async () => {
   h.stories = [{ id: "a*" }, { id: "ab" }];
-  const { id: runId } = (await review(project, options())).comparison.run;
-  const decided = await decide(project, { runId, decision: "approved", actor: "ui", stories: { ids: ["a*", "nobody"] } });
+  const { comparison } = await review(project, options());
+  const { id: runId } = comparison.run;
+  const star = comparison.snapshots.find(({ story }) => story === "a*")!;
+  const target = { story: "a*", imageHash: star.imageHash! };
+  const decided = await decide(project, { runId, decision: "approved", actor: "ui", stories: { targets: [target] } });
   expect(decided.decided.map(({ story }) => story)).toEqual(["a*"]);
-  expect(decided.unmatchedPatterns).toEqual(["nobody"]);
   expect(summarizeRun(decided.comparison).counts.undecided).toBe(1);
 
-  await decide(project, { runId, decision: "approved", actor: "ui", stories: "all" });
-  const check = await checkAccept(project, { runId });
+  await expect(
+    decide(project, { runId, decision: "approved", actor: "ui", stories: { targets: [target, { story: "nobody", imageHash: star.imageHash! }] } }),
+  ).rejects.toMatchObject({ code: "stale-decision" });
+
+  const all = await decide(project, { runId, decision: "approved", actor: "ui", stories: "all" });
+  const check = await checkAccept(project, all.comparison);
   expect(check.refusals).toEqual([]);
-  const { gitSha, environment } = check.comparison.run;
+  const { gitSha, environment } = all.comparison.run;
   expect(await project.snapshots.acceptedRunAt(gitSha, environment)).toBeNull();
   expect((await accept(project, { runId })).accepted).toBe(true);
   expect(await project.snapshots.acceptedRunAt(gitSha, environment)).toBe(runId);

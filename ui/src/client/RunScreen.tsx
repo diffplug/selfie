@@ -15,20 +15,20 @@ import {
   Text,
   TextInput,
   useDetails,
+  VisuallyHidden,
 } from "@primer/react";
 import { Blankslate, ScrollableRegion, Table } from "@primer/react/experimental";
-import { memo, useDeferredValue, useEffect, useMemo, useRef, useState, type RefObject } from "react";
-import type { Attention, BlockerReason, DecisionKind, RunView, SnapshotRow } from "../shared/api.ts";
+import { memo, useDeferredValue, useEffect, useMemo, useRef, useState, type ComponentProps, type MouseEvent, type RefObject } from "react";
+import type { AdvisoryReason, BlockerReason, DecisionKind, RunView, SnapshotRow } from "../shared/api.ts";
 import { imageUrl } from "./api.ts";
-import { applyFilter, decisionTargets, filterQuery, isDecidable, parseFilter, SHOW_OPTIONS, type RowFilter, type Show } from "./filter.ts";
+import { applyFilter, decidableIn, filterQuery, hasAdvisory, NO_FILTER, parseFilter, showQuery, SHOW_OPTIONS, targetsOf, type RowFilter, type Show } from "./filter.ts";
 import { useHotkeys, useTitle, type RunState } from "./hooks.ts";
 import { Keys } from "./Keys.tsx";
-import { acceptPath, AppLink, AppLinkButton, navigate, runPath, storyPath } from "./router.tsx";
+import { acceptPath, AppLink, AppLinkButton, followLink, navigate, runPath, storyPath } from "./router.tsx";
 import { ActionFailure, RunNotes } from "./RunNotes.tsx";
+import { StoryLinks } from "./StoryLinks.tsx";
 import { AdvisoryLabels, BLOCKER_WORDS, DecisionLabel, describePixels, plural, shortSha, StateLabel } from "./words.tsx";
 
-/** A longer list is one click away, in the table with its filter set. */
-const STORIES_LISTED = 25;
 const PATTERNS_LISTED = 3;
 
 function Fact({ term, children }: { term: string; children: React.ReactNode }) {
@@ -41,7 +41,7 @@ function Fact({ term, children }: { term: string; children: React.ReactNode }) {
 }
 
 function Facts({ view }: { view: RunView }) {
-  const { run, baseline, actor, siblings } = view;
+  const { run, actor, siblings } = view;
   return (
     <dl className="selfie-facts">
       <Fact term="Commit">
@@ -52,7 +52,7 @@ function Facts({ view }: { view: RunView }) {
       </Fact>
       <Fact term="Working tree">{run.dirty ? "Dirty when recorded" : "Clean when recorded"}</Fact>
       <Fact term="Baseline">
-        {baseline.sha === null ? "None" : <code title={baseline.sha}>{shortSha(baseline.sha)}</code>}
+        {run.baselineSha === null ? "None" : <code title={run.baselineSha}>{shortSha(run.baselineSha)}</code>}
       </Fact>
       <Fact term="Environment">
         <code>{run.environment}</code>
@@ -105,67 +105,41 @@ function Count({ label, count, show, onShow }: { label: string; count: number; s
   );
 }
 
-function StoryList({ runId, stories, query }: { runId: string; stories: readonly { story: string; detail?: string | null }[]; query: string }) {
+function StoryList(props: ComponentProps<typeof StoryLinks>) {
   const { getDetailsProps } = useDetails({ closeOnOutsideClick: false });
-  const listed = stories.slice(0, STORIES_LISTED);
   return (
     <Details {...getDetailsProps()} className="selfie-details">
       <summary>Show which</summary>
-      <ul className="selfie-story-list">
-        {listed.map(({ story, detail }) => (
-          <li key={story}>
-            <AppLink href={storyPath(runId, story, query)}>{story}</AppLink>
-            {detail ? <div className="selfie-detail-text">{detail}</div> : null}
-          </li>
-        ))}
-        {stories.length > listed.length && <li className="selfie-muted">and {stories.length - listed.length} more, in the list below</li>}
-      </ul>
+      <StoryLinks {...props} />
     </Details>
   );
 }
 
-const BLOCKER_ORDER: readonly BlockerReason[] = [
-  "failed",
-  "rejected",
-  "changed-unapproved",
-  "new-unapproved",
-  "removed",
-  "pattern-unmatched",
+const BLOCKERS: readonly { readonly reason: BlockerReason; readonly show?: Show }[] = [
+  { reason: "failed", show: "failed" },
+  { reason: "rejected", show: "rejected" },
+  { reason: "changed-unapproved", show: "undecided" },
+  { reason: "new-unapproved", show: "undecided" },
+  { reason: "removed", show: "removed" },
+  { reason: "pattern-unmatched" },
 ];
 
-const BLOCKER_SHOW: Readonly<Partial<Record<BlockerReason, Show>>> = {
-  failed: "failed",
-  rejected: "rejected",
-  "changed-unapproved": "undecided",
-  "new-unapproved": "undecided",
-  removed: "removed",
-};
-
 function Blockers({ view, onShow }: { view: RunView; onShow: (show: Show) => void }) {
-  const groups = useMemo(() => {
-    const byReason = new Map<BlockerReason, Attention<BlockerReason>[]>();
-    for (const blocker of view.blockers) {
-      byReason.set(blocker.reason, [...(byReason.get(blocker.reason) ?? []), blocker]);
-    }
-    return BLOCKER_ORDER.flatMap((reason) => {
-      const entries = byReason.get(reason);
-      return entries === undefined ? [] : [{ reason, entries }];
-    });
-  }, [view.blockers]);
-
+  const byReason = Map.groupBy(view.blockers, ({ reason }) => reason);
+  const present = BLOCKERS.filter(({ reason }) => byReason.has(reason));
   return (
-    <section aria-labelledby="blockers-heading" className="selfie-section">
+    <Stack as="section" aria-labelledby="blockers-heading" gap="condensed">
       <Heading as="h3" id="blockers-heading" variant="small">
         Blocking this run <CounterLabel>{view.blockers.length}</CounterLabel>
       </Heading>
-      {groups.length === 0 ? (
+      {present.length === 0 ? (
         <Text as="p" className="selfie-muted">
           Nothing in its images: each is approved or unchanged, and nothing failed.
         </Text>
       ) : (
         <ul className="selfie-attention">
-          {groups.map(({ reason, entries }) => {
-            const show = BLOCKER_SHOW[reason];
+          {present.map(({ reason, show }) => {
+            const entries = byReason.get(reason)!;
             return (
               <li key={reason}>
                 <Stack direction="horizontal" align="center" gap="condensed" wrap="wrap">
@@ -176,7 +150,7 @@ function Blockers({ view, onShow }: { view: RunView; onShow: (show: Show) => voi
                     </Link>
                   )}
                 </Stack>
-                {reason === "pattern-unmatched" ? (
+                {show === undefined ? (
                   <ul className="selfie-story-list">
                     {entries.map(({ detail }) => (
                       <li key={detail}>
@@ -187,11 +161,8 @@ function Blockers({ view, onShow }: { view: RunView; onShow: (show: Show) => voi
                 ) : (
                   <StoryList
                     runId={view.run.id}
-                    query={filterQuery({ text: "", show: show ?? "all" })}
-                    stories={entries.map(({ story, detail }) => ({
-                      story: story!,
-                      detail: reason === "failed" ? detail : null,
-                    }))}
+                    show={show}
+                    stories={entries.map(({ story, detail }) => ({ story: story!, detail: reason === "failed" ? detail : null }))}
                   />
                 )}
               </li>
@@ -199,17 +170,19 @@ function Blockers({ view, onShow }: { view: RunView; onShow: (show: Show) => voi
           })}
         </ul>
       )}
-    </section>
+    </Stack>
   );
 }
 
+const ADVISORIES: readonly { readonly reason: AdvisoryReason; readonly words: string }[] = [
+  { reason: "play-error", words: "whose play function threw" },
+  { reason: "unstable", words: "that rendered differently twice" },
+];
+
 function Advisories({ view }: { view: RunView }) {
   if (view.advisories.length === 0) return null;
-  const query = filterQuery({ text: "", show: "advisory" });
-  const plays = view.advisories.filter(({ reason }) => reason === "play-error");
-  const unstable = view.advisories.filter(({ reason }) => reason === "unstable");
   return (
-    <section aria-labelledby="advisories-heading" className="selfie-section">
+    <Stack as="section" aria-labelledby="advisories-heading" gap="condensed">
       <Heading as="h3" id="advisories-heading" variant="small">
         Advisories <CounterLabel>{view.advisories.length}</CounterLabel>
       </Heading>
@@ -217,39 +190,47 @@ function Advisories({ view }: { view: RunView }) {
         These don't stop anything, but their images may not mean what they seem to.
       </Text>
       <ul className="selfie-attention">
-        {plays.length > 0 && (
-          <li>
-            <Text weight="semibold">{plural(plays.length, "story", "stories")} whose play function threw</Text>
-            <StoryList runId={view.run.id} query={query} stories={plays.map(({ story, detail }) => ({ story: story!, detail }))} />
-          </li>
-        )}
-        {unstable.length > 0 && (
-          <li>
-            <Text weight="semibold">{plural(unstable.length, "story", "stories")} that rendered differently twice</Text>
-            <StoryList runId={view.run.id} query={query} stories={unstable.map(({ story }) => ({ story: story! }))} />
-          </li>
-        )}
+        {ADVISORIES.map(({ reason, words }) => {
+          const entries = view.advisories.filter((advisory) => advisory.reason === reason);
+          if (entries.length === 0) return null;
+          return (
+            <li key={reason}>
+              <Text weight="semibold">
+                {plural(entries.length, "story", "stories")} {words}
+              </Text>
+              <StoryList runId={view.run.id} show="advisory" stories={entries.map(({ story, detail }) => ({ story: story!, detail }))} />
+            </li>
+          );
+        })}
       </ul>
-    </section>
+    </Stack>
   );
 }
 
-const Row = memo(function Row({ row, runId, query }: { row: SnapshotRow; runId: string; query: string }) {
+/**
+ * Its filter isn't a prop, so a keystroke re-renders only the rows it shows or hides: a click takes
+ * the filter from the URL as it is by then.
+ */
+const Row = memo(function Row({ row, runId }: { row: SnapshotRow; runId: string }) {
   const thumbnail = row.imageHash ?? row.goldenHash;
-  const href = storyPath(runId, row.story, query);
   return (
     <Table.Row>
       <Table.Cell>
         {thumbnail !== null ? (
           <img className="selfie-thumb" src={imageUrl(thumbnail)} alt="" loading="lazy" decoding="async" width={64} height={48} />
         ) : (
-          <div className="selfie-thumb selfie-thumb-empty" aria-hidden="true" />
+          <div className="selfie-thumb" aria-hidden="true" />
         )}
       </Table.Cell>
       <Table.Cell>
-        <AppLink href={href} data-story={row.story} className="selfie-story-link">
+        <Link
+          href={storyPath(runId, row.story)}
+          onClick={(event: MouseEvent) => followLink(event, storyPath(runId, row.story, window.location.search))}
+          data-story={row.story}
+          className="selfie-story-link"
+        >
           {row.story}
-        </AppLink>
+        </Link>
       </Table.Cell>
       <Table.Cell>
         <StateLabel state={row.state} />
@@ -269,14 +250,14 @@ const Row = memo(function Row({ row, runId, query }: { row: SnapshotRow; runId: 
   );
 });
 
-function StoriesTable({ rows, runId, query }: { rows: readonly SnapshotRow[]; runId: string; query: string }) {
+function StoriesTable({ rows, runId }: { rows: readonly SnapshotRow[]; runId: string }) {
   return (
     <ScrollableRegion aria-labelledby="differences-heading">
       <Table aria-labelledby="differences-heading" cellPadding="condensed" gridTemplateColumns="80px minmax(200px, 1fr) 120px 170px 190px 130px">
         <Table.Head>
           <Table.Row>
             <Table.Header>
-              <span className="selfie-visually-hidden">Preview</span>
+              <VisuallyHidden>Preview</VisuallyHidden>
             </Table.Header>
             <Table.Header>Story</Table.Header>
             <Table.Header>State</Table.Header>
@@ -287,7 +268,7 @@ function StoriesTable({ rows, runId, query }: { rows: readonly SnapshotRow[]; ru
         </Table.Head>
         <Table.Body>
           {rows.map((row) => (
-            <Row key={row.story} row={row} runId={runId} query={query} />
+            <Row key={row.story} row={row} runId={runId} />
           ))}
         </Table.Body>
       </Table>
@@ -297,6 +278,7 @@ function StoriesTable({ rows, runId, query }: { rows: readonly SnapshotRow[]; ru
 
 interface PendingBulk {
   readonly decision: DecisionKind;
+  /** Each decidable, as they were when the dialog opened, which is exactly what gets sent. */
   readonly rows: readonly SnapshotRow[];
   /** All of the run, as opposed to what a filter is showing. */
   readonly scope: "all" | "shown";
@@ -305,19 +287,18 @@ interface PendingBulk {
 function BulkDialog({ pending, onClose }: { pending: PendingBulk; onClose: (confirmed: boolean) => void }) {
   const { decision, rows, scope } = pending;
   const verb = decision === "approved" ? "Approve" : "Reject";
-  const targets = rows.filter(isDecidable);
-  const count = (test: (row: SnapshotRow) => boolean) => targets.filter(test).length;
+  const count = (test: (row: SnapshotRow) => boolean) => rows.filter(test).length;
   const facts = [
     [count(({ state }) => state === "changed"), "changed"],
     [count(({ state }) => state === "new"), "new"],
     [count(({ decision: made }) => made?.decision === "approved"), "already approved"],
     [count(({ decision: made }) => made?.decision === "rejected"), "already rejected"],
-    [count(({ playError, unstable }) => playError !== null || unstable === true), "with an advisory"],
+    [count(hasAdvisory), "with an advisory"],
   ] as const;
   return (
     <ConfirmationDialog
-      title={`${verb} ${plural(targets.length, "image")}?`}
-      confirmButtonContent={`${verb} ${plural(targets.length, "image")}`}
+      title={`${verb} ${plural(rows.length, "image")}?`}
+      confirmButtonContent={`${verb} ${plural(rows.length, "image")}`}
       cancelButtonContent="Cancel"
       confirmButtonType="danger"
       width="large"
@@ -337,14 +318,40 @@ function BulkDialog({ pending, onClose }: { pending: PendingBulk; onClose: (conf
               </li>
             ))}
         </ul>
-        <div className="selfie-bulk-sample" tabIndex={0} role="group" aria-label="The images this decides on">
-          {targets.slice(0, 200).map(({ story }) => (
+        <ScrollableRegion className="selfie-bulk-sample" aria-label="The images this decides on">
+          {rows.slice(0, 200).map(({ story }) => (
             <div key={story}>{story}</div>
           ))}
-          {targets.length > 200 && <div className="selfie-muted">and {targets.length - 200} more</div>}
-        </div>
+          {rows.length > 200 && <div className="selfie-muted">and {rows.length - 200} more</div>}
+        </ScrollableRegion>
       </Stack>
     </ConfirmationDialog>
+  );
+}
+
+function BulkButton({
+  decision,
+  scope,
+  rows,
+  busy,
+  onPick,
+}: {
+  decision: DecisionKind;
+  scope: PendingBulk["scope"];
+  rows: readonly SnapshotRow[];
+  busy: boolean;
+  onPick: (pending: PendingBulk) => void;
+}) {
+  const verb = decision === "approved" ? "Approve" : "Reject";
+  const count = rows.length.toLocaleString();
+  return (
+    <Button
+      variant={decision === "rejected" && scope === "all" ? "danger" : "default"}
+      disabled={busy || rows.length === 0}
+      onClick={() => onPick({ decision, rows, scope })}
+    >
+      {scope === "all" ? `${verb} all (${count})` : `${verb} ${count} shown`}
+    </Button>
   );
 }
 
@@ -362,8 +369,6 @@ function Differences({
   filterInput: RefObject<HTMLInputElement | null>;
 }) {
   const [pending, setPending] = useState<PendingBulk | null>(null);
-  const [text, setText] = useState(filter.text);
-  useEffect(() => setText(filter.text), [filter.text]);
 
   const { unchanged, loadUnchanged } = state;
   const wantsUnchanged = filter.show === "unchanged";
@@ -374,43 +379,39 @@ function Differences({
   const deferredFilter = useDeferredValue(filter);
   const source = deferredFilter.show === "unchanged" ? (unchanged ?? []) : view.rows;
   const shown = useMemo(() => applyFilter(source, deferredFilter), [source, deferredFilter]);
-  const query = filterQuery(deferredFilter);
-  const allTargets = useMemo(() => decisionTargets(view.rows).length, [view.rows]);
-  const shownTargets = useMemo(() => decisionTargets(shown).length, [shown]);
+  const allDecidable = useMemo(() => decidableIn(view.rows), [view.rows]);
+  const shownDecidable = useMemo(() => decidableIn(shown), [shown]);
+  const undecided = useMemo(() => applyFilter(view.rows, { ...NO_FILTER, show: "undecided" }), [view.rows]);
   const isFiltered = filter.text !== "" || filter.show !== "all";
   const loadingUnchanged = wantsUnchanged && unchanged === null;
-  const undecided = useMemo(() => applyFilter(view.rows, { text: "", show: "undecided" }), [view.rows]);
 
   const confirm = async (confirmed: boolean) => {
     const decided = pending;
     setPending(null);
-    if (confirmed && decided !== null) await state.decide(decided.decision, decisionTargets(decided.rows));
+    if (confirmed && decided !== null) await state.decide(decided.decision, targetsOf(decided.rows));
   };
 
   return (
-    <section aria-labelledby="differences-heading" className="selfie-section">
+    <Stack as="section" aria-labelledby="differences-heading" gap="condensed">
       <Stack direction="horizontal" align="center" justify="space-between" wrap="wrap" gap="condensed">
         <Heading as="h3" id="differences-heading" variant="small">
           Differences
         </Heading>
         {undecided.length > 0 && (
-          <AppLinkButton variant="primary" href={storyPath(view.run.id, undecided[0]!.story, filterQuery({ text: "", show: "undecided" }))}>
+          <AppLinkButton variant="primary" href={storyPath(view.run.id, undecided[0]!.story, showQuery("undecided"))}>
             Review {plural(undecided.length, "undecided image")}
           </AppLinkButton>
         )}
       </Stack>
-      <div className="selfie-toolbar">
+      <Stack direction="horizontal" wrap="wrap" align="end" gap="normal">
         <FormControl>
           <FormControl.Label>Filter by story</FormControl.Label>
           <TextInput
             ref={filterInput}
             leadingVisual={SearchIcon}
-            value={text}
+            value={filter.text}
             placeholder="Press / to search"
-            onChange={(event) => {
-              setText(event.target.value);
-              setFilter({ ...filter, text: event.target.value }, true);
-            }}
+            onChange={(event) => setFilter({ ...filter, text: event.target.value }, true)}
           />
         </FormControl>
         <FormControl>
@@ -423,31 +424,23 @@ function Differences({
             ))}
           </Select>
         </FormControl>
-        <div className="selfie-bulk" role="group" aria-label="Decide on many images">
+        <Stack direction="horizontal" wrap="wrap" gap="condensed" className="selfie-bulk" role="group" aria-label="Decide on many images">
           {isFiltered && (
             <>
-              <Button disabled={state.busy || shownTargets === 0} onClick={() => setPending({ decision: "approved", rows: shown, scope: "shown" })}>
-                Approve {shownTargets.toLocaleString()} shown
-              </Button>
-              <Button disabled={state.busy || shownTargets === 0} onClick={() => setPending({ decision: "rejected", rows: shown, scope: "shown" })}>
-                Reject {shownTargets.toLocaleString()} shown
-              </Button>
+              <BulkButton decision="approved" scope="shown" rows={shownDecidable} busy={state.busy} onPick={setPending} />
+              <BulkButton decision="rejected" scope="shown" rows={shownDecidable} busy={state.busy} onPick={setPending} />
             </>
           )}
-          <Button disabled={state.busy || allTargets === 0} onClick={() => setPending({ decision: "approved", rows: view.rows, scope: "all" })}>
-            Approve all ({allTargets.toLocaleString()})
-          </Button>
-          <Button variant="danger" disabled={state.busy || allTargets === 0} onClick={() => setPending({ decision: "rejected", rows: view.rows, scope: "all" })}>
-            Reject all ({allTargets.toLocaleString()})
-          </Button>
-        </div>
-      </div>
+          <BulkButton decision="approved" scope="all" rows={allDecidable} busy={state.busy} onPick={setPending} />
+          <BulkButton decision="rejected" scope="all" rows={allDecidable} busy={state.busy} onPick={setPending} />
+        </Stack>
+      </Stack>
       <Text as="p" className="selfie-muted" role="status">
         {loadingUnchanged ? "Reading the unchanged stories…" : `Showing ${shown.length.toLocaleString()} of ${source.length.toLocaleString()}.`}{" "}
         <Keys keys="j" /> and <Keys keys="k" /> move through the list, <Keys keys="/" /> searches.
       </Text>
       {shown.length > 0 ? (
-        <StoriesTable rows={shown} runId={view.run.id} query={query} />
+        <StoriesTable rows={shown} runId={view.run.id} />
       ) : loadingUnchanged ? null : (
         <Blankslate border>
           <Blankslate.Heading as="h4">
@@ -458,13 +451,13 @@ function Differences({
           </Blankslate.Description>
           {isFiltered && (
             <Stack direction="horizontal" justify="center">
-              <Button onClick={() => setFilter({ text: "", show: "all" })}>Clear the filter</Button>
+              <Button onClick={() => setFilter(NO_FILTER)}>Clear the filter</Button>
             </Stack>
           )}
         </Blankslate>
       )}
       {pending !== null && <BulkDialog pending={pending} onClose={(confirmed) => void confirm(confirmed)} />}
-    </section>
+    </Stack>
   );
 }
 
@@ -479,12 +472,12 @@ export function RunScreen({
   search: string;
   returningFrom: RefObject<string | null>;
 }) {
-  const { run, counts, refusals, acceptedRunId } = view;
+  const { run, counts, refusals, acceptedRunId, removals } = view;
   const filter = useMemo(() => parseFilter(search), [search]);
   const filterInput = useRef<HTMLInputElement>(null);
   const setFilter = (next: RowFilter, replace = false) => navigate(runPath(run.id, filterQuery(next)), { replace });
   const showInList = (show: Show) => {
-    setFilter({ text: "", show });
+    setFilter({ ...NO_FILTER, show });
     document.getElementById("differences-heading")?.scrollIntoView();
   };
 
@@ -496,12 +489,11 @@ export function RunScreen({
     document.querySelector<HTMLElement>(`[data-story="${CSS.escape(story)}"]`)?.focus();
   }, [returningFrom]);
 
-  const links = () => [...document.querySelectorAll<HTMLElement>("[data-story]")];
   const moveFocus = (delta: number) => {
-    const all = links();
-    if (all.length === 0) return;
-    const at = all.indexOf(document.activeElement as HTMLElement);
-    all[at === -1 ? 0 : Math.max(0, Math.min(all.length - 1, at + delta))]?.focus();
+    const links = [...document.querySelectorAll<HTMLElement>("[data-story]")];
+    if (links.length === 0) return;
+    const at = links.indexOf(document.activeElement as HTMLElement);
+    links[at === -1 ? 0 : Math.max(0, Math.min(links.length - 1, at + delta))]?.focus();
   };
   useHotkeys({
     j: () => moveFocus(1),
@@ -513,6 +505,7 @@ export function RunScreen({
   const newest = view.siblings.find(({ status }) => status !== "recording");
   const stopsAccept = refusals.filter(({ reason }) => reason !== "removed-unacknowledged");
   const ready = stopsAccept.length === 0 && acceptedRunId !== run.id;
+  const { outsideFilter } = removals;
 
   return (
     <Stack gap="normal">
@@ -533,6 +526,13 @@ export function RunScreen({
         />
       )}
       <Facts view={view} />
+      {run.dirty && (
+        <Banner
+          variant="warning"
+          title="Recorded on a dirty tree"
+          description={`The tree had uncommitted changes while this rendered, so these images don't describe ${shortSha(run.gitSha)} and can't become its goldens. You can still decide on them. Commit, then run selfie review again: your approvals carry over.`}
+        />
+      )}
       <RunNotes view={view} />
       <div className="selfie-counts">
         <Count label="Stories" count={counts.stories} onShow={showInList} />
@@ -544,12 +544,11 @@ export function RunScreen({
         <Count label="Undecided" count={counts.undecided} show="undecided" onShow={showInList} />
         <Count label="Advisories" count={counts.advisories} show="advisory" onShow={showInList} />
       </div>
-      {view.notRendered.length > 0 && (
+      {outsideFilter > 0 && (
         <Banner
           variant="info"
           title="This run was filtered"
-          description={`${plural(view.notRendered.length, "golden")} of the baseline ${view.notRendered.length === 1 ? "is" : "are"} outside its --story filter, so ${view.notRendered.length === 1 ? "it isn't" : "they aren't"} compared here. Accepting would drop ${view.notRendered.length === 1 ? "it" : "them"}.`}
-          hideTitle={false}
+          description={`${plural(outsideFilter, "golden")} of the baseline ${outsideFilter === 1 ? "is" : "are"} outside its --story filter, so ${outsideFilter === 1 ? "it isn't" : "they aren't"} compared here. Accepting would drop ${outsideFilter === 1 ? "it" : "them"}.`}
         />
       )}
       <Blockers view={view} onShow={showInList} />

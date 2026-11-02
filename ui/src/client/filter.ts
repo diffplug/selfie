@@ -1,4 +1,5 @@
 // Which rows a filter shows, and where next and previous go. Pure, so a test needs no browser.
+import { isDecidable } from "selfie-store";
 import type { DecisionTarget, SnapshotRow } from "../shared/api.ts";
 
 export const SHOW_OPTIONS = [
@@ -23,20 +24,17 @@ export interface RowFilter {
 
 export const NO_FILTER: RowFilter = { text: "", show: "all" };
 
-export const isDecidable = ({ state }: SnapshotRow) => state === "changed" || state === "new";
-
-const isDifference = ({ state }: SnapshotRow) => state !== "unchanged";
-const hasAdvisory = ({ playError, unstable }: SnapshotRow) => playError !== null || unstable === true;
+export const hasAdvisory = ({ playError, unstable }: SnapshotRow) => playError !== null || unstable === true;
 
 function inShow(row: SnapshotRow, show: Show): boolean {
   switch (show) {
     case "all":
-      return isDifference(row) || hasAdvisory(row);
+      return row.state !== "unchanged" || hasAdvisory(row);
     case "undecided":
-      return isDecidable(row) && row.decision === null;
+      return isDecidable(row.state) && row.decision === null;
     case "approved":
     case "rejected":
-      return isDecidable(row) && row.decision?.decision === show;
+      return isDecidable(row.state) && row.decision?.decision === show;
     case "advisory":
       return hasAdvisory(row);
     default:
@@ -54,9 +52,11 @@ export function applyFilter(rows: readonly SnapshotRow[], { text, show }: RowFil
   });
 }
 
-/** What a decision on these rows would decide on: only what has an image to approve. */
-export const decisionTargets = (rows: readonly SnapshotRow[]): DecisionTarget[] =>
-  rows.filter(isDecidable).map(({ story, imageHash }) => ({ story, imageHash: imageHash! }));
+/** What these rows have to decide on. */
+export const decidableIn = (rows: readonly SnapshotRow[]) => rows.filter(({ state }) => isDecidable(state));
+
+export const targetsOf = (rows: readonly SnapshotRow[]): DecisionTarget[] =>
+  rows.map(({ story, imageHash }) => ({ story, imageHash: imageHash! }));
 
 /**
  * The shown rows on either side of a story, by position in `all`, so a story a decision just took
@@ -82,6 +82,25 @@ export function neighbors(
   return { previous, next };
 }
 
+/**
+ * Keeps the objects of rows that haven't changed, so a screen memoizing by row re-renders only what
+ * did. A run's images never change, so its hashes and its decision are all that can.
+ */
+export function reuseRows(previous: readonly SnapshotRow[], next: readonly SnapshotRow[]): readonly SnapshotRow[] {
+  const known = new Map(previous.map((row) => [row.story, row]));
+  return next.map((row) => {
+    const old = known.get(row.story);
+    const same =
+      old !== undefined &&
+      old.imageHash === row.imageHash &&
+      old.goldenHash === row.goldenHash &&
+      old.decision?.decision === row.decision?.decision &&
+      old.decision?.actor === row.decision?.actor &&
+      old.decision?.at === row.decision?.at;
+    return same ? old : row;
+  });
+}
+
 /** A filter as the query of a URL, so going back and reloading both keep it. */
 export function filterQuery({ text, show }: RowFilter): string {
   const params = new URLSearchParams();
@@ -90,6 +109,8 @@ export function filterQuery({ text, show }: RowFilter): string {
   const query = params.toString();
   return query === "" ? "" : `?${query}`;
 }
+
+export const showQuery = (show: Show) => filterQuery({ ...NO_FILTER, show });
 
 export function parseFilter(search: string): RowFilter {
   const params = new URLSearchParams(search);

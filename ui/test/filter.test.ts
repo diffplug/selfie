@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { applyFilter, decisionTargets, filterQuery, neighbors, NO_FILTER, parseFilter } from "../src/client/filter.ts";
+import { applyFilter, decidableIn, filterQuery, neighbors, NO_FILTER, parseFilter, reuseRows, showQuery } from "../src/client/filter.ts";
 import type { SnapshotRow } from "../src/shared/api.ts";
 
 const row = (story: string, overrides: Partial<SnapshotRow> = {}): SnapshotRow => ({
@@ -43,7 +43,7 @@ test("every word must appear, in any order, ignoring case", () => {
 });
 
 test("a bulk decision targets only what has an image to decide on", () => {
-  expect(decisionTargets(rows).map(({ story }) => story)).toEqual(["button--large", "button--small", "card--new"]);
+  expect(stories(decidableIn(rows))).toEqual(["button--large", "button--small", "card--new"]);
 });
 
 test("neighbors skip what's filtered out, and survive the current story leaving the filter", () => {
@@ -54,7 +54,20 @@ test("neighbors skip what's filtered out, and survive the current story leaving 
   expect(neighbors(rows, shown, "card--new")).toEqual({ previous: shown[0], next: null });
 });
 
+test("a read keeps the objects of rows it didn't change, so only a changed row re-renders", () => {
+  const next = rows.map((row) => ({ ...row }));
+  next[0] = { ...next[0]!, decision: approved };
+  next[1] = { ...next[1]!, decision: { ...approved, at: 2 } };
+  const kept = reuseRows(rows, [...next, row("appeared")]);
+  expect(kept[0]).toBe(next[0]);
+  expect(kept[1]).toBe(next[1]);
+  expect(kept.slice(2, rows.length)).toEqual(rows.slice(2));
+  kept.slice(2, rows.length).forEach((same, index) => expect(same).toBe(rows[index + 2]));
+  expect(kept[rows.length]!.story).toBe("appeared");
+});
+
 test("a filter survives the URL, and a bad one falls back", () => {
+  expect(showQuery("failed")).toBe("?show=failed");
   expect(filterQuery(NO_FILTER)).toBe("");
   expect(parseFilter(filterQuery({ text: "a b&c", show: "rejected" }))).toEqual({ text: "a b&c", show: "rejected" });
   expect(parseFilter("?show=nonsense")).toEqual(NO_FILTER);

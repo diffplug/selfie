@@ -1,22 +1,22 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { DecisionKind, DecisionTarget, RunView, SnapshotRow } from "../shared/api.ts";
+import type { AcceptRefusal, DecisionKind, DecisionTarget, RunView, SnapshotRow } from "../shared/api.ts";
 import { fetchRun, fetchUnchanged, postAccept, postDecision, RequestError } from "./api.ts";
+import { reuseRows } from "./filter.ts";
 
 export interface RunState {
   readonly view: RunView | null;
-  /** Why the run couldn't be read at all. */
+  /** Why the run couldn't be read. */
   readonly loadError: RequestError | null;
   /** Why the last action didn't happen. */
   readonly actionError: RequestError | null;
   readonly busy: boolean;
   readonly unchanged: readonly SnapshotRow[] | null;
-  readonly reload: () => void;
   readonly loadUnchanged: () => void;
   readonly clearActionError: () => void;
   /** True if the decision was recorded. */
   readonly decide: (decision: DecisionKind, targets: readonly DecisionTarget[]) => Promise<boolean>;
   /** The refusals, or null if the request never got an answer. */
-  readonly accept: (removedSeen: number | undefined) => Promise<{ accepted: boolean; refusals: RunView["refusals"] } | null>;
+  readonly accept: (removedSeen: number | undefined) => Promise<{ accepted: boolean; refusals: readonly AcceptRefusal[] } | null>;
 }
 
 const asRequestError = (error: unknown) =>
@@ -32,54 +32,48 @@ export function useRun(runId: string): RunState {
   const [actionError, setActionError] = useState<RequestError | null>(null);
   const [busy, setBusy] = useState(false);
   const [unchanged, setUnchanged] = useState<readonly SnapshotRow[] | null>(null);
-  // An answer applies only if no newer request has been sent, so a slow read can't undo an action.
-  const latest = useRef(0);
+  // At most one read is on its way, and a newer read or an action's answer aborts it, so a slow read
+  // can't undo either.
+  const reading = useRef<AbortController | null>(null);
 
-  const reload = useCallback(() => {
-    const ticket = ++latest.current;
-    fetchRun(runId).then(
-      (next) => {
-        if (ticket !== latest.current) return;
-        setView(next);
-        setLoadError(null);
-      },
-      (error: unknown) => {
-        if (ticket === latest.current) setLoadError(asRequestError(error));
-      },
-    );
-  }, [runId]);
+  const apply = useCallback((next: RunView) => {
+    setView((previous) => (previous === null ? next : { ...next, rows: reuseRows(previous.rows, next.rows) }));
+    setLoadError(null);
+  }, []);
+
+  const read = useCallback(() => {
+    reading.current?.abort();
+    const controller = new AbortController();
+    reading.current = controller;
+    fetchRun(runId, controller.signal).then(apply, (error: unknown) => {
+      if (!controller.signal.aborted) setLoadError(asRequestError(error));
+    });
+  }, [runId, apply]);
 
   useEffect(() => {
-    setView(null);
-    setLoadError(null);
-    setActionError(null);
-    setUnchanged(null);
-    reload();
-    const onVisible = () => {
-      if (document.visibilityState === "visible") reload();
-    };
-    document.addEventListener("visibilitychange", onVisible);
-    window.addEventListener("focus", onVisible);
+    read();
+    window.addEventListener("focus", read);
     return () => {
-      document.removeEventListener("visibilitychange", onVisible);
-      window.removeEventListener("focus", onVisible);
+      window.removeEventListener("focus", read);
+      reading.current?.abort();
     };
-  }, [reload]);
+  }, [read]);
 
   const loadUnchanged = useCallback(() => {
     fetchUnchanged(runId).then(setUnchanged, (error: unknown) => setActionError(asRequestError(error)));
   }, [runId]);
 
   const act = async <T,>(work: () => Promise<T>): Promise<T | null> => {
-    const ticket = ++latest.current;
     setBusy(true);
     setActionError(null);
     try {
-      return await work();
+      const answer = await work();
+      reading.current?.abort();
+      return answer;
     } catch (error) {
       setActionError(asRequestError(error));
       // Whatever was refused, the screen may be out of date, which may be why.
-      if (ticket === latest.current) reload();
+      read();
       return null;
     } finally {
       setBusy(false);
@@ -92,19 +86,17 @@ export function useRun(runId: string): RunState {
     actionError,
     busy,
     unchanged,
-    reload,
     loadUnchanged,
     clearActionError: useCallback(() => setActionError(null), []),
     decide: async (decision, targets) => {
       const next = await act(() => postDecision(runId, decision, targets));
-      if (next === null) return false;
-      setView(next);
-      return true;
+      if (next !== null) apply(next);
+      return next !== null;
     },
     accept: async (removedSeen) => {
       const outcome = await act(() => postAccept(runId, removedSeen));
       if (outcome === null) return null;
-      setView(outcome.view);
+      apply(outcome.view);
       return { accepted: outcome.accepted, refusals: outcome.refusals };
     },
   };
@@ -137,7 +129,7 @@ export function useTitle(title: string): void {
 }
 
 /** Runs once on mount and again when `key` changes, for data a screen fetches for itself. */
-export function useFetched<T>(key: string | null, load: () => Promise<T>): { data: T | null; error: RequestError | null } {
+export function useFetched<T>(key: string | null, load: (signal: AbortSignal) => Promise<T>): { data: T | null; error: RequestError | null } {
   const [state, setState] = useState<{ key: string | null; data: T | null; error: RequestError | null }>({
     key: null,
     data: null,
@@ -145,18 +137,14 @@ export function useFetched<T>(key: string | null, load: () => Promise<T>): { dat
   });
   useEffect(() => {
     if (key === null) return;
-    let live = true;
-    load().then(
-      (data) => {
-        if (live) setState({ key, data, error: null });
-      },
+    const controller = new AbortController();
+    load(controller.signal).then(
+      (data) => setState({ key, data, error: null }),
       (error: unknown) => {
-        if (live) setState({ key, data: null, error: asRequestError(error) });
+        if (!controller.signal.aborted) setState({ key, data: null, error: asRequestError(error) });
       },
     );
-    return () => {
-      live = false;
-    };
+    return () => controller.abort();
     // `load` is a function of `key`.
   }, [key]);
   return state.key === key ? state : { data: null, error: null };

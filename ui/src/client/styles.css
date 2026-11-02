@@ -27,6 +27,10 @@ body {
   padding: var(--base-size-16) var(--base-size-24);
 }
 
+.selfie-blank-action {
+  margin-top: var(--base-size-16);
+}
+
 .selfie-center {
   display: flex;
   justify-content: center;
@@ -46,15 +50,6 @@ body {
 }
 
 .selfie-nowrap {
-  white-space: nowrap;
-}
-
-.selfie-visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
   white-space: nowrap;
 }
 
@@ -117,12 +112,6 @@ code {
 }
 
 /* Sections */
-.selfie-section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--base-size-8);
-}
-
 .selfie-attention {
   list-style: none;
   margin: 0;
@@ -164,17 +153,7 @@ code {
 }
 
 /* The list */
-.selfie-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: var(--base-size-12);
-}
-
 .selfie-bulk {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--base-size-8);
   margin-left: auto;
 }
 
@@ -212,12 +191,6 @@ code {
 /* The detail */
 .selfie-story-title {
   overflow-wrap: anywhere;
-}
-
-.selfie-compare {
-  display: flex;
-  flex-direction: column;
-  gap: var(--base-size-8);
 }
 
 .selfie-panes {

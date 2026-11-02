@@ -1,10 +1,13 @@
 // The review UI's routes over the real library, a real store, and real Git, with no socket and no
 // browser, plus `selfie ui` itself on a real socket. Only the capture is a stand-in.
+import { execFileSync } from "node:child_process";
 import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { networkInterfaces, tmpdir } from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { decodeImage } from "selfie-store";
-import { createLocalApp, REQUEST_HEADER_VALUE, type LocalServer, serveLocal } from "selfie-ui";
+import { REQUEST_HEADER_VALUE } from "selfie-ui/app";
+import { createLocalApp, serveLocal, type LocalServer } from "selfie-ui/local";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { runCli } from "../src/cli.ts";
 import { openProject, type Project } from "../src/project.ts";
@@ -145,10 +148,17 @@ describe("who may ask", () => {
 
     test("can't be read or framed", async () => {
       expect((await get("/api/current", { origin: "https://evil.example" })).status).toBe(403);
-      const page = await get("/");
-      expect(page.headers.get("content-security-policy")).toContain("frame-ancestors 'none'");
-      expect(page.headers.get("x-frame-options")).toBe("DENY");
-      expect(page.headers.get("access-control-allow-origin")).toBeNull();
+      const refused = await get("/api/current", { host: "evil.example" });
+      for (const response of [await get("/"), await get("/api/current"), refused]) {
+        expect(response.headers.get("content-security-policy")).toBe(
+          "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
+        );
+        expect(response.headers.get("x-frame-options")).toBe("DENY");
+        expect(response.headers.get("cross-origin-resource-policy")).toBe("same-origin");
+        expect(response.headers.get("referrer-policy")).toBe("no-referrer");
+        expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+        expect(response.headers.get("access-control-allow-origin")).toBeNull();
+      }
     });
 
     test("succeeds from the page itself, by either name", async () => {
@@ -189,32 +199,36 @@ describe("pages", () => {
 describe("which run", () => {
   test("says when there are none yet, and why", async () => {
     const current = (await (await get("/api/current")).json()) as any;
-    expect(current).toMatchObject({ head: git(h.repo, "rev-parse", "HEAD"), runId: null, runs: [], baseline: { sha: null, reason: "no-goldens" } });
+    expect(current).toEqual({
+      head: git(h.repo, "rev-parse", "HEAD"),
+      runId: null,
+      hasUnfinishedRun: false,
+      baseline: { sha: null, message: expect.any(String) },
+    });
   });
 
   test("is the newest finished one at HEAD, in this environment", async () => {
     h.stories = [{ id: "a" }];
-    const first = (await review()).json.runId;
+    const { environment } = (await review()).json;
     const second = (await review()).json.runId;
     const current = async () => (await (await get("/api/current")).json()) as any;
-    expect(await current()).toMatchObject({ runId: second, runs: [{ id: second }, { id: first }] });
+    // With a run to open, nothing asks Git about baselines.
+    expect(await current()).toEqual({ head: expect.any(String), runId: second, hasUnfinishedRun: true, baseline: null });
 
     // A review still recording, or crashed, can't be compared.
     const recording = await project.snapshots.beginRun({
       gitSha: git(h.repo, "rev-parse", "HEAD"),
-      environment: (await current()).environment,
+      environment,
       dirty: false,
       baselineSha: null,
     });
-    const now = await current();
-    expect(now.runId).toBe(second);
-    expect(now.runs.map(({ status }: any) => status)).toContain("recording");
+    expect((await current()).runId).toBe(second);
     const unfinished = await get(`/api/runs/${recording.id}`);
     expect(unfinished.status).toBe(409);
     expect(await unfinished.json()).toMatchObject({ error: { code: "run-not-finished" } });
 
     await commit(h.repo, "moved on");
-    expect(await current()).toMatchObject({ runId: null, runs: [] });
+    expect(await current()).toMatchObject({ runId: null, hasUnfinishedRun: false });
     // Though a run of an earlier commit is still there to view.
     expect((await get(`/api/runs/${second}`)).status).toBe(200);
   });
@@ -228,6 +242,7 @@ describe("which run", () => {
       for (const response of [
         await get(`/api/runs/${run}`),
         await get(`/api/runs/${run}/unchanged`),
+        await get(`/api/runs/${run}/baseline`),
         await acceptRun(run),
         await decideOn(run, "approved", [{ story: "a", imageHash: UNKNOWN_HASH }]),
       ]) {
@@ -264,8 +279,8 @@ describe("the run view", () => {
     expect(view.advisories).toEqual([{ story: "same", reason: "play-error", detail: "It threw" }]);
     expect(view.rows.find(({ story }: any) => story === "breaks")).toMatchObject({ failure: "render: It broke", imageHash: null });
     expect(view.rows.find(({ story }: any) => story === "differs").pixelDiff).toMatchObject({ kind: "pixels", changedPixels: 64 });
-    expect(view.removals).toEqual(["gone"]);
-    expect(view.baseline.sha).toBe(json.baseline.sha);
+    expect(view.removals).toEqual({ stories: ["gone"], outsideFilter: 0 });
+    expect(view.run.baselineSha).toBe(json.baseline.sha);
     expect(view.actor).toBe("tester@example.com");
     expect(view.siblings.map(({ id }: any) => id)).toContain(json.runId);
 
@@ -289,8 +304,11 @@ describe("the run view", () => {
 
   test("explains a run with no baseline", async () => {
     h.stories = [{ id: "a" }];
-    const view = await viewOf((await review()).json.runId);
-    expect(view.baseline).toMatchObject({ sha: null, reason: "no-goldens", message: expect.any(String) });
+    const { runId } = (await review()).json;
+    expect((await viewOf(runId)).run.baselineSha).toBeNull();
+    const baseline = await get(`/api/runs/${runId}/baseline`);
+    expect(await baseline.json()).toEqual({ sha: null, message: expect.any(String) });
+    expect(baseline.headers.get("cache-control")).toBe("no-store");
   });
 
   test("says whose goldens a commit has, including another run's", async () => {
@@ -348,10 +366,17 @@ describe("images", () => {
     // Pixel stats in a list are a cache's. The detail's are computed, so they survive it.
     expect(row.pixelDiff).toBeNull();
     const url = `/api/diffs/${row.imageHash}/${row.goldenHash}`;
-    expect(await (await get(url)).json()).toEqual({
-      diff: { kind: "pixels", changedPixels: 1, totalPixels: 64, boundingBox: { x: 1, y: 2, width: 1, height: 1 }, firstChanged: { x: 1, y: 2 }, maxChannelDelta: 170 },
-      hasImage: true,
+    const stats = await get(url);
+    expect(await stats.json()).toEqual({
+      kind: "pixels",
+      changedPixels: 1,
+      totalPixels: 64,
+      boundingBox: { x: 1, y: 2, width: 1, height: 1 },
+      firstChanged: { x: 1, y: 2 },
+      maxChannelDelta: 170,
     });
+    // Addressed by content, as the image is, so a browser needn't ask twice.
+    expect(stats.headers.get("cache-control")).toBe("private, max-age=31536000, immutable");
     const image = await get(`${url}/image`);
     expect(image.status).toBe(200);
     expect(image.headers.get("cache-control")).toMatch(/^private\b/);
@@ -367,10 +392,7 @@ describe("images", () => {
     h.stories = [{ id: "a", width: 10, height: 6 }];
     const [row] = (await viewOf((await review()).json.runId)).rows;
     const url = `/api/diffs/${row.imageHash}/${row.goldenHash}`;
-    expect(await (await get(url)).json()).toEqual({
-      diff: { kind: "size-differs", current: { width: 10, height: 6 }, golden: { width: 8, height: 8 } },
-      hasImage: false,
-    });
+    expect(await (await get(url)).json()).toEqual({ kind: "size-differs", current: { width: 10, height: 6 }, golden: { width: 8, height: 8 } });
     expect((await get(`${url}/image`)).status).toBe(404);
   });
 });
@@ -426,6 +448,23 @@ describe("approve and reject", () => {
     const failed = await decideOn(runId, "approved", [{ story: "c", imageHash: rows.find(({ story }) => story === "c").goldenHash }]);
     expect(failed.status).toBe(409);
     expect((await decideOn(runId, "approved", [{ story: "nobody", imageHash: target("a").imageHash }])).status).toBe(409);
+  });
+
+  test("compares at most twice, and never reads the unchanged rows", async () => {
+    const compareRun = project.snapshots.compareRun.bind(project.snapshots);
+    const options: unknown[] = [];
+    project.snapshots.compareRun = (id, baseline, compareOptions) => {
+      options.push(compareOptions);
+      return compareRun(id, baseline, compareOptions);
+    };
+    expect((await decideOn(runId, "approved", [target("a")])).status).toBe(200);
+    expect(options).toEqual([{ includeUnchanged: false }, undefined]);
+    options.length = 0;
+    await viewOf(runId);
+    expect(options).toHaveLength(1);
+    options.length = 0;
+    await acceptRun(runId);
+    expect(options).toHaveLength(1);
   });
 
   test("takes a story ID as itself, never as a pattern", async () => {
@@ -524,7 +563,7 @@ describe("accept", () => {
     h.stories = [{ id: "a" }];
     const { runId } = (await review()).json;
     const view = await viewOf(runId);
-    expect(view.removals).toEqual(["b"]);
+    expect(view.removals).toEqual({ stories: ["b"], outsideFilter: 0 });
     expect(view.rows).toMatchObject([{ story: "b", state: "removed", imageHash: null }]);
     expect(refusalReasons(view.refusals)).toEqual(["removed-unacknowledged"]);
 
@@ -551,8 +590,7 @@ describe("accept", () => {
     await commit(h.repo, "next");
     const { runId } = (await review("--story", "a")).json;
     const view = await viewOf(runId);
-    expect(view.notRendered).toEqual(["b"]);
-    expect(view.removals).toEqual(["b"]);
+    expect(view.removals).toEqual({ stories: ["b"], outsideFilter: 1 });
     expect(view.rows).toEqual([]);
     expect(view.counts.removed).toBe(0);
     expect(view.refusals).toMatchObject([{ reason: "removed-unacknowledged", outsideFilter: 1 }]);
@@ -577,6 +615,33 @@ describe("accept", () => {
     for (const removedSeen of [-1, 1.5, "1", null]) {
       expect((await acceptRun(runId, { removedSeen })).status, String(removedSeen)).toBe(400);
     }
+  });
+});
+
+/** Every module a Node process loads to import this file, by a hook that sees each resolved. */
+function modulesLoadedBy(file: string): string[] {
+  const script = `
+    import { registerHooks } from "node:module";
+    const seen = [];
+    registerHooks({ resolve(specifier, context, next) { const result = next(specifier, context); seen.push(result.url); return result; } });
+    await import(${JSON.stringify(pathToFileURL(file).href)});
+    console.log(JSON.stringify(seen));
+  `;
+  return JSON.parse(execFileSync(process.execPath, ["--input-type=module", "-e", script], { encoding: "utf8" }));
+}
+
+describe("what each entry point loads", () => {
+  const root = path.resolve(import.meta.dirname, "../..");
+
+  test("the CLI loads no web server until selfie ui asks for one", () => {
+    const loaded = modulesLoadedBy(path.join(root, "cli/src/cli.ts"));
+    expect(loaded.length).toBeGreaterThan(5);
+    expect(loaded.filter((url) => url.includes("hono") || url.includes("/ui/src/"))).toEqual([]);
+  });
+
+  test("the routes and their protections need nothing of a platform", () => {
+    const loaded = modulesLoadedBy(path.join(root, "ui/src/server/app.ts"));
+    expect(loaded.filter((url) => url.startsWith("node:") || url.includes("/server/local") || url.includes("@hono/node-server"))).toEqual([]);
   });
 });
 

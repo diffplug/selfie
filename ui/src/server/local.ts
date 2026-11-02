@@ -1,4 +1,4 @@
-// The local half of the seam: who may talk to a server on this machine, and how Node serves it.
+// The local half of the seam: which hosts may ask a server on this machine, and how Node serves it.
 import { existsSync } from "node:fs";
 import type { Server } from "node:http";
 import path from "node:path";
@@ -6,54 +6,26 @@ import { fileURLToPath } from "node:url";
 import { serve, type ServerType } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono, type MiddlewareHandler } from "hono";
-import { REQUEST_HEADER, REQUEST_HEADER_VALUE, type ApiError, type ReviewSource } from "../shared/api.ts";
-import { createReviewApi } from "./app.ts";
+import type { ReviewSource } from "../shared/api.ts";
+import { createReviewApi, failure, pageHeaders, sameOriginWrites } from "./app.ts";
 
 const LOOPBACK = "127.0.0.1";
 const IMMUTABLE_ASSET = "public, max-age=31536000, immutable";
 
 /** Where `vite build` puts the client. */
-export const CLIENT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../dist");
-
-const hasClientIn = (clientDir: string) => existsSync(path.join(clientDir, "index.html"));
-
-const refused = (code: string, message: string): ApiError => ({ error: { code, message } });
+const CLIENT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../dist");
 
 /**
  * Refuses a request not addressed to this server by a loopback name, so a site that points its own
- * DNS name at 127.0.0.1 can't read anything, and refuses every state change a page on another
- * site could cause. `port` is asked per request, since listening decides it.
+ * DNS name at 127.0.0.1 can't read anything. `port` is asked per request, since listening decides it.
  */
-export function localGuard(port: () => number): MiddlewareHandler {
+function loopbackHosts(port: () => number): MiddlewareHandler {
   return async (context, next) => {
-    const allowedHosts = [`${LOOPBACK}:${port()}`, `localhost:${port()}`];
     const host = context.req.header("host");
-    if (host === undefined || !allowedHosts.includes(host)) {
-      return context.json(refused("bad-host", "This server only answers to its own loopback address."), 403);
-    }
-    const origin = context.req.header("origin");
-    if (origin !== undefined && origin !== `http://${host}`) {
-      return context.json(refused("bad-origin", "This server doesn't answer other sites."), 403);
-    }
-    if (context.req.method !== "GET" && context.req.method !== "HEAD") {
-      // A form can't send this header or this type, and a page's fetch can't without a preflight,
-      // which gets no CORS headers from here.
-      const contentType = context.req.header("content-type")?.split(";")[0]?.trim();
-      if (context.req.header(REQUEST_HEADER) !== REQUEST_HEADER_VALUE || contentType !== "application/json") {
-        return context.json(refused("bad-request-kind", "A change must come from the review page."), 403);
-      }
+    if (host !== `${LOOPBACK}:${port()}` && host !== `localhost:${port()}`) {
+      return context.json(failure("bad-host", "This server only answers to its own loopback address."), 403);
     }
     await next();
-    const { headers } = context.res;
-    // Another site can't frame the page to steer a click, or embed an image to learn it exists.
-    headers.set("Cross-Origin-Resource-Policy", "same-origin");
-    headers.set("X-Content-Type-Options", "nosniff");
-    headers.set("X-Frame-Options", "DENY");
-    headers.set("Referrer-Policy", "no-referrer");
-    headers.set(
-      "Content-Security-Policy",
-      "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
-    );
   };
 }
 
@@ -64,17 +36,21 @@ function cacheAs(value: string): MiddlewareHandler {
   };
 }
 
-export interface LocalAppOptions {
+/** The whole local app, ready for any Hono caller, which lets a test skip the socket. */
+export function createLocalApp({
+  source,
+  port,
+  clientDir,
+}: {
   readonly source: ReviewSource;
   readonly port: () => number;
   /** The built client, served for everything that isn't `/api`. */
   readonly clientDir: string;
-}
-
-/** The whole local app, ready for any Hono caller, which lets a test skip the socket. */
-export function createLocalApp({ source, port, clientDir }: LocalAppOptions): Hono {
+}): Hono {
   const app = new Hono();
-  app.use(localGuard(port));
+  app.use(pageHeaders);
+  app.use(loopbackHosts(port));
+  app.use(sameOriginWrites((context) => `http://${context.req.header("host")}`));
   app.route("/api", createReviewApi(source));
   app.use("/assets/*", cacheAs(IMMUTABLE_ASSET), serveStatic({ root: clientDir }));
   // Vite names an asset by its content, so a missing one is never the page below.
@@ -100,7 +76,7 @@ export async function serveLocal({
   readonly port: number;
   readonly clientDir?: string;
 }): Promise<LocalServer> {
-  if (!hasClientIn(clientDir)) {
+  if (!existsSync(path.join(clientDir, "index.html"))) {
     throw Object.assign(new Error("The review UI isn't built yet. Run: pnpm --filter selfie-ui build"), {
       code: "ui-not-built",
     });

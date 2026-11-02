@@ -1,7 +1,7 @@
 // Seeing the change. Side by side gives the shape of it, and flip gives one pixel at actual size:
 // all three layers stay stacked and loaded, so switching costs no scroll and no flash. How someone
 // is looking stays the same from story to story, since this stays mounted across them.
-import { Button, Checkbox, FormControl, SegmentedControl, Text } from "@primer/react";
+import { Button, Checkbox, FormControl, SegmentedControl, Stack, Text } from "@primer/react";
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import type { PixelDiff, SnapshotRow } from "../shared/api.ts";
 import { diffImageUrl, imageUrl } from "./api.ts";
@@ -14,6 +14,19 @@ type Layer = "current" | "golden" | "diff";
 
 const LAYER_WORDS: Readonly<Record<Layer, string>> = { current: "Current", golden: "Golden", diff: "Diff" };
 
+interface Source {
+  readonly name: Layer;
+  readonly src: string;
+}
+
+function sourcesOf({ imageHash, goldenHash }: SnapshotRow, hasDiffImage: boolean): readonly Source[] {
+  const sources: Source[] = [];
+  if (goldenHash !== null) sources.push({ name: "golden", src: imageUrl(goldenHash) });
+  if (imageHash !== null) sources.push({ name: "current", src: imageUrl(imageHash) });
+  if (hasDiffImage && imageHash !== null && goldenHash !== null) sources.push({ name: "diff", src: diffImageUrl(imageHash, goldenHash) });
+  return sources;
+}
+
 function Pane({ layer, src, story, onOpen }: { layer: Layer; src: string; story: string; onOpen: () => void }) {
   return (
     <figure className="selfie-pane">
@@ -25,13 +38,9 @@ function Pane({ layer, src, story, onOpen }: { layer: Layer; src: string; story:
   );
 }
 
-export function ImageCompare({ row, diff, hasDiffImage }: { row: SnapshotRow; diff: PixelDiff | null; hasDiffImage: boolean }) {
+export function ImageCompare({ row, diff }: { row: SnapshotRow; diff: PixelDiff | null }) {
   const { story, imageHash, goldenHash } = row;
-  const sources: readonly (readonly [Layer, string])[] = [
-    ...(goldenHash === null ? [] : [["golden", imageUrl(goldenHash)] as const]),
-    ...(imageHash === null ? [] : [["current", imageUrl(imageHash)] as const]),
-    ...(hasDiffImage && imageHash !== null && goldenHash !== null ? [["diff", diffImageUrl(imageHash, goldenHash)] as const] : []),
-  ];
+  const sources = sourcesOf(row, diff?.kind === "pixels");
   const canFlip = goldenHash !== null && imageHash !== null;
   const box = diff?.kind === "pixels" ? diff.boundingBox : null;
   const firstChanged = diff?.kind === "pixels" ? diff.firstChanged : null;
@@ -39,17 +48,14 @@ export function ImageCompare({ row, diff, hasDiffImage }: { row: SnapshotRow; di
   const [mode, setMode] = useState<"side" | "flip">("side");
   const [wantedLayer, setLayer] = useState<Layer>("current");
   // The layer someone asked for, or, in a story without it, the one it has.
-  const layer = sources.find(([name]) => name === wantedLayer)?.[0] ?? sources.find(([name]) => name === "current")?.[0] ?? sources[0]?.[0] ?? "current";
+  const shown = sources.find(({ name }) => name === wantedLayer) ?? sources.find(({ name }) => name === "current") ?? sources[0];
+  const layer = shown?.name ?? "current";
   const [zoom, setZoom] = useState<Zoom>(1);
   const [outline, setOutline] = useState(true);
   const [sizes, setSizes] = useState<Readonly<Record<string, { width: number; height: number }>>>({});
   const viewport = useRef<HTMLDivElement>(null);
 
-  const sizeOf = (name: Layer) => {
-    const source = sources.find(([candidate]) => candidate === name);
-    return source === undefined ? undefined : sizes[source[1]];
-  };
-  const shownSize = sizeOf(layer);
+  const shownSize = shown === undefined ? undefined : sizes[shown.src];
   const hasSize = shownSize !== undefined;
 
   const center = useCallback(() => {
@@ -58,8 +64,8 @@ export function ImageCompare({ row, diff, hasDiffImage }: { row: SnapshotRow; di
     // A box too big for the viewport may show nothing changed at its center, as when two distant
     // pixels changed, so go to a pixel that certainly did.
     const fits = box.width * zoom <= element.clientWidth && box.height * zoom <= element.clientHeight;
-    const x = fits || firstChanged === null ? box.x + box.width / 2 : firstChanged.x + 0.5;
-    const y = fits || firstChanged === null ? box.y + box.height / 2 : firstChanged.y + 0.5;
+    const x = fits || !firstChanged ? box.x + box.width / 2 : firstChanged.x + 0.5;
+    const y = fits || !firstChanged ? box.y + box.height / 2 : firstChanged.y + 0.5;
     element.scrollTo({ left: x * zoom - element.clientWidth / 2, top: y * zoom - element.clientHeight / 2 });
   }, [box, firstChanged, zoom]);
 
@@ -69,7 +75,7 @@ export function ImageCompare({ row, diff, hasDiffImage }: { row: SnapshotRow; di
     if (mode === "flip" && hasSize) center();
   }, [mode, center, hasSize]);
 
-  const hasDiffLayer = sources.some(([name]) => name === "diff");
+  const hasDiffLayer = sources.some(({ name }) => name === "diff");
 
   useHotkeys({
     s: () => setMode("side"),
@@ -98,8 +104,8 @@ export function ImageCompare({ row, diff, hasDiffImage }: { row: SnapshotRow; di
   }
 
   return (
-    <section aria-label="Images" className="selfie-compare">
-      <div className="selfie-toolbar">
+    <Stack as="section" aria-label="Images" gap="condensed">
+      <Stack direction="horizontal" wrap="wrap" align="end" gap="normal">
         <SegmentedControl aria-label="How to compare the images" onChange={(index) => setMode(index === 0 ? "side" : "flip")}>
           <SegmentedControl.Button selected={mode === "side"}>Side by side</SegmentedControl.Button>
           <SegmentedControl.Button selected={mode === "flip"}>Actual pixels</SegmentedControl.Button>
@@ -107,8 +113,8 @@ export function ImageCompare({ row, diff, hasDiffImage }: { row: SnapshotRow; di
         {mode === "flip" && (
           <>
             {sources.length > 1 && (
-              <SegmentedControl aria-label="Which image to show" onChange={(index) => setLayer(sources[index]![0])}>
-                {sources.map(([name]) => (
+              <SegmentedControl aria-label="Which image to show" onChange={(index) => setLayer(sources[index]!.name)}>
+                {sources.map(({ name }) => (
                   <SegmentedControl.Button key={name} selected={layer === name}>
                     {LAYER_WORDS[name]}
                   </SegmentedControl.Button>
@@ -135,7 +141,7 @@ export function ImageCompare({ row, diff, hasDiffImage }: { row: SnapshotRow; di
             )}
           </>
         )}
-      </div>
+      </Stack>
       <Text as="p" className="selfie-muted selfie-small">
         {mode === "flip" ? (
           <>
@@ -162,7 +168,7 @@ export function ImageCompare({ row, diff, hasDiffImage }: { row: SnapshotRow; di
       {mode === "side" ? (
         <div className="selfie-panes" data-count={sources.length}>
           {/* Keyed by image, so a new story never shows the last one's image while its own loads. */}
-          {sources.map(([name, src]) => (
+          {sources.map(({ name, src }) => (
             <Pane
               key={src}
               layer={name}
@@ -178,7 +184,7 @@ export function ImageCompare({ row, diff, hasDiffImage }: { row: SnapshotRow; di
       ) : (
         <div className="selfie-viewport" ref={viewport} tabIndex={0} role="group" aria-label={`${LAYER_WORDS[layer]} image at ${zoom}×. Scroll to pan.`}>
           <div className="selfie-stack" style={shownSize === undefined ? undefined : { width: shownSize.width * zoom, height: shownSize.height * zoom }}>
-            {sources.map(([name, src]) => {
+            {sources.map(({ name, src }) => {
               const size = sizes[src];
               return (
                 <img
@@ -207,6 +213,6 @@ export function ImageCompare({ row, diff, hasDiffImage }: { row: SnapshotRow; di
           </div>
         </div>
       )}
-    </section>
+    </Stack>
   );
 }

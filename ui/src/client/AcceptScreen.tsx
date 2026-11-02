@@ -3,32 +3,12 @@ import { ArrowLeftIcon } from "@primer/octicons-react";
 import { Banner, Button, Checkbox, FormControl, Heading, Stack, Text } from "@primer/react";
 import { Fragment, useEffect, useState, type ReactNode } from "react";
 import type { AcceptRefusal, RunView } from "../shared/api.ts";
-import { filterQuery } from "./filter.ts";
+import { showQuery } from "./filter.ts";
 import { useTitle, type RunState } from "./hooks.ts";
-import { AppLink, runPath, storyPath } from "./router.tsx";
+import { AppLink, runPath } from "./router.tsx";
 import { ActionFailure, RunNotes } from "./RunNotes.tsx";
+import { StoryLinks } from "./StoryLinks.tsx";
 import { plural, shortSha } from "./words.tsx";
-
-const STORIES_LISTED = 10;
-
-function Stories({ runId, stories, show }: { runId: string; stories: readonly string[]; show: Parameters<typeof filterQuery>[0]["show"] }) {
-  const query = filterQuery({ text: "", show });
-  const listed = stories.slice(0, STORIES_LISTED);
-  return (
-    <ul className="selfie-story-list">
-      {listed.map((story) => (
-        <li key={story}>
-          <AppLink href={storyPath(runId, story, query)}>{story}</AppLink>
-        </li>
-      ))}
-      {stories.length > listed.length && (
-        <li>
-          <AppLink href={runPath(runId, query)}>and {stories.length - listed.length} more</AppLink>
-        </li>
-      )}
-    </ul>
-  );
-}
 
 function Refusal({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -57,7 +37,7 @@ function refusalWords(refusal: AcceptRefusal, runId: string): ReactNode {
       return (
         <Refusal title={`${plural(refusal.stories.length, "story", "stories")} failed to render`}>
           <Text as="p">A run with failures can't become goldens. Fix them, and run <code>selfie review</code> again.</Text>
-          <Stories runId={runId} stories={refusal.stories} show="failed" />
+          <StoryLinks runId={runId} stories={refusal.stories.map((story) => ({ story }))} show="failed" />
         </Refusal>
       );
     case "unapproved": {
@@ -67,7 +47,7 @@ function refusalWords(refusal: AcceptRefusal, runId: string): ReactNode {
       return (
         <Refusal title={`${plural(refusal.stories.length, "image")} not approved: ${parts.join(", ")}`}>
           <Text as="p">Every changed or new image must be approved before this run can become goldens.</Text>
-          <Stories runId={runId} stories={refusal.stories.map(({ story }) => story)} show={rejected > 0 && undecided === 0 ? "rejected" : "all"} />
+          <StoryLinks runId={runId} stories={refusal.stories} show={rejected > 0 && undecided === 0 ? "rejected" : "all"} />
         </Refusal>
       );
     }
@@ -85,50 +65,51 @@ function refusalWords(refusal: AcceptRefusal, runId: string): ReactNode {
 }
 
 function Removals({ view, acknowledged, setAcknowledged }: { view: RunView; acknowledged: boolean; setAcknowledged: (value: boolean) => void }) {
-  const { removals, notRendered, run } = view;
+  const { stories, outsideFilter } = view.removals;
   return (
-    <section aria-labelledby="removals-heading" className="selfie-section">
+    <Stack as="section" aria-labelledby="removals-heading" gap="condensed">
       <Heading as="h3" id="removals-heading" variant="small">
-        Goldens this would drop: {removals.length}
+        Goldens this would drop: {stories.length}
       </Heading>
       <Text as="p">
-        The baseline has {removals.length === 1 ? "this story" : "these stories"}, and this run doesn't. Accepting means {removals.length === 1 ? "its golden is" : "their goldens are"} gone from this commit on.
+        The baseline has {stories.length === 1 ? "this story" : "these stories"}, and this run doesn't. Accepting means {stories.length === 1 ? "its golden is" : "their goldens are"} gone from this commit on.
       </Text>
-      {notRendered.length > 0 && (
+      {outsideFilter > 0 && (
         <Banner
           variant="warning"
-          title={`${notRendered.length} of these are only outside this run's --story filter`}
+          title={`${outsideFilter} of these are only outside this run's --story filter`}
           description="They weren't removed from the Storybook. A run without a filter may be what you want."
         />
       )}
-      <Stories runId={run.id} stories={removals} show="removed" />
+      <StoryLinks runId={view.run.id} stories={stories.map((story) => ({ story }))} show="removed" />
       <FormControl>
         <Checkbox checked={acknowledged} onChange={(event) => setAcknowledged(event.target.checked)} />
         <FormControl.Label>
-          I've looked at {removals.length === 1 ? "this removal" : `these ${removals.length} removals`}, and {removals.length === 1 ? "it's" : "they're"} right
+          I've looked at {stories.length === 1 ? "this removal" : `these ${stories.length} removals`}, and {stories.length === 1 ? "it's" : "they're"} right
         </FormControl.Label>
       </FormControl>
-    </section>
+    </Stack>
   );
 }
 
 export function AcceptScreen({ state, view }: { state: RunState; view: RunView }) {
   const { run, refusals, removals, acceptedRunId, advisories } = view;
+  const removedCount = removals.stories.length;
   const [acknowledged, setAcknowledged] = useState(false);
   const [lastRefusals, setLastRefusals] = useState<readonly AcceptRefusal[]>([]);
   // Whatever was acknowledged was a different list if the count has moved.
-  useEffect(() => setAcknowledged(false), [removals.length]);
+  useEffect(() => setAcknowledged(false), [removedCount]);
 
   useTitle(`Accept the run at ${shortSha(run.gitSha)}`);
   const isAccepted = acceptedRunId === run.id;
   const blocking = refusals.filter(({ reason }) => reason !== "removed-unacknowledged");
   const wrongCount = lastRefusals.filter(({ reason }) => reason === "wrong-removed-count");
   const shownRefusals = [...blocking, ...wrongCount];
-  const needsAcknowledgment = removals.length > 0;
+  const needsAcknowledgment = removedCount > 0;
   const canAccept = blocking.length === 0 && (!needsAcknowledgment || acknowledged) && !isAccepted;
 
   const submit = async () => {
-    const outcome = await state.accept(needsAcknowledgment ? removals.length : undefined);
+    const outcome = await state.accept(needsAcknowledgment ? removedCount : undefined);
     setLastRefusals(outcome?.accepted === false ? outcome.refusals : []);
   };
 
@@ -144,7 +125,7 @@ export function AcceptScreen({ state, view }: { state: RunState; view: RunView }
         Accepting makes this run's images the goldens of <code>{shortSha(run.gitSha)}</code> in <code>{run.environment}</code>, for later reviews to compare with.
       </Text>
       <ActionFailure state={state} />
-      <RunNotes view={{ ...view, run: { ...run, dirty: false } }} />
+      <RunNotes view={view} />
       {isAccepted ? (
         <Banner variant="success" title="Accepted" description={`These images are the goldens of ${shortSha(run.gitSha)}.`} />
       ) : (
@@ -153,11 +134,19 @@ export function AcceptScreen({ state, view }: { state: RunState; view: RunView }
             <Banner
               variant="info"
               title="Another run is this commit's goldens"
-              description={<>Accepting this one replaces them with this run's images. <AppLink inline href={runPath(acceptedRunId)}>See that run</AppLink>.</>}
+              description={
+                <>
+                  Accepting this one replaces them with this run's images.{" "}
+                  <AppLink inline href={runPath(acceptedRunId)}>
+                    See that run
+                  </AppLink>
+                  .
+                </>
+              }
             />
           )}
           {shownRefusals.length > 0 ? (
-            <section aria-labelledby="refusals-heading" className="selfie-section">
+            <Stack as="section" aria-labelledby="refusals-heading" gap="condensed">
               <Heading as="h3" id="refusals-heading" variant="small">
                 Why this can't be accepted yet
               </Heading>
@@ -166,7 +155,7 @@ export function AcceptScreen({ state, view }: { state: RunState; view: RunView }
                   <Fragment key={refusal.reason}>{refusalWords(refusal, run.id)}</Fragment>
                 ))}
               </ul>
-            </section>
+            </Stack>
           ) : (
             <Banner
               variant="success"
@@ -178,14 +167,15 @@ export function AcceptScreen({ state, view }: { state: RunState; view: RunView }
           {advisories.length > 0 && (
             <Text as="p" className="selfie-muted">
               {plural(advisories.length, "advisory", "advisories")} on this run {advisories.length === 1 ? "doesn't" : "don't"} stop it, and {advisories.length === 1 ? "is" : "are"} listed on{" "}
-              <AppLink inline href={runPath(run.id, filterQuery({ text: "", show: "advisory" }))}>
+              <AppLink inline href={runPath(run.id, showQuery("advisory"))}>
                 the run's page
-              </AppLink>.
+              </AppLink>
+              .
             </Text>
           )}
           <Stack direction="horizontal">
             <Button variant="primary" disabled={!canAccept || state.busy} onClick={() => void submit()} loading={state.busy}>
-              {needsAcknowledgment ? `Accept, dropping ${plural(removals.length, "golden")}` : "Accept this run"}
+              {needsAcknowledgment ? `Accept, dropping ${plural(removedCount, "golden")}` : "Accept this run"}
             </Button>
           </Stack>
         </>

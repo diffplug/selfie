@@ -12,13 +12,12 @@ import {
 } from "@primer/octicons-react";
 import { Label, Stack, type LabelProps } from "@primer/react";
 import type { ReactNode } from "react";
+import { isDecidable } from "selfie-store";
 import type { BlockerReason, PixelDiff, SnapshotRow, SnapshotState } from "../shared/api.ts";
-import { isDecidable } from "./filter.ts";
 
 export const shortSha = (sha: string) => sha.slice(0, 10);
 
-const plural = (count: number, one: string, many = `${one}s`) => `${count.toLocaleString()} ${count === 1 ? one : many}`;
-export { plural };
+export const plural = (count: number, one: string, many = `${one}s`) => `${count.toLocaleString()} ${count === 1 ? one : many}`;
 
 function IconLabel({ variant, icon, children }: { variant: LabelProps["variant"]; icon: ReactNode; children: ReactNode }) {
   return (
@@ -49,7 +48,7 @@ export function StateLabel({ state }: { readonly state: SnapshotState }) {
 }
 
 export function DecisionLabel({ row }: { readonly row: SnapshotRow }) {
-  if (!isDecidable(row)) return <span className="selfie-muted">No decision needed</span>;
+  if (!isDecidable(row.state)) return <span className="selfie-muted">No decision needed</span>;
   if (row.decision?.decision === "approved") {
     return (
       <IconLabel variant="success" icon={<CheckIcon size={12} />}>

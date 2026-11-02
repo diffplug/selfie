@@ -1,7 +1,6 @@
 // Arguments in, one document and an exit code out. The work is the library's.
 import { parseArgs, type ParseArgsConfig } from "node:util";
 import type { capture } from "selfie-render";
-import { serveLocal } from "selfie-ui";
 import { resolveCaptureSettings } from "./config.ts";
 import { accept, decide } from "./decisions.ts";
 import { buildAcceptDocument, buildReviewDocument } from "./document.ts";
@@ -10,7 +9,6 @@ import { gitUserEmail } from "./git.ts";
 import { compareAsReviewed, findBaseline, openProject, type Project } from "./project.ts";
 import { review } from "./review.ts";
 import { summarizeRun } from "./summary.ts";
-import { localReviewSource } from "./ui.ts";
 
 const EXIT_OK = 0;
 const EXIT_NEEDS_ATTENTION = 1;
@@ -201,6 +199,8 @@ async function dispatch(command: string | undefined, args: string[], context: Co
       }
       return withProject(context, async (project) => {
         if (runId !== undefined) await compareAsReviewed(project, runId);
+        // Only here, so that no other command loads a web server.
+        const [{ serveLocal }, { localReviewSource }] = await Promise.all([import("selfie-ui/local"), import("./ui.ts")]);
         const server = await serveLocal({
           source: localReviewSource(project, { native: values.native }),
           port,

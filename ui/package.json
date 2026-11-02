@@ -5,10 +5,12 @@
   "license": "FSL-1.1-MIT",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    "./app": "./src/server/app.ts",
+    "./local": "./src/server/local.ts"
   },
   "scripts": {
     "build": "vite build",
+    "prepare": "vite build",
     "test": "pnpm typecheck && vite build --logLevel warn && vitest run",
     "typecheck": "tsc -p tsconfig.json"
   },

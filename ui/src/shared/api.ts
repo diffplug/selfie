@@ -1,24 +1,31 @@
 // What crosses between the browser and the server, and what the server needs from its platform.
 // Types only, so the client's bundle holds none of the server, and the server none of the client.
+// `selfie-cli` takes its own result types from here, so each has one definition.
 import type { ComparedSnapshot, DecisionKind, Run } from "selfie-store";
 
 export type { ComparedSnapshot, DecisionKind, Run, SnapshotState } from "selfie-store";
+
+export interface BoundingBox {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
 
 export type PixelDiff =
   | {
       readonly kind: "pixels";
       readonly changedPixels: number;
       readonly totalPixels: number;
-      readonly boundingBox: {
-        readonly x: number;
-        readonly y: number;
-        readonly width: number;
-        readonly height: number;
-      } | null;
+      /** Null only if the images are identical, which a `changed` snapshot never is. */
+      readonly boundingBox: BoundingBox | null;
+      /** The first changed pixel in reading order, which `boundingBox`'s center need not be. */
       readonly firstChanged: { readonly x: number; readonly y: number } | null;
+      /** The largest difference in any one channel of any pixel, 1 to 255. */
       readonly maxChannelDelta: number;
     }
   | {
+      /** Nothing lines up, so there are no pixels to compare and no diff image. */
       readonly kind: "size-differs";
       readonly current: { readonly width: number; readonly height: number };
       readonly golden: { readonly width: number; readonly height: number };
@@ -35,8 +42,10 @@ export type BlockerReason =
 export type AdvisoryReason = "play-error" | "unstable";
 
 export interface Attention<Reason extends string> {
+  /** Null only for `pattern-unmatched`. */
   readonly story: string | null;
   readonly reason: Reason;
+  /** The fact behind it, if there's more than its name: a message, an actor, or a pattern. */
   readonly detail: string | null;
 }
 
@@ -54,12 +63,14 @@ export type AcceptRefusal =
   | {
       readonly reason: "removed-unacknowledged";
       readonly stories: readonly string[];
+      /** How many of `stories` are gone only because the run's filter left them out. */
       readonly outsideFilter: number;
     }
   | {
       readonly reason: "wrong-removed-count";
       readonly stories: readonly string[];
       readonly outsideFilter: number;
+      /** The count the caller gave. */
       readonly seen: number;
     };
 
@@ -68,24 +79,17 @@ export interface SnapshotRow extends ComparedSnapshot {
   readonly pixelDiff: PixelDiff | null;
 }
 
-/** Why a run or a repository has no baseline, if that's so. */
+/** The baseline a review would use, and why there's none, if that's so. */
 export interface BaselineNote {
   readonly sha: string | null;
-  readonly reason: string | null;
   readonly message: string | null;
 }
 
-export interface RunListing {
-  readonly id: string;
-  readonly startedAt: number;
-  readonly status: Run["status"];
-  readonly dirty: boolean;
-}
+export type RunListing = Pick<Run, "id" | "startedAt" | "status" | "dirty">;
 
 /** Everything a screen shows about a run, recomputed from `summarizeRun` after every action. */
 export interface RunView {
   readonly run: Run;
-  readonly baseline: BaselineNote;
   /** The run whose images are the goldens of this run's Git SHA, which may be this one. */
   readonly acceptedRunId: string | null;
   /** Who a decision made here is recorded as, or null if Git doesn't say. */
@@ -104,12 +108,13 @@ export interface RunView {
   };
   /** Everything that isn't unchanged, and anything with an advisory, in name order. */
   readonly rows: readonly SnapshotRow[];
-  /** Goldens this run lacks only because its filter left them out, and not listed in `rows`. */
-  readonly notRendered: readonly string[];
   /** What `accept` would refuse now, were no removals acknowledged. */
   readonly refusals: readonly AcceptRefusal[];
-  /** Every golden accepting would drop. Acknowledging means passing this list's length. */
-  readonly removals: readonly string[];
+  /**
+   * Every golden accepting would drop, and how many only the run's filter left out, which aren't in
+   * `rows`. Acknowledging means passing the length of `stories`.
+   */
+  readonly removals: { readonly stories: readonly string[]; readonly outsideFilter: number };
   readonly usableAsBaseline: boolean;
   /** Every run at this SHA and environment, newest first, this one included. */
   readonly siblings: readonly RunListing[];
@@ -118,10 +123,11 @@ export interface RunView {
 /** Which run the UI opens to: the newest finished one at HEAD, in the project's environment. */
 export interface CurrentView {
   readonly head: string | null;
-  readonly environment: string;
   readonly runId: string | null;
-  readonly runs: readonly RunListing[];
-  readonly baseline: BaselineNote;
+  /** HEAD has runs, and none finished. */
+  readonly hasUnfinishedRun: boolean;
+  /** Only asked for if there's no run to open. */
+  readonly baseline: BaselineNote | null;
 }
 
 export interface AcceptOutcome {
@@ -129,12 +135,6 @@ export interface AcceptOutcome {
   /** Empty if accepted. These include any about the count this request passed. */
   readonly refusals: readonly AcceptRefusal[];
   readonly view: RunView;
-}
-
-export interface DiffView {
-  readonly diff: PixelDiff;
-  /** A size difference has no diff image. */
-  readonly hasImage: boolean;
 }
 
 export interface ApiError {
@@ -148,19 +148,21 @@ export interface DecisionTarget {
 
 /**
  * The seam between the routes and a platform: how they reach a project's data. `cli/src/ui.ts`
- * implements it for a local repository, and a Worker would implement it for D1 and R2. An error
- * with a `code` from `ERROR_STATUS` becomes that status with its message.
+ * implements it for a local repository. An error with a `code` from `ERROR_STATUS` becomes that
+ * status with its message.
  */
 export interface ReviewSource {
   current(): Promise<CurrentView>;
   runView(runId: string): Promise<RunView>;
+  /** Why the run has no baseline: only a screen showing that asks. */
+  baseline(runId: string): Promise<BaselineNote>;
   unchanged(runId: string): Promise<readonly SnapshotRow[]>;
   /** Decides on exactly these images, or refuses all of them if one isn't what the run holds. */
   decide(runId: string, decision: DecisionKind, targets: readonly DecisionTarget[]): Promise<RunView>;
   accept(runId: string, removedSeen: number | undefined): Promise<AcceptOutcome>;
   /** The stored bytes, or null if this store doesn't hold it. */
   image(hash: string): Promise<Uint8Array | null>;
-  /** Null if the store doesn't hold both. */
+  /** Null if the store doesn't hold both. A size difference has no `png`. */
   diff(current: string, golden: string): Promise<{ diff: PixelDiff; png: Uint8Array | null } | null>;
 }
 

@@ -232,6 +232,9 @@ export interface Decision {
 
 export type SnapshotState = "unchanged" | "changed" | "new" | "removed" | "failed";
 
+/** Whether a snapshot in this state has an image that can take a decision. */
+export const isDecidable = (state: SnapshotState): boolean => state === "changed" || state === "new";
+
 export interface ComparedSnapshot {
   readonly story: string;
   readonly state: SnapshotState;

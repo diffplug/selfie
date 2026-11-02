@@ -3,9 +3,10 @@ import { ArrowLeftIcon, CheckIcon, XIcon } from "@primer/octicons-react";
 import { Banner, Button, Dialog, Heading, RelativeTime, Stack, Text } from "@primer/react";
 import { AriaStatus } from "@primer/react/experimental";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { DecisionKind, DiffView, RunView, SnapshotRow } from "../shared/api.ts";
+import { isDecidable } from "selfie-store";
+import type { DecisionKind, PixelDiff, RunView, SnapshotRow } from "../shared/api.ts";
 import { diffImageUrl, fetchDiff, imageUrl } from "./api.ts";
-import { applyFilter, isDecidable, neighbors, parseFilter } from "./filter.ts";
+import { applyFilter, neighbors, parseFilter, targetsOf } from "./filter.ts";
 import { useFetched, useHotkeys, useTitle, type RunState } from "./hooks.ts";
 import { ImageCompare } from "./ImageCompare.tsx";
 import { Keys } from "./Keys.tsx";
@@ -45,8 +46,7 @@ function ShortcutsDialog({ onClose }: { readonly onClose: () => void }) {
   );
 }
 
-function PixelStats({ diff }: { diff: DiffView }) {
-  const { diff: stats } = diff;
+function PixelStats({ stats }: { stats: PixelDiff }) {
   if (stats.kind === "size-differs") {
     return <Text className="selfie-muted">{describePixels(stats)}</Text>;
   }
@@ -112,10 +112,12 @@ export function DetailScreen({ state, view, story, search }: { state: RunState; 
   );
   const listHref = runPath(view.run.id, search);
 
+  // Its review's stats, if they're still on disk, and otherwise computed from the store.
   const changedPair = row?.state === "changed" && row.imageHash !== null && row.goldenHash !== null;
-  const { data: diff, error: diffError } = useFetched(changedPair ? `${row.imageHash}/${row.goldenHash}` : null, () =>
-    fetchDiff(row!.imageHash!, row!.goldenHash!),
+  const { data: fetched, error: diffError } = useFetched(changedPair && row.pixelDiff === null ? `${row.imageHash}/${row.goldenHash}` : null, (signal) =>
+    fetchDiff(row!.imageHash!, row!.goldenHash!, signal),
   );
+  const diff = row?.pixelDiff ?? fetched;
 
   // The next story's images are likely wanted within seconds, so have them ready.
   useEffect(() => {
@@ -132,11 +134,11 @@ export function DetailScreen({ state, view, story, search }: { state: RunState; 
 
   const decide = async (decision: DecisionKind) => {
     if (row === null || state.busy) return;
-    if (!isDecidable(row)) {
+    if (!isDecidable(row.state)) {
       setMessage(row.state === "unchanged" ? "An unchanged image needs no decision." : "This story has no image to decide on.");
       return;
     }
-    const recorded = await state.decide(decision, [{ story: row.story, imageHash: row.imageHash! }]);
+    const recorded = await state.decide(decision, targetsOf([row]));
     if (!recorded) return;
     const word = decision === "approved" ? "Approved" : "Rejected";
     setMessage(next === null ? `${word} ${row.story}. That's the last one here.` : `${word} ${row.story}.`);
@@ -158,7 +160,7 @@ export function DetailScreen({ state, view, story, search }: { state: RunState; 
     return <Banner variant="warning" title="This run has no such story" description={<AppLink href={listHref}>Back to the run</AppLink>} />;
   }
 
-  const decidable = isDecidable(row);
+  const decidable = isDecidable(row.state);
   const finished = view.counts.undecided === 0 && next === null && filter.show === "undecided";
 
   return (
@@ -209,7 +211,7 @@ export function DetailScreen({ state, view, story, search }: { state: RunState; 
             by {row.decision.actor}, <RelativeTime date={new Date(row.decision.at)} />.
           </Text>
         )}
-        {diff !== null && <PixelStats diff={diff} />}
+        {diff !== null && <PixelStats stats={diff} />}
         {changedPair && diff === null && diffError === null && <Text className="selfie-muted">Comparing pixels…</Text>}
         {diffError !== null && <Text className="selfie-muted">The pixels couldn't be compared: {diffError.message}</Text>}
       </Stack>
@@ -233,8 +235,8 @@ export function DetailScreen({ state, view, story, search }: { state: RunState; 
           }
         />
       )}
-      <Notes row={row} sizeDiffers={diff?.diff.kind === "size-differs"} />
-      <ImageCompare row={row} diff={diff?.diff ?? null} hasDiffImage={diff?.hasImage ?? false} />
+      <Notes row={row} sizeDiffers={diff?.kind === "size-differs"} />
+      <ImageCompare row={row} diff={diff} />
       {helpOpen && <ShortcutsDialog onClose={() => setHelpOpen(false)} />}
     </Stack>
   );
