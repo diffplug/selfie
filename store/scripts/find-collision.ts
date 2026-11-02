@@ -16,10 +16,10 @@ import { availableParallelism } from "node:os";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseArgs } from "node:util";
 import { Worker, isMainThread, parentPort } from "node:worker_threads";
 import { encodePam, truncateHash } from "../src/core/index.ts";
 
+const MAX_MINUTES = 20;
 const IMAGE_SIZE = 4;
 const DISTINGUISHED_BITS = 16;
 const DISTINGUISHED = 2 ** DISTINGUISHED_BITS;
@@ -190,10 +190,7 @@ async function search(maxMinutes: number): Promise<void> {
 }
 
 if (isMainThread) {
-  const { values } = parseArgs({
-    options: { "max-minutes": { type: "string", default: "20" } },
-  });
-  await search(Number(values["max-minutes"]));
+  await search(MAX_MINUTES);
 } else {
   runWorker();
 }

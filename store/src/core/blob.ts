@@ -1,6 +1,6 @@
 /**
- * What a platform implements to hold bytes. Each adapter calls `assertBlobKey`
- * on every operation.
+ * What a platform implements to hold bytes. Adapters only store: every rule about
+ * keys lives in `Blobs`, so no adapter can forget one.
  */
 export interface BlobStorage {
   /**
@@ -19,8 +19,38 @@ export interface BlobStorage {
 // path such as an adapter's temp directory.
 const BLOB_KEY = /^[a-z0-9][a-z0-9._-]*(?:\/[a-z0-9][a-z0-9._-]*)*$/;
 
-export function assertBlobKey(key: string): void {
+function assertBlobKey(key: string): void {
   if (!BLOB_KEY.test(key)) {
     throw new RangeError(`Invalid blob key: ${JSON.stringify(key)}`);
+  }
+}
+
+/**
+ * The blob interface the store core uses. Refuses an invalid key before any
+ * adapter sees it.
+ *
+ * A class with a private field rather than an interface, so that a bare adapter
+ * cannot be passed where `Blobs` is expected and skip the check.
+ */
+export class Blobs implements BlobStorage {
+  readonly #adapter: BlobStorage;
+
+  constructor(adapter: BlobStorage) {
+    this.#adapter = adapter;
+  }
+
+  async put(key: string, bytes: Uint8Array): Promise<void> {
+    assertBlobKey(key);
+    await this.#adapter.put(key, bytes);
+  }
+
+  async get(key: string): Promise<Uint8Array | null> {
+    assertBlobKey(key);
+    return this.#adapter.get(key);
+  }
+
+  async has(key: string): Promise<boolean> {
+    assertBlobKey(key);
+    return this.#adapter.has(key);
   }
 }

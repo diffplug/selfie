@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, open, readFile, rename, rm, stat } from "node:fs/promises";
+import { mkdir, open, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
-import { assertBlobKey, type BlobStorage } from "../core/index.ts";
+import type { BlobStorage } from "../core/index.ts";
 
-// Blob keys cannot start a segment with a dot, so no key can name this directory.
+// `Blobs` refuses a key with a segment starting with a dot, so no key can name this directory.
 // It sits under the root to share a filesystem with the keys: rename is only
 // atomic within one. A crash can leave an orphan here but never at a key.
 const TEMP_DIR = ".tmp";
@@ -20,7 +20,6 @@ export class FilesystemBlobStorage implements BlobStorage {
   }
 
   async put(key: string, bytes: Uint8Array): Promise<void> {
-    assertBlobKey(key);
     const target = join(this.#root, key);
     const tempDir = join(this.#root, TEMP_DIR);
     await mkdir(tempDir, { recursive: true });
@@ -28,14 +27,8 @@ export class FilesystemBlobStorage implements BlobStorage {
 
     const temp = join(tempDir, randomUUID());
     try {
-      const file = await open(temp, "wx");
-      try {
-        await file.writeFile(bytes);
-        // Before the rename, or a power cut could expose a key with missing data.
-        await file.sync();
-      } finally {
-        await file.close();
-      }
+      // Flushed before the rename, or a power cut could expose a key with missing data.
+      await writeFile(temp, bytes, { flag: "wx", flush: true });
       await rename(temp, target);
     } catch (error) {
       await rm(temp, { force: true });
@@ -50,9 +43,9 @@ export class FilesystemBlobStorage implements BlobStorage {
   }
 
   async get(key: string): Promise<Uint8Array | null> {
-    assertBlobKey(key);
     try {
-      return new Uint8Array(await readFile(join(this.#root, key)));
+      const file = await readFile(join(this.#root, key));
+      return new Uint8Array(file.buffer, file.byteOffset, file.byteLength);
     } catch (error) {
       if (isNotFound(error)) return null;
       throw error;
@@ -60,7 +53,6 @@ export class FilesystemBlobStorage implements BlobStorage {
   }
 
   async has(key: string): Promise<boolean> {
-    assertBlobKey(key);
     try {
       return (await stat(join(this.#root, key))).isFile();
     } catch (error) {

@@ -8,7 +8,7 @@ import { env } from "cloudflare:workers";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { D1RestAdapter, D1RestError, type D1RestConfig } from "selfie-store/adapters/d1-rest";
 import { R2BlobStorage } from "selfie-store/adapters/r2";
-import { encodePam, initStoreSchema, Sql, Store, toHex, type RawImage } from "../../src/core/index.ts";
+import { Blobs, encodePam, initStoreSchema, Sql, Store, toHex, type RawImage } from "../../src/core/index.ts";
 import { collidingHash } from "../support/colliding-hash.ts";
 
 const { D1_ACCOUNT_ID: accountId, D1_DATABASE_ID: databaseId, D1_TOKEN: token } = env;
@@ -70,7 +70,7 @@ describe.skipIf(token === undefined)("real D1 inside workerd (opt-in: pnpm test:
       // Bare, not counted, to exercise the default. One attempt makes it one request.
       const sql = connect({ fetch: undefined, retry: { maxAttempts: 1 } });
       requests++;
-      expect(await sql.run("SELECT 1 AS one")).toEqual([{ one: 1 }]);
+      expect(await sql.run({ sql: "SELECT 1 AS one" })).toEqual([{ one: 1 }]);
     });
 
     it("runs a batch in one request, with parameters and rows intact", async () => {
@@ -92,7 +92,7 @@ describe.skipIf(token === undefined)("real D1 inside workerd (opt-in: pnpm test:
 
     it("rejects with D1's own message and no token", async () => {
       const error = await connect()
-        .run("SELEKT 1")
+        .run({ sql: "SELEKT 1" })
         .catch((e: unknown) => e);
       expect(error).toBeInstanceOf(D1RestError);
       const { message, codes, status, attempts } = error as D1RestError;
@@ -105,7 +105,7 @@ describe.skipIf(token === undefined)("real D1 inside workerd (opt-in: pnpm test:
 
     it("times out a request with AbortSignal.timeout, as an unknown outcome", async () => {
       const error = await connect({ requestTimeoutMs: 1, retry: { maxAttempts: 1 } })
-        .run("SELECT 1")
+        .run({ sql: "SELECT 1" })
         .catch((e: unknown) => e);
       expect(error).toBeInstanceOf(D1RestError);
       expect((error as D1RestError).outcomeUnknown).toBe(true);
@@ -124,7 +124,7 @@ describe.skipIf(token === undefined)("real D1 inside workerd (opt-in: pnpm test:
     const TRUNCATED = 500;
     const project = `workerd-${crypto.randomUUID()}`;
     const prefix = `projects/${project}/`;
-    const blob = new R2BlobStorage({ bucket: env.BLOBS, project });
+    const blob = new Blobs(new R2BlobStorage({ bucket: env.BLOBS, project }));
     const a = image(1);
     const b = image(2);
     const hash = collidingHash({ 1: TRUNCATED, 2: TRUNCATED });

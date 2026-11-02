@@ -1,7 +1,6 @@
 import { inspect } from "node:util";
 import { afterEach, describe, expect, it } from "vitest";
 import { D1RestAdapter, D1RestError, type D1RestConfig } from "../src/adapters/d1-rest.ts";
-import { SqliteAdapter } from "../src/adapters/sqlite.ts";
 import {
   imageInsertStatement,
   initStoreSchema,
@@ -10,6 +9,7 @@ import {
   type SqlRow,
   type SqlStatement,
 } from "../src/core/index.ts";
+import { hashOf } from "./support/sql-params.ts";
 import { createTempStore } from "./support/temp-store.ts";
 
 const TOKEN = "test-token-abc123";
@@ -342,11 +342,12 @@ describe("D1RestAdapter replay against a real SQL engine", () => {
 
   /**
    * An adapter over local SQLite that really runs each request, then loses the
-   * response to the first `lost` of them, as a connection dropped after a commit would.
+   * response to those `shouldLose` picks, as a connection dropped after a commit would.
    */
-  async function losingResponses(lost: number) {
+  async function losingResponses(shouldLose: (request: number) => boolean) {
     temp = await createTempStore();
-    const engine = new SqliteAdapter(temp.path);
+    const engine = temp.connect();
+    const sent: SqlStatement[] = [];
     let requests = 0;
     const adapter = new D1RestAdapter({
       accountId: "a",
@@ -355,55 +356,31 @@ describe("D1RestAdapter replay against a real SQL engine", () => {
       sleep: async () => {},
       fetch: async (_, init) => {
         const { batch } = JSON.parse(String(init?.body)) as { batch: SqlStatement[] };
-        const rows = await engine.execute(batch);
-        if (requests++ < lost) throw new TypeError("fetch failed");
+        sent.push(...batch);
+        const rows = await engine.batch(batch);
+        if (shouldLose(requests++)) throw new TypeError("fetch failed");
         return ok(...rows);
       },
     });
-    return { sql: new Sql(adapter), requests: () => requests, engine };
+    return { sql: new Sql(adapter), sent, requests: () => requests };
   }
 
-  const hash = (n: number) => n.toString(16).padStart(64, "0");
-
   it("keeps one key and spends no negative key when an image insert is replayed", async () => {
-    const { sql, requests, engine } = await losingResponses(2);
-    const positive = await sql.runStatement(imageInsertStatement(hash(1), 500));
-    expect(positive).toEqual([{ key: 500 }]);
+    const { sql, requests } = await losingResponses((request) => request < 2);
+    expect(await sql.run(imageInsertStatement(hashOf(1), 500))).toEqual([{ key: 500 }]);
     expect(requests()).toBe(3);
-    const negative = await sql.runStatement(imageInsertStatement(hash(2), 500));
-    expect(negative).toEqual([{ key: -1 }]);
-    const again = await sql.runStatement(imageInsertStatement(hash(3), 500));
-    expect(again).toEqual([{ key: -2 }]);
-    engine.close();
+    expect(await sql.run(imageInsertStatement(hashOf(2), 500))).toEqual([{ key: -1 }]);
+    expect(await sql.run(imageInsertStatement(hashOf(3), 500))).toEqual([{ key: -2 }]);
   });
 
   it("marks everything the store sends as idempotent, so a lost response never fails it", async () => {
-    temp = await createTempStore();
-    const engine = new SqliteAdapter(temp.path);
-    const sent: SqlStatement[] = [];
-    let requests = 0;
-    const sql = new Sql(
-      new D1RestAdapter({
-        accountId: "a",
-        databaseId: "d",
-        token: TOKEN,
-        sleep: async () => {},
-        fetch: async (_, init) => {
-          const { batch } = JSON.parse(String(init?.body)) as { batch: SqlStatement[] };
-          sent.push(...batch);
-          const rows = await engine.execute(batch);
-          // Every first try of each statement loses its response.
-          if (requests++ % 2 === 0) throw new TypeError("fetch failed");
-          return ok(...rows);
-        },
-      }),
-    );
+    // Every first try of each statement loses its response.
+    const { sql, sent } = await losingResponses((request) => request % 2 === 0);
     await initStoreSchema(sql);
     const store = new Store({ sql, blob: temp.blob });
     const pixels = new Uint8Array([1, 2, 3, 255]);
     const { hash: imageHash, key } = await store.putImage({ width: 1, height: 1, pixels });
     expect(await store.lookupKey(imageHash)).toBe(key);
     expect(sent).toHaveLength(6);
-    engine.close();
   });
 });

@@ -1,4 +1,4 @@
-import { assertBlobKey, type BlobStorage } from "../core/index.ts";
+import type { BlobStorage } from "../core/index.ts";
 
 /**
  * The part of a Worker's R2 binding this adapter uses, stated here so the store
@@ -92,7 +92,6 @@ export class R2BlobStorage implements BlobStorage {
   }
 
   #objectKey(key: string): string {
-    assertBlobKey(key);
     return this.#prefix + key;
   }
 }

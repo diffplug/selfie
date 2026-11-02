@@ -4,7 +4,7 @@
 import { parentPort, workerData } from "node:worker_threads";
 import { SqliteAdapter } from "../../src/adapters/sqlite.ts";
 import { imageInsertStatement, Sql } from "../../src/core/index.ts";
-import { withParamMode } from "./sql-params.ts";
+import { insertedKey, withParamMode } from "./sql-params.ts";
 import type { WorkerInput, WorkerOutput } from "./sqlite-workers.ts";
 
 const { path, rows, mode, parties, barrier } = workerData as WorkerInput;
@@ -24,9 +24,7 @@ if (Atomics.add(gate, 0, 1) + 1 === parties) {
 const startedAt = performance.timeOrigin + performance.now();
 const keys: number[] = [];
 for (const row of rows) {
-  const { sql: text, params } = imageInsertStatement(row.hash, row.truncated);
-  const [result] = await sql.run(text, params);
-  keys.push(result?.key as number);
+  keys.push(insertedKey(await sql.run(imageInsertStatement(row.hash, row.truncated))));
 }
 const finishedAt = performance.timeOrigin + performance.now();
 

@@ -1,4 +1,4 @@
-import type { SqlAdapter } from "../../src/core/index.ts";
+import type { SqlAdapter, SqlRow } from "../../src/core/index.ts";
 
 /**
  * The D1 REST API documents its parameters as strings, so SQL tests run with
@@ -10,6 +10,20 @@ export type ParamMode = "number" | "string";
 export interface ImageRow {
   readonly hash: string;
   readonly truncated: number;
+}
+
+/** A valid image hash, distinct for each number. */
+export function hashOf(n: number): string {
+  return n.toString(16).padStart(64, "0");
+}
+
+/** The key from an image insert's rows. Throws rather than asserts, since worker threads use this too. */
+export function insertedKey(rows: readonly SqlRow[]): number {
+  const key = rows[0]?.key;
+  if (rows.length !== 1 || typeof key !== "number") {
+    throw new TypeError(`Expected one row with a numeric key, got ${JSON.stringify(rows)}`);
+  }
+  return key;
 }
 
 export function withParamMode(adapter: SqlAdapter, mode: ParamMode): SqlAdapter {

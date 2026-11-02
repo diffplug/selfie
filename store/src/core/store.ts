@@ -1,4 +1,4 @@
-import type { BlobStorage } from "./blob.ts";
+import type { Blobs } from "./blob.ts";
 import { SHA256_BYTES, sha256, toHex, truncateHash, type HashFunction } from "./image-hash.ts";
 import { encodePam, type RawImage } from "./pam.ts";
 import type { Sql, SqlStatement } from "./sql.ts";
@@ -28,6 +28,10 @@ const SELECT_IMAGE_KEY = "SELECT key FROM images WHERE hash = ?1";
 
 const IMAGE_HASH = /^[0-9a-f]{64}$/;
 
+// Each group is one request on D1, whose API limit every project shares. A group
+// this size stays far inside what real D1 was measured to accept in one batch.
+const INSERTS_PER_REQUEST = 100;
+
 /** The insert statement for one image, given its hash and its truncated hash. */
 export function imageInsertStatement(hash: string, truncated: number): SqlStatement {
   // Idempotent: a second run hits ON CONFLICT and returns the key the first assigned.
@@ -36,12 +40,12 @@ export function imageInsertStatement(hash: string, truncated: number): SqlStatem
 
 /** Creates the store's tables if they are missing. Safe to call concurrently. */
 export async function initStoreSchema(sql: Sql): Promise<void> {
-  await sql.runStatement({ sql: CREATE_IMAGES_TABLE, idempotent: true });
+  await sql.run({ sql: CREATE_IMAGES_TABLE, idempotent: true });
 }
 
 export interface StoreOptions {
   readonly sql: Sql;
-  readonly blob: BlobStorage;
+  readonly blob: Blobs;
   /** Defaults to SHA-256. Tests inject one to force collisions. */
   readonly hash?: HashFunction;
 }
@@ -55,7 +59,7 @@ export interface StoredImage {
 
 export class Store {
   readonly #sql: Sql;
-  readonly #blob: BlobStorage;
+  readonly #blob: Blobs;
   readonly #hash: HashFunction;
 
   constructor({ sql, blob, hash = sha256 }: StoreOptions) {
@@ -66,6 +70,36 @@ export class Store {
 
   /** Stores an image, or finds it if it is already stored. */
   async putImage(image: RawImage): Promise<StoredImage> {
+    const [stored] = await this.putImages([image]);
+    return stored!;
+  }
+
+  /**
+   * Stores images, or finds those already stored, returning them in order. Use this
+   * over repeated `putImage` for many images: it sends far fewer SQL requests. A
+   * failure can leave earlier images stored, and calling this again is safe.
+   */
+  async putImages(images: readonly RawImage[]): Promise<StoredImage[]> {
+    const stored: StoredImage[] = [];
+    for (let i = 0; i < images.length; i += INSERTS_PER_REQUEST) {
+      const prepared: { hash: string; statement: SqlStatement }[] = [];
+      for (const image of images.slice(i, i + INSERTS_PER_REQUEST)) {
+        prepared.push(await this.#writeBytes(image));
+      }
+      const results = await this.#sql.batch(prepared.map(({ statement }) => statement));
+      results.forEach((rows, j) => {
+        const key = rows[0]?.key;
+        if (typeof key !== "number" || !Number.isSafeInteger(key)) {
+          throw new TypeError(`Image insert returned an invalid key: ${String(key)}`);
+        }
+        stored.push({ hash: prepared[j]!.hash, key });
+      });
+    }
+    return stored;
+  }
+
+  /** Bytes first: a failure here or later can orphan bytes, but can never leave a row without them. */
+  async #writeBytes(image: RawImage): Promise<{ hash: string; statement: SqlStatement }> {
     const pam = encodePam(image);
     const digest = await this.#hash(pam);
     if (digest.length !== SHA256_BYTES) {
@@ -73,19 +107,11 @@ export class Store {
     }
     const hash = toHex(digest);
 
-    // Bytes first: a failure here or below can orphan bytes, but can never leave
-    // a row without them.
     const blobKey = imageBlobKey(hash);
     if (!(await this.#blob.has(blobKey))) {
       await this.#blob.put(blobKey, pam);
     }
-
-    const [row] = await this.#sql.runStatement(imageInsertStatement(hash, truncateHash(digest)));
-    const key = row?.key;
-    if (typeof key !== "number" || !Number.isSafeInteger(key)) {
-      throw new TypeError(`Image insert returned an invalid key: ${String(key)}`);
-    }
-    return { hash, key };
+    return { hash, statement: imageInsertStatement(hash, truncateHash(digest)) };
   }
 
   /** This store's key for an image hash, or null if the image is not stored. */
@@ -93,7 +119,7 @@ export class Store {
     assertImageHash(hash);
     // By the full hash, never by truncated value: a colliding image must not
     // resolve to the key of the image that claimed that value first.
-    const [row] = await this.#sql.runStatement({
+    const [row] = await this.#sql.run({
       sql: SELECT_IMAGE_KEY,
       params: [hash],
       idempotent: true,

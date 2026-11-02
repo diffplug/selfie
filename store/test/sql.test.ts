@@ -23,13 +23,13 @@ function recording() {
 
 const accepts = async (text: string, params: SqlParam[] = []) => {
   const { sql, seen } = recording();
-  await sql.run(text, params);
+  await sql.run({ sql: text, params });
   expect(seen).toHaveLength(1);
 };
 
 const refuses = async (text: string, params: SqlParam[] = []) => {
   const { sql, seen } = recording();
-  await expect(sql.run(text, params)).rejects.toThrow(SqlInterfaceError);
+  await expect(sql.run({ sql: text, params })).rejects.toThrow(SqlInterfaceError);
   expect(seen).toEqual([]);
 };
 
@@ -115,8 +115,8 @@ describe("Sql", () => {
 
   it("passes a statement's idempotent mark through to the adapter", async () => {
     const { sql, seen } = recording();
-    await sql.runStatement({ sql: "SELECT 1", idempotent: true });
-    await sql.run("SELECT 2");
+    await sql.run({ sql: "SELECT 1", idempotent: true });
+    await sql.run({ sql: "SELECT 2" });
     expect(seen.map((statement) => statement.idempotent)).toEqual([true, undefined]);
   });
 

@@ -3,6 +3,7 @@
 import { env } from "cloudflare:workers";
 import { afterEach, describe, expect, it } from "vitest";
 import { R2BlobStorage, type R2BucketLike } from "selfie-store/adapters/r2";
+import { Blobs } from "../../src/core/index.ts";
 import { describeBlobContract } from "../contract/blob-contract.ts";
 
 const bucket = env.BLOBS;
@@ -80,7 +81,7 @@ describe("R2BlobStorage", () => {
     it.each(["../beta/images/abc", "images/../../beta/images/abc", "./images/abc", "%2e%2e/beta/images/abc"])(
       "refuses the climbing key %j on every operation",
       async (key) => {
-        const attacker = storageFor("alpha");
+        const attacker = new Blobs(storageFor("alpha"));
         await expect(attacker.put(key, bytes)).rejects.toThrow(RangeError);
         await expect(attacker.get(key)).rejects.toThrow(RangeError);
         await expect(attacker.has(key)).rejects.toThrow(RangeError);
