@@ -39,11 +39,11 @@ Source of truth: `cli/src/index.ts`; tests in `cli/test/library.test.ts`.
 |---|---|
 | `openProject({ cwd, env })` | The repository's `Project`: its `repo`, `directory`, `store`, `snapshots`, and `close()` |
 | `review(project, options)` | Returns a `ReviewResult`: the `comparison`, `dirtyPaths`, `baseline`, `stabilityChecked`, `differences`, `playErrors`, `unstable`, `warnings`, and `timings` |
-| `decide(project, { runId, decision, actor, stories })` | `stories` is `"all"`, patterns, or `{ ids }`: exact story IDs, for a caller that showed a list. Returns `decided`, `skipped`, `unmatchedPatterns`, and the `comparison` after it |
+| `decide(project, { runId, decision, actor, stories })` | `stories` is `"all"`, patterns, or `{ targets }`: exact stories and image hashes, for a caller that showed them, refused whole with `stale-decision` if any isn't a changed or new image the run holds. Returns `decided`, `skipped`, `unmatchedPatterns`, and the `comparison` after it. It compares twice, and reads unchanged rows only for patterns |
 | `accept(project, { runId, removedSeen })` | Returns `accepted`, `refusals`, `usableAsBaseline`, and the `comparison` |
-| `checkAccept(project, { runId, removedSeen })` | What `accept` would refuse, changing nothing, with `removalFacts` |
+| `checkAccept(project, comparison, removedSeen)` | What `accept` would refuse of a comparison a caller holds, changing nothing: `refusals`, `usableAsBaseline`, and `removals` |
 | `summarizeRun(comparison)` | Returns `blockers`, `advisories`, `counts`, `undecided`, `unapproved`, `failed`, `removed`, and `notRendered` |
-| `isDecidable(state)` | Whether a snapshot in this state can take a decision: `changed` or `new` |
+| `isDecidable(state)` | Whether a snapshot in this state can take a decision: `changed` or `new`. Defined in `selfie-store` |
 | `compareAsReviewed(project, runId, options)` | A run compared with the baseline its reviewer saw |
 | `findBaseline(project, environment)`, `resolveCaptureSettings(repo, { native })`, `gitUserEmail(repo)` | What the commands use for these |
 | `readReviewCache(project, runId)` | The paths and pixel diffs a review exported, or null once pruned |
@@ -52,6 +52,7 @@ Source of truth: `cli/src/index.ts`; tests in `cli/test/library.test.ts`.
 - **Must keep facts in results and compute verdicts.** A result never says what needs attention: `summarizeRun` does, from a comparison, so a verdict can be recomputed after any decision.
 - **Must keep command wording out of results.** `next` steps and refusal messages are built in `cli/src/document.ts`, and a refusal holds fields such as `stories` and `outsideFilter`.
 - **Must keep printing and exit codes in `cli/src/cli.ts`.**
+- **Must take the types the review UI also reads from `selfie-ui/app`, with `import type`**, so each has one definition and nothing is loaded for them: `PixelDiff`, `AcceptRefusal`, `Attention`, and the reasons.
 
 ## Local data
 
@@ -216,7 +217,8 @@ Source of truth: `cli/src/ui.ts`, and `selfie ui` in `cli/src/cli.ts`; tests in 
 - **Must take an optional run**, and refuse a bad or unknown one with exit 2 before listening. With none, the page opens at the newest finished run at HEAD in this project's environment, or `--native`'s.
 - **Must ask the system for a free port unless given `--port`**, so two projects can both be served.
 - **Never open a browser.** Whoever ran it decides what to do with the URL.
-- **Must fail with `ui-not-built` and exit 2 if the client isn't built**, saying what to run: `pnpm --filter selfie-ui build`.
+- **Must load `selfie-ui` and Hono only in this command**, by a dynamic `import()`, so no other command pays for a web server. `cli/test/ui.test.ts` checks what `cli/src/cli.ts` loads.
+- **Must fail with `ui-not-built` and exit 2 if the client isn't built**, saying what to run: `pnpm --filter selfie-ui build`. `pnpm install` builds it, through `prepare`.
 - **Must take a decision's actor from `git config user.email`, or refuse with `no-actor`.** There's no `--actor` here, since a page has no way to be anyone else.
 
 ## Configuration

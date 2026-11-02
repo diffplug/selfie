@@ -56,7 +56,7 @@ A run is one recording of a set of snapshots against one full Git SHA in one env
 Source of truth: `Snapshots.compareRun` in `store/src/core/snapshots.ts`.
 
 - **Must compare by image alone: the same hash is the same image.** Pixel diffs belong to `selfie review` (`docs/specs/cli.md` → Review).
-- **Must give each snapshot exactly one state:**
+- **Must give each snapshot exactly one state**, of which `changed` and `new` are the ones `isDecidable`, having an image to decide on:
 
 | State | The run has | The baseline's goldens have |
 |---|---|---|
