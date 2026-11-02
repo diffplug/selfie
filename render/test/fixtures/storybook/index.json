@@ -1,0 +1,18 @@
+{
+  "v": 5,
+  "entries": {
+    "guide--docs": { "id": "guide--docs", "title": "Guide", "name": "Docs", "type": "docs", "importPath": "./guide.mdx" },
+    "basic--detail": { "id": "basic--detail", "title": "Basic", "name": "Detail", "type": "story", "importPath": "./basic.js" },
+    "basic--environment": { "id": "basic--environment", "title": "Basic", "name": "Environment", "type": "story", "importPath": "./basic.js" },
+    "basic--animation": { "id": "basic--animation", "title": "Basic", "name": "Animation", "type": "story", "importPath": "./basic.js" },
+    "basic--external-request": { "id": "basic--external-request", "title": "Basic", "name": "External request", "type": "story", "importPath": "./basic.js" },
+    "timers--always-random": { "id": "timers--always-random", "title": "Timers", "name": "Always random", "type": "story", "importPath": "./timers.js" },
+    "timers--ticking": { "id": "timers--ticking", "title": "Timers", "name": "Ticking", "type": "story", "importPath": "./timers.js" },
+    "timers--frozen-by-selfie": { "id": "timers--frozen-by-selfie", "title": "Timers", "name": "Frozen by Selfie", "type": "story", "importPath": "./timers.js" },
+    "timers--frozen-by-project": { "id": "timers--frozen-by-project", "title": "Timers", "name": "Frozen by project", "type": "story", "importPath": "./timers.js" },
+    "init--css-applied": { "id": "init--css-applied", "title": "Init", "name": "CSS applied", "type": "story", "importPath": "./init.js" },
+    "broken--throws": { "id": "broken--throws", "title": "Broken", "name": "Throws", "type": "story", "importPath": "./broken.js" },
+    "broken--never-finishes": { "id": "broken--never-finishes", "title": "Broken", "name": "Never finishes", "type": "story", "importPath": "./broken.js" },
+    "broken--blocks-main-thread": { "id": "broken--blocks-main-thread", "title": "Broken", "name": "Blocks main thread", "type": "story", "importPath": "./broken.js" }
+  }
+}

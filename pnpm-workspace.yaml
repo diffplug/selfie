@@ -1,4 +1,5 @@
 packages:
   - store
+  - render
 strictPeerDependencies: true
 minimumReleaseAge: 1440
