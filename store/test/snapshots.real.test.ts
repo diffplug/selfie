@@ -12,8 +12,8 @@ import { hashOf } from "./support/sql-params.ts";
 
 const ENABLED = process.env.SELFIE_D1_CONTRACT === "1";
 
-// Well above a healthy run of about 55, and far below the shared limit of 1,200 per 5 minutes.
-const REQUEST_BUDGET = 80;
+// Well above a healthy run of about 90, and far below the shared limit of 1,200 per 5 minutes.
+const REQUEST_BUDGET = 120;
 
 // The size a run must stay efficient at.
 const SNAPSHOTS = 10_000;
@@ -101,7 +101,7 @@ describe.skipIf(!ENABLED)("real D1 snapshots (opt-in: pnpm test:d1:snapshots)", 
     }));
     const environment = "size";
     const gitSha = "3".repeat(40);
-    const run = await measure("beginRun", () => snapshots.beginRun({ gitSha, environment }));
+    const run = await measure("beginRun", () => snapshots.beginRun({ gitSha, environment, dirty: false, baselineSha: null }));
     await measure("recordSnapshots", () => snapshots.recordSnapshots(run.id, items));
     await measure("finishRun", () => snapshots.finishRun(run.id, SNAPSHOTS));
     await measure("decide", () =>
@@ -119,7 +119,7 @@ describe.skipIf(!ENABLED)("real D1 snapshots (opt-in: pnpm test:d1:snapshots)", 
     for (let i = 0; i < NEW; i++) {
       head.push({ story: `zz-new-${i}`, imageHash: hashes[SNAPSHOTS + CHANGED + i]! });
     }
-    const headRun = await snapshots.beginRun({ gitSha: "4".repeat(40), environment });
+    const headRun = await snapshots.beginRun({ gitSha: "4".repeat(40), environment, dirty: false, baselineSha: null });
     await snapshots.recordSnapshots(headRun.id, head);
     await snapshots.finishRun(headRun.id, head.length);
     const { snapshots: compared, unchangedCount } = await measure("compareRun (differences)", () =>

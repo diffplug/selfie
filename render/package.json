@@ -5,7 +5,8 @@
   "license": "FSL-1.1-MIT",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./testing": "./src/testing.ts"
   },
   "scripts": {
     "test": "pnpm typecheck && vitest run",

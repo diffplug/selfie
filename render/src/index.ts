@@ -15,5 +15,5 @@ export {
   type ManifestTotals,
   type StabilityStatus,
 } from "./manifest.ts";
-export { RenderError, type StoryEntry } from "./storybook.ts";
+export { filterStories, RenderError, type StoryEntry } from "./storybook.ts";
 export type { StoryError, WorkerRuntime } from "./worker/protocol.ts";

@@ -1,6 +1,6 @@
 # Snapshots
 
-> Status: built — the data layer for runs, comparisons, decisions, and goldens, on local SQLite and D1. Nothing calls it yet; `selfie review` and the review UI come next. See `## Future`.
+> Status: built — the data layer for runs, comparisons, decisions, and goldens, on local SQLite and D1. `selfie review` calls it (`docs/specs/cli.md`), and the review UI comes next. See `## Future`.
 >
 > - See `docs/specs/glossary.md` for snapshot, snapshot name, run, decision, golden, and baseline.
 > - Owns what a run holds, how a crash leaves one, snapshot states, decisions, and goldens. `docs/specs/system.md` owns why approvals carry through a push and why environments are part of a name. `docs/specs/store.md` owns image identity, image keys, and the `Sql` rules everything here obeys.
@@ -26,9 +26,11 @@ A run is one recording of a set of snapshots against one full Git SHA in one env
 |---|---|---|---|
 | `recording` | Not finished: still being written, or its writer crashed | Refused | Refused |
 | `failed` | Finished, and at least one story failed to render | Yes | Refused |
-| `complete` | Finished, and every story rendered | Yes | If approved |
+| `complete` | Finished, and every story rendered | Yes | If approved and not `dirty` |
 
+- **Must be told when it begins whether the working tree was dirty, and the baseline its reviewer saw**, and may be told any story filter, as `patterns` and the `unmatched` among them. A run keeps these for good, so nothing about it depends on a file outside the store.
 - **Must record a story that failed to render as a row with its failure message**, never leave it absent, so only a `recording` run can lack a story. A message is cut to 2,000 characters.
+- **Must record a story's play error as a message, cut the same way, whether or not it also has an image.** It changes no state and no acceptance ([Open questions](#open-questions)).
 - **Must refuse a snapshot whose image isn't stored**, so a row always has an image. Rows hold image keys, and the API only takes and returns image hashes, per `docs/specs/store.md` → Image identity.
 - **Must record whether each story was unstable, as the renderer reports it:** true, false, or null if nobody checked. A later run can't supply this for an earlier one (rationale). It changes no state and no acceptance ([Open questions](#open-questions)).
 - **Must let a run's newest result for a name replace the older one until it is finished**, and refuse any change after that, since a finished run may hold goldens.
@@ -53,7 +55,7 @@ A run is one recording of a set of snapshots against one full Git SHA in one env
 
 Source of truth: `Snapshots.compareRun` in `store/src/core/snapshots.ts`.
 
-- **Must compare by image alone: the same hash is the same image.** Pixel diffs are a later step ([Future](#future)).
+- **Must compare by image alone: the same hash is the same image.** Pixel diffs belong to `selfie review` (`docs/specs/cli.md` → Review).
 - **Must give each snapshot exactly one state:**
 
 | State | The run has | The baseline's goldens have |
@@ -64,7 +66,7 @@ Source of truth: `Snapshots.compareRun` in `store/src/core/snapshots.ts`.
 | `failed` | A failure | Anything |
 | `removed` | Nothing | An image |
 
-- **Must list only what isn't `unchanged`, and anything flagged unstable, by default, with a count of every `unchanged` snapshot.** `includeUnchanged` lists them all (rationale).
+- **Must list only what isn't `unchanged`, and anything flagged unstable or with a play error, by default, with a count of every `unchanged` snapshot.** `includeUnchanged` lists them all (rationale).
 - **Must refuse a baseline SHA that has no goldens in the run's environment**, rather than report everything as new. A null baseline means there are none yet, and gives `new` and `failed` only. That is what changing the environment starts from (`docs/specs/system.md`).
 - **Must return the decision on exactly the run's image for that name**, whatever the state, so `selfie review` can show what is already approved.
 
@@ -80,25 +82,27 @@ A decision is an approval or a rejection, by an actor, at the time it is recorde
 
 ## Goldens
 
-Source of truth: `Snapshots.acceptRun` and `hasCompleteGoldens` in `store/src/core/snapshots.ts`.
+Source of truth: `Snapshots.acceptRun`, `hasCompleteGoldens`, and `firstWithGoldens` in `store/src/core/snapshots.ts`.
 
 Goldens are per Git SHA and environment, and are the images of the one run accepted there. A reader finds them as `goldenHash` in `compareRun`.
 
 - **Must make a SHA's goldens exist whole or not at all**, so `hasCompleteGoldens` only asks whether a run was accepted there. A SHA with no accepted run has no goldens, however many of its images are approved (rationale).
 - **Must accept only a `complete` run whose every image either matches the baseline's for that name or is approved at exactly that hash.** `acceptRun` otherwise returns false and changes nothing, and `compareRun` shows which. A null baseline means every image needs an approval.
+- **Must refuse a run recorded on a dirty tree with `run-dirty`**, since a SHA's goldens must describe that commit, and this holds for every caller (rationale).
 - **Must be told how many removed snapshots the reviewer saw, and must refuse a different number with `wrong-removed-count`**, so a filtered render or a discovery bug can't silently drop goldens. A removed snapshot needs no decision of its own, since no image is being accepted (rationale).
 - **Must check and write in one statement**, so nothing can change between them.
 - **Must let a later accepted run replace a SHA's goldens.**
-- **May leave finding the SHA to the caller.** Nothing here runs Git. Reserved: `find-baseline` asks `hasCompleteGoldens` of each merge-base candidate ([Future](#future)).
+- **May leave finding the SHA to the caller.** Nothing here runs Git. `selfie find-baseline` gives `firstWithGoldens` its merge-base candidates, nearest first (`docs/specs/cli.md` → find-baseline).
+- **Must answer `firstWithGoldens` in the order asked, with one query per 99 SHAs, and none after the group holding the answer**, so a walk of 1,000 commits costs at most about 10 requests, and usually one.
 
 ## Schema
 
 Source of truth: `CREATE_SNAPSHOT_TABLES` in `store/src/core/snapshots.ts`, `initStoreSchema` in `store/src/core/store.ts`.
 
 ```sql
-runs(key PK, id UNIQUE, git_sha, environment, started_at, finished_at, failed_count)
+runs(key PK, id UNIQUE, git_sha, environment, started_at, finished_at, failed_count, dirty, baseline_sha, story_filter)
   INDEX runs_by_sha(git_sha, environment, started_at)
-run_snapshots(run_key, story, image_key, failure, unstable)  PK (run_key, story)  WITHOUT ROWID
+run_snapshots(run_key, story, image_key, failure, unstable, play_error)  PK (run_key, story)  WITHOUT ROWID
 decisions(environment, story, image_hash, decision, actor, decided_at)  PK (environment, story, image_hash)  WITHOUT ROWID
 goldens(git_sha, environment, run_key)  PK (git_sha, environment)  WITHOUT ROWID
 ```
@@ -111,8 +115,8 @@ goldens(git_sha, environment, run_key)  PK (git_sha, environment)  WITHOUT ROWID
 
 Source of truth: `store/src/core/snapshots.ts`; `store/test/snapshots.test.ts` measures these at 10,000 snapshots.
 
-- **Must send at most 400 statements per request, and at most 5,000 rows per page**, so that a run under 19,600 snapshots records in one request (rationale).
-- **Must run the model's contract against every SQL adapter.** `pnpm test` runs it on local SQLite with both parameter forms. In `store/`, `pnpm test:d1:snapshots` runs it on real D1 at about 55 requests, and `pnpm test:d1` runs it after the SQL contract (`docs/specs/store.md` → D1 REST adapter).
+- **Must send at most 400 statements per request, and at most 5,000 rows per page**, so that a run under 19,600 snapshots records in one request (rationale). A statement holds 49 snapshots, or as few as 33 if each has a play error, since each needs one more parameter.
+- **Must run the model's contract against every SQL adapter.** `pnpm test` runs it on local SQLite with both parameter forms. In `store/`, `pnpm test:d1:snapshots` runs it on real D1 at about 90 requests, and `pnpm test:d1` runs it after the SQL contract (`docs/specs/store.md` → D1 REST adapter).
 
 ## Future
 
@@ -122,7 +126,7 @@ Source of truth: `store/src/core/snapshots.ts`; `store/test/snapshots.test.ts` m
 - A way to list decisions to send.
 - Moving a golden set between stores: rows by name and image hash, under a run in the receiving store.
 
-**Scope: cli-review** and **Scope: local-review** are defined in `docs/specs/system.md` → Build order. Pixel diffs and image paths belong to them.
+**Scope: local-review** is defined in `docs/specs/system.md` → Build order.
 
 ### Storing only what changed
 
@@ -132,5 +136,6 @@ Every run writes every row. At 10,000 snapshots a run and an assumed 100 runs a 
 
 - **Retention.** Every run keeps its rows, and nothing deletes one. Deleting needs to keep any run a golden points at, and `docs/specs/store.md` → Image keys forbids reusing a key, so `runs` would need a rule of its own.
 - **A reappearing image.** An approval never expires, so an image approved once under a name, later replaced, and later back again shows as approved. Decide whether a review should ask again (rationale).
+- **Play errors and acceptance.** A story whose play function failed still has its image, which can be approved and accepted. `selfie review` reports it as an advisory (`docs/specs/cli.md` → What blocks).
 - **Unstable stories and acceptance.** A flagged story with an unapproved image blocks `acceptRun` like any other. A story with unbounded variants gets a new image on nearly every run, so it needs a new approval each time and blocks every SHA from having goldens, which stops `find-baseline` finding any. Whether an unstable story may be accepted without one is the user's call (rationale).
 - **What acknowledging a removal means.** `acceptRun` checks a count, so it catches a reviewer who wasn't shown the removals, and not one who was shown them and missed that they were wrong.

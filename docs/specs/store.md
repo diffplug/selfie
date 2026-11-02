@@ -93,7 +93,7 @@ Source of truth: `store/src/adapters/d1-rest.ts`; tests in `store/test/d1-rest.t
 - **Must fail at once on any other failure**, such as a SQL error or a bad token, with D1's message.
 - **Must bound every retry and every attempt**: a limit on attempts, a limit on any one wait, and a timeout on each request.
 - **Never put the token in an error or in anything a log could print.**
-- **Must keep tests against real D1 opt-in**, so `pnpm test` runs offline with no credentials. `pnpm test:d1` runs the contract in Node, and `docs/specs/snapshots.md`'s after it, and sends about 460 requests against the shared limit, so never loop it. `pnpm test:d1:snapshots`, in `store/`, runs only the second, at about 55. `pnpm test:d1:workerd` runs inside workerd, with the whole store over this adapter and the [R2 adapter](#r2-adapter), and stops at a budget of 30. Run one at a time, of either, since all runs share one database.
+- **Must keep tests against real D1 opt-in**, so `pnpm test` runs offline with no credentials. `pnpm test:d1` runs the contract in Node, and `docs/specs/snapshots.md`'s after it, and sends about 495 requests against the shared limit, so never loop it. `pnpm test:d1:snapshots`, in `store/`, runs only the second, at about 90. `pnpm test:d1:workerd` runs inside workerd, with the whole store over this adapter and the [R2 adapter](#r2-adapter), and stops at a budget of 30. Run one at a time, of either, since all runs share one database.
 
 ## R2 adapter
 

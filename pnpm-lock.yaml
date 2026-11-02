@@ -20,6 +20,25 @@ importers:
 
   .: {}
 
+  cli:
+    dependencies:
+      selfie-render:
+        specifier: workspace:*
+        version: link:../render
+      selfie-store:
+        specifier: workspace:*
+        version: link:../store
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.6
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.5(@types/node@26.6.6)(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2))
+
   render:
     dependencies:
       playwright-core:
