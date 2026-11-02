@@ -54,6 +54,13 @@ GitHub decides. Selfie keeps no member list of its own.
 - **Must verify every OIDC token before accepting it:** an RS256 signature from GitHub's published keys, the issuer `https://token.actions.githubusercontent.com`, an unexpired token, an audience naming Selfie, and a `repository_id` that is the project being uploaded to (rationale). A token for any other audience was meant for another service.
 - **Must accept an OIDC token only for uploading to its own repository's project**, never to view a private project, approve, or reject, since it identifies a workflow and not a person.
 
+### Pull requests from forks
+
+- **Must give a fork's pull request only what read access gives**: its author can read the repository's snapshots as anyone with read access can, and can't upload or approve.
+- **Must fail a fork's pull request's snapshot check until a maintainer approves running the capture pass.** Nothing from the fork is stored before that.
+
+**Later:** a fork's pull request could keep its changed snapshots somewhere like Actions artifacts until a maintainer accepts them.
+
 ### Local review server
 
 - **Must listen only on loopback and check the `Host` header**, so a website the user visits can't read their snapshots through it.
@@ -61,5 +68,5 @@ GitHub decides. Selfie keeps no member list of its own.
 ### Open questions
 
 - **Unpushed work in public repositories.** A run uploaded from an unpushed branch of a public repository would be visible to anyone. Decide whether anonymous viewers see only runs for commits GitHub already has, or whether a run isn't uploaded until its commit is pushed.
-- **Pull requests from forks.** Someone without write access can't upload under the table above, and GitHub's docs don't say whether a fork's `pull_request` run can get an OIDC token at all. Test that, along with how `pull_request_target` behaves, which runs with write access even from a public fork, and decide how a fork's pull request gets snapshots.
+- **Running an approved capture pass.** Decide how a maintainer approves it and how it runs, since it executes the fork's code and needs a token to upload. GitHub's docs don't say whether a fork's `pull_request` run can get an OIDC token, and `pull_request_target` runs with write access even from a public fork, so both need testing. The fork's code could forge its screenshots, so its run must stay subject to normal approval.
 - **Reading code for `change-grouping`.** That scope sends code diffs to a Meta model, which needs more app permissions and means private code leaves GitHub. Decide how a repository owner consents.
