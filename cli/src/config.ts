@@ -7,7 +7,7 @@ import { resolveInside } from "./paths.ts";
 
 /** At the Git top level. It's the only place a project configures Selfie. */
 const CONFIG_FILE = "selfie.config.json";
-const KNOWN_KEYS = new Set(["environment", "initScript", "storybookDir"]);
+const KNOWN_KEYS = new Set(["environment", "initScript", "storybookDir", "regionMergeDistance"]);
 
 // Never a build command: docs/specs/cli.md → Configuration.
 interface ProjectConfig {
@@ -16,6 +16,8 @@ interface ProjectConfig {
   readonly initScript?: string;
   /** A directory path, inside the Git top level. */
   readonly storybookDir?: string;
+  /** In CSS pixels. Only groups what's shown. */
+  readonly regionMergeDistance?: number;
 }
 
 async function loadConfig(repo: Repo): Promise<ProjectConfig> {
@@ -80,4 +82,13 @@ export async function resolveCaptureSettings(
     ...(initScript === undefined ? {} : { initScript }),
     ...(storybookDir === undefined ? {} : { storybookDir }),
   };
+}
+
+/** How close changed regions group, in CSS pixels. A view multiplies it by its run's scale. */
+export async function resolveRegionMergeDistance(repo: Repo): Promise<number> {
+  const distance = (await loadConfig(repo)).regionMergeDistance ?? 12;
+  if (typeof distance !== "number" || !Number.isFinite(distance) || distance < 0) {
+    throw new SelfieError("bad-config", `The config's regionMergeDistance must be a non-negative number, got ${distance}.`);
+  }
+  return distance;
 }

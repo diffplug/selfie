@@ -1,8 +1,9 @@
 import type { RawImage } from "selfie-store";
-import type { BoundingBox, ChangedRegion, PixelDiff } from "selfie-ui/app";
+import type { PixelDiff } from "selfie-ui/app";
 import { encodePng } from "./png.ts";
+import { findRegions } from "./regions.ts";
 
-export type { BoundingBox, ChangedRegion, PixelDiff };
+export type { BoundingBox, PixelDiff } from "selfie-ui/app";
 
 const HIGHLIGHT = [255, 0, 80] as const;
 // An unchanged pixel fades into gray from this level to white, so the page stays readable
@@ -23,33 +24,6 @@ function highlight(out: Uint8Array, at: number): void {
   out[at + 2] = HIGHLIGHT[2];
 }
 
-function rowsMatch(current: RawImage, currentRow: number, golden: RawImage, goldenRow: number): boolean {
-  const bytes = current.width * 3;
-  const a = current.pixels.subarray(currentRow * bytes, (currentRow + 1) * bytes);
-  const b = golden.pixels.subarray(goldenRow * bytes, (goldenRow + 1) * bytes);
-  return Buffer.compare(a, b) === 0;
-}
-
-/**
- * Which parts of each image correspond, and differ: from the edges inward, what's left between the
- * rows that match from the top and from the bottom. So today there's at most one region, as wide
- * as the image, and with different widths no row can match, so it's the whole of both images.
- */
-function alignRows(current: RawImage, golden: RawImage): readonly ChangedRegion[] {
-  const shared = Math.min(current.height, golden.height);
-  let above = 0;
-  let below = 0;
-  if (current.width === golden.width) {
-    while (above < shared && rowsMatch(current, above, golden, above)) above += 1;
-    while (below < shared - above && rowsMatch(current, current.height - 1 - below, golden, golden.height - 1 - below)) below += 1;
-  }
-  const region = {
-    current: { x: 0, y: above, width: current.width, height: current.height - above - below },
-    golden: { x: 0, y: above, width: golden.width, height: golden.height - above - below },
-  };
-  return region.current.height === 0 && region.golden.height === 0 ? [] : [region];
-}
-
 /**
  * Compares two images, and draws the current one faded with what changed highlighted. Within a
  * region, pixels compare from its top left, and anything only one image has is changed.
@@ -68,25 +42,26 @@ export function diffImages(current: RawImage, golden: RawImage): { readonly diff
   let maxY = -1;
   let firstChanged: { x: number; y: number } | null = null;
   const mark = (x: number, y: number) => {
-    firstChanged ??= { x, y };
+    if (firstChanged === null || y < firstChanged.y || (y === firstChanged.y && x < firstChanged.x)) firstChanged = { x, y };
     if (x < minX) minX = x;
     if (x > maxX) maxX = x;
     if (y < minY) minY = y;
     if (y > maxY) maxY = y;
   };
 
-  const regions = alignRows(current, golden);
-  for (const region of regions) {
-    const sharedRows = Math.min(region.current.height, region.golden.height);
+  const regions = findRegions(current, golden);
+  for (const { current: here, golden: there } of regions) {
+    const sharedRows = Math.min(here.height, there.height);
+    const sharedColumns = Math.min(here.width, there.width);
     let changedHere = 0;
-    for (let row = 0; row < region.current.height; row++) {
-      const y = region.current.y + row;
-      const goldenRowStart = row < sharedRows ? (region.golden.y + row) * golden.width * 3 : -1;
-      for (let x = 0; x < width; x++) {
+    for (let row = 0; row < here.height; row++) {
+      for (let column = 0; column < here.width; column++) {
+        const x = here.x + column;
+        const y = here.y + row;
         const at = (y * width + x) * 3;
         let delta = 0;
-        if (goldenRowStart >= 0 && x < golden.width) {
-          const goldenAt = goldenRowStart + x * 3;
+        if (row < sharedRows && column < sharedColumns) {
+          const goldenAt = ((there.y + row) * golden.width + there.x + column) * 3;
           delta = Math.max(Math.abs(a[at]! - b[goldenAt]!), Math.abs(a[at + 1]! - b[goldenAt + 1]!), Math.abs(a[at + 2]! - b[goldenAt + 2]!));
           if (delta === 0) continue;
         }
@@ -96,13 +71,15 @@ export function diffImages(current: RawImage, golden: RawImage): { readonly diff
         highlight(out, at);
       }
     }
-    // What only the golden has here: rows past the current's, and columns past its width.
-    const goldenOnly = (region.golden.height - sharedRows) * golden.width + sharedRows * Math.max(0, golden.width - width);
+    // What only the golden has here.
+    const goldenOnly = there.width * there.height - sharedRows * sharedColumns;
     changedPixels += changedHere + goldenOnly;
     if (changedHere === 0 && goldenOnly > 0) {
       // Nothing here changed, since something was only removed, so mark the seam it left.
-      const seam = Math.min(region.current.y, height - 1);
-      for (let x = 0; x < width; x++) {
+      const seam = Math.min(here.y, height - 1);
+      const from = here.width === 0 ? 0 : here.x;
+      const to = here.width === 0 ? width : here.x + here.width;
+      for (let x = from; x < to; x++) {
         mark(x, seam);
         highlight(out, (seam * width + x) * 3);
       }

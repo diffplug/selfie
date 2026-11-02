@@ -24,7 +24,7 @@ import {
   type Run,
   type StoryFilter,
 } from "selfie-store";
-import { resolveCaptureSettings, type CaptureSettings } from "./config.ts";
+import { resolveCaptureSettings, resolveRegionMergeDistance, type CaptureSettings } from "./config.ts";
 import { diffToPng, type PixelDiff } from "./diff.ts";
 import { SelfieError } from "./errors.ts";
 import { dirtyPaths, headSha, resolveCommit, type BaselineSearch } from "./git.ts";
@@ -97,6 +97,8 @@ export interface ReviewResult {
   readonly branchGoldens: string | null;
   /** The comparison accepting checks, which says what blocks. `comparison`, unless that's against the branch's goldens. */
   readonly reviewed: Comparison;
+  /** How close regions group here, in image pixels. */
+  readonly regionMergeDistance: number;
   /** Within the run's filter. */
   readonly differences: readonly Difference[];
   readonly playErrors: readonly {
@@ -561,6 +563,7 @@ export async function review(project: Project, options: ReviewOptions): Promise<
     given,
     branchGoldens: onBranch,
     reviewed,
+    regionMergeDistance: (await resolveRegionMergeDistance(project.repo)) * run.scale,
     differences,
     playErrors,
     warnings: recorded.warnings,

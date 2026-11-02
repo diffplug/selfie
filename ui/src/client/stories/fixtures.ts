@@ -123,6 +123,7 @@ export function viewOf(
   return {
     run,
     branchGoldens: null,
+    regionMergeDistance: 12,
     acceptedRunId: null,
     actor: "ned@example.com",
     blockers,

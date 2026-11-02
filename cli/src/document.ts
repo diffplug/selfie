@@ -1,6 +1,7 @@
 // What the CLI prints, as pure functions from the library's results. All command wording lives
 // here, since none of it belongs in anything a store or a UI would keep.
 import type { AcceptRefusal, AcceptResult } from "./decisions.ts";
+import { groupRegions } from "selfie-ui/regions";
 import type { RecordResult, ReviewResult } from "./review.ts";
 import { summarizeRun, type RunSummary } from "./summary.ts";
 
@@ -40,7 +41,7 @@ function nextSteps(result: ReviewResult, checked: RunSummary): string[] {
 
 /** The one document `selfie review` prints. */
 export function buildReviewDocument(result: ReviewResult) {
-  const { comparison, reviewed, baseline, given, branchGoldens, dirtyPaths, differences, playErrors, warnings } = result;
+  const { comparison, reviewed, baseline, given, branchGoldens, regionMergeDistance, dirtyPaths, differences, playErrors, warnings } = result;
   const { run } = comparison;
   const shown = summarizeRun(comparison);
   // What stops accepting comes from what accepting checks, whatever this shows.
@@ -67,7 +68,13 @@ export function buildReviewDocument(result: ReviewResult) {
     counts: { ...shown.counts, undecided: checked.counts.undecided },
     blockers: checked.blockers,
     advisories: shown.advisories,
-    differences,
+    differences: differences.map((difference) => ({
+      ...difference,
+      regionGroups:
+        difference.pixelDiff === null
+          ? null
+          : groupRegions(difference.pixelDiff.regions, regionMergeDistance).map(({ current, golden }) => ({ current, golden })),
+    })),
     playErrors,
     warnings,
     next: nextSteps(result, checked),

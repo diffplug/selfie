@@ -2,7 +2,7 @@
 // here renders, so the UI only reads what `selfie review` recorded and records decisions on it.
 import type { Comparison, DecisionKind } from "selfie-store";
 import type { AcceptOutcome, CurrentView, DecisionTarget, ReviewSource, RunView, SnapshotRow } from "selfie-ui/app";
-import { resolveCaptureSettings } from "./config.ts";
+import { resolveCaptureSettings, resolveRegionMergeDistance } from "./config.ts";
 import { accept, checkAccept, decide } from "./decisions.ts";
 import { diffToPng, type PixelDiff } from "./diff.ts";
 import { SelfieError } from "./errors.ts";
@@ -46,6 +46,7 @@ export function localReviewSource(project: Project, { native }: { readonly nativ
     return {
       run,
       branchGoldens: onBranch,
+      regionMergeDistance: await resolveRegionMergeDistance(repo),
       acceptedRunId: await snapshots.acceptedRunAt(run.gitSha, run.environment),
       actor,
       blockers: checked.blockers,
