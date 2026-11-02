@@ -28,7 +28,7 @@ export const CAPTURE_RECIPE = {
   fixedTime: "2026-01-15T12:00:00.000Z",
   networkQuietMs: 100,
   networkQuietBoundMs: 15_000,
-  screenshot: { animations: "disabled", caret: "hide", scale: "device", fullPage: false },
+  screenshot: { animations: "disabled", caret: "hide", scale: "device", fullPage: true },
 } as const;
 
 export interface WorkerStory {
