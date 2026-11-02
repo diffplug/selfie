@@ -403,8 +403,8 @@ describe("D1RestAdapter replay against a real SQL engine", () => {
       actor: "ned",
       snapshots: [{ story: "a", imageHash: hashOf(1) }],
     });
-    expect(await snapshots.acceptRun(run.id, null)).toBe(true);
-    expect(await snapshots.compareRun(run.id, gitSha)).toMatchObject({
+    expect(await snapshots.acceptRun(run.id, null, 0)).toBe(true);
+    expect(await snapshots.compareRun(run.id, gitSha, { includeUnchanged: true })).toMatchObject({
       snapshots: [{ story: "a", state: "unchanged" }],
     });
     expect(await snapshots.hasCompleteGoldens(gitSha, environment)).toBe(true);

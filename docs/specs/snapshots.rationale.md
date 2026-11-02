@@ -4,11 +4,11 @@
 
 ## Snapshot names
 
-**Three columns, not one joined string.** Story IDs can hold `/` and anything else a build gives them, so a joined name needs an encoding that every store must then agree on. Columns can't be ambiguous.
+**No separate settings.** Nothing produces render settings outside the environment today: the renderer's viewport and scale are in it. A caller with a variant can put it in the opaque story ID, so a column would only add a parameter per row and a second cursor field. No store holds this data yet, so this was the cheap time to drop it, and adding one later would need a migration.
 
 **The environment is on the run, not each row.** With IDs like `container-linux-arm64-<16 hex>` that saves about 40 bytes per row, and it makes a mixed-environment run impossible to store. Decisions keep the environment in their key, since they outlive any run.
 
-**Not interning names.** A table of names with integer keys would make each row about 2.7× smaller, by estimate rather than measurement, at 30 character story IDs. It also costs a second statement per group and a lookup per name. Worth revisiting with [retention](snapshots.md#open-questions), and a migration then would be the first real test of that open question.
+**Not interning names.** A table of names with integer keys would make each row much smaller, by estimate rather than measurement. It also costs a second statement per group and a lookup per name. Worth revisiting with [storing only what changed](snapshots.md#storing-only-what-changed).
 
 ## Runs
 
@@ -16,17 +16,23 @@
 
 **Resolving images by hash in the statement.** Taking a hash rather than a key costs one read per row, but no caller holds a key, and a snapshot can't name an image that isn't stored. A statement returning fewer rows than it was sent is how a missing image or a finished run shows, with no extra request unless something is wrong.
 
+**Recording instability now.** About 1% of real stories vary between identical renders, a figure given for this change and not measured here. A run can't be backfilled, so the flag is stored even though nothing yet acts on it.
+
+**A new run after a crash.** Skipping what already landed would need a way to read a recording run back, for a case that only follows a crash. The cost is rendering again, and a crashed run's rows stay, unused.
+
+**What a resend can overwrite.** `decide` and `acceptRun` have no ordering rule, so a statement resent after a lost response could overwrite another writer's change made in between. The adapter resends within seconds, and on one machine there is rarely another writer. A cloud store with several writers has this gap until sync brings an [ordering rule](snapshots.md#future).
+
+**Accepting a run already accepted.** Accepting a rerun over its own SHA's goldens makes the run its own baseline, so a resend finds nothing removed and would report a wrong count, after success. The statement passes a run that already holds the goldens. A test fails without this.
+
 ## Compare
 
 **Refusing a missing baseline.** Reporting everything as new would look like a first run, and hide a wrong SHA.
 
+**Only differences by default.** A mostly unchanged compare fell from 3 requests and 2.9 MB of responses to 1 request and 56 KB, with 250 differences listed, or about 220 bytes each. Rows read barely moved, from 70,015 to 60,213, since finding differences still reads both sides and the count reads them again. That costs about $0.00006 at D1's listed $0.001 per million rows.
+
 ## Decisions
 
-**Why latest wins, by a total order.** Upserting only when `(decided_at, decision, actor)` is greater is what makes the statement commutative and idempotent: it is a last-writer-wins register, so a future sync can run this same statement in any order with no conflict rule. The cost is trusting clocks: a machine whose clock runs behind can lose to an older decision. No test has run with real clock skew.
-
-**Rejection wins a tie**, only because `rejected` sorts after `approved`. The safer of the two.
-
-**Keeping no history.** A log of every decision would also merge cleanly, but nothing in `selfie review` or the review UI reads one, and the latest needs a subquery. Access's audit needs, if any, aren't specified yet.
+**Keeping no history.** A log of every decision would merge cleanly, but nothing in `selfie review` or the review UI reads one.
 
 **A reappearing image.** A name and hash is exactly what the system spec asks for, and it is what stops a re-approval at push. Its cost is that A → B → A shows the second A as approved, if A was ever explicitly approved. A review could ask again by comparing times, but that needs a decision about what approval means.
 
@@ -36,31 +42,37 @@
 
 **All or nothing per SHA.** A SHA with 3 images unapproved has no goldens yet, and `find-baseline` moves on to the next candidate. Approvals made meanwhile are kept against their hash, so once the last is made, accepting succeeds with nothing to redo.
 
-**A gate here, not in the caller.** The statement is the only place the check and the write can't be separated, and it is what makes "golden" mean "accepted". A first set needs its approvals like any other, which costs one request per 12,800 images.
+**A gate here, not in the caller.** The statement is the only place the check and the write can't be separated, and it is what makes "golden" mean "accepted". A first set needs its approvals like any other, which costs one request per 19,200 images.
 
-**The `>=` in the acceptance's conflict clause.** So that an older acceptance sent again can't overwrite a newer one, and the same statement sent again still returns its row and reports success.
+**Counting removals.** Every image in a filtered render is unchanged, so the image gate alone would accept it and drop every story it missed from that SHA's goldens. A test does exactly this with 500. The count is asked for rather than a list because the run and its baseline already fix which snapshots are removed.
 
 ## Requests
 
-**Measured on real D1, 2026-11**, from one Mac over the REST API at 10,000 snapshots, with the sizes in the spec:
+**Measured on real D1, 2026-11**, from one Mac over the REST API at 10,000 snapshots, with the sizes in the spec. `compareRun` is of a run with 100 changed, 50 failed, 50 new, 50 removed, and 9,800 unchanged:
 
-| Operation | Time | Requests | Rows read | Rows written |
-|---|---|---|---|---|
-| `beginRun` | 101 ms | 1 | 0 | 3 |
-| `recordSnapshots` | 1,027 ms | 1 | 40,304 | 10,000 |
-| `finishRun` | 96 ms | 1 | 10,006 | 1 |
-| `decide` | 665 ms | 1 | 0 | 10,000 |
-| `acceptRun` | 137 ms | 1 | 30,005 | 1 |
-| `compareRun` | 478 ms | 3 | 70,015 | 0 |
+| Operation | Time | Requests | Rows read | Rows written | Response |
+|---|---|---|---|---|---|
+| `beginRun` | 105 ms | 1 | 0 | 3 | 360 B |
+| `recordSnapshots` | 748 ms | 1 | 40,205 | 10,000 | 204 KB |
+| `finishRun` | 128 ms | 1 | 10,006 | 1 | 555 B |
+| `decide` | 560 ms | 1 | 0 | 10,000 | 65 KB |
+| `acceptRun`, with no baseline | 117 ms | 1 | 30,006 | 1 | 1.2 KB |
+| `compareRun` | 92 ms | 1 | 60,213 | 0 | 56 KB |
 
-Row counts were the same in an earlier run, where `recordSnapshots` took 536 ms and `decide` 455 ms.
+D1's docs say a database runs one query at a time, so a batch this size holds up others for as long as it runs. No test measured concurrent load. `acceptRun` against a baseline also reads both sides to count removals, which this run didn't measure.
 
-So about 150,000 rows read per recorded, reviewed, and accepted run, or about 15 per snapshot. D1's docs say a database runs one query at a time, so a batch this size holds up others for as long as it runs. No test measured concurrent load.
+**Statement size.** A record statement holds 49 snapshots, limited by the 100 bound parameters, since each needs a story and either a hash or a failure. Its SQL is 1,662 bytes, so the 100,000 byte limit is far off. `Sql` binds no nulls, so the column a row leaves empty, and its `unstable` flag, are literals in the statement.
 
-**The same on local SQLite**, 10,000 snapshots, on one Mac: `recordSnapshots` about 60 ms, `decide` about 45 ms, `acceptRun` about 6 ms, and `compareRun` about 22 ms.
+**Request size.** A 10,000 snapshot run is 205 statements and 1.27 MB with 30 character story IDs, against the store's 2,000 statement batch (`store.rationale.md` → D1 REST adapter). 400 statements is a judgment call inside what was measured. A failure-heavy request grows with the 2,000 character limit, and at its worst, 400 statements of 49 failures at that length, would be about 39 MB. That size was not tested.
 
-**Request size.** The 304 statement request above carries 1.26 MB with 30 character story IDs, against the store's 2,000 statement batch (`store.rationale.md` → D1 REST adapter). 400 is a judgment call inside what was measured. A failure-heavy request grows with the 2,000 character limit, and at its worst, 400 statements of 33 failures at that length, would be about 26 MB. That size was not tested.
+**Page size.** Pages of 5,000 rows, at about 290 bytes a row and 1.44 MB a page, returned without trouble. No larger page was tested, and D1's docs state no limit on a response.
 
-**Page size.** Two pages of 5,000 rows, at about 290 bytes a row and 1.44 MB a page, returned without trouble. No larger page was tested, and D1's docs state no limit on a response.
+**Schema on D1.** `WITHOUT ROWID`, `UPDATE ... FROM`, `WITH ... INSERT`, and `RETURNING` from an upsert all ran on real D1.
 
-**Schema on D1.** `WITHOUT ROWID`, `UPDATE ... FROM`, row-value comparison, `WITH ... INSERT`, and `RETURNING` from an upsert all ran on real D1 in that run.
+## Storing only what changed
+
+**The numbers.** 10,000 rows × 100 runs × 30 days is 30 million rows a month. The 100 runs a day is an assumption, not a measurement.
+
+- **Writes.** D1 lists $1.00 per million rows written, so about $30 a month. It also lists the first 50 million a month as included on the paid plan, so a project this size alone pays nothing until others use up that allowance.
+- **Storage.** About 1.37 GB a month assumes about 46 bytes a row. Local SQLite measured 39 bytes a row by file growth with 30 character story IDs, which would be 1.17 GB a month and about 256 days to the limit. D1's own overhead was not measured.
+- **The limit.** D1's docs list 10 GB per database on the paid plan and 500 MB on the free plan, as checked 2026-11. On the free plan this rate reaches the limit in about 11 days.

@@ -10,9 +10,14 @@ import {
   type SqlAdapter,
   type SqlStatement,
 } from "../src/core/index.ts";
-import { describeSnapshotContract, failing, replaying } from "./contract/snapshots-contract.ts";
+import {
+  describeSnapshotContract,
+  failing,
+  rendered,
+  replaying,
+} from "./contract/snapshots-contract.ts";
 import { pngOf } from "./support/png-builder.ts";
-import { hashOf, insertedKey } from "./support/sql-params.ts";
+import { hashOf } from "./support/sql-params.ts";
 import { createTempStore } from "./support/temp-store.ts";
 
 for (const mode of ["number", "string"] as const) {
@@ -27,20 +32,19 @@ const SHA_B = "b".repeat(40);
 const SHA_C = "c".repeat(40);
 const ENV = "container-linux-arm64-0123456789abcdef";
 
-const rendered = (story: string, image: number): RecordedSnapshot => ({
-  story,
-  imageHash: hashOf(image),
-});
-
 /** Counts requests, the unit D1's shared API limit is spent in. */
 function counting(adapter: SqlAdapter) {
   const sent: SqlStatement[][] = [];
+  const responseBytes: number[] = [];
   return {
     sent,
+    responseBytes,
     adapter: {
-      execute: (statements: readonly SqlStatement[]) => {
+      execute: async (statements: readonly SqlStatement[]) => {
         sent.push([...statements]);
-        return adapter.execute(statements);
+        const rows = await adapter.execute(statements);
+        responseBytes.push(JSON.stringify(rows).length);
+        return rows;
       },
     } satisfies SqlAdapter,
   };
@@ -55,13 +59,6 @@ describe("Snapshots", () => {
 
   const over = (wrap: (adapter: SqlAdapter) => SqlAdapter) =>
     new Snapshots({ sql: new Sql(wrap(adapter)), now: () => clock++ });
-
-  const seedImages = async (count: number, target = sql) => {
-    const statements = Array.from({ length: count }, (_, i) =>
-      imageInsertStatement(hashOf(i + 1), i + 1),
-    );
-    await target.batch(statements);
-  };
 
   /** A finished run of these snapshots. */
   const recordRun = async (
@@ -80,24 +77,26 @@ describe("Snapshots", () => {
       environment,
       decision: "approved",
       actor: "ned",
-      snapshots: items.map(({ story, settings, imageHash }) => ({
-        story,
-        settings,
-        imageHash: imageHash!,
-      })),
+      snapshots: items.map(({ story, imageHash }) => ({ story, imageHash: imageHash! })),
     });
 
   /** Goldens at this SHA, holding these snapshots. */
   const goldensAt = async (gitSha: string, items: readonly RecordedSnapshot[]) => {
     const run = await recordRun(gitSha, items);
     await approve(items);
-    expect(await snapshots.acceptRun(run.id, null)).toBe(true);
+    expect(await snapshots.acceptRun(run.id, null, 0)).toBe(true);
     return run;
   };
 
   const statesOf = async (runId: string, baseline: string | null, model = snapshots) => {
-    const { snapshots: compared } = await model.compareRun(runId, baseline);
+    const { snapshots: compared } = await model.compareRun(runId, baseline, { includeUnchanged: true });
     return Object.fromEntries(compared.map(({ story, state }) => [story, state]));
+  };
+
+  /** What a run holds, as a reader finds out: its full comparison. */
+  const heldBy = async (runId: string) => {
+    const { snapshots: compared } = await snapshots.compareRun(runId, null, { includeUnchanged: true });
+    return compared;
   };
 
   beforeEach(async () => {
@@ -106,7 +105,7 @@ describe("Snapshots", () => {
     sql = new Sql(adapter);
     clock = 1_000;
     snapshots = new Snapshots({ sql, now: () => clock++ });
-    await seedImages(40);
+    await sql.batch(Array.from({ length: 40 }, (_, i) => imageInsertStatement(hashOf(i + 1), i + 1)));
   });
 
   afterEach(async () => {
@@ -114,28 +113,11 @@ describe("Snapshots", () => {
   });
 
   describe("names", () => {
-    it("treats settings as part of a name", async () => {
-      const items: RecordedSnapshot[] = [
-        { story: "a", imageHash: hashOf(1) },
-        { story: "a", settings: "dark", imageHash: hashOf(2) },
-      ];
-      await goldensAt(SHA_A, items);
-      const run = await recordRun(SHA_B, [
-        { story: "a", imageHash: hashOf(1) },
-        { story: "a", settings: "dark", imageHash: hashOf(3) },
-      ]);
-      const { snapshots: compared } = await snapshots.compareRun(run.id, SHA_A);
-      expect(compared.map(({ settings, state }) => [settings, state])).toEqual([
-        ["", "unchanged"],
-        ["dark", "changed"],
-      ]);
-    });
-
     it("takes a story ID as opaque, whatever it holds", async () => {
-      const stories = ["ui/button--primary", "it's", 'a"b', "--", "\u{1F600}", "123", "(?1)"];
+      const stories = ["ui/button--primary", "it's", 'a"b', "--", "\u{1F600}", "123", "(?1)", "NULL"];
       const run = await recordRun(SHA_A, stories.map((story, i) => rendered(story, i + 1)));
-      const listed = await snapshots.listSnapshots(run.id);
-      expect(listed.map(({ story }) => story).sort()).toEqual([...stories].sort());
+      const held = await heldBy(run.id);
+      expect(held.map(({ story }) => story).sort()).toEqual([...stories].sort());
     });
 
     it("refuses what can't name a snapshot", async () => {
@@ -145,9 +127,6 @@ describe("Snapshots", () => {
         await expect(snapshots.beginRun({ gitSha: SHA_A, environment: bad })).rejects.toThrow(RangeError);
       }
       await expect(
-        snapshots.recordSnapshots(run.id, [{ story: "a", settings: "\0", imageHash: hashOf(1) }]),
-      ).rejects.toThrow(RangeError);
-      await expect(
         snapshots.recordSnapshots(run.id, [{ story: "a", imageHash: "abc" }]),
       ).rejects.toThrow("Not an image hash");
       await expect(snapshots.recordSnapshots(run.id, [rendered("a", 1), rendered("a", 2)])).rejects.toThrow(
@@ -156,7 +135,7 @@ describe("Snapshots", () => {
       for (const sha of ["abc123", SHA_A.toUpperCase()]) {
         await expect(snapshots.beginRun({ gitSha: sha, environment: ENV })).rejects.toThrow("Git SHA");
       }
-      expect(await snapshots.listSnapshots(run.id)).toEqual([]);
+      await expect(snapshots.finishRun(run.id, 0)).resolves.toMatchObject({ status: "complete" });
     });
   });
 
@@ -165,24 +144,16 @@ describe("Snapshots", () => {
       const run = await snapshots.beginRun({ gitSha: SHA_A, environment: ENV });
       await snapshots.recordSnapshots(run.id, [{ story: "a", failure: "Timeout" }, rendered("b", 1)]);
       await snapshots.recordSnapshots(run.id, [rendered("a", 2), { story: "b", failure: "Crash" }]);
-      expect(await snapshots.listSnapshots(run.id)).toEqual([
-        { story: "a", settings: "", imageHash: hashOf(2) },
-        { story: "b", settings: "", failure: "Crash" },
+      expect(await snapshots.finishRun(run.id, 2)).toMatchObject({ status: "failed", failedCount: 1 });
+      expect(await heldBy(run.id)).toMatchObject([
+        { story: "a", state: "new", imageHash: hashOf(2), failure: null },
+        { story: "b", state: "failed", imageHash: null, failure: "Crash" },
       ]);
-      expect(await snapshots.finishRun(run.id, 2)).toMatchObject({
-        status: "failed",
-        snapshotCount: 2,
-        failedCount: 1,
-      });
 
       await expect(snapshots.recordSnapshots(run.id, [rendered("b", 3)])).rejects.toMatchObject({
         code: "run-finished",
       });
-      expect((await snapshots.listSnapshots(run.id))[1]).toEqual({
-        story: "b",
-        settings: "",
-        failure: "Crash",
-      });
+      expect((await heldBy(run.id))[1]).toMatchObject({ state: "failed", failure: "Crash" });
     });
 
     it("records a failed story, so it isn't silently absent", async () => {
@@ -191,11 +162,34 @@ describe("Snapshots", () => {
       expect(await statesOf(run.id, null)).toEqual({ a: "failed" });
     });
 
+    it("records a mix of results in one statement", async () => {
+      const { adapter: counted, sent } = counting(adapter);
+      const model = new Snapshots({ sql: new Sql(counted) });
+      const run = await model.beginRun({ gitSha: SHA_A, environment: ENV });
+      sent.length = 0;
+      await model.recordSnapshots(run.id, [
+        rendered("a", 1),
+        { story: "b", failure: "Boom" },
+        { ...rendered("c", 2), unstable: true },
+        { ...rendered("d", 3), unstable: false },
+        { story: "e", failure: "Second render failed", unstable: true },
+      ]);
+      expect(sent.flat()).toHaveLength(1);
+      await model.finishRun(run.id, 5);
+      expect(await heldBy(run.id)).toMatchObject([
+        { story: "a", state: "new", unstable: null },
+        { story: "b", state: "failed", unstable: null },
+        { story: "c", state: "new", unstable: true },
+        { story: "d", state: "new", unstable: false },
+        { story: "e", state: "failed", unstable: true },
+      ]);
+    });
+
     it("bounds a failure message without splitting a character", async () => {
       const run = await snapshots.beginRun({ gitSha: SHA_A, environment: ENV });
       await snapshots.recordSnapshots(run.id, [{ story: "a", failure: "\0\u{1F600}".repeat(5_000) }]);
-      const [listed] = await snapshots.listSnapshots(run.id);
-      expect(listed?.failure).toBe("\u{1F600}".repeat(2_000));
+      await snapshots.finishRun(run.id, 1);
+      expect((await heldBy(run.id))[0]?.failure).toBe("\u{1F600}".repeat(2_000));
     });
 
     it("refuses an image that isn't stored, and a run that doesn't exist", async () => {
@@ -208,8 +202,18 @@ describe("Snapshots", () => {
       });
       await expect(snapshots.finishRun("nope", 0)).rejects.toMatchObject({ code: "unknown-run" });
       await expect(snapshots.compareRun("nope", null)).rejects.toMatchObject({ code: "unknown-run" });
-      await expect(snapshots.acceptRun("nope", null)).rejects.toMatchObject({ code: "unknown-run" });
+      await expect(snapshots.acceptRun("nope", null, 0)).rejects.toMatchObject({ code: "unknown-run" });
       expect(await snapshots.getRun("nope")).toBeNull();
+    });
+
+    it("keeps the good rows of a statement that also names an unstored image", async () => {
+      const run = await snapshots.beginRun({ gitSha: SHA_A, environment: ENV });
+      await expect(
+        snapshots.recordSnapshots(run.id, [rendered("a", 1), rendered("b", 9_999)]),
+      ).rejects.toMatchObject({ code: "unknown-image", message: expect.stringContaining("1 snapshots") });
+      await expect(snapshots.finishRun(run.id, 2)).rejects.toMatchObject({
+        message: expect.stringContaining("holds 1 snapshots"),
+      });
     });
 
     it("finishes an empty run, and sends nothing for an empty call", async () => {
@@ -219,7 +223,7 @@ describe("Snapshots", () => {
       await model.recordSnapshots(run.id, []);
       await model.decide({ environment: ENV, decision: "approved", actor: "ned", snapshots: [] });
       expect(sent).toHaveLength(1);
-      expect(await model.finishRun(run.id, 0)).toMatchObject({ status: "complete", snapshotCount: 0 });
+      expect(await model.finishRun(run.id, 0)).toMatchObject({ status: "complete", failedCount: 0 });
     });
 
     it("lists runs at a SHA, crashed ones included, for one environment", async () => {
@@ -236,8 +240,8 @@ describe("Snapshots", () => {
   });
 
   describe("crashes partway", () => {
-    // 13,200 snapshots fill the 400 statements of one request, so this takes two.
-    const SNAPSHOTS = 14_000;
+    // 19,600 snapshots fill the 400 statements of one request, so this takes two.
+    const SNAPSHOTS = 20_000;
     const items: RecordedSnapshot[] = Array.from({ length: SNAPSHOTS }, (_, i) =>
       rendered(`story-${i}`, (i % 40) + 1),
     );
@@ -248,13 +252,13 @@ describe("Snapshots", () => {
       const run = await model.beginRun({ gitSha: SHA_A, environment: ENV });
       sent.length = 0;
       await model.recordSnapshots(run.id, items);
-      expect(sent.map((statements) => statements.length)).toEqual([400, 25]);
+      expect(sent.map((statements) => statements.length)).toEqual([400, 9]);
     });
 
     it.each([
-      ["nothing landed", 0, 13_200],
-      ["its statements landed in part", 10, 13_200 + 10 * 33],
-    ])("can resume when a batch dies and %s", async (_, ran, stored) => {
+      ["nothing landed", 0, 19_600],
+      ["its statements landed in part", 5, 19_600 + 5 * 49],
+    ])("leaves a run that says so when a batch dies and %s", async (_, ran, stored) => {
       const run = await snapshots.beginRun({ gitSha: SHA_A, environment: ENV });
       let requests = 0;
       const dying = over((inner) => failing(inner, () => ++requests === 2, ran));
@@ -270,18 +274,26 @@ describe("Snapshots", () => {
       await expect(snapshots.compareRun(run.id, null)).rejects.toMatchObject({
         code: "run-not-finished",
       });
-      await expect(snapshots.acceptRun(run.id, null)).rejects.toMatchObject({
+      await expect(snapshots.acceptRun(run.id, null, 0)).rejects.toMatchObject({
         code: "run-not-finished",
       });
-      expect(await snapshots.listSnapshots(run.id)).toHaveLength(stored);
 
-      // The resume: everything again, or only what `listSnapshots` shows is missing.
-      const held = new Set((await snapshots.listSnapshots(run.id)).map(({ story }) => story));
-      await snapshots.recordSnapshots(run.id, items.filter(({ story }) => !held.has(story)));
-      expect(await snapshots.finishRun(run.id, SNAPSHOTS)).toMatchObject({
-        status: "complete",
-        snapshotCount: SNAPSHOTS,
-      });
+      // A new run replaces it, and it stays behind, still saying what it is.
+      const fresh = await recordRun(SHA_A, items);
+      expect(fresh.status).toBe("complete");
+      expect((await snapshots.runsAt(SHA_A, ENV)).map(({ status }) => status)).toEqual([
+        "complete",
+        "recording",
+      ]);
+    });
+
+    it("can send a failed call again, whatever of it landed", async () => {
+      const run = await snapshots.beginRun({ gitSha: SHA_A, environment: ENV });
+      let requests = 0;
+      const dying = over((inner) => failing(inner, () => ++requests === 2, 5));
+      await expect(dying.recordSnapshots(run.id, items)).rejects.toThrow("Simulated");
+      await snapshots.recordSnapshots(run.id, items);
+      expect(await snapshots.finishRun(run.id, SNAPSHOTS)).toMatchObject({ status: "complete" });
     });
 
     it("keeps one row per name when a request commits and its response is lost", async () => {
@@ -299,15 +311,15 @@ describe("Snapshots", () => {
       }));
       await expect(losing.recordSnapshots(run.id, items)).rejects.toThrow("Simulated");
       await losing.recordSnapshots(run.id, items);
-      expect(await snapshots.finishRun(run.id, SNAPSHOTS)).toMatchObject({ snapshotCount: SNAPSHOTS });
+      expect(await snapshots.finishRun(run.id, SNAPSHOTS)).toMatchObject({ status: "complete" });
     });
 
     it("marks everything idempotent, and gives the same answers when all of it is resent", async () => {
       const { adapter: counted, sent } = counting(adapter);
       const model = over(() => replaying(counted));
-      const golden = await recordRun(SHA_A, [rendered("a", 1), rendered("b", 2)], ENV, model);
-      await approve([rendered("a", 1), rendered("b", 2)], ENV, model);
-      expect(await model.acceptRun(golden.id, null)).toBe(true);
+      const golden = await recordRun(SHA_A, [rendered("a", 1), rendered("b", 2), rendered("gone", 5)], ENV, model);
+      await approve([rendered("a", 1), rendered("b", 2), rendered("gone", 5)], ENV, model);
+      expect(await model.acceptRun(golden.id, null, 0)).toBe(true);
       const head = await recordRun(
         SHA_B,
         [rendered("a", 1), rendered("b", 3), rendered("c", 4), { story: "d", failure: "Boom" }],
@@ -315,12 +327,15 @@ describe("Snapshots", () => {
         model,
       );
       const states = await statesOf(head.id, SHA_A, model);
-      expect(states).toEqual({ a: "unchanged", b: "changed", c: "new", d: "failed" });
+      expect(states).toEqual({ a: "unchanged", b: "changed", c: "new", d: "failed", gone: "removed" });
       expect(await model.runsAt(SHA_B, ENV)).toHaveLength(1);
-      expect(await model.listSnapshots(head.id)).toHaveLength(4);
-      expect(await model.goldens(SHA_A, ENV)).toHaveLength(2);
       expect(await model.hasCompleteGoldens(SHA_A, ENV)).toBe(true);
-      expect(await model.getRun(head.id)).toMatchObject({ snapshotCount: 4, failedCount: 1 });
+      expect(await model.getRun(head.id)).toMatchObject({ failedCount: 1 });
+
+      // A rerun accepted over its own SHA's goldens, with a removal. Sent again, the baseline
+      // is by then the run itself and nothing reads as removed, so it mustn't report a mismatch.
+      const rerun = await recordRun(SHA_A, [rendered("a", 1), rendered("b", 2)], ENV, model);
+      expect(await model.acceptRun(rerun.id, SHA_A, 1)).toBe(true);
 
       expect(sent.flat().filter(({ idempotent }) => idempotent !== true)).toEqual([]);
       // Finished at the first send's time, not the second's.
@@ -329,37 +344,24 @@ describe("Snapshots", () => {
   });
 
   describe("decisions", () => {
-    const decisionOn = async (runId: string, story: string) => {
-      const { snapshots: compared } = await snapshots.compareRun(runId, null);
-      return compared.find((snapshot) => snapshot.story === story)?.decision;
-    };
-    const decide = (decision: "approved" | "rejected", actor: string, at: number, image = 1) =>
+    const decisionOn = async (runId: string) => (await heldBy(runId))[0]?.decision;
+    const decide = (decision: "approved" | "rejected", actor: string) =>
       snapshots.decide({
         environment: ENV,
         decision,
         actor,
-        at,
-        snapshots: [{ story: "a", imageHash: hashOf(image) }],
+        snapshots: [{ story: "a", imageHash: hashOf(1) }],
       });
 
-    it("keeps the latest decision, whatever order they arrive in", async () => {
+    it("keeps the most recent decision, with who and when", async () => {
+      clock = 500;
       const run = await recordRun(SHA_A, [rendered("a", 1)]);
-      await decide("rejected", "bob", 200);
-      await decide("approved", "ned", 100);
-      expect(await decisionOn(run.id, "a")).toEqual({ decision: "rejected", actor: "bob", at: 200 });
-      await decide("approved", "ned", 300);
-      expect(await decisionOn(run.id, "a")).toEqual({ decision: "approved", actor: "ned", at: 300 });
-    });
-
-    it("settles a tie the same way in either order, with rejection winning", async () => {
-      const run = await recordRun(SHA_A, [rendered("a", 1)]);
-      await decide("rejected", "bob", 200);
-      await decide("approved", "ned", 200);
-      expect((await decisionOn(run.id, "a"))?.decision).toBe("rejected");
-      const other = await recordRun(SHA_B, [rendered("a", 2)]);
-      await decide("approved", "ned", 200, 2);
-      await decide("rejected", "bob", 200, 2);
-      expect((await decisionOn(other.id, "a"))?.decision).toBe("rejected");
+      clock = 1_000;
+      await decide("rejected", "bob");
+      expect(await decisionOn(run.id)).toEqual({ decision: "rejected", actor: "bob", at: 1_000 });
+      clock = 2_000;
+      await decide("approved", "ned");
+      expect(await decisionOn(run.id)).toEqual({ decision: "approved", actor: "ned", at: 2_000 });
     });
 
     it("carries through a push: no new approval at a new SHA for the same image", async () => {
@@ -375,45 +377,7 @@ describe("Snapshots", () => {
       expect(await snapshots.compareRun(pushed.id, SHA_A)).toMatchObject({
         snapshots: [{ state: "changed", decision: { decision: "approved", actor: "ned" } }],
       });
-      expect(await snapshots.acceptRun(pushed.id, SHA_A)).toBe(true);
-    });
-
-    it("moves between stores by name and hash, though the image keys differ", async () => {
-      const elsewhere = await createTempStore();
-      try {
-        const remote = new Snapshots({ sql: elsewhere.sql });
-        // The same image holds a different key there.
-        const key = insertedKey(await elsewhere.sql.run(imageInsertStatement(hashOf(1), 777)));
-        const localKey = insertedKey(await sql.run(imageInsertStatement(hashOf(1), 777)));
-        expect(key).not.toBe(localKey);
-
-        await snapshots.decide({
-          environment: ENV,
-          decision: "approved",
-          actor: "ned",
-          at: 123,
-          snapshots: [{ story: "a", imageHash: hashOf(1) }],
-        });
-        const run = await recordRun(SHA_A, [rendered("a", 1)]);
-        const [compared] = (await snapshots.compareRun(run.id, null)).snapshots;
-        const carried = compared!;
-
-        // What a sync would send: a name, a hash, who, and when.
-        await remote.decide({
-          environment: ENV,
-          decision: carried.decision!.decision,
-          actor: carried.decision!.actor,
-          at: carried.decision!.at,
-          snapshots: [{ story: carried.story, settings: carried.settings, imageHash: carried.imageHash! }],
-        });
-        const there = await recordRun(SHA_B, [rendered("a", 1)], ENV, remote);
-        expect(await remote.compareRun(there.id, null)).toMatchObject({
-          snapshots: [{ decision: { decision: "approved", actor: "ned", at: 123 } }],
-        });
-        expect(await remote.acceptRun(there.id, null)).toBe(true);
-      } finally {
-        await elsewhere.destroy();
-      }
+      expect(await snapshots.acceptRun(pushed.id, SHA_A, 0)).toBe(true);
     });
 
     it("may be recorded before the image reaches this store", async () => {
@@ -426,10 +390,10 @@ describe("Snapshots", () => {
       });
       await sql.run(imageInsertStatement(hash, 9_999));
       const run = await recordRun(SHA_A, [{ story: "a", imageHash: hash }]);
-      expect(await snapshots.acceptRun(run.id, null)).toBe(true);
+      expect(await snapshots.acceptRun(run.id, null, 0)).toBe(true);
     });
 
-    it("refuses a malformed hash", async () => {
+    it("refuses a malformed hash, and a decision by nobody", async () => {
       await expect(
         snapshots.decide({
           environment: ENV,
@@ -438,20 +402,24 @@ describe("Snapshots", () => {
           snapshots: [{ story: "a", imageHash: "1" }],
         }),
       ).rejects.toThrow("Not an image hash");
+      await expect(
+        snapshots.decide({ environment: ENV, decision: "approved", actor: "", snapshots: [] }),
+      ).rejects.toThrow("who made it");
     });
   });
 
   describe("goldens", () => {
     it("has none until a run is accepted, then has that run's images", async () => {
       expect(await snapshots.hasCompleteGoldens(SHA_A, ENV)).toBe(false);
-      expect(await snapshots.goldens(SHA_A, ENV)).toBeNull();
       await goldensAt(SHA_A, [rendered("a", 1), rendered("b", 2)]);
       expect(await snapshots.hasCompleteGoldens(SHA_A, ENV)).toBe(true);
       expect(await snapshots.hasCompleteGoldens(SHA_B, ENV)).toBe(false);
       expect(await snapshots.hasCompleteGoldens(SHA_A, "other")).toBe(false);
-      expect(await snapshots.goldens(SHA_A, ENV)).toEqual([
-        { story: "a", settings: "", imageHash: hashOf(1) },
-        { story: "b", settings: "", imageHash: hashOf(2) },
+
+      const head = await recordRun(SHA_B, [rendered("a", 3), rendered("b", 2)]);
+      expect((await snapshots.compareRun(head.id, SHA_A, { includeUnchanged: true })).snapshots).toMatchObject([
+        { story: "a", goldenHash: hashOf(1) },
+        { story: "b", goldenHash: hashOf(2) },
       ]);
     });
 
@@ -460,50 +428,95 @@ describe("Snapshots", () => {
       const head = await recordRun(SHA_B, [rendered("a", 1), rendered("b", 4), rendered("c", 5)]);
 
       // Nothing decided on the changed b or the new c.
-      expect(await snapshots.acceptRun(head.id, SHA_A)).toBe(false);
+      expect(await snapshots.acceptRun(head.id, SHA_A, 1)).toBe(false);
       await approve([rendered("b", 4)]);
-      expect(await snapshots.acceptRun(head.id, SHA_A)).toBe(false);
+      expect(await snapshots.acceptRun(head.id, SHA_A, 1)).toBe(false);
 
       // Another image for c is approved, and c's own is rejected.
       await approve([rendered("c", 6)]);
-      expect(await snapshots.acceptRun(head.id, SHA_A)).toBe(false);
+      expect(await snapshots.acceptRun(head.id, SHA_A, 1)).toBe(false);
       await snapshots.decide({
         environment: ENV,
         decision: "rejected",
         actor: "bob",
         snapshots: [{ story: "c", imageHash: hashOf(5) }],
       });
-      expect(await snapshots.acceptRun(head.id, SHA_A)).toBe(false);
+      expect(await snapshots.acceptRun(head.id, SHA_A, 1)).toBe(false);
       expect(await snapshots.hasCompleteGoldens(SHA_B, ENV)).toBe(false);
 
-      // Removing a story needs no decision, since no image is being accepted.
-      clock += 1;
       await approve([rendered("c", 5)]);
-      expect(await snapshots.acceptRun(head.id, SHA_A)).toBe(true);
-      expect(await snapshots.goldens(SHA_B, ENV)).toHaveLength(3);
+      expect(await snapshots.acceptRun(head.id, SHA_A, 1)).toBe(true);
       expect(await snapshots.hasCompleteGoldens(SHA_B, ENV)).toBe(true);
+    });
+
+    it("refuses to silently drop 500 goldens a filtered render missed", async () => {
+      const everything = Array.from({ length: 510 }, (_, i) =>
+        rendered(`story-${String(i).padStart(3, "0")}`, (i % 40) + 1),
+      );
+      await goldensAt(SHA_A, everything);
+
+      // Every image it rendered is unchanged, so without the count this would be accepted.
+      const filtered = await recordRun(SHA_B, everything.slice(0, 10));
+      const compared = await snapshots.compareRun(filtered.id, SHA_A);
+      expect(compared.unchangedCount).toBe(10);
+      const removed = compared.snapshots.filter(({ state }) => state === "removed");
+      expect(removed).toHaveLength(500);
+
+      await expect(snapshots.acceptRun(filtered.id, SHA_A, 0)).rejects.toMatchObject({
+        code: "wrong-removed-count",
+        message: expect.stringContaining("would remove 500 goldens, not the 0 the reviewer saw"),
+      });
+      await expect(snapshots.acceptRun(filtered.id, SHA_A, 499)).rejects.toMatchObject({
+        code: "wrong-removed-count",
+      });
+      expect(await snapshots.hasCompleteGoldens(SHA_B, ENV)).toBe(false);
+
+      // A reviewer who saw all 500 may accept them.
+      expect(await snapshots.acceptRun(filtered.id, SHA_A, removed.length)).toBe(true);
+      expect(await snapshots.hasCompleteGoldens(SHA_B, ENV)).toBe(true);
+    });
+
+    it("refuses a claim of removals with no baseline, and a wrong count of too many", async () => {
+      const run = await recordRun(SHA_A, [rendered("a", 1)]);
+      await approve([rendered("a", 1)]);
+      await expect(snapshots.acceptRun(run.id, null, 1)).rejects.toMatchObject({
+        code: "wrong-removed-count",
+      });
+      expect(await snapshots.acceptRun(run.id, null, 0)).toBe(true);
+    });
+
+    it("doesn't let being unstable change what is accepted", async () => {
+      await goldensAt(SHA_A, [rendered("a", 1), rendered("b", 2)]);
+      // A flagged image that is unchanged needs nothing, and a flagged change needs its approval.
+      const head = await recordRun(SHA_B, [
+        { ...rendered("a", 1), unstable: true },
+        { ...rendered("b", 3), unstable: true },
+      ]);
+      expect(await snapshots.acceptRun(head.id, SHA_A, 0)).toBe(false);
+      await approve([rendered("b", 3)]);
+      expect(await snapshots.acceptRun(head.id, SHA_A, 0)).toBe(true);
     });
 
     it("doesn't take an approval from another environment", async () => {
       const run = await recordRun(SHA_A, [rendered("a", 1)]);
       await approve([rendered("a", 1)], "other");
-      expect(await snapshots.acceptRun(run.id, null)).toBe(false);
+      expect(await snapshots.acceptRun(run.id, null, 0)).toBe(false);
     });
 
     it("refuses a run with failures or still recording, and a baseline with no goldens", async () => {
       const failed = await recordRun(SHA_A, [{ story: "a", failure: "Boom" }]);
-      await expect(snapshots.acceptRun(failed.id, null)).rejects.toMatchObject({
+      await expect(snapshots.acceptRun(failed.id, null, 0)).rejects.toMatchObject({
         code: "run-has-failures",
       });
       const recording = await snapshots.beginRun({ gitSha: SHA_A, environment: ENV });
-      await expect(snapshots.acceptRun(recording.id, null)).rejects.toMatchObject({
+      await expect(snapshots.acceptRun(recording.id, null, 0)).rejects.toMatchObject({
         code: "run-not-finished",
       });
 
       // Approved, so only the missing baseline can stop it, and it must change nothing.
       const run = await recordRun(SHA_A, [rendered("a", 1)]);
       await approve([rendered("a", 1)]);
-      await expect(snapshots.acceptRun(run.id, SHA_C)).rejects.toMatchObject({ code: "no-goldens" });
+      await expect(snapshots.acceptRun(run.id, SHA_C, 0)).rejects.toMatchObject({ code: "no-goldens" });
       expect(await snapshots.hasCompleteGoldens(SHA_A, ENV)).toBe(false);
     });
 
@@ -517,27 +530,48 @@ describe("Snapshots", () => {
         ],
       });
       await approve([rendered("a", 3)]);
-      expect(await snapshots.acceptRun(rerun.id, SHA_A)).toBe(true);
-      expect(await snapshots.goldens(SHA_A, ENV)).toEqual([
-        { story: "a", settings: "", imageHash: hashOf(3) },
-      ]);
-    });
-
-    it("doesn't let a resent older acceptance overwrite a newer one", async () => {
-      const older = await recordRun(SHA_A, [rendered("a", 1)]);
-      const newer = await recordRun(SHA_A, [rendered("a", 2)]);
-      await approve([rendered("a", 1)]);
-      await approve([rendered("a", 2)]);
-      const stale = new Snapshots({ sql, now: () => 10 });
-      expect(await snapshots.acceptRun(newer.id, null)).toBe(true);
-      expect(await stale.acceptRun(older.id, null)).toBe(false);
-      expect(await snapshots.goldens(SHA_A, ENV)).toEqual([
-        { story: "a", settings: "", imageHash: hashOf(2) },
-      ]);
+      expect(await snapshots.acceptRun(rerun.id, SHA_A, 1)).toBe(true);
+      expect(await statesOf(rerun.id, SHA_A)).toEqual({ a: "unchanged" });
     });
   });
 
   describe("compare", () => {
+    it("lists only differences and anything unstable, unless asked for everything", async () => {
+      await goldensAt(SHA_A, [rendered("same", 1), rendered("shaky", 2), rendered("calm", 3)]);
+      const run = await recordRun(SHA_B, [
+        rendered("same", 1),
+        { ...rendered("shaky", 2), unstable: true },
+        { ...rendered("calm", 3), unstable: false },
+        { story: "broken", failure: "Boom" },
+      ]);
+
+      const differences = await snapshots.compareRun(run.id, SHA_A);
+      expect(differences.snapshots.map(({ story, state, unstable }) => [story, state, unstable])).toEqual([
+        ["broken", "failed", null],
+        ["shaky", "unchanged", true],
+      ]);
+      expect(differences.unchangedCount).toBe(3);
+
+      const everything = await snapshots.compareRun(run.id, SHA_A, { includeUnchanged: true });
+      expect(everything.snapshots.map(({ story }) => story)).toEqual(["broken", "calm", "same", "shaky"]);
+      expect(everything.unchangedCount).toBe(3);
+    });
+
+    it("lists a failure that has no golden, with or without a baseline", async () => {
+      const run = await recordRun(SHA_A, [{ story: "a", failure: "Boom" }]);
+      expect((await snapshots.compareRun(run.id, null)).snapshots).toMatchObject([{ state: "failed" }]);
+      await goldensAt(SHA_B, [rendered("b", 1)]);
+      expect((await snapshots.compareRun(run.id, SHA_B)).snapshots).toMatchObject([
+        { story: "a", state: "failed", goldenHash: null },
+        { story: "b", state: "removed" },
+      ]);
+    });
+
+    it("counts nothing as unchanged with no baseline", async () => {
+      const run = await recordRun(SHA_A, [rendered("a", 1)]);
+      expect((await snapshots.compareRun(run.id, null)).unchangedCount).toBe(0);
+    });
+
     it("compares images with colliding truncated hashes by their full hash", async () => {
       const a = hashOf(50_001);
       const b = hashOf(50_002);
@@ -545,9 +579,9 @@ describe("Snapshots", () => {
       await goldensAt(SHA_A, [{ story: "x", imageHash: a }]);
       const head = await recordRun(SHA_B, [{ story: "x", imageHash: b }]);
       expect(await statesOf(head.id, SHA_A)).toEqual({ x: "changed" });
-      expect(await snapshots.acceptRun(head.id, SHA_A)).toBe(false);
+      expect(await snapshots.acceptRun(head.id, SHA_A, 0)).toBe(false);
       await approve([{ story: "x", imageHash: a }]);
-      expect(await snapshots.acceptRun(head.id, SHA_A)).toBe(false);
+      expect(await snapshots.acceptRun(head.id, SHA_A, 0)).toBe(false);
     });
 
     it("uses images a real Store put", async () => {
@@ -572,11 +606,27 @@ describe("Snapshots", () => {
       );
       await goldensAt(SHA_A, golden);
       const run = await recordRun(SHA_B, golden.slice(0, PAGE));
-      const { snapshots: compared } = await snapshots.compareRun(run.id, SHA_A);
+      const { snapshots: compared } = await snapshots.compareRun(run.id, SHA_A, { includeUnchanged: true });
       expect(compared.filter(({ state }) => state === "unchanged")).toHaveLength(PAGE);
       expect(compared.filter(({ state }) => state === "removed")).toHaveLength(5_500);
       expect(new Set(compared.map(({ story }) => story)).size).toBe(PAGE + 5_500);
-      expect(await snapshots.listSnapshots(run.id)).toHaveLength(PAGE);
+    });
+
+    it("reads every page of differences alone, past a run of unchanged rows", async () => {
+      const PAGE = 5_000;
+      const golden = Array.from({ length: PAGE + 200 }, (_, i) =>
+        rendered(`s-${String(i).padStart(5, "0")}`, 1),
+      );
+      await goldensAt(SHA_A, golden);
+      // The first 100 are unchanged, and the rest differ, so differences span two pages.
+      const run = await recordRun(
+        SHA_B,
+        golden.map((item, i) => (i < 100 ? item : rendered(item.story, 2))),
+      );
+      const { snapshots: compared, unchangedCount } = await snapshots.compareRun(run.id, SHA_A);
+      expect(compared).toHaveLength(PAGE + 100);
+      expect(new Set(compared.map(({ story }) => story)).size).toBe(PAGE + 100);
+      expect(unchangedCount).toBe(100);
     });
   });
 
@@ -620,17 +670,19 @@ describe("Snapshots", () => {
 
     it("records, compares, and accepts 10,000 snapshots in few requests", { timeout: 120_000 }, async () => {
       seedMany(1_000_000, N + 1_000);
-      const { adapter: counted, sent } = counting(adapter);
+      const { adapter: counted, sent, responseBytes } = counting(adapter);
       const model = new Snapshots({ sql: new Sql(counted) });
-      const report: Record<string, { ms: number; requests: number; statements: number }> = {};
+      const report: Record<string, { ms: number; requests: number; statements: number; responseBytes: number }> = {};
       const measure = async <T>(name: string, work: () => Promise<T>): Promise<T> => {
         sent.length = 0;
+        responseBytes.length = 0;
         const start = performance.now();
         const result = await work();
         report[name] = {
           ms: Math.round(performance.now() - start),
           requests: sent.length,
           statements: sent.flat().length,
+          responseBytes: responseBytes.reduce((sum, bytes) => sum + bytes, 0),
         };
         return result;
       };
@@ -640,7 +692,7 @@ describe("Snapshots", () => {
       await measure("recordSnapshots", () => model.recordSnapshots(golden.id, goldenItems));
       await measure("finishRun", () => model.finishRun(golden.id, N));
       await measure("decide (all)", () => approve(goldenItems, ENV, model));
-      const accepted = await measure("acceptRun (all approved)", () => model.acceptRun(golden.id, null));
+      const accepted = await measure("acceptRun (all approved)", () => model.acceptRun(golden.id, null, 0));
       expect(accepted).toBe(true);
 
       // 100 changed, 50 failed, and 50 removed, with 50 new, and the rest unchanged.
@@ -657,14 +709,18 @@ describe("Snapshots", () => {
       const finished = await measure("finishRun (head)", () => model.finishRun(run.id, head.length));
       expect(finished.failedCount).toBe(50);
 
-      const { snapshots: compared } = await measure("compareRun", () => model.compareRun(run.id, SHA_A));
+      const differences = await measure("compareRun (differences)", () => model.compareRun(run.id, SHA_A));
+      expect(differences.snapshots).toHaveLength(250);
+      expect(differences.unchangedCount).toBe(N - 200);
+
+      const { snapshots: compared } = await measure("compareRun (includeUnchanged)", () =>
+        model.compareRun(run.id, SHA_A, { includeUnchanged: true }),
+      );
       const counts: Record<string, number> = {};
       for (const { state } of compared) counts[state] = (counts[state] ?? 0) + 1;
       expect(counts).toEqual({ unchanged: N - 200, changed: 100, failed: 50, new: 50, removed: 50 });
 
       await measure("hasCompleteGoldens", () => model.hasCompleteGoldens(SHA_A, ENV));
-      await measure("listSnapshots", () => model.listSnapshots(run.id));
-      await measure("goldens", () => model.goldens(SHA_A, ENV));
 
       console.log(`Snapshot model at ${N} snapshots:`);
       console.table(report);
@@ -672,8 +728,9 @@ describe("Snapshots", () => {
       expect(report.recordSnapshots!.requests).toBe(1);
       expect(report["decide (all)"]!.requests).toBe(1);
       expect(report["acceptRun (all approved)"]!.requests).toBe(1);
+      expect(report["compareRun (differences)"]!.requests).toBe(1);
       // 10,000 rows at 5,000 per page, and one more that finds none.
-      expect(report.compareRun!.requests).toBe(3);
+      expect(report["compareRun (includeUnchanged)"]!.requests).toBe(3);
     });
 
     it("never scans a table, for anything a review sends", async () => {
@@ -682,14 +739,15 @@ describe("Snapshots", () => {
       const items = [rendered("a", 1), rendered("b", 2)];
       const golden = await recordRun(SHA_A, items, ENV, model);
       await approve(items, ENV, model);
-      await model.acceptRun(golden.id, null);
+      await model.acceptRun(golden.id, null, 0);
       const head = await recordRun(SHA_B, [rendered("a", 3), { story: "c", failure: "Boom" }], ENV, model);
       await model.compareRun(head.id, SHA_A);
-      await model.acceptRun(head.id, SHA_A).catch(() => {});
-      await model.listSnapshots(head.id);
+      await model.compareRun(head.id, SHA_A, { includeUnchanged: true });
+      await model.acceptRun(head.id, SHA_A, 1).catch(() => {});
+      const clean = await recordRun(SHA_C, [rendered("a", 3)], ENV, model);
+      await model.acceptRun(clean.id, SHA_A, 0).catch(() => {});
       await model.runsAt(SHA_A, ENV);
       await model.hasCompleteGoldens(SHA_A, ENV);
-      await model.goldens(SHA_A, ENV);
       await model.getRun(head.id);
       await model.finishRun(head.id, 2);
       await model.finishRun(head.id, 99).catch(() => {});

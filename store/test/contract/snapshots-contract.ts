@@ -43,7 +43,7 @@ export function failing(
   };
 }
 
-const rendered = (story: string, image: number): RecordedSnapshot => ({
+export const rendered = (story: string, image: number): RecordedSnapshot => ({
   story,
   imageHash: hashOf(image),
 });
@@ -88,10 +88,9 @@ export function describeSnapshotContract(
         environment: "shared",
         decision: "approved",
         actor: "ned",
-        at: 1000,
         snapshots: GOLDENS.map((snapshot) => ({ story: snapshot.story, imageHash: snapshot.imageHash! })),
       });
-      expect(await snapshots.acceptRun(golden.id, null)).toBe(true);
+      expect(await snapshots.acceptRun(golden.id, null, 0)).toBe(true);
 
       // Against those goldens: a is unchanged, b changed, c failed, d removed, and e new.
       const head = await snapshots.beginRun({ gitSha: SHA_1, environment: "shared" });
@@ -104,14 +103,14 @@ export function describeSnapshotContract(
       ]);
       await snapshots.finishRun(headRun, 4);
 
-      // The same SHA again, where b came out differently and c rendered.
+      // The same SHA again, where b came out differently and c rendered, unstably.
       const again = await snapshots.beginRun({ gitSha: SHA_1, environment: "shared" });
       rerun = again.id;
       await snapshots.recordSnapshots(rerun, [
         rendered("a", 1),
         rendered("b", 7),
-        rendered("c", 3),
-        rendered("e", 6),
+        { ...rendered("c", 3), unstable: true },
+        { ...rendered("e", 6), unstable: false },
       ]);
       await snapshots.finishRun(rerun, 4);
     });
@@ -120,15 +119,15 @@ export function describeSnapshotContract(
       await database?.destroy();
     });
 
-    it("gives each snapshot its state", async () => {
-      const { run, snapshots: compared } = await snapshots.compareRun(headRun, SHA_0);
-      expect(run).toMatchObject({ status: "failed", snapshotCount: 4, failedCount: 1 });
+    it("gives each difference its state, and counts what is unchanged", async () => {
+      const { run, snapshots: compared, unchangedCount } = await snapshots.compareRun(headRun, SHA_0);
+      expect(run).toMatchObject({ status: "failed", failedCount: 1 });
+      expect(unchangedCount).toBe(1);
       expect(compared).toEqual([
-        { story: "a", settings: "", state: "unchanged", imageHash: hashOf(1), goldenHash: hashOf(1), failure: null, decision: { decision: "approved", actor: "ned", at: 1000 } },
-        { story: "b", settings: "", state: "changed", imageHash: hashOf(5), goldenHash: hashOf(2), failure: null, decision: null },
-        { story: "c", settings: "", state: "failed", imageHash: null, goldenHash: hashOf(3), failure: "Render threw", decision: null },
-        { story: "e", settings: "", state: "new", imageHash: hashOf(6), goldenHash: null, failure: null, decision: null },
-        { story: "d", settings: "", state: "removed", imageHash: null, goldenHash: hashOf(4), failure: null, decision: null },
+        { story: "b", state: "changed", imageHash: hashOf(5), goldenHash: hashOf(2), failure: null, unstable: null, decision: null },
+        { story: "c", state: "failed", imageHash: null, goldenHash: hashOf(3), failure: "Render threw", unstable: null, decision: null },
+        { story: "e", state: "new", imageHash: hashOf(6), goldenHash: null, failure: null, unstable: null, decision: null },
+        { story: "d", state: "removed", imageHash: null, goldenHash: hashOf(4), failure: null, unstable: null, decision: null },
       ]);
     });
 
@@ -138,16 +137,15 @@ export function describeSnapshotContract(
         environment: "shared",
         decision: "approved",
         actor: "ned",
-        at: 2000,
         snapshots: [{ story: "b", imageHash: hashOf(5) }],
       });
       const head = await snapshots.compareRun(headRun, SHA_0);
-      expect(head.snapshots[1]).toMatchObject({
+      expect(head.snapshots[0]).toMatchObject({
         story: "b",
         imageHash: hashOf(5),
-        decision: { decision: "approved", actor: "ned", at: 2000 },
+        decision: { decision: "approved", actor: "ned", at: expect.any(Number) },
       });
-      const again = await snapshots.compareRun(rerun, SHA_0);
+      const again = await snapshots.compareRun(rerun, SHA_0, { includeUnchanged: true });
       expect(statesOf(again.snapshots)).toEqual({
         a: "unchanged",
         b: "changed",
@@ -155,7 +153,9 @@ export function describeSnapshotContract(
         e: "new",
         d: "removed",
       });
+      expect(again.unchangedCount).toBe(2);
       expect(again.snapshots[1]).toMatchObject({ imageHash: hashOf(7), decision: null });
+      expect(again.snapshots.map(({ unstable }) => unstable)).toEqual([null, null, true, false, null]);
     });
 
     it("never compares across environments", async () => {
@@ -169,21 +169,20 @@ export function describeSnapshotContract(
       expect(compared).toMatchObject([{ story: "a", state: "new", decision: null }]);
     });
 
-    it("leaves a crashed run recording and resumable", async () => {
+    it("leaves a crashed run recording, beside the new run that replaces it", async () => {
       const environment = "crash";
-      const run = await snapshots.beginRun({ gitSha: SHA_1, environment });
-      await snapshots.recordSnapshots(run.id, [rendered("a", 1)]);
+      const crashed = await snapshots.beginRun({ gitSha: SHA_1, environment });
+      await snapshots.recordSnapshots(crashed.id, [rendered("a", 1)]);
 
       const dying = over((adapter) => failing(adapter, () => true));
-      await expect(dying.recordSnapshots(run.id, [rendered("b", 2)])).rejects.toThrow("Simulated");
+      await expect(dying.recordSnapshots(crashed.id, [rendered("b", 2)])).rejects.toThrow("Simulated");
 
-      await expect(snapshots.finishRun(run.id, 2)).rejects.toMatchObject({ code: "wrong-snapshot-count" });
-      expect(await snapshots.listSnapshots(run.id)).toEqual([
-        { story: "a", settings: "", imageHash: hashOf(1) },
-      ]);
+      await expect(snapshots.finishRun(crashed.id, 2)).rejects.toMatchObject({ code: "wrong-snapshot-count" });
+      await expect(snapshots.compareRun(crashed.id, null)).rejects.toMatchObject({ code: "run-not-finished" });
 
-      await snapshots.recordSnapshots(run.id, [rendered("b", 2)]);
-      expect(await snapshots.finishRun(run.id, 2)).toMatchObject({ status: "complete", snapshotCount: 2 });
+      const fresh = await snapshots.beginRun({ gitSha: SHA_1, environment });
+      await snapshots.recordSnapshots(fresh.id, [rendered("a", 1), rendered("b", 2)]);
+      expect(await snapshots.finishRun(fresh.id, 2)).toMatchObject({ status: "complete", failedCount: 0 });
     });
 
     it("survives writes being resent, and ends with a complete set of goldens", async () => {
@@ -191,15 +190,23 @@ export function describeSnapshotContract(
       const replayed = over(replaying);
       const run = await snapshots.beginRun({ gitSha: SHA_2, environment });
       await replayed.recordSnapshots(run.id, [rendered("a", 8)]);
-      expect(await replayed.finishRun(run.id, 1)).toMatchObject({ status: "complete", snapshotCount: 1 });
+      expect(await replayed.finishRun(run.id, 1)).toMatchObject({ status: "complete" });
       await snapshots.decide({
         environment,
         decision: "approved",
         actor: "ned",
         snapshots: [{ story: "a", imageHash: hashOf(8) }],
       });
-      expect(await replayed.acceptRun(run.id, null)).toBe(true);
+      expect(await replayed.acceptRun(run.id, null, 0)).toBe(true);
       expect(await snapshots.hasCompleteGoldens(SHA_2, environment)).toBe(true);
+    });
+
+    it("refuses an acceptance that would drop goldens the reviewer didn't see", async () => {
+      // The rerun lacks d, and the reviewer says nothing was removed.
+      await expect(snapshots.acceptRun(rerun, SHA_0, 0)).rejects.toMatchObject({
+        code: "wrong-removed-count",
+        message: expect.stringContaining("would remove 1 goldens, not the 0"),
+      });
     });
   });
 }

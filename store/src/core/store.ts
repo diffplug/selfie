@@ -1,4 +1,5 @@
 import type { Blobs } from "./blob.ts";
+import { chunks } from "./chunks.ts";
 import {
   assertImageHash,
   SHA256_BYTES,
@@ -102,8 +103,8 @@ export class Store {
    */
   async putImages(files: readonly Uint8Array[]): Promise<StoredImage[]> {
     const stored: StoredImage[] = [];
-    for (let i = 0; i < files.length; i += IMAGES_PER_GROUP) {
-      stored.push(...(await this.#putGroup(files.slice(i, i + IMAGES_PER_GROUP))));
+    for (const group of chunks(files, IMAGES_PER_GROUP)) {
+      stored.push(...(await this.#putGroup(group)));
     }
     return stored;
   }

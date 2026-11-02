@@ -14,7 +14,7 @@
 | **Approval** | A person's or agent's acceptance of a snapshot change. May be made before the change is pushed (`docs/specs/system.md`). |
 | **Rejection** | A person's or agent's refusal of a snapshot change. |
 | **Decision** | An approval or a rejection, recorded against a snapshot name and an image hash (`docs/specs/snapshots.md`). |
-| **Snapshot name** | What identifies a snapshot across runs and stores: its story ID, any render settings that aren't part of the environment, and its environment ID. |
+| **Snapshot name** | What identifies a snapshot across runs and stores: its story ID, with any render variant in it, and its environment ID. |
 | **Snapshot state** | How a run's snapshot compares with the baseline's goldens: unchanged, changed, new, removed, or failed (`docs/specs/snapshots.md`). |
 | **Project** | One GitHub repository's cloud snapshot data, held in its own D1 database. Exists once the GitHub App is installed on that repository (`docs/specs/access.md`). |
 | **Store** | One place that holds images and their metadata: a local store on a machine, or a project's cloud store. |

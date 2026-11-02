@@ -5,6 +5,7 @@ export { encodePam, type RawImage } from "./pam.ts";
 export {
   Snapshots,
   SnapshotError,
+  type CompareOptions,
   type ComparedSnapshot,
   type Comparison,
   type Decision,
@@ -14,7 +15,6 @@ export {
   type Run,
   type RunStatus,
   type SnapshotErrorCode,
-  type SnapshotKey,
   type SnapshotsOptions,
   type SnapshotState,
 } from "./snapshots.ts";
