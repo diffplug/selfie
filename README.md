@@ -41,7 +41,11 @@ Access follows GitHub through a GitHub App: anyone can view a public repository'
 Selfie has the following commands:
 
 - find-baseline - returns the Git sha of the nearest merge-base with a complete set of goldens
-- review - records snapshots (only if necessary) and shows the diff against the baseline
+- review - records snapshots and shows the diff against the baseline, as one JSON document whose exit code says whether anything needs attention
+- approve, reject - decides on a run's changed snapshots, on a dirty tree if you like, so committing doesn't ask again
+- accept - makes a run's snapshots the goldens for its Git sha, on a clean tree
+
+An agent's loop is `selfie review`, then look at the diff images it names, then `selfie approve <run> --all`, commit, `selfie review`, and `selfie accept <run>`. These work on local data for now: pushing and pulling goldens, and with them the cloud half of find-baseline, are still to come. See `docs/specs/cli.md`.
 
 ## Implementation details
 

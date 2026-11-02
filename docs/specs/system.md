@@ -1,6 +1,6 @@
 # System
 
-> Status: partly built — rendering environments are built in `docs/specs/render.md`, and local approvals in `docs/specs/snapshots.md`; everything under `## Future` is design.
+> Status: partly built — rendering environments are built in `docs/specs/render.md`, local approvals in `docs/specs/snapshots.md`, and the local CLI in `docs/specs/cli.md`; everything under `## Future` is design.
 >
 > - See `docs/specs/glossary.md` for vocabulary.
 > - Owns the staged build order and the behavior spanning the local app and the cloud. Image storage belongs to `docs/specs/store.md`.
@@ -21,6 +21,13 @@ Source of truth: `store/src/core/snapshots.ts`. `docs/specs/snapshots.md` → De
 - **Must not make a user re-approve a snapshot change at a new Git SHA in the same store.** An approval holds for a snapshot's name and image hash, so a run after a commit, rebase, or amend finds it if the pixels are the same.
 
 Reserved: this is the local half of [carrying approvals through a push](#approvals-across-stores).
+
+## Local CLI
+
+Source of truth: `cli/src/`. `docs/specs/cli.md` owns how it works.
+
+- **Must let an agent use the loop without a UI:** `selfie review` records snapshots locally and outputs JSON with image paths, and `selfie approve`, `reject`, and `accept` act on the run it names. Its exit codes tell an agent whether anything needs attention.
+- **Must keep local data under `~/.config/selfie/<git-origin-slugified>/`.**
 
 ## Future
 
@@ -50,15 +57,13 @@ Selfie is for fully opaque images, and transparency is never allowed: `docs/spec
 
 **Scope: store** — `docs/specs/store.md`.
 
-**Scope: cli-review** — `selfie review` records snapshots locally and outputs JSON with image paths, so an agent can use the loop without a UI.
-
 **Scope: local-review** — A review UI with approval, built as a Hono app running locally. The UI uses GitHub Primer.
 
 **Scope: cloud-deploy** — The same Hono app deployed at `hackathon.selfie.dev`, with accounts in Neon through pgstencil and Hyperdrive, per-project D1, and R2 ([Cloud data](#cloud-data)). Serves no image before `github-access`.
 
 **Scope: github-access** — The GitHub App, sign-in, and access checks (`docs/specs/access.md`). Ships with `cloud-deploy`, since a deployed service needs them before it holds anyone's images.
 
-**Scope: sync** — Push and pull between stores, and `find-baseline`. Local approvals carry through here ([Approvals across stores](#approvals-across-stores)).
+**Scope: sync** — Push and pull between stores, and the cloud half of `find-baseline`, whose local half is built (`docs/specs/cli.md` → find-baseline). Local approvals carry through here ([Approvals across stores](#approvals-across-stores)).
 
 **Scope: trust** — The cloud accepts local results without re-rendering.
 

@@ -1,0 +1,23 @@
+{
+  "name": "selfie-cli",
+  "version": "0.0.0",
+  "private": true,
+  "license": "FSL-1.1-MIT",
+  "type": "module",
+  "bin": {
+    "selfie": "./src/main.ts"
+  },
+  "scripts": {
+    "test": "pnpm typecheck && vitest run",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "selfie-render": "workspace:*",
+    "selfie-store": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

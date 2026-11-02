@@ -12,6 +12,7 @@ A spec is the accurate reference for the current code: it states the invariants 
 - **`docs/specs/snapshots.md`** — Runs, snapshot states, decisions, and goldens: the data layer `selfie review` and the review UI use.
 - **`docs/specs/store.md`** — Image storage: image identity, decoding, keys, hash collisions, and the SQL and blob adapters.
 - **`docs/specs/render.md`** — The renderer: capturing a built Storybook into PNGs in a pinned environment, the environment ID, stability, and the manifest.
+- **`docs/specs/cli.md`** — The `selfie` CLI: `review`, `approve`, `reject`, `accept`, and `find-baseline`, their exit codes and JSON, and local data's layout.
 
 ### Conventions
 

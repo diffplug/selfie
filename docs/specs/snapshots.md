@@ -1,6 +1,6 @@
 # Snapshots
 
-> Status: built — the data layer for runs, comparisons, decisions, and goldens, on local SQLite and D1. Nothing calls it yet; `selfie review` and the review UI come next. See `## Future`.
+> Status: built — the data layer for runs, comparisons, decisions, and goldens, on local SQLite and D1. `selfie review` calls it (`docs/specs/cli.md`), and the review UI comes next. See `## Future`.
 >
 > - See `docs/specs/glossary.md` for snapshot, snapshot name, run, decision, golden, and baseline.
 > - Owns what a run holds, how a crash leaves one, snapshot states, decisions, and goldens. `docs/specs/system.md` owns why approvals carry through a push and why environments are part of a name. `docs/specs/store.md` owns image identity, image keys, and the `Sql` rules everything here obeys.
@@ -53,7 +53,7 @@ A run is one recording of a set of snapshots against one full Git SHA in one env
 
 Source of truth: `Snapshots.compareRun` in `store/src/core/snapshots.ts`.
 
-- **Must compare by image alone: the same hash is the same image.** Pixel diffs are a later step ([Future](#future)).
+- **Must compare by image alone: the same hash is the same image.** Pixel diffs belong to `selfie review` (`docs/specs/cli.md` → Review).
 - **Must give each snapshot exactly one state:**
 
 | State | The run has | The baseline's goldens have |
@@ -89,7 +89,7 @@ Goldens are per Git SHA and environment, and are the images of the one run accep
 - **Must be told how many removed snapshots the reviewer saw, and must refuse a different number with `wrong-removed-count`**, so a filtered render or a discovery bug can't silently drop goldens. A removed snapshot needs no decision of its own, since no image is being accepted (rationale).
 - **Must check and write in one statement**, so nothing can change between them.
 - **Must let a later accepted run replace a SHA's goldens.**
-- **May leave finding the SHA to the caller.** Nothing here runs Git. Reserved: `find-baseline` asks `hasCompleteGoldens` of each merge-base candidate ([Future](#future)).
+- **May leave finding the SHA to the caller.** Nothing here runs Git. `selfie find-baseline` asks `hasCompleteGoldens` of each merge-base candidate (`docs/specs/cli.md` → find-baseline).
 
 ## Schema
 
@@ -122,7 +122,7 @@ Source of truth: `store/src/core/snapshots.ts`; `store/test/snapshots.test.ts` m
 - A way to list decisions to send.
 - Moving a golden set between stores: rows by name and image hash, under a run in the receiving store.
 
-**Scope: cli-review** and **Scope: local-review** are defined in `docs/specs/system.md` → Build order. Pixel diffs and image paths belong to them.
+**Scope: local-review** is defined in `docs/specs/system.md` → Build order.
 
 ### Storing only what changed
 
