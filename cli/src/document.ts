@@ -6,8 +6,8 @@ import { summarizeRun, type RunSummary } from "./summary.ts";
 
 const DIRTY_PATHS_SHOWN = 20;
 
-function nextSteps(result: ReviewResult, summary: RunSummary): string[] {
-  const { comparison, baseline, given } = result;
+function nextSteps(result: ReviewResult, checked: RunSummary): string[] {
+  const { comparison, baseline, given, branchGoldens } = result;
   const { id: runId, gitSha, dirty, baselineSha } = comparison.run;
   const steps: string[] = [];
   if (given !== null) {
@@ -15,21 +15,22 @@ function nextSteps(result: ReviewResult, summary: RunSummary): string[] {
       `This compared with ${given.run ?? given.sha} for this review alone. selfie approve and selfie accept still compare with ${baselineSha ?? "no baseline"}, the baseline this run recorded.`,
     ];
   }
-  if (summary.counts.undecided > 0) {
+  if (checked.counts.undecided > 0) {
     steps.push(`Look at the images, then: selfie approve ${runId} --all, or with --story <pattern>, or selfie reject.`);
   }
-  if (summary.failed.length > 0) steps.push("A run with failed stories can't be accepted. Fix them and review again.");
+  if (checked.failed.length > 0) steps.push("A run with failed stories can't be accepted. Fix them and review again.");
 
-  const offTheBaselineHistory = baseline.sha === null && baseline.mergeBase !== null && baseline.mergeBase !== gitSha;
-  if (offTheBaselineHistory) {
-    steps.push(
-      `There's no baseline yet, and goldens accepted on a feature branch aren't read by later reviews. To make one, check out ${baseline.mergeBase} on ${baseline.defaultBranch ?? "the default branch"}, then selfie review, selfie approve, and selfie accept there.`,
-    );
+  if (baseline.sha === null && baseline.mergeBase !== null && baseline.mergeBase !== gitSha) {
+    const shown =
+      branchGoldens === null
+        ? "There's no baseline yet. Goldens accepted on this branch only show later reviews here what changed."
+        : `There's no baseline yet, so this compared with ${branchGoldens}, the nearest goldens on this branch. That's only to look at: accepting still needs every image approved, including the ones that match.`;
+    steps.push(`${shown} To make a baseline, accept on ${baseline.defaultBranch ?? "the default branch"} once a commit there has these stories.`);
   }
   if (dirty) {
     steps.push("This tree is dirty, so this run can't become goldens. Commit, and review again: approvals carry over.");
-  } else if (!offTheBaselineHistory && result.differences.length > 0 && summary.failed.length === 0) {
-    const removed = summary.removed.length + summary.notRendered.length;
+  } else if (result.differences.length > 0 && checked.failed.length === 0) {
+    const removed = checked.removed.length + checked.notRendered.length;
     steps.push(
       `Once every image is approved, make this run its commit's goldens: selfie accept ${runId}${removed > 0 ? ` --removed ${removed}` : ""}`,
     );
@@ -39,9 +40,11 @@ function nextSteps(result: ReviewResult, summary: RunSummary): string[] {
 
 /** The one document `selfie review` prints. */
 export function buildReviewDocument(result: ReviewResult) {
-  const { comparison, baseline, given, dirtyPaths, differences, playErrors, warnings } = result;
+  const { comparison, reviewed, baseline, given, branchGoldens, dirtyPaths, differences, playErrors, warnings } = result;
   const { run } = comparison;
-  const summary = summarizeRun(comparison);
+  const shown = summarizeRun(comparison);
+  // What stops accepting comes from what accepting checks, whatever this shows.
+  const checked = reviewed === comparison ? shown : summarizeRun(reviewed);
   return {
     schemaVersion: 1,
     runId: run.id,
@@ -49,22 +52,25 @@ export function buildReviewDocument(result: ReviewResult) {
     gitSha: run.gitSha,
     dirty: run.dirty,
     dirtyPaths: dirtyPaths.slice(0, DIRTY_PATHS_SHOWN),
-    baseline:
-      given === null
-        ? { sha: baseline.sha, run: null, given: false, reason: baseline.reason, message: baseline.message }
-        : { sha: given.sha ?? null, run: given.run ?? null, given: true, reason: null, message: null },
+    baseline: { sha: baseline.sha, reason: baseline.reason, message: baseline.message },
+    comparedWith:
+      given !== null
+        ? { source: "given", sha: given.sha ?? null, run: given.run ?? null }
+        : branchGoldens !== null
+          ? { source: "branch", sha: branchGoldens, run: null }
+          : { source: "baseline", sha: baseline.sha, run: null },
     environment: run.environment,
     filter:
       run.storyFilter === null
         ? null
-        : { patterns: run.storyFilter.patterns, notRendered: summary.notRendered.length },
-    counts: summary.counts,
-    blockers: summary.blockers,
-    advisories: summary.advisories,
+        : { patterns: run.storyFilter.patterns, notRendered: shown.notRendered.length },
+    counts: { ...shown.counts, undecided: checked.counts.undecided },
+    blockers: checked.blockers,
+    advisories: shown.advisories,
     differences,
     playErrors,
     warnings,
-    next: nextSteps(result, summary),
+    next: nextSteps(result, checked),
   };
 }
 

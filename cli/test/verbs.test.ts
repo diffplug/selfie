@@ -1,9 +1,9 @@
 // `selfie record`, and `selfie review` of a run it's told about, against real Git, a real store,
 // real files, and only the browser replaced.
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, realpath, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
-import { BLUE, commit, createHarness, GREEN, type Harness } from "./support.ts";
+import { BLUE, commit, createHarness, git, GREEN, type Harness } from "./support.ts";
 
 let h: Harness;
 let build: string;
@@ -70,7 +70,7 @@ describe("selfie review <run>", () => {
     const reviewed = await h.cli("review", head.json.runId);
     expect(captures).toBe(2);
     expect(reviewed.code).toBe(1);
-    expect(reviewed.json).toMatchObject({ runId: head.json.runId, baseline: { sha: first.json.gitSha, given: false } });
+    expect(reviewed.json).toMatchObject({ runId: head.json.runId, comparedWith: { source: "baseline", sha: first.json.gitSha } });
     expect(reviewed.json.differences.map(({ story }: any) => story)).toEqual(["a--one"]);
     await readFile(reviewed.json.differences[0].diff);
   });
@@ -112,6 +112,152 @@ describe("selfie review <run>", () => {
   });
 });
 
+describe("a branch when the default branch has no goldens", () => {
+  /** Goldens at a commit on a feature branch. */
+  async function goldensOnBranch() {
+    git(h.repo, "switch", "--quiet", "-c", "feature");
+    await commit(h.repo, "on feature");
+    const first = await reviewBuild();
+    await h.cli("approve", first.json.runId, "--all");
+    expect((await h.cli("accept", first.json.runId)).code).toBe(0);
+    return first.json;
+  }
+  /** And a new commit after them. */
+  async function acceptedOnBranch() {
+    const first = await goldensOnBranch();
+    await commit(h.repo, "more on feature");
+    return first;
+  }
+  const changeTheBuild = () => writeFile(path.join(build, "iframe.html"), `<html>${Math.random()}</html>`);
+
+  test("compares with the nearest goldens there, and says so", async () => {
+    const first = await acceptedOnBranch();
+    h.stories = [{ id: "a--one", color: BLUE }, { id: "a--two" }];
+    await changeTheBuild();
+    const { code, json } = await reviewBuild();
+    expect(code).toBe(1);
+    expect(json.comparedWith).toEqual({ source: "branch", sha: first.gitSha, run: null });
+    expect(json.baseline).toMatchObject({ sha: null, reason: "no-goldens" });
+    expect(json.counts).toMatchObject({ unchanged: 1, changed: 1, new: 0, undecided: 1 });
+    expect(json.differences.map(({ story, state }: any) => [story, state])).toEqual([["a--one", "changed"]]);
+    expect(json.differences[0].pixelDiff.kind).toBe("pixels");
+    expect(json.next.join()).toContain("only to look at");
+  });
+
+  test("is only to look at: the run records no baseline, and accepting needs each image approved", async () => {
+    await acceptedOnBranch();
+    h.stories = [{ id: "a--one", color: BLUE }, { id: "a--two" }];
+    await changeTheBuild();
+    const { json } = await reviewBuild();
+
+    const refused = await h.cli("accept", json.runId);
+    expect(refused.code).toBe(1);
+    expect(refused.json.baselineSha).toBeNull();
+    expect(refused.json.refusals.flatMap(({ stories }: any) => stories.map(({ story }: any) => story))).toEqual(["a--one"]);
+
+    await h.cli("approve", json.runId, "--story", "a--one");
+    expect((await h.cli("accept", json.runId)).code).toBe(0);
+  });
+
+  test("won't let an image pass for matching a golden someone has since rejected", async () => {
+    const first = await acceptedOnBranch();
+    await h.cli("reject", first.runId, "--story", "a--one");
+    await changeTheBuild();
+    const { json } = await reviewBuild();
+    expect(json.counts).toMatchObject({ unchanged: 2, changed: 0 });
+    // What it blocks on is what accepting would refuse, whatever it shows.
+    expect(json.blockers).toEqual([{ story: "a--one", reason: "rejected", detail: expect.any(String) }]);
+
+    const refused = await h.cli("accept", json.runId);
+    expect(refused.code).toBe(1);
+    expect(refused.json.refusals[0].stories).toEqual([{ story: "a--one", state: "new", decision: "rejected" }]);
+    expect((await h.cli("approve", json.runId, "--story", "a--one")).code).toBe(0);
+    expect((await h.cli("accept", json.runId)).code).toBe(0);
+  });
+
+  test("a story gone since those goldens needs no count to accept", async () => {
+    await acceptedOnBranch();
+    h.stories = [{ id: "a--two" }];
+    await changeTheBuild();
+    const { json } = await reviewBuild();
+    expect(json.counts.removed).toBe(1);
+    expect(json.next.join()).toContain(`selfie accept ${json.runId}`);
+    expect(json.next.join()).not.toContain("--removed");
+    expect(json.blockers).toEqual([]);
+    expect((await h.cli("accept", json.runId)).code).toBe(0);
+  });
+
+  test("a review at the commit with the goldens shows nothing differing", async () => {
+    await goldensOnBranch();
+    const again = await reviewBuild();
+    expect(again.code).toBe(0);
+    expect(again.json.comparedWith.source).toBe("branch");
+    expect(again.json.differences).toEqual([]);
+  });
+
+  test("never applies on the default branch, or once it has goldens", async () => {
+    const onMain = await reviewBuild();
+    expect(onMain.json.comparedWith).toMatchObject({ source: "baseline", sha: null });
+
+    await h.cli("approve", onMain.json.runId, "--all");
+    await h.cli("accept", onMain.json.runId);
+    git(h.repo, "switch", "--quiet", "-c", "feature");
+    await commit(h.repo, "on feature");
+    const one = await reviewBuild();
+    await h.cli("accept", one.json.runId);
+    await commit(h.repo, "more on feature");
+    const two = await reviewBuild();
+    expect(two.json.comparedWith).toEqual({ source: "baseline", sha: onMain.json.gitSha, run: null });
+  });
+
+  test("--baseline wins over it", async () => {
+    const first = await acceptedOnBranch();
+    const { json } = await reviewBuild();
+    const given = await h.cli("review", json.runId, "--baseline", first.runId);
+    expect(given.json.comparedWith).toEqual({ source: "given", sha: null, run: first.runId });
+  });
+});
+
+describe("the config's storybookDir", () => {
+  const config = (value: unknown) => writeFile(path.join(h.repo, "selfie.config.json"), JSON.stringify(value));
+
+  beforeEach(async () => {
+    await mkdir(path.join(h.repo, "built"));
+    await writeFile(path.join(h.repo, "built", "iframe.html"), "<html></html>");
+    h.onCapture = (options) => {
+      captures += 1;
+      seen = options.storybookDir;
+    };
+  });
+  let seen: string | undefined;
+
+  test("is what a command uses with no flag, relative to the Git top level", async () => {
+    await config({ storybookDir: "built" });
+    expect((await h.cli("record")).code).toBe(0);
+    expect(seen).toBe(path.join(await realpath(h.repo), "built"));
+  });
+
+  test("loses to --storybook-dir", async () => {
+    await config({ storybookDir: "built" });
+    expect((await record()).code).toBe(0);
+    expect(seen).toBe(build);
+  });
+
+  test.each(["../outside", "/etc"])("refuses %s, outside the repository", async (storybookDir) => {
+    await config({ storybookDir });
+    const { code, json } = await h.cli("record");
+    expect(code).toBe(2);
+    expect(json.error.code).toBe("bad-config");
+  });
+
+  test.each(["buildCommand", "build-command", "build"])("has no %s, since a checkout must not run a shell", async (key) => {
+    await config({ [key]: "touch pwned" });
+    const { code, json } = await h.cli("record");
+    expect(code).toBe(2);
+    expect(json.error.code).toBe("bad-config");
+  });
+});
+
 describe("selfie review --baseline", () => {
   describe("with a run, which is how to look for flakiness", () => {
     test("exits 0 when two renders match", async () => {
@@ -119,7 +265,7 @@ describe("selfie review --baseline", () => {
       const { code, json } = await h.cli("review", two.json.runId, "--baseline", one.json.runId);
       expect(code).toBe(0);
       expect(json.differences).toEqual([]);
-      expect(json.baseline).toMatchObject({ sha: null, run: one.json.runId, given: true });
+      expect(json.comparedWith).toEqual({ source: "given", sha: null, run: one.json.runId });
     });
 
     test("exits 1 when they differ, even if both images are approved", async () => {
@@ -148,7 +294,7 @@ describe("selfie review --baseline", () => {
       const against = await h.cli("review", two.json.runId, "--baseline", one.json.runId);
       expect(against.json.differences[0].current).toContain(path.join("against", one.json.runId));
       expect(await readFile(cache, "utf8")).toBe(before);
-      expect((await h.cli("review", two.json.runId)).json.baseline).toMatchObject({ sha: null, given: false });
+      expect((await h.cli("review", two.json.runId)).json.comparedWith).toMatchObject({ source: "baseline", sha: null });
 
       // Nothing is approved, and comparing with a run holding the same image doesn't change that.
       const same = await h.cli("review", two.json.runId, "--baseline", two.json.runId);
@@ -168,7 +314,7 @@ describe("selfie review --baseline", () => {
 
       const { code, json } = await h.cli("review", two.json.runId, "--baseline", "HEAD~1");
       expect(code).toBe(1);
-      expect(json.baseline).toMatchObject({ sha: one.json.gitSha, run: null, given: true });
+      expect(json.comparedWith).toEqual({ source: "given", sha: one.json.gitSha, run: null });
       expect(json.differences.map(({ story }: any) => story)).toEqual(["a--one"]);
     });
 

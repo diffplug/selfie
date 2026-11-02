@@ -26,8 +26,9 @@ const USAGE = `Usage: selfie <command>
       exact build, and records one only if there's none yet, so call record first to render
       again. --baseline compares with those goldens or that run for this review alone, and is
       how to look for flakiness: record twice, then review the second --baseline the first.
-      Exits 0 if nothing blocks it, 1 if something does or anything differs from a --baseline,
-      2 if the review couldn't run. Play errors are advisories, and don't change the exit code.
+      If the default branch has no goldens yet, it compares with the nearest on this branch and
+      says so, which accept doesn't rely on. Exits 0 if nothing blocks it, 1 if something does or
+      anything differs from a --baseline, 2 if the review couldn't run. Play errors are advisories, and don't change the exit code.
 
   approve <run> (--all | --story <pattern>...) [--actor <who>]
   reject <run> (--all | --story <pattern>...) [--actor <who>]
@@ -47,8 +48,9 @@ const USAGE = `Usage: selfie <command>
       browser by itself.
 
 Local data lives under ~/.config/selfie/<git-origin-slugified>/, or $SELFIE_HOME instead of
-~/.config/selfie. A project configures Selfie in selfie.config.json at its Git top level. A
-story pattern matches IDs, where * matches any run of characters.
+~/.config/selfie. A project configures Selfie in selfie.config.json at its Git top level:
+environment, initScript, and storybookDir, which --storybook-dir overrides. A build command
+is never read from a file. A story pattern matches IDs, where * matches any run of characters.
 `;
 
 /** What a command reaches the outside through, so tests can supply their own. */
@@ -111,7 +113,7 @@ const BUILD_OPTIONS = {
 
 function recordOptions(values: ReturnType<typeof parse<typeof BUILD_OPTIONS>>["values"], context: Context) {
   return {
-    storybookDir: values["storybook-dir"] ?? "storybook-static",
+    storybookDir: values["storybook-dir"],
     buildCommand: values["build-command"],
     native: values.native,
     stories: values.story,
@@ -210,7 +212,7 @@ async function dispatch(command: string | undefined, args: string[], context: Co
           context.stderr(`Not accepted:\n${reasons}\n`);
         } else if (!result.usableAsBaseline) {
           context.stderr(
-            `Accepted, but ${document.gitSha} isn't on the default branch's first-parent history, so later reviews won't read these goldens.\n`,
+            `Accepted. ${document.gitSha} isn't on the default branch's first-parent history, so only later reviews on this branch will compare with these goldens.\n`,
           );
         }
         printJson(context, document);

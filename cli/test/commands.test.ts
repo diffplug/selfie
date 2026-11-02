@@ -42,7 +42,8 @@ describe("a first review, with no baseline", () => {
     const { code, json, stderr } = await review();
     expect(code).toBe(1);
     expect(json.schemaVersion).toBe(1);
-    expect(json.baseline).toEqual({ sha: null, run: null, given: false, reason: "no-goldens", message: expect.any(String) });
+    expect(json.baseline).toEqual({ sha: null, reason: "no-goldens", message: expect.any(String) });
+    expect(json.comparedWith).toEqual({ source: "baseline", sha: null, run: null });
     expect(json.gitSha).toBe(git(h.repo, "rev-parse", "HEAD"));
     expect(json.dirtyPaths).toEqual([]);
     expect(json.environment).toMatch(/^container-linux-arm64-/);
@@ -108,19 +109,17 @@ describe("a first review, with no baseline", () => {
     expect(json.next.join(" ")).not.toContain("merge-base");
   });
 
-  test("on a feature branch, the next step is to make a baseline at the merge-base", async () => {
-    const mergeBase = git(h.repo, "rev-parse", "HEAD");
+  test("on a feature branch, says how to make a baseline, and that accepting here still helps", async () => {
     git(h.repo, "switch", "--quiet", "-c", "feature");
     await commit(h.repo, "on feature");
     const { json } = await review();
     const next = json.next.join(" ");
-    expect(next).toContain(mergeBase);
-    expect(next).toContain("on main");
-    expect(next).toContain("aren't read by later reviews");
-    expect(next).not.toContain("selfie accept " + json.runId);
+    expect(next).toContain("accept on main");
+    expect(next).toContain("only show later reviews here what changed");
+    expect(next).toContain("selfie accept " + json.runId);
   });
 
-  test("accept says a feature branch's goldens won't be read by later reviews", async () => {
+  test("accept says a feature branch's goldens are only for later reviews there", async () => {
     git(h.repo, "switch", "--quiet", "-c", "feature");
     await commit(h.repo, "on feature");
     const { json } = await review();
@@ -128,7 +127,7 @@ describe("a first review, with no baseline", () => {
     const accepted = await h.cli("accept", json.runId);
     expect(accepted.code).toBe(0);
     expect(accepted.json).toMatchObject({ accepted: true, usableAsBaseline: false });
-    expect(accepted.stderr).toContain("won't read these goldens");
+    expect(accepted.stderr).toContain("only later reviews on this branch will compare with these goldens");
     expect((await h.cli("find-baseline")).json.sha).toBeNull();
   });
 });

@@ -11,6 +11,7 @@
     "build:ui": "pnpm --filter selfie-ui build",
     "selfie": "node --disable-warning=ExperimentalWarning cli/src/main.ts",
     "selfie:storybook": "pnpm --filter selfie-ui build-storybook",
+    "selfie:review": "pnpm selfie:storybook >&2 && pnpm --silent selfie review",
     "test": "pnpm -r test",
     "test:d1": "pnpm --filter selfie-store test:d1",
     "test:d1:workerd": "pnpm --filter selfie-store test:d1:workerd",

@@ -17,12 +17,19 @@ export function ActionFailure({ state }: { readonly state: RunState }) {
 }
 
 /** Whether later reviews could compare with these images, and what this one compared them with. */
-export function RunNotes({ view: { run, usableAsBaseline } }: { readonly view: RunView }) {
+export function RunNotes({ view: { run, usableAsBaseline, branchGoldens } }: { readonly view: RunView }) {
   // Git says why there's no baseline, and only a run without one needs to ask.
-  const noBaseline = run.baselineSha === null;
+  const noBaseline = run.baselineSha === null && branchGoldens === null;
   const { data: baseline } = useFetched(noBaseline ? run.id : null, (signal) => fetchBaseline(run.id, signal));
   return (
     <>
+      {branchGoldens !== null && (
+        <Banner
+          variant="info"
+          title="Compared with this branch's goldens"
+          description={`The default branch has no goldens, so this shows what changed since ${shortSha(branchGoldens)}, the nearest on this branch. That's only to look at: accepting still needs every image approved, including the ones that match.`}
+        />
+      )}
       {noBaseline && (
         <Banner
           variant="info"
@@ -33,8 +40,8 @@ export function RunNotes({ view: { run, usableAsBaseline } }: { readonly view: R
       {!usableAsBaseline && (
         <Banner
           variant="warning"
-          title="This commit can't be a baseline"
-          description={`${shortSha(run.gitSha)} isn't on the default branch's first-parent history. It can be accepted, but later reviews won't read its goldens. To make a baseline, review and accept on the default branch.`}
+          title="This commit won't be a baseline"
+          description={`${shortSha(run.gitSha)} isn't on the default branch's first-parent history. It can be accepted, and later reviews on this branch will compare with it, but only goldens on the default branch are a baseline. To make one, review and accept on the default branch.`}
         />
       )}
     </>

@@ -196,6 +196,23 @@ export async function walkToBaseline(
   };
 }
 
+/**
+ * The nearest commit from this one back to, but not including, its merge-base with the default
+ * branch, on first-parent history, for which `firstWithGoldens` answers. Null on the default branch.
+ */
+export async function nearestOnBranch(
+  repo: Repo,
+  sha: string,
+  firstWithGoldens: (shas: readonly string[]) => Promise<string | null>,
+): Promise<string | null> {
+  const ref = await defaultBranchRef(repo);
+  if (ref === null) return null;
+  const mergeBase = await ask(repo.root, ["merge-base", sha, ref]);
+  if (mergeBase === null) return null;
+  const commits = await firstParentHistory(repo, `${mergeBase}..${sha}`, MAX_COMMITS);
+  return commits.length === 0 ? null : firstWithGoldens(commits);
+}
+
 /** Whether a later review could find goldens at this SHA: it is on the default branch's first-parent history. */
 export async function isOnBaselineHistory(repo: Repo, sha: string): Promise<boolean> {
   const history = await firstParentHistory(repo, (await defaultBranchRef(repo)) ?? "HEAD", MAX_COMMITS);

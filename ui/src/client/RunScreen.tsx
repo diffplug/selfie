@@ -41,7 +41,7 @@ function Fact({ term, children }: { term: string; children: React.ReactNode }) {
 }
 
 function Facts({ view }: { view: RunView }) {
-  const { run, actor, siblings } = view;
+  const { run, actor, siblings, branchGoldens } = view;
   return (
     <dl className="selfie-facts">
       <Fact term="Commit">
@@ -59,6 +59,11 @@ function Facts({ view }: { view: RunView }) {
       <Fact term="Baseline">
         {run.baselineSha === null ? "None" : <code title={run.baselineSha}>{shortSha(run.baselineSha)}</code>}
       </Fact>
+      {branchGoldens !== null && (
+        <Fact term="Compared with">
+          <code title={branchGoldens}>{shortSha(branchGoldens)}</code>, on this branch
+        </Fact>
+      )}
       <Fact term="Environment">
         <code>{run.environment}</code>
       </Fact>

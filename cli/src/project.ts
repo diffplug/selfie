@@ -9,7 +9,7 @@ import { SqliteAdapter } from "selfie-store/adapters/sqlite";
 import { Blobs, initStoreSchema, Snapshots, Sql, Store, type CompareOptions, type Comparison, type Run } from "selfie-store";
 import type { PixelDiff } from "./diff.ts";
 import { SelfieError } from "./errors.ts";
-import { openRepo, walkToBaseline, type BaselineSearch, type Repo } from "./git.ts";
+import { nearestOnBranch, openRepo, walkToBaseline, type BaselineSearch, type Repo } from "./git.ts";
 import { assertRunId, isRunId, projectSlug, selfieHome } from "./paths.ts";
 
 /** How many runs keep their exported images. Older ones are deleted by the next review. */
@@ -108,6 +108,16 @@ export async function requireRun(project: Project, runId: string): Promise<Run> 
   const run = await project.snapshots.getRun(runId);
   if (run === null) throw new SelfieError("unknown-run", `No run ${runId} in this project's local store.`);
   return run;
+}
+
+/**
+ * What a person should see a run with no baseline against: the nearest goldens on its branch, if
+ * it has any. Only to look at. They're never its baseline, so deciding and accepting use
+ * `compareAsReviewed`.
+ */
+export async function branchGoldens(project: Project, run: Run): Promise<string | null> {
+  if (run.baselineSha !== null) return null;
+  return nearestOnBranch(project.repo, run.gitSha, (shas) => project.snapshots.firstWithGoldens(shas, run.environment));
 }
 
 export const runDirectory = (project: Project, runId: string) => path.join(project.directory, "runs", runId);
