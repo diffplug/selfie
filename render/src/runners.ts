@@ -51,10 +51,13 @@ export async function prepareRunner(runner: RenderEnvironment["runner"]): Promis
   } catch (error) {
     throw new RenderError(`Docker is unavailable: ${(error as Error).message}`);
   }
-  // With --platform, so a multi-platform digest answers for the platform asked for rather than
-  // the host's, and a digest for another platform is refused.
-  const inspect = () =>
-    docker(["image", "inspect", "--platform", runner.platform, runner.image], DOCKER_QUERY_TIMEOUT_MS);
+  // Not `image inspect --platform`: Docker 28 has no such flag, and where it exists it exits 0
+  // for a platform with no content. Without it, a multi-platform digest answers for the host.
+  const inspect = async () => {
+    const format = "{{.Os}}/{{.Architecture}}";
+    const found = (await docker(["image", "inspect", "--format", format, runner.image], DOCKER_QUERY_TIMEOUT_MS)).trim();
+    if (found !== runner.platform) throw new Error(`The image is for ${found}. Use the digest for ${runner.platform}.`);
+  };
   try {
     await inspect();
   } catch {

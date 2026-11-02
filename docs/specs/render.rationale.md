@@ -24,6 +24,8 @@ With the flag, 7 full runs of all 541 stories, across the settle times, quiet pe
 
 ## Capture
 
+**One image check, without `--platform`.** GitHub's arm64 runners have Docker 28.0.4, which rejects `docker image inspect --platform` with `unknown flag: --platform`. On Docker 29.9.2 with the containerd store, that flag also exits 0 for a platform with no content, printing an empty OS and architecture. Plain `inspect` reported the right platform for the default arm64 digest on 28.0.4 and 29.9.2, and for an amd64 digest on an arm64 host on 29.9.2. A multi-platform tag on 29.9.2 answered for the host instead, which is why a multi-platform digest for another platform is refused.
+
 **Container isolation doesn't change pixels.** On the 30-story sample with its freeze, before the raster flag, this package's PNGs were byte-identical on 30 of 30 to an earlier experiment's. The experiment ran as root with `--ipc=host`, a writable root, Docker's default capabilities, no request blocking, a static server, and one story at a time.
 
 **`route.fulfill` instead of a server.** PNGs stayed byte-identical on 30 of 30 sample stories when the static server was replaced. It removes the server, the port, and the MIME table, and a fixed origin keeps a story that reads its location the same in both runners.
