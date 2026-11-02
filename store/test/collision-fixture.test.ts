@@ -3,8 +3,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { encodePam, sha256, Store, toHex, truncateHash, type RawImage } from "../src/core/index.ts";
 import { createTempStore } from "./support/temp-store.ts";
 
-// Real images from scripts/find-collision.ts. Nothing about them is trusted: only
-// the image bytes are committed, and both hashes are computed here.
+// Real opaque images from scripts/find-collision.ts. Nothing about them is trusted:
+// only the image bytes are committed, and both hashes are computed here.
 
 function readFixture(name: string): { file: Uint8Array; image: RawImage } {
   const url = new URL(`./fixtures/collision-53bit/${name}`, import.meta.url);
@@ -12,14 +12,13 @@ function readFixture(name: string): { file: Uint8Array; image: RawImage } {
   const end = "ENDHDR\n";
   const header = new TextDecoder("latin1").decode(file).split(end)[0]! + end;
   const dimension = (field: string) => Number(new RegExp(`^${field} (\\d+)$`, "m").exec(header)?.[1]);
-  return {
-    file,
-    image: {
-      width: dimension("WIDTH"),
-      height: dimension("HEIGHT"),
-      pixels: file.subarray(header.length),
-    },
-  };
+  const rgb = file.subarray(header.length);
+  const pixels = new Uint8Array((rgb.length / 3) * 4);
+  for (let i = 0; i < rgb.length / 3; i++) {
+    pixels.set(rgb.subarray(i * 3, i * 3 + 3), i * 4);
+    pixels[i * 4 + 3] = 255;
+  }
+  return { file, image: { width: dimension("WIDTH"), height: dimension("HEIGHT"), pixels } };
 }
 
 describe("committed 53-bit collision", () => {

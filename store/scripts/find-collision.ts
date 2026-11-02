@@ -42,18 +42,19 @@ function pixelsFor(x: number): Uint8Array {
   for (let i = 0; i < pixels.length; i++) {
     pixels[i] = i % 4 === 3 ? 255 : i * 3;
   }
-  writeSeed(pixels, 0, x);
+  writeSeed(pixels, 0, x, RGBA_SEED_OFFSETS);
   return pixels;
 }
 
-// Skips each pixel's alpha, at offsets 3 and 7.
-const SEED_OFFSETS = [0, 1, 2, 4, 5, 6, 8] as const;
+// The same seven channels, as laid out in RGBA pixels and in an opaque image's PAM.
+const RGBA_SEED_OFFSETS = [0, 1, 2, 4, 5, 6, 8] as const;
+const RGB_SEED_OFFSETS = [0, 1, 2, 3, 4, 5, 6] as const;
 
-function writeSeed(bytes: Uint8Array, base: number, x: number): void {
+function writeSeed(bytes: Uint8Array, base: number, x: number, offsets: readonly number[]): void {
   const high = Math.floor(x / TWO_32);
   const low = x >>> 0;
   const seed = [high >>> 16, high >>> 8, high, low >>> 24, low >>> 16, low >>> 8, low];
-  SEED_OFFSETS.forEach((offset, i) => {
+  offsets.forEach((offset, i) => {
     bytes[base + offset] = seed[i]! & 255;
   });
 }
@@ -64,9 +65,9 @@ function createStep(): (x: number) => number {
     height: IMAGE_SIZE,
     pixels: pixelsFor(0),
   });
-  const pixelStart = pam.length - IMAGE_SIZE * IMAGE_SIZE * 4;
+  const pixelStart = pam.length - IMAGE_SIZE * IMAGE_SIZE * 3;
   return (x) => {
-    writeSeed(pam, pixelStart, x);
+    writeSeed(pam, pixelStart, x, RGB_SEED_OFFSETS);
     return truncateHash(hash("sha256", pam, "buffer"));
   };
 }

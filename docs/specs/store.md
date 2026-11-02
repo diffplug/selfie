@@ -9,7 +9,8 @@
 
 Source of truth: `store/src/core/pam.ts`, `store/src/core/image-hash.ts`.
 
-- **Must compute the image hash over a complete PAM file, header included, with one canonical header form**, so identical bytes at 100×200 and 200×100 are different images, and one set of pixels has one hash. The form is `P7\nWIDTH <w>\nHEIGHT <h>\nDEPTH 4\nMAXVAL 255\nTUPLTYPE RGB_ALPHA\nENDHDR\n`, with `<w>` and `<h>` as plain decimals, followed by the pixels as RGBA row by row. The hash is SHA256, written as lowercase hex.
+- **Must compute the image hash over a complete PAM file, header included, with one canonical header form**, so identical bytes at 100×200 and 200×100 are different images, and one set of pixels has one hash. The form is `P7\nWIDTH <w>\nHEIGHT <h>\nDEPTH <d>\nMAXVAL 255\nTUPLTYPE <t>\nENDHDR\n`, with `<w>` and `<h>` as plain decimals, followed by the pixels row by row. The hash is SHA256, written as lowercase hex.
+- **Must encode an image as RGB when every alpha is 255, and as RGBA when any alpha is not**, so that nearly every screenshot drops a channel that holds nothing. RGB is `<d>` 3 and `<t>` `RGB`. RGBA is `<d>` 4 and `<t>` `RGB_ALPHA`, with every pixel's bytes unchanged, including the colors under a fully transparent pixel.
 - **Must take decoded RGBA pixels with a width and height, never an encoded file**, so the source encoding cannot reach the hash. Reserved: decoding is [Image decoding](#image-decoding).
 - **Must exchange images between stores by image hash, never by image key.** The store's API takes and returns image hashes; the key it returns is only for that store's own rows.
 
@@ -100,4 +101,4 @@ Source of truth: `store/src/adapters/r2.ts`; tests in `store/test/workerd/r2.wor
 ### Open questions
 
 - **Schema migrations.** How a schema change reaches every project database, and how the app treats a database still on the older schema.
-- **Stored encoding.** Whether R2 holds the hashed PAM or a compressed form that decodes back to it.
+- **Stored encoding.** Which lossless format stores images. It must decode to the exact pixels that were hashed, so it has to keep alpha for an image that isn't fully opaque.

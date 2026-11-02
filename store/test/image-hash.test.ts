@@ -5,11 +5,33 @@ const hashOf = async (width: number, height: number, pixels: Uint8Array) =>
   toHex(await sha256(encodePam({ width, height, pixels })));
 
 describe("encodePam", () => {
-  it("writes the one canonical header followed by the pixels", () => {
-    const pam = encodePam({ width: 1, height: 1, pixels: new Uint8Array([1, 2, 3, 4]) });
-    const header = "P7\nWIDTH 1\nHEIGHT 1\nDEPTH 4\nMAXVAL 255\nTUPLTYPE RGB_ALPHA\nENDHDR\n";
-    expect(new TextDecoder().decode(pam.subarray(0, header.length))).toBe(header);
-    expect([...pam.subarray(header.length)]).toEqual([1, 2, 3, 4]);
+  const pamOf = (header: string, body: readonly number[]) => [
+    ...new TextEncoder().encode(header),
+    ...body,
+  ];
+  const RGB_HEADER = "P7\nWIDTH 2\nHEIGHT 1\nDEPTH 3\nMAXVAL 255\nTUPLTYPE RGB\nENDHDR\n";
+  const RGBA_HEADER = "P7\nWIDTH 2\nHEIGHT 1\nDEPTH 4\nMAXVAL 255\nTUPLTYPE RGB_ALPHA\nENDHDR\n";
+
+  it("writes RGB when every alpha is 255", () => {
+    const pixels = new Uint8Array([1, 2, 3, 255, 4, 5, 6, 255]);
+    expect([...encodePam({ width: 2, height: 1, pixels })]).toEqual(
+      pamOf(RGB_HEADER, [1, 2, 3, 4, 5, 6]),
+    );
+  });
+
+  it.each([
+    ["the first pixel", [1, 2, 3, 254, 4, 5, 6, 255]],
+    ["only the last pixel", [1, 2, 3, 255, 4, 5, 6, 254]],
+    ["every pixel, fully transparent", [1, 2, 3, 0, 4, 5, 6, 0]],
+  ])("writes RGBA, unchanged, when alpha isn't 255 in %s", (_, values) => {
+    const pixels = new Uint8Array(values);
+    expect([...encodePam({ width: 2, height: 1, pixels })]).toEqual(pamOf(RGBA_HEADER, values));
+  });
+
+  it("leaves the caller's pixels alone", () => {
+    const pixels = new Uint8Array([1, 2, 3, 255]);
+    encodePam({ width: 1, height: 1, pixels });
+    expect([...pixels]).toEqual([1, 2, 3, 255]);
   });
 
   it.each([
@@ -36,6 +58,25 @@ describe("image hash", () => {
     expect(await hashOf(1, 1, new Uint8Array([1, 2, 3, 4]))).toBe(
       "64119739112e822d5739371ece5cd7adcea0d7728aff2b58bdbfbcd9bd209442",
     );
+    expect(await hashOf(1, 1, new Uint8Array([1, 2, 3, 255]))).toBe("ef9d806b3ac8115d59120d0e65b1c3d24912c36fccca9ef0f143443a2daf794a");
+  });
+
+  it("differs between an opaque image and the same colors nearly opaque", async () => {
+    expect(await hashOf(1, 1, new Uint8Array([1, 2, 3, 255]))).not.toBe(
+      await hashOf(1, 1, new Uint8Array([1, 2, 3, 254])),
+    );
+  });
+
+  it("keeps the colors under fully transparent pixels", async () => {
+    expect(await hashOf(1, 1, new Uint8Array([1, 2, 3, 0]))).not.toBe(
+      await hashOf(1, 1, new Uint8Array([9, 9, 9, 0])),
+    );
+  });
+
+  it("differs for opaque images of the same bytes at swapped dimensions", async () => {
+    const pixels = new Uint8Array(2 * 3 * 4).fill(255);
+    pixels[0] = 1;
+    expect(await hashOf(2, 3, pixels)).not.toBe(await hashOf(3, 2, pixels));
   });
 
   it("differs for the same bytes at swapped dimensions", async () => {
