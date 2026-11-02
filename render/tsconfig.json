@@ -1,18 +1,7 @@
 {
+  "extends": "../tsconfig.base.json",
   "compilerOptions": {
-    "target": "ES2023",
-    "lib": ["ES2023", "ESNext", "DOM"],
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
-    "types": ["node"],
-    "noEmit": true,
-    "strict": true,
-    "noUncheckedIndexedAccess": true,
-    "verbatimModuleSyntax": true,
-    "erasableSyntaxOnly": true,
-    "allowImportingTsExtensions": true,
-    "resolveJsonModule": true,
-    "skipLibCheck": true
+    "lib": ["ES2023", "ESNext", "DOM"]
   },
   "include": ["src", "test", "vitest.config.ts"]
 }

@@ -4,6 +4,18 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+catalogs:
+  default:
+    '@types/node':
+      specifier: ^26.6.6
+      version: 26.6.6
+    typescript:
+      specifier: ^7.0.2
+      version: 7.0.2
+    vitest:
+      specifier: ^5.0.5
+      version: 5.0.5
+
 importers:
 
   .: {}
@@ -15,13 +27,13 @@ importers:
         version: 1.63.0
     devDependencies:
       '@types/node':
-        specifier: ^26.6.6
+        specifier: 'catalog:'
         version: 26.6.6
       typescript:
-        specifier: ^7.0.2
+        specifier: 'catalog:'
         version: 7.0.2
       vitest:
-        specifier: ^5.0.5
+        specifier: 'catalog:'
         version: 5.0.5(@types/node@26.6.6)(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2))
 
   store:
@@ -33,13 +45,13 @@ importers:
         specifier: ^5.20261101.1
         version: 5.20261101.1
       '@types/node':
-        specifier: ^26.6.6
+        specifier: 'catalog:'
         version: 26.6.6
       typescript:
-        specifier: ^7.0.2
+        specifier: 'catalog:'
         version: 7.0.2
       vitest:
-        specifier: ^5.0.5
+        specifier: 'catalog:'
         version: 5.0.5(@types/node@26.6.6)(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2))
 
 packages:
