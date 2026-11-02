@@ -103,4 +103,4 @@ Source of truth: `store/src/adapters/r2.ts`; tests in `store/test/workerd/r2.wor
 ### Open questions
 
 - **Schema migrations.** How a schema change reaches every project database, and how the app treats a database still on the older schema.
-- **Stored encoding.** Which lossless format stores images. It must decode to the exact RGB pixels that were hashed, and stores no alpha.
+- **Stored encoding.** PNG is a stand-in, pending the lossless format comparison. Whatever stores images must decode to the exact RGB pixels that were hashed, with no alpha.
