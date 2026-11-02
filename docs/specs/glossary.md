@@ -8,6 +8,7 @@
 | **Image hash** | The full SHA256 that identifies an image in every store (`docs/specs/store.md`). |
 | **Image key** | A store's private integer for an image. Meaningless to any other store. |
 | **Snapshot** | A named test case bound to an image: which story was rendered, under which conditions, and what image resulted. |
+| **Environment** | What decides the pixels apart from the project's own input: the runner, its architecture, the browser and its flags, the viewport and scale, and the capture recipe (`docs/specs/system.md`). Its ID is part of a snapshot's name. |
 | **Run** | One recording of a set of snapshots against a Git sha. |
 | **Golden** | The snapshot accepted as correct for its name. |
 | **Baseline** | The Git sha a run is compared against: the nearest merge-base with a complete set of goldens. |

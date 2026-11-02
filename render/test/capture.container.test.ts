@@ -1,0 +1,284 @@
+// Real Chromium in the real pinned container, against a tiny Storybook-like fixture.
+// vitest.config.ts decides whether these run, and says why if they don't.
+import { execFile } from "node:child_process";
+import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
+import { afterAll, beforeAll, describe, expect, test } from "vitest";
+import { capture, type CaptureOptions } from "../src/capture.ts";
+import { type ContainerRunner, defineEnvironment, environmentId } from "../src/environment.ts";
+import type { Manifest, ManifestStory } from "../src/manifest.ts";
+
+const STORYBOOK = fileURLToPath(new URL("./fixtures/storybook", import.meta.url));
+const quiet = () => {};
+
+let scratch: string;
+let dirCounter = 0;
+const newOutDir = () => path.join(scratch, `out-${(dirCounter += 1)}`);
+
+const run = (options: Partial<CaptureOptions>, outDir = newOutDir()) =>
+  capture({ storybookDir: STORYBOOK, outDir, log: quiet, ...options });
+const story = (manifest: Manifest, id: string): ManifestStory => {
+  const found = manifest.stories.find((entry) => entry.id === id);
+  if (!found) throw new Error(`no story ${id}`);
+  return found;
+};
+
+function pngChunkTypes(png: Buffer): string[] {
+  const types: string[] = [];
+  for (let offset = 8; offset < png.length; offset += 12 + png.readUInt32BE(offset))
+    types.push(png.toString("latin1", offset + 4, offset + 8));
+  return types;
+}
+
+/** The selfie-render containers holding this output directory, so another run's don't count. */
+const containersFor = async (outDir: string) => {
+  const { stdout } = await promisify(execFile)("docker", [
+    "ps",
+    "--all",
+    "--no-trunc",
+    "--filter",
+    "label=selfie-render",
+    "--format",
+    "{{.Mounts}}",
+  ]);
+  return stdout
+    .split("\n")
+    .filter((mounts) => mounts.includes(outDir))
+    .join("\n");
+};
+
+beforeAll(async () => {
+  scratch = await mkdtemp(path.join(tmpdir(), "selfie-render-test-"));
+});
+afterAll(async () => {
+  await rm(scratch, { recursive: true, force: true });
+});
+
+describe.runIf(process.env.SELFIE_RENDER_CONTAINER === "1")("in the pinned container", () => {
+  describe("a full stability run", () => {
+    let outDir: string;
+    let manifest: Manifest;
+
+    beforeAll(async () => {
+      outDir = newOutDir();
+      manifest = await run({ stability: true, storyTimeoutMs: 5_000 }, outDir);
+    }, 120_000);
+
+    test("runs on the image it was told to, and records it", () => {
+      expect(manifest.environmentId).toBe(environmentId(defineEnvironment()));
+      expect(manifest.environment).toEqual(defineEnvironment());
+      expect(manifest.runtime).toMatchObject({ platform: "linux", arch: "arm64", playwright: "1.63.0" });
+      expect(manifest.settleMs).toBeGreaterThanOrEqual(0);
+    });
+
+    test("answers from the build, and 404s what's missing or outside it", () => {
+      const served = story(manifest, "basic--serving");
+      expect(served.errors.map((error) => error.message).join()).not.toContain("answered");
+      expect(served.status).toBe("ok");
+    });
+
+    test("reports a play failure as its own source, without failing the story", () => {
+      const played = story(manifest, "play--fails");
+      expect(played.status).toBe("ok");
+      expect(played.errors).toContainEqual({ source: "play", message: "this play function fails" });
+    });
+
+    test("captures every story and leaves out docs", () => {
+      expect(manifest.stories.map((entry) => entry.id)).not.toContain("guide--docs");
+      expect(manifest.totals.stories).toBe(13);
+    });
+
+    test("applies the page conditions before story code runs", () => {
+      const { status, errors } = story(manifest, "basic--environment");
+      expect(errors).toEqual([]);
+      expect(status).toBe("ok");
+    });
+
+    test("writes real PNGs of the viewport's size at the path the manifest names", async () => {
+      const { file, width, height, status } = story(manifest, "basic--detail");
+      expect({ status, width, height }).toEqual({ status: "ok", width: 1200, height: 900 });
+      const png = await readFile(path.join(outDir, file as string));
+      expect(png.subarray(1, 4).toString()).toBe("PNG");
+    });
+
+    test("reports a failed story and carries on", () => {
+      const thrown = story(manifest, "broken--throws");
+      expect(thrown).toMatchObject({ status: "failed", file: null, stability: "unchecked" });
+      expect(thrown.errors).toContainEqual({ source: "render", message: "this story always throws" });
+      expect(manifest.totals.failed).toBeLessThan(manifest.totals.stories);
+    });
+
+    test("bounds a story that never finishes", () => {
+      const hung = story(manifest, "broken--never-finishes");
+      expect(hung.status).toBe("failed");
+      expect(hung.errors.map((error) => error.source)).toContain("timeout");
+      expect(hung.durationMs).toBeLessThan(15_000);
+    });
+
+    test("bounds a story that blocks its main thread", () => {
+      const blocked = story(manifest, "broken--blocks-main-thread");
+      expect(blocked.status).toBe("failed");
+      expect(blocked.errors.map((error) => error.source)).toContain("timeout");
+      expect(blocked.durationMs).toBeLessThan(15_000);
+    });
+
+    test("blocks external requests and reports them without failing the story", () => {
+      const external = story(manifest, "basic--external-request");
+      expect(external.status).toBe("ok");
+      expect(external.errors.map((error) => error.message).join()).toContain("example.invalid");
+    });
+
+    test("stays stable through a CSS animation and the fixed Date", () => {
+      expect(story(manifest, "basic--animation").stability).toBe("stable");
+      expect(story(manifest, "basic--environment").stability).toBe("stable");
+    });
+
+    test("flags a story whose pixels differ, and keeps both images", async () => {
+      const random = story(manifest, "timers--always-random");
+      expect(random.stability).toBe("unstable");
+      const [first, second] = await Promise.all([
+        readFile(path.join(outDir, random.file as string)),
+        readFile(path.join(outDir, random.repeatFile as string)),
+      ]);
+      expect(first.equals(second)).toBe(false);
+    });
+
+    test("flags a story driven by a running timer", () => {
+      expect(story(manifest, "timers--ticking").stability).toBe("unstable");
+    });
+
+    test("sets the Selfie global before stories load, so a project can freeze with it", () => {
+      expect(story(manifest, "timers--frozen-by-selfie").stability).toBe("stable");
+    });
+
+    test("doesn't freeze a project's own timers by itself", () => {
+      expect(story(manifest, "timers--frozen-by-project").stability).toBe("unstable");
+    });
+
+    test("keeps second renders only for unstable stories", async () => {
+      const unstable = manifest.stories
+        .filter((entry) => entry.stability === "unstable")
+        .map((entry) => path.basename(entry.repeatFile as string));
+      expect((await readdir(path.join(outDir, "repeat"))).sort()).toEqual(unstable.sort());
+      expect((await readdir(outDir)).sort()).toEqual(["manifest.json", "repeat", "stories"]);
+    });
+
+    test("writes the manifest it returns", async () => {
+      expect(JSON.parse(await readFile(path.join(outDir, "manifest.json"), "utf8"))).toEqual(manifest);
+    });
+
+    test("removes its containers", async () => {
+      expect(await containersFor(outDir)).toBe("");
+    });
+  });
+
+  test("the PNG encoder is deterministic, so comparing bytes compares pixels", async () => {
+    const options = { stories: ["basic--detail", "timers--frozen-by-selfie"], concurrency: 2 };
+    const manifests = [await run(options), await run(options), await run(options)];
+    for (const id of options.stories) {
+      expect(new Set(manifests.map((manifest) => story(manifest, id).pngSha256)).size).toBe(1);
+    }
+    // A timestamp or text chunk would make equal pixels differ.
+    const outDir = newOutDir();
+    const manifest = await run({ stories: ["basic--detail"] }, outDir);
+    const png = await readFile(path.join(outDir, story(manifest, "basic--detail").file as string));
+    expect(pngChunkTypes(png).filter((type) => type !== "IDAT")).toEqual(["IHDR", "IEND"]);
+  });
+
+  test("a project's init script runs before story code", async () => {
+    const frozen = await run({
+      stories: ["timers--frozen-by-project"],
+      stability: true,
+      initScript: "window.__PROJECT_FREEZE__ = true;",
+    });
+    expect(story(frozen, "timers--frozen-by-project")).toMatchObject({ errors: [], stability: "stable" });
+    expect(frozen.totals).toEqual({ stories: 1, failed: 0, unstable: 0 });
+    expect(frozen.initScriptSha256).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  test("a digest for another platform is refused before the output is touched", async () => {
+    const outDir = newOutDir();
+    await run({ stories: ["basic--detail"] }, outDir);
+    const environment = defineEnvironment({
+      runner: { ...(defineEnvironment().runner as ContainerRunner), platform: "linux/s390x" },
+    });
+    await expect(run({ environment, stories: ["basic--detail"] }, outDir)).rejects.toThrow(/linux\/s390x/);
+    expect(await readdir(outDir)).toContain("manifest.json");
+  });
+
+  test("settling longer doesn't change the environment", async () => {
+    const manifest = await run({ stories: ["basic--detail"], settleMs: 1 });
+    expect(manifest.settleMs).toBe(1);
+    expect(manifest.environmentId).toBe(environmentId(defineEnvironment()));
+  });
+
+  test("viewport and scale reach the pixels", async () => {
+    const environment = defineEnvironment({ viewport: { width: 400, height: 300 }, scale: 2 });
+    const manifest = await run({ environment, stories: ["basic--detail"] });
+    expect(story(manifest, "basic--detail")).toMatchObject({ status: "ok", width: 800, height: 600 });
+    expect(manifest.environmentId).not.toBe(environmentId(defineEnvironment()));
+  });
+
+  test("an abort stops the run and removes its container", async () => {
+    const outDir = newOutDir();
+    const abort = new AbortController();
+    const running = run(
+      { stories: ["broken--never-finishes"], storyTimeoutMs: 60_000, signal: abort.signal },
+      outDir,
+    );
+    await expect.poll(() => containersFor(outDir), { timeout: 30_000 }).not.toBe("");
+    abort.abort();
+    await expect(running).rejects.toThrow("Capture aborted.");
+    await expect.poll(() => containersFor(outDir), { timeout: 30_000 }).toBe("");
+  });
+
+  test("a filter matching nothing is reported, and starts no container", async () => {
+    const manifest = await run({ stories: ["nope--*"] });
+    expect(manifest.totals.stories).toBe(0);
+    expect(manifest.runtime).toBeNull();
+    expect(manifest.warnings.join()).toContain("nope--*");
+  });
+});
+
+test("a build directory that isn't a Storybook is refused", async () => {
+  await expect(
+    capture({ storybookDir: path.join(STORYBOOK, "missing"), outDir: newOutDir(), log: quiet }),
+  ).rejects.toThrow(/index/);
+});
+
+test("a native runner warns, and its environment never names the container", async (context) => {
+  const lines: string[] = [];
+  const environment = defineEnvironment({ runner: { kind: "native" } });
+  let manifest: Manifest;
+  try {
+    manifest = await capture({
+      storybookDir: STORYBOOK,
+      outDir: newOutDir(),
+      environment,
+      stories: ["basic--detail"],
+      log: (line) => lines.push(line),
+    });
+  } catch (error) {
+    if (String(error).includes("Executable doesn't exist")) {
+      context.skip("Playwright's Chromium isn't installed on this machine.");
+    }
+    throw error;
+  }
+  expect(lines.join("\n")).toMatch(/won't match other machines/);
+  expect(manifest.warnings.join()).toMatch(/won't match other machines/);
+  expect(manifest.environmentId).toMatch(new RegExp(`^native-${process.platform}-${process.arch}-`));
+  expect(manifest.runtime).toMatchObject({ platform: process.platform, arch: process.arch });
+  expect(story(manifest, "basic--detail").status).toBe("ok");
+});
+
+test("a native environment from another machine is refused", async () => {
+  const environment = defineEnvironment({
+    runner: { kind: "native", os: "plan9", osRelease: "4", arch: "mips" },
+  });
+  await expect(
+    capture({ storybookDir: STORYBOOK, outDir: newOutDir(), environment, log: quiet }),
+  ).rejects.toThrow(/this machine/);
+});

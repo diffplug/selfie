@@ -1,9 +1,18 @@
 # System
 
-> Status: partly built — local approvals are built in `docs/specs/snapshots.md`; everything under `## Future` is design.
+> Status: partly built — rendering environments are built in `docs/specs/render.md`, and local approvals in `docs/specs/snapshots.md`; everything under `## Future` is design.
 >
 > - See `docs/specs/glossary.md` for vocabulary.
 > - Owns the staged build order and the behavior spanning the local app and the cloud. Image storage belongs to `docs/specs/store.md`.
+
+## Rendering environments
+
+Source of truth: `render/src/environment.ts`, `render/src/capture.ts`. `docs/specs/render.md` owns how the package does this.
+
+- **Must make the rendering environment configurable, and record it with every capture.** An environment is what decides the pixels apart from the project's own input: the container image digest or other runner, its CPU architecture, the browser and its flags, the viewport and scale, and the fixed capture recipe. Project input, such as story code, a settle time, or an init script, is not part of it (`docs/specs/render.md` → Environment).
+- **Must default to one pinned Linux arm64 container image**, the only setup measured to match across machines (rationale).
+- **Must make the environment part of a snapshot's name**, so images from different environments are never compared, and changing the environment starts new goldens rather than reporting every story as changed. `docs/specs/snapshots.md` → Snapshot names owns how, and a run records its environment.
+- **Must let a project freeze its own timers, and flag a story that renders differently twice in a row**, since browser options alone don't stop a blinking cursor (rationale).
 
 ## Approvals
 
@@ -15,18 +24,13 @@ Reserved: this is the local half of [carrying approvals through a push](#approva
 
 ## Future
 
+### Environment selection
+
+An agent skill could help a project test its own setup and find an environment that works for it.
+
 ### Opaque images only
 
 Selfie is for fully opaque images, and transparency is never allowed: `docs/specs/store.md` → Image identity owns the rule, and `docs/specs/store.md` → Image decoding what happens to an image with alpha.
-
-### Rendering environments
-
-- **Must make the rendering environment configurable, and record it with every run.** An environment is everything that decides the pixels: the container image digest or other runner, its CPU architecture, and the browser and its flags.
-- **Must default to one pinned Linux arm64 container image**, the only setup measured to match across machines (rationale).
-- **Must make the environment part of a snapshot's name**, so images from different environments are never compared, and changing the environment starts new goldens rather than reporting every story as changed.
-- **Must let a project freeze its own timers, and flag a story that renders differently twice in a row**, since browser options alone don't stop a blinking cursor (rationale).
-
-**Later:** an agent skill could help a project test its own setup and find an environment that works for it.
 
 ### Approvals across stores
 

@@ -1,0 +1,161 @@
+<!doctype html>
+<!-- Speaks just enough of Storybook's preview protocol for the capture worker: the render
+     phase on window.__STORYBOOK_PREVIEW__, and the error classes on body. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      body { margin: 0; font: 16px sans-serif; }
+      #storybook-root { padding: 16px; }
+      @keyframes slide { from { transform: translateX(0); } to { transform: translateX(400px); } }
+      .sliding { width: 100px; height: 100px; background: teal; animation: slide 700ms linear infinite; }
+    </style>
+  </head>
+  <body>
+    <div id="storybook-root"></div>
+    <div id="error-message"></div>
+    <script type="module">
+      const root = document.getElementById("storybook-root");
+
+      function randomColor() {
+        return `rgb(${[0, 0, 0].map(() => Math.floor(Math.random() * 256)).join(",")})`;
+      }
+
+      const stories = {
+        // Many glyphs, a gradient, and shapes, so a nondeterministic PNG encoder has something to show.
+        "basic--detail"() {
+          const canvas = document.createElement("canvas");
+          canvas.width = 600;
+          canvas.height = 300;
+          const ctx = canvas.getContext("2d");
+          const gradient = ctx.createLinearGradient(0, 0, 600, 300);
+          gradient.addColorStop(0, "#ff5500");
+          gradient.addColorStop(1, "#0055ff");
+          ctx.fillStyle = gradient;
+          ctx.fillRect(0, 0, 600, 300);
+          for (let i = 0; i < 200; i++) {
+            ctx.fillStyle = `hsl(${i * 7}, 70%, 50%)`;
+            ctx.beginPath();
+            ctx.arc((i * 37) % 600, (i * 53) % 300, 3 + (i % 11), 0, Math.PI * 2);
+            ctx.fill();
+          }
+          root.append(canvas);
+          const text = document.createElement("p");
+          text.textContent = "The quick brown fox jumps over the lazy dog. ".repeat(30);
+          root.append(text);
+        },
+        // Throws unless the page conditions and the Selfie global were in place before this ran.
+        "basic--environment"() {
+          const expected = {
+            selfieGlobal: true,
+            now: Date.parse("2026-01-15T12:00:00.000Z"),
+            timeZone: "UTC",
+            locale: "en-US",
+            innerWidth: 1200,
+            innerHeight: 900,
+            light: true,
+            reducedMotion: true,
+            loopback: "127.0.0.1",
+          };
+          const actual = {
+            selfieGlobal: window.__SELFIE_SNAPSHOT__,
+            now: Date.now(),
+            timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            locale: navigator.language,
+            innerWidth: window.innerWidth,
+            innerHeight: window.innerHeight,
+            light: matchMedia("(prefers-color-scheme: light)").matches,
+            reducedMotion: matchMedia("(prefers-reduced-motion: reduce)").matches,
+            loopback: location.hostname,
+          };
+          for (const key of Object.keys(expected)) {
+            if (actual[key] !== expected[key]) throw new Error(`${key} was ${actual[key]}, expected ${expected[key]}`);
+          }
+          root.textContent = new Date().toISOString();
+        },
+        "basic--animation"() {
+          root.innerHTML = '<div class="sliding"></div>';
+        },
+        async "basic--external-request"() {
+          await fetch("https://example.invalid/never").catch(() => {});
+          root.textContent = "rendered after a blocked request";
+        },
+        "timers--always-random"() {
+          document.body.style.background = randomColor();
+        },
+        "timers--ticking"() {
+          // A cycle of 1.1 s, which the repeat's extra settle can't land back on. Seven
+          // colors made 700 ms, and a 730 ms delay reads as the same color every time.
+          const colors = ["red", "orange", "yellow", "green", "blue", "indigo", "violet", "pink", "gray", "teal", "navy"];
+          let tick = 0;
+          setInterval(() => {
+            tick += 1;
+            document.body.style.background = colors[tick % colors.length];
+          }, 100);
+        },
+        "timers--frozen-by-selfie"() {
+          document.body.style.background = window.__SELFIE_SNAPSHOT__ ? "white" : randomColor();
+        },
+        "timers--frozen-by-project"() {
+          document.body.style.background = window.__PROJECT_FREEZE__ ? "white" : randomColor();
+        },
+        // Throws unless the build answers, and nothing outside it does.
+        async "basic--serving"() {
+          const statuses = {
+            "/index.json": 200,
+            "/missing.txt": 404,
+            "/%2e%2e%2fpackage.json": 404,
+            "/..%2f..%2f..%2f..%2fetc%2fpasswd": 404,
+          };
+          for (const [url, expected] of Object.entries(statuses)) {
+            const response = await fetch(url);
+            await response.text();
+            const { status } = response;
+            if (status !== expected) throw new Error(`${url} answered ${status}, expected ${expected}`);
+          }
+          root.textContent = "served";
+        },
+        // The way Storybook handles a failed play function under throwPlayFunctionExceptions:
+        // false, with `errored` held long enough that a waiter is sure to see it.
+        async "play--fails"() {
+          root.textContent = "rendered, then play failed";
+          render.phase = "playing";
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          channel.emit("playFunctionThrewException", { name: "Error", message: "this play function fails" });
+          render.phase = "errored";
+          await new Promise((resolve) => setTimeout(resolve, 300));
+          console.error(new Error("this play function fails"));
+        },
+        "broken--throws"() {
+          throw new Error("this story always throws");
+        },
+        "broken--never-finishes"() {
+          return new Promise(() => {});
+        },
+        "broken--blocks-main-thread"() {
+          setTimeout(() => {
+            for (;;);
+          }, 0);
+        },
+      };
+
+      const listeners = new Map();
+      const channel = {
+        on: (event, listener) => listeners.set(event, [...(listeners.get(event) ?? []), listener]),
+        emit: (event, payload) => (listeners.get(event) ?? []).forEach((listener) => listener(payload)),
+      };
+      globalThis.__STORYBOOK_ADDONS_CHANNEL__ = channel;
+
+      const render = { phase: "rendering" };
+      window.__STORYBOOK_PREVIEW__ = { currentRender: render };
+      try {
+        await stories[new URLSearchParams(location.search).get("id")]();
+        render.phase = "completed";
+      } catch (error) {
+        document.getElementById("error-message").textContent = error.message;
+        document.body.classList.add("sb-show-errordisplay");
+        render.phase = "errored";
+      }
+    </script>
+  </body>
+</html>
