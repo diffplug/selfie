@@ -1,24 +1,10 @@
 // Verdicts, computed from a comparison's facts, so a caller can recompute them after any decision.
 import { filterStories } from "selfie-render";
-import type { ComparedSnapshot, Comparison, SnapshotState } from "selfie-store";
+import { isDecidable, type ComparedSnapshot, type Comparison, type SnapshotState } from "selfie-store";
+import type { AdvisoryReason, Attention, BlockerReason } from "selfie-ui/app";
 
-export type BlockerReason =
-  | "failed"
-  | "changed-unapproved"
-  | "new-unapproved"
-  | "rejected"
-  | "removed"
-  | "pattern-unmatched";
-
-export type AdvisoryReason = "play-error" | "unstable";
-
-export interface Attention<Reason extends string> {
-  /** Null only for `pattern-unmatched`. */
-  readonly story: string | null;
-  readonly reason: Reason;
-  /** The fact behind it, if there's more than its name: a message, an actor, or a pattern. */
-  readonly detail: string | null;
-}
+export { isDecidable };
+export type { AdvisoryReason, Attention, BlockerReason };
 
 export interface RunSummary {
   /** What stops a reviewer calling this run good. */
@@ -45,9 +31,6 @@ export interface RunSummary {
   /** Goldens this run lacks only because its filter left them out. */
   readonly notRendered: readonly ComparedSnapshot[];
 }
-
-/** Whether a snapshot in this state has an image that can take a decision. */
-export const isDecidable = (state: SnapshotState) => state === "changed" || state === "new";
 
 export function summarizeRun({ run, snapshots, unchangedCount }: Comparison): RunSummary {
   const inState = (state: SnapshotState) => snapshots.filter((snapshot) => snapshot.state === state);

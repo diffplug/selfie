@@ -197,8 +197,11 @@ export function describeSnapshotContract(
         actor: "ned",
         snapshots: [{ story: "a", imageHash: hashOf(8) }],
       });
+      expect(await snapshots.acceptedRunAt(SHA_2, environment)).toBeNull();
       expect(await replayed.acceptRun(run.id, null, 0)).toBe(true);
       expect(await snapshots.hasCompleteGoldens(SHA_2, environment)).toBe(true);
+      expect(await snapshots.acceptedRunAt(SHA_2, environment)).toBe(run.id);
+      expect(await snapshots.acceptedRunAt(SHA_2, "another environment")).toBeNull();
     });
 
     it("keeps what a run was recorded against, and never accepts a dirty one", async () => {

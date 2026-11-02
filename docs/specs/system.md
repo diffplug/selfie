@@ -1,6 +1,6 @@
 # System
 
-> Status: partly built — rendering environments are built in `docs/specs/render.md`, local approvals in `docs/specs/snapshots.md`, and the local CLI in `docs/specs/cli.md`; everything under `## Future` is design.
+> Status: partly built — rendering environments are built in `docs/specs/render.md`, local approvals in `docs/specs/snapshots.md`, the local CLI in `docs/specs/cli.md`, and the local review UI in `docs/specs/ui.md`; everything under `## Future` is design.
 >
 > - See `docs/specs/glossary.md` for vocabulary.
 > - Owns the staged build order and the behavior spanning the local app and the cloud. Image storage belongs to `docs/specs/store.md`.
@@ -28,6 +28,14 @@ Source of truth: `cli/src/`. `docs/specs/cli.md` owns how it works.
 
 - **Must let an agent use the loop without a UI:** `selfie review` records snapshots locally and outputs JSON with image paths, and `selfie approve`, `reject`, and `accept` act on the run it names. Its exit codes tell an agent whether anything blocks. The same logic is a library, for the review UI.
 - **Must keep local data under `~/.config/selfie/<git-origin-slugified>/`.**
+
+## Local review
+
+Source of truth: `ui/src/`, `cli/src/ui.ts`. `docs/specs/ui.md` owns how it works, and `docs/specs/access.md` → Local review server who may reach it.
+
+- **Must let a person review a run in a browser, on their own machine:** `selfie ui` serves a Hono app using GitHub Primer, with approve, reject, and accept.
+- **Must keep what's specific to a platform behind one seam**, so [`cloud-deploy`](#build-order) can serve the same routes and screens from a Worker.
+- **Never render from the UI.** A person runs `selfie review` and looks at what it recorded.
 
 ## Future
 
@@ -57,9 +65,7 @@ Selfie is for fully opaque images, and transparency is never allowed: `docs/spec
 
 **Scope: store** — `docs/specs/store.md`.
 
-**Scope: local-review** — A review UI with approval, built as a Hono app running locally. The UI uses GitHub Primer.
-
-**Scope: cloud-deploy** — The same Hono app deployed at `hackathon.selfie.dev`, with accounts in Neon through pgstencil and Hyperdrive, per-project D1, and R2 ([Cloud data](#cloud-data)). Serves no image before `github-access`.
+**Scope: cloud-deploy** — The same Hono app ([Local review](#local-review)) deployed at `hackathon.selfie.dev`, with accounts in Neon through pgstencil and Hyperdrive, per-project D1, and R2 ([Cloud data](#cloud-data)). Serves no image before `github-access`.
 
 **Scope: github-access** — The GitHub App, sign-in, and access checks (`docs/specs/access.md`). Ships with `cloud-deploy`, since a deployed service needs them before it holds anyone's images.
 
@@ -73,4 +79,4 @@ Selfie is for fully opaque images, and transparency is never allowed: `docs/spec
 
 **Scope: customer-subdomains** — Possible future offer: a subdomain per customer. Independent of `platforms-upgrade`.
 
-**Scope: annotations** — Stretch, if we get to it: agents and humans annotate snapshots and their deltas. Not ordered against the scopes above beyond needing `local-review`.
+**Scope: annotations** — Stretch, if we get to it: agents and humans annotate snapshots and their deltas. Not ordered against the scopes above.

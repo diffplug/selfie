@@ -32,8 +32,10 @@ export function toHex(digest: Uint8Array): string {
 
 const IMAGE_HASH = /^[0-9a-f]{64}$/;
 
+export const isImageHash = (hash: string): boolean => IMAGE_HASH.test(hash);
+
 export function assertImageHash(hash: string): void {
-  if (!IMAGE_HASH.test(hash)) {
+  if (!isImageHash(hash)) {
     throw new RangeError(`Not an image hash: ${JSON.stringify(hash)}`);
   }
 }

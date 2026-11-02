@@ -1,28 +1,8 @@
-import type { RawImage } from "selfie-store";
+import { decodeImage, type RawImage } from "selfie-store";
+import type { BoundingBox, PixelDiff } from "selfie-ui/app";
+import { encodePng } from "./png.ts";
 
-export interface BoundingBox {
-  readonly x: number;
-  readonly y: number;
-  readonly width: number;
-  readonly height: number;
-}
-
-export type PixelDiff =
-  | {
-      readonly kind: "pixels";
-      readonly changedPixels: number;
-      readonly totalPixels: number;
-      /** Null only if the images are identical, which a `changed` snapshot never is. */
-      readonly boundingBox: BoundingBox | null;
-      /** The largest difference in any one channel of any pixel, 1 to 255. */
-      readonly maxChannelDelta: number;
-    }
-  | {
-      /** Nothing lines up, so there are no pixels to compare and no diff image. */
-      readonly kind: "size-differs";
-      readonly current: { readonly width: number; readonly height: number };
-      readonly golden: { readonly width: number; readonly height: number };
-    };
+export type { BoundingBox, PixelDiff };
 
 const HIGHLIGHT = [255, 0, 80] as const;
 // An unchanged pixel fades into gray from this level to white, so the page stays readable
@@ -55,6 +35,7 @@ export function diffImages(
   let minY = height;
   let maxX = -1;
   let maxY = -1;
+  let firstChanged: { x: number; y: number } | null = null;
   for (let y = 0, at = 0; y < height; y++) {
     for (let x = 0; x < width; x++, at += 3) {
       const red = a[at]!;
@@ -69,6 +50,7 @@ export function diffImages(
         out[at + 2] = faded;
       } else {
         changedPixels += 1;
+        firstChanged ??= { x, y };
         if (delta > maxChannelDelta) maxChannelDelta = delta;
         if (x < minX) minX = x;
         if (x > maxX) maxX = x;
@@ -87,8 +69,18 @@ export function diffImages(
       totalPixels: width * height,
       boundingBox:
         changedPixels === 0 ? null : { x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1 },
+      firstChanged,
       maxChannelDelta,
     },
     highlighted: { width, height, pixels: out },
   };
+}
+
+/** Two stored files compared: what `selfie review` exports, and what the review UI serves. */
+export async function diffFiles(
+  currentFile: Uint8Array,
+  goldenFile: Uint8Array,
+): Promise<{ readonly diff: PixelDiff; readonly png: Uint8Array | null }> {
+  const { diff, highlighted } = diffImages(await decodeImage(currentFile), await decodeImage(goldenFile));
+  return { diff, png: highlighted === null ? null : await encodePng(highlighted) };
 }

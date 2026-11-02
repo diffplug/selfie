@@ -8,6 +8,7 @@
     "node": ">=26"
   },
   "scripts": {
+    "build:ui": "pnpm --filter selfie-ui build",
     "test": "pnpm -r test",
     "test:d1": "pnpm --filter selfie-store test:d1",
     "test:d1:workerd": "pnpm --filter selfie-store test:d1:workerd",

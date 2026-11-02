@@ -16,7 +16,8 @@
   },
   "dependencies": {
     "selfie-render": "workspace:*",
-    "selfie-store": "workspace:*"
+    "selfie-store": "workspace:*",
+    "selfie-ui": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",

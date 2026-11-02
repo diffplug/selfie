@@ -1,0 +1,300 @@
+/* Layout only, and in Primer's tokens: components bring their own look, and modes come from these. */
+body {
+  margin: 0;
+  background: var(--bgColor-default);
+  color: var(--fgColor-default);
+  font-size: var(--text-body-size-medium);
+}
+
+.selfie-page {
+  min-height: 100vh;
+}
+
+.selfie-header {
+  padding: var(--base-size-8) var(--base-size-24);
+  border-bottom: var(--borderWidth-thin) solid var(--borderColor-default);
+  background: var(--bgColor-muted);
+}
+
+.selfie-brand {
+  font-size: var(--text-title-size-small);
+  margin: 0;
+}
+
+.selfie-main {
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: var(--base-size-16) var(--base-size-24);
+}
+
+.selfie-blank-action {
+  margin-top: var(--base-size-16);
+}
+
+.selfie-center {
+  display: flex;
+  justify-content: center;
+  padding: var(--base-size-40);
+}
+
+.selfie-main p {
+  margin: 0;
+}
+
+.selfie-muted {
+  color: var(--fgColor-muted);
+}
+
+.selfie-small {
+  font-size: var(--text-body-size-small);
+}
+
+.selfie-nowrap {
+  white-space: nowrap;
+}
+
+code {
+  font-family: var(--fontStack-monospace);
+  font-size: 0.9em;
+}
+
+.selfie-pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Facts and counts */
+.selfie-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--base-size-8) var(--base-size-32);
+  margin: 0;
+}
+
+.selfie-fact dt {
+  font-size: var(--text-body-size-small);
+  color: var(--fgColor-muted);
+}
+
+.selfie-fact dd {
+  margin: 0;
+}
+
+.selfie-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--base-size-8) var(--base-size-32);
+  padding: var(--base-size-12) var(--base-size-16);
+  border: var(--borderWidth-thin) solid var(--borderColor-default);
+  border-radius: var(--borderRadius-medium);
+}
+
+.selfie-count {
+  display: flex;
+  flex-direction: column;
+}
+
+.selfie-count-number {
+  padding: 0;
+  font-size: var(--text-title-size-medium);
+  font-weight: var(--text-title-weight-medium);
+  line-height: var(--text-title-lineHeight-medium);
+  text-align: left;
+}
+
+.selfie-inline-link {
+  font-size: inherit;
+}
+
+.selfie-count-label {
+  font-size: var(--text-body-size-small);
+  color: var(--fgColor-muted);
+}
+
+/* Sections */
+.selfie-attention {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: var(--borderWidth-thin) solid var(--borderColor-default);
+  border-radius: var(--borderRadius-medium);
+}
+
+.selfie-attention > li {
+  padding: var(--base-size-8) var(--base-size-16);
+}
+
+.selfie-attention > li + li {
+  border-top: var(--borderWidth-thin) solid var(--borderColor-muted);
+}
+
+.selfie-attention p {
+  margin: 0 0 var(--base-size-4);
+}
+
+.selfie-details summary {
+  cursor: pointer;
+  color: var(--fgColor-muted);
+  font-size: var(--text-body-size-small);
+}
+
+.selfie-story-list {
+  margin: var(--base-size-4) 0 0;
+  padding-left: var(--base-size-20);
+  overflow-wrap: anywhere;
+}
+
+.selfie-detail-text {
+  color: var(--fgColor-muted);
+  font-size: var(--text-body-size-small);
+  white-space: pre-wrap;
+  max-height: 8em;
+  overflow: auto;
+}
+
+/* The list */
+.selfie-bulk {
+  margin-left: auto;
+}
+
+.selfie-thumb {
+  display: block;
+  width: 64px;
+  height: 48px;
+  object-fit: contain;
+  object-position: top left;
+  border: var(--borderWidth-thin) solid var(--borderColor-muted);
+  border-radius: var(--borderRadius-small);
+  background: var(--bgColor-muted);
+}
+
+.selfie-story-link {
+  overflow-wrap: anywhere;
+}
+
+.selfie-bulk-facts {
+  margin: 0;
+  padding-left: var(--base-size-20);
+}
+
+.selfie-bulk-sample {
+  max-height: 200px;
+  overflow: auto;
+  padding: var(--base-size-8);
+  font-family: var(--fontStack-monospace);
+  font-size: var(--text-body-size-small);
+  background: var(--bgColor-muted);
+  border-radius: var(--borderRadius-small);
+  overflow-wrap: anywhere;
+}
+
+/* The detail */
+.selfie-story-title {
+  overflow-wrap: anywhere;
+}
+
+.selfie-panes {
+  display: grid;
+  gap: var(--base-size-12);
+  align-items: start;
+}
+
+.selfie-panes[data-count="1"] {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 900px;
+}
+
+.selfie-panes[data-count="2"] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.selfie-panes[data-count="3"] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.selfie-pane {
+  margin: 0;
+}
+
+.selfie-pane figcaption {
+  font-weight: var(--base-text-weight-semibold);
+  margin-bottom: var(--base-size-4);
+}
+
+.selfie-pane-button {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: var(--borderWidth-thin) solid var(--borderColor-default);
+  border-radius: var(--borderRadius-small);
+  background: var(--bgColor-muted);
+  cursor: zoom-in;
+}
+
+/* A tall story still fits on a screen with the buttons, and actual pixels shows the rest. */
+.selfie-pane-button img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: max(360px, calc(100vh - 290px));
+  object-fit: contain;
+  object-position: top left;
+}
+
+.selfie-pane-button:focus-visible,
+.selfie-viewport:focus-visible {
+  outline: var(--borderWidth-thick) solid var(--focus-outlineColor);
+  outline-offset: 1px;
+}
+
+.selfie-viewport {
+  overflow: auto;
+  /* Room for what's above it, so the whole viewport and the buttons fit on a screen together. */
+  height: max(360px, calc(100vh - 290px));
+  border: var(--borderWidth-thin) solid var(--borderColor-default);
+  border-radius: var(--borderRadius-small);
+  background: var(--bgColor-muted);
+}
+
+.selfie-stack {
+  position: relative;
+}
+
+/* One image pixel must stay one crisp block at every zoom and on every display. */
+.selfie-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: block;
+  max-width: none;
+  image-rendering: pixelated;
+}
+
+.selfie-outline {
+  position: absolute;
+  box-sizing: content-box;
+  margin: -3px 0 0 -3px;
+  /* Dashed, and in two tones, so it can't pass for part of a screenshot on any background. */
+  border: 2px dashed var(--fgColor-default);
+  outline: 1px solid var(--bgColor-default);
+  pointer-events: none;
+}
+
+.selfie-shortcuts {
+  margin: 0;
+}
+
+.selfie-shortcuts > div {
+  display: flex;
+  align-items: baseline;
+  gap: var(--base-size-12);
+  padding: var(--base-size-4) 0;
+}
+
+.selfie-shortcuts dt {
+  min-width: 2em;
+}
+
+.selfie-shortcuts dd {
+  margin: 0;
+}

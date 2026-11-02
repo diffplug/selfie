@@ -12,7 +12,6 @@ import {
 } from "selfie-render";
 import {
   chunks,
-  decodeImage,
   ImageDecodeError,
   type ComparedSnapshot,
   type Comparison,
@@ -21,11 +20,10 @@ import {
   type StoryFilter,
 } from "selfie-store";
 import { resolveCaptureSettings, type CaptureSettings } from "./config.ts";
-import { diffImages, type PixelDiff } from "./diff.ts";
+import { diffFiles, type PixelDiff } from "./diff.ts";
 import { SelfieError } from "./errors.ts";
 import { dirtyPaths, headSha, type BaselineSearch } from "./git.ts";
 import { regularFileInside, storyDirName } from "./paths.ts";
-import { encodePng } from "./png.ts";
 import {
   captureDirectory,
   findBaseline,
@@ -243,11 +241,11 @@ async function exportDifference(project: Project, runDir: string, snapshot: Comp
   let pixelDiff: PixelDiff | null = null;
   let diff: string | null = null;
   if (snapshot.state === "changed" && current !== null && golden !== null) {
-    const compared = diffImages(await decodeImage(current.bytes), await decodeImage(golden.bytes));
+    const compared = await diffFiles(current.bytes, golden.bytes);
     pixelDiff = compared.diff;
-    if (compared.highlighted !== null) {
+    if (compared.png !== null) {
       diff = path.join(directory, "diff.png");
-      await writeFile(diff, await encodePng(compared.highlighted));
+      await writeFile(diff, compared.png);
     }
   }
   return {

@@ -6,7 +6,7 @@ import { accept, decide } from "./decisions.ts";
 import { buildAcceptDocument, buildReviewDocument } from "./document.ts";
 import { SelfieError } from "./errors.ts";
 import { gitUserEmail } from "./git.ts";
-import { findBaseline, openProject, type Project } from "./project.ts";
+import { compareAsReviewed, findBaseline, openProject, type Project } from "./project.ts";
 import { review } from "./review.ts";
 import { summarizeRun } from "./summary.ts";
 
@@ -33,6 +33,11 @@ const USAGE = `Usage: selfie <command>
   find-baseline [--native]
       Prints the nearest SHA at or before the merge-base with complete goldens, or null.
 
+  ui [<run>] [--port <n>] [--native]
+      Serves the review UI on loopback until stopped, and prints its URL. Opens at this run, or
+      else the newest at HEAD. It shows what selfie review recorded, and never renders. Opens no
+      browser by itself.
+
 Local data lives under ~/.config/selfie/<git-origin-slugified>/, or $SELFIE_HOME instead of
 ~/.config/selfie. A project configures Selfie in selfie.config.json at its Git top level. A
 story pattern matches IDs, where * matches any run of characters.
@@ -48,9 +53,18 @@ interface Context {
   readonly stderr: (text: string) => void;
   readonly capture?: typeof capture;
   readonly signal?: AbortSignal;
+  /** Defaults to the built client in `selfie-ui`. */
+  readonly uiClientDir?: string;
 }
 
 const printJson = (context: Context, document: unknown) => context.stdout(`${JSON.stringify(document, null, 2)}\n`);
+
+/** Until the signal says to stop. */
+const stopped = (signal: AbortSignal | undefined) =>
+  new Promise<void>((resolve) => {
+    if (signal?.aborted) resolve();
+    signal?.addEventListener("abort", () => resolve(), { once: true });
+  });
 
 const parse = <Options extends NonNullable<ParseArgsConfig["options"]>>(args: string[], options: Options) => {
   try {
@@ -169,6 +183,40 @@ async function dispatch(command: string | undefined, args: string[], context: Co
       return withProject(context, async (project) => {
         const { environmentId } = await resolveCaptureSettings(project.repo, { native: values.native });
         printJson(context, { ...(await findBaseline(project, environmentId)), environment: environmentId });
+        return EXIT_OK;
+      });
+    }
+    case "ui": {
+      const { values, positionals } = parse(args, {
+        port: { type: "string", default: "0" },
+        native: { type: "boolean" },
+      });
+      const [runId, ...extra] = positionals;
+      if (extra.length > 0) throw new SelfieError("usage", "Expected at most one run ID.");
+      const port = Number(values.port);
+      if (!Number.isInteger(port) || port < 0 || port > 65_535) {
+        throw new SelfieError("usage", `--port must be a port number, got "${values.port}".`);
+      }
+      return withProject(context, async (project) => {
+        if (runId !== undefined) await compareAsReviewed(project, runId);
+        // Only here, so that no other command loads a web server.
+        const [{ serveLocal }, { localReviewSource }] = await Promise.all([import("selfie-ui/local"), import("./ui.ts")]);
+        const server = await serveLocal({
+          source: localReviewSource(project, { native: values.native }),
+          port,
+          ...(context.uiClientDir === undefined ? {} : { clientDir: context.uiClientDir }),
+        });
+        try {
+          printJson(context, {
+            url: runId === undefined ? server.url : `${server.url}runs/${runId}`,
+            port: server.port,
+            runId: runId ?? null,
+          });
+          context.stderr("Serving the review UI until this is stopped.\n");
+          await stopped(context.signal);
+        } finally {
+          await server.close();
+        }
         return EXIT_OK;
       });
     }

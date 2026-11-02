@@ -1,6 +1,6 @@
 # Snapshots
 
-> Status: built — the data layer for runs, comparisons, decisions, and goldens, on local SQLite and D1. `selfie review` calls it (`docs/specs/cli.md`), and the review UI comes next. See `## Future`.
+> Status: built — the data layer for runs, comparisons, decisions, and goldens, on local SQLite and D1. `selfie review` calls it (`docs/specs/cli.md`), and so does the review UI (`docs/specs/ui.md`). See `## Future`.
 >
 > - See `docs/specs/glossary.md` for snapshot, snapshot name, run, decision, golden, and baseline.
 > - Owns what a run holds, how a crash leaves one, snapshot states, decisions, and goldens. `docs/specs/system.md` owns why approvals carry through a push and why environments are part of a name. `docs/specs/store.md` owns image identity, image keys, and the `Sql` rules everything here obeys.
@@ -56,7 +56,7 @@ A run is one recording of a set of snapshots against one full Git SHA in one env
 Source of truth: `Snapshots.compareRun` in `store/src/core/snapshots.ts`.
 
 - **Must compare by image alone: the same hash is the same image.** Pixel diffs belong to `selfie review` (`docs/specs/cli.md` → Review).
-- **Must give each snapshot exactly one state:**
+- **Must give each snapshot exactly one state**, of which `changed` and `new` are the ones `isDecidable`, having an image to decide on:
 
 | State | The run has | The baseline's goldens have |
 |---|---|---|
@@ -82,7 +82,7 @@ A decision is an approval or a rejection, by an actor, at the time it is recorde
 
 ## Goldens
 
-Source of truth: `Snapshots.acceptRun`, `hasCompleteGoldens`, and `firstWithGoldens` in `store/src/core/snapshots.ts`.
+Source of truth: `Snapshots.acceptRun`, `hasCompleteGoldens`, `acceptedRunAt`, and `firstWithGoldens` in `store/src/core/snapshots.ts`.
 
 Goldens are per Git SHA and environment, and are the images of the one run accepted there. A reader finds them as `goldenHash` in `compareRun`.
 
@@ -91,7 +91,7 @@ Goldens are per Git SHA and environment, and are the images of the one run accep
 - **Must refuse a run recorded on a dirty tree with `run-dirty`**, since a SHA's goldens must describe that commit, and this holds for every caller (rationale).
 - **Must be told how many removed snapshots the reviewer saw, and must refuse a different number with `wrong-removed-count`**, so a filtered render or a discovery bug can't silently drop goldens. A removed snapshot needs no decision of its own, since no image is being accepted (rationale).
 - **Must check and write in one statement**, so nothing can change between them.
-- **Must let a later accepted run replace a SHA's goldens.**
+- **Must let a later accepted run replace a SHA's goldens.** `acceptedRunAt` says which run's they are now.
 - **May leave finding the SHA to the caller.** Nothing here runs Git. `selfie find-baseline` gives `firstWithGoldens` its merge-base candidates, nearest first (`docs/specs/cli.md` → find-baseline).
 - **Must answer `firstWithGoldens` in the order asked, with one query per 99 SHAs, and none after the group holding the answer**, so a walk of 1,000 commits costs at most about 10 requests, and usually one.
 
@@ -125,8 +125,6 @@ Source of truth: `store/src/core/snapshots.ts`; `store/test/snapshots.test.ts` m
 - **An ordering rule for decisions.** `decide` overwrites, which is only right with one store. Sync must restore a rule that lets two stores agree, such as latest by `decided_at` with a fixed tie-break, and needs no schema change, since each row already holds the time, actor, and decision. It also needs `decide` to take a decision's original time, and a decision on who to trust when clocks differ.
 - A way to list decisions to send.
 - Moving a golden set between stores: rows by name and image hash, under a run in the receiving store.
-
-**Scope: local-review** is defined in `docs/specs/system.md` → Build order.
 
 ### Storing only what changed
 

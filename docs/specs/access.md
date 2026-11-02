@@ -1,9 +1,21 @@
 # Access
 
-> Status: design — nothing here is implemented yet.
+> Status: partly built — the [local review server](#local-review-server) is built; everything under `## Future` is design.
 >
 > - See `docs/specs/glossary.md` for project, image, and store.
 > - Owns the GitHub App, who can see and change a project, and how images are served. Where account data lives belongs to `docs/specs/system.md` → Cloud data; how bytes are stored belongs to `docs/specs/store.md`.
+
+## Local review server
+
+Source of truth: `loopbackHosts` in `ui/src/server/local.ts`, and `sameOriginWrites` and `pageHeaders` in `ui/src/server/app.ts`, which any deployment keeps; tests in `cli/test/ui.test.ts`. `docs/specs/ui.md` owns the routes.
+
+There's no login on this server, since anyone who can reach loopback on the machine already has the store's files.
+
+- **Must listen only on loopback and check the `Host` header**, so a website the user visits can't read their snapshots through it, by pointing its own DNS name at `127.0.0.1` for one (rationale). The header must be `127.0.0.1:<port>` or `localhost:<port>`, with the port it is listening on, and anything else gets 403.
+- **Must refuse a request whose `Origin` isn't this server's**, whatever its method.
+- **Must require `Content-Type: application/json` and the header `X-Selfie-Request: review-ui` on anything but GET and HEAD**, so a form or a page on another site can't approve anything, and must send no CORS headers, so a page's own attempt fails its preflight (rationale).
+- **Must refuse to be framed and to be embedded**, with `frame-ancestors 'none'`, `X-Frame-Options: DENY`, and `Cross-Origin-Resource-Policy: same-origin`, so another site can't steer a click on Approve (rationale), on every response, refusals included. `Content-Security-Policy` is exactly `default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'none'`, through `hono/secure-headers`.
+- **Must serve an image only through the app, by a validated hash, with `Cache-Control: private`**, and never name a file path in a response. Reserved: [Serving images](#serving-images) holds the same for the cloud.
 
 ## Future
 
@@ -60,10 +72,6 @@ GitHub decides. Selfie keeps no member list of its own.
 - **Must fail a fork's pull request's snapshot check until a maintainer approves running the capture pass.** Nothing from the fork is stored before that.
 
 **Later:** a fork's pull request could keep its changed snapshots somewhere like Actions artifacts until a maintainer accepts them.
-
-### Local review server
-
-- **Must listen only on loopback and check the `Host` header**, so a website the user visits can't read their snapshots through it.
 
 ### Open questions
 

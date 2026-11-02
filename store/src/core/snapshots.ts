@@ -232,6 +232,9 @@ export interface Decision {
 
 export type SnapshotState = "unchanged" | "changed" | "new" | "removed" | "failed";
 
+/** Whether a snapshot in this state has an image that can take a decision. */
+export const isDecidable = (state: SnapshotState): boolean => state === "changed" || state === "new";
+
 export interface ComparedSnapshot {
   readonly story: string;
   readonly state: SnapshotState;
@@ -585,6 +588,18 @@ ON CONFLICT(environment, story, image_hash) DO UPDATE SET
       idempotent: true,
     });
     return rows.length > 0;
+  }
+
+  /** The ID of the run whose images are this SHA's goldens in this environment, or null. */
+  async acceptedRunAt(gitSha: string, environment: string): Promise<string | null> {
+    assertGitSha(gitSha);
+    const [row] = await this.#sql.run({
+      sql: `SELECT runs.id AS id FROM goldens JOIN runs ON runs.key = goldens.run_key
+WHERE goldens.git_sha = ?1 AND goldens.environment = ?2`,
+      params: [gitSha, environment],
+      idempotent: true,
+    });
+    return row === undefined ? null : (row.id as string);
   }
 
   /**

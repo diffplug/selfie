@@ -44,8 +44,9 @@ Selfie has the following commands:
 - review - records snapshots and shows the diff against the baseline, as one JSON document whose exit code says whether anything blocks. Recording only if necessary is still to come
 - approve, reject - decides on a run's changed snapshots, on a dirty tree if you like, so committing doesn't ask again
 - accept - makes a run's snapshots the goldens for its Git sha, on a clean tree
+- ui - serves a local review page in the browser, to look at a run's images, approve, reject, and accept. It shows what `review` recorded, and never renders
 
-An agent's loop is `selfie review`, then look at the diff images it names, then `selfie approve <run> --all`, commit, `selfie review`, and `selfie accept <run>`. A project sets its environment and init script in `selfie.config.json` at its Git top level. These work on local data for now: pushing and pulling goldens, and with them the cloud half of find-baseline, are still to come. See `docs/specs/cli.md`.
+An agent's loop is `selfie review`, then look at the diff images it names, then `selfie approve <run> --all`, commit, `selfie review`, and `selfie accept <run>`. A project sets its environment and init script in `selfie.config.json` at its Git top level. A person's loop is the same with `selfie ui` for the looking and deciding. These work on local data for now: pushing and pulling goldens, and with them the cloud half of find-baseline, are still to come. See `docs/specs/cli.md` and `docs/specs/ui.md`.
 
 ## Implementation details
 
@@ -54,6 +55,7 @@ An agent's loop is `selfie review`, then look at the diff images it names, then 
   - the db primary key of images is based on this SHA256, truncated to the safe range for positive javascript integers
   - images whose truncated hash collides are stored in the same table under monotonic negative integers
 - local app is built with SQLite, Typescript and Vite
+- local review UI is a Hono app with GitHub Primer, on loopback only
 - cloud server is implemented with Hono (typically Cloudflare Workers), Typescript and Vite, with user accounts in Neon Postgres (via pgstencil, connecting through Hyperdrive), snapshot metadata in a per-project Cloudflare D1 database, and image bytes in Cloudflare R2
 
 ## Third-party open source
@@ -61,6 +63,8 @@ An agent's loop is `selfie review`, then look at the diff images it names, then 
 - [Storybook](https://storybook.js.org) (MIT)
 - [Hono](https://hono.dev) (MIT)
 - [Vite](https://vite.dev) (MIT)
+- [GitHub Primer](https://primer.style) (MIT)
+- [React](https://react.dev) (MIT)
 - [SQLite](https://sqlite.org) (public domain)
 - [PostgreSQL](https://www.postgresql.org) (PostgreSQL License)
 - [pgstencil](https://github.com/diffplug/pgstencil) (MIT)
