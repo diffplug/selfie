@@ -29,3 +29,11 @@ export function toHex(digest: Uint8Array): string {
   }
   return hex;
 }
+
+const IMAGE_HASH = /^[0-9a-f]{64}$/;
+
+export function assertImageHash(hash: string): void {
+  if (!IMAGE_HASH.test(hash)) {
+    throw new RangeError(`Not an image hash: ${JSON.stringify(hash)}`);
+  }
+}

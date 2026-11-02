@@ -4,6 +4,7 @@ import { D1RestAdapter, D1RestError, type D1RestConfig } from "../src/adapters/d
 import {
   imageInsertStatement,
   initStoreSchema,
+  Snapshots,
   Sql,
   Store,
   type SqlRow,
@@ -382,6 +383,30 @@ describe("D1RestAdapter replay against a real SQL engine", () => {
     const store = new Store({ sql, blob: temp.blob });
     const { hash: imageHash, key } = await store.putImage(pngOf(image(1)));
     expect(await store.lookupKey(imageHash)).toBe(key);
-    expect(sent).toHaveLength(8);
+    // Twice each: the schema's 6 statements, and the put's lookup, insert, and lookup.
+    expect(sent).toHaveLength(18);
+  });
+
+  it("resends everything the snapshot model sends, so a lost response never fails it", async () => {
+    const { sql } = await losingResponses((request) => request % 2 === 0);
+    await initStoreSchema(sql);
+    await sql.run(imageInsertStatement(hashOf(1), 500));
+    const snapshots = new Snapshots({ sql });
+    const environment = "env";
+    const gitSha = "a".repeat(40);
+    const run = await snapshots.beginRun({ gitSha, environment });
+    await snapshots.recordSnapshots(run.id, [{ story: "a", imageHash: hashOf(1) }]);
+    expect(await snapshots.finishRun(run.id, 1)).toMatchObject({ status: "complete" });
+    await snapshots.decide({
+      environment,
+      decision: "approved",
+      actor: "ned",
+      snapshots: [{ story: "a", imageHash: hashOf(1) }],
+    });
+    expect(await snapshots.acceptRun(run.id, null, 0)).toBe(true);
+    expect(await snapshots.compareRun(run.id, gitSha, { includeUnchanged: true })).toMatchObject({
+      snapshots: [{ story: "a", state: "unchanged" }],
+    });
+    expect(await snapshots.hasCompleteGoldens(gitSha, environment)).toBe(true);
   });
 });
