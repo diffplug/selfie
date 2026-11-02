@@ -17,7 +17,7 @@ export function withParamMode(adapter: SqlAdapter, mode: ParamMode): SqlAdapter 
   return {
     execute: (statements) =>
       adapter.execute(
-        statements.map(({ sql, params = [] }) => ({ sql, params: params.map(String) })),
+        statements.map(({ params = [], ...rest }) => ({ ...rest, params: params.map(String) })),
       ),
   };
 }

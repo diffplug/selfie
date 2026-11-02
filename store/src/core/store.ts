@@ -30,12 +30,13 @@ const IMAGE_HASH = /^[0-9a-f]{64}$/;
 
 /** The insert statement for one image, given its hash and its truncated hash. */
 export function imageInsertStatement(hash: string, truncated: number): SqlStatement {
-  return { sql: INSERT_IMAGE, params: [truncated, hash] };
+  // Idempotent: a second run hits ON CONFLICT and returns the key the first assigned.
+  return { sql: INSERT_IMAGE, params: [truncated, hash], idempotent: true };
 }
 
 /** Creates the store's tables if they are missing. Safe to call concurrently. */
 export async function initStoreSchema(sql: Sql): Promise<void> {
-  await sql.run(CREATE_IMAGES_TABLE);
+  await sql.runStatement({ sql: CREATE_IMAGES_TABLE, idempotent: true });
 }
 
 export interface StoreOptions {
@@ -79,8 +80,7 @@ export class Store {
       await this.#blob.put(blobKey, pam);
     }
 
-    const { sql, params } = imageInsertStatement(hash, truncateHash(digest));
-    const [row] = await this.#sql.run(sql, params);
+    const [row] = await this.#sql.runStatement(imageInsertStatement(hash, truncateHash(digest)));
     const key = row?.key;
     if (typeof key !== "number" || !Number.isSafeInteger(key)) {
       throw new TypeError(`Image insert returned an invalid key: ${String(key)}`);
@@ -93,7 +93,11 @@ export class Store {
     assertImageHash(hash);
     // By the full hash, never by truncated value: a colliding image must not
     // resolve to the key of the image that claimed that value first.
-    const [row] = await this.#sql.run(SELECT_IMAGE_KEY, [hash]);
+    const [row] = await this.#sql.runStatement({
+      sql: SELECT_IMAGE_KEY,
+      params: [hash],
+      idempotent: true,
+    });
     return row === undefined ? null : (row.key as number);
   }
 

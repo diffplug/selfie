@@ -149,6 +149,36 @@ export function describeSqlContract(name: string, factory: SqlAdapterFactory): v
       });
     });
 
+    describe("statement shape", () => {
+      // Spelled out, not imported, for the same reason as LIMIT.
+      const BYTE_LIMIT = 100_000;
+      const ofBytes = (bytes: number) => `SELECT '${"x".repeat(bytes - "SELECT '' AS s".length)}' AS s`;
+
+      it("runs a statement however it ends, within what the interface allows", async () => {
+        const texts = [
+          "SELECT 1 AS n;",
+          "SELECT 1 AS n;\n  ",
+          "-- first\nSELECT 1 AS n /* c */ ;",
+          "SELECT 1 AS n -- c",
+        ];
+        const results = await sql.batch(texts.map((text) => ({ sql: text })));
+        expect(results).toEqual(texts.map(() => [{ n: 1 }]));
+      });
+
+      it("refuses a comment after the closing semicolon", async () => {
+        await expect(sql.run("SELECT 1; -- done\n")).rejects.toThrow(SqlInterfaceError);
+      });
+
+      it("allows a statement of exactly the byte limit", async () => {
+        const [row] = await sql.run(ofBytes(BYTE_LIMIT));
+        expect(String(row?.s).length).toBe(BYTE_LIMIT - "SELECT '' AS s".length);
+      });
+
+      it("refuses a statement over the byte limit", async () => {
+        await expect(sql.run(ofBytes(BYTE_LIMIT + 1))).rejects.toThrow(SqlInterfaceError);
+      });
+    });
+
     describe("image insert", () => {
       it("assigns the truncated value as the key when it is unclaimed", async () => {
         expect(await insert({ hash: hashOf(1), truncated: 12345 })).toBe(12345);

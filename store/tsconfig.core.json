@@ -1,10 +1,10 @@
-// Checks the store core with Web-standard types only and no Node types, so a
-// platform import or global in src/core fails typecheck.
+// Checks the store core and the D1 REST adapter with Web-standard types only and no
+// Node types, so a platform import or global in them fails typecheck.
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "lib": ["ES2023", "WebWorker"],
     "types": []
   },
-  "include": ["src/core"]
+  "include": ["src/core", "src/adapters/d1-rest.ts"]
 }

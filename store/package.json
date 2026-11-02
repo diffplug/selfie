@@ -6,11 +6,13 @@
   "type": "module",
   "exports": {
     ".": "./src/core/index.ts",
+    "./adapters/d1-rest": "./src/adapters/d1-rest.ts",
     "./adapters/sqlite": "./src/adapters/sqlite.ts",
     "./adapters/filesystem-blob": "./src/adapters/filesystem-blob.ts"
   },
   "scripts": {
     "test": "pnpm typecheck && vitest run",
+    "test:d1": "SELFIE_D1_CONTRACT=1 vitest run --silent=false test/d1-rest.real.test.ts",
     "typecheck": "tsc -p tsconfig.core.json && tsc -p tsconfig.json",
     "find-collision": "node scripts/find-collision.ts"
   },

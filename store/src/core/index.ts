@@ -3,6 +3,7 @@ export { sha256, toHex, truncateHash, type HashFunction } from "./image-hash.ts"
 export { encodePam, type RawImage } from "./pam.ts";
 export {
   MAX_BOUND_PARAMETERS,
+  MAX_STATEMENT_BYTES,
   Sql,
   SqlInterfaceError,
   type SqlAdapter,
