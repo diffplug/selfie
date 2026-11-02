@@ -48,7 +48,7 @@
 
 It takes 4 to 10 ms an image on average, 17 ms at worst, and a story's stats come to 1 to 2 KB. Those are three changes in two projects, all at 1×.
 
-**Why the account is checked.** Calling something moved can hide a change, so the claim isn't taken on trust. The current side is rebuilt from what was matched and compared with what's really there, and what the golden had that matched nothing counts too. Without that last part, deleting one block while moving another would read as nothing changed. That affected none of the three changes above, but it's the difference between a label that's usually right and one that can be relied on.
+**Why the account is checked.** Calling something moved can hide a change, so the claim isn't taken on trust. The current side is rebuilt from what was matched and compared with what's really there, and what the golden had that matched nothing counts too. Without that last part, deleting one block while moving another would read as nothing changed. Measured on the three changes above, it adds 175,318 changed pixels on Selfie's stories, 2,525 on the restyle, and 5,163 on the layout shift, and no story's label depends on it. It's the difference between a label that's usually right and one that can be relied on.
 
 **Why a region must gain from it.** Rebuilding a region that was restyled counts its pixels on both sides, so taking moves everywhere made the restyle above 18% worse than comparing in place, in a prototype. Comparing whichever is better fixes that, and a region compared in place gives up its blocks, since its pixels are already judged where they are.
 
