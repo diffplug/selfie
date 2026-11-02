@@ -1,16 +1,16 @@
 import type { HashFunction, RawImage } from "../../src/core/index.ts";
 
-/** An opaque 1×1 image whose red channel identifies it, as `collidingHash` expects. */
+/** A 1×1 image whose red channel identifies it, as `collidingHash` expects. */
 export const image = (id: number): RawImage => ({
   width: 1,
   height: 1,
-  pixels: new Uint8Array([id, 0, 0, 255]),
+  pixels: new Uint8Array([id, 0, 0]),
 });
 
 /**
  * Forces the first 53 bits of the hash to the value assigned to the image's id,
  * with the rest of the digest unique to the image. The id is the red channel,
- * which is the third-to-last byte of an opaque 1×1 PAM.
+ * which is the third-to-last byte of a 1×1 PAM.
  */
 export function collidingHash(truncatedById: Record<number, number>): HashFunction {
   return async (pam) => {

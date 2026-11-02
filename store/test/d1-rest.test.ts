@@ -378,7 +378,7 @@ describe("D1RestAdapter replay against a real SQL engine", () => {
     const { sql, sent } = await losingResponses((request) => request % 2 === 0);
     await initStoreSchema(sql);
     const store = new Store({ sql, blob: temp.blob });
-    const pixels = new Uint8Array([1, 2, 3, 255]);
+    const pixels = new Uint8Array([1, 2, 3]);
     const { hash: imageHash, key } = await store.putImage({ width: 1, height: 1, pixels });
     expect(await store.lookupKey(imageHash)).toBe(key);
     expect(sent).toHaveLength(6);

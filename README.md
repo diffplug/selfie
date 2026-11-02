@@ -43,6 +43,7 @@ Selfie has the following commands:
 
 ## Implementation details
 
+- image snapshots are fully opaque 8-bit RGB, and transparency is not supported
 - image snapshots are always referred to by the SHA256 hash of the snapshot pixel data in the PAM format
   - the db primary key of images is based on this SHA256, truncated to the safe range for positive javascript integers
   - images whose truncated hash collides are stored in the same table under monotonic negative integers

@@ -128,7 +128,7 @@ describe.skipIf(!ENABLED)("real D1 (opt-in: pnpm test:d1)", () => {
         const images = Array.from({ length: 205 }, (_, i) => ({
           width: 1,
           height: 1,
-          pixels: new Uint8Array([i & 255, i >> 8, 0, 255]),
+          pixels: new Uint8Array([i & 255, i >> 8, 0]),
         }));
         const before = harness.requests;
         const stored = await store.putImages(images);

@@ -9,9 +9,9 @@
 
 Source of truth: `store/src/core/pam.ts`, `store/src/core/image-hash.ts`.
 
-- **Must compute the image hash over a complete PAM file, header included, with one canonical header form**, so identical bytes at 100×200 and 200×100 are different images, and one set of pixels has one hash. The form is `P7\nWIDTH <w>\nHEIGHT <h>\nDEPTH <d>\nMAXVAL 255\nTUPLTYPE <t>\nENDHDR\n`, with `<w>` and `<h>` as plain decimals, followed by the pixels row by row. The hash is SHA256, written as lowercase hex.
-- **Must encode an image as RGB when every alpha is 255, and as RGBA when any alpha is not**, so that nearly every screenshot drops a channel that holds nothing. RGB is `<d>` 3 and `<t>` `RGB`. RGBA is `<d>` 4 and `<t>` `RGB_ALPHA`, with every pixel's bytes unchanged, including the colors under a fully transparent pixel.
-- **Must take decoded RGBA pixels with a width and height, never an encoded file**, so the source encoding cannot reach the hash. Reserved: decoding is [Image decoding](#image-decoding).
+- **Must handle only fully opaque images. Transparency is never allowed.** An image is 8-bit RGB with no alpha channel in every interface, hash, and stored form (rationale).
+- **Must compute the image hash over a complete PAM file, header included, with one canonical header form**, so identical bytes at 100×200 and 200×100 are different images, and one set of pixels has one hash. The form is `P7\nWIDTH <w>\nHEIGHT <h>\nDEPTH 3\nMAXVAL 255\nTUPLTYPE RGB\nENDHDR\n`, with `<w>` and `<h>` as plain decimals, followed by the pixels as RGB row by row. The hash is SHA256, written as lowercase hex.
+- **Must take decoded RGB pixels with a width and height, never an encoded file**, so the source encoding cannot reach the hash. Reserved: decoding is [Image decoding](#image-decoding).
 - **Must exchange images between stores by image hash, never by image key.** The store's API takes and returns image hashes; the key it returns is only for that store's own rows.
 
 ## Image keys
@@ -96,9 +96,11 @@ Source of truth: `store/src/adapters/r2.ts`; tests in `store/test/workerd/r2.wor
 
 ### Image decoding
 
-- **Must decode every source encoding of the same pixels to the same 8-bit RGBA**, so re-encoding a PNG does not create a new image.
+- **Must decode every source encoding of the same pixels to the same 8-bit RGB**, so re-encoding a PNG does not create a new image.
+- **Must drop an alpha channel whose every value is 255**, since such a source is fully opaque.
+- **Must refuse an image with any other alpha value, with a clear error, and never flatten it onto a background**, since flattening would give different images one hash.
 
 ### Open questions
 
 - **Schema migrations.** How a schema change reaches every project database, and how the app treats a database still on the older schema.
-- **Stored encoding.** Which lossless format stores images. It must decode to the exact pixels that were hashed, so it has to keep alpha for an image that isn't fully opaque.
+- **Stored encoding.** Which lossless format stores images. It must decode to the exact RGB pixels that were hashed, and stores no alpha.

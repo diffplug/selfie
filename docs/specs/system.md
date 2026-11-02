@@ -7,6 +7,10 @@
 
 ## Future
 
+### Opaque images only
+
+Selfie is for fully opaque images, and transparency is never allowed: `docs/specs/store.md` → Image identity owns the rule, and `docs/specs/store.md` → Image decoding what happens to an image with alpha.
+
 ### Approvals
 
 - **Must not make a user re-approve at push a snapshot change they already approved locally.** A user can approve changes on an unpushed PR, and those approvals carry through the push. The mechanism is undecided.
