@@ -209,7 +209,7 @@ describe("Store", () => {
       const images = Array.from({ length: 250 }, (_, i) => ({
         width: 1,
         height: 1,
-        pixels: new Uint8Array([i & 255, i >> 8, 0, 255]),
+        pixels: new Uint8Array([i & 255, i >> 8, 0]),
       }));
       const store = new Store({
         sql: new Sql({

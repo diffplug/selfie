@@ -34,27 +34,24 @@ interface Trail {
 }
 
 /**
- * An opaque 4×4 image. Its first seven color channels hold x, big-endian, so
- * different values of x always make different images. The rest is a fixed gradient.
+ * A 4×4 image. Its first seven channels hold x, big-endian, so different values of x
+ * always make different images. The rest is a fixed gradient.
  */
 function pixelsFor(x: number): Uint8Array {
-  const pixels = new Uint8Array(IMAGE_SIZE * IMAGE_SIZE * 4);
+  const pixels = new Uint8Array(IMAGE_SIZE * IMAGE_SIZE * 3);
   for (let i = 0; i < pixels.length; i++) {
-    pixels[i] = i % 4 === 3 ? 255 : i * 3;
+    pixels[i] = i * 3;
   }
   writeSeed(pixels, 0, x);
   return pixels;
 }
 
-// Skips each pixel's alpha, at offsets 3 and 7.
-const SEED_OFFSETS = [0, 1, 2, 4, 5, 6, 8] as const;
-
 function writeSeed(bytes: Uint8Array, base: number, x: number): void {
   const high = Math.floor(x / TWO_32);
   const low = x >>> 0;
   const seed = [high >>> 16, high >>> 8, high, low >>> 24, low >>> 16, low >>> 8, low];
-  SEED_OFFSETS.forEach((offset, i) => {
-    bytes[base + offset] = seed[i]! & 255;
+  seed.forEach((value, i) => {
+    bytes[base + i] = value & 255;
   });
 }
 
@@ -64,7 +61,7 @@ function createStep(): (x: number) => number {
     height: IMAGE_SIZE,
     pixels: pixelsFor(0),
   });
-  const pixelStart = pam.length - IMAGE_SIZE * IMAGE_SIZE * 4;
+  const pixelStart = pam.length - IMAGE_SIZE * IMAGE_SIZE * 3;
   return (x) => {
     writeSeed(pam, pixelStart, x);
     return truncateHash(hash("sha256", pam, "buffer"));

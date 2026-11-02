@@ -3,8 +3,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { encodePam, sha256, Store, toHex, truncateHash, type RawImage } from "../src/core/index.ts";
 import { createTempStore } from "./support/temp-store.ts";
 
-// Real images from scripts/find-collision.ts. Nothing about them is trusted: only
-// the image bytes are committed, and both hashes are computed here.
+// Real images from scripts/find-collision.ts. Nothing about them is trusted:
+// only the image bytes are committed, and both hashes are computed here.
 
 function readFixture(name: string): { file: Uint8Array; image: RawImage } {
   const url = new URL(`./fixtures/collision-53bit/${name}`, import.meta.url);
