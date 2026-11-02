@@ -12,5 +12,5 @@
 | **Golden** | The snapshot accepted as correct for its name. |
 | **Baseline** | The Git sha a run is compared against: the nearest merge-base with a complete set of goldens. |
 | **Approval** | A person's or agent's acceptance of a snapshot change. May be made before the change is pushed (`docs/specs/system.md`). |
-| **Project** | One repository's cloud snapshot data, held in its own D1 database. |
+| **Project** | One GitHub repository's cloud snapshot data, held in its own D1 database. Exists once the GitHub App is installed on that repository (`docs/specs/access.md`). |
 | **Store** | One place that holds images and their metadata: a local store on a machine, or a project's cloud store. |
