@@ -11,6 +11,15 @@
 
 Selfie is for fully opaque images, and transparency is never allowed: `docs/specs/store.md` → Image identity owns the rule, and `docs/specs/store.md` → Image decoding what happens to an image with alpha.
 
+### Rendering environments
+
+- **Must make the rendering environment configurable, and record it with every run.** An environment is everything that decides the pixels: the container image digest or other runner, its CPU architecture, and the browser and its flags.
+- **Must default to one pinned Linux arm64 container image**, the only setup measured to match across machines (rationale).
+- **Must make the environment part of a snapshot's name**, so images from different environments are never compared, and changing the environment starts new goldens rather than reporting every story as changed.
+- **Must let a project freeze its own timers, and flag a story that renders differently twice in a row**, since browser options alone don't stop a blinking cursor (rationale).
+
+**Later:** an agent skill could help a project test its own setup and find an environment that works for it.
+
 ### Approvals
 
 - **Must not make a user re-approve at push a snapshot change they already approved locally.** A user can approve changes on an unpushed PR, and those approvals carry through the push. The mechanism is undecided.
@@ -26,8 +35,6 @@ Selfie is for fully opaque images, and transparency is never allowed: `docs/spec
 - **Never put snapshot metadata in Neon or account data in a project's D1.**
 
 ### Build order
-
-**Scope: rendering-check** — Render one Storybook twice on a Mac and on Linux CI, and compare image hashes. The result decides whether goldens need to be per-environment, which changes the snapshot name.
 
 **Scope: store** — `docs/specs/store.md`.
 
