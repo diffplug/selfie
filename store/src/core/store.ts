@@ -1,6 +1,7 @@
 import type { Blobs } from "./blob.ts";
 import { SHA256_BYTES, sha256, toHex, truncateHash, type HashFunction } from "./image-hash.ts";
 import { encodePam, type RawImage } from "./pam.ts";
+import { decodePng, encodePng } from "./png.ts";
 import type { Sql, SqlStatement } from "./sql.ts";
 
 const CREATE_IMAGES_TABLE = `CREATE TABLE IF NOT EXISTS images (
@@ -50,6 +51,15 @@ export interface StoreOptions {
   readonly hash?: HashFunction;
 }
 
+/**
+ * An image already encoded as a PNG, such as a rendered screenshot. Its bytes are
+ * stored as they are, and its hash comes from decoding them, so they always decode
+ * to the pixels that were hashed.
+ */
+export interface PngImage {
+  readonly png: Uint8Array;
+}
+
 export interface StoredImage {
   /** Lowercase hex SHA-256 of the image's PAM file. The same in every store. */
   readonly hash: string;
@@ -68,8 +78,12 @@ export class Store {
     this.#hash = hash;
   }
 
-  /** Stores an image, or finds it if it is already stored. */
-  async putImage(image: RawImage): Promise<StoredImage> {
+  /**
+   * Stores an image, or finds it if it is already stored. Its first stored bytes
+   * stay: a later encoding of the same pixels changes nothing. Throws
+   * `ImageDecodeError` for a PNG that isn't exactly 8-bit opaque RGB.
+   */
+  async putImage(image: RawImage | PngImage): Promise<StoredImage> {
     const [stored] = await this.putImages([image]);
     return stored!;
   }
@@ -79,7 +93,7 @@ export class Store {
    * over repeated `putImage` for many images: it sends far fewer SQL requests. A
    * failure can leave earlier images stored, and calling this again is safe.
    */
-  async putImages(images: readonly RawImage[]): Promise<StoredImage[]> {
+  async putImages(images: readonly (RawImage | PngImage)[]): Promise<StoredImage[]> {
     const stored: StoredImage[] = [];
     for (let i = 0; i < images.length; i += INSERTS_PER_REQUEST) {
       const prepared: { hash: string; statement: SqlStatement }[] = [];
@@ -99,9 +113,8 @@ export class Store {
   }
 
   /** Bytes first: a failure here or later can orphan bytes, but can never leave a row without them. */
-  async #writeBytes(image: RawImage): Promise<{ hash: string; statement: SqlStatement }> {
-    const pam = encodePam(image);
-    const digest = await this.#hash(pam);
+  async #writeBytes(image: RawImage | PngImage): Promise<{ hash: string; statement: SqlStatement }> {
+    const digest = await this.#hash(encodePam("png" in image ? await decodePng(image.png) : image));
     if (digest.length !== SHA256_BYTES) {
       throw new RangeError(`Image hash must be ${SHA256_BYTES} bytes, got ${digest.length}`);
     }
@@ -109,7 +122,7 @@ export class Store {
 
     const blobKey = imageBlobKey(hash);
     if (!(await this.#blob.has(blobKey))) {
-      await this.#blob.put(blobKey, pam);
+      await this.#blob.put(blobKey, "png" in image ? image.png : await encodePng(image));
     }
     return { hash, statement: imageInsertStatement(hash, truncateHash(digest)) };
   }
@@ -128,8 +141,9 @@ export class Store {
   }
 
   /**
-   * The PAM file for an image hash, or null if the image is not stored. Bytes
-   * with no row are orphans from a failed insert, so they count as not stored.
+   * The stored PNG for an image hash, or null if the image is not stored. It can
+   * be served as it is, as `imageMediaType` says. Bytes with no row are orphans from a
+   * failed insert, so they count as not stored.
    */
   async getImage(hash: string): Promise<Uint8Array | null> {
     if ((await this.lookupKey(hash)) === null) return null;

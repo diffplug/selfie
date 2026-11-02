@@ -1,6 +1,7 @@
 import { cloudflareTest } from "@cloudflare/vitest-plugin";
 import { defineConfig } from "vitest/config";
 import { CONTRACT_DATABASE_ID, loadD1Credentials } from "./test/support/d1-credentials.ts";
+import { pngFixturesAsBase64 } from "./test/support/png-fixtures.ts";
 
 const realD1InWorkerd = process.env.SELFIE_D1_WORKERD === "1";
 
@@ -55,7 +56,7 @@ export default defineConfig({
               r2Buckets: ["BLOBS"],
               // Otherwise Miniflare downloads request metadata when it starts.
               cf: false,
-              bindings: realD1Bindings,
+              bindings: { ...realD1Bindings, PNG_FIXTURES: pngFixturesAsBase64() },
             },
           }),
         ],

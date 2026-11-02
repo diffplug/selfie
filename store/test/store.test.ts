@@ -1,7 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   Blobs,
+  decodePng,
   encodePam,
+  encodePng,
+  ImageDecodeError,
+  imageMediaType,
   Sql,
   sha256,
   Store,
@@ -9,6 +13,8 @@ import {
   type BlobStorage,
 } from "../src/core/index.ts";
 import { collidingHash, image } from "./support/colliding-hash.ts";
+import { buildPng, GRAY, RGB, RGBA } from "./support/png-builder.ts";
+import { readPngFixture } from "./support/png-fixtures.ts";
 import { createTempStore } from "./support/temp-store.ts";
 
 describe("Store", () => {
@@ -25,6 +31,10 @@ describe("Store", () => {
   const storeWith = (truncatedById: Record<number, number>) =>
     new Store({ sql: temp.sql, blob: temp.blob, hash: collidingHash(truncatedById) });
 
+  /** The stored file for a hash, decoded back to what it holds. */
+  const storedImage = async (store: Store, hash: string) =>
+    decodePng((await store.getImage(hash))!);
+
   describe("with the real hash", () => {
     it("reports the image hash of the PAM file", async () => {
       const store = new Store({ sql: temp.sql, blob: temp.blob });
@@ -39,10 +49,12 @@ describe("Store", () => {
       expect(await temp.sql.run({ sql: "SELECT key FROM images" })).toHaveLength(1);
     });
 
-    it("returns the PAM file for a stored image", async () => {
+    it("returns a PNG of the exact pixels for a stored image", async () => {
       const store = new Store({ sql: temp.sql, blob: temp.blob });
       const { hash } = await store.putImage(image(1));
-      expect(await store.getImage(hash)).toEqual(encodePam(image(1)));
+      const stored = (await store.getImage(hash))!;
+      expect(imageMediaType(stored)).toBe("image/png");
+      expect(await decodePng(stored)).toEqual(image(1));
     });
 
     it("finds an image through a separate connection", async () => {
@@ -88,8 +100,8 @@ describe("Store", () => {
       expect(first.hash).not.toBe(second.hash);
       expect(await store.lookupKey(first.hash)).toBe(500);
       expect(await store.lookupKey(second.hash)).toBe(-1);
-      expect(await store.getImage(first.hash)).toEqual(encodePam(image(1)));
-      expect(await store.getImage(second.hash)).toEqual(encodePam(image(2)));
+      expect(await storedImage(store, first.hash)).toEqual(image(1));
+      expect(await storedImage(store, second.hash)).toEqual(image(2));
     });
 
     it("does not resolve an unstored image whose truncated value is claimed", async () => {
@@ -172,7 +184,7 @@ describe("Store", () => {
       expect(await store.getImage(hash)).toBeNull();
 
       expect((await store.putImage(image(1))).hash).toBe(hash);
-      expect(await store.getImage(hash)).toEqual(encodePam(image(1)));
+      expect(await storedImage(store, hash)).toEqual(image(1));
     });
 
     it("reports a row with no bytes rather than treating it as absent", async () => {
@@ -192,7 +204,7 @@ describe("Store", () => {
       const stored = await store.putImages([image(1), image(2), image(1), image(3)]);
       expect(stored.map(({ key }) => key)).toEqual([500, -1, 500, 1003]);
       expect(stored[0]!.hash).toBe(stored[2]!.hash);
-      expect(await store.getImage(stored[1]!.hash)).toEqual(encodePam(image(2)));
+      expect(await storedImage(store, stored[1]!.hash)).toEqual(image(2));
     });
 
     it("returns nothing and sends nothing for no images", async () => {
@@ -243,6 +255,140 @@ describe("Store", () => {
       await expect(store.putImages([image(1), image(2)])).rejects.toThrow("sql down");
       expect((await store.putImages([image(1), image(2)])).map(({ hash }) => hash)).toHaveLength(2);
       expect(await temp.sql.run({ sql: "SELECT key FROM images" })).toHaveLength(2);
+    });
+  });
+
+  describe("with PNG files", () => {
+    const screenshot = () => new Uint8Array(readPngFixture("chromium-update-banner.png"));
+    const pixelsOfOne = { width: 1, height: 1, pixels: new Uint8Array([9, 9, 9]) };
+    const asRgb = buildPng({ width: 1, height: 1, colorType: RGB, bitDepth: 8, sample: () => [9, 9, 9] });
+    const asGray = buildPng({ width: 1, height: 1, colorType: GRAY, bitDepth: 8, sample: () => [9] });
+    const asRgba = buildPng({ width: 1, height: 1, colorType: RGBA, bitDepth: 8, sample: () => [9, 9, 9, 255] });
+    const transparent = buildPng({ width: 1, height: 1, colorType: RGBA, bitDepth: 8, sample: () => [9, 9, 9, 128] });
+
+    const newStore = () => new Store({ sql: temp.sql, blob: temp.blob });
+
+    it("stores a screenshot's own bytes, not a recompressed copy", async () => {
+      const store = newStore();
+      const png = screenshot();
+      const { hash } = await store.putImage({ png });
+      expect(await store.getImage(hash)).toEqual(png);
+      expect(await temp.blob.get(`images/${hash}`)).toEqual(png);
+    });
+
+    it("hashes the decoded pixels, never the file", async () => {
+      const store = newStore();
+      const png = screenshot();
+      const { hash } = await store.putImage({ png });
+      expect(hash).toBe(toHex(await sha256(encodePam(await decodePng(png)))));
+      expect(hash).not.toBe(toHex(await sha256(png as Uint8Array<ArrayBuffer>)));
+    });
+
+    it("gives bytes that decode to the pixels that were hashed", async () => {
+      const store = newStore();
+      const { hash } = await store.putImage({ png: screenshot() });
+      const stored = await storedImage(store, hash);
+      expect(toHex(await sha256(encodePam(stored)))).toBe(hash);
+    });
+
+    it("gives pixels and every encoding of them one hash, key and row", async () => {
+      const store = newStore();
+      const first = await store.putImage({ png: asRgb });
+      expect(await store.putImage({ png: asGray })).toEqual(first);
+      expect(await store.putImage({ png: asRgba })).toEqual(first);
+      expect(await store.putImage(pixelsOfOne)).toEqual(first);
+      expect(await store.putImage({ png: await encodePng(pixelsOfOne) })).toEqual(first);
+      expect(await temp.sql.run({ sql: "SELECT key FROM images" })).toHaveLength(1);
+    });
+
+    it("keeps the first bytes stored for a hash, from a file", async () => {
+      const store = newStore();
+      const { hash } = await store.putImage({ png: asGray });
+      await store.putImage({ png: asRgb });
+      await store.putImage(pixelsOfOne);
+      expect(await store.getImage(hash)).toEqual(asGray);
+    });
+
+    it("keeps the first bytes stored for a hash, from pixels", async () => {
+      const store = newStore();
+      const { hash } = await store.putImage(pixelsOfOne);
+      const first = await store.getImage(hash);
+      await store.putImage({ png: asGray });
+      expect(await store.getImage(hash)).toEqual(first);
+      expect(first).not.toEqual(asGray);
+    });
+
+    it("keeps the first of two encodings in one call", async () => {
+      const store = newStore();
+      const [first, second] = await store.putImages([{ png: asGray }, { png: asRgb }]);
+      expect(first).toEqual(second);
+      expect(await store.getImage(first!.hash)).toEqual(asGray);
+    });
+
+    it("adopts orphaned bytes rather than replacing them", async () => {
+      const failingSql = new Sql({ execute: () => Promise.reject(new Error("sql down")) });
+      const broken = new Store({ sql: failingSql, blob: temp.blob });
+      await expect(broken.putImage({ png: asGray })).rejects.toThrow("sql down");
+      const { hash } = await newStore().putImage({ png: asRgb });
+      expect(await newStore().getImage(hash)).toEqual(asGray);
+    });
+
+    it("writes nothing for a refused file", async () => {
+      const store = newStore();
+      await expect(store.putImage({ png: transparent })).rejects.toThrow(ImageDecodeError);
+      expect(await temp.sql.run({ sql: "SELECT key FROM images" })).toEqual([]);
+    });
+
+    it("stops a call at a refused file, keeping the groups already written", async () => {
+      const store = newStore();
+      const good = (i: number) => ({ width: 1, height: 1, pixels: new Uint8Array([i, 0, 0]) });
+      const images = [...Array.from({ length: 100 }, (_, i) => good(i)), { png: transparent }];
+      await expect(store.putImages(images)).rejects.toThrow(ImageDecodeError);
+      expect(await temp.sql.run({ sql: "SELECT key FROM images" })).toHaveLength(100);
+    });
+
+    it("mixes files and pixels, in order, with bytes before each group's rows", async () => {
+      const requests: number[] = [];
+      let blobsWritten = 0;
+      const store = new Store({
+        sql: new Sql({
+          execute: async (statements) => {
+            requests.push(statements.length);
+            expect(blobsWritten).toBe(requests.reduce((sum, size) => sum + size, 0));
+            return statements.map((_, i) => [{ key: i + 1 }]);
+          },
+        }),
+        blob: new Blobs({
+          has: async () => false,
+          get: async () => null,
+          put: async () => {
+            blobsWritten++;
+          },
+        }),
+      });
+      const images = await Promise.all(
+        Array.from({ length: 150 }, async (_, i) => {
+          const raw = { width: 1, height: 1, pixels: new Uint8Array([i, 0, 0]) };
+          return i % 2 === 0 ? { png: await encodePng(raw) } : raw;
+        }),
+      );
+      const stored = await store.putImages(images);
+      expect(requests).toEqual([100, 50]);
+      const expected = await Promise.all(
+        images.map(async (input) => {
+          const pixels = "png" in input ? await decodePng(input.png) : input;
+          return toHex(await sha256(encodePam(pixels)));
+        }),
+      );
+      expect(stored.map(({ hash }) => hash)).toEqual(expected);
+    });
+
+    it("gives injected hash functions the canonical PAM, so collisions still work", async () => {
+      const store = storeWith({ 1: 500, 2: 500 });
+      const png = async (id: number) => ({ png: await encodePng(image(id)) });
+      expect((await store.putImage(await png(1))).key).toBe(500);
+      expect((await store.putImage(await png(2))).key).toBe(-1);
+      expect((await store.putImage(await png(1))).key).toBe(500);
     });
   });
 

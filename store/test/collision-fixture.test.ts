@@ -1,6 +1,14 @@
 import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { encodePam, sha256, Store, toHex, truncateHash, type RawImage } from "../src/core/index.ts";
+import {
+  decodePng,
+  encodePam,
+  sha256,
+  Store,
+  toHex,
+  truncateHash,
+  type RawImage,
+} from "../src/core/index.ts";
 import { createTempStore } from "./support/temp-store.ts";
 
 // Real images from scripts/find-collision.ts. Nothing about them is trusted:
@@ -69,8 +77,8 @@ describe("committed 53-bit collision", () => {
       expect(await store.putImage(b.image)).toEqual(second);
       expect(await store.lookupKey(first.hash)).toBe(first.key);
       expect(await store.lookupKey(second.hash)).toBe(-1);
-      expect(await store.getImage(first.hash)).toEqual(a.file);
-      expect(await store.getImage(second.hash)).toEqual(b.file);
+      expect(encodePam(await decodePng((await store.getImage(first.hash))!))).toEqual(a.file);
+      expect(encodePam(await decodePng((await store.getImage(second.hash))!))).toEqual(b.file);
     });
 
     it("does not resolve the second image before it is stored", async () => {

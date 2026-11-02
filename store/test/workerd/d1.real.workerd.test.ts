@@ -8,7 +8,7 @@ import { env } from "cloudflare:workers";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { D1RestError, type D1RestConfig } from "selfie-store/adapters/d1-rest";
 import { R2BlobStorage } from "selfie-store/adapters/r2";
-import { Blobs, encodePam, initStoreSchema, Sql, Store, toHex } from "../../src/core/index.ts";
+import { Blobs, decodePng, encodePam, initStoreSchema, Sql, Store, toHex } from "../../src/core/index.ts";
 import { collidingHash, image } from "../support/colliding-hash.ts";
 import { createD1Harness, type D1Harness } from "../support/d1-harness.ts";
 import { emptyBucket, objectKeys } from "./bucket.ts";
@@ -138,8 +138,8 @@ describe.skipIf(token === undefined)("real D1 inside workerd (opt-in: pnpm test:
 
       expect(await store.lookupKey(first.hash)).toBe(TRUNCATED);
       expect(await store.lookupKey(second.hash)).toBe(-1);
-      expect(await store.getImage(first.hash)).toEqual(encodePam(a));
-      expect(await store.getImage(second.hash)).toEqual(encodePam(b));
+      expect(await decodePng((await store.getImage(first.hash))!)).toEqual(a);
+      expect(await decodePng((await store.getImage(second.hash))!)).toEqual(b);
 
       expect((await objectKeys(prefix)).sort()).toEqual(
         [first.hash, second.hash].map((imageHash) => `${prefix}images/${imageHash}`).sort(),

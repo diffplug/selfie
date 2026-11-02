@@ -1,9 +1,9 @@
 # Store
 
-> Status: partly built — the store core, its local SQLite and filesystem adapters, and the D1 REST and R2 adapters exist. Image decoding does not; see `## Future`.
+> Status: built — the store core, image decoding, PNG storage, its local SQLite and filesystem adapters, and the D1 REST and R2 adapters exist. Two questions stay open; see `## Future`.
 >
 > - See `docs/specs/glossary.md` for image, image hash, image key, and store.
-> - Owns image identity, image keys, and hash collisions. The build order belongs to `docs/specs/system.md`.
+> - Owns image identity, image decoding, image keys, and hash collisions. The build order belongs to `docs/specs/system.md`.
 
 ## Image identity
 
@@ -11,8 +11,31 @@ Source of truth: `store/src/core/pam.ts`, `store/src/core/image-hash.ts`.
 
 - **Must handle only fully opaque images. Transparency is never allowed.** An image is 8-bit RGB with no alpha channel in every interface, hash, and stored form (rationale).
 - **Must compute the image hash over a complete PAM file, header included, with one canonical header form**, so identical bytes at 100×200 and 200×100 are different images, and one set of pixels has one hash. The form is `P7\nWIDTH <w>\nHEIGHT <h>\nDEPTH 3\nMAXVAL 255\nTUPLTYPE RGB\nENDHDR\n`, with `<w>` and `<h>` as plain decimals, followed by the pixels as RGB row by row. The hash is SHA256, written as lowercase hex.
-- **Must take decoded RGB pixels with a width and height, never an encoded file**, so the source encoding cannot reach the hash. Reserved: decoding is [Image decoding](#image-decoding).
+- **Must hash decoded RGB pixels with a width and height, never an encoded file**, so the source encoding cannot reach the hash. A file is decoded first, per [Image decoding](#image-decoding).
 - **Must exchange images between stores by image hash, never by image key.** The store's API takes and returns image hashes; the key it returns is only for that store's own rows.
+
+## Image decoding
+
+Source of truth: `store/src/core/png.ts`; the contract suite is `store/test/contract/png-contract.ts`, which `store/test/png.test.ts` runs in Node and `store/test/workerd/png.workerd.test.ts` runs in workerd.
+
+- **Must decode every source encoding of the same pixels to the same 8-bit RGB**, so re-encoding a PNG does not create a new image.
+- **Must normalize a PNG only where the result is exact, and refuse it otherwise**, per this table. Any filters, compression level, or split across IDAT chunks are also just encodings.
+
+| Source | Result |
+|---|---|
+| Interlaced | The same pixels as if not interlaced |
+| Grayscale, 1, 2, 4, or 8 bits | Red, green, and blue all equal the sample, which below 8 bits is scaled as the PNG spec says (× 255, × 85, × 17) |
+| Palette, 1, 2, 4, or 8 bits | The entry's color, or refused if the index is outside the palette |
+| 16 bits | A sample that is an 8-bit value × 257 becomes that value, and any other is refused (rationale) |
+
+- **Must drop an alpha channel whose every value is 255**, or 65535 at 16 bits, since such a source is fully opaque.
+- **Must refuse an image with any other alpha value, with a clear error, and never flatten it onto a background**, since flattening would give different images one hash. A pixel a `tRNS` chunk makes transparent counts: one matching its color, or using a palette entry it gives less than 255. A `tRNS` chunk no pixel is affected by is dropped.
+- **Must refuse a PNG with a `gAMA`, `cHRM`, `iCCP`, or `cICP` chunk**, since a browser applies these when showing the file, so the samples alone wouldn't say how the image looks (rationale). `sRGB` is what Selfie already assumes, and every other ancillary chunk is ignored.
+- **Must refuse an animated PNG**, since an image is one picture.
+- **Must refuse a corrupt or malformed PNG, never repair it**: a failed checksum on any chunk or on the zlib stream, chunks out of the order the PNG spec requires, an unknown critical chunk, an invalid header or filter type, image data that doesn't inflate to exactly the expected length, or bytes after `IEND`.
+- **Must refuse a PNG over 100,000,000 pixels before allocating for it, and stop inflating as soon as the data runs past the expected length**, so a small file can't exhaust memory.
+- **Must report every refusal as an `ImageDecodeError`** that says why.
+- **Must run unchanged in Node and in Workers**, on Web-standard APIs and no library (rationale), since `Store` decodes on both. The whole contract runs in workerd as part of `pnpm test`.
 
 ## Image keys
 
@@ -27,9 +50,13 @@ Source of truth: `store/src/core/store.ts`.
 
 ## Storage
 
-Source of truth: `store/src/core/store.ts`; tests in `store/test/store.test.ts` and `store/test/collision-fixture.test.ts`.
+Source of truth: `store/src/core/store.ts`, `store/src/core/png.ts`; tests in `store/test/store.test.ts` and `store/test/collision-fixture.test.ts`.
 
-- **Must keep image bytes in blob storage, never in SQL**, since D1 caps a row at 2 MB. A blob holds the image's complete PAM file.
+- **Must keep image bytes in blob storage, never in SQL**, since D1 caps a row at 2 MB. A blob holds the image as a PNG, which `Store.getImage` returns ready to serve.
+- **Must keep the stored format behind `store/src/core/png.ts`, and never let it reach the hash or a key**, since compressed bytes differ between tools and the format may change. See [Open questions](#open-questions).
+- **Must store a PNG it is given as those exact bytes, with no recompression, and take its hash from decoding them**, so they always decode to the pixels that were hashed. `Store.putImage` takes either that file or pixels, never both, so a caller can't pair a file with other pixels. It encodes pixels only when the image isn't already stored.
+- **Must keep the first bytes stored for a hash.** A later encoding of the same pixels changes nothing, and neither does a retry that finds an orphan. Concurrent first puts may leave either one, and both decode to the same pixels.
+- **Must make a blob state its own format in its first bytes**, so a store can hold more than one format, with no schema change. `imageMediaType` reads it.
 - **Must key blobs by image hash, never by image key.** The key is `images/<image hash>`; the [R2 adapter](#r2-adapter) adds the project.
 - **Must write image bytes before the metadata row that refers to them**, since blob storage and SQL share no transaction: a failure can orphan bytes but never leave a row without bytes.
 - **Must treat bytes with no row as not stored**, so an orphan is never served as an image.
@@ -58,7 +85,7 @@ The store core runs unchanged locally and in the cloud, the way Hono does for HT
 - **Never allow a comment after a statement's closing semicolon**, since real D1 fails on it where local SQLite runs it (rationale). A comment before the semicolon is fine on both.
 - **Must mark a statement idempotent only if running it again, after it may already have run, returns the same rows and changes nothing further.** An adapter may resend a statement after a failure that leaves its outcome unknown only if it is so marked. Everything the store sends is: the image insert returns the key the first run assigned, per [Image keys](#image-keys).
 - **Must write SQL that gives the same result whether a parameter arrives as a number or a string**, since the D1 REST API documents its parameters as strings. Integer parameters are wrapped in `CAST(?1 AS INTEGER)`.
-- **Must make blob put idempotent**, so a retry or a concurrent put of the same image is safe.
+- **Must make blob put idempotent**, so a retry or a concurrent put of the same image is safe, whichever encoding each one holds.
 - **Must make a blob complete at its key or absent from it, never partial**, including after a crash mid-write.
 - **Must keep blob keys to lowercase letters, digits, `.`, `_`, `-`, and `/` separators, with each segment starting with a letter or digit**, so every adapter can hold every key and none can escape its directory.
 - **Must run one contract test suite against every adapter**, including concurrent inserts through separate connections, so a new adapter is correct when it passes. A new adapter supplies a factory. Its concurrent inserts must really overlap: an adapter whose driver blocks its thread, as `node:sqlite` does, supplies separate threads. An adapter metered per request may group each connection's inserts into batches, and must then also show single inserts from separate connections interleaving on the database.
@@ -87,20 +114,14 @@ Source of truth: `store/src/adapters/r2.ts`; tests in `store/test/workerd/r2.wor
 - **Must key cloud blobs by project and image hash**, never by image key, and never shared across projects. The object key is `projects/<project>/<blob key>`, so the same image in two projects is two objects.
 - **Must refuse a project identifier that isn't one blob key segment**, as [Adapters](#adapters) defines a segment, so it holds no `/` and no project's prefix can lie inside another's. A blob key can't climb out of its prefix, by the same rule.
 - **Must give a project an identifier that never passes to another project**, since the identifier is all that separates their objects. Reserved: a project's identifier is its GitHub repository ID (`docs/specs/access.md` → GitHub App).
-- **Must treat R2's per-key write limit as a concurrent put, not a failure.** R2 allows [one write per second per key](https://developers.cloudflare.com/r2/platform/limits/) and throws error 10058 for more. If a blob is then at the key, the put is done, since callers only put the same bytes at a key. If not, it resends after a jittered doubling delay, a bounded number of times, then fails with R2's error. Any other error fails at once.
+- **Must treat R2's per-key write limit as a concurrent put, not a failure.** R2 allows [one write per second per key](https://developers.cloudflare.com/r2/platform/limits/) and throws error 10058 for more. If a blob is then at the key, the put is done, since everything put at a key decodes to the same pixels. If not, it resends after a jittered doubling delay, a bounded number of times, then fails with R2's error. Any other error fails at once.
 - **Must run the blob contract against the real binding inside workerd, never a mock or a Node-side proxy**, as part of `pnpm test`, since workerd's local R2 needs no network or credentials. Local R2 does not enforce the per-key write limit, so tests raise error 10058 over the binding. No test has run against real R2.
 
 ## Future
 
 **Scope: store**
 
-### Image decoding
-
-- **Must decode every source encoding of the same pixels to the same 8-bit RGB**, so re-encoding a PNG does not create a new image.
-- **Must drop an alpha channel whose every value is 255**, since such a source is fully opaque.
-- **Must refuse an image with any other alpha value, with a clear error, and never flatten it onto a background**, since flattening would give different images one hash.
-
 ### Open questions
 
 - **Schema migrations.** How a schema change reaches every project database, and how the app treats a database still on the older schema.
-- **Stored encoding.** PNG is a stand-in, pending the lossless format comparison. Whatever stores images must decode to the exact RGB pixels that were hashed, with no alpha.
+- **Stored encoding.** PNG is a stand-in, and lossless WebP is the comparison's recommendation (rationale). Whatever stores images must decode to the exact RGB pixels that were hashed, with no alpha, and identify itself by its first bytes.
