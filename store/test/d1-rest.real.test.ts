@@ -8,6 +8,7 @@ import { imageInsertStatement, initStoreSchema, Sql, Store } from "../src/core/i
 import { describeSqlContract } from "./contract/sql-contract.ts";
 import type { D1Harness } from "./support/d1-harness.ts";
 import { d1Harness } from "./support/real-d1.ts";
+import { pngOf } from "./support/png-builder.ts";
 import { hashOf, insertedKey, withParamMode, type ImageRow } from "./support/sql-params.ts";
 import { createTempStore } from "./support/temp-store.ts";
 
@@ -125,14 +126,13 @@ describe.skipIf(!ENABLED)("real D1 (opt-in: pnpm test:d1)", () => {
       const temp = await createTempStore();
       try {
         const store = new Store({ sql: new Sql(harness.connect()), blob: temp.blob });
-        const images = Array.from({ length: 205 }, (_, i) => ({
-          width: 1,
-          height: 1,
-          pixels: new Uint8Array([i & 255, i >> 8, 0]),
-        }));
+        const files = Array.from({ length: 205 }, (_, i) =>
+          pngOf({ width: 1, height: 1, pixels: new Uint8Array([i & 255, i >> 8, 0]) }),
+        );
         const before = harness.requests;
-        const stored = await store.putImages(images);
-        expect(harness.requests - before).toBe(3);
+        const stored = await store.putImages(files);
+        // A lookup and an insert for each of 3 groups.
+        expect(harness.requests - before).toBe(6);
         expect(new Set(stored.map(({ key }) => key)).size).toBe(205);
         expect(await store.lookupKey(stored[204]!.hash)).toBe(stored[204]!.key);
       } finally {

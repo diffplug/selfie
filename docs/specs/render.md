@@ -61,7 +61,7 @@ Browser options don't stop a project's own JavaScript timers. A project freezes 
 
 Source of truth: `render/src/capture.ts`, `render/src/manifest.ts`.
 
-- **Must, when `stability` is set, render each story that succeeded a second time, in a new worker, settling 530 ms longer** (rationale).
+- **Must, when `stability` is set, render each story that succeeded a second time, in a new worker, settling 730 ms longer** (rationale).
 - **Must compare PNG bytes** (rationale). A differing story is `unstable`, and its second render is kept at `repeat/<file>`. A story that fails its second render is also `unstable`. A story that failed the first time stays `unchecked`.
 - **Must treat the first render as the result.** The longer settle is only ever used for comparing.
 

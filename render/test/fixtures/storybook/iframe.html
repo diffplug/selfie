@@ -84,7 +84,9 @@
           document.body.style.background = randomColor();
         },
         "timers--ticking"() {
-          const colors = ["red", "orange", "yellow", "green", "blue", "indigo", "violet"];
+          // A cycle of 1.1 s, which the repeat's extra settle can't land back on. Seven
+          // colors made 700 ms, and a 730 ms delay reads as the same color every time.
+          const colors = ["red", "orange", "yellow", "green", "blue", "indigo", "violet", "pink", "gray", "teal", "navy"];
           let tick = 0;
           setInterval(() => {
             tick += 1;

@@ -5,8 +5,9 @@
 export interface BlobStorage {
   /**
    * Stores the bytes so that they are complete at the key or absent from it,
-   * never partial. Idempotent: callers only ever put the same bytes at a key, so
-   * a retry or a concurrent put of that key is safe.
+   * never partial. Idempotent: everything callers put at a key is interchangeable,
+   * since it decodes to the same pixels, so a retry or a concurrent put of that key
+   * is safe.
    */
   put(key: string, bytes: Uint8Array): Promise<void>;
   /** The bytes at the key, or null if there are none. */

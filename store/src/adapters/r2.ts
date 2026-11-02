@@ -60,8 +60,8 @@ export class R2BlobStorage implements BlobStorage {
         return;
       } catch (error) {
         if (!isKeyRateLimited(error)) throw error;
-        // Callers only put the same bytes at a key, and R2 is strongly consistent,
-        // so a blob here means another writer has already done this put.
+        // Everything callers put at a key is interchangeable, and R2 is strongly
+        // consistent, so a blob here means another writer has already done this put.
         if ((await this.#bucket.head(objectKey)) !== null) return;
         if (attempt >= MAX_ATTEMPTS) throw error;
       }

@@ -8,9 +8,10 @@ import { env } from "cloudflare:workers";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { D1RestError, type D1RestConfig } from "selfie-store/adapters/d1-rest";
 import { R2BlobStorage } from "selfie-store/adapters/r2";
-import { Blobs, encodePam, initStoreSchema, Sql, Store, toHex } from "../../src/core/index.ts";
+import { Blobs, decodeImage, encodePam, initStoreSchema, Sql, Store, toHex } from "../../src/core/index.ts";
 import { collidingHash, image } from "../support/colliding-hash.ts";
 import { createD1Harness, type D1Harness } from "../support/d1-harness.ts";
+import { pngOf } from "../support/png-builder.ts";
 import { emptyBucket, objectKeys } from "./bucket.ts";
 
 const { D1_ACCOUNT_ID: accountId, D1_DATABASE_ID: databaseId, D1_TOKEN: token } = env;
@@ -126,24 +127,35 @@ describe.skipIf(token === undefined)("real D1 inside workerd (opt-in: pnpm test:
     });
 
     it("stores a colliding pair under separate keys and separate objects", async () => {
-      const first = await store.putImage(a);
-      const second = await store.putImage(b);
+      const first = await store.putImage(pngOf(a));
+      const second = await store.putImage(pngOf(b));
       expect(first.key).toBe(TRUNCATED);
       expect(second.key).toBe(-1);
       expect(first.hash).not.toBe(second.hash);
 
       // Inserting again returns what the first insert assigned, negative key included.
-      expect(await store.putImage(a)).toEqual(first);
-      expect(await store.putImage(b)).toEqual(second);
+      expect(await store.putImage(pngOf(a))).toEqual(first);
+      expect(await store.putImage(pngOf(b))).toEqual(second);
 
       expect(await store.lookupKey(first.hash)).toBe(TRUNCATED);
       expect(await store.lookupKey(second.hash)).toBe(-1);
-      expect(await store.getImage(first.hash)).toEqual(encodePam(a));
-      expect(await store.getImage(second.hash)).toEqual(encodePam(b));
+      expect(await decodeImage((await store.getImage(first.hash))!)).toEqual(a);
+      expect(await decodeImage((await store.getImage(second.hash))!)).toEqual(b);
 
       expect((await objectKeys(prefix)).sort()).toEqual(
         [first.hash, second.hash].map((imageHash) => `${prefix}images/${imageHash}`).sort(),
       );
+    });
+
+    it("finds a full group of stored images with one 100 parameter lookup", async () => {
+      const real = new Store({ sql: connect(), blob });
+      const files = Array.from({ length: 100 }, (_, i) =>
+        pngOf({ width: 1, height: 1, pixels: new Uint8Array([i, 1, 0]) }),
+      );
+      const stored = await real.putImages(files);
+      const before = harness.requests;
+      expect(await real.putImages(files)).toEqual(stored);
+      expect(harness.requests - before).toBe(1);
     });
 
     it("reports an unstored image as absent, and an orphan blob as not stored", async () => {

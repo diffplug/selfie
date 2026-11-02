@@ -72,4 +72,6 @@ With the flag, 7 full runs of all 541 stories, across the settle times, quiet pe
 | 930 ms | 4 | 0 | 0 | 0 | 16.7 s |
 | 1130 ms | 2 | 2 | 0 | 0 | 17.7 s |
 
-**Limits.** One app's stories, on one machine, and stability is one repeat with one extra delay, so a timer whose period happens to fit the delay can still match. The fixture's `timers--ticking` tests a repeating timer, not this delay's exact value.
+So the extra settle is 730 ms, the smallest value that caught both timer stories in every run.
+
+**Limits.** One app's stories, on one machine, and stability is one repeat with one extra delay, so a timer whose period happens to fit the delay can still match. A fixture cycling every 700 ms did exactly that at 730 ms, reading as stable in every run, so a stable result is not proof. The fixture's `timers--ticking` tests a repeating timer, not this delay's exact value.

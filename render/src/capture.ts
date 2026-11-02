@@ -27,7 +27,7 @@ const RUN_OVERHEAD_MS = 90_000;
  * The repeat settles this much longer, so a timer shows up instead of matching by luck: with
  * equal timing, unfrozen stories matched in every run measured (see render.rationale.md).
  */
-const REPEAT_EXTRA_SETTLE_MS = 530;
+const REPEAT_EXTRA_SETTLE_MS = 730;
 
 const NATIVE_WARNING =
   "Native runner: these images won't match other machines or the container. Use them for local experiments only.";
