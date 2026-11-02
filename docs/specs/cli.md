@@ -1,13 +1,13 @@
 # CLI
 
-> Status: built — `selfie review`, `approve`, `reject`, `accept`, and `find-baseline`, on the local store. Nothing here reaches the cloud; see `## Future`.
+> Status: built — the `selfie-cli` library and the `selfie` binary: `review`, `approve`, `reject`, `accept`, and `find-baseline`, on the local store. Nothing here reaches the cloud; see `## Future`.
 >
 > - See `docs/specs/glossary.md` for run, snapshot, golden, baseline, decision, and environment.
-> - Owns local data's layout, each command's checks and exit code, and the shape of what they print. `docs/specs/snapshots.md` owns what a run, a decision, and a golden are. `docs/specs/render.md` owns capture. `docs/specs/store.md` owns images.
+> - Owns local data's layout, each command's checks and exit code, and the shape of what they print and return. `docs/specs/snapshots.md` owns what a run, a decision, and a golden are. `docs/specs/render.md` owns capture. `docs/specs/store.md` owns images.
 
 ## Commands
 
-Source of truth: `cli/src/cli.ts`; the real binary's tests are in `cli/test/binary.test.ts`. `selfie --help` lists every flag.
+Source of truth: `cli/src/cli.ts`, `cli/src/document.ts`; the real binary's tests are in `cli/test/binary.test.ts`. `selfie --help` lists every flag.
 
 | Command | Does |
 |---|---|
@@ -16,16 +16,40 @@ Source of truth: `cli/src/cli.ts`; the real binary's tests are in `cli/test/bina
 | `selfie accept <run>` | Makes a run the goldens of its Git SHA |
 | `selfie find-baseline` | Prints the baseline this repository and environment would use |
 
-- **Must print exactly one document on stdout, whatever happens,** and everything for people on stderr. A command that couldn't run prints `{ "error": { "name", "message" } }`. `selfie review --human` prints a short summary in place of its JSON. `--help` prints usage.
+- **Must print exactly one document on stdout, whatever happens,** and everything for people on stderr, including a review's one line of timings. A command that couldn't run prints `{ "error": { "code", "message" } }`. `--help` prints usage.
 - **Must use these exit codes:**
 
 | Code | Meaning | Examples |
 |---|---|---|
-| 0 | Nothing needs attention | A review with nothing to decide, a decision recorded, a run accepted, any `find-baseline` result |
-| 1 | The command ran, and something needs attention | A review listing anything in `needsAttention`, `accept` refusing, a `--story` pattern on `approve` or `reject` that matched nothing |
-| 2 | The command couldn't run | Not a Git repository, no commits, no Storybook, no Docker, a failed `--build-command`, a bad flag, an unknown run, a run with no record, `--story` matching no story at all |
+| 0 | Nothing blocks | A review with no blockers, a decision recorded, a run accepted, any `find-baseline` result |
+| 1 | The command ran, and something blocks | A review listing anything in `blockers`, `accept` refusing, a `--story` pattern on `approve` or `reject` that matched nothing |
+| 2 | The command couldn't run | Not a Git repository, no commits, no Storybook, no Docker, a failed `--build-command`, a bad flag, an unknown run, `--story` matching no story at all |
 
+- **Decision for the user to review: advisories don't change the exit code.** A project with two known `play` errors can reach exit 0, so 1 keeps its meaning of "something here stops you". It also means **an agent checking only the exit code won't see a `play` failure or an unstable story**: it has to read `advisories`, which is why the document always carries the list and its count ([What blocks](#what-blocks)) (rationale).
 - **Must take a story pattern as `docs/specs/render.md` → Capture defines it:** an ID, where `*` matches any run of characters.
+
+## Library
+
+Source of truth: `cli/src/index.ts`; tests in `cli/test/library.test.ts`.
+
+`selfie-cli` exports what a UI needs, in plain data with no printing and no exit codes:
+
+| Export | Does |
+|---|---|
+| `openProject({ cwd, env })` | The repository's `Project`: its `repo`, `directory`, `store`, `snapshots`, and `close()` |
+| `review(project, options)` | Returns a `ReviewResult`: the `comparison`, `dirtyPaths`, `baseline`, `stabilityChecked`, `differences`, `playErrors`, `unstable`, `warnings`, and `timings` |
+| `decide(project, { runId, decision, actor, stories })` | `stories` is `"all"` or patterns. Returns `decided`, `skipped`, `unmatchedPatterns`, and the `comparison` after it |
+| `accept(project, { runId, removedSeen })` | Returns `accepted`, `refusals`, `usableAsBaseline`, and the `comparison` |
+| `summarizeRun(comparison)` | Returns `blockers`, `advisories`, `counts`, `undecided`, `unapproved`, `failed`, `removed`, and `notRendered` |
+| `isDecidable(state)` | Whether a snapshot in this state can take a decision: `changed` or `new` |
+| `compareAsReviewed(project, runId, options)` | A run compared with the baseline its reviewer saw |
+| `findBaseline(project, environment)`, `resolveCaptureSettings(repo, { native })`, `gitUserEmail(repo)` | What the commands use for these |
+| `readReviewCache(project, runId)` | The paths and pixel diffs a review exported, or null once pruned |
+| `SelfieError` | Has a `code`, so a caller can tell cases apart without reading its message |
+
+- **Must keep facts in results and compute verdicts.** A result never says what needs attention: `summarizeRun` does, from a comparison, so a verdict can be recomputed after any decision.
+- **Must keep command wording out of results.** `next` steps and refusal messages are built in `cli/src/document.ts`, and a refusal holds fields such as `stories` and `outsideFilter`.
+- **Must keep printing and exit codes in `cli/src/cli.ts`.**
 
 ## Local data
 
@@ -37,7 +61,7 @@ Source of truth: `cli/src/paths.ts`, `cli/src/project.ts`; tests in `cli/test/un
 <home>/<slug>/
   store.db                               SQLite, per docs/specs/store.md
   blobs/images/<image hash>              Filesystem blobs, per docs/specs/store.md
-  runs/<run id>/review.json              The review's document, which later commands read
+  runs/<run id>/review.json              A disposable cache of exported paths and pixel diffs
   runs/<run id>/stories/<name>/*.png     current, golden, diff, and repeat
   capture/<uuid>/                        One capture's output, deleted when the review ends
 ```
@@ -56,82 +80,85 @@ In order, a review:
 
 1. Runs `--build-command`, if given, in a shell. Its stdout goes to stderr. **Never guess a project's build system.** **Never use a shell for anything else.**
 2. Reads HEAD and the working tree, and finds the baseline ([`find-baseline`](#find-baseline)).
-3. Captures `--storybook-dir` (default `storybook-static`) in a new capture directory, with `--story` patterns, `--init-script`, and, if asked, `--stability`.
-4. Stores each PNG as written with `Store.putImages`, and records and finishes the run with `Snapshots`. Rows carry the failure message and the unstable flag.
-5. Compares the run with the baseline, and exports images and pixel diffs for what isn't unchanged.
-6. Writes `review.json`, prunes [output](#output-directories), and prints the document.
+3. Captures `--storybook-dir` (default `storybook-static`) in a new capture directory, with `--story` patterns, the project's [init script](#configuration), and, if asked, `--stability`.
+4. Checks HEAD didn't move.
+5. Begins a run recording whether the tree was dirty, the baseline, and any filter. Stores each PNG as written with `Store.putImages`, and records and finishes the run with `Snapshots`. Rows carry the failure message, the `play` error, and the unstable flag.
+6. Compares the run with the baseline.
+7. Exports images and pixel diffs for what isn't unchanged, writes `review.json`, and prunes [output](#output-directories).
 
-- **Must do diff work only on a `changed` snapshot.** A `new` or `removed` one exports its one image, and an unchanged one nothing, unless it needs attention.
+- **Must do diff work only on a `changed` snapshot.** A `new` or `removed` one exports its one image, and an unchanged one nothing, unless it has an advisory.
 - **Must report a different size as `pixelDiff.kind: "size-differs"`, with no diff image**, not as a failure.
 - **Must make the diff image from the current image, faded to light gray, with changed pixels solid `#ff0050`.** Its encoder lives in `cli/`, since `docs/specs/store.md` → Storage forbids one in the store.
 - **Must treat a capture's unusable file as that story's failure**: a manifest path outside the capture directory, a path that isn't a regular file, or a PNG the store refuses. Other stories continue.
 - **Must fail with exit 2 if HEAD moves during the render, or if no story was captured**, since one Git SHA must describe the run, and a typo must not pass.
-- **Must record `dirty` as whether the tree had changes either before or after the render.** Ignored files don't count, so a gitignored `storybook-static` doesn't dirty the tree, and neither does a stale one (rationale).
-- **Must say so in `stability.note` when `--stability` wasn't passed**, and leave `counts.unstable` null rather than 0. It is off by default (rationale).
-- **Must not call a golden removed when `--story` left its story out.** Such goldens are counted in `filter.notRendered`, and are not in `differences`, `counts.removed`, or `needsAttention`. A removed story matching a pattern still is.
+- **Must record a run as dirty if the tree had changes either before or after the render.** Ignored files don't count, so a gitignored `storybook-static` doesn't dirty the tree, and neither does a stale one (rationale).
+- **Must leave stability off unless asked, and say which in `stabilityChecked`** (rationale).
+- **Must not call a golden removed when `--story` left its story out.** Such goldens are counted in `filter.notRendered`, and are not in `differences`, `counts.removed`, or `blockers`. A removed story matching a pattern still is.
 
-### What needs attention
+### What blocks
 
-- **Must list these in `needsAttention`, and exit 1 if it isn't empty,** each with its story, `reason`, and a `detail`:
+Source of truth: `summarizeRun` in `cli/src/summary.ts`.
 
-| `reason` | When |
-|---|---|
-| `failed` | The story failed to render, or its image was unusable |
-| `play-error` | Its `play` function threw. Its image is still recorded (`docs/specs/render.md` → Manifest) |
-| `unstable` | `--stability` saw it render differently twice |
-| `changed-unapproved`, `new-unapproved` | Its image has no decision |
-| `rejected` | Its image is rejected |
-| `removed` | The baseline has its golden, and this run doesn't have the story |
-| `pattern-unmatched` | A `--story` pattern matched nothing, while another did. `story` is null |
+- **Must exit 1 if `blockers` isn't empty, and never because of `advisories`.** Each entry has a `story`, a `reason`, and a `detail` holding the fact behind it, if there is one:
+
+| List | `reason` | When | `detail` |
+|---|---|---|---|
+| `blockers` | `failed` | The story failed to render, or its image was unusable | The failure |
+| | `changed-unapproved`, `new-unapproved` | Its image has no decision | |
+| | `rejected` | Its image is rejected | The actor |
+| | `removed` | The baseline has its golden, and this run doesn't have the story | |
+| | `pattern-unmatched` | A `--story` pattern matched nothing, while another did. `story` is null | The pattern |
+| `advisories` | `play-error` | Its `play` function threw. Its image is still recorded (`docs/specs/render.md` → Manifest) | The message |
+| | `unstable` | `--stability` saw it render differently twice | |
 
 - **Must not list an approved image**: it is still in `differences`, with its `decision`. That is how an approval made earlier, at any Git SHA, needs no repeating (`docs/specs/system.md` → Approvals).
-- **Must list a `play` error or an unstable story whatever its state**, including unchanged ones.
-- **Never make `play` errors or instability a gate.** They need attention, and `accept` reports them, but `acceptRun`'s checks are the only ones on an image (`docs/specs/snapshots.md` → Open questions).
+- **Must list an advisory whatever its story's state**, including unchanged, and count them in `counts.advisories`.
+- **Never make an advisory a gate.** `accept` reports them, but `acceptRun`'s checks are the only ones on an image (`docs/specs/snapshots.md` → Open questions).
 
 ### The document
 
-Every path is absolute, and names a file that exists.
+Every path is absolute, and names a file that exists until it is pruned.
 
 | Field | Meaning |
 |---|---|
 | `schemaVersion` | 1 |
-| `runId`, `status` | The run, and `complete` or `failed` |
-| `gitSha`, `dirty`, `dirtyPaths` | What it was recorded against. `dirtyPaths` holds at most 20 |
-| `baselineSha`, `baseline` | The baseline or null, and the whole `find-baseline` result |
-| `environment` | `id` and `definition` |
-| `initScriptSha256`, `storybookDir`, `outputDir` | What it rendered, and its run directory |
+| `runId`, `gitSha` | The run, and what it was recorded against |
+| `dirtyPaths` | Up to 20 of the tree's changes while it rendered. Empty means clean |
+| `baseline` | `sha`, `reason`, and `message`, as [`find-baseline`](#find-baseline) gives them |
+| `environment` | Its ID |
 | `filter` | `patterns` and `notRendered`, or null with no `--story` |
-| `stability` | `checked` and `note` |
-| `counts` | `stories`, `unchanged`, `changed`, `new`, `removed`, `failed`, `playErrors`, `unstable`, `approved`, `rejected`, `undecided`, `needsAttention` |
-| `needsAttention[]` | `story`, `reason`, `detail` |
-| `differences[]` | `story`, `state`, `decision`, `unstable`, `imageHash`, `goldenHash`, `current`, `golden`, `diff`, `pixelDiff` |
-| `failures[]` | `story`, `failure`, `goldenHash` |
-| `playErrors[]` | `story`, `errors`, `current` |
+| `stabilityChecked` | Whether `--stability` ran |
+| `counts` | `stories`, `unchanged`, `changed`, `new`, `removed`, `undecided`, and `advisories` |
+| `blockers[]`, `advisories[]` | `story`, `reason`, `detail` |
+| `differences[]` | `story`, `state`, `decision`, `imageHash`, `goldenHash`, `current`, `golden`, `diff`, `pixelDiff` |
+| `playErrors[]` | `story`, `playError`, `current` |
 | `unstable[]` | `story`, `current`, `repeat` |
 | `warnings[]` | The manifest's |
 | `next[]` | What to do next, in words and commands |
-| `timings` | `captureMs`, `storeMs`, `compareMs`, `diffMs`, `totalMs` |
 
 `pixelDiff` is `{ kind: "pixels", changedPixels, totalPixels, boundingBox, maxChannelDelta }`, or `{ kind: "size-differs", current, golden }` with their widths and heights, and is null unless `changed`.
+
+- **Must keep a difference's hashes**, so a UI can cache images by content.
+- **Must say, when the baseline is null and HEAD isn't the merge-base, that the next step is to review and accept at the merge-base on the default branch**, since goldens accepted on a feature branch aren't read by later reviews.
 
 ## Output directories
 
 Source of truth: `cli/src/project.ts`.
 
+- **Must keep every fact about a run in the store**, so that deleting a run directory loses nothing but the exported files: a pruned run can be decided on and accepted, and its images come from `Store.getImage`.
 - **Must give each review its own capture directory and run directory, named by UUID**, so concurrent reviews can't touch each other's files.
 - **Must delete a capture directory when its review ends, however it ends.** A later review deletes one over 24 hours old, left by a crash.
 - **Must keep the newest 20 run directories, and delete older ones at the end of each review** (rationale). A run is never deleted from the store, per `docs/specs/snapshots.md` → Open questions, and an image's blob stays with it.
-- **Must refuse to decide on or accept a run with no `review.json`**, with exit 2 and the advice to review again. That includes a run a crash left `recording`. Approvals are in the store, so nothing is lost.
-- **Must write `review.json` last, atomically**, so a run with a record has everything the record names.
+- **Must write `review.json` atomically.** It holds exported paths and pixel diffs, which are all it can lose.
 
 ## Approve and reject
 
-Source of truth: `cli/src/decisions.ts`.
+Source of truth: `decide` in `cli/src/decisions.ts`.
 
 - **Must decide on exactly the run's `changed` and `new` images selected by `--all` or `--story`, and require exactly one of those.** Unchanged images get no decision. Failed and removed ones have no image, and are listed under `skipped`.
 - **Must work on a dirty tree**, so a user can approve work before committing it (`docs/specs/system.md` → Approvals).
 - **Must take the actor from `--actor`, or else `git config user.email`**, and fail if there's neither.
-- **Must compare against the baseline in the run's `review.json`**, the one its reviewer saw.
+- **Must compare against the baseline recorded on the run**, the one its reviewer saw.
 
 It prints `runId`, `decision`, `actor`, `decided`, `skipped`, `undecided` (what still has no decision), and `unmatchedPatterns`.
 
@@ -139,25 +166,24 @@ A first run needs every image approved: `selfie approve <run> --all`, then `self
 
 ## Accept
 
-Source of truth: `cli/src/decisions.ts`.
+Source of truth: `accept` in `cli/src/decisions.ts`.
 
 - **Must refuse, with exit 1, and report every reason at once:**
 
-| `reason` | When |
-|---|---|
-| `dirty-tree` | The tree is dirty now |
-| `recorded-on-dirty-tree` | The run was recorded on a dirty tree, even if it is clean now (rationale) |
-| `run-has-failures` | A story failed to render |
-| `unapproved` | A changed or new image isn't approved. `unapproved[]` lists them |
-| `removed-unacknowledged` | The baseline has stories this run lacks, and `--removed` wasn't passed |
-| `wrong-removed-count` | `--removed` isn't the count there is |
+| `reason` | When | Fields |
+|---|---|---|
+| `recorded-on-dirty-tree` | The run was recorded on a dirty tree, even if it is clean now (rationale). `acceptRun` refuses this for every caller | `gitSha` |
+| `run-has-failures` | A story failed to render | `stories` |
+| `unapproved` | A changed or new image isn't approved | `stories` of `story`, `state`, `decision` |
+| `removed-unacknowledged` | The baseline has stories this run lacks, and `--removed` wasn't passed | `stories`, `outsideFilter` |
+| `wrong-removed-count` | `--removed` isn't the count there is | `stories`, `outsideFilter`, `seen` |
 
-- **Must show what a refusal is about by name**, in its `message` and in `removed[]`, including which removals are only outside a `--story` filter.
+- **Must not check the tree as it is now**: only how the run was recorded decides whether its images describe its SHA (rationale). So a run recorded clean may be accepted while HEAD is elsewhere or the tree has moved on.
 - **Must pass `acceptRun` the count the caller gave in `--removed`, and 0 if there are no removals.** `docs/specs/snapshots.md` → Goldens owns what it does with it. A filtered run may be accepted, once acknowledged, and then drops the goldens it left out.
-- **May accept a run recorded clean at an earlier commit, while HEAD is elsewhere**, since its goldens describe that commit.
-- **Must report the run's `playErrors` and `unstable` in its output, accepted or not.**
+- **Must report `usableAsBaseline`: whether the SHA is on the default branch's first-parent history, or HEAD's if there is none.** Accepting off it succeeds, and later reviews won't read those goldens ([`find-baseline`](#find-baseline)).
+- **Must report the run's advisories in its output, accepted or not.**
 
-It prints `accepted`, `runId`, `gitSha`, `environment`, `baselineSha`, `removed`, `playErrors`, `unstable`, and when refused, `refusals[]` of `reason` and `message`, and `unapproved`.
+It prints `accepted`, `runId`, `gitSha`, `environment`, `baselineSha`, `usableAsBaseline`, `removed`, `refusals[]` with each one's fields and a `message`, and `advisories`.
 
 ## find-baseline
 
@@ -165,8 +191,7 @@ Source of truth: `cli/src/git.ts`; tests in `cli/test/git.test.ts`, on real Git 
 
 - **Must run Git only by argument arrays, never through a shell.**
 - **Must choose the default branch as the first of these that exists:** `origin/HEAD`'s target, `origin/main`, `origin/master`, local `main`, local `master`. With none, it walks from HEAD and says so in `message`.
-- **Must start at the merge-base of HEAD and the default branch, and walk first-parent history, nearest first, to the first SHA where `hasCompleteGoldens` is true in the environment.** A branch's own goldens are never its baseline (rationale).
-- **Must stop after `--max-commits` commits, default 1,000.**
+- **Must start at the merge-base of HEAD and the default branch, and walk first-parent history, nearest first, for at most 1,000 commits, to the first SHA with complete goldens in the environment.** A branch's own goldens are never its baseline (rationale). It asks through `Snapshots.firstWithGoldens`, about 10 queries for 1,000 commits at worst.
 - **Must exit 0 whatever it finds, and explain null** with `reason` and `message`:
 
 | `reason` | When |
@@ -174,10 +199,10 @@ Source of truth: `cli/src/git.ts`; tests in `cli/test/git.test.ts`, on real Git 
 | `no-commits` | The repository has none |
 | `no-merge-base` | HEAD shares no history with the default branch |
 | `shallow-history` | The clone is shallow, and history ended before an answer |
-| `limit-reached` | `--max-commits` ran out |
+| `limit-reached` | 1,000 commits had no goldens |
 | `no-goldens` | The whole history was checked |
 
-It prints `baselineSha`, `environment`, `head`, `detached`, `defaultBranch`, `mergeBase`, `commitsChecked`, `maxCommits`, `shallow`, `reason`, and `message`.
+It prints `sha`, `reason`, `message`, `defaultBranch`, `mergeBase`, and `environment`.
 
 - **Must use local data only.** `sync` adds the cloud's goldens ([Future](#future)).
 
@@ -185,14 +210,14 @@ It prints `baselineSha`, `environment`, `head`, `detached`, `defaultBranch`, `me
 
 Source of truth: `cli/src/config.ts`.
 
-`selfie.config.json` at the Git top level, or the file `--config` names, holds:
+`selfie.config.json` at the Git top level is the only place a project configures Selfie:
 
 | Key | Meaning |
 |---|---|
 | `environment` | Overrides for `defineEnvironment` (`docs/specs/render.md` → Environment) |
-| `initScript` | A file inside the config's directory, used as `capture`'s `initScript` |
+| `initScript` | A file inside the Git top level, used as `capture`'s `initScript` |
 
-- **Must let a flag win over the config**, and the config over the default: `--native` over `runner`, `--init-script` over `initScript`.
+- **May let `--native` win over its `runner`.**
 - **Must refuse an unknown key**, so a typo can't silently render the wrong environment.
 - **Never read a build command from a file.** A checkout must not be able to run a shell; only `--build-command` can.
 
@@ -210,15 +235,25 @@ Story IDs come from a project's build, and a manifest's paths from a directory i
 
 **Scope: sync** is defined in `docs/specs/system.md` → Build order. For this CLI it still needs:
 
-- `find-baseline` asking the cloud's goldens as well as local ones, and its per-commit question batched, since each is a request there.
+- `find-baseline` asking the cloud's goldens as well as local ones.
 - `selfie push` and `selfie pull`, and carrying decisions through them (`docs/specs/snapshots.md` → Future).
 - A way for a branch's reviewer to have a baseline when only other machines accepted the default branch's goldens.
 
-**Scope: local-review** is defined in `docs/specs/system.md` → Build order, and reads the same store and run directories.
+**Scope: local-review** is defined in `docs/specs/system.md` → Build order. It reads the store through [the library](#library), and images from `Store.getImage` or the run directories.
 
 ### Recording only if necessary
 
-The README's `review` records "only if necessary", and today it always renders. Reusing a finished run needs a way to prove the build hasn't changed, such as a hash of the Storybook directory, and an identical init script and environment.
+This is the README's "records snapshots (only if necessary)", and today `review` always renders. Skipping the render when the build is unchanged would take a 70 s rerun of 541 stories to about 0.5 s (rationale). With it, or independently of it:
+
+- A cache from PNG bytes to image hash, since decoding and hashing unchanged images is most of a review's non-render time.
+- A diff cache by hash pair.
+
+What a review of the idea found could go wrong:
+
+- **The key must include `settleMs`, the init script, and the renderer version**, along with the environment and a hash of the build, since each can change pixels without changing the environment ID or the commit.
+- **Never reuse a run with failures.**
+- **Non-reproducible builds miss.** A build embedding a timestamp or a random chunk name never hits, and that must be no worse than today.
+- **Must report `reusedFromRun`**, so nobody mistakes a reused result for a fresh render.
 
 ### Open questions
 

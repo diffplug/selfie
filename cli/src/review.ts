@@ -1,72 +1,65 @@
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { availableParallelism } from "node:os";
 import path from "node:path";
-import { filterStories, type Manifest, type ManifestStory, type RenderEnvironment, type StoryError } from "selfie-render";
 import {
+  capture as realCapture,
+  filterStories,
+  type Manifest,
+  type ManifestStory,
+  type StoryError,
+} from "selfie-render";
+import {
+  chunks,
   decodeImage,
   ImageDecodeError,
   type ComparedSnapshot,
+  type Comparison,
   type Decision,
   type RecordedSnapshot,
-  type RunStatus,
+  type StoryFilter,
 } from "selfie-store";
-import { resolveCaptureSettings } from "./config.ts";
+import { resolveCaptureSettings, type CaptureSettings } from "./config.ts";
 import { diffImages, type PixelDiff } from "./diff.ts";
-import { dirtyPaths, findBaseline, readHead, type BaselineResult } from "./git.ts";
-import { CliError, EXIT_NEEDS_ATTENTION, EXIT_OK, printJson, type Context } from "./output.ts";
+import { SelfieError } from "./errors.ts";
+import { dirtyPaths, headSha, type BaselineSearch } from "./git.ts";
 import { regularFileInside, storyDirName } from "./paths.ts";
 import { encodePng } from "./png.ts";
 import {
   captureDirectory,
-  openProject,
+  findBaseline,
   pruneOutput,
   runDirectory,
-  writeRunRecord,
+  writeReviewCache,
   type Project,
 } from "./project.ts";
+import { isDecidable, summarizeRun } from "./summary.ts";
 
-/** Each group is read into memory whole, and `Store.putImages` takes at most this many per SQL request. */
+/** Each group is read into memory whole. */
 const IMAGES_PER_GROUP = 100;
 const MAX_CONCURRENT_DIFFS = 6;
-const HUMAN_LINES = 30;
-const STABILITY_NOT_RUN =
-  "Stability wasn't checked, so no story can be flagged as unstable. Pass --stability to render every story twice.";
 
-export interface ReviewFlags {
+export interface ReviewOptions {
+  /** Relative to the project's `cwd`. */
   readonly storybookDir: string;
+  /** The caller's own command, run in a shell. Its stdout goes to stderr. */
   readonly buildCommand?: string | undefined;
-  readonly config?: string | undefined;
-  readonly native?: boolean | undefined;
-  readonly story?: string[] | undefined;
-  readonly initScript?: string | undefined;
+  /** Story ID patterns. Defaults to every story. */
+  readonly stories?: readonly string[] | undefined;
   readonly stability?: boolean | undefined;
-  readonly human?: boolean | undefined;
-}
-
-export type AttentionReason =
-  | "failed"
-  | "play-error"
-  | "unstable"
-  | "changed-unapproved"
-  | "new-unapproved"
-  | "rejected"
-  | "removed"
-  | "pattern-unmatched";
-
-export interface Attention {
-  /** Null only for `pattern-unmatched`. */
-  readonly story: string | null;
-  readonly reason: AttentionReason;
-  readonly detail: string;
+  readonly native?: boolean | undefined;
+  /** Defaults to the renderer's. */
+  readonly capture?: typeof realCapture | undefined;
+  readonly signal?: AbortSignal | undefined;
+  /** Progress for people. Defaults to nothing. */
+  readonly log?: ((line: string) => void) | undefined;
 }
 
 export interface Difference {
   readonly story: string;
   readonly state: "changed" | "new" | "removed";
   readonly decision: Decision | null;
-  readonly unstable: boolean | null;
   readonly imageHash: string | null;
   readonly goldenHash: string | null;
   /** Absolute paths. `current` is null if removed, `golden` if new, `diff` unless pixels could be compared. */
@@ -77,46 +70,18 @@ export interface Difference {
   readonly pixelDiff: PixelDiff | null;
 }
 
-/** What `selfie review` prints, and also what it keeps for later commands as `review.json`. */
-export interface ReviewOutput {
-  readonly schemaVersion: 1;
-  readonly runId: string;
-  readonly status: RunStatus;
-  readonly gitSha: string;
-  /** Whether the tree had changes while this ran, so the images may not describe `gitSha`. */
-  readonly dirty: boolean;
+export interface ReviewResult {
+  /** Everything about the run, as `summarizeRun` reads it. */
+  readonly comparison: Comparison;
+  /** Modified, staged, and untracked paths while it rendered. */
   readonly dirtyPaths: readonly string[];
-  readonly baselineSha: string | null;
-  readonly baseline: BaselineResult;
-  readonly environment: { readonly id: string; readonly definition: RenderEnvironment };
-  readonly initScriptSha256: string | null;
-  readonly storybookDir: string;
-  /** The per-run directory holding every image path below. */
-  readonly outputDir: string;
-  /** Set if `--story` limited this run. `notRendered` is how many goldens it didn't try to match. */
-  readonly filter: { readonly patterns: readonly string[]; readonly notRendered: number } | null;
-  readonly stability: { readonly checked: boolean; readonly note: string | null };
-  readonly counts: {
-    readonly stories: number;
-    readonly unchanged: number;
-    readonly changed: number;
-    readonly new: number;
-    readonly removed: number;
-    readonly failed: number;
-    readonly playErrors: number;
-    /** Null if stability wasn't checked. */
-    readonly unstable: number | null;
-    readonly approved: number;
-    readonly rejected: number;
-    readonly undecided: number;
-    readonly needsAttention: number;
-  };
-  readonly needsAttention: readonly Attention[];
+  readonly baseline: BaselineSearch;
+  readonly stabilityChecked: boolean;
+  /** Within the run's filter. */
   readonly differences: readonly Difference[];
-  readonly failures: readonly { readonly story: string; readonly failure: string; readonly goldenHash: string | null }[];
   readonly playErrors: readonly {
     readonly story: string;
-    readonly errors: readonly StoryError[];
+    readonly playError: string;
     readonly current: string | null;
   }[];
   readonly unstable: readonly {
@@ -126,8 +91,6 @@ export interface ReviewOutput {
     readonly repeat: string | null;
   }[];
   readonly warnings: readonly string[];
-  /** What to do next, as commands to run. */
-  readonly next: readonly string[];
   readonly timings: {
     readonly captureMs: number;
     readonly storeMs: number;
@@ -137,20 +100,37 @@ export interface ReviewOutput {
   };
 }
 
-/** The user's own command, in a shell, on purpose. Its stdout goes to stderr, keeping stdout one document. */
 function runBuildCommand(command: string, cwd: string, signal: AbortSignal | undefined): Promise<void> {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, { shell: true, cwd, stdio: ["ignore", 2, 2], signal });
-    child.once("error", (error) => reject(new CliError(`--build-command couldn't run: ${error.message}`)));
+    const child = spawn(command, { shell: true, cwd, stdio: ["ignore", 2, 2], ...(signal ? { signal } : {}) });
+    child.once("error", (error) =>
+      reject(new SelfieError("build-failed", `The build command couldn't run: ${error.message}`)),
+    );
     child.once("close", (code, killedBy) => {
       if (code === 0) resolve();
-      else reject(new CliError(`--build-command failed with ${killedBy ?? `exit code ${code}`}.`));
+      else reject(new SelfieError("build-failed", `The build command failed with ${killedBy ?? `exit code ${code}`}.`));
     });
   });
 }
 
+/** No stories means nothing to record, and a typo must not pass. */
+function assertStoriesCaptured(manifest: Manifest, storybookDir: string, stories: readonly string[] | undefined) {
+  if (manifest.stories.length > 0) return;
+  throw new SelfieError(
+    "no-stories",
+    stories === undefined
+      ? `The Storybook at ${storybookDir} has no stories.`
+      : `No story matched ${stories.join(", ")}.`,
+  );
+}
+
 const describeErrors = (errors: readonly StoryError[]) =>
-  errors.map(({ source, message }) => `${source}: ${message}`).join("; ") || "the story failed to render";
+  errors.map(({ source, message }) => `${source}: ${message}`).join("; ") || "The story failed to render.";
+
+const playErrorOf = ({ errors }: ManifestStory) => {
+  const play = errors.filter(({ source }) => source === "play");
+  return play.length === 0 ? null : play.map(({ message }) => message).join("; ");
+};
 
 /** `null` stands for "nobody checked", which is also a failed story's answer. */
 function unstableFlag({ stability }: ManifestStory): boolean | null {
@@ -184,16 +164,10 @@ async function storeGroup(
   return { hashes, refused };
 }
 
-/** Puts the capture's images in the store. Returns one row per story, and each stored story's hash. */
-async function storeCapture(
-  project: Project,
-  captureDir: string,
-  manifest: Manifest,
-): Promise<{ records: RecordedSnapshot[]; hashes: Map<string, string> }> {
+/** Puts the capture's images in the store, and returns one row per story. */
+async function storeCapture(project: Project, captureDir: string, manifest: Manifest): Promise<RecordedSnapshot[]> {
   const records: RecordedSnapshot[] = [];
-  const hashes = new Map<string, string>();
-  for (let start = 0; start < manifest.stories.length; start += IMAGES_PER_GROUP) {
-    const group = manifest.stories.slice(start, start + IMAGES_PER_GROUP);
+  for (const group of chunks(manifest.stories, IMAGES_PER_GROUP)) {
     const failures = new Map<string, string>();
     const files: { story: string; png: Uint8Array }[] = [];
     for (const story of group) {
@@ -208,16 +182,16 @@ async function storeCapture(
     const stored = await storeGroup(project, files);
     for (const [story, message] of stored.refused) failures.set(story, `The store refused its image: ${message}`);
     for (const story of group) {
-      const hash = stored.hashes.get(story.id);
-      if (hash !== undefined) {
-        hashes.set(story.id, hash);
-        records.push({ story: story.id, imageHash: hash, unstable: unstableFlag(story) });
-      } else {
-        records.push({ story: story.id, failure: failures.get(story.id)!, unstable: null });
-      }
+      const imageHash = stored.hashes.get(story.id);
+      const shared = { story: story.id, playError: playErrorOf(story) };
+      records.push(
+        imageHash !== undefined
+          ? { ...shared, imageHash, unstable: unstableFlag(story) }
+          : { ...shared, failure: failures.get(story.id)!, unstable: null },
+      );
     }
   }
-  return { records, hashes };
+  return records;
 }
 
 async function mapConcurrently<Item, Result>(
@@ -247,7 +221,7 @@ async function exportImage(
   hash: string,
 ): Promise<{ file: string; bytes: Uint8Array }> {
   const bytes = await project.store.getImage(hash);
-  if (bytes === null) throw new CliError(`Image ${hash} is missing from the local store.`);
+  if (bytes === null) throw new SelfieError("missing-image", `Image ${hash} is missing from the local store.`);
   const file = path.join(directory, name);
   await writeFile(file, bytes);
   return { file, bytes };
@@ -259,19 +233,9 @@ async function storyDirectory(runDir: string, story: string): Promise<string> {
   return directory;
 }
 
-/** An unstable story's second render, which only exists in the capture, since it isn't the run's image. */
-async function exportRepeat(captureDir: string, runDir: string, story: ManifestStory): Promise<string | null> {
-  if (story.repeatFile === null) return null;
-  const checked = await regularFileInside(captureDir, story.repeatFile);
-  if ("refused" in checked) return null;
-  const file = path.join(await storyDirectory(runDir, story.id), "repeat.png");
-  await writeFile(file, await readFile(checked.file));
-  return file;
-}
-
 /** Writes one difference's files, and computes a pixel diff if it is `changed`. */
 async function exportDifference(project: Project, runDir: string, snapshot: ComparedSnapshot): Promise<Difference> {
-  const { story, imageHash, goldenHash, decision, unstable } = snapshot;
+  const { story, imageHash, goldenHash, decision } = snapshot;
   const directory = await storyDirectory(runDir, story);
   const current = imageHash === null ? null : await exportImage(project, directory, "current.png", imageHash);
   const golden = goldenHash === null ? null : await exportImage(project, directory, "golden.png", goldenHash);
@@ -290,7 +254,6 @@ async function exportDifference(project: Project, runDir: string, snapshot: Comp
     story,
     state: snapshot.state as Difference["state"],
     decision,
-    unstable,
     imageHash,
     goldenHash,
     current: current?.file ?? null,
@@ -300,238 +263,175 @@ async function exportDifference(project: Project, runDir: string, snapshot: Comp
   };
 }
 
-function attentionForDifference(difference: Difference): Attention | null {
-  const { story, state, decision, pixelDiff } = difference;
-  if (state === "removed") {
-    return { story, reason: "removed", detail: "The baseline has this story's golden, and this run doesn't have the story." };
-  }
-  if (decision?.decision === "approved") return null;
-  if (decision?.decision === "rejected") {
-    return { story, reason: "rejected", detail: `${decision.actor} rejected this image.` };
-  }
-  if (state === "new") return { story, reason: "new-unapproved", detail: "No golden yet, and this image isn't approved." };
-  return {
-    story,
-    reason: "changed-unapproved",
-    detail:
-      pixelDiff?.kind === "size-differs"
-        ? `The size changed from ${pixelDiff.golden.width}x${pixelDiff.golden.height} to ${pixelDiff.current.width}x${pixelDiff.current.height}, and this image isn't approved.`
-        : `${pixelDiff?.kind === "pixels" ? pixelDiff.changedPixels : "Some"} pixels changed, and this image isn't approved.`,
+/** Exports what's needed to act on the comparison: only `changed` snapshots get diff work. */
+async function exportImages(project: Project, runDir: string, comparison: Comparison, captureDir: string, manifest: Manifest) {
+  const { removed } = summarizeRun(comparison);
+  const shown = [...comparison.snapshots.filter(({ state }) => isDecidable(state)), ...removed];
+  const differences = await mapConcurrently(
+    shown,
+    Math.min(MAX_CONCURRENT_DIFFS, availableParallelism()),
+    (snapshot) => exportDifference(project, runDir, snapshot),
+  );
+
+  // Unchanged stories can need a look too, so these get their images here.
+  const exportCurrent = async ({ story, imageHash }: ComparedSnapshot) => {
+    if (imageHash === null) return null;
+    return (await exportImage(project, await storyDirectory(runDir, story), "current.png", imageHash)).file;
   };
+  const playErrors = await Promise.all(
+    comparison.snapshots
+      .filter(({ playError }) => playError !== null)
+      .map(async (snapshot) => ({
+        story: snapshot.story,
+        playError: snapshot.playError!,
+        current: await exportCurrent(snapshot),
+      })),
+  );
+
+  const repeatFiles = new Map(manifest.stories.map(({ id, repeatFile }) => [id, repeatFile]));
+  const exportRepeat = async (story: string) => {
+    const repeatFile = repeatFiles.get(story) ?? null;
+    if (repeatFile === null) return null;
+    const checked = await regularFileInside(captureDir, repeatFile);
+    if ("refused" in checked) return null;
+    const file = path.join(await storyDirectory(runDir, story), "repeat.png");
+    await copyFile(checked.file, file);
+    return file;
+  };
+  const unstable = await Promise.all(
+    comparison.snapshots
+      .filter(({ unstable: flag }) => flag === true)
+      .map(async (snapshot) => ({
+        story: snapshot.story,
+        current: await exportCurrent(snapshot),
+        repeat: await exportRepeat(snapshot.story),
+      })),
+  );
+  return { differences, playErrors, unstable };
 }
 
-function nextSteps(
-  runId: string,
-  dirty: boolean,
-  differences: readonly Difference[],
-  removedTotal: number,
-  failed: number,
-): string[] {
-  const steps: string[] = [];
-  const undecided = differences.filter(({ state, decision }) => state !== "removed" && decision === null).length;
-  if (undecided > 0) {
-    steps.push(`Look at the images, then: selfie approve ${runId} --all, or with --story <pattern>, or selfie reject.`);
-  }
-  if (failed > 0) steps.push("A run with failed stories can't be accepted. Fix them and review again.");
-  if (dirty) {
-    steps.push("This tree is dirty, so this run can't become goldens. Commit, and review again: approvals carry over.");
-  } else if (differences.length > 0 && failed === 0) {
-    const removed = removedTotal > 0 ? ` --removed ${removedTotal}` : "";
-    steps.push(`Once every image is approved, make this run its commit's goldens: selfie accept ${runId}${removed}`);
-  }
-  return steps;
+/** What a capture says about a filter, as a fact for the run. */
+function storyFilterOf(patterns: readonly string[] | undefined, manifest: Manifest): StoryFilter | null {
+  return patterns === undefined ? null : { patterns, unmatched: filterStories(manifest.stories, patterns).unmatched };
 }
 
-function humanSummary(output: ReviewOutput): string {
-  const { counts } = output;
-  const lines = [
-    `Run ${output.runId} at ${output.gitSha.slice(0, 12)}${output.dirty ? " (dirty)" : ""}, baseline ${output.baselineSha?.slice(0, 12) ?? "none"}`,
-    `${counts.stories} stories: ${counts.unchanged} unchanged, ${counts.changed} changed, ${counts.new} new, ${counts.removed} removed, ${counts.failed} failed`,
-    ...(output.stability.checked ? [] : ["Stability wasn't checked."]),
-  ];
-  if (output.needsAttention.length > 0) {
-    lines.push(`Needs attention (${output.needsAttention.length}):`);
-    for (const { story, reason } of output.needsAttention.slice(0, HUMAN_LINES)) {
-      lines.push(`  ${reason}: ${story}`);
-    }
-    if (output.needsAttention.length > HUMAN_LINES) lines.push("  ...");
-  }
-  lines.push(...output.next);
-  return `${lines.join("\n")}\n`;
+async function recordRun(
+  project: Project,
+  captureDir: string,
+  manifest: Manifest,
+  fields: {
+    gitSha: string;
+    settings: CaptureSettings;
+    dirty: boolean;
+    baselineSha: string | null;
+    storyFilter: StoryFilter | null;
+  },
+) {
+  const { snapshots } = project;
+  const run = await snapshots.beginRun({
+    gitSha: fields.gitSha,
+    environment: fields.settings.environmentId,
+    dirty: fields.dirty,
+    baselineSha: fields.baselineSha,
+    storyFilter: fields.storyFilter,
+  });
+  const records = await storeCapture(project, captureDir, manifest);
+  await snapshots.recordSnapshots(run.id, records);
+  await snapshots.finishRun(run.id, records.length);
+  return run;
 }
 
-export async function reviewCommand(flags: ReviewFlags, context: Context): Promise<number> {
-  const started = Date.now();
-  const log = (line: string) => context.stderr(`${line}\n`);
-  const project = await openProject(context);
+/**
+ * Renders a built Storybook, records a run, and exports what differs from the baseline. A story's
+ * failure is a fact in the result. Throws if the review couldn't run.
+ */
+export async function review(project: Project, options: ReviewOptions): Promise<ReviewResult> {
   const { repo } = project;
+  const log = options.log ?? (() => {});
+  const capture = options.capture ?? realCapture;
+  const started = Date.now();
+  const storybookDir = path.resolve(project.cwd, options.storybookDir);
   const captureDir = captureDirectory(project, randomUUID());
   try {
-    const storybookDir = path.resolve(context.cwd, flags.storybookDir);
-    if (flags.buildCommand !== undefined) {
-      log(`Building: ${flags.buildCommand}`);
-      await runBuildCommand(flags.buildCommand, context.cwd, context.signal);
+    // 1. Build. Whatever it writes is part of what this review describes, so it comes first.
+    if (options.buildCommand !== undefined) {
+      log(`Building: ${options.buildCommand}`);
+      await runBuildCommand(options.buildCommand, project.cwd, options.signal);
     }
 
-    // After the build, whose output is part of what is being described.
-    const { sha: gitSha } = await readHead(repo);
+    // 2. Read where we are.
+    const gitSha = await headSha(repo);
     if (gitSha === null) {
-      throw new CliError("This repository has no commits yet, and a run is recorded against a Git SHA. Commit first.");
+      throw new SelfieError("no-commits", "This repository has no commits yet, and a run is recorded against a Git SHA.");
     }
-    const settings = await resolveCaptureSettings(flags, context.cwd, repo);
-    const baseline = await findBaseline(repo, settings.environmentId, (sha) =>
-      project.snapshots.hasCompleteGoldens(sha, settings.environmentId),
-    );
+    const settings = await resolveCaptureSettings(repo, { native: options.native });
+    const baseline = await findBaseline(project, settings.environmentId);
     const dirtyBefore = await dirtyPaths(repo);
 
+    // 3. Capture.
     const captureStarted = Date.now();
-    const manifest = await context.capture({
+    const manifest = await capture({
       storybookDir,
       outDir: captureDir,
       environment: settings.environment,
-      stability: flags.stability ?? false,
+      stability: options.stability ?? false,
       log,
-      ...(flags.story === undefined ? {} : { stories: flags.story }),
+      ...(options.stories === undefined ? {} : { stories: [...options.stories] }),
       ...(settings.initScript === undefined ? {} : { initScript: settings.initScript }),
-      ...(context.signal === undefined ? {} : { signal: context.signal }),
+      ...(options.signal === undefined ? {} : { signal: options.signal }),
     });
     const captured = Date.now();
-    if (manifest.stories.length === 0) {
-      throw new CliError(
-        flags.story === undefined
-          ? `The Storybook at ${storybookDir} has no stories.`
-          : `No story matched --story ${flags.story.join(", ")}.`,
-      );
-    }
+    assertStoriesCaptured(manifest, storybookDir, options.stories);
 
-    // A moved HEAD means no one commit describes what was rendered.
-    const { sha: shaAfter } = await readHead(repo);
+    // 4. Check one commit still describes what rendered.
+    const shaAfter = await headSha(repo);
     if (shaAfter !== gitSha) {
-      throw new CliError(`HEAD moved from ${gitSha} to ${shaAfter} during the render, so review again.`);
+      throw new SelfieError("head-moved", `HEAD moved from ${gitSha} to ${shaAfter} during the render, so review again.`);
     }
     const dirty = [...new Set([...dirtyBefore, ...(await dirtyPaths(repo))])];
 
-    const { snapshots } = project;
-    const run = await snapshots.beginRun({ gitSha, environment: settings.environmentId });
-    const { records, hashes } = await storeCapture(project, captureDir, manifest);
-    await snapshots.recordSnapshots(run.id, records);
-    const finished = await snapshots.finishRun(run.id, records.length);
+    // 5. Record.
+    const run = await recordRun(project, captureDir, manifest, {
+      gitSha,
+      settings,
+      dirty: dirty.length > 0,
+      baselineSha: baseline.sha,
+      storyFilter: storyFilterOf(options.stories, manifest),
+    });
     const stored = Date.now();
-    log(`Recorded run ${run.id}: ${records.length} stories.`);
+    log(`Recorded run ${run.id}: ${manifest.stories.length} stories.`);
 
-    const comparison = await snapshots.compareRun(run.id, baseline.baselineSha);
+    // 6. Compare.
+    const comparison = await project.snapshots.compareRun(run.id, baseline.sha);
     const compared = Date.now();
 
+    // 7. Export, keep a cache of what was exported, and prune older runs.
     const runDir = runDirectory(project, run.id);
     await mkdir(runDir, { recursive: true });
-    const isDifference = ({ state }: ComparedSnapshot) => state === "changed" || state === "new" || state === "removed";
-
-    const patterns = flags.story ?? null;
-    const inFilter = (story: string) =>
-      patterns === null || filterStories([{ id: story, title: "", name: "" }], patterns).stories.length > 0;
-    const shown = comparison.snapshots.filter((snapshot) => isDifference(snapshot) && inFilter(snapshot.story));
-    const removedTotal = comparison.snapshots.filter(({ state }) => state === "removed").length;
-    log(`Comparing: ${shown.length} differences.`);
-
-    const differences = await mapConcurrently(
-      shown,
-      Math.min(MAX_CONCURRENT_DIFFS, availableParallelism()),
-      (snapshot) => exportDifference(project, runDir, snapshot),
-    );
-    const failed = comparison.snapshots.filter(({ state }) => state === "failed");
-
-    // Unchanged stories can need attention too, so these get their images here.
-    const exportCurrent = async (story: ManifestStory) => {
-      const hash = hashes.get(story.id);
-      if (hash === undefined) return null;
-      const directory = await storyDirectory(runDir, story.id);
-      return (await exportImage(project, directory, "current.png", hash)).file;
-    };
-    const playErrors = await Promise.all(
-      manifest.stories
-        .filter(({ errors }) => errors.some(({ source }) => source === "play"))
-        .map(async (story) => ({
-          story: story.id,
-          errors: story.errors.filter(({ source }) => source === "play"),
-          current: await exportCurrent(story),
-        })),
-    );
-    const unstable = await Promise.all(
-      manifest.stories
-        .filter(({ stability }) => stability === "unstable")
-        .map(async (story) => ({
-          story: story.id,
-          current: await exportCurrent(story),
-          repeat: await exportRepeat(captureDir, runDir, story),
-        })),
-    );
+    const { differences, playErrors, unstable } = await exportImages(project, runDir, comparison, captureDir, manifest);
     const diffed = Date.now();
+    await writeReviewCache(project, run.id, {
+      differences: differences.map(({ story, current, golden, diff, pixelDiff }) => ({
+        story,
+        current,
+        golden,
+        diff,
+        pixelDiff,
+      })),
+      playErrors: playErrors.map(({ story, current }) => ({ story, current })),
+      unstable,
+    });
+    await pruneOutput(project, run.id);
 
-    const unmatched = patterns === null ? [] : filterStories(manifest.stories, patterns).unmatched;
-    const needsAttention: Attention[] = [
-      ...failed.map(({ story, failure }) => ({
-        story,
-        reason: "failed" as const,
-        detail: failure ?? "The story failed to render.",
-      })),
-      ...playErrors.map(({ story, errors }) => ({
-        story,
-        reason: "play-error" as const,
-        detail: describeErrors(errors),
-      })),
-      ...unstable.map(({ story }) => ({
-        story,
-        reason: "unstable" as const,
-        detail: "Rendering this story twice gave different images.",
-      })),
-      ...differences.flatMap((difference) => attentionForDifference(difference) ?? []),
-      ...unmatched.map((pattern) => ({
-        story: null,
-        reason: "pattern-unmatched" as const,
-        detail: `--story ${pattern} matched nothing.`,
-      })),
-    ];
-    const decided = (kind: Decision["decision"]) =>
-      differences.filter(({ decision }) => decision?.decision === kind).length;
-
-    const output: ReviewOutput = {
-      schemaVersion: 1,
-      runId: run.id,
-      status: finished.status,
-      gitSha,
-      dirty: dirty.length > 0,
-      dirtyPaths: dirty.slice(0, 20),
-      baselineSha: baseline.baselineSha,
+    return {
+      comparison,
+      dirtyPaths: dirty,
       baseline,
-      environment: { id: settings.environmentId, definition: settings.environment },
-      initScriptSha256: manifest.initScriptSha256,
-      storybookDir,
-      outputDir: runDir,
-      filter: patterns === null ? null : { patterns, notRendered: removedTotal - differences.filter(({ state }) => state === "removed").length },
-      stability: flags.stability
-        ? { checked: true, note: null }
-        : { checked: false, note: STABILITY_NOT_RUN },
-      counts: {
-        stories: records.length,
-        unchanged: comparison.unchangedCount,
-        changed: differences.filter(({ state }) => state === "changed").length,
-        new: differences.filter(({ state }) => state === "new").length,
-        removed: differences.filter(({ state }) => state === "removed").length,
-        failed: failed.length,
-        playErrors: playErrors.length,
-        unstable: flags.stability ? unstable.length : null,
-        approved: decided("approved"),
-        rejected: decided("rejected"),
-        undecided: differences.filter(({ state, decision }) => state !== "removed" && decision === null).length,
-        needsAttention: needsAttention.length,
-      },
-      needsAttention,
+      stabilityChecked: options.stability ?? false,
       differences,
-      failures: failed.map(({ story, failure, goldenHash }) => ({ story, failure: failure ?? "", goldenHash })),
       playErrors,
       unstable,
       warnings: manifest.warnings,
-      next: nextSteps(run.id, dirty.length > 0, differences, removedTotal, failed.length),
       timings: {
         captureMs: captured - captureStarted,
         storeMs: stored - captured,
@@ -540,14 +440,7 @@ export async function reviewCommand(flags: ReviewFlags, context: Context): Promi
         totalMs: Date.now() - started,
       },
     };
-
-    await writeRunRecord(project, run.id, output);
-    await pruneOutput(project, run.id);
-    if (flags.human) context.stdout(humanSummary(output));
-    else printJson(context, output);
-    return needsAttention.length > 0 ? EXIT_NEEDS_ATTENTION : EXIT_OK;
   } finally {
     await rm(captureDir, { recursive: true, force: true });
-    project.close();
   }
 }

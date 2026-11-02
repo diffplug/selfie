@@ -91,7 +91,7 @@ Source of truth: `render/src/manifest.ts`; tests in `render/test/manifest.test.t
 
 Source of truth: `render/src/index.ts`.
 
-`selfie-render` is a library, and `docs/specs/cli.md` is its CLI. It exports `capture(options)`, `defineEnvironment(overrides)`, `environmentId(environment)`, `filterStories(stories, patterns)`, `MANIFEST_FILE`, `RenderError`, `EnvironmentError`, and the types above. A native runner is `defineEnvironment({ runner: { kind: "native" } })`. `capture` writes human progress to its `log` option, which defaults to stderr.
+`selfie-render` is a library, and `docs/specs/cli.md` is its CLI. It exports `capture(options)`, `defineEnvironment(overrides)`, `environmentId(environment)`, `filterStories(stories, patterns)`, which keeps whatever it is given that has an `id`, `MANIFEST_FILE`, `RenderError`, `EnvironmentError`, and the types above. `selfie-render/testing` exports what a stand-in for `capture` needs in another package's tests, so that it can't drift from what `capture` writes. A native runner is `defineEnvironment({ runner: { kind: "native" } })`. `capture` writes human progress to its `log` option, which defaults to stderr.
 
 ## Future
 

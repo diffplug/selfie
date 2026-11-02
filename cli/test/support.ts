@@ -15,6 +15,7 @@ import {
   type ManifestStory,
   type StoryError,
 } from "selfie-render";
+import { REPEAT_DIR, STORIES_DIR, storyFileName, totalsOf, writeManifest } from "selfie-render/testing";
 import { runCli } from "../src/cli.ts";
 import { encodePng } from "../src/png.ts";
 
@@ -55,29 +56,26 @@ export interface FakeStory {
 }
 
 /** Writes what `capture` writes for these stories. */
-export function fakeCapture(stories: () => readonly FakeStory[], onCapture?: () => void): typeof capture {
+export function fakeCapture(
+  stories: () => readonly FakeStory[],
+  onCapture?: (options: CaptureOptions) => void,
+): typeof capture {
   return async (options: CaptureOptions) => {
-    onCapture?.();
+    onCapture?.(options);
     const environment = options.environment ?? defineEnvironment();
-    const all = stories();
-    const filtered = options.stories
-      ? filterStories(
-          all.map(({ id }) => ({ id, title: "", name: "" })),
-          options.stories,
-        )
-      : null;
-    const selected = filtered === null ? all : all.filter(({ id }) => filtered.stories.some((s) => s.id === id));
+    const filtered = options.stories ? filterStories(stories(), options.stories) : null;
+    const selected = filtered?.stories ?? stories();
 
-    await mkdir(path.join(options.outDir, "stories"), { recursive: true });
-    await mkdir(path.join(options.outDir, "repeat"), { recursive: true });
+    await mkdir(path.join(options.outDir, STORIES_DIR), { recursive: true });
+    await mkdir(path.join(options.outDir, REPEAT_DIR), { recursive: true });
     const manifestStories: ManifestStory[] = [];
     for (const story of selected) {
-      const fileName = `${encodeURIComponent(story.id)}.png`;
-      const file = path.posix.join("stories", fileName);
+      const fileName = storyFileName(story.id);
+      const file = path.posix.join(STORIES_DIR, fileName);
       const width = story.width ?? 8;
       const height = story.height ?? 8;
       if (story.failed === undefined && story.fileOverride === undefined) {
-        const target = path.join(options.outDir, "stories", fileName);
+        const target = path.join(options.outDir, file);
         if (story.symlinkTo !== undefined) {
           await symlink(story.symlinkTo, target);
         } else {
@@ -98,7 +96,7 @@ export function fakeCapture(stories: () => readonly FakeStory[], onCapture?: () 
       }
       let repeatFile: string | null = null;
       if (story.repeatColor !== undefined) {
-        repeatFile = path.posix.join("repeat", fileName);
+        repeatFile = path.posix.join(REPEAT_DIR, fileName);
         await writeFile(path.join(options.outDir, repeatFile), await encodePng(solid(width, height, story.repeatColor)));
       }
       manifestStories.push({
@@ -122,16 +120,15 @@ export function fakeCapture(stories: () => readonly FakeStory[], onCapture?: () 
       environment,
       recipe: {} as Manifest["recipe"],
       settleMs: 100,
-      // Not a hash, so a test can see which script arrived.
-      initScriptSha256: options.initScript ?? null,
+      initScriptSha256: null,
       runtime: null,
       startedAt: new Date().toISOString(),
       durationMs: 1,
       warnings: filtered?.unmatched.map((pattern) => `Story pattern "${pattern}" matched nothing.`) ?? [],
-      totals: { stories: manifestStories.length, failed: 0, unstable: 0 },
+      totals: totalsOf(manifestStories),
       stories: manifestStories,
     };
-    await writeFile(path.join(options.outDir, "manifest.json"), JSON.stringify(manifest));
+    await writeManifest(options.outDir, manifest);
     return manifest;
   };
 }
@@ -167,8 +164,10 @@ export interface Harness {
   stories: readonly FakeStory[];
   /** Runs a command in-process. `json` is stdout parsed, which fails if it isn't one document. */
   cli: (...argv: string[]) => Promise<{ code: number; json: any; stdout: string; stderr: string }>;
+  /** The capture to hand to the library directly. */
+  capture: typeof capture;
   /** Called at the start of each capture. */
-  onCapture?: () => void;
+  onCapture?: (options: CaptureOptions) => void;
   destroy: () => Promise<void>;
 }
 
@@ -176,11 +175,16 @@ export async function createHarness(): Promise<Harness> {
   const scratch = await mkdtemp(path.join(tmpdir(), "selfie-cli-test-"));
   const repo = await createRepo(scratch);
   const home = path.join(scratch, "home");
+  const fake = fakeCapture(
+    () => harness.stories,
+    (options) => harness.onCapture?.(options),
+  );
   const harness: Harness = {
     scratch,
     repo,
     home,
     stories: [],
+    capture: fake,
     cli: async (...argv) => {
       let stdout = "";
       let stderr = "";
@@ -193,12 +197,9 @@ export async function createHarness(): Promise<Harness> {
         stderr: (text) => {
           stderr += text;
         },
-        capture: fakeCapture(
-          () => harness.stories,
-          () => harness.onCapture?.(),
-        ),
+        capture: fake,
       });
-      return { code, stdout, stderr, json: argv.includes("--human") ? null : JSON.parse(stdout) };
+      return { code, stdout, stderr, json: JSON.parse(stdout) };
     },
     destroy: () => rm(scratch, { recursive: true, force: true }),
   };

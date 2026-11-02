@@ -41,12 +41,14 @@ describe("exit 2, with one JSON document saying why", () => {
     ["no run", ["accept"]],
     ["no selection", ["approve", "7f0e6a2e-1234-4abc-8def-0123456789ab"]],
     ["a missing Storybook", ["review", "--storybook-dir", "does-not-exist"]],
-    ["a missing init script", ["review", "--init-script", "does-not-exist.js"]],
-    ["a missing config", ["review", "--config", "does-not-exist.json"]],
+    ["a removed flag", ["review", "--human"]],
+    ["another removed flag", ["find-baseline", "--max-commits", "1"]],
   ])("%s", (_, args) => {
     const { status, stdout, stderr } = selfie(repo, ...args);
     expect(status).toBe(2);
-    expect(JSON.parse(stdout).error.message).toBeTruthy();
+    const { error } = JSON.parse(stdout);
+    expect(error.message).toBeTruthy();
+    expect(error.code).toBeTruthy();
     expect(stderr).toContain("selfie:");
   });
 
@@ -85,9 +87,9 @@ test("find-baseline prints null with a reason, and exits 0", () => {
   expect(status).toBe(0);
   const result = JSON.parse(stdout);
   expect(result).toMatchObject({
-    baselineSha: null,
+    sha: null,
     reason: "no-goldens",
-    head: git(repo, "rev-parse", "HEAD"),
+    mergeBase: git(repo, "rev-parse", "HEAD"),
     defaultBranch: "main",
   });
   expect(result.environment).toMatch(/^container-linux-arm64-[0-9a-f]{16}$/);

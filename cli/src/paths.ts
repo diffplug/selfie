@@ -3,8 +3,8 @@ import { createHash } from "node:crypto";
 import { lstat } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
+import { SelfieError } from "./errors.ts";
 import type { Repo } from "./git.ts";
-import { CliError } from "./output.ts";
 
 const READABLE_SLUG_CHARACTERS = 80;
 const READABLE_NAME_CHARACTERS = 80;
@@ -74,7 +74,7 @@ export const isRunId = (name: string) => UUID.test(name);
 
 /** Refuses anything but a run ID before it reaches a path. */
 export function assertRunId(run: string): void {
-  if (!isRunId(run)) throw new CliError(`"${run}" isn't a run ID. A review's JSON gives it as runId.`);
+  if (!isRunId(run)) throw new SelfieError("bad-run-id", `"${run}" isn't a run ID. A review's JSON gives it as runId.`);
 }
 
 /** `relative` under `root`, or null if it would land anywhere else. */

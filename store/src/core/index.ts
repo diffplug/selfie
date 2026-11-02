@@ -1,4 +1,5 @@
 export { Blobs, isBlobKeySegment, type BlobStorage } from "./blob.ts";
+export { chunks } from "./chunks.ts";
 export { sha256, toHex, truncateHash, type HashFunction } from "./image-hash.ts";
 export { decodeImage, ImageDecodeError, imageMediaType } from "./image-file.ts";
 export { encodePam, type RawImage } from "./pam.ts";
@@ -17,6 +18,7 @@ export {
   type SnapshotErrorCode,
   type SnapshotsOptions,
   type SnapshotState,
+  type StoryFilter,
 } from "./snapshots.ts";
 export {
   Sql,

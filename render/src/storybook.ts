@@ -38,10 +38,10 @@ export async function readStoryIndex(storybookDir: string): Promise<StoryEntry[]
  * Keeps the stories whose ID matches a pattern, where `*` matches any run of characters.
  * `unmatched` lists the patterns that matched nothing, so a typo doesn't look like a pass.
  */
-export function filterStories(
-  stories: StoryEntry[],
-  patterns: string[],
-): { stories: StoryEntry[]; unmatched: string[] } {
+export function filterStories<Story extends { id: string }>(
+  stories: readonly Story[],
+  patterns: readonly string[],
+): { stories: Story[]; unmatched: string[] } {
   const matchers = patterns.map((pattern) => ({
     pattern,
     regex: new RegExp(`^${pattern.split("*").map(RegExp.escape).join(".*")}$`),

@@ -54,7 +54,7 @@ const statesOf = (snapshots: readonly { story: string; state: string }[]) =>
 /**
  * Run this with a factory to prove the model on an adapter. Tests share one database and
  * tell themselves apart by environment, since a reset per test would spend real D1's
- * shared limit. A run spends about 40 requests against D1.
+ * shared limit. A run spends about 75 requests against D1.
  */
 export function describeSnapshotContract(
   name: string,
@@ -81,7 +81,7 @@ export function describeSnapshotContract(
         Array.from({ length: 12 }, (_, i) => imageInsertStatement(hashOf(i + 1), 1000 + i)),
       );
 
-      const golden = await snapshots.beginRun({ gitSha: SHA_0, environment: "shared" });
+      const golden = await snapshots.beginRun({ gitSha: SHA_0, environment: "shared", dirty: false, baselineSha: null });
       await snapshots.recordSnapshots(golden.id, GOLDENS);
       await snapshots.finishRun(golden.id, GOLDENS.length);
       await snapshots.decide({
@@ -93,7 +93,7 @@ export function describeSnapshotContract(
       expect(await snapshots.acceptRun(golden.id, null, 0)).toBe(true);
 
       // Against those goldens: a is unchanged, b changed, c failed, d removed, and e new.
-      const head = await snapshots.beginRun({ gitSha: SHA_1, environment: "shared" });
+      const head = await snapshots.beginRun({ gitSha: SHA_1, environment: "shared", dirty: false, baselineSha: null });
       headRun = head.id;
       await snapshots.recordSnapshots(headRun, [
         rendered("a", 1),
@@ -104,7 +104,7 @@ export function describeSnapshotContract(
       await snapshots.finishRun(headRun, 4);
 
       // The same SHA again, where b came out differently and c rendered, unstably.
-      const again = await snapshots.beginRun({ gitSha: SHA_1, environment: "shared" });
+      const again = await snapshots.beginRun({ gitSha: SHA_1, environment: "shared", dirty: false, baselineSha: null });
       rerun = again.id;
       await snapshots.recordSnapshots(rerun, [
         rendered("a", 1),
@@ -124,10 +124,10 @@ export function describeSnapshotContract(
       expect(run).toMatchObject({ status: "failed", failedCount: 1 });
       expect(unchangedCount).toBe(1);
       expect(compared).toEqual([
-        { story: "b", state: "changed", imageHash: hashOf(5), goldenHash: hashOf(2), failure: null, unstable: null, decision: null },
-        { story: "c", state: "failed", imageHash: null, goldenHash: hashOf(3), failure: "Render threw", unstable: null, decision: null },
-        { story: "e", state: "new", imageHash: hashOf(6), goldenHash: null, failure: null, unstable: null, decision: null },
-        { story: "d", state: "removed", imageHash: null, goldenHash: hashOf(4), failure: null, unstable: null, decision: null },
+        { story: "b", state: "changed", imageHash: hashOf(5), goldenHash: hashOf(2), failure: null, unstable: null, playError: null, decision: null },
+        { story: "c", state: "failed", imageHash: null, goldenHash: hashOf(3), failure: "Render threw", unstable: null, playError: null, decision: null },
+        { story: "e", state: "new", imageHash: hashOf(6), goldenHash: null, failure: null, unstable: null, playError: null, decision: null },
+        { story: "d", state: "removed", imageHash: null, goldenHash: hashOf(4), failure: null, unstable: null, playError: null, decision: null },
       ]);
     });
 
@@ -159,7 +159,7 @@ export function describeSnapshotContract(
     });
 
     it("never compares across environments", async () => {
-      const other = await snapshots.beginRun({ gitSha: SHA_1, environment: "other" });
+      const other = await snapshots.beginRun({ gitSha: SHA_1, environment: "other", dirty: false, baselineSha: null });
       await snapshots.recordSnapshots(other.id, [rendered("a", 1)]);
       await snapshots.finishRun(other.id, 1);
       // `SHA_0` has goldens, and the same image for the same story, in another environment.
@@ -171,7 +171,7 @@ export function describeSnapshotContract(
 
     it("leaves a crashed run recording, beside the new run that replaces it", async () => {
       const environment = "crash";
-      const crashed = await snapshots.beginRun({ gitSha: SHA_1, environment });
+      const crashed = await snapshots.beginRun({ gitSha: SHA_1, environment, dirty: false, baselineSha: null });
       await snapshots.recordSnapshots(crashed.id, [rendered("a", 1)]);
 
       const dying = over((adapter) => failing(adapter, () => true));
@@ -180,7 +180,7 @@ export function describeSnapshotContract(
       await expect(snapshots.finishRun(crashed.id, 2)).rejects.toMatchObject({ code: "wrong-snapshot-count" });
       await expect(snapshots.compareRun(crashed.id, null)).rejects.toMatchObject({ code: "run-not-finished" });
 
-      const fresh = await snapshots.beginRun({ gitSha: SHA_1, environment });
+      const fresh = await snapshots.beginRun({ gitSha: SHA_1, environment, dirty: false, baselineSha: null });
       await snapshots.recordSnapshots(fresh.id, [rendered("a", 1), rendered("b", 2)]);
       expect(await snapshots.finishRun(fresh.id, 2)).toMatchObject({ status: "complete", failedCount: 0 });
     });
@@ -188,7 +188,7 @@ export function describeSnapshotContract(
     it("survives writes being resent, and ends with a complete set of goldens", async () => {
       const environment = "retried";
       const replayed = over(replaying);
-      const run = await snapshots.beginRun({ gitSha: SHA_2, environment });
+      const run = await snapshots.beginRun({ gitSha: SHA_2, environment, dirty: false, baselineSha: null });
       await replayed.recordSnapshots(run.id, [rendered("a", 8)]);
       expect(await replayed.finishRun(run.id, 1)).toMatchObject({ status: "complete" });
       await snapshots.decide({
@@ -199,6 +199,95 @@ export function describeSnapshotContract(
       });
       expect(await replayed.acceptRun(run.id, null, 0)).toBe(true);
       expect(await snapshots.hasCompleteGoldens(SHA_2, environment)).toBe(true);
+    });
+
+    it("keeps what a run was recorded against, and never accepts a dirty one", async () => {
+      const environment = "dirty";
+      const storyFilter = { patterns: ["a*", "typo*"], unmatched: ["typo*"] };
+      const run = await snapshots.beginRun({
+        gitSha: SHA_2,
+        environment,
+        dirty: true,
+        baselineSha: SHA_0,
+        storyFilter,
+      });
+      expect(run).toMatchObject({ dirty: true, baselineSha: SHA_0, storyFilter });
+      await snapshots.recordSnapshots(run.id, [rendered("a", 9)]);
+      expect(await snapshots.finishRun(run.id, 1)).toMatchObject({ dirty: true, baselineSha: SHA_0, storyFilter });
+      expect(await snapshots.getRun(run.id)).toMatchObject({ dirty: true, baselineSha: SHA_0, storyFilter });
+      await snapshots.decide({
+        environment,
+        decision: "approved",
+        actor: "ned",
+        snapshots: [{ story: "a", imageHash: hashOf(9) }],
+      });
+      await expect(snapshots.acceptRun(run.id, null, 0)).rejects.toMatchObject({ code: "run-dirty" });
+      expect(await snapshots.hasCompleteGoldens(SHA_2, environment)).toBe(false);
+
+      const clean = await snapshots.beginRun({ gitSha: SHA_2, environment, dirty: false, baselineSha: null });
+      expect(clean).toMatchObject({ dirty: false, baselineSha: null, storyFilter: null });
+      expect(await snapshots.getRun(clean.id)).toMatchObject({ dirty: false, baselineSha: null, storyFilter: null });
+    });
+
+    it("keeps a play error, and lists its snapshot even when unchanged", async () => {
+      const environment = "play";
+      const run = await snapshots.beginRun({ gitSha: SHA_0, environment, dirty: false, baselineSha: null });
+      const played = [
+        { ...rendered("a", 10), playError: "play threw" },
+        rendered("b", 11),
+        { story: "c", failure: "Render threw", playError: "play threw too" },
+      ];
+      await snapshots.recordSnapshots(run.id, played);
+      await snapshots.finishRun(run.id, 3);
+      const first = await snapshots.compareRun(run.id, null);
+      expect(first.snapshots.map(({ story, playError }) => [story, playError])).toEqual([
+        ["a", "play threw"],
+        ["b", null],
+        ["c", "play threw too"],
+      ]);
+
+      const golden = await snapshots.beginRun({ gitSha: SHA_1, environment, dirty: false, baselineSha: null });
+      const clean = [rendered("a", 10), rendered("b", 11)];
+      await snapshots.recordSnapshots(golden.id, clean);
+      await snapshots.finishRun(golden.id, 2);
+      await snapshots.decide({
+        environment,
+        decision: "approved",
+        actor: "ned",
+        snapshots: clean.map(({ story, imageHash }) => ({ story, imageHash: imageHash! })),
+      });
+      expect(await snapshots.acceptRun(golden.id, null, 0)).toBe(true);
+
+      const next = await snapshots.beginRun({ gitSha: SHA_2, environment, dirty: false, baselineSha: SHA_1 });
+      await snapshots.recordSnapshots(next.id, [played[0]!, played[1]!]);
+      await snapshots.finishRun(next.id, 2);
+      const compared = await snapshots.compareRun(next.id, SHA_1);
+      expect(compared.unchangedCount).toBe(2);
+      expect(compared.snapshots.map(({ story, state }) => [story, state])).toEqual([["a", "unchanged"]]);
+    });
+
+    it("fits a whole statement of the longest play errors and failures", async () => {
+      const environment = "long-play";
+      const run = await snapshots.beginRun({ gitSha: SHA_0, environment, dirty: false, baselineSha: null });
+      const count = 100;
+      const long = "x".repeat(2_000);
+      await snapshots.recordSnapshots(
+        run.id,
+        Array.from({ length: count }, (_, i) => ({ story: `s${i}`, failure: long, playError: long })),
+      );
+      expect(await snapshots.finishRun(run.id, count)).toMatchObject({ status: "failed", failedCount: count });
+      const { snapshots: compared } = await snapshots.compareRun(run.id, null);
+      expect(compared).toHaveLength(count);
+      expect(compared[0]).toMatchObject({ failure: long, playError: long });
+    });
+
+    it("finds the nearest SHA with goldens, in the order asked, across query groups", async () => {
+      const environment = "shared";
+      const shas = Array.from({ length: 150 }, (_, i) => i.toString(16).padStart(40, "f"));
+      expect(await snapshots.firstWithGoldens(shas, environment)).toBeNull();
+      expect(await snapshots.firstWithGoldens([...shas, SHA_0], environment)).toBe(SHA_0);
+      expect(await snapshots.firstWithGoldens([SHA_0, ...shas], "no-such-environment")).toBeNull();
+      expect(await snapshots.firstWithGoldens([], environment)).toBeNull();
     });
 
     it("refuses an acceptance that would drop goldens the reviewer didn't see", async () => {

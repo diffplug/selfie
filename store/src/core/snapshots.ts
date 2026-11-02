@@ -15,7 +15,10 @@ export const CREATE_SNAPSHOT_TABLES: readonly string[] = [
   environment TEXT NOT NULL,
   started_at INTEGER NOT NULL,
   finished_at INTEGER,
-  failed_count INTEGER
+  failed_count INTEGER,
+  dirty INTEGER NOT NULL CHECK (dirty IN (0, 1)),
+  baseline_sha TEXT,
+  story_filter TEXT
 )`,
   "CREATE INDEX IF NOT EXISTS runs_by_sha ON runs(git_sha, environment, started_at)",
   `CREATE TABLE IF NOT EXISTS run_snapshots (
@@ -24,6 +27,7 @@ export const CREATE_SNAPSHOT_TABLES: readonly string[] = [
   image_key INTEGER,
   failure TEXT,
   unstable INTEGER,
+  play_error TEXT,
   PRIMARY KEY (run_key, story),
   CHECK ((image_key IS NULL) <> (failure IS NULL))
 ) WITHOUT ROWID`,
@@ -44,10 +48,13 @@ export const CREATE_SNAPSHOT_TABLES: readonly string[] = [
 ) WITHOUT ROWID`,
 ];
 
-// These fit the limit of 100 bound parameters per statement: two per snapshot, plus
-// what all of a statement's snapshots share.
-const SNAPSHOTS_PER_RECORD_STATEMENT = 49;
+// These fit the limit of 100 bound parameters per statement, beside what all of a
+// statement's rows share. A recorded snapshot takes two, or three with a play error,
+// so a statement holds 49 when none has one, and at least 33.
+const MAX_RECORD_PARAMS = 100;
 const SNAPSHOTS_PER_DECISION_STATEMENT = 48;
+// Nearest first, beside the environment.
+const SHAS_PER_GOLDENS_QUERY = 99;
 
 // Sizes measured on real D1: `docs/specs/snapshots.rationale.md`. A request of 400
 // statements holds 19,600 snapshots, so a run of up to that many costs one.
@@ -55,11 +62,12 @@ const STATEMENTS_PER_REQUEST = 400;
 const ROWS_PER_PAGE = 5_000;
 
 // Enough to read, and it bounds how large one request can grow.
-const MAX_FAILURE_CHARACTERS = 2_000;
+const MAX_MESSAGE_CHARACTERS = 2_000;
 
 const GIT_SHA = /^[0-9a-f]{40}(?:[0-9a-f]{24})?$/;
 
-const RUN_COLUMNS = "id, git_sha, environment, started_at, finished_at, failed_count";
+const RUN_COLUMNS =
+  "id, git_sha, environment, started_at, finished_at, failed_count, dirty, baseline_sha, story_filter";
 
 const SELECT_RUN = `SELECT ${RUN_COLUMNS} FROM runs WHERE id = ?1`;
 
@@ -71,7 +79,7 @@ const BASELINE_RUN_KEY = `(SELECT g.run_key FROM goldens g
 const SELECT_BASELINE = `SELECT ${BASELINE_RUN_KEY} AS run_key`;
 
 // `gs` joins before the images so that a row left out never reads them.
-const SELECT_COMPARED_PAGE = `SELECT rs.story, i.hash AS image_hash, rs.failure, rs.unstable,
+const SELECT_COMPARED_PAGE = `SELECT rs.story, i.hash AS image_hash, rs.failure, rs.unstable, rs.play_error,
   gi.hash AS golden_hash, d.decision, d.actor, d.decided_at
 FROM runs r
 CROSS JOIN run_snapshots rs ON rs.run_key = r.key
@@ -82,7 +90,7 @@ LEFT JOIN decisions d ON d.environment = r.environment AND d.story = rs.story
   AND d.image_hash = i.hash
 WHERE r.id = ?1 AND rs.story > ?3
   AND (CAST(?5 AS INTEGER) = 1 OR rs.image_key IS NULL
-    OR rs.image_key IS NOT gs.image_key OR rs.unstable = 1)
+    OR rs.image_key IS NOT gs.image_key OR rs.unstable = 1 OR rs.play_error IS NOT NULL)
 ORDER BY rs.story
 LIMIT CAST(?4 AS INTEGER)`;
 
@@ -114,7 +122,7 @@ const SELECT_REMOVED_COUNT = `SELECT ${COUNT_REMOVED} AS total`;
 const ACCEPT_RUN = `INSERT INTO goldens(git_sha, environment, run_key)
 SELECT r.git_sha, r.environment, r.key
 FROM runs r
-WHERE r.id = ?1 AND r.finished_at IS NOT NULL AND r.failed_count = 0
+WHERE r.id = ?1 AND r.finished_at IS NOT NULL AND r.failed_count = 0 AND r.dirty = 0
   AND (?2 = '' OR ${BASELINE_RUN_KEY} IS NOT NULL)
   AND (
     EXISTS (SELECT 1 FROM goldens a
@@ -156,24 +164,27 @@ WHERE run_key = (SELECT key FROM runs WHERE id = ?1)`;
 // A row with a hash the images table lacks, or a finished run, matches nothing, so the
 // statement returns too few rows, which is how `recordSnapshots` knows.
 const recordSql = (values: string) =>
-  `WITH v(story, image_hash, failure, unstable) AS (VALUES ${values})
-INSERT INTO run_snapshots(run_key, story, image_key, failure, unstable)
-SELECT r.key, v.story, i.key, v.failure, v.unstable
+  `WITH v(story, image_hash, failure, unstable, play_error) AS (VALUES ${values})
+INSERT INTO run_snapshots(run_key, story, image_key, failure, unstable, play_error)
+SELECT r.key, v.story, i.key, v.failure, v.unstable, v.play_error
 FROM runs r CROSS JOIN v LEFT JOIN images i ON i.hash = v.image_hash
 WHERE r.id = ?1 AND r.finished_at IS NULL AND (v.image_hash IS NULL OR i.key IS NOT NULL)
 ON CONFLICT(run_key, story) DO UPDATE SET
-  image_key = excluded.image_key, failure = excluded.failure, unstable = excluded.unstable
+  image_key = excluded.image_key, failure = excluded.failure, unstable = excluded.unstable,
+  play_error = excluded.play_error
 RETURNING 1 AS written`;
 
 /**
  * What a run recorded for one story: the stored image's hash, or why it failed.
  * `unstable` says whether the story rendered differently when rendered twice, and is
- * absent or null if nobody checked.
+ * absent or null if nobody checked. `playError` says why its play function failed, on
+ * a story that may still have rendered.
  */
 export type RecordedSnapshot = {
   /** The story ID, with any render variant in it. Opaque here. */
   readonly story: string;
   readonly unstable?: boolean | null;
+  readonly playError?: string | null;
 } & (
   | { readonly imageHash: string; readonly failure?: undefined }
   | { readonly failure: string; readonly imageHash?: undefined }
@@ -187,6 +198,12 @@ export type RecordedSnapshot = {
  */
 export type RunStatus = "recording" | "complete" | "failed";
 
+/** The `--story` patterns that limited a run, and those that matched nothing. */
+export interface StoryFilter {
+  readonly patterns: readonly string[];
+  readonly unmatched: readonly string[];
+}
+
 export interface Run {
   readonly id: string;
   readonly gitSha: string;
@@ -196,6 +213,12 @@ export interface Run {
   /** Null until finished, as is `failedCount`. */
   readonly finishedAt: number | null;
   readonly failedCount: number | null;
+  /** The working tree had changes, so the images may not describe `gitSha`. Never accepted. */
+  readonly dirty: boolean;
+  /** The baseline its reviewer saw, or null if there was none. */
+  readonly baselineSha: string | null;
+  /** Null if every story was asked for. */
+  readonly storyFilter: StoryFilter | null;
 }
 
 export type DecisionKind = "approved" | "rejected";
@@ -220,6 +243,8 @@ export interface ComparedSnapshot {
   readonly failure: string | null;
   /** As recorded: null if nobody checked, and always null if `removed`. */
   readonly unstable: boolean | null;
+  /** As recorded: null if there was none, and always null if `removed`. */
+  readonly playError: string | null;
   /** The decision on exactly `imageHash` for this name, if there is one. */
   readonly decision: Decision | null;
 }
@@ -228,7 +253,8 @@ export interface Comparison {
   readonly run: Run;
   /**
    * In name order, the run's differences from the baseline and anything flagged
-   * unstable, then the removed snapshots. Unchanged ones only if asked for or unstable.
+   * unstable or with a play error, then the removed snapshots. Other unchanged ones
+   * only if asked for.
    */
   readonly snapshots: readonly ComparedSnapshot[];
   /** How many of the run's snapshots are `unchanged`, whether listed or not. */
@@ -256,6 +282,8 @@ export type SnapshotErrorCode =
   | "run-not-finished"
   /** The run is `failed`, so it can't become goldens. */
   | "run-has-failures"
+  /** The run was recorded on a dirty tree, so it can't become goldens. */
+  | "run-dirty"
   /** Finishing was asked for with a different count than the run holds. */
   | "wrong-snapshot-count"
   /** Accepting was asked for with a different count of removed snapshots than there are. */
@@ -296,16 +324,38 @@ export class Snapshots {
   }
 
   /** Starts a run, which stays `recording` until `finishRun`. */
-  async beginRun({ gitSha, environment }: { gitSha: string; environment: string }): Promise<Run> {
+  async beginRun({
+    gitSha,
+    environment,
+    dirty,
+    baselineSha,
+    storyFilter = null,
+  }: {
+    gitSha: string;
+    environment: string;
+    dirty: boolean;
+    baselineSha: string | null;
+    storyFilter?: StoryFilter | null;
+  }): Promise<Run> {
     assertGitSha(gitSha);
     assertNamePart(environment, "environment");
+    if (baselineSha !== null) assertGitSha(baselineSha);
     const id = crypto.randomUUID();
     const startedAt = this.#now();
+    // Sql binds no nulls, so an empty string stands for one.
     await this.#sql.run({
-      sql: `INSERT INTO runs(id, git_sha, environment, started_at)
-VALUES (?1, ?2, ?3, CAST(?4 AS INTEGER))
+      sql: `INSERT INTO runs(id, git_sha, environment, started_at, dirty, baseline_sha, story_filter)
+VALUES (?1, ?2, ?3, CAST(?4 AS INTEGER), CAST(?5 AS INTEGER), NULLIF(?6, ''), NULLIF(?7, ''))
 ON CONFLICT(id) DO NOTHING`,
-      params: [id, gitSha, environment, startedAt],
+      params: [
+        id,
+        gitSha,
+        environment,
+        startedAt,
+        dirty ? 1 : 0,
+        baselineSha ?? "",
+        storyFilter === null ? "" : JSON.stringify(storyFilter),
+      ],
       idempotent: true,
     });
     return {
@@ -316,6 +366,9 @@ ON CONFLICT(id) DO NOTHING`,
       startedAt,
       finishedAt: null,
       failedCount: null,
+      dirty,
+      baselineSha,
+      storyFilter,
     };
   }
 
@@ -480,8 +533,9 @@ ON CONFLICT(environment, story, image_hash) DO UPDATE SET
    * that hash, and `removedSeen` is how many snapshots the baseline has and the run
    * lacks. If an image isn't accepted, returns false and changes nothing: `compareRun`
    * shows which. Throws if the count is wrong, so goldens are never silently dropped by
-   * a filtered render or a discovery bug. A null baseline means every image needs an
-   * approval, and nothing can be removed.
+   * a filtered render or a discovery bug, and if the run was recorded on a dirty tree,
+   * since a SHA's goldens must describe that commit. A null baseline means every image
+   * needs an approval, and nothing can be removed.
    */
   async acceptRun(runId: string, baselineSha: string | null, removedSeen: number): Promise<boolean> {
     if (baselineSha !== null) assertGitSha(baselineSha);
@@ -497,6 +551,12 @@ ON CONFLICT(environment, story, image_hash) DO UPDATE SET
       throw new SnapshotError(
         "run-has-failures",
         `Run ${runId} has ${run.failedCount} failed stories, so it can't become goldens`,
+      );
+    }
+    if (run.dirty) {
+      throw new SnapshotError(
+        "run-dirty",
+        `Run ${runId} was recorded on a dirty tree, so it doesn't describe ${run.gitSha}`,
       );
     }
     assertBaselineFound(baselineSha, baselineRows, run);
@@ -520,11 +580,32 @@ ON CONFLICT(environment, story, image_hash) DO UPDATE SET
   async hasCompleteGoldens(gitSha: string, environment: string): Promise<boolean> {
     assertGitSha(gitSha);
     const rows = await this.#sql.run({
-      sql: "SELECT 1 AS found FROM goldens WHERE git_sha = ?1 AND environment = ?2",
+      sql: "SELECT 1 AS found FROM goldens WHERE git_sha = ?1 AND environment = ?2 LIMIT 1",
       params: [gitSha, environment],
       idempotent: true,
     });
     return rows.length > 0;
+  }
+
+  /**
+   * The first of these SHAs, in the order given, with complete goldens in this environment,
+   * or null. One query per group, and none after the group that holds it.
+   */
+  async firstWithGoldens(gitShas: readonly string[], environment: string): Promise<string | null> {
+    gitShas.forEach(assertGitSha);
+    for (const group of chunks(gitShas, SHAS_PER_GOLDENS_QUERY)) {
+      const rows = await this.#sql.run({
+        sql: `SELECT git_sha FROM goldens WHERE environment = ?1 AND git_sha IN (${group
+          .map((_, i) => `?${i + 2}`)
+          .join(", ")})`,
+        params: [environment, ...group],
+        idempotent: true,
+      });
+      const found = new Set(rows.map((row) => row.git_sha as string));
+      const first = group.find((sha) => found.has(sha));
+      if (first !== undefined) return first;
+    }
+    return null;
   }
 }
 
@@ -545,27 +626,39 @@ function recordStatements(runId: string, snapshots: readonly RecordedSnapshot[])
     if (names.has(story)) throw new RangeError(`Story recorded twice in one call: ${story}`);
     names.add(story);
   }
-  return chunks(snapshots, SNAPSHOTS_PER_RECORD_STATEMENT).map((group) => {
-    const params: SqlParam[] = [runId];
-    const values = group.map(({ story, imageHash, failure, unstable }) => {
-      const name = `?${params.push(story)}`;
-      // Sql binds no nulls, so the column a row leaves empty is a literal.
-      const result =
-        imageHash !== undefined
-          ? `?${params.push(imageHash)}, NULL`
-          : `NULL, ?${params.push(cleanFailure(failure))}`;
-      return `(${name}, ${result}, ${unstable === true ? 1 : unstable === false ? 0 : "NULL"})`;
-    });
-    return {
+
+  const statements: RecordStatement[] = [];
+  let params: SqlParam[] = [runId];
+  let values: string[] = [];
+  const flush = () => {
+    if (values.length === 0) return;
+    statements.push({
       statement: { sql: recordSql(values.join(", ")), params, idempotent: true },
-      rows: group.length,
-    };
-  });
+      rows: values.length,
+    });
+    params = [runId];
+    values = [];
+  };
+  for (const { story, imageHash, failure, unstable, playError } of snapshots) {
+    const needed = playError == null ? 2 : 3;
+    if (params.length + needed > MAX_RECORD_PARAMS) flush();
+    const name = `?${params.push(story)}`;
+    // Sql binds no nulls, so the column a row leaves empty is a literal.
+    const result =
+      imageHash !== undefined
+        ? `?${params.push(imageHash)}, NULL`
+        : `NULL, ?${params.push(cleanMessage(failure))}`;
+    const flag = unstable === true ? 1 : unstable === false ? 0 : "NULL";
+    const play = playError == null ? "NULL" : `?${params.push(cleanMessage(playError))}`;
+    values.push(`(${name}, ${result}, ${flag}, ${play})`);
+  }
+  flush();
+  return statements;
 }
 
 /** Cut by code point, so a cut never splits a surrogate pair. */
-function cleanFailure(failure: string): string {
-  return Array.from(failure.replaceAll("\0", "")).slice(0, MAX_FAILURE_CHARACTERS).join("");
+function cleanMessage(message: string): string {
+  return Array.from(message.replaceAll("\0", "")).slice(0, MAX_MESSAGE_CHARACTERS).join("");
 }
 
 function finishedRun(rows: readonly SqlRow[], runId: string): Run {
@@ -601,6 +694,9 @@ function toRun(row: SqlRow): Run {
     startedAt: row.started_at as number,
     finishedAt,
     failedCount,
+    dirty: row.dirty === 1,
+    baselineSha: row.baseline_sha as string | null,
+    storyFilter: row.story_filter === null ? null : (JSON.parse(row.story_filter as string) as StoryFilter),
   };
 }
 
@@ -622,6 +718,7 @@ function toComparedSnapshot(row: SqlRow): ComparedSnapshot {
     goldenHash,
     failure: row.failure as string | null,
     unstable: row.unstable === null ? null : row.unstable === 1,
+    playError: row.play_error as string | null,
     decision:
       row.decision === null
         ? null
@@ -641,6 +738,7 @@ function toRemovedSnapshot(row: SqlRow): ComparedSnapshot {
     goldenHash: row.golden_hash as string,
     failure: null,
     unstable: null,
+    playError: null,
     decision: null,
   };
 }

@@ -48,8 +48,9 @@ describe.runIf(process.env.SELFIE_CLI_CONTAINER === "1")("in the pinned containe
   test("the whole loop: new, approved, accepted, unchanged, then changed with a diff", async () => {
     const first = await review(...STORIES);
     expect(first.status).toBe(1);
-    expect(first.json.counts).toMatchObject({ stories: 2, new: 2, needsAttention: 2 });
-    expect(first.json.environment.id).toMatch(/^container-linux-arm64-/);
+    expect(first.json.counts).toMatchObject({ stories: 2, new: 2, undecided: 2 });
+    expect(first.json.blockers).toHaveLength(2);
+    expect(first.json.environment).toMatch(/^container-linux-arm64-/);
     expect(first.stderr).toContain("render 2/2");
 
     expect((await selfie("approve", first.json.runId, "--all")).status).toBe(0);
@@ -57,20 +58,20 @@ describe.runIf(process.env.SELFIE_CLI_CONTAINER === "1")("in the pinned containe
 
     const same = await review(...STORIES);
     expect(same.status).toBe(0);
-    expect(same.json.baselineSha).toBe(first.json.gitSha);
+    expect(same.json.baseline.sha).toBe(first.json.gitSha);
     expect(same.json.differences).toEqual([]);
     expect(same.json.counts.unchanged).toBe(2);
 
     // An init script is project input, so it reports a change rather than starting new goldens.
-    const script = path.join(scratch, "paint.js");
     await writeFile(
-      script,
+      path.join(repo, "paint.js"),
       `addEventListener("DOMContentLoaded", () => { document.documentElement.style.filter = "invert(1)"; });`,
     );
-    const changed = await review(...STORIES, "--init-script", script);
+    await writeFile(path.join(repo, "selfie.config.json"), JSON.stringify({ initScript: "paint.js" }));
+    const changed = await review(...STORIES);
     expect(changed.status).toBe(1);
-    expect(changed.json.initScriptSha256).toMatch(/^[0-9a-f]{64}$/);
     expect(changed.json.counts.changed).toBe(2);
+    expect(changed.json.dirtyPaths).toContain("selfie.config.json");
     for (const { current, golden, diff, pixelDiff } of changed.json.differences) {
       expect(pixelDiff.kind).toBe("pixels");
       expect(pixelDiff.changedPixels).toBeGreaterThan(0);
@@ -80,7 +81,7 @@ describe.runIf(process.env.SELFIE_CLI_CONTAINER === "1")("in the pinned containe
     }
   }, 120_000);
 
-  test("failures, play errors, and unstable stories are all listed, and exit 1", async () => {
+  test("failures block, and play errors and unstable stories are advisories", async () => {
     const { status, json } = await review(
       "--stability",
       "--story",
@@ -91,13 +92,14 @@ describe.runIf(process.env.SELFIE_CLI_CONTAINER === "1")("in the pinned containe
       "timers--ticking",
     );
     expect(status).toBe(1);
-    expect(json.status).toBe("failed");
-    expect(json.stability.checked).toBe(true);
-    expect(json.failures.map(({ story }: any) => story)).toEqual(["broken--throws"]);
+    expect(json.stabilityChecked).toBe(true);
+    expect(json.blockers.filter(({ reason }: any) => reason === "failed").map(({ story }: any) => story)).toEqual([
+      "broken--throws",
+    ]);
     expect(json.playErrors.map(({ story }: any) => story)).toEqual(["play--fails"]);
     expect(json.unstable.map(({ story }: any) => story)).toEqual(["timers--ticking"]);
     await access(json.unstable[0].repeat);
-    const reasons = json.needsAttention.map(({ reason }: any) => reason);
-    expect(reasons).toEqual(expect.arrayContaining(["failed", "play-error", "unstable"]));
+    expect(json.advisories.map(({ reason }: any) => reason).sort()).toEqual(["play-error", "unstable"]);
+    expect(json.counts.advisories).toBe(2);
   }, 120_000);
 });

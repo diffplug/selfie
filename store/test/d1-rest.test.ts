@@ -394,7 +394,7 @@ describe("D1RestAdapter replay against a real SQL engine", () => {
     const snapshots = new Snapshots({ sql });
     const environment = "env";
     const gitSha = "a".repeat(40);
-    const run = await snapshots.beginRun({ gitSha, environment });
+    const run = await snapshots.beginRun({ gitSha, environment, dirty: false, baselineSha: null });
     await snapshots.recordSnapshots(run.id, [{ story: "a", imageHash: hashOf(1) }]);
     expect(await snapshots.finishRun(run.id, 1)).toMatchObject({ status: "complete" });
     await snapshots.decide({

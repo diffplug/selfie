@@ -1,5 +1,5 @@
 // The commands against real Git, a real store, and real files, with only the browser replaced.
-import { access, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { access, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { decodeImage } from "selfie-store";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
@@ -19,8 +19,10 @@ const exists = (file: string) =>
     () => true,
     () => false,
   );
-const reasons = (json: any) => json.needsAttention.map(({ reason }: any) => reason);
+const reasons = (list: readonly any[]) => list.map(({ reason }) => reason);
 const review = (...flags: string[]) => h.cli("review", "--storybook-dir", "ignored", ...flags);
+const writeConfig = (config: unknown) => writeFile(path.join(h.repo, "selfie.config.json"), JSON.stringify(config));
+const projectDirectory = async () => path.join(h.home, (await readdir(h.home)).find((name) => name !== "d1.env")!);
 
 /** Reviews, approves all, and accepts, so `h.stories` become the goldens of HEAD. */
 async function makeGoldens(): Promise<string> {
@@ -39,21 +41,32 @@ describe("a first review, with no baseline", () => {
   test("reports every story as new, with a current image, and exits 1", async () => {
     const { code, json, stderr } = await review();
     expect(code).toBe(1);
-    expect(json.baselineSha).toBeNull();
-    expect(json.baseline.reason).toBe("no-goldens");
+    expect(json.schemaVersion).toBe(1);
+    expect(json.baseline).toEqual({ sha: null, reason: "no-goldens", message: expect.any(String) });
     expect(json.gitSha).toBe(git(h.repo, "rev-parse", "HEAD"));
-    expect(json.dirty).toBe(false);
-    expect(json.status).toBe("complete");
-    expect(json.counts).toMatchObject({ stories: 2, new: 2, changed: 0, unchanged: 0, undecided: 2, needsAttention: 2 });
-    expect(reasons(json)).toEqual(["new-unapproved", "new-unapproved"]);
+    expect(json.dirtyPaths).toEqual([]);
+    expect(json.environment).toMatch(/^container-linux-arm64-/);
+    expect(json.counts).toEqual({ stories: 2, unchanged: 0, changed: 0, new: 2, removed: 0, undecided: 2, advisories: 0 });
+    expect(reasons(json.blockers)).toEqual(["new-unapproved", "new-unapproved"]);
+    expect(json.advisories).toEqual([]);
     for (const difference of json.differences) {
       expect(difference.state).toBe("new");
       expect(await exists(difference.current)).toBe(true);
       expect(difference.golden).toBeNull();
       expect(difference.diff).toBeNull();
+      expect(difference.imageHash).toMatch(/^[0-9a-f]{64}$/);
       expect((await decodeImage(await readFile(difference.current))).width).toBe(8);
     }
     expect(stderr).toContain("Recorded run");
+    expect(stderr).toMatch(/Timings: capture \d+ ms, store \d+ ms, compare \d+ ms, diff \d+ ms, total \d+ ms/);
+  });
+
+  test("leaves out what the document no longer carries", async () => {
+    const { json } = await review();
+    for (const key of ["failures", "status", "storybookDir", "outputDir", "initScriptSha256", "timings", "dirty", "baselineSha", "stability", "needsAttention"]) {
+      expect(json).not.toHaveProperty(key);
+    }
+    expect(json.differences[0]).not.toHaveProperty("unstable");
   });
 
   test("becomes goldens with approve --all and accept, and then has nothing to report", async () => {
@@ -68,37 +81,66 @@ describe("a first review, with no baseline", () => {
 
     const accepted = await h.cli("accept", first.json.runId);
     expect(accepted.code).toBe(0);
-    expect(accepted.json).toMatchObject({ accepted: true, gitSha: first.json.gitSha, removed: [] });
+    expect(accepted.json).toMatchObject({
+      accepted: true,
+      gitSha: first.json.gitSha,
+      baselineSha: null,
+      removed: [],
+      refusals: [],
+      usableAsBaseline: true,
+    });
 
     const second = await review();
     expect(second.code).toBe(0);
-    expect(second.json.baselineSha).toBe(first.json.gitSha);
+    expect(second.json.baseline.sha).toBe(first.json.gitSha);
     expect(second.json.differences).toEqual([]);
-    expect(second.json.counts).toMatchObject({ unchanged: 2, needsAttention: 0 });
+    expect(second.json.counts).toMatchObject({ stories: 2, unchanged: 2, undecided: 0 });
+    expect(second.json.blockers).toEqual([]);
+    expect(second.json.next).toEqual([]);
 
     const found = await h.cli("find-baseline");
     expect(found.code).toBe(0);
-    expect(found.json.baselineSha).toBe(first.json.gitSha);
+    expect(found.json.sha).toBe(first.json.gitSha);
   });
 
-  test("says when stability wasn't checked, and not when it was", async () => {
+  test("says whether stability was checked", async () => {
     const { json } = await review();
-    expect(json.stability.checked).toBe(false);
-    expect(json.stability.note).toContain("--stability");
-    expect(json.counts.unstable).toBeNull();
+    expect(json.stabilityChecked).toBe(false);
 
     h.stories = [{ id: "a--one", stability: "stable" }];
     const checked = await review("--stability");
-    expect(checked.json.stability).toEqual({ checked: true, note: null });
-    expect(checked.json.counts.unstable).toBe(0);
+    expect(checked.json.stabilityChecked).toBe(true);
+    expect(checked.json.unstable).toEqual([]);
   });
 
-  test("the human mode prints a summary instead of JSON", async () => {
-    const { code, stdout } = await review("--human");
-    expect(code).toBe(1);
-    expect(stdout).toContain("2 stories: 0 unchanged, 0 changed, 2 new");
-    expect(stdout).toContain("new-unapproved: a--one");
-    expect(() => JSON.parse(stdout)).toThrow();
+  test("at the merge-base, the next step is to accept here", async () => {
+    const { json } = await review();
+    expect(json.next.join(" ")).toContain(`selfie accept ${json.runId}`);
+    expect(json.next.join(" ")).not.toContain("merge-base");
+  });
+
+  test("on a feature branch, the next step is to make a baseline at the merge-base", async () => {
+    const mergeBase = git(h.repo, "rev-parse", "HEAD");
+    git(h.repo, "switch", "--quiet", "-c", "feature");
+    await commit(h.repo, "on feature");
+    const { json } = await review();
+    const next = json.next.join(" ");
+    expect(next).toContain(mergeBase);
+    expect(next).toContain("on main");
+    expect(next).toContain("aren't read by later reviews");
+    expect(next).not.toContain("selfie accept " + json.runId);
+  });
+
+  test("accept says a feature branch's goldens won't be read by later reviews", async () => {
+    git(h.repo, "switch", "--quiet", "-c", "feature");
+    await commit(h.repo, "on feature");
+    const { json } = await review();
+    await h.cli("approve", json.runId, "--all");
+    const accepted = await h.cli("accept", json.runId);
+    expect(accepted.code).toBe(0);
+    expect(accepted.json).toMatchObject({ accepted: true, usableAsBaseline: false });
+    expect(accepted.stderr).toContain("won't read these goldens");
+    expect((await h.cli("find-baseline")).json.sha).toBeNull();
   });
 });
 
@@ -116,10 +158,11 @@ describe("comparing with a baseline", () => {
     ];
     const { code, json } = await review();
     expect(code).toBe(1);
-    expect(json.counts).toMatchObject({ changed: 1, unchanged: 2, needsAttention: 1 });
-    expect(reasons(json)).toEqual(["changed-unapproved"]);
+    expect(json.counts).toMatchObject({ changed: 1, unchanged: 2, undecided: 1 });
+    expect(reasons(json.blockers)).toEqual(["changed-unapproved"]);
 
     const [difference] = json.differences;
+    expect(difference.imageHash).not.toBe(difference.goldenHash);
     expect(difference.pixelDiff).toEqual({
       kind: "pixels",
       changedPixels: 8,
@@ -133,7 +176,8 @@ describe("comparing with a baseline", () => {
     expect([...diff.pixels.subarray((3 * 8 + 2) * 3, (3 * 8 + 2) * 3 + 3)]).toEqual([255, 0, 80]);
     expect(diff.pixels[0]).toBe(diff.pixels[1]);
 
-    expect(await readdir(path.join(json.outputDir, "stories"))).toHaveLength(1);
+    const storiesDir = path.dirname(path.dirname(difference.current));
+    expect(await readdir(storiesDir)).toHaveLength(1);
   });
 
   test("reports images of different sizes without a diff image", async () => {
@@ -149,7 +193,7 @@ describe("comparing with a baseline", () => {
     expect(difference.diff).toBeNull();
     expect(await exists(difference.current)).toBe(true);
     expect(await exists(difference.golden)).toBe(true);
-    expect(reasons(json)).toEqual(["changed-unapproved"]);
+    expect(reasons(json.blockers)).toEqual(["changed-unapproved"]);
   });
 
   test("shows removals, and requires the count to accept them", async () => {
@@ -157,7 +201,7 @@ describe("comparing with a baseline", () => {
     await commit(h.repo, "second");
     const { code, json } = await review();
     expect(code).toBe(1);
-    expect(reasons(json)).toEqual(["removed"]);
+    expect(reasons(json.blockers)).toEqual(["removed"]);
     expect(json.differences[0]).toMatchObject({ story: "b--three", state: "removed", current: null });
     expect(await exists(json.differences[0].golden)).toBe(true);
     expect(json.counts.removed).toBe(1);
@@ -166,13 +210,16 @@ describe("comparing with a baseline", () => {
     expect(unacknowledged.code).toBe(1);
     expect(unacknowledged.json.accepted).toBe(false);
     expect(unacknowledged.json.removed).toEqual(["b--three"]);
-    expect(unacknowledged.json.refusals[0].reason).toBe("removed-unacknowledged");
-    expect(unacknowledged.json.refusals[0].message).toContain("b--three");
+    expect(unacknowledged.json.refusals[0]).toMatchObject({
+      reason: "removed-unacknowledged",
+      stories: ["b--three"],
+      outsideFilter: 0,
+    });
     expect(unacknowledged.json.refusals[0].message).toContain("--removed 1");
 
     const wrong = await h.cli("accept", json.runId, "--removed", "2");
     expect(wrong.code).toBe(1);
-    expect(wrong.json.refusals[0].reason).toBe("wrong-removed-count");
+    expect(wrong.json.refusals[0]).toMatchObject({ reason: "wrong-removed-count", seen: 2 });
 
     const right = await h.cli("accept", json.runId, "--removed", "1");
     expect(right.code).toBe(0);
@@ -180,16 +227,25 @@ describe("comparing with a baseline", () => {
     expect((await review()).json.differences).toEqual([]);
   });
 
+  test("--removed is checked even when nothing is removed", async () => {
+    await commit(h.repo, "second");
+    const { json } = await review();
+    const wrong = await h.cli("accept", json.runId, "--removed", "1");
+    expect(wrong.code).toBe(1);
+    expect(wrong.json.refusals[0]).toMatchObject({ reason: "wrong-removed-count", stories: [], seen: 1 });
+  });
+
   test("a filter limits what's rendered, and doesn't call the rest removed", async () => {
     const { code, json } = await review("--story", "a--*");
     expect(code).toBe(0);
-    expect(json.counts).toMatchObject({ stories: 2, removed: 0, needsAttention: 0 });
+    expect(json.counts).toMatchObject({ stories: 2, removed: 0 });
     expect(json.filter).toEqual({ patterns: ["a--*"], notRendered: 1 });
     expect(json.differences).toEqual([]);
 
     // Accepting it would still drop that golden, so that needs the acknowledgment.
     const refused = await h.cli("accept", json.runId);
     expect(refused.code).toBe(1);
+    expect(refused.json.refusals[0]).toMatchObject({ reason: "removed-unacknowledged", outsideFilter: 1 });
     expect(refused.json.refusals[0].message).toContain("outside this run's --story filter");
   });
 
@@ -204,56 +260,69 @@ describe("comparing with a baseline", () => {
   test("a pattern matching nothing is a mistake, not a pass", async () => {
     const none = await review("--story", "nope--*");
     expect(none.code).toBe(2);
-    expect(none.json.error.message).toContain("nope--*");
+    expect(none.json.error).toMatchObject({ code: "no-stories", message: expect.stringContaining("nope--*") });
 
     const some = await review("--story", "a--*", "--story", "nope--*");
     expect(some.code).toBe(1);
-    expect(reasons(some.json)).toEqual(["pattern-unmatched"]);
+    expect(some.json.blockers).toEqual([{ story: null, reason: "pattern-unmatched", detail: "nope--*" }]);
   });
 
   test("baselines don't cross environments", async () => {
-    await writeFile(path.join(h.repo, "other.json"), JSON.stringify({ environment: { viewport: { width: 640, height: 480 } } }));
-    git(h.repo, "add", "other.json");
-    git(h.repo, "commit", "--quiet", "-m", "config");
-    const { json } = await h.cli("find-baseline", "--config", "other.json");
-    expect(json.baselineSha).toBeNull();
-    const reviewed = await review("--config", "other.json");
-    expect(reviewed.json.baselineSha).toBeNull();
+    await writeConfig({ environment: { viewport: { width: 640, height: 480 } } });
+    const { json } = await h.cli("find-baseline");
+    expect(json.sha).toBeNull();
+    const reviewed = await review();
+    expect(reviewed.json.baseline.sha).toBeNull();
     expect(reviewed.json.counts.new).toBe(3);
-    expect(reviewed.json.environment.definition.viewport).toEqual({ width: 640, height: 480 });
-    // The default environment still finds them.
-    expect((await h.cli("find-baseline")).json.baselineSha).not.toBeNull();
+
+    await rm(path.join(h.repo, "selfie.config.json"));
+    expect((await h.cli("find-baseline")).json.sha).not.toBeNull();
+  });
+});
+
+describe("selfie.config.json", () => {
+  beforeEach(() => {
+    h.stories = [{ id: "a--one" }];
   });
 
-  test("selfie.config.json at the top level applies without being named", async () => {
-    await writeFile(path.join(h.repo, "selfie.config.json"), JSON.stringify({ environment: { scale: 2 } }));
-    git(h.repo, "add", "selfie.config.json");
-    git(h.repo, "commit", "--quiet", "-m", "config");
-    const { json } = await review();
-    expect(json.environment.definition.scale).toBe(2);
-    expect(json.baselineSha).toBeNull();
+  test("gives the environment and the init script", async () => {
+    await writeFile(path.join(h.repo, "freeze.js"), "frozen();");
+    await writeConfig({ environment: { scale: 2 }, initScript: "freeze.js" });
+    let seen: any;
+    h.onCapture = (options) => {
+      seen = options;
+    };
+    await review();
+    expect(seen.initScript).toBe("frozen();");
+    expect(seen.environment.scale).toBe(2);
   });
 
-  test("a config's init script is read from beside it, and a flag wins", async () => {
-    await writeFile(path.join(h.repo, "freeze.js"), "fromConfig();");
-    await writeFile(path.join(h.scratch, "flag.js"), "fromFlag();");
-    await writeFile(path.join(h.repo, "selfie.config.json"), JSON.stringify({ initScript: "freeze.js" }));
-    expect((await review()).json.initScriptSha256).toBe("fromConfig();");
-    expect((await review("--init-script", path.join(h.scratch, "flag.js"))).json.initScriptSha256).toBe("fromFlag();");
+  test("uses the pinned default with no file", async () => {
+    let seen: any;
+    h.onCapture = (options) => {
+      seen = options;
+    };
+    await review();
+    expect(seen.environment.scale).toBe(1);
+    expect(seen.initScript).toBeUndefined();
   });
 
-  test("a config's init script can't be outside the config's directory", async () => {
-    await writeFile(path.join(h.repo, "selfie.config.json"), JSON.stringify({ initScript: "../outside.js" }));
+  test.each([
+    [{ buildCommand: "rm -rf /" }, 'unknown key "buildCommand"'],
+    [{ initScript: "../outside.js" }, "must be inside"],
+    [{ initScript: "missing.js" }, "Can't read the init script"],
+    [[1], "must hold a JSON object"],
+  ])("refuses %j", async (config, message) => {
+    await writeConfig(config);
     const { code, json } = await review();
     expect(code).toBe(2);
-    expect(json.error.message).toContain("must be inside");
+    expect(json.error).toMatchObject({ code: "bad-config", message: expect.stringContaining(message) });
   });
 
-  test("a config with an unknown key is refused, so a typo doesn't pass silently", async () => {
-    await writeFile(path.join(h.repo, "bad.json"), JSON.stringify({ buildCommand: "rm -rf /" }));
-    const { code, json } = await review("--config", "bad.json");
-    expect(code).toBe(2);
-    expect(json.error.message).toContain('unknown key "buildCommand"');
+  test("refuses what isn't JSON", async () => {
+    await writeFile(path.join(h.repo, "selfie.config.json"), "{nope");
+    const { json } = await review();
+    expect(json.error.code).toBe("bad-config");
   });
 });
 
@@ -273,14 +342,17 @@ describe("decisions", () => {
 
     const refused = await h.cli("accept", json.runId);
     expect(refused.code).toBe(1);
-    expect(refused.json.unapproved).toEqual([{ story: "b--three", state: "changed", decision: null }]);
+    expect(refused.json.refusals[0]).toMatchObject({
+      reason: "unapproved",
+      stories: [{ story: "b--three", state: "changed", decision: null }],
+    });
     expect(refused.json.refusals[0].message).toContain("b--three");
 
     expect((await h.cli("approve", json.runId, "--story", "b--*")).code).toBe(0);
     expect((await h.cli("accept", json.runId)).code).toBe(0);
   });
 
-  test("a rejection needs attention and blocks accepting until it's changed", async () => {
+  test("a rejection blocks, and blocks accepting until it's changed", async () => {
     const { json } = await review();
     const rejected = await h.cli("reject", json.runId, "--all", "--actor", "agent-7");
     expect(rejected.code).toBe(0);
@@ -288,13 +360,13 @@ describe("decisions", () => {
 
     const next = await review();
     expect(next.code).toBe(1);
-    expect(reasons(next.json)).toEqual(["rejected", "rejected", "rejected"]);
+    expect(next.json.blockers[0]).toEqual({ story: "a--one", reason: "rejected", detail: "agent-7" });
     expect(next.json.differences[0].decision).toMatchObject({ decision: "rejected", actor: "agent-7" });
-    expect(next.json.counts.rejected).toBe(3);
+    expect(next.json.counts.undecided).toBe(0);
 
     const refused = await h.cli("accept", next.json.runId);
     expect(refused.code).toBe(1);
-    expect(refused.json.unapproved[0]).toEqual({ story: "a--one", state: "changed", decision: "rejected" });
+    expect(refused.json.refusals[0].stories[0]).toEqual({ story: "a--one", state: "changed", decision: "rejected" });
 
     await h.cli("approve", next.json.runId, "--all");
     expect((await h.cli("accept", next.json.runId)).code).toBe(0);
@@ -306,7 +378,7 @@ describe("decisions", () => {
     h.stories = [{ id: "a--one", color: GREEN }, { id: "a--two", color: BLUE }, { id: "b--three", color: GREEN }];
     const next = await review();
     expect(next.code).toBe(1);
-    expect(next.json.needsAttention.map(({ story }: any) => story)).toEqual(["a--one"]);
+    expect(next.json.blockers.map(({ story }: any) => story)).toEqual(["a--one"]);
   });
 
   test("a typo in a pattern exits 1, and decides nothing", async () => {
@@ -319,18 +391,18 @@ describe("decisions", () => {
 
   test("needs --all or a pattern, and refuses both", async () => {
     const { json } = await review();
-    expect((await h.cli("approve", json.runId)).code).toBe(2);
+    expect((await h.cli("approve", json.runId)).json.error.code).toBe("usage");
     expect((await h.cli("approve", json.runId, "--all", "--story", "a*")).code).toBe(2);
   });
 
   test("refuses what isn't a run ID before it reaches a path, and reports an unknown one", async () => {
     const traversal = await h.cli("approve", "../../..", "--all");
     expect(traversal.code).toBe(2);
-    expect(traversal.json.error.message).toContain("isn't a run ID");
-    expect((await h.cli("accept", "../../..")).code).toBe(2);
+    expect(traversal.json.error.code).toBe("bad-run-id");
+    expect((await h.cli("accept", "../../..")).json.error.code).toBe("bad-run-id");
     const unknown = await h.cli("accept", "00000000-0000-4000-8000-000000000000");
     expect(unknown.code).toBe(2);
-    expect(unknown.json.error.message).toContain("No run");
+    expect(unknown.json.error.code).toBe("unknown-run");
   });
 });
 
@@ -345,7 +417,6 @@ describe("dirty trees", () => {
     await writeFile(path.join(h.repo, "file.txt"), "edited\n");
     const dirty = await review();
     expect(dirty.code).toBe(1);
-    expect(dirty.json.dirty).toBe(true);
     expect(dirty.json.dirtyPaths).toEqual(["file.txt"]);
     expect((await h.cli("approve", dirty.json.runId, "--all")).code).toBe(0);
 
@@ -353,27 +424,16 @@ describe("dirty trees", () => {
     const after = await review();
     expect(after.code).toBe(0);
     expect(after.json.gitSha).toBe(sha);
-    expect(after.json.dirty).toBe(false);
+    expect(after.json.dirtyPaths).toEqual([]);
     expect(after.json.differences[0]).toMatchObject({ state: "changed" });
     expect(after.json.differences[0].decision.decision).toBe("approved");
-    expect(after.json.counts).toMatchObject({ approved: 1, undecided: 0, needsAttention: 0 });
+    expect(after.json.counts).toMatchObject({ undecided: 0 });
+    expect(after.json.blockers).toEqual([]);
 
     expect((await h.cli("accept", after.json.runId)).code).toBe(0);
     const final = await review();
-    expect(final.json.baselineSha).toBe(sha);
+    expect(final.json.baseline.sha).toBe(sha);
     expect(final.json.differences).toEqual([]);
-  });
-
-  test("accept refuses a dirty tree, and says what's dirty", async () => {
-    await commit(h.repo, "second");
-    const { json } = await review();
-    await h.cli("approve", json.runId, "--all");
-    await writeFile(path.join(h.repo, "untracked.txt"), "x");
-    const refused = await h.cli("accept", json.runId);
-    expect(refused.code).toBe(1);
-    expect(refused.json.refusals[0].reason).toBe("dirty-tree");
-    expect(refused.json.refusals[0].message).toContain("untracked.txt");
-    expect(refused.stderr).toContain("Not accepted");
   });
 
   test("accept refuses a run recorded on a dirty tree, even once the tree is clean", async () => {
@@ -384,9 +444,19 @@ describe("dirty trees", () => {
 
     const refused = await h.cli("accept", json.runId);
     expect(refused.code).toBe(1);
-    expect(refused.json.refusals.map(({ reason }: any) => reason)).toEqual(["recorded-on-dirty-tree"]);
+    expect(reasons(refused.json.refusals)).toEqual(["recorded-on-dirty-tree"]);
     expect(refused.json.refusals[0].message).toContain("approvals carry over");
-    expect((await h.cli("find-baseline")).json.baselineSha).not.toBeNull();
+    expect(refused.stderr).toContain("Not accepted");
+  });
+
+  test("accept takes a run recorded clean, whatever the tree holds now", async () => {
+    const sha = await commit(h.repo, "second");
+    const { json } = await review();
+    await h.cli("approve", json.runId, "--all");
+    await writeFile(path.join(h.repo, "untracked.txt"), "x");
+    const accepted = await h.cli("accept", json.runId);
+    expect(accepted.code).toBe(0);
+    expect(accepted.json.gitSha).toBe(sha);
   });
 
   test("accept takes a run recorded clean at an earlier commit, for that commit", async () => {
@@ -397,7 +467,7 @@ describe("dirty trees", () => {
     const accepted = await h.cli("accept", json.runId);
     expect(accepted.code).toBe(0);
     expect(accepted.json.gitSha).toBe(earlier);
-    expect((await h.cli("find-baseline")).json.baselineSha).toBe(earlier);
+    expect((await h.cli("find-baseline")).json.sha).toBe(earlier);
   });
 
   test("a HEAD that moves during the render fails the review", async () => {
@@ -407,55 +477,55 @@ describe("dirty trees", () => {
     };
     const { code, json } = await review();
     expect(code).toBe(2);
-    expect(json.error.message).toContain("HEAD moved");
+    expect(json.error.code).toBe("head-moved");
   });
 });
 
-describe("stories needing attention", () => {
-  test("a failed story is listed, exits 1, and blocks accepting", async () => {
+describe("blockers and advisories", () => {
+  test("a failed story blocks, and blocks accepting", async () => {
     h.stories = [{ id: "a--one" }, { id: "a--two", failed: "boom" }];
     const { code, json } = await review();
     expect(code).toBe(1);
-    expect(json.status).toBe("failed");
-    expect(json.failures).toEqual([{ story: "a--two", failure: "render: boom", goldenHash: null }]);
-    expect(reasons(json)).toContain("failed");
-    expect(json.counts.failed).toBe(1);
+    expect(json.blockers).toContainEqual({ story: "a--two", reason: "failed", detail: "render: boom" });
 
     const approved = await h.cli("approve", json.runId, "--all");
-    expect(approved.json.skipped[0]).toMatchObject({ story: "a--two", state: "failed" });
+    expect(approved.json.skipped).toEqual([{ story: "a--two", state: "failed" }]);
     const refused = await h.cli("accept", json.runId);
     expect(refused.code).toBe(1);
-    expect(refused.json.refusals[0].reason).toBe("run-has-failures");
-    expect(refused.json.refusals[0].message).toContain("a--two");
+    expect(refused.json.refusals[0]).toMatchObject({ reason: "run-has-failures", stories: ["a--two"] });
   });
 
-  test("play errors and unstable stories need attention, but acceptRun's gate is the only one", async () => {
+  test("play errors and unstable stories alone exit 0, and stay plainly visible", async () => {
     h.stories = [
       { id: "a--play", errors: [{ source: "play", message: "the play failed" }, { source: "console", message: "noise" }] },
       { id: "a--wobbly", stability: "unstable", repeatColor: BLUE },
       { id: "a--fine", stability: "stable" },
     ];
-    const { code, json } = await review("--stability");
-    expect(code).toBe(1);
-    expect(json.playErrors).toHaveLength(1);
-    expect(json.playErrors[0].errors).toEqual([{ source: "play", message: "the play failed" }]);
-    expect(await exists(json.playErrors[0].current)).toBe(true);
-    expect(json.unstable[0].story).toBe("a--wobbly");
-    expect(await exists(json.unstable[0].current)).toBe(true);
-    expect(await exists(json.unstable[0].repeat)).toBe(true);
-    expect(json.counts).toMatchObject({ playErrors: 1, unstable: 1 });
-    expect(reasons(json)).toEqual(expect.arrayContaining(["play-error", "unstable"]));
+    const first = await review("--stability");
+    expect(first.code).toBe(1); // Everything is new, which does block.
+    expect(reasons(first.json.blockers)).toEqual(["new-unapproved", "new-unapproved", "new-unapproved"]);
+    expect(first.json.advisories).toEqual([
+      { story: "a--play", reason: "play-error", detail: "the play failed" },
+      { story: "a--wobbly", reason: "unstable", detail: null },
+    ]);
+    expect(first.json.counts.advisories).toBe(2);
+    expect(first.json.playErrors[0]).toMatchObject({ story: "a--play", playError: "the play failed" });
+    expect(await exists(first.json.playErrors[0].current)).toBe(true);
+    expect(first.json.unstable[0].story).toBe("a--wobbly");
+    expect(await exists(first.json.unstable[0].current)).toBe(true);
+    expect(await exists(first.json.unstable[0].repeat)).toBe(true);
 
-    await h.cli("approve", json.runId, "--all");
-    const accepted = await h.cli("accept", json.runId);
+    await h.cli("approve", first.json.runId, "--all");
+    const accepted = await h.cli("accept", first.json.runId);
     expect(accepted.code).toBe(0);
-    expect(accepted.json.playErrors[0].story).toBe("a--play");
-    expect(accepted.json.unstable[0].story).toBe("a--wobbly");
+    expect(reasons(accepted.json.advisories)).toEqual(["play-error", "unstable"]);
 
-    // Unchanged, and still needing attention.
+    // Unchanged, so nothing blocks, and they're still reported.
     const next = await review("--stability");
-    expect(next.code).toBe(1);
+    expect(next.code).toBe(0);
+    expect(next.json.blockers).toEqual([]);
     expect(next.json.differences).toEqual([]);
+    expect(next.json.counts.advisories).toBe(2);
     expect(next.json.playErrors[0].story).toBe("a--play");
     expect(next.json.unstable[0].story).toBe("a--wobbly");
   });
@@ -466,9 +536,55 @@ describe("stories needing attention", () => {
     h.stories = [{ id: "a--one" }, { id: "a--bad", rawPng: alpha }];
     const { code, json } = await review();
     expect(code).toBe(1);
-    expect(json.failures[0].story).toBe("a--bad");
-    expect(json.failures[0].failure).toContain("The store refused its image");
-    expect(json.counts).toMatchObject({ stories: 2, new: 1, failed: 1 });
+    expect(json.blockers[0]).toMatchObject({ story: "a--bad", reason: "failed" });
+    expect(json.blockers[0].detail).toContain("The store refused its image");
+    expect(json.counts).toMatchObject({ stories: 2, new: 1 });
+  });
+});
+
+describe("a run pruned from disk", () => {
+  test("can still be decided on and accepted, since its facts are in the store", async () => {
+    h.stories = [{ id: "a--one" }, { id: "a--two" }];
+    await makeGoldens();
+    h.stories = [{ id: "a--one", color: BLUE }];
+    await commit(h.repo, "second");
+    const { json } = await review();
+    const [difference] = json.differences;
+    const runDir = path.join(await projectDirectory(), "runs", json.runId);
+    expect(await exists(path.join(runDir, "review.json"))).toBe(true);
+    await rm(runDir, { recursive: true });
+
+    // The reviewer's baseline, the removal count, and the decisions all survive.
+    const refused = await h.cli("accept", json.runId);
+    expect(refused.code).toBe(1);
+    expect(refused.json.baselineSha).toBe(json.baseline.sha);
+    expect(reasons(refused.json.refusals)).toEqual(["unapproved", "removed-unacknowledged"]);
+
+    const approved = await h.cli("approve", json.runId, "--all");
+    expect(approved.code).toBe(0);
+    expect(approved.json.decided[0].imageHash).toBe(difference.imageHash);
+    expect((await h.cli("accept", json.runId, "--removed", "1")).code).toBe(0);
+    expect((await h.cli("find-baseline")).json.sha).toBe(json.gitSha);
+  });
+
+  test("still refuses if it was recorded dirty, with no file to say so", async () => {
+    h.stories = [{ id: "a--one" }];
+    await writeFile(path.join(h.repo, "file.txt"), "edited\n");
+    const { json } = await review();
+    await h.cli("approve", json.runId, "--all");
+    git(h.repo, "checkout", "--", "file.txt");
+    await rm(path.join(await projectDirectory(), "runs", json.runId), { recursive: true });
+    const refused = await h.cli("accept", json.runId);
+    expect(reasons(refused.json.refusals)).toEqual(["recorded-on-dirty-tree"]);
+  });
+
+  test("still knows its filter", async () => {
+    h.stories = [{ id: "a--one" }, { id: "b--two" }];
+    await makeGoldens();
+    const { json } = await review("--story", "a--*");
+    await rm(path.join(await projectDirectory(), "runs", json.runId), { recursive: true });
+    const refused = await h.cli("accept", json.runId);
+    expect(refused.json.refusals[0]).toMatchObject({ reason: "removed-unacknowledged", outsideFilter: 1 });
   });
 });
 
@@ -482,14 +598,14 @@ describe("untrusted names", () => {
       const baselineStories = [{ id, color: RED }];
       await makeGoldens();
       h.stories = [...h.stories, ...baselineStories];
-      const fileName = encodeURIComponent(id);
       // The stand-in writes under the same encoding as the renderer. A name too long for a file
       // can't come from the renderer either, since it would be a failed story there.
-      if (fileName.length > 240) h.stories = [{ id: "plain", color: BLUE }, { id, failed: "too long" }];
+      if (encodeURIComponent(id).length > 240) h.stories = [{ id: "plain", color: BLUE }, { id, failed: "too long" }];
       const { json } = await review();
+      const runsRoot = path.join(await projectDirectory(), "runs", json.runId);
       for (const { current, golden, diff } of json.differences) {
         for (const file of [current, golden, diff]) {
-          if (file !== null) expect(isInside(json.outputDir, file)).toBe(true);
+          if (file !== null) expect(isInside(runsRoot, file)).toBe(true);
         }
       }
       expect(await readdir(h.scratch)).toEqual(expect.arrayContaining(["home", "repo"]));
@@ -514,8 +630,9 @@ describe("untrusted names", () => {
     ];
     const { code, json } = await review();
     expect(code).toBe(1);
-    expect(json.failures.map(({ story }: any) => story)).toEqual(["a--absolute", "a--escape"]);
-    for (const { failure } of json.failures) expect(failure).toContain("The capture is unusable");
+    const failed = json.blockers.filter(({ reason }: any) => reason === "failed");
+    expect(failed.map(({ story }: any) => story)).toEqual(["a--absolute", "a--escape"]);
+    for (const { detail } of failed) expect(detail).toContain("The capture is unusable");
     expect(json.counts.new).toBe(1);
   });
 
@@ -524,7 +641,7 @@ describe("untrusted names", () => {
     await writeFile(secret, await encodePng(solid(2, 2, GREEN)));
     h.stories = [{ id: "a--link", symlinkTo: secret }];
     const { json } = await review();
-    expect(json.failures[0].failure).toContain("isn't a regular file");
+    expect(json.blockers[0].detail).toContain("isn't a regular file");
   });
 });
 
@@ -546,17 +663,16 @@ describe("local data", () => {
     const first = await review();
     let last = first;
     for (let i = 0; i < 21; i++) last = await review();
-    const projectDir = path.dirname(path.dirname(last.json.outputDir));
+    const projectDir = await projectDirectory();
     const runs = await readdir(path.join(projectDir, "runs"));
     expect(runs).toHaveLength(20);
     expect(runs).toContain(last.json.runId);
     expect(runs).not.toContain(first.json.runId);
     expect(await readdir(path.join(projectDir, "capture"))).toEqual([]);
 
-    // A pruned run can't be acted on, and says why, and the store still knows it.
-    const old = await h.cli("accept", first.json.runId);
-    expect(old.code).toBe(2);
-    expect(old.json.error.message).toContain("no review record");
+    // The oldest was pruned, and can still be acted on.
+    expect((await h.cli("approve", first.json.runId, "--all")).code).toBe(0);
+    expect((await h.cli("accept", first.json.runId)).code).toBe(0);
   });
 
   test("leaves no capture directory behind when the capture fails", async () => {
@@ -571,8 +687,7 @@ describe("local data", () => {
     };
     const { runCli } = await import("../src/cli.ts");
     expect(await runCli(["review"], context)).toBe(2);
-    const [project] = await readdir(h.home);
-    expect(await readdir(path.join(h.home, project!, "capture")).catch(() => [])).toEqual([]);
+    expect(await readdir(path.join(await projectDirectory(), "capture")).catch(() => [])).toEqual([]);
   });
 });
 
@@ -581,7 +696,7 @@ describe("the build command", () => {
     h.stories = [{ id: "a--one" }];
     const failed = await review("--build-command", "exit 3");
     expect(failed.code).toBe(2);
-    expect(failed.json.error.message).toContain("exit code 3");
+    expect(failed.json.error).toMatchObject({ code: "build-failed", message: expect.stringContaining("exit code 3") });
 
     const ok = await review("--build-command", `echo built > "${path.join(h.scratch, "marker")}"`);
     expect(ok.code).toBe(1);

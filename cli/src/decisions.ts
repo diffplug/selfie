@@ -1,173 +1,140 @@
-// `selfie approve`, `selfie reject`, and `selfie accept`. Each acts on a run's record, which holds
-// the baseline its reviewer saw.
+// Deciding on and accepting a run, from what the store knows about it, whether or not its
+// exported images are still on disk.
 import { filterStories } from "selfie-render";
-import { SnapshotError, type ComparedSnapshot, type DecisionKind } from "selfie-store";
-import { dirtyPaths, gitUserEmail } from "./git.ts";
-import { CliError, EXIT_NEEDS_ATTENTION, EXIT_OK, printJson, type Context } from "./output.ts";
-import { assertRunId } from "./paths.ts";
-import { openProject, readRunRecord } from "./project.ts";
-import type { ReviewOutput } from "./review.ts";
+import { SnapshotError, type ComparedSnapshot, type Comparison, type DecisionKind } from "selfie-store";
+import { isOnBaselineHistory } from "./git.ts";
+import { compareAsReviewed, type Project } from "./project.ts";
+import { isDecidable, summarizeRun } from "./summary.ts";
 
-const asEntry = ({ story }: { story: string }) => ({ id: story, title: "", name: "" });
-
-export interface DecideFlags {
-  readonly run: string;
+export interface DecideRequest {
+  readonly runId: string;
   readonly decision: DecisionKind;
-  readonly all?: boolean | undefined;
-  readonly story?: string[] | undefined;
-  readonly actor?: string | undefined;
+  readonly actor: string;
+  /** Every changed and new image, or those whose story IDs match these patterns. */
+  readonly stories: "all" | readonly string[];
 }
 
-export async function decideCommand(flags: DecideFlags, context: Context): Promise<number> {
-  const { run: runId, decision, all, story: patterns } = flags;
-  assertRunId(runId);
-  if (Boolean(all) === Boolean(patterns?.length)) {
-    throw new CliError("Say which snapshots: either --all, or one or more --story patterns.");
-  }
-
-  const project = await openProject(context);
-  try {
-    const actor = flags.actor ?? (await gitUserEmail(project.repo));
-    if (actor === null) throw new CliError("No actor: set git config user.email, or pass --actor.");
-    const { baselineSha } = await readRunRecord<ReviewOutput>(project, runId);
-    const comparison = await project.snapshots.compareRun(runId, baselineSha, { includeUnchanged: true });
-
-    // A typo must not read as a decision made.
-    const matching = patterns === undefined ? null : filterStories(comparison.snapshots.map(asEntry), patterns);
-    const chosen =
-      matching === null
-        ? comparison.snapshots
-        : comparison.snapshots.filter(({ story }) => matching.stories.some(({ id }) => id === story));
-
-    const decidable = ({ state }: ComparedSnapshot) => state === "changed" || state === "new";
-    const decided = chosen.filter(decidable);
-    const skipped = chosen.filter(({ state }) => state === "failed" || state === "removed");
-    await project.snapshots.decide({
-      environment: comparison.run.environment,
-      decision,
-      actor,
-      snapshots: decided.map(({ story, imageHash }) => ({ story, imageHash: imageHash! })),
-    });
-    const unmatchedPatterns = matching?.unmatched ?? [];
-
-    // What still blocks accepting, now this decision is in.
-    const chosenStories = new Set(decided.map(({ story }) => story));
-    const undecided = comparison.snapshots.filter(
-      (snapshot) => decidable(snapshot) && !chosenStories.has(snapshot.story) && snapshot.decision === null,
-    );
-    printJson(context, {
-      runId,
-      decision,
-      actor,
-      decided: decided.map(({ story, state, imageHash }) => ({ story, state, imageHash })),
-      skipped: skipped.map(({ story, state }) => ({
-        story,
-        state,
-        reason: state === "failed" ? "It failed to render, so it has no image." : "It was removed, so it has no image.",
-      })),
-      undecided: undecided.map(({ story, state }) => ({ story, state })),
-      unmatchedPatterns,
-    });
-    return unmatchedPatterns.length > 0 ? EXIT_NEEDS_ATTENTION : EXIT_OK;
-  } finally {
-    project.close();
-  }
+export interface DecideResult {
+  /** The images that took the decision. */
+  readonly decided: readonly ComparedSnapshot[];
+  /** What was selected, but has no image to decide on. */
+  readonly skipped: readonly ComparedSnapshot[];
+  /** Patterns that matched nothing, which a caller shouldn't read as a decision made. */
+  readonly unmatchedPatterns: readonly string[];
+  /** The run as it stands after this decision. */
+  readonly comparison: Comparison;
 }
 
-export interface AcceptFlags {
-  readonly run: string;
-  /** The count of removed snapshots the reviewer saw. Required if there are any. */
-  readonly removed?: number | undefined;
+export async function decide(project: Project, request: DecideRequest): Promise<DecideResult> {
+  const { runId, decision, actor, stories } = request;
+  const before = await compareAsReviewed(project, runId, { includeUnchanged: true });
+  const matching =
+    stories === "all"
+      ? null
+      : filterStories(
+          before.snapshots.map((snapshot) => ({ ...snapshot, id: snapshot.story })),
+          stories,
+        );
+  const chosen: readonly ComparedSnapshot[] = matching?.stories ?? before.snapshots;
+  const decided = chosen.filter(({ state }) => isDecidable(state));
+  await project.snapshots.decide({
+    environment: before.run.environment,
+    decision,
+    actor,
+    snapshots: decided.map(({ story, imageHash }) => ({ story, imageHash: imageHash! })),
+  });
+  return {
+    decided,
+    skipped: chosen.filter(({ state }) => state === "failed" || state === "removed"),
+    unmatchedPatterns: matching?.unmatched ?? [],
+    comparison: await compareAsReviewed(project, runId),
+  };
 }
 
 export type AcceptRefusal =
-  | "dirty-tree"
-  | "recorded-on-dirty-tree"
-  | "run-has-failures"
-  | "unapproved"
-  | "removed-unacknowledged"
-  | "wrong-removed-count";
-
-export async function acceptCommand(flags: AcceptFlags, context: Context): Promise<number> {
-  const { run: runId, removed: removedSeen } = flags;
-  assertRunId(runId);
-
-  const project = await openProject(context);
-  try {
-    const record = await readRunRecord<ReviewOutput>(project, runId);
-    const { snapshots: compared, run } = await project.snapshots.compareRun(runId, record.baselineSha);
-    const removed = compared.filter(({ state }) => state === "removed").map(({ story }) => story);
-    const unapproved = compared
-      .filter(
-        ({ state, decision }) => (state === "changed" || state === "new") && decision?.decision !== "approved",
-      )
-      .map(({ story, state, decision }) => ({ story, state, decision: decision?.decision ?? null }));
-    const failed = compared.filter(({ state }) => state === "failed").map(({ story }) => story);
-    const outsideFilter =
-      record.filter === null
-        ? 0
-        : removed.length - filterStories(removed.map((story) => asEntry({ story })), [...record.filter.patterns]).stories.length;
-    const dirty = await dirtyPaths(project.repo);
-
-    const refusals: { reason: AcceptRefusal; message: string }[] = [];
-    if (dirty.length > 0) {
-      refusals.push({
-        reason: "dirty-tree",
-        message: `The working tree is dirty (${dirty.slice(0, 5).join(", ")}${dirty.length > 5 ? ", ..." : ""}). Commit first: a SHA's goldens must describe that commit.`,
-      });
+  | { readonly reason: "recorded-on-dirty-tree"; readonly gitSha: string }
+  | { readonly reason: "run-has-failures"; readonly stories: readonly string[] }
+  | {
+      readonly reason: "unapproved";
+      readonly stories: readonly {
+        readonly story: string;
+        readonly state: string;
+        readonly decision: DecisionKind | null;
+      }[];
     }
-    if (record.dirty) {
-      refusals.push({
-        reason: "recorded-on-dirty-tree",
-        message: `This run was recorded on a dirty tree at ${run.gitSha}, so its images don't describe that commit. Run \`selfie review\` on a clean tree and accept that run: approvals carry over.`,
-      });
+  | {
+      readonly reason: "removed-unacknowledged";
+      readonly stories: readonly string[];
+      /** How many of `stories` are gone only because the run's filter left them out. */
+      readonly outsideFilter: number;
     }
-    if (failed.length > 0) {
-      refusals.push({
-        reason: "run-has-failures",
-        message: `A run with failures can't become goldens. Stories that failed to render (${failed.length}): ${failed.join(", ")}.`,
-      });
-    }
-    if (unapproved.length > 0) {
-      const names = unapproved.map(({ story, state, decision }) => `${story} (${state}${decision === null ? "" : `, ${decision}`})`);
-      refusals.push({
-        reason: "unapproved",
-        message: `Images not approved (${unapproved.length}): ${names.join(", ")}. Use selfie approve ${runId} --all, or --story <pattern>.`,
-      });
-    }
-    if (removed.length > 0 && removedSeen === undefined) {
-      refusals.push({
-        reason: "removed-unacknowledged",
-        message: `Goldens that accepting would remove (${removed.length}): ${removed.join(", ")}.${outsideFilter > 0 ? ` Of those, ${outsideFilter} are only outside this run's --story filter, so a run without a filter may be what you want.` : ""} If that is right, pass --removed ${removed.length}.`,
-      });
-    }
-
-    const attention = { playErrors: record.playErrors, unstable: record.unstable };
-    const summary = { runId, gitSha: run.gitSha, environment: run.environment, baselineSha: record.baselineSha, removed };
-    const refuse = (list: typeof refusals) => {
-      context.stderr(`Not accepted:\n${list.map(({ message }) => `  ${message}`).join("\n")}\n`);
-      printJson(context, { accepted: false, ...summary, refusals: list, unapproved, ...attention });
-      return EXIT_NEEDS_ATTENTION;
+  | {
+      readonly reason: "wrong-removed-count";
+      readonly stories: readonly string[];
+      readonly outsideFilter: number;
+      /** The count the caller gave. */
+      readonly seen: number;
     };
-    if (refusals.length > 0) return refuse(refusals);
 
-    let accepted: boolean;
-    try {
-      accepted = await project.snapshots.acceptRun(runId, record.baselineSha, removedSeen ?? 0);
-    } catch (error) {
-      if (error instanceof SnapshotError && error.code === "wrong-removed-count") {
-        return refuse([{ reason: "wrong-removed-count", message: error.message }]);
-      }
-      throw error;
+export interface AcceptRequest {
+  readonly runId: string;
+  /** How many removed snapshots the reviewer saw. Needed if there are any. */
+  readonly removedSeen?: number | undefined;
+}
+
+export interface AcceptResult {
+  readonly accepted: boolean;
+  /** Empty if accepted. Every reason at once, so a caller doesn't fix them one run at a time. */
+  readonly refusals: readonly AcceptRefusal[];
+  /** Whether the run's SHA is where a later review could read goldens from. */
+  readonly usableAsBaseline: boolean;
+  readonly comparison: Comparison;
+}
+
+export async function accept(project: Project, { runId, removedSeen }: AcceptRequest): Promise<AcceptResult> {
+  const comparison = await compareAsReviewed(project, runId);
+  const { run } = comparison;
+  const { failed, unapproved, removed, notRendered } = summarizeRun(comparison);
+  const removedStories = [...removed, ...notRendered].map(({ story }) => story).sort();
+  const removalFacts = { stories: removedStories, outsideFilter: notRendered.length };
+
+  const refusals: AcceptRefusal[] = [];
+  if (run.dirty) refusals.push({ reason: "recorded-on-dirty-tree", gitSha: run.gitSha });
+  if (failed.length > 0) refusals.push({ reason: "run-has-failures", stories: failed.map(({ story }) => story) });
+  if (unapproved.length > 0) {
+    refusals.push({
+      reason: "unapproved",
+      stories: unapproved.map(({ story, state, decision }) => ({
+        story,
+        state,
+        decision: decision?.decision ?? null,
+      })),
+    });
+  }
+  if (removedSeen === undefined && removedStories.length > 0) {
+    refusals.push({ reason: "removed-unacknowledged", ...removalFacts });
+  } else if (removedSeen !== undefined && removedSeen !== removedStories.length) {
+    refusals.push({ reason: "wrong-removed-count", ...removalFacts, seen: removedSeen });
+  }
+
+  const usableAsBaseline = await isOnBaselineHistory(project.repo, run.gitSha);
+  const result = (list: readonly AcceptRefusal[], accepted: boolean): AcceptResult => ({
+    accepted,
+    refusals: list,
+    usableAsBaseline,
+    comparison,
+  });
+  if (refusals.length > 0) return result(refusals, false);
+
+  // Nothing above stands in for this: the store's one statement is what makes it so.
+  try {
+    const accepted = await project.snapshots.acceptRun(runId, run.baselineSha, removedSeen ?? 0);
+    return result(accepted ? [] : [{ reason: "unapproved", stories: [] }], accepted);
+  } catch (error) {
+    // Another writer can move a baseline's goldens between the check above and this.
+    if (error instanceof SnapshotError && error.code === "wrong-removed-count") {
+      return result([{ reason: "wrong-removed-count", ...removalFacts, seen: removedSeen ?? 0 }], false);
     }
-    if (!accepted) {
-      return refuse([
-        { reason: "unapproved", message: "An image lost its approval while accepting. Review the run again." },
-      ]);
-    }
-    printJson(context, { accepted: true, ...summary, ...attention });
-    return EXIT_OK;
-  } finally {
-    project.close();
+    throw error;
   }
 }

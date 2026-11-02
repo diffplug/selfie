@@ -26,7 +26,7 @@ Reserved: this is the local half of [carrying approvals through a push](#approva
 
 Source of truth: `cli/src/`. `docs/specs/cli.md` owns how it works.
 
-- **Must let an agent use the loop without a UI:** `selfie review` records snapshots locally and outputs JSON with image paths, and `selfie approve`, `reject`, and `accept` act on the run it names. Its exit codes tell an agent whether anything needs attention.
+- **Must let an agent use the loop without a UI:** `selfie review` records snapshots locally and outputs JSON with image paths, and `selfie approve`, `reject`, and `accept` act on the run it names. Its exit codes tell an agent whether anything blocks. The same logic is a library, for the review UI.
 - **Must keep local data under `~/.config/selfie/<git-origin-slugified>/`.**
 
 ## Future

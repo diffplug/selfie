@@ -24,6 +24,12 @@
 
 **Accepting a run already accepted.** Accepting a rerun over its own SHA's goldens makes the run its own baseline, so a resend finds nothing removed and would report a wrong count, after success. The statement passes a run that already holds the goldens. A test fails without this.
 
+**A run's facts in columns.** `selfie review` first kept whether a tree was dirty, its baseline, and its play errors in a file beside the exported images. Pruning that file lost them, and with them the rule that a dirty run can't become goldens, so a UI, or anyone else calling `acceptRun`, wasn't bound by it. They became columns while no store held this data, which is why this table could still change: see `docs/specs/store.md` → Open questions for the next time.
+
+**Not yet run on real D1.** The `play_error` column, the three new columns on `runs`, the longest statement of play errors and failures, and `firstWithGoldens` are in the contract suite, and pass on local SQLite through the same `Sql` limits. The run on real D1 wasn't made when they went in, so their fit there is unproven, and the suite's size of about 90 requests is counted from the code rather than measured. A statement of 33 snapshots with both messages at their 2,000 characters binds about 132 KB, which is the case to watch.
+
+**A filter as a fact.** Whether a removed golden is really gone or only outside the run's filter needs the patterns, so they're kept too. What's unmatched is kept alongside them, since a comparison lists too little to work it out.
+
 ## Compare
 
 **Refusing a missing baseline.** Reporting everything as new would look like a first run, and hide a wrong SHA.
@@ -41,6 +47,8 @@
 **A pointer to a run, not a copy of its rows.** Copying would write 10,000 rows per accepted SHA, and D1 bills per row written. A pointer writes one, and exists whole by construction, so there is no partial set to explain after a crash. What it gives up is goldens with a mix of images from several runs. A baseline must be complete to be a baseline, so nothing reads a partial set. A future sync can bring goldens in as rows of a local run.
 
 **All or nothing per SHA.** A SHA with 3 images unapproved has no goldens yet, and `find-baseline` moves on to the next candidate. Approvals made meanwhile are kept against their hash, so once the last is made, accepting succeeds with nothing to redo.
+
+**A dirty run in the statement.** A caller could always check `dirty` itself, and one that forgot would make goldens that misdescribe their SHA. The check is one more condition in a statement that exists to make such a rule hold.
 
 **A gate here, not in the caller.** The statement is the only place the check and the write can't be separated, and it is what makes "golden" mean "accepted". A first set needs its approvals like any other, which costs one request per 19,200 images.
 
