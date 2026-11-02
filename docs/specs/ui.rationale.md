@@ -25,6 +25,7 @@ Evidence and reasoning for `docs/specs/ui.md`, keyed by its headings.
 
 ## Screens
 
+- **Why moves and spacing are a filter, not a pass.** On one real layout shift, 59 of 134 stories had nothing else in them. Looking through them one at a time is the cost the label should save, and `kind` must not decide for anyone (`cli.rationale.md`), so the filter lets a person see just those, glance over the thumbnails, and approve what's shown.
 - **Why stacking recenters.** A real change in the end-to-end Storybook, 278 pixels at the two ends of a 1186×30 box, showed nothing at all at the box's center at 8×. The first changed pixel always shows one.
 - **Why `firstChanged` is in `PixelDiff`.** The diff loop already visits every pixel, and only the server has the pixels at no extra cost. It adds one field to `selfie review`'s document.
 - **Why two kinds of size.** 1× was one CSS pixel at first, so that an image wouldn't be half the width on some screens and not others. Actual size now gives that consistent size, and a person looking for one wrong pixel needs to know what a pixel on their screen is, which only device pixels can say. A 1× image on a 2× display is half its actual width at 1×, and that's the point of choosing it.

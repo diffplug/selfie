@@ -122,6 +122,8 @@ Source of truth: `ui/src/client/`.
 - **Must keep how someone is looking when moving between stories**, and must never show one story's image under another's name while it loads.
 - **Must compute diff images, and pixel stats a run's `review.json` no longer holds, on demand, from the store, by hash pair**, so a pruned run reads like any other. A list shows stats only from `review.json`, and one snapshot uses them rather than ask (rationale).
 - **Must explain each kind of snapshot:** new has no golden, removed has no current and takes no decision, failed shows its message, and a changed size says so, and shows the images from their top left corners.
+- **Must say when a changed snapshot is only moves and spacing, in the list, the pixel stats, and a banner, and that it still needs a decision**, and offer those as a filter of the list, so they can be approved together (rationale).
+- **Must say what the diff image's colors mean wherever it has more than one.**
 - **Must not offer a decision on what has no image to decide on.**
 
 **Accepting** shows, in plain words, every refusal `accept` would give, and what to do about it.

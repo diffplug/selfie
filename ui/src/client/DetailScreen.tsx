@@ -13,7 +13,7 @@ import { Keys } from "./Keys.tsx";
 import { acceptPath, AppLink, navigate, runPath, storyPath } from "./router.tsx";
 import { ActionFailure } from "./RunNotes.tsx";
 import { LoadFailure, Loading } from "./Status.tsx";
-import { groupRegions } from "../shared/regions.ts";
+import { groupRegions, isLayoutOnly } from "../shared/regions.ts";
 import { AdvisoryLabels, DecisionLabel, describePixels, plural, sizeChanged, StateLabel } from "./words.tsx";
 
 const SHORTCUTS: readonly (readonly [string, string])[] = [
@@ -49,12 +49,19 @@ function ShortcutsDialog({ onClose }: { readonly onClose: () => void }) {
 
 function PixelStats({ stats, mergeDistance }: { stats: PixelDiff; mergeDistance: number }) {
   const box = stats.boundingBox;
+  const groups = plural(groupRegions(stats.regions, mergeDistance).length, "region");
+  const account = [
+    stats.movedPixels > 0 && `${stats.movedPixels.toLocaleString()} moved`,
+    stats.spacingPixels > 0 && `${stats.spacingPixels.toLocaleString()} spacing`,
+  ].filter(Boolean);
   return (
     <Text className="selfie-muted">
-      <strong>{describePixels(stats)}</strong> of {stats.totalPixels.toLocaleString()} changed
-      {box === null ? "" : `, within ${box.width}×${box.height} at ${box.x}, ${box.y}`}.{" "}
-      {`${plural(groupRegions(stats.regions, mergeDistance).length, "changed region")}. `}
+      <strong>{describePixels(stats)}</strong>
+      {!isLayoutOnly(stats) && ` of ${stats.totalPixels.toLocaleString()} changed`}
+      {box === null ? "" : `, within ${box.width}×${box.height} at ${box.x}, ${box.y}`}. {groups}.
+      {account.length > 0 && ` ${account.join(", ")} pixels.`}
       {stats.maxChannelDelta > 0 && ` The largest difference in a channel is ${stats.maxChannelDelta} of 255.`}
+      {account.length > 0 && " In the diff, pink changed, blue moved, and yellow is spacing that grew or shrank."}
     </Text>
   );
 }
@@ -72,8 +79,11 @@ function Notes({ row, diff }: { row: SnapshotRow; diff: PixelDiff | null }) {
         <Banner variant="warning" title="Removed story" description="The baseline has this golden, and this run doesn't have the story. There's no image to decide on: accepting asks you to acknowledge the removal." />
       )}
       {row.state === "unchanged" && <Banner variant="info" title="Unchanged" description="This image is the same as the baseline's." />}
+      {diff !== null && isLayoutOnly(diff) && (
+        <Banner variant="info" title="Moved and spacing only" description="Everything in this image is in the golden too, and only where it sits changed. That can still be a bug, so it needs a decision like any other." />
+      )}
       {diff !== null && sizeChanged(diff) && (
-        <Banner variant="warning" title="The size changed" description="The images are different sizes. The rows that still match are left out of the change, and the images are shown from their top left corners, so what's below the change won't line up when flipping." />
+        <Banner variant="warning" title="The size changed" description="The images are different sizes, and they're shown from their top left corners, so what's below the change won't line up when flipping." />
       )}
       {row.playError !== null && (
         <Banner variant="warning" title="Its play function threw" description={<code className="selfie-pre">{row.playError}</code>} />

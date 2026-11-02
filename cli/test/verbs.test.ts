@@ -268,7 +268,7 @@ describe("regionMergeDistance", () => {
     const review = async () => (await h.cli("review", two.json.runId, "--baseline", one.json.runId)).json.differences[0];
 
     const standard = await review();
-    expect(standard.regionGroups).toEqual([{ current: { x: 1, y: 1, width: 2, height: 2 }, golden: { x: 1, y: 1, width: 2, height: 2 } }]);
+    expect(standard.regionGroups).toEqual([{ current: { x: 1, y: 1, width: 2, height: 2 }, golden: { x: 1, y: 1, width: 2, height: 2 }, kind: "changed" }]);
     await config({ regionMergeDistance: 100 });
     const wide = await review();
     expect(wide.pixelDiff).toEqual(standard.pixelDiff);

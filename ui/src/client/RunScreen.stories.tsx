@@ -37,6 +37,9 @@ export const FirstRunAllNew: Story = {
     ),
   },
 };
+export const MovedAndSpacingOnly: Story = {
+  args: { view: viewOf([rows.spaced("pages-home--with-more-space"), rows.moved("pages-home--indented"), rows.changed("components-button--primary")]), search: "?show=layout" },
+};
 export const ChangesUndecided: Story = { args: { view: viewOf(SOME_CHANGES) } };
 export const SomeDecided: Story = {
   args: {

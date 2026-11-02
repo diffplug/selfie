@@ -12,10 +12,22 @@ export interface BoundingBox {
   readonly height: number;
 }
 
-/** Rectangles of each image that correspond, and differ. Everything outside a region matches. */
-export interface ChangedRegion {
+/** Rectangles of each image that correspond. */
+export interface BoxPair {
   readonly current: BoundingBox;
   readonly golden: BoundingBox;
+}
+
+/** What a region's difference is. Anything not accounted for by moves and spacing is `changed`. */
+export type RegionKind = "changed" | "moved" | "spacing";
+
+/** Boxes that differ. Everything outside a region matches. */
+export interface ChangedRegion extends BoxPair {
+  readonly kind: RegionKind;
+  /** What moves and spacing don't account for. */
+  readonly changedPixels: number;
+  /** What landed here, identical to what was elsewhere in the golden. A region that only lost something to another region is `moved` with none of these. */
+  readonly moved: readonly BoxPair[];
 }
 
 export interface PixelDiff {
@@ -23,15 +35,19 @@ export interface PixelDiff {
   readonly golden: { readonly width: number; readonly height: number };
   /** Top to bottom. */
   readonly regions: readonly ChangedRegion[];
-  /** Including what only the golden has, which isn't in `boundingBox`. */
+  /** What moves and spacing don't account for, including what only the golden has, which isn't in `boundingBox`. */
   readonly changedPixels: number;
+  /** Of blocks that are identical, but elsewhere. */
+  readonly movedPixels: number;
+  /** Of bands of the surrounding color that grew or shrank. */
+  readonly spacingPixels: number;
   /** The larger image's. */
   readonly totalPixels: number;
-  /** In the current image. If something was only removed, the row marking where. Null only if the images are identical, which a `changed` snapshot never is. */
+  /** In the current image, around what changed, or else what moved or grew. If something was only removed, the row marking where. Null only if the images are identical, which a `changed` snapshot never is. */
   readonly boundingBox: BoundingBox | null;
-  /** The first changed pixel in reading order, which `boundingBox`'s center need not be. */
+  /** Where to look first, in reading order, which `boundingBox`'s center need not be. */
   readonly firstChanged: { readonly x: number; readonly y: number } | null;
-  /** The largest difference in any one channel where both images have a pixel, 0 to 255. */
+  /** The largest difference in any one changed channel where both images have a pixel, 0 to 255. */
   readonly maxChannelDelta: number;
 }
 

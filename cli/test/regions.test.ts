@@ -58,9 +58,9 @@ describe("findRegions", () => {
     const added = page([...lines.slice(0, 20), null, null, null, null, null, ...lines.slice(20)]);
     const current = paint(added, 2, 4, 3, 1);
     const { diff, highlighted } = diffImages(current, golden);
-    expect(diff.regions).toEqual([
-      { current: box(2, 4, 3, 1), golden: box(2, 4, 3, 1) },
-      { current: box(0, 20, WIDTH, 5), golden: box(0, 20, WIDTH, 0) },
+    expect(diff.regions).toMatchObject([
+      { current: box(2, 4, 3, 1), golden: box(2, 4, 3, 1), kind: "changed", changedPixels: 3 },
+      { current: box(0, 20, WIDTH, 5), golden: box(0, 20, WIDTH, 0), kind: "spacing", changedPixels: 0 },
     ]);
     // A mark from below the added rows would show here as a ghost if rows weren't lined up.
     const below = highlighted.pixels.subarray(25 * WIDTH * 3);

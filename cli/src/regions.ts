@@ -4,7 +4,7 @@
 // This depends on the two images alone, so the same pair always gives the same regions.
 import { createHash } from "node:crypto";
 import type { RawImage } from "selfie-store";
-import type { BoundingBox, ChangedRegion } from "selfie-ui/app";
+import type { BoundingBox, BoxPair } from "selfie-ui/app";
 
 /** A shorter span could be anything, such as one line of text. */
 const MIN_ANCHOR_ROWS = 4;
@@ -17,7 +17,7 @@ type Box = { -readonly [K in keyof BoundingBox]: BoundingBox[K] };
 
 const isEmpty = ({ width, height }: BoundingBox) => width === 0 || height === 0;
 
-const rowOf = ({ pixels, width }: RawImage, { x, width: columns }: BoundingBox, y: number) =>
+export const rowOf = ({ pixels, width }: RawImage, { x, width: columns }: BoundingBox, y: number) =>
   pixels.subarray((y * width + x) * 3, (y * width + x + columns) * 3);
 
 const rowsMatch = (a: RawImage, aBox: BoundingBox, aY: number, b: RawImage, bBox: BoundingBox, bY: number) =>
@@ -33,7 +33,7 @@ function columnsMatch(a: RawImage, aBox: BoundingBox, aX: number, b: RawImage, b
 }
 
 /** One color all the way across, which matches anywhere, so it says nothing about where it belongs. */
-function isFlat(row: Uint8Array): boolean {
+export function isFlat(row: Uint8Array): boolean {
   for (let i = 3; i < row.length; i++) if (row[i] !== row[i - 3]) return false;
   return true;
 }
@@ -120,7 +120,7 @@ function longestGap(count: number, same: (at: number) => boolean): { start: numb
   return best;
 }
 
-function slice(a: RawImage, aFrom: BoundingBox, b: RawImage, bFrom: BoundingBox, depth: number, found: ChangedRegion[]): void {
+function slice(a: RawImage, aFrom: BoundingBox, b: RawImage, bFrom: BoundingBox, depth: number, found: BoxPair[]): void {
   const aBox: Box = { ...aFrom };
   const bBox: Box = { ...bFrom };
   trimMatching(a, aBox, b, bBox);
@@ -155,8 +155,8 @@ function slice(a: RawImage, aFrom: BoundingBox, b: RawImage, bFrom: BoundingBox,
  * Everything outside the regions matches, once what's between them has been lined up. In reading
  * order. Two images of different widths, whose rows can't compare, are cut no further.
  */
-export function findRegions(current: RawImage, golden: RawImage): readonly ChangedRegion[] {
-  const found: ChangedRegion[] = [];
+export function findRegions(current: RawImage, golden: RawImage): readonly BoxPair[] {
+  const found: BoxPair[] = [];
   const whole = ({ width, height }: RawImage) => ({ x: 0, y: 0, width, height });
   slice(current, whole(current), golden, whole(golden), 0, found);
   return found.sort((p, q) => p.current.y - q.current.y || p.current.x - q.current.x);

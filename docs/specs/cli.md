@@ -80,7 +80,7 @@ Source of truth: `cli/src/paths.ts`, `cli/src/project.ts`; tests in `cli/test/un
 
 ## Review
 
-Source of truth: `cli/src/review.ts`, `cli/src/diff.ts`, `cli/src/regions.ts`, `cli/src/png.ts`; tests in `cli/test/commands.test.ts` with a stand-in for `capture`, and `cli/test/review.container.test.ts` with the real one.
+Source of truth: `cli/src/review.ts`, `cli/src/diff.ts`, `cli/src/regions.ts`, `cli/src/explain.ts`, `cli/src/png.ts`; tests in `cli/test/commands.test.ts` with a stand-in for `capture`, and `cli/test/review.container.test.ts` with the real one.
 
 A review of a named run starts at step 6. `selfie record` is steps 1 to 5, always captures, and prints what it recorded. Otherwise, in order, a review:
 
@@ -102,9 +102,15 @@ A review of a named run starts at step 6. `selfie record` is steps 1 to 5, alway
 - **Must report what changed as regions:** rectangles of each image that correspond and differ, with everything outside them matching once what's between them is lined up, found by a recursive 9-slice in `cli/src/regions.ts` (rationale).
 - **Must make regions depend on the two images alone**, so the same pair always gives the same regions, and a decision or a cache can rely on it.
 - **Must keep `regionMergeDistance` to grouping what's shown**, as `regionGroups` in the document, and never let it change a comparison, a diff image, or what a decision is on (rationale).
-- **Must compare a region's pixels from its top left, and count what only one image has as changed**, whether rows or columns, so images of any two sizes have stats and a diff image.
-- **Must mark a seam for a region whose only change is what was removed**, one highlighted row where it was, so every region has a place in the current image.
-- **Must make the diff image from the current image, faded to light gray, with changed pixels solid `#ff0050`.**
+- **Must say what each region's difference is, as its `kind`: `moved`, `spacing`, or else `changed`**, worked out in `cli/src/explain.ts` from the two images alone (rationale).
+- **Must call content moved only if an identical block of it is in the golden, at least 9 pixels of it, each block used once, wherever in the image it was**, since what went sideways is two regions: one that lost it, and one that gained it (rationale).
+- **Must call rows spacing only if they're one color all the way across, that color is the image's background or the row just outside the region, and there are no more of them than the region's two sides differ in height by**, so a new solid banner is `changed` (rationale).
+- **Must count as changed whatever moves and spacing don't account for: any pixel that comes out different when the current side is rebuilt from what was matched, and all of what the golden had that matched nothing**, so that nothing can vanish by being called moved.
+- **Must claim a region's moves only if that leaves fewer pixels unexplained than comparing it in place, and must then not let any other region use its blocks** (rationale).
+- **Must never let `kind` change what blocks, what a decision is on, or what `accept` checks.** A snapshot with only moves and spacing needs a decision like any other (rationale).
+- **Must compare a region in place from its top left, past spacing, and count what only one image has as changed**, whether rows or columns, so images of any two sizes have stats and a diff image.
+- **Must mark a seam for a region with nothing different in the current image, because something was only taken away**, one row where it was, in the color of what happened to it, so every region has a place in the current image.
+- **Must make the diff image from the current image, faded to light gray, with changed pixels solid `#ff0050`, what moved tinted `#0969da` both where it landed and where it left, and spacing solid `#ffd666`.**
 - **Must treat a capture's unusable file as that story's failure**: a manifest path outside the capture directory, a path that isn't a regular file, or a PNG the store refuses. Other stories continue.
 - **Must fail with exit 2 if HEAD moves during the render, or if no story was captured**, since one Git SHA must describe the run, and a typo must not pass.
 - **Must record a run as dirty if the tree had changes either before or after the render.** Ignored files don't count, so a gitignored `storybook-static` doesn't dirty the tree, and neither does a stale one (rationale).
@@ -170,7 +176,7 @@ Every path is absolute, and names a file that exists until it is pruned.
 | `warnings[]` | The manifest's |
 | `next[]` | What to do next, in words and commands |
 
-`pixelDiff` is `{ current, golden, regions, changedPixels, totalPixels, boundingBox, firstChanged, maxChannelDelta }`, where `current` and `golden` are each image's `width` and `height`, each of `regions` is `{ current, golden }`, each with that image's `x`, `y`, `width`, and `height`, `totalPixels` is the larger image's, `changedPixels` includes what only the golden has, `firstChanged` is the first changed pixel in reading order, and `maxChannelDelta` is 0 if no pixel compared. It is null unless `changed`.
+`pixelDiff` is `{ current, golden, regions, changedPixels, movedPixels, spacingPixels, totalPixels, boundingBox, firstChanged, maxChannelDelta }`, where `current` and `golden` are each image's `width` and `height`, each of `regions` is `{ current, golden, kind, changedPixels, moved }`, each of whose `current` and `golden` has that image's `x`, `y`, `width`, and `height`, and each of whose `moved` is `{ current, golden }`, the box of a block that landed in this region and the box it was in. A region that only lost something to another region is `moved` with no `moved` entries. `totalPixels` is the larger image's, `changedPixels` includes what only the golden has, `movedPixels` counts what landed, `spacingPixels` counts both sides' spacing, `boundingBox` and `firstChanged` are of changed pixels, or of the regions if none changed, `firstChanged` is in reading order, and `maxChannelDelta` is 0 if no pixel compared. It is null unless `changed`. `regionGroups` is `{ current, golden, kind }`, where `kind` is the most that any of the group's regions is: `changed`, then `moved`, then `spacing`.
 
 - **Must keep a difference's hashes**, so a UI can cache images by content.
 - **Must say, when the baseline is null and HEAD isn't the merge-base, that goldens accepted on this branch only show later reviews here what changed, and that a baseline takes accepting on the default branch**, since its merge-base may not have these stories yet.
@@ -292,7 +298,7 @@ Story IDs come from a project's build, and a manifest's paths from a directory i
 
 - Showing and selecting them in the UI.
 - Decisions on them (`docs/specs/snapshots.md` → Future).
-- A change in one column defeats row matching, so a list whose thumbnails changed height has its text only moved, in a region as wide as the list, where the shifted rows can still ghost.
+- Content that moved inside something with a fill of its own, such as text in an input in a modal, still ghosts: the input's borders keep its rows from being flat, and its fill isn't the image's background, so no block of the text comes out identical. A scrolled pane does too, since what's cut off at its edge differs.
 - Pixels alone can't tell that a button's four rounded corners are one thing. The renderer could record each element's box, so regions snap to them, at the cost of tying the differ to the browser.
 
 ### A render that does change
