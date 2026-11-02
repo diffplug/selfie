@@ -1,0 +1,22 @@
+{
+  "name": "selfie-store",
+  "version": "0.0.0",
+  "private": true,
+  "license": "FSL-1.1-MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/core/index.ts",
+    "./adapters/sqlite": "./src/adapters/sqlite.ts",
+    "./adapters/filesystem-blob": "./src/adapters/filesystem-blob.ts"
+  },
+  "scripts": {
+    "test": "pnpm typecheck && vitest run",
+    "typecheck": "tsc -p tsconfig.core.json && tsc -p tsconfig.json",
+    "find-collision": "node scripts/find-collision.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
+  }
+}
