@@ -152,7 +152,9 @@ describe("comparing with a baseline", () => {
     const [difference] = json.differences;
     expect(difference.imageHash).not.toBe(difference.goldenHash);
     expect(difference.pixelDiff).toEqual({
-      kind: "pixels",
+      current: { width: 8, height: 8 },
+      golden: { width: 8, height: 8 },
+      regions: [{ current: { x: 0, y: 3, width: 8, height: 2 }, golden: { x: 0, y: 3, width: 8, height: 2 } }],
       changedPixels: 8,
       totalPixels: 64,
       boundingBox: { x: 2, y: 3, width: 4, height: 2 },
@@ -169,17 +171,16 @@ describe("comparing with a baseline", () => {
     expect(await readdir(storiesDir)).toHaveLength(1);
   });
 
-  test("reports images of different sizes without a diff image", async () => {
+  test("reports images of different sizes with a diff image", async () => {
     h.stories = [{ id: "a--one", width: 10, height: 4 }, { id: "a--two" }, { id: "b--three" }];
     const { code, json } = await review();
     expect(code).toBe(1);
     const [difference] = json.differences;
-    expect(difference.pixelDiff).toEqual({
-      kind: "size-differs",
+    expect(difference.pixelDiff).toMatchObject({
       current: { width: 10, height: 4 },
       golden: { width: 8, height: 8 },
     });
-    expect(difference.diff).toBeNull();
+    expect(await exists(difference.diff)).toBe(true);
     expect(await exists(difference.current)).toBe(true);
     expect(await exists(difference.golden)).toBe(true);
     expect(reasons(json.blockers)).toEqual(["changed-unapproved"]);

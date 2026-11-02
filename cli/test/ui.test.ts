@@ -280,7 +280,7 @@ describe("the run view", () => {
     expect(view.blockers.map(({ reason }: any) => reason).sort()).toEqual(["changed-unapproved", "failed", "new-unapproved", "removed"]);
     expect(view.advisories).toEqual([{ story: "same", reason: "play-error", detail: "It threw" }]);
     expect(view.rows.find(({ story }: any) => story === "breaks")).toMatchObject({ failure: "render: It broke", imageHash: null });
-    expect(view.rows.find(({ story }: any) => story === "differs").pixelDiff).toMatchObject({ kind: "pixels", changedPixels: 64 });
+    expect(view.rows.find(({ story }: any) => story === "differs").pixelDiff).toMatchObject({ changedPixels: 64 });
     expect(view.removals).toEqual({ stories: ["gone"], outsideFilter: 0 });
     expect(view.run.baselineSha).toBe(json.baseline.sha);
     expect(view.actor).toBe("tester@example.com");
@@ -397,7 +397,9 @@ describe("images", () => {
     const url = `/api/diffs/${row.imageHash}/${row.goldenHash}`;
     const stats = await get(url);
     expect(await stats.json()).toEqual({
-      kind: "pixels",
+      current: { width: 8, height: 8 },
+      golden: { width: 8, height: 8 },
+      regions: [{ current: { x: 0, y: 2, width: 8, height: 1 }, golden: { x: 0, y: 2, width: 8, height: 1 } }],
       changedPixels: 1,
       totalPixels: 64,
       boundingBox: { x: 1, y: 2, width: 1, height: 1 },
@@ -415,14 +417,26 @@ describe("images", () => {
     expect((await get(`/api/images/${row.imageHash}`)).status).toBe(200);
   });
 
-  test("a different size has stats and no diff image", async () => {
+  test("a diff's stats and image asked for together both answer", async () => {
+    h.stories = [{ id: "a" }];
+    await makeGoldens();
+    h.stories = [{ id: "a", color: BLUE }];
+    const [row] = (await viewOf((await review()).json.runId)).rows;
+    const url = `/api/diffs/${row.imageHash}/${row.goldenHash}`;
+    const [stats, image] = await Promise.all([get(url), get(`${url}/image`)]);
+    expect([stats.status, image.status]).toEqual([200, 200]);
+    expect((await get(`/api/diffs/${UNKNOWN_HASH}/${row.goldenHash}`)).status).toBe(404);
+    expect((await get(`/api/diffs/${UNKNOWN_HASH}/${row.goldenHash}/image`)).status).toBe(404);
+  });
+
+  test("a different size has stats and a diff image", async () => {
     h.stories = [{ id: "a" }];
     await makeGoldens();
     h.stories = [{ id: "a", width: 10, height: 6 }];
     const [row] = (await viewOf((await review()).json.runId)).rows;
     const url = `/api/diffs/${row.imageHash}/${row.goldenHash}`;
-    expect(await (await get(url)).json()).toEqual({ kind: "size-differs", current: { width: 10, height: 6 }, golden: { width: 8, height: 8 } });
-    expect((await get(`${url}/image`)).status).toBe(404);
+    expect(await (await get(url)).json()).toMatchObject({ current: { width: 10, height: 6 }, golden: { width: 8, height: 8 } });
+    expect((await get(`${url}/image`)).status).toBe(200);
   });
 });
 

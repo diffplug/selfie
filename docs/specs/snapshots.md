@@ -129,6 +129,15 @@ Source of truth: `store/src/core/snapshots.ts`; `store/test/snapshots.test.ts` m
 - A way to list decisions to send.
 - Moving a golden set between stores: rows by name and image hash, under a run in the receiving store.
 
+### Decisions on regions
+
+A decision is on a name and a whole image today ([Decisions](#decisions)). **Scope: regions** (`docs/specs/cli.md` → Future) makes a whole-image decision the case of one region, and needs a key that survives what regions are for:
+
+- Keyed by the content of both sides of a region, never by its position or by what the aligner made of it, so a shift or a better aligner doesn't orphan an approval.
+- With the change it belongs to, as a branch and when it started, so an approval doesn't carry to another pull request.
+- Taking any set of an image's regions, and approving their union, so a person can undo a split the differ got wrong, with no special case for one region or for all of them.
+- With acceptance worked out from whether every region of an image is approved. A removed story becomes a region with no `after`, in place of the `--removed` count.
+
 ### Storing only what changed
 
 Every run writes every row. At 10,000 snapshots a run and an assumed 100 runs a day, that is 30 million rows a month: about $30 a month in writes and about 1.37 GB a month in storage, which reaches D1's limit of 10 GB per database in about 220 days (rationale). Storing only what changed from a parent run fixes both, and it adds a parent pointer and read-through complexity to every query. It can wait, along with retention below, until a project gets close.

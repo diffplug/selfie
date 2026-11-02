@@ -14,8 +14,31 @@ export const HASHES = {
 } as const;
 
 export const PIXEL_DIFFS = {
-  "changed": {
-    "kind": "pixels",
+  "changed-golden": {
+    "current": {
+      "width": 1200,
+      "height": 900
+    },
+    "golden": {
+      "width": 1200,
+      "height": 900
+    },
+    "regions": [
+      {
+        "current": {
+          "x": 0,
+          "y": 450,
+          "width": 1200,
+          "height": 36
+        },
+        "golden": {
+          "x": 0,
+          "y": 450,
+          "width": 1200,
+          "height": 36
+        }
+      }
+    ],
     "changedPixels": 5760,
     "totalPixels": 1080000,
     "boundingBox": {
@@ -30,8 +53,31 @@ export const PIXEL_DIFFS = {
     },
     "maxChannelDelta": 163
   },
-  "tallChanged": {
-    "kind": "pixels",
+  "tallChanged-tallGolden": {
+    "current": {
+      "width": 1200,
+      "height": 2400
+    },
+    "golden": {
+      "width": 1200,
+      "height": 2400
+    },
+    "regions": [
+      {
+        "current": {
+          "x": 0,
+          "y": 2340,
+          "width": 1200,
+          "height": 36
+        },
+        "golden": {
+          "x": 0,
+          "y": 2340,
+          "width": 1200,
+          "height": 36
+        }
+      }
+    ],
     "changedPixels": 21376,
     "totalPixels": 2880000,
     "boundingBox": {
@@ -46,8 +92,7 @@ export const PIXEL_DIFFS = {
     },
     "maxChannelDelta": 199
   },
-  "taller": {
-    "kind": "size-differs",
+  "taller-golden": {
     "current": {
       "width": 1200,
       "height": 990
@@ -55,10 +100,101 @@ export const PIXEL_DIFFS = {
     "golden": {
       "width": 1200,
       "height": 900
-    }
+    },
+    "regions": [
+      {
+        "current": {
+          "x": 0,
+          "y": 434,
+          "width": 1200,
+          "height": 90
+        },
+        "golden": {
+          "x": 0,
+          "y": 434,
+          "width": 1200,
+          "height": 0
+        }
+      }
+    ],
+    "changedPixels": 108000,
+    "totalPixels": 1188000,
+    "boundingBox": {
+      "x": 0,
+      "y": 434,
+      "width": 1200,
+      "height": 90
+    },
+    "firstChanged": {
+      "x": 0,
+      "y": 434
+    },
+    "maxChannelDelta": 0
   },
-  "doubleChanged": {
-    "kind": "pixels",
+  "golden-taller": {
+    "current": {
+      "width": 1200,
+      "height": 900
+    },
+    "golden": {
+      "width": 1200,
+      "height": 990
+    },
+    "regions": [
+      {
+        "current": {
+          "x": 0,
+          "y": 434,
+          "width": 1200,
+          "height": 0
+        },
+        "golden": {
+          "x": 0,
+          "y": 434,
+          "width": 1200,
+          "height": 90
+        }
+      }
+    ],
+    "changedPixels": 108000,
+    "totalPixels": 1188000,
+    "boundingBox": {
+      "x": 0,
+      "y": 434,
+      "width": 1200,
+      "height": 1
+    },
+    "firstChanged": {
+      "x": 0,
+      "y": 434
+    },
+    "maxChannelDelta": 0
+  },
+  "doubleChanged-doubleGolden": {
+    "current": {
+      "width": 2400,
+      "height": 1800
+    },
+    "golden": {
+      "width": 2400,
+      "height": 1800
+    },
+    "regions": [
+      {
+        "current": {
+          "x": 0,
+          "y": 900,
+          "width": 2400,
+          "height": 72
+        },
+        "golden": {
+          "x": 0,
+          "y": 900,
+          "width": 2400,
+          "height": 72
+        }
+      }
+    ],
     "changedPixels": 23040,
     "totalPixels": 4320000,
     "boundingBox": {

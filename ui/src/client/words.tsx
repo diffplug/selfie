@@ -96,13 +96,13 @@ export function AdvisoryLabels({ row }: { readonly row: SnapshotRow }) {
   );
 }
 
+export const sizeChanged = ({ current, golden }: PixelDiff) => current.width !== golden.width || current.height !== golden.height;
+
 export function describePixels(diff: PixelDiff | null): string {
   if (diff === null) return "";
-  if (diff.kind === "size-differs") {
-    return `Size: ${diff.golden.width}×${diff.golden.height} to ${diff.current.width}×${diff.current.height}`;
-  }
   const percent = (diff.changedPixels / diff.totalPixels) * 100;
-  return `${plural(diff.changedPixels, "pixel")} (${percent < 0.01 ? "<0.01" : percent.toFixed(2)}%)`;
+  const size = sizeChanged(diff) ? `, ${diff.golden.width}×${diff.golden.height} to ${diff.current.width}×${diff.current.height}` : "";
+  return `${plural(diff.changedPixels, "pixel")} (${percent < 0.01 ? "<0.01" : percent.toFixed(2)}%)${size}`;
 }
 
 export const BLOCKER_WORDS: Readonly<Record<BlockerReason, (count: number) => string>> = {

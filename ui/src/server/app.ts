@@ -175,7 +175,7 @@ export function createReviewApi(source: ReviewSource): Hono {
   api.get("/diffs/:current/:golden/image", async (context) => {
     const { current, golden } = context.req.param();
     const result = await source.diff(current, golden);
-    if (result?.png == null) return context.json(failure("no-diff-image", "There's no diff image for these."), 404);
+    if (result === null) return context.json(failure("unknown-image", "This store doesn't hold those images."), 404);
     return png(context, result.png);
   });
 

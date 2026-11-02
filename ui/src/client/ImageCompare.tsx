@@ -42,10 +42,10 @@ function Pane({ layer, src, story, onOpen }: { layer: Layer; src: string; story:
 
 export function ImageCompare({ row, diff, scale }: { row: SnapshotRow; diff: PixelDiff | null; scale: number }) {
   const { story, imageHash, goldenHash } = row;
-  const sources = sourcesOf(row, diff?.kind === "pixels");
+  const sources = sourcesOf(row, diff !== null);
   const canFlip = goldenHash !== null && imageHash !== null;
-  const box = diff?.kind === "pixels" ? diff.boundingBox : null;
-  const firstChanged = diff?.kind === "pixels" ? diff.firstChanged : null;
+  const box = diff?.boundingBox ?? null;
+  const firstChanged = diff?.firstChanged ?? null;
 
   const [mode, setMode] = useState<"side" | "flip">("side");
   const [wantedLayer, setLayer] = useState<Layer>("current");

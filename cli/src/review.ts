@@ -235,10 +235,8 @@ async function exportDifference(project: Project, runDir: string, snapshot: Comp
   if (snapshot.state === "changed" && current !== null && golden !== null) {
     const compared = await diffToPng(current.image, golden.image);
     pixelDiff = compared.diff;
-    if (compared.png !== null) {
-      diff = path.join(directory, "diff.png");
-      await writeFile(diff, compared.png);
-    }
+    diff = path.join(directory, "diff.png");
+    await writeFile(diff, compared.png);
   }
   return {
     story,
