@@ -21,9 +21,9 @@ const SHORTCUTS: readonly (readonly [string, string])[] = [
   ["a", "Approve, then go to the next"],
   ["r", "Reject, then go to the next"],
   ["s", "Side by side"],
-  ["f", "Actual pixels, then flip between current and golden"],
-  ["d", "Show the diff at actual pixels"],
-  ["z", "Next zoom: 1×, 2×, 4×, 8×"],
+  ["f", "Stacked at the current zoom, then flip between current and golden"],
+  ["d", "Show the diff"],
+  ["z", "Next zoom: actual size, 1×, 2×, 4×, 8×"],
   ["c", "Center on the change"],
   ["u", "Back to the list"],
   ["?", "This list"],
@@ -236,7 +236,7 @@ export function DetailScreen({ state, view, story, search }: { state: RunState; 
         />
       )}
       <Notes row={row} sizeDiffers={diff?.kind === "size-differs"} />
-      <ImageCompare row={row} diff={diff} />
+      <ImageCompare row={row} diff={diff} scale={view.run.scale} />
       {helpOpen && <ShortcutsDialog onClose={() => setHelpOpen(false)} />}
     </Stack>
   );
