@@ -15,18 +15,21 @@ import {
 import {
   chunks,
   ImageDecodeError,
+  mapConcurrently,
   type ComparedSnapshot,
   type Comparison,
   type Decision,
   type RecordedSnapshot,
+  type RawImage,
   type Run,
   type StoryFilter,
 } from "selfie-store";
 import { resolveCaptureSettings, type CaptureSettings } from "./config.ts";
-import { diffFiles, type PixelDiff } from "./diff.ts";
+import { diffToPng, type PixelDiff } from "./diff.ts";
 import { SelfieError } from "./errors.ts";
 import { dirtyPaths, headSha, type BaselineSearch } from "./git.ts";
 import { regularFileInside, storyDirName } from "./paths.ts";
+import { encodePng } from "./png.ts";
 import {
   captureDirectory,
   findBaseline,
@@ -197,37 +200,18 @@ async function storeCapture(project: Project, captureDir: string, manifest: Mani
   return records;
 }
 
-async function mapConcurrently<Item, Result>(
-  items: readonly Item[],
-  limit: number,
-  work: (item: Item) => Promise<Result>,
-): Promise<Result[]> {
-  const results: Result[] = new Array(items.length);
-  let next = 0;
-  await Promise.all(
-    Array.from({ length: Math.min(limit, items.length) }, async () => {
-      while (next < items.length) {
-        const at = next;
-        next += 1;
-        results[at] = await work(items[at]!);
-      }
-    }),
-  );
-  return results;
-}
-
-/** Copies a stored image to a named file an agent can open, and returns its bytes with the path. */
+/** Writes a stored image as a PNG an agent can open, whatever it's stored as, and returns its pixels with the path. */
 async function exportImage(
   project: Project,
   directory: string,
   name: string,
   hash: string,
-): Promise<{ file: string; bytes: Uint8Array }> {
-  const bytes = await project.store.getImage(hash);
-  if (bytes === null) throw new SelfieError("missing-image", `Image ${hash} is missing from the local store.`);
+): Promise<{ file: string; image: RawImage }> {
+  const image = await project.store.getPixels(hash);
+  if (image === null) throw new SelfieError("missing-image", `Image ${hash} is missing from the local store.`);
   const file = path.join(directory, name);
-  await writeFile(file, bytes);
-  return { file, bytes };
+  await writeFile(file, await encodePng(image));
+  return { file, image };
 }
 
 async function storyDirectory(runDir: string, story: string): Promise<string> {
@@ -246,7 +230,7 @@ async function exportDifference(project: Project, runDir: string, snapshot: Comp
   let pixelDiff: PixelDiff | null = null;
   let diff: string | null = null;
   if (snapshot.state === "changed" && current !== null && golden !== null) {
-    const compared = await diffFiles(current.bytes, golden.bytes);
+    const compared = await diffToPng(current.image, golden.image);
     pixelDiff = compared.diff;
     if (compared.png !== null) {
       diff = path.join(directory, "diff.png");
@@ -270,25 +254,23 @@ async function exportDifference(project: Project, runDir: string, snapshot: Comp
 async function exportImages(project: Project, runDir: string, comparison: Comparison, captureDir: string, recording: Recording) {
   const { removed } = summarizeRun(comparison);
   const shown = [...comparison.snapshots.filter(({ state }) => isDecidable(state)), ...removed];
-  const differences = await mapConcurrently(
-    shown,
-    Math.min(MAX_CONCURRENT_DIFFS, availableParallelism()),
-    (snapshot) => exportDifference(project, runDir, snapshot),
-  );
+  // Each of these holds whole images in memory.
+  const limit = Math.min(MAX_CONCURRENT_DIFFS, availableParallelism());
+  const differences = await mapConcurrently(shown, limit, (snapshot) => exportDifference(project, runDir, snapshot));
 
   // Unchanged stories can need a look too, so these get their images here.
   const exportCurrent = async ({ story, imageHash }: ComparedSnapshot) => {
     if (imageHash === null) return null;
     return (await exportImage(project, await storyDirectory(runDir, story), "current.png", imageHash)).file;
   };
-  const playErrors = await Promise.all(
-    comparison.snapshots
-      .filter(({ playError }) => playError !== null)
-      .map(async (snapshot) => ({
-        story: snapshot.story,
-        playError: snapshot.playError!,
-        current: await exportCurrent(snapshot),
-      })),
+  const playErrors = await mapConcurrently(
+    comparison.snapshots.filter(({ playError }) => playError !== null),
+    limit,
+    async (snapshot) => ({
+      story: snapshot.story,
+      playError: snapshot.playError!,
+      current: await exportCurrent(snapshot),
+    }),
   );
 
   const exportRepeat = async (story: string) => {
@@ -300,14 +282,14 @@ async function exportImages(project: Project, runDir: string, comparison: Compar
     await copyFile(checked.file, file);
     return file;
   };
-  const unstable = await Promise.all(
-    comparison.snapshots
-      .filter(({ unstable: flag }) => flag === true)
-      .map(async (snapshot) => ({
-        story: snapshot.story,
-        current: await exportCurrent(snapshot),
-        repeat: await exportRepeat(snapshot.story),
-      })),
+  const unstable = await mapConcurrently(
+    comparison.snapshots.filter(({ unstable: flag }) => flag === true),
+    limit,
+    async (snapshot) => ({
+      story: snapshot.story,
+      current: await exportCurrent(snapshot),
+      repeat: await exportRepeat(snapshot.story),
+    }),
   );
   return { differences, playErrors, unstable };
 }

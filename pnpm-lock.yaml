@@ -59,6 +59,10 @@ importers:
         version: 5.0.5(@types/node@26.6.6)(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2))
 
   store:
+    dependencies:
+      sharp:
+        specifier: 0.35.5
+        version: 0.35.5(@types/node@26.6.6)
     devDependencies:
       '@cloudflare/vitest-plugin':
         specifier: ^1.4.11

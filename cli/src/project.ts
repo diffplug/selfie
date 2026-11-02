@@ -4,6 +4,7 @@
 import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { FilesystemBlobStorage } from "selfie-store/adapters/filesystem-blob";
+import { sharpWebp } from "selfie-store/adapters/sharp-webp";
 import { SqliteAdapter } from "selfie-store/adapters/sqlite";
 import { Blobs, initStoreSchema, Snapshots, Sql, Store, type CompareOptions, type Comparison } from "selfie-store";
 import type { PixelDiff } from "./diff.ts";
@@ -80,7 +81,7 @@ export async function openProject({ cwd, env }: { cwd: string; env: NodeJS.Proce
     repo,
     directory,
     renders: rendersIn(sql),
-    store: new Store({ sql, blob: new Blobs(new FilesystemBlobStorage(path.join(directory, "blobs"))) }),
+    store: new Store({ sql, blob: new Blobs(new FilesystemBlobStorage(path.join(directory, "blobs"))), webp: sharpWebp }),
     snapshots: new Snapshots({ sql }),
     close: () => adapter.close(),
   };

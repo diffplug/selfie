@@ -1,11 +1,13 @@
 /**
- * The one place that knows what format image files are in. Today that is PNG, a
- * lossless stand-in, and only the narrow form Chromium writes. The image hash never
- * sees any of this: it covers the canonical PAM of the decoded pixels.
+ * The one place that knows what format image files are in: the narrow PNG Chromium
+ * writes, and lossless WebP in its simple form, which is how a store keeps them. The
+ * image hash never sees any of this: it covers the canonical PAM of the decoded pixels.
  *
- * Written here rather than taken from a library because uploads are untrusted, and a
- * decoder must refuse what it can't decode exactly, which takes control of each chunk
- * and of the inflate. See `docs/specs/store.rationale.md` → Image decoding.
+ * PNG is written here rather than taken from a library because uploads are untrusted,
+ * and a decoder must refuse what it can't decode exactly, which takes control of each
+ * chunk and of the inflate. A WebP's body goes to a `WebpCodec`, which depends on the
+ * platform, after this has checked its header. See `docs/specs/store.rationale.md` →
+ * Image decoding.
  */
 
 import type { RawImage } from "./pam.ts";
@@ -15,13 +17,34 @@ export class ImageDecodeError extends Error {
   override readonly name = "ImageDecodeError";
 }
 
+/** Lossless WebP on one platform. An adapter, since no one library runs everywhere this does. */
+export interface WebpCodec {
+  /** Must write the simple form `decodeImage` accepts, and decode to exactly these pixels. */
+  encode(image: RawImage): Promise<Uint8Array>;
+  decode(file: Uint8Array): Promise<RawImage>;
+}
+
+/** The most a WebP can hold on either side. A larger image stays a PNG. */
+export const WEBP_MAX_SIDE = 16383;
+
 /**
- * Decodes an image file to its exact 8-bit RGB. Throws `ImageDecodeError` for
- * anything else, including any transparency.
+ * Decodes an image file to its exact 8-bit RGB. Throws `ImageDecodeError` for anything
+ * else, including any transparency, and for a WebP when given no codec to read it.
  */
-export async function decodeImage(file: Uint8Array): Promise<RawImage> {
+export async function decodeImage(file: Uint8Array, webp?: WebpCodec): Promise<RawImage> {
   if (hasPngSignature(file)) return decodePng(file);
-  throw new ImageDecodeError("Refusing this file: it isn't a PNG, the one format the store accepts");
+  if (hasWebpSignature(file)) return decodeWebp(file, webp);
+  throw new ImageDecodeError("Refusing this file: it isn't a PNG or a WebP, the formats the store accepts");
+}
+
+/**
+ * The WebP to keep for a new file, or null if it should stay as it is: it isn't a PNG, or
+ * it's too large for a WebP. Must only be given a file that has already decoded.
+ */
+export async function webpToKeep(file: Uint8Array, webp: WebpCodec): Promise<Uint8Array | null> {
+  if (!hasPngSignature(file)) return null;
+  const image = await decodePng(file);
+  return Math.max(image.width, image.height) > WEBP_MAX_SIDE ? null : webp.encode(image);
 }
 
 /**
@@ -31,7 +54,53 @@ export async function decodeImage(file: Uint8Array): Promise<RawImage> {
  */
 export function imageMediaType(file: Uint8Array): string {
   if (hasPngSignature(file)) return "image/png";
+  if (hasWebpSignature(file)) return "image/webp";
   throw new RangeError("These bytes are not in a format the store writes");
+}
+
+function fourCc(file: Uint8Array, offset: number): string {
+  return String.fromCharCode(...file.subarray(offset, offset + 4));
+}
+
+function hasWebpSignature(file: Uint8Array): boolean {
+  return fourCc(file, 0) === "RIFF" && fourCc(file, 8) === "WEBP";
+}
+
+const VP8L_HEADER_BYTES = 25;
+const VP8L_SIGNATURE = 0x2f;
+
+function refuseWebp(reason: string): never {
+  throw new ImageDecodeError(`Refusing this WebP: ${reason}`);
+}
+
+async function decodeWebp(file: Uint8Array, webp: WebpCodec | undefined): Promise<RawImage> {
+  if (file.length < VP8L_HEADER_BYTES) refuseWebp("it is truncated");
+  const chunk = fourCc(file, 12);
+  if (chunk !== "VP8L") refuseWebp(`its ${chunk.trim()} chunk isn't the simple lossless form, the only one accepted`);
+  const view = new DataView(file.buffer, file.byteOffset, file.byteLength);
+  const chunkBytes = view.getUint32(16, true);
+  if (view.getUint32(4, true) + 8 !== file.length || 20 + chunkBytes + (chunkBytes & 1) !== file.length) {
+    refuseWebp("its length doesn't match its header, so it is truncated or has something after the image");
+  }
+  if (file[20] !== VP8L_SIGNATURE) refuseWebp("its VP8L signature is wrong");
+  const bits = view.getUint32(21, true);
+  const width = (bits & 0x3fff) + 1;
+  const height = ((bits >>> 14) & 0x3fff) + 1;
+  if ((bits >>> 28) & 1) refuseWebp("it has transparency");
+  if (bits >>> 29 !== 0) refuseWebp("its VP8L version isn't 0");
+  if (width * height > MAX_PIXELS) refuseWebp(`at ${width}x${height} it is over the limit of ${MAX_PIXELS} pixels`);
+  if (webp === undefined) refuseWebp("nothing here can decode one");
+
+  let image: RawImage;
+  try {
+    image = await webp.decode(file);
+  } catch (error) {
+    refuseWebp(`it didn't decode: ${(error as Error).message}`);
+  }
+  if (image.width !== width || image.height !== height || image.pixels.length !== width * height * 3) {
+    refuseWebp(`it decoded to ${image.width}x${image.height} rather than the ${width}x${height} its header states`);
+  }
+  return image;
 }
 
 function refuse(reason: string): never {
@@ -92,7 +161,7 @@ function readChunks(png: Uint8Array): { header: Header; data: readonly Uint8Arra
     const length = view.getUint32(offset);
     const end = offset + CHUNK_OVERHEAD + length;
     if (end > png.length) refuse("it ends inside a chunk");
-    const type = String.fromCharCode(...png.subarray(offset + 4, offset + 8));
+    const type = fourCc(png, offset + 4);
     if (view.getUint32(end - 4) !== crc32(png.subarray(offset + 4, end - 4))) {
       refuse(`its ${type} chunk fails its checksum`);
     }

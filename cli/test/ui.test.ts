@@ -6,6 +6,7 @@ import { networkInterfaces, tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { decodeImage } from "selfie-store";
+import { sharpWebp } from "selfie-store/adapters/sharp-webp";
 import { REQUEST_HEADER_VALUE } from "selfie-ui/app";
 import { createLocalApp, serveLocal, type LocalServer } from "selfie-ui/local";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
@@ -352,17 +353,17 @@ describe("a run that reused an earlier render", () => {
 });
 
 describe("images", () => {
-  test("serves a stored PNG, privately, by its hash", async () => {
+  test("serves a stored image, privately, by its hash", async () => {
     h.stories = [{ id: "a" }];
     const view = await viewOf((await review()).json.runId);
     const [{ imageHash }] = view.rows;
     const response = await get(`/api/images/${imageHash}`);
     expect(response.status).toBe(200);
-    expect(response.headers.get("content-type")).toBe("image/png");
+    expect(response.headers.get("content-type")).toBe("image/webp");
     expect(response.headers.get("cache-control")).toMatch(/^private\b/);
     expect(response.headers.get("cross-origin-resource-policy")).toBe("same-origin");
     expect(response.headers.get("x-content-type-options")).toBe("nosniff");
-    const image = await decodeImage(new Uint8Array(await response.arrayBuffer()));
+    const image = await decodeImage(new Uint8Array(await response.arrayBuffer()), sharpWebp);
     expect(image).toMatchObject({ width: 8, height: 8 });
   });
 

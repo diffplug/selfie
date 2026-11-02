@@ -85,13 +85,14 @@ In order, a review:
 2. Reads HEAD and the working tree, and finds the baseline ([`find-baseline`](#find-baseline)).
 3. Unless that exact build [already rendered](#recording-only-if-necessary), captures `--storybook-dir` (default `storybook-static`) in a new capture directory, with `--story` patterns, the project's [init script](#configuration), and, if asked, `--stability`.
 4. Checks HEAD didn't move.
-5. Begins a run recording whether the tree was dirty, the baseline, and any filter. Stores each PNG as written with `Store.putImages`, or takes an earlier render's rows, and records and finishes the run with `Snapshots`. Rows carry the failure message, the `play` error, and the unstable flag.
+5. Begins a run recording whether the tree was dirty, the baseline, and any filter. Stores each PNG with `Store.putImages`, which keeps new ones as WebP, or takes an earlier render's rows, and records and finishes the run with `Snapshots`. Rows carry the failure message, the `play` error, and the unstable flag.
 6. Compares the run with the baseline.
 7. Exports images and pixel diffs for what isn't unchanged, writes `review.json`, and prunes [output](#output-directories).
 
 - **Must do diff work only on a `changed` snapshot.** A `new` or `removed` one exports its one image, and an unchanged one nothing, unless it has an advisory.
+- **Must write every exported image as a PNG, whatever the store keeps**, so a document's paths stay what they say and any agent can open them.
 - **Must report a different size as `pixelDiff.kind: "size-differs"`, with no diff image**, not as a failure.
-- **Must make the diff image from the current image, faded to light gray, with changed pixels solid `#ff0050`.** Its encoder lives in `cli/`, since `docs/specs/store.md` → Storage forbids one in the store.
+- **Must make the diff image from the current image, faded to light gray, with changed pixels solid `#ff0050`.**
 - **Must treat a capture's unusable file as that story's failure**: a manifest path outside the capture directory, a path that isn't a regular file, or a PNG the store refuses. Other stories continue.
 - **Must fail with exit 2 if HEAD moves during the render, or if no story was captured**, since one Git SHA must describe the run, and a typo must not pass.
 - **Must record a run as dirty if the tree had changes either before or after the render.** Ignored files don't count, so a gitignored `storybook-static` doesn't dirty the tree, and neither does a stale one (rationale).
