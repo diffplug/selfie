@@ -30,6 +30,7 @@ GitHub decides. Selfie keeps no member list of its own.
 
 - **Must decide from the repository's `permissions` and `private` fields as GitHub reports them**, using the user's token for a signed-in user and an installation token for an anonymous viewer (rationale).
 - **Never let an anonymous viewer change anything.**
+- **Must apply a repository's current visibility to all its snapshots, past ones included**, so a repository going public makes its earlier snapshots public, as it does its Git history, and going private hides them all again.
 - **Must fail closed.** If GitHub can't answer, a private repository's data is refused, and a repository not known to be public counts as private.
 - **Must answer 404 to someone without access, identical to a project that doesn't exist**, so a response never reveals that a private repository uses Selfie.
 - **May cache an access answer for at most 5 minutes**, and must drop it on any webhook about that repository, so a review page's many images don't each ask GitHub. Webhooks only shorten the window, since they don't cover every change (rationale).
@@ -54,7 +55,6 @@ GitHub decides. Selfie keeps no member list of its own.
 ### Open questions
 
 - **Unpushed work in public repositories.** A run uploaded from an unpushed branch of a public repository would be visible to anyone. Decide whether anonymous viewers see only runs for commits GitHub already has, or whether a run isn't uploaded until its commit is pushed.
-- **A private repository going public.** Decide whether its earlier snapshots become public with it. Its Git history does.
 - **CI uploads.** GitHub Actions OIDC carries `repository_id`, so CI may need no stored secret. Confirm how to verify the token, and what a pull request from a fork receives.
 - **Pull requests from forks.** Someone without write access can't upload under the table above, so decide how a fork's pull request gets snapshots.
 - **Reading code for `change-grouping`.** That scope sends code diffs to a Meta model, which needs more app permissions and means private code leaves GitHub. Decide how a repository owner consents.
