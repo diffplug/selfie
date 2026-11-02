@@ -24,12 +24,12 @@ With the flag, 7 full runs of all 541 stories, across the settle times, quiet pe
 
 ## Capture
 
-**The whole page.** All 541 of dormouse's stories, in the default container with the stability check on, on one Mac, 2026-11. Encoding uses `sharp` lossless WebP at effort 4, outside the container.
+**The whole page.** All 541 of dormouse's stories, in the default container, each story rendered twice, on one Mac, 2026-11. Encoding uses `sharp` lossless WebP at effort 4, outside the container.
 
 | | 1× | 1.5× | 2× |
 |---|---|---|---|
 | Time, both passes | 200 s | 222 s | 287 s |
-| Failed or unstable | 0 | 0 | 0 |
+| Failed, or differing between the two renders | 0 | 0 | 0 |
 | Median height | 900 | 1,350 | 1,800 |
 | Tallest | 4,949 | 7,424 | 9,898 |
 | PNG total | 25.2 MB | 44.6 MB | 62.1 MB |
@@ -43,7 +43,7 @@ Against the viewport capture at 1×:
 - **6 were 5 px wider.** All 6 are app bar or workspace window stories, and the overflow is real: the viewport had cut it off.
 - **10 were taller, with a top that differed.** Of the two inspected, one had scrolled to a focused button in the viewport capture, and the full page starts at the top. The other drew one `→` differently, in a story that's stable in both modes. Why the mode changes that glyph is unknown. The other 8 were not looked at, though 2 of them share that story's exact count of 2,270 changed pixels.
 
-Across machines at 1×, comparing image hashes: 541/541 between two GitHub arm64 runners (Neoverse-N2), and 541/541 between each of them and a local M4 Mac, all with the stability check finding every story stable. At 1.5× and 2×, only the Mac was measured, and stability there is one repeat on one machine.
+Across machines at 1×, comparing image hashes: 541/541 between two GitHub arm64 runners (Neoverse-N2), and 541/541 between each of them and a local M4 Mac, with each story rendering the same twice on each machine. At 1.5× and 2×, only the Mac was measured, and that's two renders on one machine.
 
 **How tall a page can be.** A page of a vertical gradient, in the default container at 1×, captured correctly at its top, middle, and bottom at every height tried, up to 120,000 px. So Chromium isn't the limit here. `decodeImage` is, at 100 million pixels, which refused 90,000 px and accepted 83,000 px at 1200 wide.
 
@@ -91,21 +91,12 @@ The reverse was left out too, for the same complexity: retrying a story that doe
 
 **Play failures.** Storybook 11's bundle sets `throwPlayFunctionExceptions: false`. On a play failure it then runs the `errored` phase, logs the error, and continues to `completed`, so an `errored` check depends on when it polls. 2 of dormouse's 541 stories do this, and both report `play` errors.
 
-## Stability
+## Freezing timers
 
-**Comparing PNG bytes.** Equal bytes always mean equal pixels, so bytes can't hide a difference. The only possible error is a false alarm, if one set of pixels could encode two ways. Across the earlier experiment's 59 runs and 1,016 captures, 233 distinct pixel hashes mapped one to one to 233 distinct PNGs. Chromium's PNGs carry no timestamp or text chunk, and `render/test/capture.container.test.ts` checks both this and that repeat renders match byte for byte in the real container.
+**How to find a story that isn't frozen.** Render it twice and compare. A built-in repeat pass did this until it was removed, since flagging unstable stories in the data, and deciding what that means, was more machinery than asking an agent to fix one. These measurements of it remain.
 
-**Why the repeat settles longer.** Two passes with equal timing called all 30 unfrozen sample stories stable in 4 of 4 runs, though two of them hold running timers: load timing is repeatable enough for a blink to land on the same phase each time.
+**Comparing PNG bytes.** Equal bytes always mean equal pixels, so bytes can't hide a difference. The only possible error is a false alarm, if one set of pixels could encode two ways. Across the earlier experiment's 59 runs and 1,016 captures, 233 distinct pixel hashes mapped one to one to 233 distinct PNGs. Chromium's PNGs carry no timestamp or text chunk, and `render/test/capture.container.test.ts` checks this and that the same render matches byte for byte in the real container.
 
-**530 ms no longer fits the shorter settle.** It was chosen against a 500 ms settle, where it caught both timer stories. At the 100 ms default, the first flip of `terminal-terminalpane--ansi-colors` comes at about 630 ms of settle, right where the repeat lands. On the unfrozen sample, 4 runs each:
+**Equal timing can miss a timer.** Two renders with equal timing called all 30 unfrozen sample stories stable in 4 of 4 runs, though two of them hold running timers: load timing is repeatable enough for a blink to land on the same phase each time. At the 100 ms settle, the second render needed about 730 ms more settling to catch both in every run: 530 ms caught both in 0 of 4 runs, and 730 and 930 ms in 4 of 4, while 1130 ms caught both in only 2 of 4.
 
-| Extra settle | Runs catching both | Runs catching one | Runs catching neither | Frozen sample unstable | Sample time |
-|---|---|---|---|---|---|
-| 530 ms | 0 | 2 | 2 | 0 | 14.4 s |
-| 730 ms | 4 | 0 | 0 | 0 | 15.7 s |
-| 930 ms | 4 | 0 | 0 | 0 | 16.7 s |
-| 1130 ms | 2 | 2 | 0 | 0 | 17.7 s |
-
-So the extra settle is 730 ms, the smallest value that caught both timer stories in every run.
-
-**Limits.** One app's stories, on one machine, and stability is one repeat with one extra delay, so a timer whose period happens to fit the delay can still match. A fixture cycling every 700 ms did exactly that at 730 ms, reading as stable in every run, so a stable result is not proof. The fixture's `timers--ticking` tests a repeating timer, not this delay's exact value.
+**Limits.** One app's stories, on one machine, so a timer whose period happens to fit the delay can still match. A fixture cycling every 700 ms did exactly that at 730 ms, so a match is not proof.

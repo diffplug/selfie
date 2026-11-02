@@ -24,7 +24,7 @@ export interface RowFilter {
 
 export const NO_FILTER: RowFilter = { text: "", show: "all" };
 
-export const hasAdvisory = ({ playError, unstable }: SnapshotRow) => playError !== null || unstable === true;
+export const hasAdvisory = ({ playError }: SnapshotRow) => playError !== null;
 
 function inShow(row: SnapshotRow, show: Show): boolean {
   switch (show) {

@@ -179,5 +179,4 @@ Also its own guard in place of `loopbackHosts`, keeping `sameOriginWrites` and `
 - Rendering from the UI. A reviewer runs `selfie review` and looks at the result.
 - A way to clear a decision. One can be replaced, and a run can be reviewed again, but `Snapshots.decide` has no way to remove one.
 - Finding runs at other commits. `/runs/:id` opens any of them, and `selfie ui <run>` prints that URL, but nothing lists them: `runs` has no index that would serve it without a scan.
-- An unstable story's second render, which is only in the review's own output and never stored.
 - Sorting the list by size of change.

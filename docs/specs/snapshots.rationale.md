@@ -16,8 +16,6 @@
 
 **Resolving images by hash in the statement.** Taking a hash rather than a key costs one read per row, but no caller holds a key, and a snapshot can't name an image that isn't stored. A statement returning fewer rows than it was sent is how a missing image or a finished run shows, with no extra request unless something is wrong.
 
-**Recording instability now.** About 1% of real stories vary between identical renders, a figure given for this change and not measured here. A run can't be backfilled, so the flag is stored even though nothing yet acts on it.
-
 **A new run after a crash.** Skipping what already landed would need a way to read a recording run back, for a case that only follows a crash. The cost is rendering again, and a crashed run's rows stay, unused.
 
 **What a resend can overwrite.** `decide` and `acceptRun` have no ordering rule, so a statement resent after a lost response could overwrite another writer's change made in between. The adapter resends within seconds, and on one machine there is rarely another writer. A cloud store with several writers has this gap until sync brings an [ordering rule](snapshots.md#future).
@@ -69,7 +67,7 @@
 
 D1's docs say a database runs one query at a time, so a batch this size holds up others for as long as it runs. No test measured concurrent load. `acceptRun` against a baseline also reads both sides to count removals, which this run didn't measure.
 
-**Statement size.** A record statement holds 49 snapshots, limited by the 100 bound parameters, since each needs a story and either a hash or a failure. Its SQL is 1,662 bytes, so the 100,000 byte limit is far off. `Sql` binds no nulls, so the column a row leaves empty, and its `unstable` flag, are literals in the statement.
+**Statement size.** A record statement holds 49 snapshots, limited by the 100 bound parameters, since each needs a story and either a hash or a failure. Its SQL is under 2,000 bytes, so the 100,000 byte limit is far off. `Sql` binds no nulls, so the column a row leaves empty is a literal in the statement.
 
 **Request size.** A 10,000 snapshot run is 205 statements and 1.27 MB with 30 character story IDs, against the store's 2,000 statement batch (`store.rationale.md` → D1 REST adapter). 400 statements is a judgment call inside what was measured. A failure-heavy request grows with the 2,000 character limit, and at its worst, 400 statements of 49 failures at that length, would be about 39 MB. That size was not tested.
 

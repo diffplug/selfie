@@ -71,9 +71,6 @@ export function summarizeRun({ run, snapshots, unchangedCount }: Comparison): Ru
     ...snapshots.flatMap(({ story, playError }) =>
       playError === null ? [] : [{ story, reason: "play-error" as const, detail: playError }],
     ),
-    ...snapshots.flatMap(({ story, unstable }) =>
-      unstable === true ? [{ story, reason: "unstable" as const, detail: null }] : [],
-    ),
   ];
 
   const changed = inState("changed").length;

@@ -1,9 +1,9 @@
 # Render
 
-> Status: partly built — the `selfie-render` library captures a built Storybook and reports PNGs and stability. `selfie review` calls it (`docs/specs/cli.md`); see `## Future`.
+> Status: partly built — the `selfie-render` library captures a built Storybook and reports PNGs. `selfie review` calls it (`docs/specs/cli.md`); see `## Future`.
 >
 > - See `docs/specs/glossary.md` for image, snapshot, environment, and run.
-> - Owns how a story becomes a PNG: the environment's shape and ID, capture, stability, and the manifest. `docs/specs/system.md` → Rendering environments owns the rules this implements. `docs/specs/store.md` owns image identity and decoding.
+> - Owns how a story becomes a PNG: the environment's shape and ID, capture, and the manifest. `docs/specs/system.md` → Rendering environments owns the rules this implements. `docs/specs/store.md` owns image identity and decoding.
 
 ## Environment
 
@@ -44,7 +44,7 @@ Source of truth: `render/src/capture.ts`, `render/src/runners.ts`, `render/src/w
 - **Must bound every wait.** `storyTimeoutMs` (default 60 s) bounds a story from context to screenshot. The network wait alone is soft and independent of it: it records an error after 15 s and captures anyway. The worker exits on its own at a deadline derived from the story count, so a container outlives no host process.
 - **Must treat a story's failure as data.** A thrown render, Storybook's error display, or a timeout marks that story `failed` and the run continues. A browser crash relaunches the browser for later stories. A worker crash marks the unreported stories `failed`.
 - **Must throw a `RenderError` only when no story could be attempted**, such as a missing `index.json`, a runner that can't run, or a browser that won't launch.
-- **Must clear only `manifest.json`, `stories/`, and `repeat/` in the output directory.**
+- **Must clear only `manifest.json` and `stories/` in the output directory.**
 - **Must remove every container it starts**, on success, timeout, and abort. Each is `--rm` with a unique name and the label `selfie-render`.
 - **May render at most 6 stories at once by default**, or fewer if the machine has fewer CPUs. Concurrency is not part of the environment (rationale).
 
@@ -54,22 +54,14 @@ Source of truth: `render/src/worker/worker.ts`.
 
 Browser options don't stop a project's own JavaScript timers. A project freezes them itself:
 
-- **Must set `window.__SELFIE_SNAPSHOT__ = true` before any story code loads.** A project's code may test it to stop blinks and other timers.
+- **Must set `window.__SELFIE_SNAPSHOT__ = true` before any story code loads.** A project's code may test it to stop blinks and other timers (rationale).
 - **May take an `initScript`**, applied before story code runs, in every frame. This reaches a freeze the project already gates on its own name, such as `window.__ARGOS_SNAPSHOT__ = true;`, and can add a style.
-
-## Stability
-
-Source of truth: `render/src/capture.ts`, `render/src/manifest.ts`.
-
-- **Must, when `stability` is set, render each story that succeeded a second time, in a new worker, settling 730 ms longer** (rationale).
-- **Must compare PNG bytes** (rationale). A differing story is `unstable`, and its second render is kept at `repeat/<file>`. A story that fails its second render is also `unstable`. A story that failed the first time stays `unchecked`.
-- **Must treat the first render as the result.** The longer settle is only ever used for comparing.
 
 ## Manifest
 
 Source of truth: `render/src/manifest.ts`; tests in `render/test/manifest.test.ts`.
 
-`manifest.json`, written atomically after the first pass and again after the repeat:
+`manifest.json`, written atomically once capture finishes:
 
 | Field | Meaning |
 |---|---|
@@ -78,14 +70,14 @@ Source of truth: `render/src/manifest.ts`; tests in `render/test/manifest.test.t
 | `settleMs`, `initScriptSha256` | The project input that can also decide pixels |
 | `runtime` | What ran: browser, Playwright, Node, OS, and architecture. Null if no story needed a browser |
 | `startedAt`, `durationMs`, `warnings` | About the run |
-| `totals` | Counts of `stories`, `failed`, and `unstable` |
-| `stories[]` | `id`, `title`, `name`, `status`, `file`, `width`, `height`, `pngSha256`, `errors`, `stability`, `repeatFile`, `durationMs` |
+| `totals` | Counts of `stories` and `failed` |
+| `stories[]` | `id`, `title`, `name`, `status`, `file`, `width`, `height`, `pngSha256`, `errors`, `durationMs` |
 
 - **Must write file paths relative to the manifest.** `file` is null on a failed story.
 - **Must name a story's file `encodeURIComponent(id) + ".png"`**, since an ID comes from the build and may hold `/`.
 - **`pngSha256` is not the image hash**, which `docs/specs/store.md` → Image identity defines over decoded pixels.
-- **Must report a play function failure under the source `play`, from Storybook's `playFunctionThrewException` channel event, and keep `status: "ok"`**, since the story still rendered and has an image. The console error it also logs stays under `console`. `selfie review` lists the story as needing attention (`docs/specs/cli.md` → What needs attention).
-- **May report other `errors` on an `ok` story:** console errors, page errors, and failed requests that didn't stop the render. Each has a `source`: `render`, `timeout`, `play`, `page`, `console`, `request`, `worker`, or `repeat`. A story keeps at most 20, each cut to 400 characters.
+- **Must report a play function failure under the source `play`, from Storybook's `playFunctionThrewException` channel event, and keep `status: "ok"`**, since the story still rendered and has an image. The console error it also logs stays under `console`. `selfie review` lists the story as needing attention (`docs/specs/cli.md` → What blocks).
+- **May report other `errors` on an `ok` story:** console errors, page errors, and failed requests that didn't stop the render. Each has a `source`: `render`, `timeout`, `play`, `page`, `console`, `request`, or `worker`. A story keeps at most 20, each cut to 400 characters.
 
 ## Render identity
 

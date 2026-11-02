@@ -92,11 +92,6 @@ export function AdvisoryLabels({ row }: { readonly row: SnapshotRow }) {
           Play error
         </IconLabel>
       )}
-      {row.unstable === true && (
-        <IconLabel variant="attention" icon={<AlertIcon size={12} />}>
-          Unstable
-        </IconLabel>
-      )}
     </>
   );
 }

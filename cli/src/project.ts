@@ -119,11 +119,6 @@ export interface ReviewCache {
     readonly pixelDiff: PixelDiff | null;
   }[];
   readonly playErrors: readonly { readonly story: string; readonly current: string | null }[];
-  readonly unstable: readonly {
-    readonly story: string;
-    readonly current: string | null;
-    readonly repeat: string | null;
-  }[];
 }
 
 /** Atomic, so a reader never sees half of one. */

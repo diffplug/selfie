@@ -28,7 +28,6 @@ export const CREATE_SNAPSHOT_TABLES: readonly string[] = [
   story TEXT NOT NULL,
   image_key INTEGER,
   failure TEXT,
-  unstable INTEGER,
   play_error TEXT,
   PRIMARY KEY (run_key, story),
   CHECK ((image_key IS NULL) <> (failure IS NULL))
@@ -81,7 +80,7 @@ const BASELINE_RUN_KEY = `(SELECT g.run_key FROM goldens g
 const SELECT_BASELINE = `SELECT ${BASELINE_RUN_KEY} AS run_key`;
 
 // `gs` joins before the images so that a row left out never reads them.
-const SELECT_COMPARED_PAGE = `SELECT rs.story, i.hash AS image_hash, rs.failure, rs.unstable, rs.play_error,
+const SELECT_COMPARED_PAGE = `SELECT rs.story, i.hash AS image_hash, rs.failure, rs.play_error,
   gi.hash AS golden_hash, d.decision, d.actor, d.decided_at
 FROM runs r
 CROSS JOIN run_snapshots rs ON rs.run_key = r.key
@@ -92,7 +91,7 @@ LEFT JOIN decisions d ON d.environment = r.environment AND d.story = rs.story
   AND d.image_hash = i.hash
 WHERE r.id = ?1 AND rs.story > ?3
   AND (CAST(?5 AS INTEGER) = 1 OR rs.image_key IS NULL
-    OR rs.image_key IS NOT gs.image_key OR rs.unstable = 1 OR rs.play_error IS NOT NULL)
+    OR rs.image_key IS NOT gs.image_key OR rs.play_error IS NOT NULL)
 ORDER BY rs.story
 LIMIT CAST(?4 AS INTEGER)`;
 
@@ -166,26 +165,23 @@ WHERE run_key = (SELECT key FROM runs WHERE id = ?1)`;
 // A row with a hash the images table lacks, or a finished run, matches nothing, so the
 // statement returns too few rows, which is how `recordSnapshots` knows.
 const recordSql = (values: string) =>
-  `WITH v(story, image_hash, failure, unstable, play_error) AS (VALUES ${values})
-INSERT INTO run_snapshots(run_key, story, image_key, failure, unstable, play_error)
-SELECT r.key, v.story, i.key, v.failure, v.unstable, v.play_error
+  `WITH v(story, image_hash, failure, play_error) AS (VALUES ${values})
+INSERT INTO run_snapshots(run_key, story, image_key, failure, play_error)
+SELECT r.key, v.story, i.key, v.failure, v.play_error
 FROM runs r CROSS JOIN v LEFT JOIN images i ON i.hash = v.image_hash
 WHERE r.id = ?1 AND r.finished_at IS NULL AND (v.image_hash IS NULL OR i.key IS NOT NULL)
 ON CONFLICT(run_key, story) DO UPDATE SET
-  image_key = excluded.image_key, failure = excluded.failure, unstable = excluded.unstable,
+  image_key = excluded.image_key, failure = excluded.failure,
   play_error = excluded.play_error
 RETURNING 1 AS written`;
 
 /**
  * What a run recorded for one story: the stored image's hash, or why it failed.
- * `unstable` says whether the story rendered differently when rendered twice, and is
- * absent or null if nobody checked. `playError` says why its play function failed, on
- * a story that may still have rendered.
+ * `playError` says why its play function failed, on a story that may still have rendered.
  */
 export type RecordedSnapshot = {
   /** The story ID, with any render variant in it. Opaque here. */
   readonly story: string;
-  readonly unstable?: boolean | null;
   readonly playError?: string | null;
 } & (
   | { readonly imageHash: string; readonly failure?: undefined }
@@ -253,8 +249,6 @@ export interface ComparedSnapshot {
   readonly goldenHash: string | null;
   /** Null unless `failed`. */
   readonly failure: string | null;
-  /** As recorded: null if nobody checked, and always null if `removed`. */
-  readonly unstable: boolean | null;
   /** As recorded: null if there was none, and always null if `removed`. */
   readonly playError: string | null;
   /** The decision on exactly `imageHash` for this name, if there is one. */
@@ -264,9 +258,8 @@ export interface ComparedSnapshot {
 export interface Comparison {
   readonly run: Run;
   /**
-   * In name order, the run's differences from the baseline and anything flagged
-   * unstable or with a play error, then the removed snapshots. Other unchanged ones
-   * only if asked for.
+   * In name order, the run's differences from the baseline and anything with a play
+   * error, then the removed snapshots. Other unchanged ones only if asked for.
    */
   readonly snapshots: readonly ComparedSnapshot[];
   /** How many of the run's snapshots are `unchanged`, whether listed or not. */
@@ -672,7 +665,7 @@ function recordStatements(runId: string, snapshots: readonly RecordedSnapshot[])
     params = [runId];
     values = [];
   };
-  for (const { story, imageHash, failure, unstable, playError } of snapshots) {
+  for (const { story, imageHash, failure, playError } of snapshots) {
     const needed = playError == null ? 2 : 3;
     if (params.length + needed > MAX_RECORD_PARAMS) flush();
     const name = `?${params.push(story)}`;
@@ -681,9 +674,8 @@ function recordStatements(runId: string, snapshots: readonly RecordedSnapshot[])
       imageHash !== undefined
         ? `?${params.push(imageHash)}, NULL`
         : `NULL, ?${params.push(cleanMessage(failure))}`;
-    const flag = unstable === true ? 1 : unstable === false ? 0 : "NULL";
     const play = playError == null ? "NULL" : `?${params.push(cleanMessage(playError))}`;
-    values.push(`(${name}, ${result}, ${flag}, ${play})`);
+    values.push(`(${name}, ${result}, ${play})`);
   }
   flush();
   return statements;
@@ -752,7 +744,6 @@ function toComparedSnapshot(row: SqlRow): ComparedSnapshot {
     imageHash,
     goldenHash,
     failure: row.failure as string | null,
-    unstable: row.unstable === null ? null : row.unstable === 1,
     playError: row.play_error as string | null,
     decision:
       row.decision === null
@@ -772,7 +763,6 @@ function toRemovedSnapshot(row: SqlRow): ComparedSnapshot {
     imageHash: null,
     goldenHash: row.golden_hash as string,
     failure: null,
-    unstable: null,
     playError: null,
     decision: null,
   };

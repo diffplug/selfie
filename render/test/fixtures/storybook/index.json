@@ -7,8 +7,6 @@
     "basic--tall": { "id": "basic--tall", "title": "Basic", "name": "Tall", "type": "story", "importPath": "./basic.js" },
     "basic--animation": { "id": "basic--animation", "title": "Basic", "name": "Animation", "type": "story", "importPath": "./basic.js" },
     "basic--external-request": { "id": "basic--external-request", "title": "Basic", "name": "External request", "type": "story", "importPath": "./basic.js" },
-    "timers--always-random": { "id": "timers--always-random", "title": "Timers", "name": "Always random", "type": "story", "importPath": "./timers.js" },
-    "timers--ticking": { "id": "timers--ticking", "title": "Timers", "name": "Ticking", "type": "story", "importPath": "./timers.js" },
     "timers--frozen-by-selfie": { "id": "timers--frozen-by-selfie", "title": "Timers", "name": "Frozen by Selfie", "type": "story", "importPath": "./timers.js" },
     "timers--frozen-by-project": { "id": "timers--frozen-by-project", "title": "Timers", "name": "Frozen by project", "type": "story", "importPath": "./timers.js" },
     "play--fails": { "id": "play--fails", "title": "Play", "name": "Fails", "type": "story", "importPath": "./play.js" },

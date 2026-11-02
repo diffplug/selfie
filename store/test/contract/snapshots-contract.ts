@@ -109,8 +109,8 @@ export function describeSnapshotContract(
       await snapshots.recordSnapshots(rerun, [
         rendered("a", 1),
         rendered("b", 7),
-        { ...rendered("c", 3), unstable: true },
-        { ...rendered("e", 6), unstable: false },
+        { ...rendered("c", 3), playError: "Played badly" },
+        rendered("e", 6),
       ]);
       await snapshots.finishRun(rerun, 4);
     });
@@ -124,10 +124,10 @@ export function describeSnapshotContract(
       expect(run).toMatchObject({ status: "failed", failedCount: 1 });
       expect(unchangedCount).toBe(1);
       expect(compared).toEqual([
-        { story: "b", state: "changed", imageHash: hashOf(5), goldenHash: hashOf(2), failure: null, unstable: null, playError: null, decision: null },
-        { story: "c", state: "failed", imageHash: null, goldenHash: hashOf(3), failure: "Render threw", unstable: null, playError: null, decision: null },
-        { story: "e", state: "new", imageHash: hashOf(6), goldenHash: null, failure: null, unstable: null, playError: null, decision: null },
-        { story: "d", state: "removed", imageHash: null, goldenHash: hashOf(4), failure: null, unstable: null, playError: null, decision: null },
+        { story: "b", state: "changed", imageHash: hashOf(5), goldenHash: hashOf(2), failure: null, playError: null, decision: null },
+        { story: "c", state: "failed", imageHash: null, goldenHash: hashOf(3), failure: "Render threw", playError: null, decision: null },
+        { story: "e", state: "new", imageHash: hashOf(6), goldenHash: null, failure: null, playError: null, decision: null },
+        { story: "d", state: "removed", imageHash: null, goldenHash: hashOf(4), failure: null, playError: null, decision: null },
       ]);
     });
 
@@ -155,7 +155,7 @@ export function describeSnapshotContract(
       });
       expect(again.unchangedCount).toBe(2);
       expect(again.snapshots[1]).toMatchObject({ imageHash: hashOf(7), decision: null });
-      expect(again.snapshots.map(({ unstable }) => unstable)).toEqual([null, null, true, false, null]);
+      expect(again.snapshots.map(({ playError }) => playError)).toEqual([null, null, "Played badly", null, null]);
     });
 
     it("never compares across environments", async () => {

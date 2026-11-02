@@ -74,7 +74,6 @@ describe("review", () => {
     const { id: runId } = reviewed.comparison.run;
     expect(reviewed.comparison.run).toMatchObject({ dirty: false, baselineSha: null, storyFilter: null });
     expect(reviewed.dirtyPaths).toEqual([]);
-    expect(reviewed.stabilityChecked).toBe(false);
     expect(reviewed.timings.totalMs).toBeGreaterThanOrEqual(0);
     expect(summarizeRun(reviewed.comparison).blockers.map(({ reason }) => reason)).toEqual([
       "new-unapproved",

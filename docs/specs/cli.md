@@ -26,7 +26,7 @@ Source of truth: `cli/src/cli.ts`, `cli/src/document.ts`; the real binary's test
 | 1 | The command ran, and something blocks | A review listing anything in `blockers`, `accept` refusing, a `--story` pattern on `approve` or `reject` that matched nothing |
 | 2 | The command couldn't run | Not a Git repository, no commits, no Storybook, no Docker, a failed `--build-command`, a bad flag, an unknown run, `--story` matching no story at all, a `ui` that can't start |
 
-- **Decision for the user to review: advisories don't change the exit code.** A project with two known `play` errors can reach exit 0, so 1 keeps its meaning of "something here stops you". It also means **an agent checking only the exit code won't see a `play` failure or an unstable story**: it has to read `advisories`, which is why the document always carries the list and its count ([What blocks](#what-blocks)) (rationale).
+- **Decision for the user to review: advisories don't change the exit code.** A project with two known `play` errors can reach exit 0, so 1 keeps its meaning of "something here stops you". It also means **an agent checking only the exit code won't see a `play` failure**: it has to read `advisories`, which is why the document always carries the list and its count ([What blocks](#what-blocks)) (rationale).
 - **Must take a story pattern as `docs/specs/render.md` → Capture defines it:** an ID, where `*` matches any run of characters.
 
 ## Library
@@ -38,7 +38,7 @@ Source of truth: `cli/src/index.ts`; tests in `cli/test/library.test.ts`.
 | Export | Does |
 |---|---|
 | `openProject({ cwd, env })` | The repository's `Project`: its `repo`, `directory`, `renders`, `store`, `snapshots`, and `close()` |
-| `review(project, options)` | Returns a `ReviewResult`: the `comparison`, `dirtyPaths`, `baseline`, `stabilityChecked`, `differences`, `playErrors`, `unstable`, `warnings`, and `timings` |
+| `review(project, options)` | Returns a `ReviewResult`: the `comparison`, `dirtyPaths`, `baseline`, `differences`, `playErrors`, `warnings`, and `timings` |
 | `decide(project, { runId, decision, actor, stories })` | `stories` is `"all"`, patterns, or `{ targets }`: exact stories and image hashes, for a caller that showed them, refused whole with `stale-decision` if any isn't a changed or new image the run holds. Returns `decided`, `skipped`, `unmatchedPatterns`, and the `comparison` after it. It compares twice, and reads unchanged rows only for patterns |
 | `accept(project, { runId, removedSeen })` | Returns `accepted`, `refusals`, `usableAsBaseline`, and the `comparison` |
 | `checkAccept(project, comparison, removedSeen)` | What `accept` would refuse of a comparison a caller holds, changing nothing: `refusals`, `usableAsBaseline`, and `removals` |
@@ -65,7 +65,7 @@ Source of truth: `cli/src/paths.ts`, `cli/src/project.ts`; tests in `cli/test/un
   store.db                               SQLite, per docs/specs/store.md, with one table of its own (Recording only if necessary)
   blobs/images/<image hash>              Filesystem blobs, per docs/specs/store.md
   runs/<run id>/review.json              A disposable cache of exported paths and pixel diffs
-  runs/<run id>/stories/<name>/*.png     current, golden, diff, and repeat
+  runs/<run id>/stories/<name>/*.png     current, golden, and diff
   capture/<uuid>/                        One capture's output, deleted when the review ends
 ```
 
@@ -83,9 +83,9 @@ In order, a review:
 
 1. Runs `--build-command`, if given, in a shell. Its stdout goes to stderr. **Never guess a project's build system.** **Never use a shell for anything else.**
 2. Reads HEAD and the working tree, and finds the baseline ([`find-baseline`](#find-baseline)).
-3. Unless that exact build [already rendered](#recording-only-if-necessary), captures `--storybook-dir` (default `storybook-static`) in a new capture directory, with `--story` patterns, the project's [init script](#configuration), and, if asked, `--stability`.
+3. Unless that exact build [already rendered](#recording-only-if-necessary), captures `--storybook-dir` (default `storybook-static`) in a new capture directory, with `--story` patterns, and the project's [init script](#configuration).
 4. Checks HEAD didn't move.
-5. Begins a run recording whether the tree was dirty, the baseline, and any filter. Stores each PNG with `Store.putImages`, which keeps new ones as WebP, or takes an earlier render's rows, and records and finishes the run with `Snapshots`. Rows carry the failure message, the `play` error, and the unstable flag.
+5. Begins a run recording whether the tree was dirty, the baseline, and any filter. Stores each PNG with `Store.putImages`, which keeps new ones as WebP, or takes an earlier render's rows, and records and finishes the run with `Snapshots`. Rows carry the failure message and the `play` error.
 6. Compares the run with the baseline.
 7. Exports images and pixel diffs for what isn't unchanged, writes `review.json`, and prunes [output](#output-directories).
 
@@ -96,7 +96,6 @@ In order, a review:
 - **Must treat a capture's unusable file as that story's failure**: a manifest path outside the capture directory, a path that isn't a regular file, or a PNG the store refuses. Other stories continue.
 - **Must fail with exit 2 if HEAD moves during the render, or if no story was captured**, since one Git SHA must describe the run, and a typo must not pass.
 - **Must record a run as dirty if the tree had changes either before or after the render.** Ignored files don't count, so a gitignored `storybook-static` doesn't dirty the tree, and neither does a stale one (rationale).
-- **Must leave stability off unless asked, and say which in `stabilityChecked`** (rationale).
 - **Must not call a golden removed when `--story` left its story out.** Such goldens are counted in `filter.notRendered`, and are not in `differences`, `counts.removed`, or `blockers`. A removed story matching a pattern still is.
 
 ### What blocks
@@ -113,7 +112,6 @@ Source of truth: `summarizeRun` in `cli/src/summary.ts`.
 | | `removed` | The baseline has its golden, and this run doesn't have the story | |
 | | `pattern-unmatched` | A `--story` pattern matched nothing, while another did. `story` is null | The pattern |
 | `advisories` | `play-error` | Its `play` function threw. Its image is still recorded (`docs/specs/render.md` → Manifest) | The message |
-| | `unstable` | `--stability` saw it render differently twice | |
 
 - **Must not list an approved image**: it is still in `differences`, with its `decision`. That is how an approval made earlier, at any Git SHA, needs no repeating (`docs/specs/system.md` → Approvals).
 - **Must list an advisory whatever its story's state**, including unchanged, and count them in `counts.advisories`.
@@ -131,7 +129,6 @@ A review recognizes a build that already rendered, skips capture and storing, an
 - **Must keep only the newest real render of a build, and forget the build if that render can't be reused**, so a forced render that fails isn't hidden by an older one that passed.
 - **Must not remember a render if the build's identity changed while it rendered**, since nothing describes those images.
 - **Must always name a run that really rendered:** a reused run is never itself remembered, so reuse doesn't chain.
-- **Must always render with `--stability`, and never remember that render or forget one because of it**, since asking for stability asks for a fresh measurement (rationale).
 - **Must answer a filtered review only from the build's whole run, by the filter, and never remember a filtered render or forget one because of it.** `filter`, `warnings`, and `blockers` come out as a render's would, and a filter matching nothing still exits 2.
 - **Must render with `--no-reuse`.** That render still updates what's remembered, so it is also how to replace one.
 - **Must make it visible:** `run.reusedFromRun` (`docs/specs/snapshots.md` → Runs), which is `reusedFromRun` in `review`'s and `accept`'s documents; one line on stderr from each; and the run and accept screens (`docs/specs/ui.md` → Screens).
@@ -151,12 +148,10 @@ Every path is absolute, and names a file that exists until it is pruned.
 | `baseline` | `sha`, `reason`, and `message`, as [`find-baseline`](#find-baseline) gives them |
 | `environment` | Its ID |
 | `filter` | `patterns` and `notRendered`, or null with no `--story` |
-| `stabilityChecked` | Whether `--stability` ran |
 | `counts` | `stories`, `unchanged`, `changed`, `new`, `removed`, `undecided`, and `advisories` |
 | `blockers[]`, `advisories[]` | `story`, `reason`, `detail` |
 | `differences[]` | `story`, `state`, `decision`, `imageHash`, `goldenHash`, `current`, `golden`, `diff`, `pixelDiff` |
 | `playErrors[]` | `story`, `playError`, `current` |
-| `unstable[]` | `story`, `current`, `repeat` |
 | `warnings[]` | The manifest's |
 | `next[]` | What to do next, in words and commands |
 

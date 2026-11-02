@@ -58,13 +58,13 @@ afterAll(async () => {
 });
 
 describe.runIf(process.env.SELFIE_RENDER_CONTAINER === "1")("in the pinned container", () => {
-  describe("a full stability run", () => {
+  describe("a full run", () => {
     let outDir: string;
     let manifest: Manifest;
 
     beforeAll(async () => {
       outDir = newOutDir();
-      manifest = await run({ stability: true, storyTimeoutMs: 5_000 }, outDir);
+      manifest = await run({ storyTimeoutMs: 5_000 }, outDir);
     }, 120_000);
 
     test("runs on the image it was told to, and records it", () => {
@@ -88,7 +88,7 @@ describe.runIf(process.env.SELFIE_RENDER_CONTAINER === "1")("in the pinned conta
 
     test("captures every story and leaves out docs", () => {
       expect(manifest.stories.map((entry) => entry.id)).not.toContain("guide--docs");
-      expect(manifest.totals.stories).toBe(14);
+      expect(manifest.totals.stories).toBe(12);
     });
 
     test("applies the page conditions before story code runs", () => {
@@ -111,7 +111,7 @@ describe.runIf(process.env.SELFIE_RENDER_CONTAINER === "1")("in the pinned conta
 
     test("reports a failed story and carries on", () => {
       const thrown = story(manifest, "broken--throws");
-      expect(thrown).toMatchObject({ status: "failed", file: null, stability: "unchecked" });
+      expect(thrown).toMatchObject({ status: "failed", file: null });
       expect(thrown.errors).toContainEqual({ source: "render", message: "this story always throws" });
       expect(manifest.totals.failed).toBeLessThan(manifest.totals.stories);
     });
@@ -136,39 +136,8 @@ describe.runIf(process.env.SELFIE_RENDER_CONTAINER === "1")("in the pinned conta
       expect(external.errors.map((error) => error.message).join()).toContain("example.invalid");
     });
 
-    test("stays stable through a CSS animation and the fixed Date", () => {
-      expect(story(manifest, "basic--animation").stability).toBe("stable");
-      expect(story(manifest, "basic--environment").stability).toBe("stable");
-    });
-
-    test("flags a story whose pixels differ, and keeps both images", async () => {
-      const random = story(manifest, "timers--always-random");
-      expect(random.stability).toBe("unstable");
-      const [first, second] = await Promise.all([
-        readFile(path.join(outDir, random.file as string)),
-        readFile(path.join(outDir, random.repeatFile as string)),
-      ]);
-      expect(first.equals(second)).toBe(false);
-    });
-
-    test("flags a story driven by a running timer", () => {
-      expect(story(manifest, "timers--ticking").stability).toBe("unstable");
-    });
-
-    test("sets the Selfie global before stories load, so a project can freeze with it", () => {
-      expect(story(manifest, "timers--frozen-by-selfie").stability).toBe("stable");
-    });
-
-    test("doesn't freeze a project's own timers by itself", () => {
-      expect(story(manifest, "timers--frozen-by-project").stability).toBe("unstable");
-    });
-
-    test("keeps second renders only for unstable stories", async () => {
-      const unstable = manifest.stories
-        .filter((entry) => entry.stability === "unstable")
-        .map((entry) => path.basename(entry.repeatFile as string));
-      expect((await readdir(path.join(outDir, "repeat"))).sort()).toEqual(unstable.sort());
-      expect((await readdir(outDir)).sort()).toEqual(["manifest.json", "repeat", "stories"]);
+    test("writes only what it owns", async () => {
+      expect((await readdir(outDir)).sort()).toEqual(["manifest.json", "stories"]);
     });
 
     test("writes the manifest it returns", async () => {
@@ -180,12 +149,13 @@ describe.runIf(process.env.SELFIE_RENDER_CONTAINER === "1")("in the pinned conta
     });
   });
 
-  test("the PNG encoder is deterministic, so comparing bytes compares pixels", async () => {
-    const options = { stories: ["basic--detail", "timers--frozen-by-selfie"], concurrency: 2 };
+  test("the same render matches byte for byte, except a project's own timers", async () => {
+    const same = ["basic--detail", "basic--animation", "basic--environment", "timers--frozen-by-selfie"];
+    const options = { stories: [...same, "timers--frozen-by-project"], concurrency: 2 };
     const manifests = [await run(options), await run(options), await run(options)];
-    for (const id of options.stories) {
-      expect(new Set(manifests.map((manifest) => story(manifest, id).pngSha256)).size).toBe(1);
-    }
+    const distinct = (id: string) => new Set(manifests.map((manifest) => story(manifest, id).pngSha256)).size;
+    for (const id of same) expect(distinct(id)).toBe(1);
+    expect(distinct("timers--frozen-by-project")).toBeGreaterThan(1);
     // A timestamp or text chunk would make equal pixels differ.
     const outDir = newOutDir();
     const manifest = await run({ stories: ["basic--detail"] }, outDir);
@@ -194,14 +164,12 @@ describe.runIf(process.env.SELFIE_RENDER_CONTAINER === "1")("in the pinned conta
   });
 
   test("a project's init script runs before story code", async () => {
-    const frozen = await run({
-      stories: ["timers--frozen-by-project"],
-      stability: true,
-      initScript: "window.__PROJECT_FREEZE__ = true;",
-    });
-    expect(story(frozen, "timers--frozen-by-project")).toMatchObject({ errors: [], stability: "stable" });
-    expect(frozen.totals).toEqual({ stories: 1, failed: 0, unstable: 0 });
+    const options = { stories: ["timers--frozen-by-project"], initScript: "window.__PROJECT_FREEZE__ = true;" };
+    const frozen = await run(options);
+    expect(story(frozen, "timers--frozen-by-project").errors).toEqual([]);
+    expect(frozen.totals).toEqual({ stories: 1, failed: 0 });
     expect(frozen.initScriptSha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(story(await run(options), "timers--frozen-by-project").pngSha256).toBe(story(frozen, "timers--frozen-by-project").pngSha256);
   });
 
   test("a digest for another platform is refused before the output is touched", async () => {

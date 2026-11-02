@@ -34,7 +34,7 @@ function nextSteps(result: ReviewResult, summary: RunSummary): string[] {
 
 /** The one document `selfie review` prints. */
 export function buildReviewDocument(result: ReviewResult) {
-  const { comparison, baseline, dirtyPaths, stabilityChecked, differences, playErrors, unstable, warnings } = result;
+  const { comparison, baseline, dirtyPaths, differences, playErrors, warnings } = result;
   const { run } = comparison;
   const summary = summarizeRun(comparison);
   return {
@@ -49,13 +49,11 @@ export function buildReviewDocument(result: ReviewResult) {
       run.storyFilter === null
         ? null
         : { patterns: run.storyFilter.patterns, notRendered: summary.notRendered.length },
-    stabilityChecked,
     counts: summary.counts,
     blockers: summary.blockers,
     advisories: summary.advisories,
     differences,
     playErrors,
-    unstable,
     warnings,
     next: nextSteps(result, summary),
   };

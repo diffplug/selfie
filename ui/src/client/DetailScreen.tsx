@@ -79,9 +79,6 @@ function Notes({ row, sizeDiffers }: { row: SnapshotRow; sizeDiffers: boolean })
       {row.playError !== null && (
         <Banner variant="warning" title="Its play function threw" description={<code className="selfie-pre">{row.playError}</code>} />
       )}
-      {row.unstable === true && (
-        <Banner variant="warning" title="Unstable" description="It rendered differently twice in a row, so this image may not be the only one it can produce." />
-      )}
     </>
   );
 }

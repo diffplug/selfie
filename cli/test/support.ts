@@ -16,7 +16,7 @@ import {
   type StoryError,
   unmatchedPatternWarning,
 } from "selfie-render";
-import { REPEAT_DIR, STORIES_DIR, storyFileName, totalsOf, writeManifest } from "selfie-render/testing";
+import { STORIES_DIR, storyFileName, totalsOf, writeManifest } from "selfie-render/testing";
 import { runCli } from "../src/cli.ts";
 import { encodePng } from "../src/png.ts";
 
@@ -45,9 +45,6 @@ export interface FakeStory {
   readonly patch?: readonly [number, number, number, number, Color];
   readonly failed?: string;
   readonly errors?: readonly StoryError[];
-  readonly stability?: ManifestStory["stability"];
-  /** Written as a second render, when `stability` is `unstable`. */
-  readonly repeatColor?: Color;
   /** A warning from the capture itself, in the manifest. */
   readonly warning?: string;
   /** Replaces the manifest's path to the image, to test what an unsafe one does. */
@@ -70,7 +67,6 @@ export function fakeCapture(
     const selected = filtered?.stories ?? stories();
 
     await mkdir(path.join(options.outDir, STORIES_DIR), { recursive: true });
-    await mkdir(path.join(options.outDir, REPEAT_DIR), { recursive: true });
     const manifestStories: ManifestStory[] = [];
     for (const story of selected) {
       const fileName = storyFileName(story.id);
@@ -97,11 +93,6 @@ export function fakeCapture(
           await writeFile(target, story.rawPng ?? (await encodePng(image)));
         }
       }
-      let repeatFile: string | null = null;
-      if (story.repeatColor !== undefined) {
-        repeatFile = path.posix.join(REPEAT_DIR, fileName);
-        await writeFile(path.join(options.outDir, repeatFile), await encodePng(solid(width, height, story.repeatColor)));
-      }
       manifestStories.push({
         id: story.id,
         title: "",
@@ -112,8 +103,6 @@ export function fakeCapture(
         height,
         pngSha256: null,
         errors: [...(story.errors ?? []), ...(story.failed === undefined ? [] : [{ source: "render" as const, message: story.failed }])],
-        stability: story.stability ?? "unchecked",
-        repeatFile,
         durationMs: 1,
       });
     }

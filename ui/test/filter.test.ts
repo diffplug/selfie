@@ -8,7 +8,6 @@ const row = (story: string, overrides: Partial<SnapshotRow> = {}): SnapshotRow =
   imageHash: "a".repeat(64),
   goldenHash: "b".repeat(64),
   failure: null,
-  unstable: null,
   playError: null,
   decision: null,
   pixelDiff: null,

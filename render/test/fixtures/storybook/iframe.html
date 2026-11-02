@@ -84,19 +84,6 @@
           await fetch("https://example.invalid/never").catch(() => {});
           root.textContent = "rendered after a blocked request";
         },
-        "timers--always-random"() {
-          document.body.style.background = randomColor();
-        },
-        "timers--ticking"() {
-          // A cycle of 1.1 s, which the repeat's extra settle can't land back on. Seven
-          // colors made 700 ms, and a 730 ms delay reads as the same color every time.
-          const colors = ["red", "orange", "yellow", "green", "blue", "indigo", "violet", "pink", "gray", "teal", "navy"];
-          let tick = 0;
-          setInterval(() => {
-            tick += 1;
-            document.body.style.background = colors[tick % colors.length];
-          }, 100);
-        },
         "timers--frozen-by-selfie"() {
           document.body.style.background = window.__SELFIE_SNAPSHOT__ ? "white" : randomColor();
         },
