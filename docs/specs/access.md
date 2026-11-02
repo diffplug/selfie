@@ -48,6 +48,12 @@ GitHub decides. Selfie keeps no member list of its own.
 - **Must sign the CLI in through the GitHub App's device flow**, which is an opt-in setting on the app.
 - **Must not need a login to view a public repository.**
 
+### CI uploads
+
+- **Must authenticate CI uploads with GitHub Actions OIDC, so a repository stores no Selfie secret.**
+- **Must verify every OIDC token before accepting it:** an RS256 signature from GitHub's published keys, the issuer `https://token.actions.githubusercontent.com`, an unexpired token, an audience naming Selfie, and a `repository_id` that is the project being uploaded to (rationale). A token for any other audience was meant for another service.
+- **Must accept an OIDC token only for uploading to its own repository's project**, never to view a private project, approve, or reject, since it identifies a workflow and not a person.
+
 ### Local review server
 
 - **Must listen only on loopback and check the `Host` header**, so a website the user visits can't read their snapshots through it.
@@ -55,6 +61,5 @@ GitHub decides. Selfie keeps no member list of its own.
 ### Open questions
 
 - **Unpushed work in public repositories.** A run uploaded from an unpushed branch of a public repository would be visible to anyone. Decide whether anonymous viewers see only runs for commits GitHub already has, or whether a run isn't uploaded until its commit is pushed.
-- **CI uploads.** GitHub Actions OIDC carries `repository_id`, so CI may need no stored secret. Confirm how to verify the token, and what a pull request from a fork receives.
-- **Pull requests from forks.** Someone without write access can't upload under the table above, so decide how a fork's pull request gets snapshots.
+- **Pull requests from forks.** Someone without write access can't upload under the table above, and GitHub's docs don't say whether a fork's `pull_request` run can get an OIDC token at all. Test that, along with how `pull_request_target` behaves, which runs with write access even from a public fork, and decide how a fork's pull request gets snapshots.
 - **Reading code for `change-grouping`.** That scope sends code diffs to a Meta model, which needs more app permissions and means private code leaves GitHub. Decide how a repository owner consents.

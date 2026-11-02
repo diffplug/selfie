@@ -13,3 +13,7 @@
 **Anonymous viewers.** GitHub allows unauthenticated requests 60 per hour per IP, which a Worker's shared addresses would exhaust. An installation token starts at 5,000 per hour.
 
 **Why webhooks can't be the only signal.** GitHub says apps do not receive `repository.deleted`, and `repository.transferred` goes only to the new owner's account if the app is installed there. The pages read don't promise delivery. Collaborator and team events also need an organization permission. So access answers expire on their own, and `privatized` and similar events only shorten the wait.
+
+## CI uploads
+
+**Verification.** GitHub's discovery document at `https://token.actions.githubusercontent.com/.well-known/openid-configuration`, read 2026-11, names that issuer, a `jwks_uri` of `/.well-known/jwks` under it, and RS256 only. Its claims include `repository_id`, `aud`, and `event_name`. By default `aud` is the repository owner's URL, and a workflow sets its own through `core.getIDToken(audience)`. A workflow needs `id-token: write` to request a token. GitHub's docs state no token lifetime, so verification relies on the token's own `exp`.
