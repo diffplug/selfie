@@ -24,8 +24,7 @@ if (Atomics.add(gate, 0, 1) + 1 === parties) {
 const startedAt = performance.timeOrigin + performance.now();
 const keys: number[] = [];
 for (const row of rows) {
-  const { sql: text, params } = imageInsertStatement(row.hash, row.truncated);
-  keys.push(insertedKey(await sql.run(text, params)));
+  keys.push(insertedKey(await sql.run(imageInsertStatement(row.hash, row.truncated))));
 }
 const finishedAt = performance.timeOrigin + performance.now();
 

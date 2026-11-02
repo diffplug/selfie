@@ -13,8 +13,8 @@ export interface D1Harness {
   connect(wrap?: (next: typeof fetch) => typeof fetch): SqlAdapter;
   /** Drops every table except D1's own, leaving the database empty. */
   sweep(): Promise<void>;
-  /** Runs `work` and returns the most requests that were in flight at once during it. */
-  measureOverlap(work: () => Promise<void>): Promise<number>;
+  /** Runs `work`, also returning the most requests that were in flight at once during it. */
+  measureOverlap<T>(work: () => Promise<T>): Promise<{ result: T; peak: number }>;
   /** Asks without exposing the token to the caller, so a failing assertion can't print it. */
   leaksToken(text: string): boolean;
   readonly requests: number;
@@ -70,16 +70,14 @@ async function createHarness(): Promise<D1Harness> {
     connect,
     sweep: async () => {
       const sql = new Sql(connect());
-      const tables = await sql.run(
-        "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite~_%' ESCAPE '~' AND name NOT LIKE '~_cf~_%' ESCAPE '~'",
-      );
+      const tables = await sql.run({ sql: "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite~_%' ESCAPE '~' AND name NOT LIKE '~_cf~_%' ESCAPE '~'" });
       if (tables.length === 0) return;
       await sql.batch(tables.map(({ name }) => ({ sql: `DROP TABLE IF EXISTS "${String(name)}"` })));
     },
     measureOverlap: async (work) => {
       peak = inFlight;
-      await work();
-      return peak;
+      const result = await work();
+      return { result, peak };
     },
     leaksToken: (text) => text.includes(token),
     get requests() {

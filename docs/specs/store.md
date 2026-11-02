@@ -32,6 +32,7 @@ Source of truth: `store/src/core/store.ts`; tests in `store/test/store.test.ts` 
 - **Must key blobs by image hash, never by image key.** The key is `images/<image hash>`. Reserved: cloud blobs add the project, per [R2 adapter](#r2-adapter).
 - **Must write image bytes before the metadata row that refers to them**, since blob storage and SQL share no transaction: a failure can orphan bytes but never leave a row without bytes.
 - **Must treat bytes with no row as not stored**, so an orphan is never served as an image.
+- **Must offer a bulk put that groups image inserts, at most 100 per SQL request**, so storing many images doesn't spend one API request each. `Store.putImages` writes each group's bytes before its rows.
 - **Must test collisions two ways:** an injected hash function for the logic, and a committed pair of real images whose hashes collide at 53 bits. The test recomputes both hashes from the committed images. `pnpm find-collision` regenerates the pair, separately from the test run.
 
 ## Adapters
@@ -49,11 +50,11 @@ The store core runs unchanged locally and in the cloud, the way Hono does for HT
 - **Must limit the SQL interface to what every adapter supports**, so a statement that works locally also works on D1. It offers no transactions, and refuses transaction and `ATTACH` statements.
 - **Must check every statement and blob key in the interfaces, above the adapters**, so no adapter can skip a check. An adapter only executes, and the store accepts only the checked `Sql` and `Blobs`.
 - **Must enforce the 100 bound parameter limit in the SQL interface for every adapter**, so an oversized query fails locally rather than only on D1. A numbered parameter counts as SQLite counts it: `?101` needs 101 parameters, and a reused `?1` counts once.
-- **Must enforce the 100,000 byte statement limit in the SQL interface for every adapter**, for the same reason. Measured on real D1: 100,000 bytes runs, and 100,001 fails with `SQLITE_TOOBIG`.
+- **Must enforce the 100,000 byte statement limit in the SQL interface for every adapter**, for the same reason (rationale).
 - **Must use only numbered or anonymous parameters, never named ones**, since D1 does not support named parameters.
 - **Must bind exactly the parameters a statement uses, each a string or a finite number**, since SQLite silently binds a missing parameter to NULL.
 - **Must run one statement at a time**, since `node:sqlite` silently ignores everything after the first.
-- **Never allow a comment after a statement's closing semicolon**, since real D1 fails it with `SQL code did not contain a statement` where local SQLite runs it. A comment before the semicolon is fine on both.
+- **Never allow a comment after a statement's closing semicolon**, since real D1 fails on it where local SQLite runs it (rationale). A comment before the semicolon is fine on both.
 - **Must mark a statement idempotent only if running it again, after it may already have run, returns the same rows and changes nothing further.** An adapter may resend a statement after a failure that leaves its outcome unknown only if it is so marked. Everything the store sends is: the image insert returns the key the first run assigned, per [Image keys](#image-keys).
 - **Must write SQL that gives the same result whether a parameter arrives as a number or a string**, since the D1 REST API documents its parameters as strings. Integer parameters are wrapped in `CAST(?1 AS INTEGER)`.
 - **Must make blob put idempotent**, so a retry or a concurrent put of the same image is safe.
@@ -68,7 +69,7 @@ Neon stays outside these interfaces: accounts are Postgres and only ever in the 
 Source of truth: `store/src/adapters/d1-rest.ts`; tests in `store/test/d1-rest.test.ts` and, against real D1, `store/test/d1-rest.real.test.ts`.
 
 - **Must reach a project's D1 through the D1 REST API, with Web-standard APIs only**, so it runs in a Worker and in Node. Typecheck enforces this as it does for the core. Moving to a Worker binding replaces only this adapter (`docs/specs/system.md` → `platforms-upgrade`).
-- **Must send one `execute` as one REST request**, since every project shares one limit of 1,200 Cloudflare API requests per 5 minutes per user. D1 has no limit of its own on top: [Cloudflare's API limits page](https://developers.cloudflare.com/fundamentals/api/reference/limits/) names the APIs with separate limits, and D1 is not one, and [D1's limits page](https://developers.cloudflare.com/d1/platform/limits/) lists no request rate. D1 responses carry no `Ratelimit` headers, so a client cannot see what remains of the limit.
+- **Must send one `execute` as one REST request**, since every project shares one limit of 1,200 Cloudflare API requests per 5 minutes per user. No documented D1 limit sits on top of it, and a client cannot see what remains of it (rationale).
 - **Must back off and resend on HTTP 429, whatever the statements are**, since exceeding the limit blocks all API calls for 5 minutes and a 429 means the request never ran. It waits as long as `Retry-After` asks, or else a jittered doubling delay.
 - **Never wait out a block.** A 429 asking for longer than the longest allowed wait fails at once, reporting the wait.
 - **Must resend after a failure with an unknown outcome only if every statement is marked idempotent**, since the request may have committed with only its response lost. A network failure, a timeout, a 5xx, an unreadable response, and the errors [D1's docs](https://developers.cloudflare.com/d1/observability/debug-d1/) say to retry all count as unknown. If it cannot resend, it fails saying the statements may have taken effect.

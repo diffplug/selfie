@@ -4,15 +4,11 @@
 
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import { D1RestError } from "../src/adapters/d1-rest.ts";
-import {
-  imageInsertStatement,
-  initStoreSchema,
-  Sql,
-  type SqlRow,
-} from "../src/core/index.ts";
+import { imageInsertStatement, initStoreSchema, Sql, Store } from "../src/core/index.ts";
 import { describeSqlContract } from "./contract/sql-contract.ts";
 import { d1Harness, type D1Harness } from "./support/d1-harness.ts";
-import { withParamMode, type ImageRow } from "./support/sql-params.ts";
+import { hashOf, insertedKey, withParamMode, type ImageRow } from "./support/sql-params.ts";
+import { createTempStore } from "./support/temp-store.ts";
 
 const ENABLED = process.env.SELFIE_D1_CONTRACT === "1";
 
@@ -20,14 +16,6 @@ const ENABLED = process.env.SELFIE_D1_CONTRACT === "1";
 // one per request, a run would pass the 1,200 request limit by itself. Grouped like
 // this, each worker still interleaves with the others, batch by batch.
 const INSERTS_PER_REQUEST = 25;
-
-const keyOf = (rows: readonly SqlRow[] | undefined): number => {
-  const key = rows?.[0]?.key;
-  if (typeof key !== "number") throw new TypeError(`Key is not a number: ${String(key)}`);
-  return key;
-};
-
-const hashOf = (n: number) => n.toString(16).padStart(64, "0");
 
 const overlaps: number[] = [];
 
@@ -51,29 +39,26 @@ describe.skipIf(!ENABLED)("real D1 (opt-in: pnpm test:d1)", () => {
     return {
       connect: async () => connect(),
       insertConcurrently: async (workloads, mode) => {
-        const results: number[][] = [];
-        const peak = await measureOverlap(async () => {
-          results.push(
-            ...(await Promise.all(
-              workloads.map(async (rows: ImageRow[]) => {
-                const sql = new Sql(withParamMode(connect(), mode));
-                const keys: number[] = [];
-                for (let i = 0; i < rows.length; i += INSERTS_PER_REQUEST) {
-                  const chunk = rows.slice(i, i + INSERTS_PER_REQUEST);
-                  const batch = await sql.batch(
-                    chunk.map((row) => imageInsertStatement(row.hash, row.truncated)),
-                  );
-                  keys.push(...batch.map(keyOf));
-                }
-                return keys;
-              }),
-            )),
-          );
-        });
+        const { result, peak } = await measureOverlap(() =>
+          Promise.all(
+            workloads.map(async (rows: ImageRow[]) => {
+              const sql = new Sql(withParamMode(connect(), mode));
+              const keys: number[] = [];
+              for (let i = 0; i < rows.length; i += INSERTS_PER_REQUEST) {
+                const chunk = rows.slice(i, i + INSERTS_PER_REQUEST);
+                const batch = await sql.batch(
+                  chunk.map((row) => imageInsertStatement(row.hash, row.truncated)),
+                );
+                keys.push(...batch.map((rows) => insertedKey(rows)));
+              }
+              return keys;
+            }),
+          ),
+        );
         overlaps.push(peak);
         // Fails the contract test: it proves nothing unless the workers really overlap.
         expect(peak).toBeGreaterThan(1);
-        return results;
+        return result;
       },
       destroy: () => sweep(),
     };
@@ -96,15 +81,15 @@ describe.skipIf(!ENABLED)("real D1 (opt-in: pnpm test:d1)", () => {
       const WORKERS = 4;
       const PER_WORKER = 5;
       const owners = new Map<number, number>();
-      await new Sql(harness.connect()).runStatement(imageInsertStatement(hashOf(1), 500));
+      await new Sql(harness.connect()).run(imageInsertStatement(hashOf(1), 500));
 
-      const peak = await harness.measureOverlap(async () => {
+      const { peak } = await harness.measureOverlap(async () => {
         await Promise.all(
           Array.from({ length: WORKERS }, async (_, worker) => {
             const sql = new Sql(harness.connect());
             for (let i = 0; i < PER_WORKER; i++) {
               const statement = imageInsertStatement(hashOf(100 * (worker + 1) + i), 500);
-              owners.set(keyOf(await sql.runStatement(statement)), worker);
+              owners.set(insertedKey(await sql.run(statement)), worker);
             }
           }),
         );
@@ -128,15 +113,34 @@ describe.skipIf(!ENABLED)("real D1 (opt-in: pnpm test:d1)", () => {
           return response;
         }),
       );
-      const rows = await sql.runStatement(imageInsertStatement(hashOf(1), 500));
-      expect(keyOf(rows)).toBe(500);
+      const rows = await sql.run(imageInsertStatement(hashOf(1), 500));
+      expect(insertedKey(rows)).toBe(500);
       expect(lost).toBe(2);
-      const stored = await new Sql(harness.connect()).run("SELECT key FROM images");
+      const stored = await new Sql(harness.connect()).run({ sql: "SELECT key FROM images" });
       expect(stored).toEqual([{ key: 500 }]);
     });
 
+    it("stores many images in a few requests through Store.putImages", async () => {
+      const temp = await createTempStore();
+      try {
+        const store = new Store({ sql: new Sql(harness.connect()), blob: temp.blob });
+        const images = Array.from({ length: 205 }, (_, i) => ({
+          width: 1,
+          height: 1,
+          pixels: new Uint8Array([i & 255, i >> 8, 0, 255]),
+        }));
+        const before = harness.requests;
+        const stored = await store.putImages(images);
+        expect(harness.requests - before).toBe(3);
+        expect(new Set(stored.map(({ key }) => key)).size).toBe(205);
+        expect(await store.lookupKey(stored[204]!.hash)).toBe(stored[204]!.key);
+      } finally {
+        await temp.destroy();
+      }
+    });
+
     it("rejects with D1's own message and no token", async () => {
-      const error = await new Sql(harness.connect()).run("SELEKT 1").catch((e: unknown) => e);
+      const error = await new Sql(harness.connect()).run({ sql: "SELEKT 1" }).catch((e: unknown) => e);
       expect(error).toBeInstanceOf(D1RestError);
       const { message, codes, status, attempts } = error as D1RestError;
       expect(message).toContain("syntax error");

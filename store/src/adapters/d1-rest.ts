@@ -16,8 +16,6 @@ export interface D1RestConfig {
   /** Defaults to the platform's `fetch`. */
   readonly fetch?: typeof fetch;
   readonly retry?: Partial<D1RestRetryOptions>;
-  /** How long one attempt may take before it counts as a network failure. */
-  readonly requestTimeoutMs?: number;
   /** Defaults to `setTimeout`. Tests inject one to observe the backoff without waiting. */
   readonly sleep?: (ms: number) => Promise<void>;
 }
@@ -26,7 +24,7 @@ const DEFAULT_RETRY: D1RestRetryOptions = { maxAttempts: 4, baseDelayMs: 1_000, 
 
 // Cloudflare resolves an API request within 30 seconds, so this only trips on a
 // request that is already lost.
-const DEFAULT_REQUEST_TIMEOUT_MS = 35_000;
+const REQUEST_TIMEOUT_MS = 35_000;
 
 // The messages Cloudflare's D1 docs say to retry, which say nothing of whether a
 // write took effect: https://developers.cloudflare.com/d1/observability/debug-d1/
@@ -79,18 +77,8 @@ interface Failure {
 
 /**
  * SQL through the D1 REST API, using only Web-standard APIs so it runs in a
- * Worker and in Node. One `execute` is one REST request, retries aside.
- *
- * Retries are bounded by `D1RestRetryOptions`, and depend on what the failure
- * says about the request:
- * - A 429 means it never ran, so it is resent whatever it holds, after
- *   `Retry-After` if Cloudflare sent one and otherwise after a jittered doubling
- *   delay. A wait longer than `maxDelayMs` is the 5 minute block, which no retry
- *   can outlast, so that fails at once with `retryAfterMs` set.
- * - A network failure, timeout, 5xx, unreadable response, or D1's transient
- *   errors leave the outcome unknown: the request may have committed with only
- *   its response lost. It is resent only if every statement is `idempotent`.
- * - Anything else, such as a SQL error or a bad token, fails at once.
+ * Worker and in Node. One `execute` is one REST request, retries aside. What it
+ * resends, and when, is in `docs/specs/store.md` -> "D1 REST adapter".
  */
 export class D1RestAdapter implements SqlAdapter {
   readonly #url: string;
@@ -98,7 +86,6 @@ export class D1RestAdapter implements SqlAdapter {
   readonly #token: string;
   readonly #fetch: typeof fetch;
   readonly #retry: D1RestRetryOptions;
-  readonly #requestTimeoutMs: number;
   readonly #sleep: (ms: number) => Promise<void>;
 
   constructor(config: D1RestConfig) {
@@ -117,7 +104,6 @@ export class D1RestAdapter implements SqlAdapter {
     const platformFetch = config.fetch ?? globalThis.fetch;
     this.#fetch = (input, init) => platformFetch(input, init);
     this.#retry = { ...DEFAULT_RETRY, ...config.retry };
-    this.#requestTimeoutMs = config.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
     this.#sleep = config.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
   }
 
@@ -165,7 +151,7 @@ export class D1RestAdapter implements SqlAdapter {
           "Content-Type": "application/json",
         },
         body,
-        signal: AbortSignal.timeout(this.#requestTimeoutMs),
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
       text = await response.text();
     } catch (error) {
@@ -177,40 +163,31 @@ export class D1RestAdapter implements SqlAdapter {
     const codes = errors.flatMap(({ code }) => (typeof code === "number" ? [code] : []));
     const status = response.status;
     const detail = errors.length > 0 ? describeErrors(errors) : snippet(text);
+    const fail = (kind: Failure["kind"], reason = detail, retryAfterMs?: number): Failure => ({
+      kind,
+      detail: reason,
+      status,
+      codes,
+      retryAfterMs,
+    });
 
     if (status === 429) {
-      const retryAfterMs = parseRetryAfter(response.headers.get("Retry-After"));
-      return {
-        kind: "rejected",
-        detail,
-        status,
-        codes,
-        ...(retryAfterMs === undefined ? {} : { retryAfterMs }),
-      };
+      return fail("rejected", detail, parseRetryAfter(response.headers.get("Retry-After")));
     }
-    if (status >= 500) return { kind: "unknown", detail, status, codes };
-    if (TRANSIENT_D1_MESSAGES.some((message) => detail.includes(message))) {
-      return { kind: "unknown", detail, status, codes };
+    if (status >= 500 || TRANSIENT_D1_MESSAGES.some((message) => detail.includes(message))) {
+      return fail("unknown");
     }
-    if (!response.ok || payload?.success === false) {
-      return { kind: "final", detail, status, codes };
-    }
+    if (!response.ok || payload?.success === false) return fail("final");
     if (payload === undefined || !Array.isArray(payload.result)) {
-      return { kind: "unknown", detail: `Unreadable response: ${snippet(text)}`, status, codes };
+      return fail("unknown", `Unreadable response: ${snippet(text)}`);
     }
 
-    const failed = payload.result.find((result) => result.success === false);
-    if (failed !== undefined) {
-      return { kind: "final", detail: "D1 reported a failed statement", status, codes };
+    if (payload.result.some((result) => result.success === false)) {
+      return fail("final", "D1 reported a failed statement");
     }
     // Would mean D1 split a statement in two, so the rows can't be matched to statements.
     if (payload.result.length !== expected) {
-      return {
-        kind: "final",
-        detail: `Sent ${expected} statements but got ${payload.result.length} results`,
-        status,
-        codes,
-      };
+      return fail("final", `Sent ${expected} statements but got ${payload.result.length} results`);
     }
     return { rows: payload.result.map((result) => result.results ?? []) };
   }

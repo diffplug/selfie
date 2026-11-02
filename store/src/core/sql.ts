@@ -49,12 +49,7 @@ export class Sql {
     this.#adapter = adapter;
   }
 
-  async run(sql: string, params: readonly SqlParam[] = []): Promise<SqlRow[]> {
-    return this.runStatement({ sql, params });
-  }
-
-  /** Like `run`, for a statement that says more about itself than its text. */
-  async runStatement(statement: SqlStatement): Promise<SqlRow[]> {
+  async run(statement: SqlStatement): Promise<SqlRow[]> {
     const [rows] = await this.batch([statement]);
     return rows ?? [];
   }
