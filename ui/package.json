@@ -10,6 +10,8 @@
   },
   "scripts": {
     "build": "vite build",
+    "build-storybook": "storybook build --quiet",
+    "storybook": "storybook dev -p 6007",
     "prepare": "vite build",
     "test": "pnpm typecheck && vite build --logLevel warn && vitest run",
     "typecheck": "tsc -p tsconfig.json"
@@ -23,6 +25,7 @@
     "@primer/octicons-react": "19.42.0",
     "@primer/primitives": "11.10.0",
     "@primer/react": "38.43.0",
+    "@storybook/react-vite": "10.6.5",
     "@types/node": "catalog:",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
@@ -31,6 +34,7 @@
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "react-is": "19.3.1",
+    "storybook": "10.6.5",
     "typescript": "catalog:",
     "vite": "8.3.5",
     "vitest": "catalog:"

@@ -22,7 +22,7 @@ function chunk(type: string, body: Buffer): Buffer {
 }
 
 /** An 8-bit RGB PNG of these pixels, in the narrow form `decodeImage` accepts. */
-export async function encodePng({ width, height, pixels }: RawImage): Promise<Uint8Array> {
+export async function encodePng({ width, height, pixels }: RawImage, level: number = DEFLATE_LEVEL): Promise<Uint8Array> {
   const rowBytes = width * 3;
   const scanlines = Buffer.alloc((rowBytes + 1) * height);
   for (let y = 0; y < height; y++) {
@@ -37,7 +37,7 @@ export async function encodePng({ width, height, pixels }: RawImage): Promise<Ui
   return Buffer.concat([
     SIGNATURE,
     chunk("IHDR", header),
-    chunk("IDAT", await deflateAsync(scanlines, { level: DEFLATE_LEVEL })),
+    chunk("IDAT", await deflateAsync(scanlines, { level })),
     chunk("IEND", Buffer.alloc(0)),
   ]);
 }

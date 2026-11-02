@@ -1,5 +1,5 @@
 import { Heading } from "@primer/react";
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
 import { fetchCurrent } from "./api.ts";
 import { AcceptScreen } from "./AcceptScreen.tsx";
 import { DetailScreen } from "./DetailScreen.tsx";
@@ -38,14 +38,8 @@ function RunRoutes({ runId, route, search }: { runId: string; route: Route; sear
   }
 }
 
-export function App() {
-  const { pathname, search } = useLocation();
-  const route = parseRoute(pathname);
-  // A new page starts at the top, and a filter changing the query isn't one. A layout effect, so a
-  // screen's own effects can still move focus somewhere further down.
-  useLayoutEffect(() => {
-    window.scrollTo(0, 0);
-  }, [pathname]);
+/** Around every screen. */
+export function Page({ children }: { readonly children: ReactNode }) {
   return (
     <div className="selfie-page">
       <header className="selfie-header">
@@ -55,13 +49,26 @@ export function App() {
           </AppLink>
         </Heading>
       </header>
-      <main className="selfie-main">
-        {route.kind === "home" && <Home />}
-        {route.kind === "missing" && <NotFound />}
-        {(route.kind === "run" || route.kind === "story" || route.kind === "accept") && (
-          <RunRoutes key={route.runId} runId={route.runId} route={route} search={search} />
-        )}
-      </main>
+      <main className="selfie-main">{children}</main>
     </div>
+  );
+}
+
+export function App() {
+  const { pathname, search } = useLocation();
+  const route = parseRoute(pathname);
+  // A new page starts at the top, and a filter changing the query isn't one. A layout effect, so a
+  // screen's own effects can still move focus somewhere further down.
+  useLayoutEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+  return (
+    <Page>
+      {route.kind === "home" && <Home />}
+      {route.kind === "missing" && <NotFound />}
+      {(route.kind === "run" || route.kind === "story" || route.kind === "accept") && (
+        <RunRoutes key={route.runId} runId={route.runId} route={route} search={search} />
+      )}
+    </Page>
   );
 }
