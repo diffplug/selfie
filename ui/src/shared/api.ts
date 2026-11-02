@@ -12,10 +12,10 @@ export interface BoundingBox {
   readonly height: number;
 }
 
-/** Rows of each image that correspond, and differ. Everything outside a region matches. */
+/** Rectangles of each image that correspond, and differ. Everything outside a region matches. */
 export interface ChangedRegion {
-  readonly current: { readonly y: number; readonly height: number };
-  readonly golden: { readonly y: number; readonly height: number };
+  readonly current: BoundingBox;
+  readonly golden: BoundingBox;
 }
 
 export interface PixelDiff {

@@ -154,7 +154,7 @@ describe("comparing with a baseline", () => {
     expect(difference.pixelDiff).toEqual({
       current: { width: 8, height: 8 },
       golden: { width: 8, height: 8 },
-      regions: [{ current: { y: 3, height: 2 }, golden: { y: 3, height: 2 } }],
+      regions: [{ current: { x: 0, y: 3, width: 8, height: 2 }, golden: { x: 0, y: 3, width: 8, height: 2 } }],
       changedPixels: 8,
       totalPixels: 64,
       boundingBox: { x: 2, y: 3, width: 4, height: 2 },

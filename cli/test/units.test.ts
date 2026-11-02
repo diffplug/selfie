@@ -155,7 +155,7 @@ describe("diffImages", () => {
     expect(diff).toEqual({
       current: { width: 4, height: 3 },
       golden: { width: 4, height: 3 },
-      regions: [{ current: { y: 1, height: 2 }, golden: { y: 1, height: 2 } }],
+      regions: [{ current: { x: 0, y: 1, width: 4, height: 2 }, golden: { x: 0, y: 1, width: 4, height: 2 } }],
       changedPixels: 2,
       totalPixels: 12,
       boundingBox: { x: 1, y: 1, width: 3, height: 2 },
@@ -170,6 +170,11 @@ describe("diffImages", () => {
     expect(r!).toBeGreaterThanOrEqual(190);
   });
 
+  /** A region as wide as each image, as today's are. */
+  const rowRegion = (width: number, current: [number, number], golden: [number, number], goldenWidth = width) => ({
+    current: { x: 0, y: current[0], width, height: current[1] },
+    golden: { x: 0, y: golden[0], width: goldenWidth, height: golden[1] },
+  });
   /** Rows of solid color, from one letter each. */
   const rowsOf = (width: number, colors: string) => {
     const palette: Record<string, Color> = { r: RED, g: GREEN, b: BLUE, k: [0, 0, 0] };
@@ -186,7 +191,7 @@ describe("diffImages", () => {
     expect(diff).toMatchObject({
       current: { width: 2, height: 4 },
       golden: { width: 2, height: 3 },
-      regions: [{ current: { y: 2, height: 1 }, golden: { y: 2, height: 0 } }],
+      regions: [rowRegion(2, [2, 1], [2, 0])],
       changedPixels: 2,
       totalPixels: 8,
       boundingBox: { x: 0, y: 2, width: 2, height: 1 },
@@ -199,7 +204,7 @@ describe("diffImages", () => {
   test("removing a row counts what's gone, and marks the seam it left", () => {
     const { diff, highlighted } = diffImages(rowsOf(2, "rgb"), rowsOf(2, "rgkb"));
     expect(diff).toMatchObject({
-      regions: [{ current: { y: 2, height: 0 }, golden: { y: 2, height: 1 } }],
+      regions: [rowRegion(2, [2, 0], [2, 1])],
       changedPixels: 2,
       totalPixels: 8,
       boundingBox: { x: 0, y: 2, width: 2, height: 1 },
@@ -217,15 +222,15 @@ describe("diffImages", () => {
 
   test("a changed band of a different height compares from its top, and the rest is changed", () => {
     const { diff, highlighted } = diffImages(rowsOf(1, "rkkkb"), rowsOf(1, "rgb"));
-    expect(diff).toMatchObject({ regions: [{ current: { y: 1, height: 3 }, golden: { y: 1, height: 1 } }], changedPixels: 3 });
+    expect(diff).toMatchObject({ regions: [rowRegion(1, [1, 3], [1, 1])], changedPixels: 3 });
     expect(diff.maxChannelDelta).toBeGreaterThan(0);
     expect(highlightedRows(highlighted)).toEqual([1, 2, 3]);
   });
 
   test("repeated rows can't match twice over", () => {
     const { diff } = diffImages(rowsOf(1, "rrr"), rowsOf(1, "rr"));
-    expect(diff).toMatchObject({ regions: [{ current: { y: 2, height: 1 }, golden: { y: 2, height: 0 } }], changedPixels: 1 });
-    expect(diffImages(rowsOf(1, "rr"), rowsOf(1, "rrr")).diff).toMatchObject({ regions: [{ current: { y: 2, height: 0 }, golden: { y: 2, height: 1 } }], changedPixels: 1 });
+    expect(diff).toMatchObject({ regions: [rowRegion(1, [2, 1], [2, 0])], changedPixels: 1 });
+    expect(diffImages(rowsOf(1, "rr"), rowsOf(1, "rrr")).diff).toMatchObject({ regions: [rowRegion(1, [2, 0], [2, 1])], changedPixels: 1 });
   });
 
   test("identical images change nothing", () => {
@@ -236,7 +241,7 @@ describe("diffImages", () => {
 
   test("different widths match no row, and compare from the top left", () => {
     const wider = diffImages(rowsOf(3, "rg"), rowsOf(2, "rg")).diff;
-    expect(wider).toMatchObject({ regions: [{ current: { y: 0, height: 2 }, golden: { y: 0, height: 2 } }], changedPixels: 2, totalPixels: 6, boundingBox: { x: 2, y: 0, width: 1, height: 2 } });
+    expect(wider).toMatchObject({ regions: [rowRegion(3, [0, 2], [0, 2], 2)], changedPixels: 2, totalPixels: 6, boundingBox: { x: 2, y: 0, width: 1, height: 2 } });
     const narrower = diffImages(rowsOf(2, "rg"), rowsOf(3, "rg")).diff;
     expect(narrower).toMatchObject({ changedPixels: 2, totalPixels: 6 });
     // Nothing visible changed here, so it marks where.
@@ -245,7 +250,7 @@ describe("diffImages", () => {
 
   test("different sizes in both directions still give a diff", () => {
     const { diff, highlighted } = diffImages(solid(4, 3, RED), solid(3, 4, BLUE));
-    expect(diff).toMatchObject({ current: { width: 4, height: 3 }, golden: { width: 3, height: 4 }, regions: [{ current: { y: 0, height: 3 }, golden: { y: 0, height: 4 } }] });
+    expect(diff).toMatchObject({ current: { width: 4, height: 3 }, golden: { width: 3, height: 4 }, regions: [rowRegion(4, [0, 3], [0, 4], 3)] });
     expect(highlighted.height).toBe(3);
   });
 

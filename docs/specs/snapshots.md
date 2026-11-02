@@ -135,6 +135,7 @@ A decision is on a name and a whole image today ([Decisions](#decisions)). **Sco
 
 - Keyed by the content of both sides of a region, never by its position or by what the aligner made of it, so a shift or a better aligner doesn't orphan an approval.
 - With the change it belongs to, as a branch and when it started, so an approval doesn't carry to another pull request.
+- Taking any set of an image's regions, and approving their union, so a person can undo a split the differ got wrong, with no special case for one region or for all of them.
 - With acceptance worked out from whether every region of an image is approved. A removed story becomes a region with no `after`, in place of the `--removed` count.
 
 ### Storing only what changed

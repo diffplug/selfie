@@ -99,7 +99,7 @@ A review of a named run starts at step 6. `selfie record` is steps 1 to 5, alway
 - **Must keep `--baseline` to this one review.** It changes nothing about the run: `selfie approve` and `selfie accept` still compare with the baseline the run recorded, its exports go under `runs/<run id>/against/<baseline>/`, and `review.json` isn't written. It exits 1 if anything differs, even when every image is approved, since the question was what differs (rationale).
 - **Must do diff work only on a `changed` snapshot.** A `new` or `removed` one exports its one image, and an unchanged one nothing, unless it has an advisory.
 - **Must write every exported image as a PNG, whatever the store keeps**, so a document's paths stay what they say and any agent can open them.
-- **Must report what changed as regions:** rows of each image that correspond and differ, with everything outside them matching (rationale). Today there's at most one, from the edges inward: rows that match from the top, then from the bottom, are outside it, so adding a row marks only that row. Rows compare whole, so with different widths none match.
+- **Must report what changed as regions:** rectangles of each image that correspond and differ, with everything outside them matching (rationale). Today there's at most one, as wide as the image, from the edges inward: rows that match from the top, then from the bottom, are outside it, so adding a row marks only that row. Rows compare whole, so with different widths none match.
 - **Must compare a region's pixels from its top left, and count what only one image has as changed**, whether rows or columns, so images of any two sizes have stats and a diff image.
 - **Must mark a seam for a region whose only change is what was removed**, one highlighted row where it was, so every region has a place in the current image.
 - **Must make the diff image from the current image, faded to light gray, with changed pixels solid `#ff0050`.**
@@ -168,7 +168,7 @@ Every path is absolute, and names a file that exists until it is pruned.
 | `warnings[]` | The manifest's |
 | `next[]` | What to do next, in words and commands |
 
-`pixelDiff` is `{ current, golden, regions, changedPixels, totalPixels, boundingBox, firstChanged, maxChannelDelta }`, where `current` and `golden` are each image's `width` and `height`, each of `regions` is `{ current, golden }` with that image's `y` and `height`, `totalPixels` is the larger image's, `changedPixels` includes what only the golden has, `firstChanged` is the first changed pixel in reading order, and `maxChannelDelta` is 0 if no pixel compared. It is null unless `changed`.
+`pixelDiff` is `{ current, golden, regions, changedPixels, totalPixels, boundingBox, firstChanged, maxChannelDelta }`, where `current` and `golden` are each image's `width` and `height`, each of `regions` is `{ current, golden }`, each with that image's `x`, `y`, `width`, and `height`, `totalPixels` is the larger image's, `changedPixels` includes what only the golden has, `firstChanged` is the first changed pixel in reading order, and `maxChannelDelta` is 0 if no pixel compared. It is null unless `changed`.
 
 - **Must keep a difference's hashes**, so a UI can cache images by content.
 - **Must say, when the baseline is null and HEAD isn't the merge-base, that goldens accepted on this branch only show later reviews here what changed, and that a baseline takes accepting on the default branch**, since its merge-base may not have these stories yet.
@@ -287,11 +287,13 @@ Story IDs come from a project's build, and a manifest's paths from a directory i
 
 ### Regions
 
-One region covers everything between the first and last difference, so a page with a change near the top and rows shifted near the bottom compares everything between them from the top, and the shifted rows ghost like a double exposure. To split it:
+One region covers everything between the first and last difference, so a page with a change near the top and rows shifted near the bottom compares everything between them from the top, and the shifted rows ghost like a double exposure. To split it, a recursive 9-slice:
 
-- Align rows inside the band, anchored on rows unique to each image, since blank space and borders repeat, and exact matching on those would split a change into slivers that each need an approval.
-- A replaced span compares as a region does now, an inserted one is all highlight, and a deleted one is a seam.
-- Decisions on regions, where approving a whole image is approving its one region (`docs/specs/snapshots.md` → Future).
+- Trim matching rows and columns from all four sides, so what's left is the center, and every outer cell matches.
+- Cut the center at a long span of rows or columns that's identical in both images and appears once in each, since table rows, blank space, and borders repeat. Slice each side again.
+- Merge regions separated only by a sliver, so one change isn't several approvals.
+- A replaced part compares as a region does now, an inserted one is all highlight, and a deleted one is a seam.
+- Decisions on regions, where someone may select several and approve their union, and a whole-image approval is just the case of one region (`docs/specs/snapshots.md` → Future).
 
 ### A render that does change
 

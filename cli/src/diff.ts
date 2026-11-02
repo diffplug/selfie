@@ -31,9 +31,9 @@ function rowsMatch(current: RawImage, currentRow: number, golden: RawImage, gold
 }
 
 /**
- * Which rows of each image correspond, and differ: from the edges inward, what's left between the
- * rows that match from the top and from the bottom. So today there's at most one region, and with
- * different widths no row can match, so it's the whole of both images.
+ * Which parts of each image correspond, and differ: from the edges inward, what's left between the
+ * rows that match from the top and from the bottom. So today there's at most one region, as wide
+ * as the image, and with different widths no row can match, so it's the whole of both images.
  */
 function alignRows(current: RawImage, golden: RawImage): readonly ChangedRegion[] {
   const shared = Math.min(current.height, golden.height);
@@ -44,8 +44,8 @@ function alignRows(current: RawImage, golden: RawImage): readonly ChangedRegion[
     while (below < shared - above && rowsMatch(current, current.height - 1 - below, golden, golden.height - 1 - below)) below += 1;
   }
   const region = {
-    current: { y: above, height: current.height - above - below },
-    golden: { y: above, height: golden.height - above - below },
+    current: { x: 0, y: above, width: current.width, height: current.height - above - below },
+    golden: { x: 0, y: above, width: golden.width, height: golden.height - above - below },
   };
   return region.current.height === 0 && region.golden.height === 0 ? [] : [region];
 }
