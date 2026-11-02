@@ -6,7 +6,8 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import { D1RestError } from "../src/adapters/d1-rest.ts";
 import { imageInsertStatement, initStoreSchema, Sql, Store } from "../src/core/index.ts";
 import { describeSqlContract } from "./contract/sql-contract.ts";
-import { d1Harness, type D1Harness } from "./support/d1-harness.ts";
+import type { D1Harness } from "./support/d1-harness.ts";
+import { d1Harness } from "./support/real-d1.ts";
 import { hashOf, insertedKey, withParamMode, type ImageRow } from "./support/sql-params.ts";
 import { createTempStore } from "./support/temp-store.ts";
 

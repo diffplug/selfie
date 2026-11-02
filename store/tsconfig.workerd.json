@@ -1,0 +1,11 @@
+// Checks the tests that run inside workerd with the Workers runtime's types and no
+// Node types, which also confirms a real `R2Bucket` satisfies `R2BucketLike`.
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2023"],
+    "types": ["@cloudflare/workers-types", "@cloudflare/vitest-plugin/types"]
+  },
+  "include": ["test/workerd"],
+  "exclude": []
+}

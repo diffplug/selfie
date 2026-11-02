@@ -10,6 +10,7 @@
   "scripts": {
     "test": "pnpm -r test",
     "test:d1": "pnpm --filter selfie-store test:d1",
+    "test:d1:workerd": "pnpm --filter selfie-store test:d1:workerd",
     "typecheck": "pnpm -r typecheck",
     "find-collision": "pnpm --filter selfie-store find-collision"
   }

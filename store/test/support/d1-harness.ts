@@ -1,16 +1,26 @@
 import { D1RestAdapter, type D1RestConfig } from "../../src/adapters/d1-rest.ts";
 import { Sql, type SqlAdapter } from "../../src/core/index.ts";
-import { CONTRACT_DATABASE_ID, loadD1Credentials } from "./d1-credentials.ts";
 
-// One real run sends about 400 requests against Cloudflare's 1,200 per 5 minutes,
-// and going over blocks all API calls for 5 minutes. This stops a run that has gone
-// wrong well before that. It doesn't protect repeated runs: don't loop this suite.
-const REQUEST_BUDGET = 600;
+export interface D1HarnessConfig {
+  readonly accountId: string;
+  readonly databaseId: string;
+  readonly token: string;
+  /**
+   * Going over Cloudflare's 1,200 requests per 5 minutes blocks all API calls for 5
+   * minutes. This stops a run that has gone wrong well before that. It doesn't protect
+   * repeated runs: don't loop these suites.
+   */
+  readonly budget: number;
+}
 
 /** Wiring for tests against the real contract database, and a count of what they send. */
 export interface D1Harness {
-  /** A new adapter, and so a new connection. `wrap` sits between it and the counted fetch. */
-  connect(wrap?: (next: typeof fetch) => typeof fetch): SqlAdapter;
+  /**
+   * A new adapter, and so a new connection. `wrap` sits between it and the counted
+   * fetch. `overrides` replace any of its config, leaving a request uncounted if they
+   * replace `fetch`.
+   */
+  connect(wrap?: (next: typeof fetch) => typeof fetch, overrides?: Partial<D1RestConfig>): SqlAdapter;
   /** Drops every table except D1's own, leaving the database empty. */
   sweep(): Promise<void>;
   /** Runs `work`, also returning the most requests that were in flight at once during it. */
@@ -20,16 +30,7 @@ export interface D1Harness {
   readonly requests: number;
 }
 
-let shared: Promise<D1Harness> | undefined;
-
-/** The one harness of this process, so its budget covers the whole run. */
-export function d1Harness(): Promise<D1Harness> {
-  shared ??= createHarness();
-  return shared;
-}
-
-async function createHarness(): Promise<D1Harness> {
-  const { accountId, token } = await loadD1Credentials();
+export function createD1Harness({ accountId, databaseId, token, budget }: D1HarnessConfig): D1Harness {
   let requests = 0;
   let inFlight = 0;
   let peak = 0;
@@ -37,8 +38,8 @@ async function createHarness(): Promise<D1Harness> {
 
   const counted: typeof fetch = async (input, init) => {
     if (stopped !== undefined) throw new Error(stopped);
-    if (requests >= REQUEST_BUDGET) {
-      stopped = `Stopped real-D1 run at its budget of ${REQUEST_BUDGET} requests`;
+    if (requests >= budget) {
+      stopped = `Stopped real-D1 run at its budget of ${budget} requests`;
       throw new Error(stopped);
     }
     requests++;
@@ -54,17 +55,16 @@ async function createHarness(): Promise<D1Harness> {
     }
   };
 
-  const connect = (wrap: (next: typeof fetch) => typeof fetch = (next) => next): SqlAdapter => {
-    const config: D1RestConfig = {
+  const connect: D1Harness["connect"] = (wrap = (next) => next, overrides = {}) =>
+    new D1RestAdapter({
       accountId,
-      databaseId: CONTRACT_DATABASE_ID,
+      databaseId,
       token,
       fetch: wrap(counted),
       // A real 429 here means the run is over budget, so fail rather than wait.
       retry: { maxAttempts: 2, baseDelayMs: 200 },
-    };
-    return new D1RestAdapter(config);
-  };
+      ...overrides,
+    });
 
   return {
     connect,

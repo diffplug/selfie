@@ -16,6 +16,8 @@ export interface D1RestConfig {
   /** Defaults to the platform's `fetch`. */
   readonly fetch?: typeof fetch;
   readonly retry?: Partial<D1RestRetryOptions>;
+  /** How long one attempt may take before it counts as a network failure. */
+  readonly requestTimeoutMs?: number;
   /** Defaults to `setTimeout`. Tests inject one to observe the backoff without waiting. */
   readonly sleep?: (ms: number) => Promise<void>;
 }
@@ -24,7 +26,7 @@ const DEFAULT_RETRY: D1RestRetryOptions = { maxAttempts: 4, baseDelayMs: 1_000, 
 
 // Cloudflare resolves an API request within 30 seconds, so this only trips on a
 // request that is already lost.
-const REQUEST_TIMEOUT_MS = 35_000;
+const DEFAULT_REQUEST_TIMEOUT_MS = 35_000;
 
 // The messages Cloudflare's D1 docs say to retry, which say nothing of whether a
 // write took effect: https://developers.cloudflare.com/d1/observability/debug-d1/
@@ -86,6 +88,7 @@ export class D1RestAdapter implements SqlAdapter {
   readonly #token: string;
   readonly #fetch: typeof fetch;
   readonly #retry: D1RestRetryOptions;
+  readonly #requestTimeoutMs: number;
   readonly #sleep: (ms: number) => Promise<void>;
 
   constructor(config: D1RestConfig) {
@@ -104,6 +107,7 @@ export class D1RestAdapter implements SqlAdapter {
     const platformFetch = config.fetch ?? globalThis.fetch;
     this.#fetch = (input, init) => platformFetch(input, init);
     this.#retry = { ...DEFAULT_RETRY, ...config.retry };
+    this.#requestTimeoutMs = config.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
     this.#sleep = config.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
   }
 
@@ -151,7 +155,7 @@ export class D1RestAdapter implements SqlAdapter {
           "Content-Type": "application/json",
         },
         body,
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        signal: AbortSignal.timeout(this.#requestTimeoutMs),
       });
       text = await response.text();
     } catch (error) {

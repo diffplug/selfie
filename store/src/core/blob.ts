@@ -17,7 +17,14 @@ export interface BlobStorage {
 // Lowercase because local filesystems may fold case. Each segment starts with a
 // letter or digit, so a key can't climb out of a directory or name a hidden
 // path such as an adapter's temp directory.
-const BLOB_KEY = /^[a-z0-9][a-z0-9._-]*(?:\/[a-z0-9][a-z0-9._-]*)*$/;
+const SEGMENT = "[a-z0-9][a-z0-9._-]*";
+const BLOB_KEY_SEGMENT = new RegExp(`^${SEGMENT}$`);
+const BLOB_KEY = new RegExp(`^${SEGMENT}(?:/${SEGMENT})*$`);
+
+/** Whether this is one segment of a blob key, with no `/`. */
+export function isBlobKeySegment(text: string): boolean {
+  return BLOB_KEY_SEGMENT.test(text);
+}
 
 function assertBlobKey(key: string): void {
   if (!BLOB_KEY.test(key)) {
