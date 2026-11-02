@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  Blobs,
   encodePam,
   Sql,
   sha256,
@@ -173,20 +174,20 @@ describe("Store", () => {
             return statements.map(() => [{ key: 1 }]);
           },
         }),
-        blob: {
+        blob: new Blobs({
           has: async () => false,
           get: async () => null,
           put: async () => {
             events.push("blob");
           },
-        },
+        }),
       });
       await store.putImage(image(1));
       expect(events).toEqual(["blob", "sql"]);
     });
 
     it("leaves no row when the blob write fails", async () => {
-      const store = new Store({ sql: temp.sql, blob: failingBlob(temp.blob) });
+      const store = new Store({ sql: temp.sql, blob: new Blobs(failingBlob(temp.blob)) });
       await expect(store.putImage(image(1))).rejects.toThrow("blob down");
       expect(await temp.sql.run("SELECT key FROM images")).toEqual([]);
     });

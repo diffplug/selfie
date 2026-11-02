@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { FilesystemBlobStorage } from "../src/adapters/filesystem-blob.ts";
+import { Blobs } from "../src/core/index.ts";
 
 const PUT_PROCESS = fileURLToPath(new URL("./support/put-blob-process.ts", import.meta.url));
 const BLOB_SIZE = 256 * 1024 * 1024;
@@ -85,7 +86,7 @@ describe("FilesystemBlobStorage", () => {
   });
 
   it("does not write outside the root for a refused key", async () => {
-    await expect(blob.put("../escape", new Uint8Array([1]))).rejects.toThrow(RangeError);
+    await expect(new Blobs(blob).put("../escape", new Uint8Array([1]))).rejects.toThrow(RangeError);
     expect(existsSync(join(root, "..", "escape"))).toBe(false);
   });
 

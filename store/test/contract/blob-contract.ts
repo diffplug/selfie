@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { BlobStorage } from "../../src/core/index.ts";
+import { Blobs, type BlobStorage } from "../../src/core/index.ts";
 
 /** One empty blob store, created for one test. */
 export interface BlobTestStore {
@@ -23,11 +23,11 @@ function patterned(length: number): Uint8Array {
 export function describeBlobContract(name: string, factory: BlobAdapterFactory): void {
   describe(`blob contract: ${name}`, () => {
     let store: BlobTestStore;
-    let blob: BlobStorage;
+    let blob: Blobs;
 
     beforeEach(async () => {
       store = await factory();
-      blob = await store.open();
+      blob = new Blobs(await store.open());
     });
 
     afterEach(async () => {
@@ -81,21 +81,23 @@ export function describeBlobContract(name: string, factory: BlobAdapterFactory):
     });
 
     it("is visible through another client", async () => {
-      const other = await store.open();
+      const other = new Blobs(await store.open());
       await blob.put("images/a", bytesOf(1, 2));
       expect(await other.get("images/a")).toEqual(bytesOf(1, 2));
     });
 
     it("survives concurrent puts of the same key through separate clients", async () => {
       const bytes = patterned(256 * 1024);
-      const clients = await Promise.all(Array.from({ length: 8 }, () => store.open()));
+      const clients = await Promise.all(
+        Array.from({ length: 8 }, async () => new Blobs(await store.open())),
+      );
       await Promise.all(clients.map((client) => client.put("images/a", bytes)));
       expect(await blob.get("images/a")).toEqual(bytes);
     });
 
     it("never shows a partial blob to a concurrent reader", async () => {
       const bytes = patterned(4 * 1024 * 1024);
-      const reader = await store.open();
+      const reader = new Blobs(await store.open());
       let finished = false;
       const reads = (async () => {
         const seen: (number | null)[] = [];

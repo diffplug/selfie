@@ -15,9 +15,6 @@ export const sha256: HashFunction = async (pam) =>
  * Multiplying rather than shifting because JS bit operators stop at 32 bits.
  */
 export function truncateHash(digest: Uint8Array): number {
-  if (digest.length < 7) {
-    throw new RangeError(`Cannot take 53 bits from ${digest.length} bytes`);
-  }
   let value = 0;
   for (let i = 0; i < 6; i++) {
     value = value * 256 + digest[i]!;
