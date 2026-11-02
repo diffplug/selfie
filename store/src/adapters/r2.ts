@@ -1,4 +1,4 @@
-import type { BlobStorage } from "../core/index.ts";
+import { isBlobKeySegment, type BlobStorage } from "../core/index.ts";
 
 /**
  * The part of a Worker's R2 binding this adapter uses, stated here so the store
@@ -11,13 +11,6 @@ export interface R2BucketLike {
   head(key: string): Promise<unknown>;
 }
 
-export interface R2RetryOptions {
-  /** Total tries for one `put`, the first included. */
-  readonly maxAttempts: number;
-  /** The wait before the first retry. Doubles each retry. */
-  readonly baseDelayMs: number;
-}
-
 export interface R2BlobStorageConfig {
   readonly bucket: R2BucketLike;
   /**
@@ -25,20 +18,17 @@ export interface R2BlobStorageConfig {
    * reaches the same objects, so it must never pass to a different project.
    */
   readonly project: string;
-  readonly retry?: Partial<R2RetryOptions>;
   /** Defaults to `setTimeout`. Tests inject one to observe the backoff without waiting. */
   readonly sleep?: (ms: number) => Promise<void>;
 }
 
-const DEFAULT_RETRY: R2RetryOptions = { maxAttempts: 4, baseDelayMs: 1_000 };
+const MAX_ATTEMPTS = 4;
+const BASE_DELAY_MS = 1_000;
 
-// One blob key segment. With no `/`, a project can't name a path inside another
-// project, so `projects/<project>/` prefixes never overlap.
-const PROJECT = /^[a-z0-9][a-z0-9._-]*$/;
-
-// R2 allows one write per second per key and throws this for more. The binding
-// puts the code at the end of the message:
+// R2 allows one write per second per key and throws error 10058 for more:
 // https://developers.cloudflare.com/r2/api/error-codes/
+// Matched on the message because the binding's errors carry no `code` in workerd,
+// although its types declare one. A test pins that, so this gets revisited if it changes.
 const KEY_RATE_LIMITED = /\(10058\)$/;
 
 /**
@@ -48,24 +38,22 @@ const KEY_RATE_LIMITED = /\(10058\)$/;
 export class R2BlobStorage implements BlobStorage {
   readonly #bucket: R2BucketLike;
   readonly #prefix: string;
-  readonly #retry: R2RetryOptions;
   readonly #sleep: (ms: number) => Promise<void>;
 
   constructor(config: R2BlobStorageConfig) {
     const { project } = config;
     // Checked as a string first: a regex test would accept `undefined` as "undefined".
-    if (typeof project !== "string" || !PROJECT.test(project)) {
+    // One segment has no `/`, so no project's prefix can sit inside another's.
+    if (typeof project !== "string" || !isBlobKeySegment(project)) {
       throw new RangeError(`Invalid project: ${JSON.stringify(project)}`);
     }
     this.#bucket = config.bucket;
     this.#prefix = `projects/${project}/`;
-    this.#retry = { ...DEFAULT_RETRY, ...config.retry };
     this.#sleep = config.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
   }
 
   async put(key: string, bytes: Uint8Array): Promise<void> {
     const objectKey = this.#objectKey(key);
-    const { maxAttempts, baseDelayMs } = this.#retry;
     for (let attempt = 1; ; attempt++) {
       try {
         await this.#bucket.put(objectKey, bytes);
@@ -75,9 +63,9 @@ export class R2BlobStorage implements BlobStorage {
         // Callers only put the same bytes at a key, and R2 is strongly consistent,
         // so a blob here means another writer has already done this put.
         if ((await this.#bucket.head(objectKey)) !== null) return;
-        if (attempt >= maxAttempts) throw error;
+        if (attempt >= MAX_ATTEMPTS) throw error;
       }
-      const ceiling = baseDelayMs * 2 ** (attempt - 1);
+      const ceiling = BASE_DELAY_MS * 2 ** (attempt - 1);
       await this.#sleep(ceiling / 2 + (Math.random() * ceiling) / 2);
     }
   }

@@ -7,17 +7,9 @@ import {
   Store,
   toHex,
   type BlobStorage,
-  type RawImage,
 } from "../src/core/index.ts";
-import { collidingHash } from "./support/colliding-hash.ts";
+import { collidingHash, image } from "./support/colliding-hash.ts";
 import { createTempStore } from "./support/temp-store.ts";
-
-/** A 1×1 image whose red channel identifies it. */
-const image = (id: number): RawImage => ({
-  width: 1,
-  height: 1,
-  pixels: new Uint8Array([id, 0, 0, 255]),
-});
 
 describe("Store", () => {
   let temp: Awaited<ReturnType<typeof createTempStore>>;

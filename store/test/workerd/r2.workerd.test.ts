@@ -1,22 +1,10 @@
 // Runs inside workerd against its local R2 binding. Nothing here crosses to Node.
 
-import { env } from "cloudflare:workers";
 import { afterEach, describe, expect, it } from "vitest";
 import { R2BlobStorage, type R2BucketLike } from "selfie-store/adapters/r2";
 import { Blobs } from "../../src/core/index.ts";
 import { describeBlobContract } from "../contract/blob-contract.ts";
-
-const bucket = env.BLOBS;
-
-async function objectKeys(prefix = "projects/"): Promise<string[]> {
-  const { objects } = await bucket.list({ prefix });
-  return objects.map((object) => object.key);
-}
-
-async function emptyBucket(prefix = "projects/"): Promise<void> {
-  const keys = await objectKeys(prefix);
-  if (keys.length > 0) await bucket.delete(keys);
-}
+import { bucket, emptyBucket, objectKeys } from "./bucket.ts";
 
 describeBlobContract("R2 in workerd", async () => {
   const project = `contract-${crypto.randomUUID()}`;
@@ -129,8 +117,8 @@ describe("R2BlobStorage", () => {
     const key = "images/abc";
     const objectKey = `projects/alpha/${key}`;
 
-    function setup(failures: number, error: () => Error = rateLimited) {
-      const delays: number[] = [];
+    /** The real bucket, except its first `failures` puts throw `error`. */
+    function limitedBucket(failures: number, error: () => Error = rateLimited) {
       let puts = 0;
       const limited: R2BucketLike = {
         put: async (name, value) => {
@@ -140,6 +128,12 @@ describe("R2BlobStorage", () => {
         get: (name) => bucket.get(name),
         head: (name) => bucket.head(name),
       };
+      return { limited, puts: () => puts };
+    }
+
+    function setup(failures: number, error?: () => Error) {
+      const delays: number[] = [];
+      const { limited, puts } = limitedBucket(failures, error);
       const storage = new R2BlobStorage({
         bucket: limited,
         project: "alpha",
@@ -147,7 +141,7 @@ describe("R2BlobStorage", () => {
           delays.push(ms);
         },
       });
-      return { storage, delays, puts: () => puts };
+      return { storage, delays, puts };
     }
 
     it("is done without resending if another writer's blob is there", async () => {
@@ -170,21 +164,9 @@ describe("R2BlobStorage", () => {
     });
 
     it("waits on the runtime's own timers by default", async () => {
-      let puts = 0;
-      const storage = new R2BlobStorage({
-        bucket: {
-          put: async (name, value) => {
-            if (++puts === 1) throw rateLimited();
-            return bucket.put(name, value);
-          },
-          get: (name) => bucket.get(name),
-          head: (name) => bucket.head(name),
-        },
-        project: "alpha",
-        retry: { baseDelayMs: 1 },
-      });
-      await storage.put(key, bytes);
-      expect(puts).toBe(2);
+      const { limited, puts } = limitedBucket(1);
+      await new R2BlobStorage({ bucket: limited, project: "alpha" }).put(key, bytes);
+      expect(puts()).toBe(2);
     });
 
     it("gives up after its attempts with R2's error", async () => {
@@ -206,6 +188,10 @@ describe("R2BlobStorage", () => {
     await expect(storage.put("images/abc", bytes)).rejects.toThrow("(10020)");
     await expect(storage.get("images/abc")).rejects.toThrow("(10020)");
     await expect(storage.has("images/abc")).rejects.toThrow("(10020)");
+    // The adapter recognizes error 10058 by its message because there's no field for
+    // it. If this starts failing, the binding has gained one, and the adapter should use it.
+    const error = await storage.put("images/abc", bytes).catch((e: unknown) => e);
+    expect((error as { code?: unknown }).code).toBeUndefined();
     expect(await objectKeys()).toEqual([]);
   });
 });

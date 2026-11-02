@@ -1,4 +1,11 @@
-import type { HashFunction } from "../../src/core/index.ts";
+import type { HashFunction, RawImage } from "../../src/core/index.ts";
+
+/** A 1×1 image whose red channel identifies it, as `collidingHash` expects. */
+export const image = (id: number): RawImage => ({
+  width: 1,
+  height: 1,
+  pixels: new Uint8Array([id, 0, 0, 255]),
+});
 
 /**
  * Forces the first 53 bits of the hash to the value assigned to the image's id,
