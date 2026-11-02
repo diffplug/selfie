@@ -1,6 +1,7 @@
 // How states and refusals read on screen. A state always has words and an icon, never color alone.
 import {
   AlertIcon,
+  ArrowSwitchIcon,
   CheckIcon,
   ClockIcon,
   DiffAddedIcon,
@@ -8,18 +9,18 @@ import {
   DiffRemovedIcon,
   DotIcon,
   StopIcon,
+  UnfoldIcon,
   XIcon,
 } from "@primer/octicons-react";
 import { Label, Stack, type LabelProps } from "@primer/react";
 import type { ReactNode } from "react";
 import { isDecidable } from "selfie-store";
-import type { BlockerReason, PixelDiff, SnapshotRow, SnapshotState } from "../shared/api.ts";
+import type { BlockerReason, PixelDiff, RegionKind, SnapshotRow, SnapshotState } from "../shared/api.ts";
 import { isLayoutOnly } from "../shared/regions.ts";
+import { plural } from "./plural.ts";
 import { AppLink, runPath } from "./router.tsx";
 
 export const shortSha = (sha: string) => sha.slice(0, 10);
-
-export const plural = (count: number, one: string, many = `${one}s`) => `${count.toLocaleString()} ${count === 1 ? one : many}`;
 
 /** A run that didn't render: where its pixels came from, which every place that offers a decision on them must say. */
 export function ReusedPixels({ from }: { readonly from: string }) {
@@ -52,6 +53,21 @@ const STATE_LABELS: Readonly<Record<SnapshotState, { variant: LabelProps["varian
   failed: { variant: "danger", icon: <StopIcon size={12} />, words: "Failed" },
   unchanged: { variant: "secondary", icon: <DotIcon size={12} />, words: "Unchanged" },
 };
+
+const KIND_LABELS: Readonly<Record<RegionKind, { variant: LabelProps["variant"]; icon: ReactNode; words: string }>> = {
+  changed: { variant: "danger", icon: <DiffModifiedIcon size={12} />, words: "Changed" },
+  moved: { variant: "accent", icon: <ArrowSwitchIcon size={12} />, words: "Moved" },
+  spacing: { variant: "attention", icon: <UnfoldIcon size={12} />, words: "Spacing" },
+};
+
+export function KindLabel({ kind }: { readonly kind: RegionKind }) {
+  const { variant, icon, words } = KIND_LABELS[kind];
+  return (
+    <IconLabel variant={variant} icon={icon}>
+      {words}
+    </IconLabel>
+  );
+}
 
 export function StateLabel({ state }: { readonly state: SnapshotState }) {
   const { variant, icon, words } = STATE_LABELS[state];

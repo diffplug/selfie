@@ -1,5 +1,9 @@
 /* Layout only, and in Primer's tokens: components bring their own look, and modes come from these. */
 :root {
+  /* The diff image's colors, from `cli/src/diff.ts`. */
+  --selfie-kind-changed: #ff0050;
+  --selfie-kind-moved: #0969da;
+  --selfie-kind-spacing: #ffd666;
   /* Room for what's above the images, so they and the buttons fit on a screen together. */
   --selfie-images-height: max(360px, calc(100vh - 290px));
 }
@@ -235,6 +239,10 @@ code {
   font-weight: var(--base-text-weight-semibold);
 }
 
+.selfie-pane-image {
+  position: relative;
+}
+
 .selfie-pane-button {
   display: block;
   width: 100%;
@@ -267,6 +275,8 @@ code {
 
 .selfie-stack {
   position: relative;
+  /* Room for the number of a region at the very top. */
+  margin-top: var(--base-size-24);
 }
 
 .selfie-layer {
@@ -277,14 +287,132 @@ code {
   max-width: none;
 }
 
-.selfie-outline {
+.selfie-outlines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* The panes' images sit inside a border. */
+.selfie-pane-image .selfie-outlines {
+  inset: 1px;
+}
+
+.selfie-region {
   position: absolute;
   box-sizing: content-box;
+  min-width: 2px;
+  min-height: 2px;
   margin: -3px 0 0 -3px;
   /* Dashed, and in two tones, so it can't pass for part of a screenshot on any background. */
-  border: 2px dashed var(--fgColor-default);
+  border: 2px dashed var(--selfie-kind);
   outline: 1px solid var(--bgColor-default);
-  pointer-events: none;
+}
+
+/* Side by side, clicking an image stacks it, so there only a region's number selects it. */
+.selfie-stack .selfie-region {
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+[data-kind="changed"] {
+  --selfie-kind: var(--selfie-kind-changed);
+}
+
+[data-kind="moved"] {
+  --selfie-kind: var(--selfie-kind-moved);
+}
+
+[data-kind="spacing"] {
+  --selfie-kind: var(--selfie-kind-spacing);
+}
+
+.selfie-region[data-selected] {
+  border-style: solid;
+  background: color-mix(in srgb, var(--selfie-kind) 15%, transparent);
+}
+
+.selfie-region[data-focused] {
+  outline: 2px solid var(--focus-outlineColor);
+}
+
+.selfie-region-number {
+  display: inline-block;
+  min-width: 1.5em;
+  border-radius: var(--borderRadius-small);
+  background: var(--selfie-kind);
+  color: #fff;
+  font-size: var(--text-caption-size, 12px);
+  font-weight: var(--base-text-weight-semibold);
+  line-height: 1.5;
+  text-align: center;
+}
+
+.selfie-region-number[data-kind="spacing"] {
+  color: #1f2328;
+}
+
+/* Outside the box, so it never covers what changed. */
+.selfie-region > .selfie-region-number {
+  position: absolute;
+  bottom: calc(100% + 2px);
+  left: -2px;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.selfie-regions {
+  border: var(--borderWidth-thin) solid var(--borderColor-default);
+  border-radius: var(--borderRadius-small);
+}
+
+.selfie-regions-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--base-size-8);
+  padding: var(--base-size-4) var(--base-size-8);
+  background: var(--bgColor-muted);
+}
+
+.selfie-regions-list {
+  max-height: 11em;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.selfie-regions-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--base-size-8);
+  padding: 0 var(--base-size-8);
+  border-top: var(--borderWidth-thin) solid var(--borderColor-muted);
+}
+
+.selfie-regions-list li[data-selected] {
+  background: var(--bgColor-accent-muted);
+}
+
+.selfie-regions-list li[data-focused] {
+  box-shadow: inset 2px 0 0 var(--focus-outlineColor);
+}
+
+.selfie-region-go {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--base-size-8);
+  min-width: 0;
+  padding: var(--base-size-4) 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 
 .selfie-shortcuts {

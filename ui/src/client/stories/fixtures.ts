@@ -55,6 +55,8 @@ export const rows = {
   spaced: changedBetween("spaced-golden"),
   moved: changedBetween("moved-golden"),
   mixed: changedBetween("mixed-golden"),
+  several: changedBetween("several-golden"),
+  pushed: changedBetween("pushed-long"),
   double: changedBetween("doubleChanged-doubleGolden"),
   fresh: (story: string, extras: Extras = {}) => snapshot({ story, state: "new", imageHash: HASHES.fresh, ...extras }),
   removed: (story: string) => snapshot({ story, state: "removed", goldenHash: HASHES.gone }),

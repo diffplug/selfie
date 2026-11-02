@@ -118,7 +118,11 @@ Source of truth: `ui/src/client/`.
 - **Must fit an image's width side by side, and scroll all of them as one**, so a tall page's images stay level.
 - **Must also offer zoom at 1×, 2×, 4×, and 8×, where 1× is one image pixel to one device pixel** (rationale), following the display's `devicePixelRatio`.
 - **Must draw nearest-neighbor only at a whole number of device pixels per image pixel, and smooth anything else**, as with a 2× image on a 1× display or a 1.5× image on a 2× display at actual size, since uneven blocks would look like changes.
-- **Must center a change on stacking the images and on every zoom:** the bounding box if it fits, or else the first changed pixel, since a large box's center may hold no change at all (rationale). A box too small to find is outlined, and the outline can be turned off.
+- **Must center a change on stacking the images and on every zoom:** the region being looked at if there is one, or else the bounding box if it fits, or else the first changed pixel, since a large box's center may hold no change at all (rationale).
+- **Must list a changed snapshot's regions, however few, grouped by `regionMergeDistance`, in reading order, each with its number, kind, how much it holds, and where it is on each side.** One region gets no special case (rationale).
+- **Must outline each region on every image, in that image's own coordinates, numbered as in the list, in its kind's color from the diff image**, side by side and stacked, and let the outlines be turned off.
+- **Must let someone select any set of regions, from the list, from an outline, or with a key, and keep that only while they stay on the story.** Clicking a stacked region's outline selects it, and side by side only its number does, since clicking an image there stacks it.
+- **Must keep the region being looked at still when flipping between images**, since it can be somewhere else in the other one (rationale).
 - **Must keep how someone is looking when moving between stories**, and must never show one story's image under another's name while it loads.
 - **Must compute diff images, and pixel stats a run's `review.json` no longer holds, on demand, from the store, by hash pair**, so a pruned run reads like any other. A list shows stats only from `review.json`, and one snapshot uses them rather than ask (rationale).
 - **Must explain each kind of snapshot:** new has no golden, removed has no current and takes no decision, failed shows its message, and a changed size says so, and shows the images from their top left corners.
@@ -145,12 +149,14 @@ Source of truth: `useHotkeys` in `ui/src/client/hooks.ts`.
 | `/` | The run | Search |
 | `a`, `r` | A snapshot | Approve or reject, then go to the next |
 | `s`, `f`, `d` | A snapshot | Side by side, stacked then flip, diff |
-| `z`, `c` | A snapshot | Next zoom, center on the change |
+| `z`, `c` | A snapshot | Next zoom, center on the region being looked at or else the change |
+| `n`, `p` | A snapshot | Next and previous region |
+| `x` | A snapshot | Select the region being looked at, or the first |
 | `u` | A snapshot | Back to the list, with focus on that story |
 | `?` | A snapshot | Lists these |
 
 - **Must show each key on screen beside what it does.**
-- **Must ignore a key while someone is typing, a dialog is open, or a modifier is held, and ignore a held key's repeats**, so holding `a` can't approve one image after another unseen (rationale).
+- **Must ignore a key while someone is typing, a dialog is open, or a modifier is held, and ignore a held key's repeats**, so holding `a` can't approve one image after another unseen (rationale). A focused checkbox isn't typing.
 
 ## Stories
 
@@ -192,6 +198,8 @@ Also its own guard in place of `loopbackHosts`, keeping `sameOriginWrites` and `
 
 ### Not built
 
+- Doing anything with a selection. Approving and rejecting are still on a whole image, until there are decisions on regions (`docs/specs/snapshots.md` → Future).
+- Selecting one region out of a group. Lowering `regionMergeDistance` separates them.
 - Rendering from the UI. A reviewer runs `selfie review` and looks at the result.
 - A way to clear a decision. One can be replaced, and a run can be reviewed again, but `Snapshots.decide` has no way to remove one.
 - Finding runs at other commits. `/runs/:id` opens any of them, and `selfie ui <run>` prints that URL, but nothing lists them: `runs` has no index that would serve it without a scan.

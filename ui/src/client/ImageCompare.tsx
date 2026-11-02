@@ -1,12 +1,15 @@
 // Seeing the change. Side by side gives the shape of it, and flip gives one pixel at a time:
 // all three layers stay stacked and loaded, so switching costs no scroll and no flash. How someone
 // is looking stays the same from story to story, since this stays mounted across them.
-import { Button, Checkbox, FormControl, SegmentedControl, Stack, Text } from "@primer/react";
-import { useCallback, useLayoutEffect, useRef, useState } from "react";
-import type { PixelDiff, SnapshotRow } from "../shared/api.ts";
+import { Button, SegmentedControl, Stack, Text } from "@primer/react";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import type { BoundingBox, PixelDiff, SnapshotRow } from "../shared/api.ts";
+import type { RegionGroup } from "../shared/regions.ts";
 import { diffImageUrl, imageUrl } from "./api.ts";
-import { useDevicePixelRatio, useHotkeys } from "./hooks.ts";
+import { useDevicePixelRatio, useHotkeys, type RegionSelection } from "./hooks.ts";
 import { Keys } from "./Keys.tsx";
+import { RegionList } from "./RegionList.tsx";
+import { stepped } from "./selection.ts";
 
 /** `"size"` is the size the page really was. A number is how many device pixels show one image pixel. */
 const ZOOMS = ["size", 1, 2, 4, 8] as const;
@@ -29,18 +32,69 @@ function sourcesOf({ imageHash, goldenHash }: SnapshotRow, hasDiffImage: boolean
   return sources;
 }
 
-function Pane({ layer, src, story, onOpen }: { layer: Layer; src: string; story: string; onOpen: () => void }) {
+/** A region is where it is in whichever image is showing, and the diff is drawn on the current one. */
+const boxOn = ({ current, golden }: RegionGroup, layer: Layer): BoundingBox => (layer === "golden" ? golden : current);
+
+/** So a region too big to center doesn't sit right against the edge. */
+const MARGIN = 16;
+
+type Size = { readonly width: number; readonly height: number };
+
+/** Over one image, as shares of its size, so at any zoom. The list says the same to assistive technology. */
+function RegionOutlines({ groups, layer, size, selection }: { groups: readonly RegionGroup[]; layer: Layer; size: Size; selection: RegionSelection }) {
+  const { selected, focused, toggle, setFocused } = selection;
+  const share = (part: number, whole: number) => `${(part / whole) * 100}%`;
+  return (
+    <div className="selfie-outlines" aria-hidden="true">
+      {groups.map((group, index) => {
+        const { x, y, width, height } = boxOn(group, layer);
+        return (
+          <div
+            key={index}
+            className="selfie-region"
+            data-region={index}
+            data-kind={group.kind}
+            data-selected={selected.has(index) || undefined}
+            data-focused={focused === index || undefined}
+            style={{ left: share(x, size.width), top: share(y, size.height), width: share(width, size.width), height: share(height, size.height) }}
+            onClick={() => {
+              toggle(index);
+              setFocused(index);
+            }}
+          >
+            <span className="selfie-region-number" data-kind={group.kind}>
+              {index + 1}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function Pane({ layer, src, story, onOpen, children }: { layer: Layer; src: string; story: string; onOpen: () => void; children: ReactNode }) {
   return (
     <figure className="selfie-pane">
       <figcaption>{LAYER_WORDS[layer]}</figcaption>
-      <button type="button" className="selfie-pane-button" onClick={onOpen} aria-label={`Show the ${layer} image stacked`}>
-        <img src={src} alt={`${LAYER_WORDS[layer]} image of ${story}`} loading="lazy" decoding="async" />
-      </button>
+      <div className="selfie-pane-image">
+        <button type="button" className="selfie-pane-button" onClick={onOpen} aria-label={`Show the ${layer} image stacked`}>
+          <img src={src} alt={`${LAYER_WORDS[layer]} image of ${story}`} loading="lazy" decoding="async" />
+        </button>
+        {children}
+      </div>
     </figure>
   );
 }
 
-export function ImageCompare({ row, diff, scale }: { row: SnapshotRow; diff: PixelDiff | null; scale: number }) {
+interface ImageCompareProps {
+  readonly row: SnapshotRow;
+  readonly diff: PixelDiff | null;
+  readonly scale: number;
+  readonly groups: readonly RegionGroup[];
+  readonly selection: RegionSelection;
+}
+
+export function ImageCompare({ row, diff, scale, groups, selection }: ImageCompareProps) {
   const { story, imageHash, goldenHash } = row;
   const sources = sourcesOf(row, diff !== null);
   const canFlip = goldenHash !== null && imageHash !== null;
@@ -57,29 +111,67 @@ export function ImageCompare({ row, diff, scale }: { row: SnapshotRow; diff: Pix
   const devicePixels = zoom === "size" ? deviceRatio / scale : zoom;
   // CSS pixels per image pixel, which everything drawn over or scrolled to is measured in.
   const cssPixels = devicePixels / deviceRatio;
-  const [outline, setOutline] = useState(true);
-  const [sizes, setSizes] = useState<Readonly<Record<string, { width: number; height: number }>>>({});
+  const [outlined, setOutlined] = useState(true);
+  const { focused, toggle, setFocused } = selection;
+  const [sizes, setSizes] = useState<Readonly<Record<string, Size>>>({});
   const viewport = useRef<HTMLDivElement>(null);
+  const section = useRef<HTMLDivElement>(null);
 
   const shownSize = shown === undefined ? undefined : sizes[shown.src];
   const hasSize = shownSize !== undefined;
 
-  const center = useCallback(() => {
+  const focusedGroup = focused === null ? null : (groups[focused] ?? null);
+
+  const fits = ({ width, height }: BoundingBox) => {
     const element = viewport.current;
-    if (element === null || box === null) return;
+    return element !== null && width * cssPixels <= element.clientWidth && height * cssPixels <= element.clientHeight;
+  };
+
+  const goToBox = (target: BoundingBox) => {
+    const { x, y, width, height } = target;
+    const element = viewport.current;
+    if (element === null) return;
+    element.scrollTo(
+      fits(target)
+        ? { left: (x + width / 2) * cssPixels - element.clientWidth / 2, top: (y + height / 2) * cssPixels - element.clientHeight / 2 }
+        : { left: x * cssPixels - MARGIN, top: y * cssPixels - MARGIN },
+    );
+  };
+
+  const center = () => {
+    if (box === null) return;
     // A box too big for the viewport may show nothing changed at its center, as when two distant
     // pixels changed, so go to a pixel that certainly did.
-    const fits = box.width * cssPixels <= element.clientWidth && box.height * cssPixels <= element.clientHeight;
-    const x = fits || !firstChanged ? box.x + box.width / 2 : firstChanged.x + 0.5;
-    const y = fits || !firstChanged ? box.y + box.height / 2 : firstChanged.y + 0.5;
-    element.scrollTo({ left: x * cssPixels - element.clientWidth / 2, top: y * cssPixels - element.clientHeight / 2 });
-  }, [box, firstChanged, cssPixels]);
+    const whole = fits(box) || firstChanged === null ? box : { ...firstChanged, width: 1, height: 1 };
+    goToBox(focusedGroup === null ? whole : boxOn(focusedGroup, layer));
+  };
 
-  // A small change is usually off-screen when zoomed, so go to it whenever the zoom changes,
-  // and as soon as the image and the change are known.
+  // A small change is usually off-screen when zoomed, so go to it whenever the zoom changes, and as
+  // soon as the image and the change are known. Never on just looking at another region or layer.
   useLayoutEffect(() => {
     if (mode === "flip" && hasSize) center();
-  }, [mode, center, hasSize]);
+  }, [mode, hasSize, cssPixels, box, firstChanged]);
+
+  // A region can be somewhere else in the golden, so keep the one being looked at still when flipping,
+  // which is what makes a flip show it changing and not the page jumping.
+  const flippedFrom = useRef(layer);
+  useLayoutEffect(() => {
+    const from = flippedFrom.current;
+    flippedFrom.current = layer;
+    if (from === layer || focusedGroup === null) return;
+    const [was, now] = [boxOn(focusedGroup, from), boxOn(focusedGroup, layer)];
+    viewport.current?.scrollBy((now.x - was.x) * cssPixels, (now.y - was.y) * cssPixels);
+  }, [layer]);
+
+  const goToRegion = (index: number | null) => {
+    if (index === null) return;
+    setFocused(index);
+    if (mode === "flip") goToBox(boxOn(groups[index]!, layer));
+    else section.current?.querySelector(`[data-region="${index}"]`)?.scrollIntoView({ block: "center" });
+  };
+
+  const outlinesOn = (on: Layer, size: Size | undefined) =>
+    outlined && size !== undefined && <RegionOutlines groups={groups} layer={on} size={size} selection={selection} />;
 
   const hasDiffLayer = sources.some(({ name }) => name === "diff");
 
@@ -99,6 +191,13 @@ export function ImageCompare({ row, diff, scale }: { row: SnapshotRow; diff: Pix
       setZoom((value) => ZOOMS[(ZOOMS.indexOf(value) + 1) % ZOOMS.length]!);
     },
     c: center,
+    n: () => goToRegion(stepped(focused, groups.length, 1)),
+    p: () => goToRegion(stepped(focused, groups.length, -1)),
+    x: () => {
+      if (groups.length === 0) return;
+      toggle(focused ?? 0);
+      if (focused === null) goToRegion(0);
+    },
   });
 
   if (sources.length === 0) {
@@ -110,7 +209,8 @@ export function ImageCompare({ row, diff, scale }: { row: SnapshotRow; diff: Pix
   }
 
   return (
-    <Stack as="section" aria-label="Images" gap="condensed">
+    <Stack as="section" aria-label="Images" gap="condensed" ref={section}>
+      {groups.length > 0 && <RegionList groups={groups} selection={selection} onGo={goToRegion} outlined={outlined} onOutlined={setOutlined} />}
       <Stack direction="horizontal" wrap="wrap" align="end" gap="normal">
         <SegmentedControl aria-label="How to compare the images" onChange={(index) => setMode(index === 0 ? "side" : "flip")}>
           <SegmentedControl.Button selected={mode === "side"}>Side by side</SegmentedControl.Button>
@@ -135,15 +235,9 @@ export function ImageCompare({ row, diff, scale }: { row: SnapshotRow; diff: Pix
               ))}
             </SegmentedControl>
             {box !== null && (
-              <>
-                <Button onClick={center} trailingVisual={() => <Keys keys="c" />}>
-                  Center on the change
-                </Button>
-                <FormControl>
-                  <Checkbox checked={outline} onChange={(event) => setOutline(event.target.checked)} />
-                  <FormControl.Label>Outline the change</FormControl.Label>
-                </FormControl>
-              </>
+              <Button onClick={center} trailingVisual={() => <Keys keys="c" />}>
+                Center on the change
+              </Button>
             )}
           </>
         )}
@@ -185,7 +279,9 @@ export function ImageCompare({ row, diff, scale }: { row: SnapshotRow; diff: Pix
                 setLayer(name);
                 setMode("flip");
               }}
-            />
+            >
+              {outlinesOn(name, diff === null ? undefined : name === "golden" ? diff.golden : diff.current)}
+            </Pane>
           ))}
         </div>
       ) : (
@@ -212,13 +308,7 @@ export function ImageCompare({ row, diff, scale }: { row: SnapshotRow; diff: Pix
                 />
               );
             })}
-            {outline && box !== null && (
-              <div
-                className="selfie-outline"
-                aria-hidden="true"
-                style={{ left: box.x * cssPixels, top: box.y * cssPixels, width: box.width * cssPixels, height: box.height * cssPixels }}
-              />
-            )}
+            {outlinesOn(layer, shownSize)}
           </div>
         </div>
       )}
