@@ -135,6 +135,8 @@ Without leaving these out, every build hashed differently and the feature would 
 
 **A column added to `runs`, against the rule.** `docs/specs/store.md` → Open questions allows only new tables and indexes until migrations are decided, and `CREATE TABLE IF NOT EXISTS` can't add a column. It was made anyway since no project database holds this schema yet, and a separate table was the alternative. On a copy of an older store, `selfie review` renders and then fails with exit 2, `table runs has no column named reused_from_run`, and `accept` fails with `no such column: reused_from_run`. Anyone with a store from before this has to delete it.
 
+**`scale`, another column on `runs`.** The same exception, for the same reason, and it comes in the same unmerged stack, so it breaks no store that `reused_from_run` hadn't already. It's a fact about one run that every viewer wants with the run, so a separate table would only add a lookup.
+
 **The newest real render wins.** Pointing a key at the newest reused run would let `reusedFromRun` name a run that rendered nothing, so reuse never chains. Forgetting a key after a bad render means `--no-reuse` can't uncover a deterministic failure only to have the next review hide it behind an older pass.
 
 **What a reused run can't change.** It's still only as good as its build. A clean tree with a stale gitignored build records stale pixels against the new SHA whether or not it renders, so reuse neither fixes nor worsens [that open question](cli.md#open-questions).

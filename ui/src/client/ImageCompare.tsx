@@ -1,15 +1,17 @@
-// Seeing the change. Side by side gives the shape of it, and flip gives one pixel at actual size:
+// Seeing the change. Side by side gives the shape of it, and flip gives one pixel at a time:
 // all three layers stay stacked and loaded, so switching costs no scroll and no flash. How someone
 // is looking stays the same from story to story, since this stays mounted across them.
 import { Button, Checkbox, FormControl, SegmentedControl, Stack, Text } from "@primer/react";
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import type { PixelDiff, SnapshotRow } from "../shared/api.ts";
 import { diffImageUrl, imageUrl } from "./api.ts";
-import { useHotkeys } from "./hooks.ts";
+import { useDevicePixelRatio, useHotkeys } from "./hooks.ts";
 import { Keys } from "./Keys.tsx";
 
-const ZOOMS = [1, 2, 4, 8] as const;
+/** `"size"` is the size the page really was. A number is how many device pixels show one image pixel. */
+const ZOOMS = ["size", 1, 2, 4, 8] as const;
 type Zoom = (typeof ZOOMS)[number];
+const zoomWords = (zoom: Zoom) => (zoom === "size" ? "Actual size" : `${zoom}×`);
 type Layer = "current" | "golden" | "diff";
 
 const LAYER_WORDS: Readonly<Record<Layer, string>> = { current: "Current", golden: "Golden", diff: "Diff" };
@@ -31,14 +33,14 @@ function Pane({ layer, src, story, onOpen }: { layer: Layer; src: string; story:
   return (
     <figure className="selfie-pane">
       <figcaption>{LAYER_WORDS[layer]}</figcaption>
-      <button type="button" className="selfie-pane-button" onClick={onOpen} aria-label={`Open the ${layer} image at actual pixels`}>
+      <button type="button" className="selfie-pane-button" onClick={onOpen} aria-label={`Show the ${layer} image stacked`}>
         <img src={src} alt={`${LAYER_WORDS[layer]} image of ${story}`} loading="lazy" decoding="async" />
       </button>
     </figure>
   );
 }
 
-export function ImageCompare({ row, diff }: { row: SnapshotRow; diff: PixelDiff | null }) {
+export function ImageCompare({ row, diff, scale }: { row: SnapshotRow; diff: PixelDiff | null; scale: number }) {
   const { story, imageHash, goldenHash } = row;
   const sources = sourcesOf(row, diff?.kind === "pixels");
   const canFlip = goldenHash !== null && imageHash !== null;
@@ -50,7 +52,11 @@ export function ImageCompare({ row, diff }: { row: SnapshotRow; diff: PixelDiff 
   // The layer someone asked for, or, in a story without it, the one it has.
   const shown = sources.find(({ name }) => name === wantedLayer) ?? sources.find(({ name }) => name === "current") ?? sources[0];
   const layer = shown?.name ?? "current";
-  const [zoom, setZoom] = useState<Zoom>(1);
+  const [zoom, setZoom] = useState<Zoom>("size");
+  const deviceRatio = useDevicePixelRatio();
+  const devicePixels = zoom === "size" ? deviceRatio / scale : zoom;
+  // CSS pixels per image pixel, which everything drawn over or scrolled to is measured in.
+  const cssPixels = devicePixels / deviceRatio;
   const [outline, setOutline] = useState(true);
   const [sizes, setSizes] = useState<Readonly<Record<string, { width: number; height: number }>>>({});
   const viewport = useRef<HTMLDivElement>(null);
@@ -63,13 +69,13 @@ export function ImageCompare({ row, diff }: { row: SnapshotRow; diff: PixelDiff 
     if (element === null || box === null) return;
     // A box too big for the viewport may show nothing changed at its center, as when two distant
     // pixels changed, so go to a pixel that certainly did.
-    const fits = box.width * zoom <= element.clientWidth && box.height * zoom <= element.clientHeight;
+    const fits = box.width * cssPixels <= element.clientWidth && box.height * cssPixels <= element.clientHeight;
     const x = fits || !firstChanged ? box.x + box.width / 2 : firstChanged.x + 0.5;
     const y = fits || !firstChanged ? box.y + box.height / 2 : firstChanged.y + 0.5;
-    element.scrollTo({ left: x * zoom - element.clientWidth / 2, top: y * zoom - element.clientHeight / 2 });
-  }, [box, firstChanged, zoom]);
+    element.scrollTo({ left: x * cssPixels - element.clientWidth / 2, top: y * cssPixels - element.clientHeight / 2 });
+  }, [box, firstChanged, cssPixels]);
 
-  // A small change is usually off-screen at actual pixels, so go to it whenever the scale changes,
+  // A small change is usually off-screen when zoomed, so go to it whenever the zoom changes,
   // and as soon as the image and the change are known.
   useLayoutEffect(() => {
     if (mode === "flip" && hasSize) center();
@@ -108,7 +114,7 @@ export function ImageCompare({ row, diff }: { row: SnapshotRow; diff: PixelDiff 
       <Stack direction="horizontal" wrap="wrap" align="end" gap="normal">
         <SegmentedControl aria-label="How to compare the images" onChange={(index) => setMode(index === 0 ? "side" : "flip")}>
           <SegmentedControl.Button selected={mode === "side"}>Side by side</SegmentedControl.Button>
-          <SegmentedControl.Button selected={mode === "flip"}>Actual pixels</SegmentedControl.Button>
+          <SegmentedControl.Button selected={mode === "flip"}>Stacked</SegmentedControl.Button>
         </SegmentedControl>
         {mode === "flip" && (
           <>
@@ -124,7 +130,7 @@ export function ImageCompare({ row, diff }: { row: SnapshotRow; diff: PixelDiff 
             <SegmentedControl aria-label="Zoom" onChange={(index) => setZoom(ZOOMS[index]!)}>
               {ZOOMS.map((value) => (
                 <SegmentedControl.Button key={value} selected={zoom === value}>
-                  {`${value}×`}
+                  {zoomWords(value)}
                 </SegmentedControl.Button>
               ))}
             </SegmentedControl>
@@ -146,7 +152,8 @@ export function ImageCompare({ row, diff }: { row: SnapshotRow; diff: PixelDiff 
         {mode === "flip" ? (
           <>
             Showing <strong>{LAYER_WORDS[layer].toLowerCase()}</strong>
-            {shownSize === undefined ? "" : `, ${shownSize.width}×${shownSize.height}`}, with one image pixel {zoom} screen {zoom === 1 ? "pixel" : "pixels"} wide.{" "}
+            {shownSize === undefined ? "" : `, ${shownSize.width}×${shownSize.height}`} captured at {scale}×,{" "}
+            {zoom === "size" ? "at its actual size." : `with one image pixel ${zoom} device ${zoom === 1 ? "pixel" : "pixels"} wide.`}{" "}
             {canFlip && (
               <>
                 <Keys keys="f" /> flips current and golden.{" "}
@@ -161,7 +168,7 @@ export function ImageCompare({ row, diff }: { row: SnapshotRow; diff: PixelDiff 
           </>
         ) : (
           <>
-            Scaled to fit. Pick an image, or press <Keys keys="f" />, to see it at actual pixels.
+            Scaled to fit. Pick an image, or press <Keys keys="f" />, to stack them.
           </>
         )}
       </Text>
@@ -182,8 +189,8 @@ export function ImageCompare({ row, diff }: { row: SnapshotRow; diff: PixelDiff 
           ))}
         </div>
       ) : (
-        <div className="selfie-viewport" ref={viewport} tabIndex={0} role="group" aria-label={`${LAYER_WORDS[layer]} image at ${zoom}×. Scroll to pan.`}>
-          <div className="selfie-stack" style={shownSize === undefined ? undefined : { width: shownSize.width * zoom, height: shownSize.height * zoom }}>
+        <div className="selfie-viewport" ref={viewport} tabIndex={0} role="group" aria-label={`${LAYER_WORDS[layer]} image, ${zoomWords(zoom).toLowerCase()}. Scroll to pan.`}>
+          <div className="selfie-stack" style={shownSize === undefined ? undefined : { width: shownSize.width * cssPixels, height: shownSize.height * cssPixels }}>
             {sources.map(({ name, src }) => {
               const size = sizes[src];
               return (
@@ -194,7 +201,9 @@ export function ImageCompare({ row, diff }: { row: SnapshotRow; diff: PixelDiff 
                   className="selfie-layer"
                   style={{
                     visibility: name === layer ? "visible" : "hidden",
-                    ...(size === undefined ? {} : { width: size.width * zoom, height: size.height * zoom }),
+                    // Blocks stay even only at a whole number of device pixels, so anything else is smoothed.
+                    imageRendering: Number.isInteger(devicePixels) ? "pixelated" : "auto",
+                    ...(size === undefined ? {} : { width: size.width * cssPixels, height: size.height * cssPixels }),
                   }}
                   onLoad={(event) => {
                     const { naturalWidth: width, naturalHeight: height } = event.currentTarget;
@@ -207,7 +216,7 @@ export function ImageCompare({ row, diff }: { row: SnapshotRow; diff: PixelDiff 
               <div
                 className="selfie-outline"
                 aria-hidden="true"
-                style={{ left: box.x * zoom, top: box.y * zoom, width: box.width * zoom, height: box.height * zoom }}
+                style={{ left: box.x * cssPixels, top: box.y * cssPixels, width: box.width * cssPixels, height: box.height * cssPixels }}
               />
             )}
           </div>

@@ -111,8 +111,10 @@ Source of truth: `ui/src/client/`.
 
 **One snapshot** shows its state and decision, pixel stats, and images.
 
-- **Must always offer the images side by side and at actual pixels.** At actual pixels, the layers stay stacked, so switching costs no scroll, with zoom at 1×, 2×, 4×, and 8×, nearest-neighbor, where 1× is one image pixel to one CSS pixel.
-- **Must center a change on entering actual pixels and on every zoom:** the bounding box if it fits, or else the first changed pixel, since a large box's center may hold no change at all (rationale). A box too small to find is outlined, and the outline can be turned off.
+- **Must always offer the images side by side and stacked.** Stacked, switching layers costs no scroll, and the zoom starts at actual size: the image's width divided by `run.scale`, in CSS pixels, so it's the size the page really was on every display.
+- **Must also offer zoom at 1×, 2×, 4×, and 8×, where 1× is one image pixel to one device pixel** (rationale), following the display's `devicePixelRatio`.
+- **Must draw nearest-neighbor only at a whole number of device pixels per image pixel, and smooth anything else**, as with a 2× image on a 1× display or a 1.5× image on a 2× display at actual size, since uneven blocks would look like changes.
+- **Must center a change on stacking the images and on every zoom:** the bounding box if it fits, or else the first changed pixel, since a large box's center may hold no change at all (rationale). A box too small to find is outlined, and the outline can be turned off.
 - **Must keep how someone is looking when moving between stories**, and must never show one story's image under another's name while it loads.
 - **Must compute diff images, and pixel stats a run's `review.json` no longer holds, on demand, from the store, by hash pair**, so a pruned run reads like any other. A list shows stats only from `review.json`, and one snapshot uses them rather than ask (rationale).
 - **Must explain each kind of snapshot:** new has no golden, removed has no current and takes no decision, failed shows its message, and a changed size shows both images from their top left corners, with no diff image.
@@ -136,7 +138,7 @@ Source of truth: `useHotkeys` in `ui/src/client/hooks.ts`.
 | `j`, `k` | The run, a snapshot | Next and previous, in the current filter |
 | `/` | The run | Search |
 | `a`, `r` | A snapshot | Approve or reject, then go to the next |
-| `s`, `f`, `d` | A snapshot | Side by side, actual pixels then flip, diff |
+| `s`, `f`, `d` | A snapshot | Side by side, stacked then flip, diff |
 | `z`, `c` | A snapshot | Next zoom, center on the change |
 | `u` | A snapshot | Back to the list, with focus on that story |
 | `?` | A snapshot | Lists these |

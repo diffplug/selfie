@@ -428,6 +428,7 @@ async function recordRun(
   const run = await snapshots.beginRun({
     gitSha: fields.gitSha,
     environment: fields.settings.environmentId,
+    scale: fields.settings.environment.scale,
     dirty: fields.dirty,
     baselineSha: fields.baselineSha,
     storyFilter: fields.storyFilter,

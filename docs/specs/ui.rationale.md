@@ -25,9 +25,9 @@ Evidence and reasoning for `docs/specs/ui.md`, keyed by its headings.
 
 ## Screens
 
-- **Why actual pixels recenters.** A real change in the end-to-end Storybook, 278 pixels at the two ends of a 1186×30 box, showed nothing at all at the box's center at 8×. The first changed pixel always shows one.
+- **Why stacking recenters.** A real change in the end-to-end Storybook, 278 pixels at the two ends of a 1186×30 box, showed nothing at all at the box's center at 8×. The first changed pixel always shows one.
 - **Why `firstChanged` is in `PixelDiff`.** The diff loop already visits every pixel, and only the server has the pixels at no extra cost. It adds one field to `selfie review`'s document.
-- **Why 1× is one CSS pixel.** On a 2× display that is two device pixels, which `image-rendering: pixelated` keeps crisp. Going to true device pixels would make a 1× image half the width on some screens and not others, which reads as a bug.
+- **Why two kinds of size.** 1× was one CSS pixel at first, so that an image wouldn't be half the width on some screens and not others. Actual size now gives that consistent size, and a person looking for one wrong pixel needs to know what a pixel on their screen is, which only device pixels can say. A 1× image on a 2× display is half its actual width at 1×, and that's the point of choosing it.
 - **Why the layers stay stacked.** A reviewer finding a 1 px change flips between two images and watches for what moves, which only works with no shift and no flash. Each layer's key is its URL, so moving to another story can't show the last story's image while its own loads, which could otherwise get the wrong image approved.
 - **Why reuse a review's stats.** A later accepted run could change a baseline's goldens under a run, and then `review.json`'s stats would describe the old pair while the images show the new one. That's rare, and it only misstates numbers, against a request for every story.
 - **Why thumbnails, given they cost a read each.** They're lazy, and 30 load on opening a 512 row list. They let someone scan for the one that's different, which pixel counts don't.
@@ -35,11 +35,11 @@ Evidence and reasoning for `docs/specs/ui.md`, keyed by its headings.
 ## Keyboard
 
 - **Why ignore repeats.** With `a` moving on to the next story, a held key would approve one image every few milliseconds. `j` and `k` lose little by it.
-- **Why no arrow keys.** They scroll the actual pixels viewport, which is how it pans from the keyboard.
+- **Why no arrow keys.** They scroll the stacked viewport, which is how it pans from the keyboard.
 
 ## Accessibility
 
-axe-core 4.10.3 was run on the no runs, no commits, run, filtered run, accept, side by side, actual pixels, and shortcuts screens in a real browser. It found one issue, a link in text told apart only by color. Primer's `inline` underlines one only under `data-a11y-link-underlines="true"`, so `ui/index.html` sets that on the body. Primer's own components passed.
+axe-core 4.10.3 was run on the no runs, no commits, run, filtered run, accept, side by side, stacked, and shortcuts screens in a real browser. It found one issue, a link in text told apart only by color. Primer's `inline` underlines one only under `data-a11y-link-underlines="true"`, so `ui/index.html` sets that on the body. Primer's own components passed.
 
 ## Scale
 

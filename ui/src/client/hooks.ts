@@ -149,3 +149,15 @@ export function useFetched<T>(key: string | null, load: (signal: AbortSignal) =>
   }, [key]);
   return state.key === key ? state : { data: null, error: null };
 }
+
+/** Device pixels per CSS pixel, which changes with browser zoom or on moving to another display. */
+export function useDevicePixelRatio(): number {
+  const [ratio, setRatio] = useState(window.devicePixelRatio);
+  useEffect(() => {
+    const query = window.matchMedia(`(resolution: ${ratio}dppx)`);
+    const update = () => setRatio(window.devicePixelRatio);
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, [ratio]);
+  return ratio;
+}
