@@ -9,7 +9,7 @@ A spec is the accurate reference for the current code: it states the invariants 
 - **`docs/specs/glossary.md`** — Canonical vocabulary: image, snapshot, run, golden, baseline. Read first; every spec defers to it for names.
 - **`docs/specs/system.md`** — The whole system's staged build order, and the behavior that spans the local app and the cloud.
 - **`docs/specs/access.md`** — The GitHub App, who can see and change a project, and how images are served. Read first for anything touching auth or visibility.
-- **`docs/specs/store.md`** — Image storage: image identity, keys, hash collisions, and the SQL and blob adapters.
+- **`docs/specs/store.md`** — Image storage: image identity, decoding, keys, hash collisions, and the SQL and blob adapters.
 
 ### Conventions
 

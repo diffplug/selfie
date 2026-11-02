@@ -1,2 +1,4 @@
 # Hashed byte for byte, so line-ending conversion would change the image.
 *.pam binary
+# Tests compare these byte for byte too.
+*.png binary
