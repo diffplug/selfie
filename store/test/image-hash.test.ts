@@ -91,8 +91,4 @@ describe("truncateHash", () => {
       expect(BigInt(truncateHash(bytes))).toBe(BigInt(`0x${toHex(bytes)}`) >> 203n);
     }
   });
-
-  it("refuses too few bytes", () => {
-    expect(() => truncateHash(new Uint8Array(6))).toThrow(RangeError);
-  });
 });

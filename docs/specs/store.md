@@ -47,7 +47,7 @@ The store core runs unchanged locally and in the cloud, the way Hono does for HT
 
 - **Never import a platform API into the store core**, such as `node:fs` or a Cloudflare type. Only adapters may, and the core uses Web-standard types. Typecheck enforces this: `store/src/core` compiles with no Node types.
 - **Must limit the SQL interface to what every adapter supports**, so a statement that works locally also works on D1. It offers no transactions, and refuses transaction and `ATTACH` statements.
-- **Must check every statement in the SQL interface, above the adapters**, so no adapter can skip a check. An adapter only executes, and the store accepts only the checked interface.
+- **Must check every statement and blob key in the interfaces, above the adapters**, so no adapter can skip a check. An adapter only executes, and the store accepts only the checked `Sql` and `Blobs`.
 - **Must enforce the 100 bound parameter limit in the SQL interface for every adapter**, so an oversized query fails locally rather than only on D1. A numbered parameter counts as SQLite counts it: `?101` needs 101 parameters, and a reused `?1` counts once.
 - **Must enforce the 100,000 byte statement limit in the SQL interface for every adapter**, for the same reason. Measured on real D1: 100,000 bytes runs, and 100,001 fails with `SQLITE_TOOBIG`.
 - **Must use only numbered or anonymous parameters, never named ones**, since D1 does not support named parameters.

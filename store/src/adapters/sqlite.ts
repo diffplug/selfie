@@ -17,6 +17,9 @@ export class SqliteAdapter implements SqlAdapter {
 
   constructor(path: string) {
     this.#db = new DatabaseSync(path, { timeout: BUSY_TIMEOUT_MS });
+    // Most commits need no fsync. A power cut can lose recent rows, which only
+    // orphans their bytes, and can't corrupt the database.
+    this.#db.exec("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL");
   }
 
   async execute(statements: readonly SqlStatement[]): Promise<SqlRow[][]> {

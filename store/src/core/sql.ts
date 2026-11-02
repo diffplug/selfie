@@ -27,8 +27,8 @@ export interface SqlAdapter {
   execute(statements: readonly SqlStatement[]): Promise<SqlRow[][]>;
 }
 
-export const MAX_BOUND_PARAMETERS = 100;
-export const MAX_STATEMENT_BYTES = 100_000;
+const MAX_BOUND_PARAMETERS = 100;
+const MAX_STATEMENT_BYTES = 100_000;
 
 /** A statement was refused before reaching any adapter. */
 export class SqlInterfaceError extends Error {
@@ -95,11 +95,6 @@ function checkStatement({ sql, params = [] }: SqlStatement): void {
   if (needed > MAX_BOUND_PARAMETERS) {
     throw new SqlInterfaceError(
       `Statement uses ${needed} bound parameters, the limit is ${MAX_BOUND_PARAMETERS}`,
-    );
-  }
-  if (params.length > MAX_BOUND_PARAMETERS) {
-    throw new SqlInterfaceError(
-      `Statement was given ${params.length} bound parameters, the limit is ${MAX_BOUND_PARAMETERS}`,
     );
   }
   // Exact, because SQLite silently binds a missing parameter to NULL.

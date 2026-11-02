@@ -5,9 +5,14 @@ import {
   Sql,
   SqlInterfaceError,
   type SqlAdapter,
-  type SqlRow,
 } from "../../src/core/index.ts";
-import { withParamMode, type ImageRow, type ParamMode } from "../support/sql-params.ts";
+import {
+  hashOf,
+  insertedKey,
+  withParamMode,
+  type ImageRow,
+  type ParamMode,
+} from "../support/sql-params.ts";
 
 /** One empty database, created for one test. */
 export interface SqlTestDatabase {
@@ -15,26 +20,14 @@ export interface SqlTestDatabase {
   connect(): Promise<SqlAdapter>;
   /**
    * Inserts each workload on its own connection, all at the same time, and returns
-   * each workload's keys in order. The default runs them with `Promise.all` over
-   * `connect()`. An adapter whose driver blocks the thread must supply this, since
-   * `Promise.all` could never make its statements overlap.
+   * each workload's keys in order. The factory must make the statements really
+   * overlap and prove it, since these tests pass trivially if they run in turn.
    */
-  insertConcurrently?(workloads: ImageRow[][], mode: ParamMode): Promise<number[][]>;
+  insertConcurrently(workloads: ImageRow[][], mode: ParamMode): Promise<number[][]>;
   destroy(): Promise<void>;
 }
 
 export type SqlAdapterFactory = () => Promise<SqlTestDatabase>;
-
-function hashOf(n: number): string {
-  return n.toString(16).padStart(64, "0");
-}
-
-function insertedKey(rows: readonly SqlRow[]): number {
-  expect(rows).toHaveLength(1);
-  const key = rows[0]?.key;
-  if (typeof key !== "number") throw new TypeError(`Key is not a number: ${String(key)}`);
-  return key;
-}
 
 const MAX_KEY = Number.MAX_SAFE_INTEGER;
 
@@ -53,22 +46,8 @@ export function describeSqlContract(name: string, factory: SqlAdapterFactory): v
       return insertedKey(await sql.run(text, params));
     };
     const allRows = () => sql.run("SELECT key, hash FROM images ORDER BY key DESC");
-    const insertConcurrently = (workloads: ImageRow[][]): Promise<number[][]> => {
-      if (database.insertConcurrently !== undefined) {
-        return database.insertConcurrently(workloads, mode);
-      }
-      return Promise.all(
-        workloads.map(async (rows) => {
-          const connection = await connect();
-          return Promise.all(
-            rows.map(async (row) => {
-              const { sql: text, params } = imageInsertStatement(row.hash, row.truncated);
-              return insertedKey(await connection.run(text, params));
-            }),
-          );
-        }),
-      );
-    };
+    const insertConcurrently = (workloads: ImageRow[][]) =>
+      database.insertConcurrently(workloads, mode);
 
     beforeEach(async () => {
       database = await factory();

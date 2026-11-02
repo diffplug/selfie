@@ -1,4 +1,4 @@
-import type { BlobStorage } from "./blob.ts";
+import type { Blobs } from "./blob.ts";
 import { SHA256_BYTES, sha256, toHex, truncateHash, type HashFunction } from "./image-hash.ts";
 import { encodePam, type RawImage } from "./pam.ts";
 import type { Sql, SqlStatement } from "./sql.ts";
@@ -41,7 +41,7 @@ export async function initStoreSchema(sql: Sql): Promise<void> {
 
 export interface StoreOptions {
   readonly sql: Sql;
-  readonly blob: BlobStorage;
+  readonly blob: Blobs;
   /** Defaults to SHA-256. Tests inject one to force collisions. */
   readonly hash?: HashFunction;
 }
@@ -55,7 +55,7 @@ export interface StoredImage {
 
 export class Store {
   readonly #sql: Sql;
-  readonly #blob: BlobStorage;
+  readonly #blob: Blobs;
   readonly #hash: HashFunction;
 
   constructor({ sql, blob, hash = sha256 }: StoreOptions) {
