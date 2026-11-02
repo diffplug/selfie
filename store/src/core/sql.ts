@@ -5,6 +5,12 @@ export type SqlRow = Readonly<Record<string, SqlValue>>;
 export interface SqlStatement {
   readonly sql: string;
   readonly params?: readonly SqlParam[];
+  /**
+   * Running this again, after it may already have run, returns the same rows and
+   * changes nothing further. An adapter may then resend it after a failure that
+   * leaves the outcome unknown, such as a lost response. Absent means it must not.
+   */
+  readonly idempotent?: boolean;
 }
 
 /**
@@ -22,6 +28,7 @@ export interface SqlAdapter {
 }
 
 const MAX_BOUND_PARAMETERS = 100;
+const MAX_STATEMENT_BYTES = 100_000;
 
 /** A statement was refused before reaching any adapter. */
 export class SqlInterfaceError extends Error {
@@ -42,8 +49,8 @@ export class Sql {
     this.#adapter = adapter;
   }
 
-  async run(sql: string, params: readonly SqlParam[] = []): Promise<SqlRow[]> {
-    const [rows] = await this.batch([{ sql, params }]);
+  async run(statement: SqlStatement): Promise<SqlRow[]> {
+    const [rows] = await this.batch([statement]);
     return rows ?? [];
   }
 
@@ -73,6 +80,12 @@ const FORBIDDEN_FIRST_KEYWORDS = new Set([
 ]);
 
 function checkStatement({ sql, params = [] }: SqlStatement): void {
+  const bytes = new TextEncoder().encode(sql).length;
+  if (bytes > MAX_STATEMENT_BYTES) {
+    throw new SqlInterfaceError(
+      `Statement is ${bytes} bytes, the limit is ${MAX_STATEMENT_BYTES}`,
+    );
+  }
   const needed = inspectSql(sql);
   if (needed > MAX_BOUND_PARAMETERS) {
     throw new SqlInterfaceError(
@@ -100,9 +113,18 @@ function inspectSql(sql: string): number {
   TOKEN.lastIndex = 0;
   for (let match = TOKEN.exec(sql); match !== null; match = TOKEN.exec(sql)) {
     const token = match[0];
-    if (/^\s/.test(token) || token.startsWith("--") || token.startsWith("/*")) continue;
-    // node:sqlite silently ignores everything after the first statement.
-    if (ended) throw new SqlInterfaceError("Only one statement may be run at a time");
+    if (/^\s/.test(token)) continue;
+    const isComment = token.startsWith("--") || token.startsWith("/*");
+    // node:sqlite silently ignores everything after the first statement, and D1
+    // fails on a comment after it with "SQL code did not contain a statement".
+    if (ended) {
+      throw new SqlInterfaceError(
+        isComment
+          ? "A comment may not follow a statement's closing semicolon: D1 refuses it"
+          : "Only one statement may be run at a time",
+      );
+    }
+    if (isComment) continue;
     if (token === ";") {
       ended = true;
       continue;

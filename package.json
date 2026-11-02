@@ -9,6 +9,7 @@
   },
   "scripts": {
     "test": "pnpm -r test",
+    "test:d1": "pnpm --filter selfie-store test:d1",
     "typecheck": "pnpm -r typecheck",
     "find-collision": "pnpm --filter selfie-store find-collision"
   }

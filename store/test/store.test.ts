@@ -67,7 +67,7 @@ describe("Store", () => {
       const store = new Store({ sql: temp.sql, blob: temp.blob });
       const first = await store.putImage(image(1));
       expect(await store.putImage(image(1))).toEqual(first);
-      expect(await temp.sql.run("SELECT key FROM images")).toHaveLength(1);
+      expect(await temp.sql.run({ sql: "SELECT key FROM images" })).toHaveLength(1);
     });
 
     it("returns the PAM file for a stored image", async () => {
@@ -189,7 +189,7 @@ describe("Store", () => {
     it("leaves no row when the blob write fails", async () => {
       const store = new Store({ sql: temp.sql, blob: new Blobs(failingBlob(temp.blob)) });
       await expect(store.putImage(image(1))).rejects.toThrow("blob down");
-      expect(await temp.sql.run("SELECT key FROM images")).toEqual([]);
+      expect(await temp.sql.run({ sql: "SELECT key FROM images" })).toEqual([]);
     });
 
     it("treats orphaned bytes as not stored, and an insert retry adopts them", async () => {
@@ -209,8 +209,71 @@ describe("Store", () => {
     it("reports a row with no bytes rather than treating it as absent", async () => {
       const store = new Store({ sql: temp.sql, blob: temp.blob });
       const hash = "ab".repeat(32);
-      await temp.sql.run("INSERT INTO images(key, hash) VALUES (CAST(?1 AS INTEGER), ?2)", [5, hash]);
+      await temp.sql.run({
+        sql: "INSERT INTO images(key, hash) VALUES (CAST(?1 AS INTEGER), ?2)",
+        params: [5, hash],
+      });
       await expect(store.getImage(hash)).rejects.toThrow("no bytes");
+    });
+  });
+
+  describe("putImages", () => {
+    it("returns each image in order, including repeats and collisions", async () => {
+      const store = storeWith({ 1: 500, 2: 500 });
+      const stored = await store.putImages([image(1), image(2), image(1), image(3)]);
+      expect(stored.map(({ key }) => key)).toEqual([500, -1, 500, 1003]);
+      expect(stored[0]!.hash).toBe(stored[2]!.hash);
+      expect(await store.getImage(stored[1]!.hash)).toEqual(encodePam(image(2)));
+    });
+
+    it("returns nothing and sends nothing for no images", async () => {
+      const store = new Store({
+        sql: new Sql({ execute: () => Promise.reject(new Error("no SQL expected")) }),
+        blob: temp.blob,
+      });
+      expect(await store.putImages([])).toEqual([]);
+    });
+
+    it("sends one request per 100 images, with bytes before each request's rows", async () => {
+      const requests: number[] = [];
+      let blobsWritten = 0;
+      const images = Array.from({ length: 250 }, (_, i) => ({
+        width: 1,
+        height: 1,
+        pixels: new Uint8Array([i & 255, i >> 8, 0, 255]),
+      }));
+      const store = new Store({
+        sql: new Sql({
+          execute: async (statements) => {
+            requests.push(statements.length);
+            expect(blobsWritten).toBe(requests.reduce((sum, size) => sum + size, 0));
+            return statements.map((_, i) => [{ key: i + 1 }]);
+          },
+        }),
+        blob: new Blobs({
+          has: async () => false,
+          get: async () => null,
+          put: async () => {
+            blobsWritten++;
+          },
+        }),
+      });
+      expect(await store.putImages(images)).toHaveLength(250);
+      expect(requests).toEqual([100, 100, 50]);
+    });
+
+    it("can be called again after failing partway", async () => {
+      let failures = 1;
+      const flaky = new Sql({
+        execute: (statements) => {
+          if (failures-- > 0) return Promise.reject(new Error("sql down"));
+          return temp.connect().batch(statements);
+        },
+      });
+      const store = new Store({ sql: flaky, blob: temp.blob });
+      await expect(store.putImages([image(1), image(2)])).rejects.toThrow("sql down");
+      expect((await store.putImages([image(1), image(2)])).map(({ hash }) => hash)).toHaveLength(2);
+      expect(await temp.sql.run({ sql: "SELECT key FROM images" })).toHaveLength(2);
     });
   });
 

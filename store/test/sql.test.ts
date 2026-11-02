@@ -23,13 +23,13 @@ function recording() {
 
 const accepts = async (text: string, params: SqlParam[] = []) => {
   const { sql, seen } = recording();
-  await sql.run(text, params);
+  await sql.run({ sql: text, params });
   expect(seen).toHaveLength(1);
 };
 
 const refuses = async (text: string, params: SqlParam[] = []) => {
   const { sql, seen } = recording();
-  await expect(sql.run(text, params)).rejects.toThrow(SqlInterfaceError);
+  await expect(sql.run({ sql: text, params })).rejects.toThrow(SqlInterfaceError);
   expect(seen).toEqual([]);
 };
 
@@ -99,6 +99,27 @@ describe("Sql", () => {
       refuses("SELECT ?1", [null as unknown as string]));
   });
 
+  describe("the statement size limit never reaches an adapter", () => {
+    // Spelled out, not imported, for the same reason as LIMIT. Measured on real D1:
+    // 100,000 bytes runs, 100,001 fails with SQLITE_TOOBIG.
+    const BYTE_LIMIT = 100_000;
+    const ofBytes = (bytes: number, filler = "x") =>
+      `SELECT '${filler.repeat((bytes - "SELECT ''".length) / new TextEncoder().encode(filler).length)}'`;
+
+    it("passes at the limit", () => accepts(ofBytes(BYTE_LIMIT)));
+
+    it("refuses over the limit", () => refuses(ofBytes(BYTE_LIMIT + 1)));
+
+    it("counts bytes, not characters", () => refuses(ofBytes(BYTE_LIMIT + 3, "é")));
+  });
+
+  it("passes a statement's idempotent mark through to the adapter", async () => {
+    const { sql, seen } = recording();
+    await sql.run({ sql: "SELECT 1", idempotent: true });
+    await sql.run({ sql: "SELECT 2" });
+    expect(seen.map((statement) => statement.idempotent)).toEqual([true, undefined]);
+  });
+
   describe("what not every adapter supports", () => {
     it.each(["SELECT :name", "SELECT @name", "SELECT $name"])("refuses named parameters: %s", (text) =>
       refuses(text, ["x"]),
@@ -110,7 +131,15 @@ describe("Sql", () => {
       "SELECT 1;;",
     ])("refuses more than one statement: %s", (text) => refuses(text));
 
-    it("allows one trailing semicolon and comment", () => accepts("SELECT 1; -- done\n"));
+    it("allows one trailing semicolon and whitespace", () => accepts("SELECT 1;\n  "));
+
+    it("allows a comment before the closing semicolon", () => accepts("SELECT 1 /* c */ ; \n"));
+
+    // Measured on real D1: "SQL code did not contain a statement".
+    it.each(["SELECT 1; -- done\n", "SELECT 1; /* done */"])(
+      "refuses a comment after the closing semicolon: %j",
+      (text) => refuses(text),
+    );
 
     it.each(["", "  \n", "-- only a comment", ";"])("refuses an empty statement: %j", (text) =>
       refuses(text),

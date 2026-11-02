@@ -42,10 +42,9 @@ export function describeSqlContract(name: string, factory: SqlAdapterFactory): v
 
     const connect = async () => new Sql(withParamMode(await database.connect(), mode));
     const insert = async (row: ImageRow) => {
-      const { sql: text, params } = imageInsertStatement(row.hash, row.truncated);
-      return insertedKey(await sql.run(text, params));
+      return insertedKey(await sql.run(imageInsertStatement(row.hash, row.truncated)));
     };
-    const allRows = () => sql.run("SELECT key, hash FROM images ORDER BY key DESC");
+    const allRows = () => sql.run({ sql: "SELECT key, hash FROM images ORDER BY key DESC" });
     const insertConcurrently = (workloads: ImageRow[][]) =>
       database.insertConcurrently(workloads, mode);
 
@@ -61,27 +60,28 @@ export function describeSqlContract(name: string, factory: SqlAdapterFactory): v
 
     describe("statements", () => {
       it("returns rows with string, number, and null values", async () => {
-        const rows = await sql.run("SELECT 'a' AS s, 2 AS n, NULL AS z");
+        const rows = await sql.run({ sql: "SELECT 'a' AS s, 2 AS n, NULL AS z" });
         expect(rows).toEqual([{ s: "a", n: 2, z: null }]);
       });
 
       it("returns no rows from a statement that produces none", async () => {
-        expect(await sql.run("CREATE TABLE empty_table (id INTEGER)")).toEqual([]);
+        expect(await sql.run({ sql: "CREATE TABLE empty_table (id INTEGER)" })).toEqual([]);
       });
 
       it("gives the same result for an integer through CAST in either parameter form", async () => {
-        const rows = await sql.run("SELECT CAST(?1 AS INTEGER) AS n, typeof(CAST(?1 AS INTEGER)) AS t", [
-          MAX_KEY,
-        ]);
+        const rows = await sql.run({
+          sql: "SELECT CAST(?1 AS INTEGER) AS n, typeof(CAST(?1 AS INTEGER)) AS t",
+          params: [MAX_KEY],
+        });
         expect(rows).toEqual([{ n: MAX_KEY, t: "integer" }]);
       });
 
       it("rejects invalid SQL", async () => {
-        await expect(sql.run("SELEKT 1")).rejects.toThrow();
+        await expect(sql.run({ sql: "SELEKT 1" })).rejects.toThrow();
       });
 
       it("runs a batch in order and returns each statement's rows", async () => {
-        await sql.run("CREATE TABLE ordered (n INTEGER)");
+        await sql.run({ sql: "CREATE TABLE ordered (n INTEGER)" });
         const results = await sql.batch([
           { sql: "INSERT INTO ordered VALUES (CAST(?1 AS INTEGER))", params: [1] },
           { sql: "INSERT INTO ordered VALUES (CAST(?1 AS INTEGER))", params: [2] },
@@ -106,18 +106,18 @@ export function describeSqlContract(name: string, factory: SqlAdapterFactory): v
       const values = (count: number) => Array.from({ length: count }, (_, i) => `v${i + 1}`);
 
       it("allows exactly the limit", async () => {
-        const [row] = await sql.run(
-          `SELECT ${placeholders(LIMIT)}`,
-          values(LIMIT),
-        );
+        const [row] = await sql.run({
+          sql: `SELECT ${placeholders(LIMIT)}`,
+          params: values(LIMIT),
+        });
         expect(row?.[`p${LIMIT}`]).toBe(`v${LIMIT}`);
       });
 
       it("refuses one over the limit", async () => {
         const over = LIMIT + 1;
-        await expect(sql.run(`SELECT ${placeholders(over)}`, values(over))).rejects.toThrow(
-          SqlInterfaceError,
-        );
+        await expect(
+          sql.run({ sql: `SELECT ${placeholders(over)}`, params: values(over) }),
+        ).rejects.toThrow(SqlInterfaceError);
       });
 
       it("refuses one over the limit inside a batch", async () => {
@@ -125,6 +125,36 @@ export function describeSqlContract(name: string, factory: SqlAdapterFactory): v
         await expect(
           sql.batch([{ sql: "SELECT 1" }, { sql: `SELECT ${placeholders(over)}`, params: values(over) }]),
         ).rejects.toThrow(SqlInterfaceError);
+      });
+    });
+
+    describe("statement shape", () => {
+      // Spelled out, not imported, for the same reason as LIMIT.
+      const BYTE_LIMIT = 100_000;
+      const ofBytes = (bytes: number) => `SELECT '${"x".repeat(bytes - "SELECT '' AS s".length)}' AS s`;
+
+      it("runs a statement however it ends, within what the interface allows", async () => {
+        const texts = [
+          "SELECT 1 AS n;",
+          "SELECT 1 AS n;\n  ",
+          "-- first\nSELECT 1 AS n /* c */ ;",
+          "SELECT 1 AS n -- c",
+        ];
+        const results = await sql.batch(texts.map((text) => ({ sql: text })));
+        expect(results).toEqual(texts.map(() => [{ n: 1 }]));
+      });
+
+      it("refuses a comment after the closing semicolon", async () => {
+        await expect(sql.run({ sql: "SELECT 1; -- done\n" })).rejects.toThrow(SqlInterfaceError);
+      });
+
+      it("allows a statement of exactly the byte limit", async () => {
+        const [row] = await sql.run({ sql: ofBytes(BYTE_LIMIT) });
+        expect(String(row?.s).length).toBe(BYTE_LIMIT - "SELECT '' AS s".length);
+      });
+
+      it("refuses a statement over the byte limit", async () => {
+        await expect(sql.run({ sql: ofBytes(BYTE_LIMIT + 1) })).rejects.toThrow(SqlInterfaceError);
       });
     });
 
@@ -140,7 +170,7 @@ export function describeSqlContract(name: string, factory: SqlAdapterFactory): v
 
       it("stores the key as an integer and the hash as text", async () => {
         await insert({ hash: hashOf(1), truncated: 7 });
-        const rows = await sql.run("SELECT typeof(key) AS k, typeof(hash) AS h FROM images");
+        const rows = await sql.run({ sql: "SELECT typeof(key) AS k, typeof(hash) AS h FROM images" });
         expect(rows).toEqual([{ k: "integer", h: "text" }]);
       });
 
@@ -153,7 +183,7 @@ export function describeSqlContract(name: string, factory: SqlAdapterFactory): v
       it("assigns a negative key when the truncated value is 0", async () => {
         expect(await insert({ hash: hashOf(1), truncated: 0 })).toBe(-1);
         expect(await insert({ hash: hashOf(2), truncated: 0 })).toBe(-2);
-        const keys = await sql.run("SELECT key FROM images WHERE key = 0");
+        const keys = await sql.run({ sql: "SELECT key FROM images WHERE key = 0" });
         expect(keys).toEqual([]);
       });
 
@@ -190,8 +220,7 @@ export function describeSqlContract(name: string, factory: SqlAdapterFactory): v
 
       it("sees rows written by another connection", async () => {
         const other = await connect();
-        const { sql: text, params } = imageInsertStatement(hashOf(1), 500);
-        expect(insertedKey(await other.run(text, params))).toBe(500);
+        expect(insertedKey(await other.run(imageInsertStatement(hashOf(1), 500)))).toBe(500);
         expect(await insert({ hash: hashOf(2), truncated: 500 })).toBe(-1);
       });
     });
