@@ -36,10 +36,14 @@ interface Page {
   /** Rows of content, in rows of about 90 px. */
   readonly cards?: number;
   readonly scale?: number;
+  /** Blank space added under the heading, which moves all that's below it. */
+  readonly gap?: number;
+  /** Where the button sits across the page, which moves it without moving anything else. */
+  readonly buttonAt?: number;
 }
 
 /** Something that reads as a page: a header, some text and cards, a button, and a footer. */
-function page({ height = 900, button = ACCENT, footer = MUTED, cards = 3, scale = 1 }: Page): RawImage {
+function page({ height = 900, button = ACCENT, footer = MUTED, cards = 3, scale = 1, gap = 0, buttonAt = 32 }: Page): RawImage {
   const at = (value: number) => value * scale;
   const { box, image } = canvas(at(1200), at(height));
   box(0, 0, at(1200), at(56), INK);
@@ -47,13 +51,13 @@ function page({ height = 900, button = ACCENT, footer = MUTED, cards = 3, scale 
   box(at(32), at(88), at(420), at(24), INK);
   box(at(32), at(124), at(640), at(12), MUTED);
   for (let row = 0; row < cards; row++) {
-    const y = 164 + row * 90;
+    const y = 164 + gap + row * 90;
     box(at(32), at(y), at(1136), at(74), [246, 248, 250]);
     box(at(48), at(y + 18), at(280), at(12), INK);
     box(at(48), at(y + 42), at(520), at(10), MUTED);
   }
-  const below = 164 + cards * 90 + 16;
-  box(at(32), at(below), at(160), at(36), button);
+  const below = 164 + gap + cards * 90 + 16;
+  box(at(buttonAt), at(below), at(160), at(36), button);
   box(at(32), at(height - 48), at(1136), at(16), footer);
   return image();
 }
@@ -64,6 +68,9 @@ const IMAGES = {
   tallGolden: page({ height: 2400, cards: 24 }),
   tallChanged: page({ height: 2400, cards: 24, button: GREEN, footer: ACCENT }),
   taller: page({ height: 990, cards: 4 }),
+  spaced: page({ height: 930, gap: 30 }),
+  moved: page({ buttonAt: 600 }),
+  mixed: page({ height: 930, gap: 30, buttonAt: 600, footer: ACCENT }),
   fresh: page({ cards: 2, button: GREEN }),
   gone: page({ cards: 5, button: INK }),
   doubleGolden: page({ scale: 2 }),
@@ -75,6 +82,9 @@ const DIFFS = [
   ["tallChanged", "tallGolden"],
   ["taller", "golden"],
   ["golden", "taller"],
+  ["spaced", "golden"],
+  ["moved", "golden"],
+  ["mixed", "golden"],
   ["doubleChanged", "doubleGolden"],
 ] as const satisfies readonly (readonly [keyof typeof IMAGES, keyof typeof IMAGES])[];
 

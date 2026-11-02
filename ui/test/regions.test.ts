@@ -1,9 +1,10 @@
 import { describe, expect, test } from "vitest";
+import type { ChangedRegion, RegionKind } from "../src/shared/api.ts";
 import { groupRegions } from "../src/shared/regions.ts";
 
-const at = (x: number, y: number, width = 4, height = 2) => {
+const at = (x: number, y: number, width = 4, height = 2, kind: RegionKind = "changed"): ChangedRegion => {
   const box = { x, y, width, height };
-  return { current: box, golden: box };
+  return { current: box, golden: box, kind, changedPixels: kind === "changed" ? 1 : 0, moved: [] };
 };
 
 describe("groupRegions", () => {
@@ -24,10 +25,17 @@ describe("groupRegions", () => {
   });
 
   test("a region of nothing, where something was removed, joins by where it was", () => {
-    const removed = { current: { x: 0, y: 8, width: 4, height: 0 }, golden: { x: 0, y: 8, width: 4, height: 3 } };
+    const removed: ChangedRegion = { current: { x: 0, y: 8, width: 4, height: 0 }, golden: { x: 0, y: 8, width: 4, height: 3 }, kind: "changed", changedPixels: 12, moved: [] };
     const [group] = groupRegions([at(0, 5, 4, 2), removed], 12);
     expect(group?.current).toEqual({ x: 0, y: 5, width: 4, height: 2 });
     expect(group?.golden).toEqual({ x: 0, y: 5, width: 4, height: 6 });
+  });
+
+  test("a group is the most that any of its regions is", () => {
+    const kindOf = (...kinds: RegionKind[]) => groupRegions(kinds.map((kind, i) => at(2, i * 3, 4, 2, kind)), 12)[0]?.kind;
+    expect(kindOf("spacing", "spacing")).toBe("spacing");
+    expect(kindOf("spacing", "moved")).toBe("moved");
+    expect(kindOf("moved", "changed", "spacing")).toBe("changed");
   });
 
   test("comes out in reading order", () => {

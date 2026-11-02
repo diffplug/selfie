@@ -71,3 +71,15 @@ test("a filter survives the URL, and a bad one falls back", () => {
   expect(parseFilter(filterQuery({ text: "a b&c", show: "rejected" }))).toEqual({ text: "a b&c", show: "rejected" });
   expect(parseFilter("?show=nonsense")).toEqual(NO_FILTER);
 });
+
+test("moved and spacing only is a changed row with nothing changed in it", () => {
+  const stats = (changedPixels: number) => ({ changedPixels }) as SnapshotRow["pixelDiff"];
+  const candidates = [
+    row("only-moved", { pixelDiff: stats(0) }),
+    row("really-changed", { pixelDiff: stats(1) }),
+    row("not-compared-yet"),
+    row("new-story", { state: "new", goldenHash: null, pixelDiff: stats(0) }),
+  ];
+  expect(stories(applyFilter(candidates, { text: "", show: "layout" }))).toEqual(["only-moved"]);
+  expect(parseFilter("?show=layout").show).toBe("layout");
+});

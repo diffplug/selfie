@@ -1,11 +1,13 @@
 // Which rows a filter shows, and where next and previous go. Pure, so a test needs no browser.
 import { isDecidable } from "selfie-store";
 import type { DecisionTarget, SnapshotRow } from "../shared/api.ts";
+import { isLayoutOnly } from "../shared/regions.ts";
 
 export const SHOW_OPTIONS = [
   ["all", "All differences"],
   ["undecided", "Needs a decision"],
   ["changed", "Changed"],
+  ["layout", "Moved and spacing only"],
   ["new", "New"],
   ["removed", "Removed"],
   ["failed", "Failed"],
@@ -37,6 +39,8 @@ function inShow(row: SnapshotRow, show: Show): boolean {
       return isDecidable(row.state) && row.decision?.decision === show;
     case "advisory":
       return hasAdvisory(row);
+    case "layout":
+      return row.state === "changed" && row.pixelDiff !== null && isLayoutOnly(row.pixelDiff);
     default:
       return row.state === show;
   }

@@ -38,6 +38,30 @@
 
 **Why anchors must be unique.** The first prototype cut at the longest run of identical rows, and table rows matched the wrong table rows, pairing 27 rows of one image with 153 of the other. Requiring a row that appears once in each stopped that on Selfie's stories, and a story that had split into 11 regions came out as 2.
 
+**Moved and spacing.** Rows that line up only take a differ so far: a change in one column defeats them, so a list whose thumbnails changed height has its text shift beside them, and the shifted text ghosts, showing in pink twice over. On three real changes:
+
+| Change | Stories | Changed pixels before | After | Only moves and spacing |
+|---|---|---:|---:|---:|
+| Selfie's own stories | 19 | 1,800,770 | 405,302 | 0 |
+| Dormouse, a layout shift | 134 | 1,247,839 | 595,950 | 59 |
+| Dormouse, a restyle | 290 | 337,008 | 328,104 | 0 |
+
+It takes 4 to 10 ms an image on average, 17 ms at worst, and a story's stats come to 1 to 2 KB. Those are three changes in two projects, all at 1×.
+
+**Why the account is checked.** Calling something moved can hide a change, so the claim isn't taken on trust. The current side is rebuilt from what was matched and compared with what's really there, and what the golden had that matched nothing counts too. Without that last part, deleting one block while moving another would read as nothing changed. That affected none of the three changes above, but it's the difference between a label that's usually right and one that can be relied on.
+
+**Why a region must gain from it.** Rebuilding a region that was restyled counts its pixels on both sides, so taking moves everywhere made the restyle above 18% worse than comparing in place, in a prototype. Comparing whichever is better fixes that, and a region compared in place gives up its blocks, since its pixels are already judged where they are.
+
+**Why matching crosses regions.** Moving a button sideways leaves matching columns between where it was and where it is, so the 9-slice makes two regions, and neither alone holds a move. The most obvious kind of move read as two changes until blocks could match across regions.
+
+**Why what spacing pushes along has stayed put.** A block's place is measured within its region, past any spacing. Measured in the image instead, everything below a gap that grew read as moved, and a page with a taller gap, a moved button, and a changed footer was blue from top to bottom, with the one thing that really moved lost in it.
+
+**Why a block has a minimum size.** A single pixel identical to one elsewhere is a coincidence, and a row of little ones floods the document. Letting blocks of any size move gave 131 entries on the layout shift, against 75 at 9 pixels, for 593,522 changed pixels against 595,950, and the same 59 stories. 25 pixels was hardly different again, at 73 entries and 597,639, so 9 is what's small enough to keep a 3×3 bullet.
+
+**Why spacing is tied to what's around it.** A solid row looks the same whether it's a gap that grew or a new banner. A band of the background, or of the color just outside it, can only read as a gap. A banner the color of what's around it, or one that grew, reads as spacing, which is what it looks like on the page too.
+
+**Why moved stories still need a decision.** A layout shift can be the bug. The label says how little there is to look at, and the "Moved and spacing only" filter means a person can approve them all at once, but that's their decision to make. It also keeps what a run's blockers and exit code say from depending on how a differ reads pixels.
+
 **Why the merge distance only groups.** It first changed the regions themselves, which meant it changed diff images, two caches keyed without it, and any approval keyed by a region's content. So regions are now a pure result of two images, and grouping happens when something is shown, so a project can change its distance freely.
 
 **Why the cut sizes don't follow the scale.** A 2x capture cuts at half the CSS size, which only makes regions finer, and grouping follows the scale. Scaling the cuts would make a diff depend on more than its two images.

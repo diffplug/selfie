@@ -399,8 +399,10 @@ describe("images", () => {
     expect(await stats.json()).toEqual({
       current: { width: 8, height: 8 },
       golden: { width: 8, height: 8 },
-      regions: [{ current: { x: 1, y: 2, width: 1, height: 1 }, golden: { x: 1, y: 2, width: 1, height: 1 } }],
+      regions: [{ current: { x: 1, y: 2, width: 1, height: 1 }, golden: { x: 1, y: 2, width: 1, height: 1 }, kind: "changed", changedPixels: 1, moved: [] }],
       changedPixels: 1,
+      movedPixels: 0,
+      spacingPixels: 0,
       totalPixels: 64,
       boundingBox: { x: 1, y: 2, width: 1, height: 1 },
       firstChanged: { x: 1, y: 2 },

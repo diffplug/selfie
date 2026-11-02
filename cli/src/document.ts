@@ -73,7 +73,7 @@ export function buildReviewDocument(result: ReviewResult) {
       regionGroups:
         difference.pixelDiff === null
           ? null
-          : groupRegions(difference.pixelDiff.regions, regionMergeDistance).map(({ current, golden }) => ({ current, golden })),
+          : groupRegions(difference.pixelDiff.regions, regionMergeDistance).map(({ current, golden, kind }) => ({ current, golden, kind })),
     })),
     playErrors,
     warnings,

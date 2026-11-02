@@ -155,8 +155,10 @@ describe("diffImages", () => {
     expect(diff).toEqual({
       current: { width: 4, height: 3 },
       golden: { width: 4, height: 3 },
-      regions: [{ current: { x: 1, y: 1, width: 3, height: 2 }, golden: { x: 1, y: 1, width: 3, height: 2 } }],
+      regions: [{ current: { x: 1, y: 1, width: 3, height: 2 }, golden: { x: 1, y: 1, width: 3, height: 2 }, kind: "changed", changedPixels: 2, moved: [] }],
       changedPixels: 2,
+      movedPixels: 0,
+      spacingPixels: 0,
       totalPixels: 12,
       boundingBox: { x: 1, y: 1, width: 3, height: 2 },
       firstChanged: { x: 1, y: 1 },
@@ -229,8 +231,8 @@ describe("diffImages", () => {
 
   test("repeated rows can't match twice over", () => {
     const { diff } = diffImages(rowsOf(1, "rrr"), rowsOf(1, "rr"));
-    expect(diff).toMatchObject({ regions: [rowRegion(1, [2, 1], [2, 0])], changedPixels: 1 });
-    expect(diffImages(rowsOf(1, "rr"), rowsOf(1, "rrr")).diff).toMatchObject({ regions: [rowRegion(1, [2, 0], [2, 1])], changedPixels: 1 });
+    expect(diff).toMatchObject({ regions: [rowRegion(1, [2, 1], [2, 0])], changedPixels: 0, spacingPixels: 1 });
+    expect(diffImages(rowsOf(1, "rr"), rowsOf(1, "rrr")).diff).toMatchObject({ regions: [rowRegion(1, [2, 0], [2, 1])], changedPixels: 0, spacingPixels: 1 });
   });
 
   test("identical images change nothing", () => {

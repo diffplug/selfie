@@ -14,6 +14,7 @@ import { Label, Stack, type LabelProps } from "@primer/react";
 import type { ReactNode } from "react";
 import { isDecidable } from "selfie-store";
 import type { BlockerReason, PixelDiff, SnapshotRow, SnapshotState } from "../shared/api.ts";
+import { isLayoutOnly } from "../shared/regions.ts";
 import { AppLink, runPath } from "./router.tsx";
 
 export const shortSha = (sha: string) => sha.slice(0, 10);
@@ -100,8 +101,9 @@ export const sizeChanged = ({ current, golden }: PixelDiff) => current.width !==
 
 export function describePixels(diff: PixelDiff | null): string {
   if (diff === null) return "";
-  const percent = (diff.changedPixels / diff.totalPixels) * 100;
   const size = sizeChanged(diff) ? `, ${diff.golden.width}×${diff.golden.height} to ${diff.current.width}×${diff.current.height}` : "";
+  if (isLayoutOnly(diff)) return `Moved and spacing only${size}`;
+  const percent = (diff.changedPixels / diff.totalPixels) * 100;
   return `${plural(diff.changedPixels, "pixel")} (${percent < 0.01 ? "<0.01" : percent.toFixed(2)}%)${size}`;
 }
 
