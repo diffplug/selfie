@@ -181,7 +181,6 @@ function Blockers({ view, onShow }: { view: RunView; onShow: (show: Show) => voi
 
 const ADVISORIES: readonly { readonly reason: AdvisoryReason; readonly words: string }[] = [
   { reason: "play-error", words: "whose play function threw" },
-  { reason: "unstable", words: "that rendered differently twice" },
 ];
 
 function Advisories({ view }: { view: RunView }) {

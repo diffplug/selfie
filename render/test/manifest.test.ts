@@ -6,7 +6,6 @@ import {
   storyFileName,
   toManifestStory,
   totalsOf,
-  withRepeat,
   writeManifest,
   type Manifest,
 } from "../src/manifest.ts";
@@ -63,8 +62,6 @@ describe("toManifestStory", () => {
       height: 20,
       pngSha256: "aaa",
       errors: [],
-      stability: "unchecked",
-      repeatFile: null,
       durationMs: 5,
     });
   });
@@ -82,58 +79,8 @@ describe("toManifestStory", () => {
   });
 });
 
-describe("withRepeat", () => {
-  const first = toManifestStory(entry, okResult("aaa"), null);
-
-  test("calls a matching PNG stable and keeps no second file", () => {
-    expect(withRepeat(first, okResult("aaa"), null)).toMatchObject({ stability: "stable", repeatFile: null });
-  });
-
-  test("calls a differing PNG unstable and points at the second file", () => {
-    expect(withRepeat(first, okResult("bbb"), null)).toMatchObject({
-      stability: "unstable",
-      repeatFile: "repeat/a--b.png",
-    });
-  });
-
-  test("calls a story that failed its second render unstable", () => {
-    const story = withRepeat(first, failedResult, null);
-    expect(story).toMatchObject({ status: "ok", stability: "unstable", repeatFile: null });
-    expect(story.errors).toEqual([{ source: "repeat", message: "boom" }]);
-  });
-
-  test("calls a story the second worker never reached unstable", () => {
-    expect(withRepeat(first, undefined, "crashed").errors).toEqual([
-      { source: "repeat", message: "crashed" },
-    ]);
-  });
-
-  test("leaves a story that failed the first time unchecked", () => {
-    const failed = toManifestStory(entry, failedResult, null);
-    expect(withRepeat(failed, undefined, null).stability).toBe("unchecked");
-  });
-});
-
-test("totalsOf counts stories, failures, and unstable stories", () => {
+test("totalsOf counts stories and failures", () => {
   const ok = toManifestStory(entry, okResult("aaa"), null);
-  const stories = [
-    ok,
-    withRepeat(ok, okResult("aaa"), null),
-    withRepeat(ok, okResult("bbb"), null),
-    toManifestStory(entry, failedResult, null),
-  ];
-  expect(totalsOf(stories)).toEqual({ stories: 4, failed: 1, unstable: 1 });
-});
-
-test("writeManifest leaves only a complete, parseable manifest", async () => {
-  const dir = await mkdtemp(path.join(os.tmpdir(), "selfie-render-manifest-"));
-  try {
-    const manifest = { schemaVersion: 1, stories: [] } as unknown as Manifest;
-    await writeManifest(dir, manifest);
-    await writeManifest(dir, manifest);
-    expect(await readdir(dir)).toEqual(["manifest.json"]);
-    expect(JSON.parse(await readFile(path.join(dir, "manifest.json"), "utf8"))).toEqual(manifest);
-  } finally {
-    await rm(dir, { recursive: true, force: true });
-  }
+  const stories = [ok, ok, toManifestStory(entry, failedResult, null)];
+  expect(totalsOf(stories)).toEqual({ stories: 3, failed: 1 });
 });

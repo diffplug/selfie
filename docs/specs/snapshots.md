@@ -34,7 +34,6 @@ A run is one recording of a set of snapshots against one full Git SHA in one env
 - **Must record a story that failed to render as a row with its failure message**, never leave it absent, so only a `recording` run can lack a story. A message is cut to 2,000 characters.
 - **Must record a story's play error as a message, cut the same way, whether or not it also has an image.** It changes no state and no acceptance ([Open questions](#open-questions)).
 - **Must refuse a snapshot whose image isn't stored**, so a row always has an image. Rows hold image keys, and the API only takes and returns image hashes, per `docs/specs/store.md` → Image identity.
-- **Must record whether each story was unstable, as the renderer reports it:** true, false, or null if nobody checked. A later run can't supply this for an earlier one (rationale). It changes no state and no acceptance ([Open questions](#open-questions)).
 - **Must let a run's newest result for a name replace the older one until it is finished**, and refuse any change after that, since a finished run may hold goldens.
 - **Must mark a run finished only in a statement that counts its rows against the number the caller expected.** A batch that never landed fails that count, and the run stays `recording`.
 - **Must refuse to compare a `recording` run**, since a snapshot it doesn't hold yet would read as removed.
@@ -68,7 +67,7 @@ Source of truth: `Snapshots.compareRun` in `store/src/core/snapshots.ts`.
 | `failed` | A failure | Anything |
 | `removed` | Nothing | An image |
 
-- **Must list only what isn't `unchanged`, and anything flagged unstable or with a play error, by default, with a count of every `unchanged` snapshot.** `includeUnchanged` lists them all (rationale).
+- **Must list only what isn't `unchanged`, and anything with a play error, by default, with a count of every `unchanged` snapshot.** `includeUnchanged` lists them all (rationale).
 - **Must refuse a baseline SHA that has no goldens in the run's environment**, rather than report everything as new. A null baseline means there are none yet, and gives `new` and `failed` only. That is what changing the environment starts from (`docs/specs/system.md`).
 - **Must return the decision on exactly the run's image for that name**, whatever the state, so `selfie review` can show what is already approved.
 
@@ -104,7 +103,7 @@ Source of truth: `CREATE_SNAPSHOT_TABLES` in `store/src/core/snapshots.ts`, `ini
 ```sql
 runs(key PK, id UNIQUE, git_sha, environment, started_at, finished_at, failed_count, dirty, baseline_sha, story_filter, reused_from_run, scale)
   INDEX runs_by_sha(git_sha, environment, started_at)
-run_snapshots(run_key, story, image_key, failure, unstable, play_error)  PK (run_key, story)  WITHOUT ROWID
+run_snapshots(run_key, story, image_key, failure, play_error)  PK (run_key, story)  WITHOUT ROWID
 decisions(environment, story, image_hash, decision, actor, decided_at)  PK (environment, story, image_hash)  WITHOUT ROWID
 goldens(git_sha, environment, run_key)  PK (git_sha, environment)  WITHOUT ROWID
 ```
@@ -138,5 +137,4 @@ Every run writes every row. At 10,000 snapshots a run and an assumed 100 runs a 
 - **Retention.** Every run keeps its rows, and nothing deletes one. Deleting needs to keep any run a golden points at, and `docs/specs/store.md` → Image keys forbids reusing a key, so `runs` would need a rule of its own.
 - **A reappearing image.** An approval never expires, so an image approved once under a name, later replaced, and later back again shows as approved. Decide whether a review should ask again (rationale).
 - **Play errors and acceptance.** A story whose play function failed still has its image, which can be approved and accepted. `selfie review` reports it as an advisory (`docs/specs/cli.md` → What blocks).
-- **Unstable stories and acceptance.** A flagged story with an unapproved image blocks `acceptRun` like any other. A story with unbounded variants gets a new image on nearly every run, so it needs a new approval each time and blocks every SHA from having goldens, which stops `find-baseline` finding any. Whether an unstable story may be accepted without one is the user's call (rationale).
 - **What acknowledging a removal means.** `acceptRun` checks a count, so it catches a reviewer who wasn't shown the removals, and not one who was shown them and missed that they were wrong.

@@ -63,10 +63,9 @@ describe("a first review, with no baseline", () => {
 
   test("leaves out what the document no longer carries", async () => {
     const { json } = await review();
-    for (const key of ["failures", "status", "storybookDir", "outputDir", "initScriptSha256", "timings", "dirty", "baselineSha", "stability", "needsAttention"]) {
+    for (const key of ["failures", "status", "storybookDir", "outputDir", "initScriptSha256", "timings", "dirty", "baselineSha", "needsAttention"]) {
       expect(json).not.toHaveProperty(key);
     }
-    expect(json.differences[0]).not.toHaveProperty("unstable");
   });
 
   test("becomes goldens with approve --all and accept, and then has nothing to report", async () => {
@@ -101,16 +100,6 @@ describe("a first review, with no baseline", () => {
     const found = await h.cli("find-baseline");
     expect(found.code).toBe(0);
     expect(found.json.sha).toBe(first.json.gitSha);
-  });
-
-  test("says whether stability was checked", async () => {
-    const { json } = await review();
-    expect(json.stabilityChecked).toBe(false);
-
-    h.stories = [{ id: "a--one", stability: "stable" }];
-    const checked = await review("--stability");
-    expect(checked.json.stabilityChecked).toBe(true);
-    expect(checked.json.unstable).toEqual([]);
   });
 
   test("at the merge-base, the next step is to accept here", async () => {
@@ -496,39 +485,33 @@ describe("blockers and advisories", () => {
     expect(refused.json.refusals[0]).toMatchObject({ reason: "run-has-failures", stories: ["a--two"] });
   });
 
-  test("play errors and unstable stories alone exit 0, and stay plainly visible", async () => {
+  test("play errors alone exit 0, and stay plainly visible", async () => {
     h.stories = [
       { id: "a--play", errors: [{ source: "play", message: "the play failed" }, { source: "console", message: "noise" }] },
-      { id: "a--wobbly", stability: "unstable", repeatColor: BLUE },
-      { id: "a--fine", stability: "stable" },
+      { id: "a--fine" },
     ];
-    const first = await review("--stability");
+    const first = await review();
     expect(first.code).toBe(1); // Everything is new, which does block.
-    expect(reasons(first.json.blockers)).toEqual(["new-unapproved", "new-unapproved", "new-unapproved"]);
+    expect(reasons(first.json.blockers)).toEqual(["new-unapproved", "new-unapproved"]);
     expect(first.json.advisories).toEqual([
       { story: "a--play", reason: "play-error", detail: "the play failed" },
-      { story: "a--wobbly", reason: "unstable", detail: null },
     ]);
-    expect(first.json.counts.advisories).toBe(2);
+    expect(first.json.counts.advisories).toBe(1);
     expect(first.json.playErrors[0]).toMatchObject({ story: "a--play", playError: "the play failed" });
     expect(await exists(first.json.playErrors[0].current)).toBe(true);
-    expect(first.json.unstable[0].story).toBe("a--wobbly");
-    expect(await exists(first.json.unstable[0].current)).toBe(true);
-    expect(await exists(first.json.unstable[0].repeat)).toBe(true);
 
     await h.cli("approve", first.json.runId, "--all");
     const accepted = await h.cli("accept", first.json.runId);
     expect(accepted.code).toBe(0);
-    expect(reasons(accepted.json.advisories)).toEqual(["play-error", "unstable"]);
+    expect(reasons(accepted.json.advisories)).toEqual(["play-error"]);
 
     // Unchanged, so nothing blocks, and they're still reported.
-    const next = await review("--stability");
+    const next = await review();
     expect(next.code).toBe(0);
     expect(next.json.blockers).toEqual([]);
     expect(next.json.differences).toEqual([]);
-    expect(next.json.counts.advisories).toBe(2);
+    expect(next.json.counts.advisories).toBe(1);
     expect(next.json.playErrors[0].story).toBe("a--play");
-    expect(next.json.unstable[0].story).toBe("a--wobbly");
   });
 
   test("a PNG the store refuses fails that story alone", async () => {

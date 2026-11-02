@@ -4,7 +4,7 @@
 
 ## Commands
 
-**Blockers and advisories.** Dormouse has two stories with real `play` errors, so with every attention item counted, every review of it exited 1 forever, and 1 stopped meaning anything: an agent learns to ignore it, or can't tell the two errors it knew about from a new one. So `play` errors and instability became advisories, which leave the exit code alone. The cost is the one the spec names, that a new `play` failure doesn't change the exit code. A blocker must be something accepting would refuse or a reviewer must decide, and those two kinds of finding aren't that. The user hasn't reviewed this.
+**Blockers and advisories.** Dormouse has two stories with real `play` errors, so with every attention item counted, every review of it exited 1 forever, and 1 stopped meaning anything: an agent learns to ignore it, or can't tell the two errors it knew about from a new one. So `play` errors became advisories, which leave the exit code alone. The cost is the one the spec names, that a new `play` failure doesn't change the exit code. A blocker must be something accepting would refuse or a reviewer must decide, and a `play` error is neither. The user hasn't reviewed this.
 
 **Exit 2 and a typo.** A pattern that matches nothing at all is 2, while one typo beside a good pattern is 1: the second run did render something, and would otherwise read as a pass.
 
@@ -25,8 +25,6 @@
 ## Review
 
 **A dirty run is recorded, not refused.** Rendering uncommitted work is the point of the loop. It can be compared and approved, and [`accept`](#accept) is where it stops.
-
-**Stability is off by default.** It renders everything twice, which on 541 stories costs 197 s against 70 s, and agents run this constantly.
 
 **A gitignored build isn't dirty.** It usually is ignored, so counting it would make every review dirty. The cost is the [open question](cli.md#open-questions) about stale builds.
 
@@ -81,9 +79,8 @@
 | First, 512 new images, 29 unchanged | 1 | 72.3 s | 63.1 s | 8.9 s | 2 ms | 56 ms |
 | Nothing changed, twice | 0 | 68.6 s, 70.1 s | 64.2 s, 65.7 s | 4.2 s, 4.1 s | 1 ms, 1 ms | 3 ms, 3 ms |
 | 130 changed by a CSS color | 1 | 73.9 s | 66.6 s | 5.3 s | 1 ms | 1,656 ms |
-| Nothing changed, `--stability` | 0 | 196.7 s | 192.2 s | 4.1 s | 1 ms | 3 ms |
 
-The two exit 0 rows list dormouse's 2 `play` errors as advisories, and no story was unstable with the freeze on. Capture is most of the time, as `docs/specs/render.rationale.md` found. Storing costs about 7.6 ms per image to decode and hash when it's already stored, and about 17 ms when it's new. A diff costs about 13 ms per changed story, for decoding two images, comparing 1.08 million pixels, and encoding. `approve` and `accept` take about 0.2 s on the same store, including on a run of 541 whose directory had been deleted.
+The exit 0 row lists dormouse's 2 `play` errors as advisories. Capture is most of the time, as `docs/specs/render.rationale.md` found. Storing costs about 7.6 ms per image to decode and hash when it's already stored, and about 17 ms when it's new. A diff costs about 13 ms per changed story, for decoding two images, comparing 1.08 million pixels, and encoding. `approve` and `accept` take about 0.2 s on the same store, including on a run of 541 whose directory had been deleted.
 
 **The loop on the 30-story sample** takes about 4.8 s, of which capture is about 4.3 s, storing about 280 ms, and comparing about 1 ms. A CSS color change touching 10 of the 30 added about 175 ms of diff work.
 
@@ -104,7 +101,7 @@ The two exit 0 rows list dormouse's 2 `play` errors as advisories, and no story 
 
 The estimate here was about 0.5 s, and the feature came in at about 0.25 s of wall time, of which about 85 ms is the review and the rest is starting Node.
 
-**Reused results match a real render.** Two `--no-reuse` renders and three reused runs each held the same image hash, failure, `play` error, and unstable flag as the first render, on 541 of 541 stories. A reused review of the 80-story change listed the same stories, states, hashes, and pixel diffs as the render it reused.
+**Reused results match a real render.** Two `--no-reuse` renders and three reused runs each held the same image hash, failure, and `play` error as the first render, on 541 of 541 stories. A reused review of the 80-story change listed the same stories, states, hashes, and pixel diffs as the render it reused.
 
 **One byte can change nothing, and that's right.** Two one-byte edits of `iframe-*.css` made invalid values (`display:flew`, `background-colox`), rendered, and reported 0 changes: those rules are also in `pocket-chrome-*.css`, so the browser used the duplicate. `.bg-transparent` from `#0000` to `#000f` is valid in the last sheet loaded, and changed 80 stories. A miss only means a render happens: what it reports is the render's own answer.
 
@@ -126,8 +123,6 @@ Without leaving these out, every build hashed differently and the feature would 
 **A failure is never replayed.** A story that timed out under load would otherwise fail forever on a build nobody changed, and the only way out would be a flag the agent has no reason to try. Only one more render is at stake.
 
 **Which errors may be reused.** On dormouse's 541 stories, a real capture's only errors were 2 `play` and the 2 `console` lines those same failures log. `play`, `console`, and `page` come from the project's own code, the same build repeats them, and none of them fails a story. `request` and the soft network `timeout` aren't reused: both can come from load, and neither is visible afterward, since a row doesn't record them. An allowed list means a new source starts out unreusable. The cost is that a project whose page always makes a failing off-origin request never reuses, and stderr names the story and the error. A `play` failure that depends on load is replayed too, which is a real gap: it stays listed as an advisory, and `--no-reuse` measures it again.
-
-**Stability always renders.** Someone asking for it wants a fresh measurement, and a remembered answer isn't one. It also keeps a remembered run's flags simple: nobody checked them, so nothing about instability is ever replayed, and neither is a `repeat` image the store doesn't keep.
 
 **A filter is answered only from a whole run.** A whole run holds every answer, and a filtered render is at most a few seconds, so it isn't worth a second key to remember one. On the 30-story sample a hit takes 0.25 s against 5.3 s, once a whole run of that build exists.
 

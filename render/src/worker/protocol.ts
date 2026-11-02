@@ -59,8 +59,7 @@ export type StoryErrorSource =
   | "page"
   | "console"
   | "request"
-  | "worker"
-  | "repeat";
+  | "worker";
 
 export interface StoryError {
   source: StoryErrorSource;

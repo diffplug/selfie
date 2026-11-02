@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { copyFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { availableParallelism } from "node:os";
 import path from "node:path";
 import {
@@ -51,7 +51,6 @@ export interface ReviewOptions {
   readonly buildCommand?: string | undefined;
   /** Story ID patterns. Defaults to every story. */
   readonly stories?: readonly string[] | undefined;
-  readonly stability?: boolean | undefined;
   readonly native?: boolean | undefined;
   /** False renders even if this exact build already rendered, and remembers the new render. Defaults to true. */
   readonly reuse?: boolean | undefined;
@@ -82,19 +81,12 @@ export interface ReviewResult {
   /** Modified, staged, and untracked paths while it rendered. */
   readonly dirtyPaths: readonly string[];
   readonly baseline: BaselineSearch;
-  readonly stabilityChecked: boolean;
   /** Within the run's filter. */
   readonly differences: readonly Difference[];
   readonly playErrors: readonly {
     readonly story: string;
     readonly playError: string;
     readonly current: string | null;
-  }[];
-  readonly unstable: readonly {
-    readonly story: string;
-    readonly current: string | null;
-    /** The second render, if it succeeded. */
-    readonly repeat: string | null;
   }[];
   readonly warnings: readonly string[];
   readonly timings: {
@@ -137,11 +129,6 @@ const playErrorOf = ({ errors }: ManifestStory) => {
   const play = errors.filter(({ source }) => source === "play");
   return play.length === 0 ? null : play.map(({ message }) => message).join("; ");
 };
-
-/** `null` stands for "nobody checked", which is also a failed story's answer. */
-function unstableFlag({ stability }: ManifestStory): boolean | null {
-  return stability === "unstable" ? true : stability === "stable" ? false : null;
-}
 
 /**
  * Stores a group's PNGs as written. A file the store refuses is that story's failure, not the
@@ -192,8 +179,8 @@ async function storeCapture(project: Project, captureDir: string, manifest: Mani
       const shared = { story: story.id, playError: playErrorOf(story) };
       records.push(
         imageHash !== undefined
-          ? { ...shared, imageHash, unstable: unstableFlag(story) }
-          : { ...shared, failure: failures.get(story.id)!, unstable: null },
+          ? { ...shared, imageHash }
+          : { ...shared, failure: failures.get(story.id)! },
       );
     }
   }
@@ -251,47 +238,25 @@ async function exportDifference(project: Project, runDir: string, snapshot: Comp
 }
 
 /** Exports what's needed to act on the comparison: only `changed` snapshots get diff work. */
-async function exportImages(project: Project, runDir: string, comparison: Comparison, captureDir: string, recording: Recording) {
+async function exportImages(project: Project, runDir: string, comparison: Comparison) {
   const { removed } = summarizeRun(comparison);
   const shown = [...comparison.snapshots.filter(({ state }) => isDecidable(state)), ...removed];
   // Each of these holds whole images in memory.
   const limit = Math.min(MAX_CONCURRENT_DIFFS, availableParallelism());
   const differences = await mapConcurrently(shown, limit, (snapshot) => exportDifference(project, runDir, snapshot));
 
-  // Unchanged stories can need a look too, so these get their images here.
-  const exportCurrent = async ({ story, imageHash }: ComparedSnapshot) => {
-    if (imageHash === null) return null;
-    return (await exportImage(project, await storyDirectory(runDir, story), "current.png", imageHash)).file;
-  };
+  // An unchanged story with a play error needs a look too, so these get their images here.
   const playErrors = await mapConcurrently(
     comparison.snapshots.filter(({ playError }) => playError !== null),
     limit,
-    async (snapshot) => ({
-      story: snapshot.story,
-      playError: snapshot.playError!,
-      current: await exportCurrent(snapshot),
+    async ({ story, playError, imageHash }) => ({
+      story,
+      playError: playError!,
+      current:
+        imageHash === null ? null : (await exportImage(project, await storyDirectory(runDir, story), "current.png", imageHash)).file,
     }),
   );
-
-  const exportRepeat = async (story: string) => {
-    const repeatFile = recording.repeatFiles.get(story) ?? null;
-    if (repeatFile === null) return null;
-    const checked = await regularFileInside(captureDir, repeatFile);
-    if ("refused" in checked) return null;
-    const file = path.join(await storyDirectory(runDir, story), "repeat.png");
-    await copyFile(checked.file, file);
-    return file;
-  };
-  const unstable = await mapConcurrently(
-    comparison.snapshots.filter(({ unstable: flag }) => flag === true),
-    limit,
-    async (snapshot) => ({
-      story: snapshot.story,
-      current: await exportCurrent(snapshot),
-      repeat: await exportRepeat(snapshot.story),
-    }),
-  );
-  return { differences, playErrors, unstable };
+  return { differences, playErrors };
 }
 
 /** What a capture says about a filter, as a fact for the run. */
@@ -305,7 +270,6 @@ interface Recording {
   readonly reusedFromRun: string | null;
   readonly storyIds: readonly string[];
   readonly warnings: readonly string[];
-  readonly repeatFiles: ReadonlyMap<string, string | null>;
   readonly records: () => Promise<readonly RecordedSnapshot[]>;
   /** Called with the finished run. */
   readonly finished: (run: Run) => Promise<void>;
@@ -341,8 +305,7 @@ async function replay(
     reusedFromRun: runId,
     storyIds,
     warnings: (storyFilterOf(patterns, storyIds)?.unmatched ?? []).map(unmatchedPatternWarning),
-    repeatFiles: new Map(),
-    // A remembered run is `complete`, so every row has an image, and nobody checked its stability.
+    // A remembered run is `complete`, so every row has an image.
     records: async () =>
       chosen.map(({ snapshot: { story, imageHash, playError } }) => ({ story, imageHash: imageHash!, playError })),
     finished: async () =>
@@ -363,12 +326,10 @@ async function renderFresh(
     readonly log: (line: string) => void;
   },
 ): Promise<Recording> {
-  const stability = options.stability ?? false;
   const manifest = await capture({
     storybookDir,
     outDir: captureDir,
     environment: settings.environment,
-    stability,
     log,
     ...(options.stories === undefined ? {} : { stories: [...options.stories] }),
     ...(settings.initScript === undefined ? {} : { initScript: settings.initScript }),
@@ -378,10 +339,9 @@ async function renderFresh(
     reusedFromRun: null,
     storyIds: manifest.stories.map(({ id }) => id),
     warnings: manifest.warnings,
-    repeatFiles: new Map(manifest.stories.map(({ id, repeatFile }) => [id, repeatFile])),
     records: () => storeCapture(project, captureDir, manifest),
     async finished(run) {
-      if (stability || options.stories !== undefined) return;
+      if (options.stories !== undefined) return;
       if (identity === null) {
         log("This render won't be reused: a native environment, or a build holding a symlink, can't be recognized.");
         return;
@@ -448,11 +408,9 @@ export async function review(project: Project, options: ReviewOptions): Promise<
     const baseline = await findBaseline(project, settings.environmentId);
     const dirtyBefore = await dirtyPaths(repo);
 
-    // 3. Capture, unless this exact build already rendered. Stability is a fresh measurement.
+    // 3. Capture, unless this exact build already rendered.
     const captureStarted = Date.now();
-    const identity = options.stability
-      ? null
-      : await renderIdentity({ storybookDir, environment: settings.environment, initScript: settings.initScript });
+    const identity = await renderIdentity({ storybookDir, environment: settings.environment, initScript: settings.initScript });
     const replayed = identity !== null && options.reuse !== false ? await replay(project, identity, options.stories, log) : null;
     const recording = replayed ?? (await renderFresh(project, captureDir, capture, { storybookDir, identity, settings, options, log }));
     const captured = Date.now();
@@ -484,7 +442,7 @@ export async function review(project: Project, options: ReviewOptions): Promise<
     // 7. Export, keep a cache of what was exported, and prune older runs.
     const runDir = runDirectory(project, run.id);
     await mkdir(runDir, { recursive: true });
-    const { differences, playErrors, unstable } = await exportImages(project, runDir, comparison, captureDir, recording);
+    const { differences, playErrors } = await exportImages(project, runDir, comparison);
     const diffed = Date.now();
     await writeReviewCache(project, run.id, {
       differences: differences.map(({ story, current, golden, diff, pixelDiff }) => ({
@@ -495,7 +453,6 @@ export async function review(project: Project, options: ReviewOptions): Promise<
         pixelDiff,
       })),
       playErrors: playErrors.map(({ story, current }) => ({ story, current })),
-      unstable,
     });
     await pruneOutput(project, run.id);
 
@@ -503,10 +460,8 @@ export async function review(project: Project, options: ReviewOptions): Promise<
       comparison,
       dirtyPaths: dirty,
       baseline,
-      stabilityChecked: options.stability ?? false,
       differences,
       playErrors,
-      unstable,
       warnings: recording.warnings,
       timings: {
         captureMs: captured - captureStarted,

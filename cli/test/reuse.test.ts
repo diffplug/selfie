@@ -144,7 +144,7 @@ describe("a render that isn't reusable", () => {
     expect((await review()).rendered).toBe(true);
   });
 
-  test.each(["request", "timeout", "worker", "repeat"] as const)("%s errors on an ok story, and stderr says which", async (source) => {
+  test.each(["request", "timeout", "worker"] as const)("%s errors on an ok story, and stderr says which", async (source) => {
     h.stories = [{ id: "a--one", errors: [{ source, message: "it happened\nand more" }] }];
     const { stderr } = await review();
     expect(stderr).toContain(`won't be reused: a--one had a ${source} error, which might not recur: it happened.`);
@@ -216,37 +216,6 @@ describe("play errors", () => {
     ]);
     await stat(second.json.playErrors[0].current);
     expect(reasons(second.json.advisories)).toEqual(["play-error"]);
-  });
-});
-
-describe("stability", () => {
-  beforeEach(() => {
-    h.stories = [{ id: "a--one", stability: "unstable", repeatColor: BLUE }];
-  });
-
-  test("always renders, even after a plain run of this build", async () => {
-    await review();
-    const checked = await review("--stability");
-    expect(checked.rendered).toBe(true);
-    expect(checked.json.reusedFromRun).toBeNull();
-    expect(checked.json.stabilityChecked).toBe(true);
-    expect(reasons(checked.json.advisories)).toEqual(["unstable"]);
-    await stat(checked.json.unstable[0].repeat);
-    expect((await review("--stability")).rendered).toBe(true);
-  });
-
-  test("isn't remembered, so it answers nothing", async () => {
-    await review("--stability");
-    const plain = await review();
-    expect(plain.rendered).toBe(true);
-    expect(plain.json.stabilityChecked).toBe(false);
-  });
-
-  test("leaves the plain run remembered, whatever it found", async () => {
-    const first = await review();
-    h.stories = [{ id: "a--one", failed: "Not this time" }];
-    await review("--stability");
-    expect((await review()).json.reusedFromRun).toBe(first.json.runId);
   });
 });
 

@@ -217,18 +217,18 @@ describe("Snapshots", () => {
       await model.recordSnapshots(run.id, [
         rendered("a", 1),
         { story: "b", failure: "Boom" },
-        { ...rendered("c", 2), unstable: true },
-        { ...rendered("d", 3), unstable: false },
-        { story: "e", failure: "Second render failed", unstable: true },
+        rendered("c", 2),
+        rendered("d", 3),
+        { story: "e", failure: "Second failure" },
       ]);
       expect(sent.flat()).toHaveLength(1);
       await model.finishRun(run.id, 5);
       expect(await heldBy(run.id)).toMatchObject([
-        { story: "a", state: "new", unstable: null },
-        { story: "b", state: "failed", unstable: null },
-        { story: "c", state: "new", unstable: true },
-        { story: "d", state: "new", unstable: false },
-        { story: "e", state: "failed", unstable: true },
+        { story: "a", state: "new" },
+        { story: "b", state: "failed" },
+        { story: "c", state: "new" },
+        { story: "d", state: "new" },
+        { story: "e", state: "failed" },
       ]);
     });
 
@@ -532,18 +532,6 @@ describe("Snapshots", () => {
       expect(await snapshots.acceptRun(run.id, null, 0)).toBe(true);
     });
 
-    it("doesn't let being unstable change what is accepted", async () => {
-      await goldensAt(SHA_A, [rendered("a", 1), rendered("b", 2)]);
-      // A flagged image that is unchanged needs nothing, and a flagged change needs its approval.
-      const head = await recordRun(SHA_B, [
-        { ...rendered("a", 1), unstable: true },
-        { ...rendered("b", 3), unstable: true },
-      ]);
-      expect(await snapshots.acceptRun(head.id, SHA_A, 0)).toBe(false);
-      await approve([rendered("b", 3)]);
-      expect(await snapshots.acceptRun(head.id, SHA_A, 0)).toBe(true);
-    });
-
     it("doesn't take an approval from another environment", async () => {
       const run = await recordRun(SHA_A, [rendered("a", 1)]);
       await approve([rendered("a", 1)], "other");
@@ -583,24 +571,24 @@ describe("Snapshots", () => {
   });
 
   describe("compare", () => {
-    it("lists only differences and anything unstable, unless asked for everything", async () => {
-      await goldensAt(SHA_A, [rendered("same", 1), rendered("shaky", 2), rendered("calm", 3)]);
+    it("lists only differences and any play error, unless asked for everything", async () => {
+      await goldensAt(SHA_A, [rendered("same", 1), rendered("played", 2), rendered("calm", 3)]);
       const run = await recordRun(SHA_B, [
         rendered("same", 1),
-        { ...rendered("shaky", 2), unstable: true },
-        { ...rendered("calm", 3), unstable: false },
+        { ...rendered("played", 2), playError: "Boom" },
+        rendered("calm", 3),
         { story: "broken", failure: "Boom" },
       ]);
 
       const differences = await snapshots.compareRun(run.id, SHA_A);
-      expect(differences.snapshots.map(({ story, state, unstable }) => [story, state, unstable])).toEqual([
+      expect(differences.snapshots.map(({ story, state, playError }) => [story, state, playError])).toEqual([
         ["broken", "failed", null],
-        ["shaky", "unchanged", true],
+        ["played", "unchanged", "Boom"],
       ]);
       expect(differences.unchangedCount).toBe(3);
 
       const everything = await snapshots.compareRun(run.id, SHA_A, { includeUnchanged: true });
-      expect(everything.snapshots.map(({ story }) => story)).toEqual(["broken", "calm", "same", "shaky"]);
+      expect(everything.snapshots.map(({ story }) => story)).toEqual(["broken", "calm", "played", "same"]);
       expect(everything.unchangedCount).toBe(3);
     });
 

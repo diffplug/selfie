@@ -14,7 +14,6 @@ export {
   type Manifest,
   type ManifestStory,
   type ManifestTotals,
-  type StabilityStatus,
 } from "./manifest.ts";
 export { filterStories, RenderError, unmatchedPatternWarning, type StoryEntry } from "./storybook.ts";
 export type { StoryError, WorkerRuntime } from "./worker/protocol.ts";

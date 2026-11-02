@@ -5,17 +5,15 @@ import { defineEnvironment, environmentId, launchArgs, type RenderEnvironment } 
 import { initScriptHash } from "./identity.ts";
 import {
   MANIFEST_FILE,
-  REPEAT_DIR,
   STORIES_DIR,
   storyFileName,
   toManifestStory,
   totalsOf,
-  withRepeat,
   writeManifest,
   type Manifest,
 } from "./manifest.ts";
-import { prepareRunner, runWorker, type WorkerOutcome } from "./runners.ts";
-import { filterStories, readStoryIndex, RenderError, unmatchedPatternWarning, type StoryEntry } from "./storybook.ts";
+import { prepareRunner, runWorker } from "./runners.ts";
+import { filterStories, readStoryIndex, RenderError, unmatchedPatternWarning } from "./storybook.ts";
 import { CAPTURE_RECIPE } from "./worker/protocol.ts";
 
 const DEFAULT_MAX_CONCURRENCY = 6;
@@ -23,26 +21,18 @@ const DEFAULT_STORY_TIMEOUT_MS = 60_000;
 const DEFAULT_SETTLE_MS = 100;
 /** Browser launch and shutdown, on top of the worst case for the stories themselves. */
 const RUN_OVERHEAD_MS = 90_000;
-/**
- * The repeat settles this much longer, so a timer shows up instead of matching by luck: with
- * equal timing, unfrozen stories matched in every run measured (see render.rationale.md).
- */
-const REPEAT_EXTRA_SETTLE_MS = 730;
-
 const NATIVE_WARNING =
   "Native runner: these images won't match other machines or the container. Use them for local experiments only.";
 
 export interface CaptureOptions {
   /** A built Storybook: the directory holding `index.json` and `iframe.html`. */
   storybookDir: string;
-  /** Receives `manifest.json`, `stories/`, and `repeat/`. Those are replaced; nothing else is touched. */
+  /** Receives `manifest.json` and `stories/`. Those are replaced; nothing else is touched. */
   outDir: string;
   /** Defaults to the pinned container. */
   environment?: RenderEnvironment;
   /** Story ID patterns, where `*` matches any run of characters. Defaults to every story. */
   stories?: string[];
-  /** Render every story a second time, settling longer, and flag those whose PNG differs. */
-  stability?: boolean;
   /** Stories rendered at once. Defaults to the machine's CPUs, at most 6. */
   concurrency?: number;
   /** The bound on one story, from opening its context to its screenshot. */
@@ -101,43 +91,10 @@ export async function capture(options: CaptureOptions): Promise<Manifest> {
   await prepareRunner(runner);
 
   const storiesDir = path.join(outDir, STORIES_DIR);
-  const repeatDir = path.join(outDir, REPEAT_DIR);
   await Promise.all(
-    [storiesDir, repeatDir, path.join(outDir, MANIFEST_FILE)].map((target) =>
-      rm(target, { recursive: true, force: true }),
-    ),
+    [storiesDir, path.join(outDir, MANIFEST_FILE)].map((target) => rm(target, { recursive: true, force: true })),
   );
   await mkdir(storiesDir, { recursive: true });
-
-  const pass = (
-    label: string,
-    passDir: string,
-    entries: StoryEntry[],
-    passSettleMs: number,
-  ): Promise<WorkerOutcome> => {
-    let finished = 0;
-    return runWorker({
-      runner,
-      buildDir,
-      outDir: passDir,
-      signal: options.signal,
-      onStory: (result) => {
-        finished += 1;
-        log(`${label} ${finished}/${entries.length} ${result.status} ${result.id}`);
-      },
-      job: {
-        stories: entries.map((story) => ({ id: story.id, file: storyFileName(story.id) })),
-        launchArgs: launchArgs(environment),
-        viewport: environment.viewport,
-        scale: environment.scale,
-        settleMs: passSettleMs,
-        initScript: options.initScript ?? null,
-        concurrency,
-        storyTimeoutMs,
-        runTimeoutMs: Math.ceil(entries.length / concurrency) * storyTimeoutMs + RUN_OVERHEAD_MS,
-      },
-    });
-  };
 
   const manifest: Manifest = {
     schemaVersion: 1,
@@ -164,28 +121,31 @@ export async function capture(options: CaptureOptions): Promise<Manifest> {
     return manifest;
   }
 
-  const first = await pass("render", storiesDir, stories, settleMs);
-  manifest.runtime = first.runtime;
-  manifest.stories = stories.map((story) => toManifestStory(story, first.results.get(story.id), first.crash));
-  if (first.crash !== null) warnings.push(`The worker stopped early: ${first.crash}`);
-  // Written now too, so a failure during the repeat still leaves the first pass's results.
+  let finished = 0;
+  const outcome = await runWorker({
+    runner,
+    buildDir,
+    outDir: storiesDir,
+    signal: options.signal,
+    onStory: (result) => {
+      finished += 1;
+      log(`render ${finished}/${stories.length} ${result.status} ${result.id}`);
+    },
+    job: {
+      stories: stories.map((story) => ({ id: story.id, file: storyFileName(story.id) })),
+      launchArgs: launchArgs(environment),
+      viewport: environment.viewport,
+      scale: environment.scale,
+      settleMs,
+      initScript: options.initScript ?? null,
+      concurrency,
+      storyTimeoutMs,
+      runTimeoutMs: Math.ceil(stories.length / concurrency) * storyTimeoutMs + RUN_OVERHEAD_MS,
+    },
+  });
+  manifest.runtime = outcome.runtime;
+  manifest.stories = stories.map((story) => toManifestStory(story, outcome.results.get(story.id), outcome.crash));
+  if (outcome.crash !== null) warnings.push(`The worker stopped early: ${outcome.crash}`);
   await save();
-
-  const passed = stories.filter((story) => first.results.get(story.id)?.status === "ok");
-  if (options.stability && passed.length > 0) {
-    await mkdir(repeatDir, { recursive: true });
-    // A second worker rather than a second loop, so a cold start is part of what's tested.
-    const second = await pass("repeat", repeatDir, passed, settleMs + REPEAT_EXTRA_SETTLE_MS);
-    if (second.crash !== null) warnings.push(`The worker stopped early during the repeat: ${second.crash}`);
-    manifest.stories = manifest.stories.map((story) =>
-      withRepeat(story, second.results.get(story.id), second.crash),
-    );
-    await Promise.all(
-      manifest.stories
-        .filter((story) => story.repeatFile === null)
-        .map((story) => rm(path.join(repeatDir, storyFileName(story.id)), { force: true })),
-    );
-    await save();
-  }
   return manifest;
 }

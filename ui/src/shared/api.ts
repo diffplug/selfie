@@ -39,7 +39,7 @@ export type BlockerReason =
   | "removed"
   | "pattern-unmatched";
 
-export type AdvisoryReason = "play-error" | "unstable";
+export type AdvisoryReason = "play-error";
 
 export interface Attention<Reason extends string> {
   /** Null only for `pattern-unmatched`. */
