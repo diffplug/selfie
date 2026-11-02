@@ -63,7 +63,7 @@ export function localReviewSource(project: Project, { native }: { readonly nativ
   };
 
   /** Diffs by content, so any run that compares these two images shares the work. */
-  const diffs = new Map<string, { diff: PixelDiff; png: Uint8Array | null }>();
+  const diffs = new Map<string, Promise<{ diff: PixelDiff; png: Uint8Array } | null>>();
 
   return {
     runView: async (runId) => viewOf(await compareAsReviewed(project, runId), await gitUserEmail(repo)),
@@ -111,7 +111,7 @@ export function localReviewSource(project: Project, { native }: { readonly nativ
 
     image: (hash) => store.getImage(hash),
 
-    async diff(current, golden) {
+    diff(current, golden) {
       const key = `${current}/${golden}`;
       const known = diffs.get(key);
       if (known !== undefined) {
@@ -120,15 +120,21 @@ export function localReviewSource(project: Project, { native }: { readonly nativ
         diffs.set(key, known);
         return known;
       }
-      const [currentImage, goldenImage] = await Promise.all([store.getPixels(current), store.getPixels(golden)]);
-      if (currentImage === null || goldenImage === null) return null;
-      const result = await diffToPng(currentImage, goldenImage);
-      diffs.set(key, result);
+      // Kept while it's working too, since a page asks for a diff's stats and its image at once.
+      const working = (async () => {
+        const [currentImage, goldenImage] = await Promise.all([store.getPixels(current), store.getPixels(golden)]);
+        return currentImage === null || goldenImage === null ? null : diffToPng(currentImage, goldenImage);
+      })();
+      diffs.set(key, working);
       for (const oldest of diffs.keys()) {
         if (diffs.size <= DIFFS_KEPT) break;
         diffs.delete(oldest);
       }
-      return result;
+      const forget = () => void diffs.delete(key);
+      working.then((result) => {
+        if (result === null) forget();
+      }, forget);
+      return working;
     },
   };
 }

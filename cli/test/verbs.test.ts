@@ -140,7 +140,7 @@ describe("a branch when the default branch has no goldens", () => {
     expect(json.baseline).toMatchObject({ sha: null, reason: "no-goldens" });
     expect(json.counts).toMatchObject({ unchanged: 1, changed: 1, new: 0, undecided: 1 });
     expect(json.differences.map(({ story, state }: any) => [story, state])).toEqual([["a--one", "changed"]]);
-    expect(json.differences[0].pixelDiff.kind).toBe("pixels");
+    expect(json.differences[0].pixelDiff.changedPixels).toBeGreaterThan(0);
     expect(json.next.join()).toContain("only to look at");
   });
 
@@ -279,7 +279,7 @@ describe("selfie review --baseline", () => {
       expect(code).toBe(1);
       expect(json.blockers).toEqual([]);
       expect(json.differences.map(({ story, state }: any) => [story, state])).toEqual([["a--one", "changed"]]);
-      expect(json.differences[0].pixelDiff.kind).toBe("pixels");
+      expect(json.differences[0].pixelDiff.changedPixels).toBeGreaterThan(0);
       expect(json.next.join()).toContain("for this review alone");
     });
 

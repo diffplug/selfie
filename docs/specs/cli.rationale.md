@@ -34,6 +34,8 @@
 
 **A branch's goldens, only to look at.** Reviewing Selfie's own stories on a branch read every story as new, until a run was compared with the branch's own earlier goldens by hand. So a run with no baseline is shown against them. Nothing about acceptance moves: every image still needs its own approval, so an image matching a golden that someone has since rejected is still refused. So what's shown and what's checked can differ. Blockers and the exit code stay with what's checked, or a review could exit 0 before `accept` refused it, and the document's `baseline` stays the real one, with `comparedWith` saying what this review showed.
 
+**Regions, starting from the edges.** Whole-page capture made any change in a page's height a size change, and a size change once compared nothing: on Selfie's own stories, moving one row put 5 of 18 changed stories there with nothing highlighted. Matching rows from each edge costs little, since a row compares in one call, and takes in every size. It's reported as a list of regions, though there's at most one, because the JSON is what agents read, and two numbers for the matching rows couldn't grow into several. Its limit is real: a heading changed near the top and rows moved near the bottom put everything between in one region, where shifted rows ghost (`docs/specs/cli.md` → Future).
+
 ### What blocks
 
 **An approved change doesn't.** This is what makes "commit, review again, no re-approval" exit 0, and it's the behavior `docs/specs/system.md` → Approvals asks for. The change stays in `differences`, with who approved it, so nothing is hidden.

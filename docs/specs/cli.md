@@ -99,7 +99,9 @@ A review of a named run starts at step 6. `selfie record` is steps 1 to 5, alway
 - **Must keep `--baseline` to this one review.** It changes nothing about the run: `selfie approve` and `selfie accept` still compare with the baseline the run recorded, its exports go under `runs/<run id>/against/<baseline>/`, and `review.json` isn't written. It exits 1 if anything differs, even when every image is approved, since the question was what differs (rationale).
 - **Must do diff work only on a `changed` snapshot.** A `new` or `removed` one exports its one image, and an unchanged one nothing, unless it has an advisory.
 - **Must write every exported image as a PNG, whatever the store keeps**, so a document's paths stay what they say and any agent can open them.
-- **Must report a different size as `pixelDiff.kind: "size-differs"`, with no diff image**, not as a failure.
+- **Must report what changed as regions:** rows of each image that correspond and differ, with everything outside them matching (rationale). Today there's at most one, from the edges inward: rows that match from the top, then from the bottom, are outside it, so adding a row marks only that row. Rows compare whole, so with different widths none match.
+- **Must compare a region's pixels from its top left, and count what only one image has as changed**, whether rows or columns, so images of any two sizes have stats and a diff image.
+- **Must mark a seam for a region whose only change is what was removed**, one highlighted row where it was, so every region has a place in the current image.
 - **Must make the diff image from the current image, faded to light gray, with changed pixels solid `#ff0050`.**
 - **Must treat a capture's unusable file as that story's failure**: a manifest path outside the capture directory, a path that isn't a regular file, or a PNG the store refuses. Other stories continue.
 - **Must fail with exit 2 if HEAD moves during the render, or if no story was captured**, since one Git SHA must describe the run, and a typo must not pass.
@@ -166,7 +168,7 @@ Every path is absolute, and names a file that exists until it is pruned.
 | `warnings[]` | The manifest's |
 | `next[]` | What to do next, in words and commands |
 
-`pixelDiff` is `{ kind: "pixels", changedPixels, totalPixels, boundingBox, firstChanged, maxChannelDelta }`, where `firstChanged` is the first changed pixel in reading order, or `{ kind: "size-differs", current, golden }` with their widths and heights, and is null unless `changed`.
+`pixelDiff` is `{ current, golden, regions, changedPixels, totalPixels, boundingBox, firstChanged, maxChannelDelta }`, where `current` and `golden` are each image's `width` and `height`, each of `regions` is `{ current, golden }` with that image's `y` and `height`, `totalPixels` is the larger image's, `changedPixels` includes what only the golden has, `firstChanged` is the first changed pixel in reading order, and `maxChannelDelta` is 0 if no pixel compared. It is null unless `changed`.
 
 - **Must keep a difference's hashes**, so a UI can cache images by content.
 - **Must say, when the baseline is null and HEAD isn't the merge-base, that goldens accepted on this branch only show later reviews here what changed, and that a baseline takes accepting on the default branch**, since its merge-base may not have these stories yet.
@@ -283,9 +285,13 @@ Story IDs come from a project's build, and a manifest's paths from a directory i
 - A way for a branch's reviewer to have a baseline when only other machines accepted the default branch's goldens.
 - A pushed run carrying `reused_from_run`, since the cloud's `trust` must be able to tell a reused run from one rendered at its SHA. That ID may name a run never pushed. Whether to also record the build's identity can wait for `trust`.
 
-### An edges-in differ
+### Regions
 
-`size-differs` compares no pixels, and with whole-page capture any change in a page's height lands there, such as adding one row to a list. An edges-in differ would match rows inward from the top and from the bottom, so an inserted band is what's marked, rather than everything below it. It replaces `size-differs` for a height change, and may also make a same-size diff smaller when content has shifted.
+One region covers everything between the first and last difference, so a page with a change near the top and rows shifted near the bottom compares everything between them from the top, and the shifted rows ghost like a double exposure. To split it:
+
+- Align rows inside the band, anchored on rows unique to each image, since blank space and borders repeat, and exact matching on those would split a change into slivers that each need an approval.
+- A replaced span compares as a region does now, an inserted one is all highlight, and a deleted one is a seam.
+- Decisions on regions, where approving a whole image is approving its one region (`docs/specs/snapshots.md` → Future).
 
 ### A render that does change
 

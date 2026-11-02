@@ -120,7 +120,7 @@ Source of truth: `ui/src/client/`.
 - **Must center a change on stacking the images and on every zoom:** the bounding box if it fits, or else the first changed pixel, since a large box's center may hold no change at all (rationale). A box too small to find is outlined, and the outline can be turned off.
 - **Must keep how someone is looking when moving between stories**, and must never show one story's image under another's name while it loads.
 - **Must compute diff images, and pixel stats a run's `review.json` no longer holds, on demand, from the store, by hash pair**, so a pruned run reads like any other. A list shows stats only from `review.json`, and one snapshot uses them rather than ask (rationale).
-- **Must explain each kind of snapshot:** new has no golden, removed has no current and takes no decision, failed shows its message, and a changed size shows both images from their top left corners, with no diff image.
+- **Must explain each kind of snapshot:** new has no golden, removed has no current and takes no decision, failed shows its message, and a changed size says so, and shows the images from their top left corners.
 - **Must not offer a decision on what has no image to decide on.**
 
 **Accepting** shows, in plain words, every refusal `accept` would give, and what to do about it.

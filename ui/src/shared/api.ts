@@ -12,24 +12,28 @@ export interface BoundingBox {
   readonly height: number;
 }
 
-export type PixelDiff =
-  | {
-      readonly kind: "pixels";
-      readonly changedPixels: number;
-      readonly totalPixels: number;
-      /** Null only if the images are identical, which a `changed` snapshot never is. */
-      readonly boundingBox: BoundingBox | null;
-      /** The first changed pixel in reading order, which `boundingBox`'s center need not be. */
-      readonly firstChanged: { readonly x: number; readonly y: number } | null;
-      /** The largest difference in any one channel of any pixel, 1 to 255. */
-      readonly maxChannelDelta: number;
-    }
-  | {
-      /** Nothing lines up, so there are no pixels to compare and no diff image. */
-      readonly kind: "size-differs";
-      readonly current: { readonly width: number; readonly height: number };
-      readonly golden: { readonly width: number; readonly height: number };
-    };
+/** Rows of each image that correspond, and differ. Everything outside a region matches. */
+export interface ChangedRegion {
+  readonly current: { readonly y: number; readonly height: number };
+  readonly golden: { readonly y: number; readonly height: number };
+}
+
+export interface PixelDiff {
+  readonly current: { readonly width: number; readonly height: number };
+  readonly golden: { readonly width: number; readonly height: number };
+  /** Top to bottom. */
+  readonly regions: readonly ChangedRegion[];
+  /** Including what only the golden has, which isn't in `boundingBox`. */
+  readonly changedPixels: number;
+  /** The larger image's. */
+  readonly totalPixels: number;
+  /** In the current image. If something was only removed, the row marking where. Null only if the images are identical, which a `changed` snapshot never is. */
+  readonly boundingBox: BoundingBox | null;
+  /** The first changed pixel in reading order, which `boundingBox`'s center need not be. */
+  readonly firstChanged: { readonly x: number; readonly y: number } | null;
+  /** The largest difference in any one channel where both images have a pixel, 0 to 255. */
+  readonly maxChannelDelta: number;
+}
 
 export type BlockerReason =
   | "failed"
@@ -164,8 +168,8 @@ export interface ReviewSource {
   accept(runId: string, removedSeen: number | undefined): Promise<AcceptOutcome>;
   /** The stored bytes, or null if this store doesn't hold it. */
   image(hash: string): Promise<Uint8Array | null>;
-  /** Null if the store doesn't hold both. A size difference has no `png`. */
-  diff(current: string, golden: string): Promise<{ diff: PixelDiff; png: Uint8Array | null } | null>;
+  /** Null if the store doesn't hold both. */
+  diff(current: string, golden: string): Promise<{ diff: PixelDiff; png: Uint8Array } | null>;
 }
 
 /** The custom header every state-changing request needs, since a form on another site can't send one. */

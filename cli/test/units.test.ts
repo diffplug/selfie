@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { diffImages } from "../src/diff.ts";
 import { assertRunId, normalizeOrigin, projectSlug, regularFileInside, resolveInside, selfieHome, storyDirName } from "../src/paths.ts";
 import { encodePng } from "../src/png.ts";
-import { BLUE, RED, solid } from "./support.ts";
+import { BLUE, GREEN, RED, solid, type Color } from "./support.ts";
 
 const slug = (origin: string) => projectSlug({ origin, commonDir: "/unused" });
 
@@ -153,30 +153,105 @@ describe("diffImages", () => {
     current.pixels.set([200, 20, 30], (2 * 4 + 3) * 3);
     const { diff, highlighted } = diffImages(current, golden);
     expect(diff).toEqual({
-      kind: "pixels",
+      current: { width: 4, height: 3 },
+      golden: { width: 4, height: 3 },
+      regions: [{ current: { y: 1, height: 2 }, golden: { y: 1, height: 2 } }],
       changedPixels: 2,
       totalPixels: 12,
       boundingBox: { x: 1, y: 1, width: 3, height: 2 },
       firstChanged: { x: 1, y: 1 },
       maxChannelDelta: 190,
     });
-    expect([...highlighted!.pixels.subarray((1 * 4 + 1) * 3, (1 * 4 + 1) * 3 + 3)]).toEqual([255, 0, 80]);
+    expect([...highlighted.pixels.subarray((1 * 4 + 1) * 3, (1 * 4 + 1) * 3 + 3)]).toEqual([255, 0, 80]);
     // An unchanged pixel fades to gray.
-    const [r, g, b] = highlighted!.pixels;
+    const [r, g, b] = highlighted.pixels;
     expect(r).toBe(g);
     expect(g).toBe(b);
     expect(r!).toBeGreaterThanOrEqual(190);
   });
 
-  test("reports a different size as a state, with no image", () => {
+  /** Rows of solid color, from one letter each. */
+  const rowsOf = (width: number, colors: string) => {
+    const palette: Record<string, Color> = { r: RED, g: GREEN, b: BLUE, k: [0, 0, 0] };
+    const pixels = new Uint8Array(width * colors.length * 3);
+    [...colors].forEach((color, y) => pixels.set(solid(width, 1, palette[color]!).pixels, y * width * 3));
+    return { width, height: colors.length, pixels };
+  };
+  const HIGHLIGHT = [255, 0, 80];
+  const highlightedRows = ({ width, height, pixels }: { width: number; height: number; pixels: Uint8Array }) =>
+    Array.from({ length: height }, (_, y) => y).filter((y) => [...pixels.subarray(y * width * 3, y * width * 3 + 3)].join() === HIGHLIGHT.join());
+
+  test("adding a row marks only that row", () => {
+    const { diff, highlighted } = diffImages(rowsOf(2, "rgkb"), rowsOf(2, "rgb"));
+    expect(diff).toMatchObject({
+      current: { width: 2, height: 4 },
+      golden: { width: 2, height: 3 },
+      regions: [{ current: { y: 2, height: 1 }, golden: { y: 2, height: 0 } }],
+      changedPixels: 2,
+      totalPixels: 8,
+      boundingBox: { x: 0, y: 2, width: 2, height: 1 },
+      firstChanged: { x: 0, y: 2 },
+      maxChannelDelta: 0,
+    });
+    expect(highlightedRows(highlighted)).toEqual([2]);
+  });
+
+  test("removing a row counts what's gone, and marks the seam it left", () => {
+    const { diff, highlighted } = diffImages(rowsOf(2, "rgb"), rowsOf(2, "rgkb"));
+    expect(diff).toMatchObject({
+      regions: [{ current: { y: 2, height: 0 }, golden: { y: 2, height: 1 } }],
+      changedPixels: 2,
+      totalPixels: 8,
+      boundingBox: { x: 0, y: 2, width: 2, height: 1 },
+      firstChanged: { x: 0, y: 2 },
+    });
+    expect(highlightedRows(highlighted)).toEqual([2]);
+  });
+
+  test("removing the last rows leaves a seam inside the image", () => {
+    const { diff, highlighted } = diffImages(rowsOf(2, "rg"), rowsOf(2, "rgbk"));
+    expect(diff.boundingBox).toEqual({ x: 0, y: 1, width: 2, height: 1 });
+    expect(diff.changedPixels).toBe(4);
+    expect(highlightedRows(highlighted)).toEqual([1]);
+  });
+
+  test("a changed band of a different height compares from its top, and the rest is changed", () => {
+    const { diff, highlighted } = diffImages(rowsOf(1, "rkkkb"), rowsOf(1, "rgb"));
+    expect(diff).toMatchObject({ regions: [{ current: { y: 1, height: 3 }, golden: { y: 1, height: 1 } }], changedPixels: 3 });
+    expect(diff.maxChannelDelta).toBeGreaterThan(0);
+    expect(highlightedRows(highlighted)).toEqual([1, 2, 3]);
+  });
+
+  test("repeated rows can't match twice over", () => {
+    const { diff } = diffImages(rowsOf(1, "rrr"), rowsOf(1, "rr"));
+    expect(diff).toMatchObject({ regions: [{ current: { y: 2, height: 1 }, golden: { y: 2, height: 0 } }], changedPixels: 1 });
+    expect(diffImages(rowsOf(1, "rr"), rowsOf(1, "rrr")).diff).toMatchObject({ regions: [{ current: { y: 2, height: 0 }, golden: { y: 2, height: 1 } }], changedPixels: 1 });
+  });
+
+  test("identical images change nothing", () => {
+    const { diff, highlighted } = diffImages(rowsOf(2, "rgb"), rowsOf(2, "rgb"));
+    expect(diff).toMatchObject({ regions: [], changedPixels: 0, boundingBox: null, firstChanged: null });
+    expect(highlightedRows(highlighted)).toEqual([]);
+  });
+
+  test("different widths match no row, and compare from the top left", () => {
+    const wider = diffImages(rowsOf(3, "rg"), rowsOf(2, "rg")).diff;
+    expect(wider).toMatchObject({ regions: [{ current: { y: 0, height: 2 }, golden: { y: 0, height: 2 } }], changedPixels: 2, totalPixels: 6, boundingBox: { x: 2, y: 0, width: 1, height: 2 } });
+    const narrower = diffImages(rowsOf(2, "rg"), rowsOf(3, "rg")).diff;
+    expect(narrower).toMatchObject({ changedPixels: 2, totalPixels: 6 });
+    // Nothing visible changed here, so it marks where.
+    expect(narrower.boundingBox).toEqual({ x: 0, y: 0, width: 2, height: 1 });
+  });
+
+  test("different sizes in both directions still give a diff", () => {
     const { diff, highlighted } = diffImages(solid(4, 3, RED), solid(3, 4, BLUE));
-    expect(diff).toEqual({ kind: "size-differs", current: { width: 4, height: 3 }, golden: { width: 3, height: 4 } });
-    expect(highlighted).toBeNull();
+    expect(diff).toMatchObject({ current: { width: 4, height: 3 }, golden: { width: 3, height: 4 }, regions: [{ current: { y: 0, height: 3 }, golden: { y: 0, height: 4 } }] });
+    expect(highlighted.height).toBe(3);
   });
 
   test("the highlight image encodes and decodes", async () => {
     const { highlighted } = diffImages(solid(4, 3, RED), solid(4, 3, BLUE));
-    const decoded = await decodeImage(await encodePng(highlighted!));
-    expect([...decoded.pixels]).toEqual([...highlighted!.pixels]);
+    const decoded = await decodeImage(await encodePng(highlighted));
+    expect([...decoded.pixels]).toEqual([...highlighted.pixels]);
   });
 });

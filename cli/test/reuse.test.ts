@@ -435,6 +435,6 @@ describe("a reused run is a real run", () => {
     expect(changed.json.reusedFromRun).toBeNull();
     expect(changed.code).toBe(1);
     expect(changed.json.differences.map(({ story, state }: any) => [story, state])).toEqual([["a--one", "changed"]]);
-    expect(changed.json.differences[0].pixelDiff.kind).toBe("pixels");
+    expect(changed.json.differences[0].pixelDiff.changedPixels).toBeGreaterThan(0);
   });
 });

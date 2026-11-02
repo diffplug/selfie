@@ -77,7 +77,6 @@ describe.runIf(process.env.SELFIE_CLI_CONTAINER === "1")("in the pinned containe
     expect(changed.json.counts.changed).toBe(2);
     expect(changed.json.dirtyPaths).toContain("selfie.config.json");
     for (const { current, golden, diff, pixelDiff } of changed.json.differences) {
-      expect(pixelDiff.kind).toBe("pixels");
       expect(pixelDiff.changedPixels).toBeGreaterThan(0);
       expect(pixelDiff.maxChannelDelta).toBeGreaterThan(0);
       const images = await Promise.all([current, golden, diff].map(async (file) => decodeImage(await readFile(file))));

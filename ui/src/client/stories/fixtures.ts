@@ -40,16 +40,19 @@ const snapshot = (fields: Pick<ComparedSnapshot, "story" | "state"> & Partial<Sn
   ...fields,
 });
 
-const changedBetween =
-  (current: keyof typeof PIXEL_DIFFS & keyof typeof HASHES, golden: keyof typeof HASHES) =>
-  (story: string, extras: Extras = {}) =>
-    snapshot({ story, state: "changed", imageHash: HASHES[current], goldenHash: HASHES[golden], pixelDiff: PIXEL_DIFFS[current], ...extras });
+/** Between the two images a generated diff is named for. */
+const changedBetween = (pair: keyof typeof PIXEL_DIFFS) => {
+  const [current, golden] = pair.split("-") as [keyof typeof HASHES, keyof typeof HASHES];
+  return (story: string, extras: Extras = {}) =>
+    snapshot({ story, state: "changed", imageHash: HASHES[current], goldenHash: HASHES[golden], pixelDiff: PIXEL_DIFFS[pair], ...extras });
+};
 
 export const rows = {
-  changed: changedBetween("changed", "golden"),
-  tall: changedBetween("tallChanged", "tallGolden"),
-  taller: changedBetween("taller", "golden"),
-  double: changedBetween("doubleChanged", "doubleGolden"),
+  changed: changedBetween("changed-golden"),
+  tall: changedBetween("tallChanged-tallGolden"),
+  taller: changedBetween("taller-golden"),
+  shorter: changedBetween("golden-taller"),
+  double: changedBetween("doubleChanged-doubleGolden"),
   fresh: (story: string, extras: Extras = {}) => snapshot({ story, state: "new", imageHash: HASHES.fresh, ...extras }),
   removed: (story: string) => snapshot({ story, state: "removed", goldenHash: HASHES.gone }),
   failed: (story: string) =>

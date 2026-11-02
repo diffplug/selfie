@@ -13,7 +13,7 @@ import { Keys } from "./Keys.tsx";
 import { acceptPath, AppLink, navigate, runPath, storyPath } from "./router.tsx";
 import { ActionFailure } from "./RunNotes.tsx";
 import { LoadFailure, Loading } from "./Status.tsx";
-import { AdvisoryLabels, DecisionLabel, describePixels, plural, StateLabel } from "./words.tsx";
+import { AdvisoryLabels, DecisionLabel, describePixels, plural, sizeChanged, StateLabel } from "./words.tsx";
 
 const SHORTCUTS: readonly (readonly [string, string])[] = [
   ["j", "Next story"],
@@ -47,20 +47,18 @@ function ShortcutsDialog({ onClose }: { readonly onClose: () => void }) {
 }
 
 function PixelStats({ stats }: { stats: PixelDiff }) {
-  if (stats.kind === "size-differs") {
-    return <Text className="selfie-muted">{describePixels(stats)}</Text>;
-  }
   const box = stats.boundingBox;
   return (
     <Text className="selfie-muted">
       <strong>{describePixels(stats)}</strong> of {stats.totalPixels.toLocaleString()} changed
-      {box === null ? "" : `, within ${box.width}×${box.height} at ${box.x}, ${box.y}`}. The largest difference in a channel is{" "}
-      {stats.maxChannelDelta} of 255.
+      {box === null ? "" : `, within ${box.width}×${box.height} at ${box.x}, ${box.y}`}.{" "}
+      {`${plural(stats.regions.length, "changed region")}. `}
+      {stats.maxChannelDelta > 0 && ` The largest difference in a channel is ${stats.maxChannelDelta} of 255.`}
     </Text>
   );
 }
 
-function Notes({ row, sizeDiffers }: { row: SnapshotRow; sizeDiffers: boolean }) {
+function Notes({ row, diff }: { row: SnapshotRow; diff: PixelDiff | null }) {
   return (
     <>
       {row.state === "failed" && (
@@ -73,8 +71,8 @@ function Notes({ row, sizeDiffers }: { row: SnapshotRow; sizeDiffers: boolean })
         <Banner variant="warning" title="Removed story" description="The baseline has this golden, and this run doesn't have the story. There's no image to decide on: accepting asks you to acknowledge the removal." />
       )}
       {row.state === "unchanged" && <Banner variant="info" title="Unchanged" description="This image is the same as the baseline's." />}
-      {sizeDiffers && (
-        <Banner variant="warning" title="The size changed" description="The images have different dimensions, so nothing lines up and there's no diff image. They're shown from their top left corners." />
+      {diff !== null && sizeChanged(diff) && (
+        <Banner variant="warning" title="The size changed" description="The images are different sizes. The rows that still match are left out of the change, and the images are shown from their top left corners, so what's below the change won't line up when flipping." />
       )}
       {row.playError !== null && (
         <Banner variant="warning" title="Its play function threw" description={<code className="selfie-pre">{row.playError}</code>} />
@@ -232,7 +230,7 @@ export function DetailScreen({ state, view, story, search }: { state: RunState; 
           }
         />
       )}
-      <Notes row={row} sizeDiffers={diff?.kind === "size-differs"} />
+      <Notes row={row} diff={diff} />
       <ImageCompare row={row} diff={diff} scale={view.run.scale} />
       {helpOpen && <ShortcutsDialog onClose={() => setHelpOpen(false)} />}
     </Stack>

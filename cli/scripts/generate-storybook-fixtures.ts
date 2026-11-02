@@ -6,7 +6,7 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { encodePam, sha256, toHex, type RawImage } from "selfie-store";
-import { diffImages } from "../src/diff.ts";
+import { diffToPng } from "../src/diff.ts";
 import { encodePng } from "../src/png.ts";
 
 type Color = readonly [number, number, number];
@@ -74,6 +74,7 @@ const DIFFS = [
   ["changed", "golden"],
   ["tallChanged", "tallGolden"],
   ["taller", "golden"],
+  ["golden", "taller"],
   ["doubleChanged", "doubleGolden"],
 ] as const satisfies readonly (readonly [keyof typeof IMAGES, keyof typeof IMAGES])[];
 
@@ -91,13 +92,11 @@ for (const [name, image] of Object.entries(IMAGES)) {
 
 const pixelDiffs: Record<string, unknown> = {};
 for (const [current, golden] of DIFFS) {
-  const { diff, highlighted } = diffImages(IMAGES[current], IMAGES[golden]);
-  pixelDiffs[current] = diff;
-  if (highlighted !== null) {
-    const directory = path.join(output, "diffs", hashes[current]!, hashes[golden]!);
-    await mkdir(directory, { recursive: true });
-    await writeFile(path.join(directory, "image"), await encodePng(highlighted));
-  }
+  const { diff, png } = await diffToPng(IMAGES[current], IMAGES[golden]);
+  pixelDiffs[`${current}-${golden}`] = diff;
+  const directory = path.join(output, "diffs", hashes[current]!, hashes[golden]!);
+  await mkdir(directory, { recursive: true });
+  await writeFile(path.join(directory, "image"), png);
 }
 
 await writeFile(
