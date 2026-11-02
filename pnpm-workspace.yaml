@@ -1,0 +1,4 @@
+packages:
+  - store
+strictPeerDependencies: true
+minimumReleaseAge: 1440

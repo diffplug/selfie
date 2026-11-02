@@ -1,0 +1,10 @@
+// Checks the store core with Web-standard types only and no Node types, so a
+// platform import or global in src/core fails typecheck.
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "WebWorker"],
+    "types": []
+  },
+  "include": ["src/core"]
+}
