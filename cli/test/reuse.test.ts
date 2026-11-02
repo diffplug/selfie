@@ -13,12 +13,17 @@ let h: Harness;
 let build: string;
 let captures: number;
 
-/** Reviews, and says whether it rendered. */
-async function review(...flags: string[]) {
+/** Runs a command on the build, and says whether it rendered. */
+async function onBuild(command: "record" | "review", flags: string[]) {
   const before = captures;
-  const result = await h.cli("review", "--storybook-dir", build, ...flags);
+  const result = await h.cli(command, "--storybook-dir", build, ...flags);
   return { ...result, rendered: captures > before };
 }
+const review = (...flags: string[]) => onBuild("review", flags);
+const record = (...flags: string[]) => onBuild("record", flags);
+let commits = 0;
+/** A new commit the build doesn't hold, since a run is per commit. */
+const newCommit = () => commit(h.repo, `elsewhere ${++commits}`);
 const writeConfig = (config: unknown) => writeFile(path.join(h.repo, "selfie.config.json"), JSON.stringify(config));
 const inBuild = (file: string) => path.join(build, file);
 const reasons = (list: readonly any[]) => list.map(({ reason }) => reason);
@@ -42,11 +47,47 @@ afterEach(async () => {
 });
 
 describe("an unchanged build", () => {
-  test("skips capture, and records the same images in a new run", async () => {
+  test("at this commit, shows the run that's already there and records nothing", async () => {
     const first = await review();
     expect(first.rendered).toBe(true);
+
+    const second = await review();
+    expect(second.rendered).toBe(false);
+    expect(second.json.runId).toBe(first.json.runId);
+    expect(second.json.reusedFromRun).toBeNull();
+    expect(second.stderr).toContain(`Run ${first.json.runId} already describes this build`);
+    expect(second.json.counts).toEqual(first.json.counts);
+    expect(second.code).toBe(first.code);
+
+    const project = await openProject({ cwd: h.repo, env: { SELFIE_HOME: h.home } });
+    expect(await project.snapshots.runsAt(first.json.gitSha, first.json.environment)).toHaveLength(1);
+    project.close();
+  });
+
+  test.each([
+    ["the tree is now dirty", () => writeFile(path.join(h.repo, "untracked.txt"), "changed")],
+    ["the baseline moved", null],
+  ])("at this commit, records a new run if %s", async (_, change) => {
+    const first = await review();
+    if (change === null) {
+      await h.cli("approve", first.json.runId, "--all");
+      await h.cli("accept", first.json.runId);
+    } else {
+      await change();
+    }
+    const second = await review();
+    expect(second.rendered).toBe(false);
+    expect(second.json.runId).not.toBe(first.json.runId);
+    expect(second.json.reusedFromRun).toBe(first.json.runId);
+    // And now that one is what's already there.
+    expect((await review()).json.runId).toBe(second.json.runId);
+  });
+
+  test("at a new commit, skips capture, and records the same images in a new run", async () => {
+    const first = await review();
     expect(first.json.reusedFromRun).toBeNull();
 
+    await newCommit();
     const second = await review();
     expect(second.rendered).toBe(false);
     expect(second.json.reusedFromRun).toBe(first.json.runId);
@@ -61,14 +102,19 @@ describe("an unchanged build", () => {
 
   test("always names the run that really rendered, not another reuse", async () => {
     const first = await review();
+    await newCommit();
     await review();
+    await newCommit();
     expect((await review()).json.reusedFromRun).toBe(first.json.runId);
   });
 
   test("still hits after every exported file is pruned", async () => {
     const first = await review();
     await pruneRuns();
-    expect((await review()).json.reusedFromRun).toBe(first.json.runId);
+    const again = await review();
+    expect(again.rendered).toBe(false);
+    expect(again.json.runId).toBe(first.json.runId);
+    await stat(again.json.differences[0].current);
   });
 
   test("runs a build command first, and hits if it wrote the same bytes", async () => {
@@ -121,7 +167,9 @@ describe("a render that isn't reusable", () => {
     const fixed = await review();
     expect(fixed.rendered).toBe(true);
     expect(reasons(fixed.json.blockers)).not.toContain("failed");
-    expect((await review()).json.reusedFromRun).toBe(fixed.json.runId);
+    const next = await review();
+    expect(next.rendered).toBe(false);
+    expect(next.json.runId).toBe(fixed.json.runId);
   });
 
   test("a failed run is never replayed, even if it's somehow remembered", async () => {
@@ -161,7 +209,7 @@ describe("a render that isn't reusable", () => {
   test("a later render's failure forgets the earlier good one", async () => {
     await review();
     h.stories = [{ id: "a--one", failed: "It really does fail" }];
-    expect((await review("--no-reuse")).rendered).toBe(true);
+    expect((await record()).rendered).toBe(true);
     expect((await review()).rendered).toBe(true);
   });
 
@@ -209,6 +257,7 @@ describe("play errors", () => {
       },
     ];
     const first = await review();
+    await newCommit();
     const second = await review();
     expect(second.json.reusedFromRun).toBe(first.json.runId);
     expect(second.json.playErrors).toEqual([
@@ -237,9 +286,10 @@ describe("a filter", () => {
 
     const flags = ["--story", "a--one", "--story", "nope--*"];
     const reused = await review(...flags);
-    const rendered = await review(...flags, "--no-reuse");
+    const recorded = await record(...flags);
+    const rendered = await h.cli("review", recorded.json.runId);
     expect(reused.rendered).toBe(false);
-    expect(rendered.rendered).toBe(true);
+    expect(recorded.rendered).toBe(true);
     expect(reused.json.filter).toEqual(rendered.json.filter);
     expect(reused.json.filter.notRendered).toBe(1);
     expect(reused.json.warnings).toEqual(rendered.json.warnings);
@@ -268,18 +318,21 @@ describe("a filter", () => {
   test("a filtered render's failure leaves the whole run remembered", async () => {
     const whole = await review();
     h.stories = [{ id: "a--one", failed: "Not this time" }, { id: "a--two" }];
-    await review("--story", "a--one", "--no-reuse");
-    expect((await review()).json.reusedFromRun).toBe(whole.json.runId);
+    await record("--story", "a--one");
+    expect((await review()).json.runId).toBe(whole.json.runId);
   });
 });
 
-describe("turning it off", () => {
-  test("--no-reuse renders, and the render answers later reviews", async () => {
+describe("selfie record", () => {
+  test("always renders, and the render answers later reviews", async () => {
     await review();
-    const forced = await review("--no-reuse");
+    const forced = await record();
     expect(forced.rendered).toBe(true);
-    expect(forced.json.reusedFromRun).toBeNull();
-    expect((await review()).json.reusedFromRun).toBe(forced.json.runId);
+    expect((await record()).rendered).toBe(true);
+    const last = await record();
+    const next = await review();
+    expect(next.rendered).toBe(false);
+    expect(next.json.runId).toBe(last.json.runId);
   });
 
   test("the config has no key for it", async () => {
@@ -295,6 +348,7 @@ describe("a reused run is a real run", () => {
     const first = await review();
     expect(first.code).toBe(1);
 
+    await newCommit();
     const reused = await review();
     expect(reused.code).toBe(1);
     expect(reasons(reused.json.blockers)).toEqual(["new-unapproved", "new-unapproved"]);
@@ -324,6 +378,7 @@ describe("a reused run is a real run", () => {
 
   test("accept still knows after the run's directory is pruned", async () => {
     const first = await review();
+    await newCommit();
     const reused = await review();
     await h.cli("approve", reused.json.runId, "--all");
     await pruneRuns();

@@ -74,17 +74,23 @@ const SELECT_RUN = `SELECT ${RUN_COLUMNS} FROM runs WHERE id = ?1`;
 
 // The key of the run holding a baseline's goldens, only ever in the run's own
 // environment. Uncorrelated, so SQLite evaluates it once. An empty ?2 means no baseline.
-const BASELINE_RUN_KEY = `(SELECT g.run_key FROM goldens g
+const GOLDENS_RUN_KEY = `(SELECT g.run_key FROM goldens g
   WHERE g.git_sha = ?2 AND g.environment = (SELECT environment FROM runs WHERE id = ?1))`;
 
-const SELECT_BASELINE = `SELECT ${BASELINE_RUN_KEY} AS run_key`;
+// The key of a finished run named by ?2, only ever in the run's own environment.
+const NAMED_RUN_KEY = `(SELECT b.key FROM runs b
+  WHERE b.id = ?2 AND b.finished_at IS NOT NULL
+    AND b.environment = (SELECT environment FROM runs WHERE id = ?1))`;
 
-// `gs` joins before the images so that a row left out never reads them.
-const SELECT_COMPARED_PAGE = `SELECT rs.story, i.hash AS image_hash, rs.failure, rs.play_error,
+/** A comparison's statements, against whichever run a key expression finds. */
+const comparisonStatements = (baselineKey: string) => ({
+  baseline: `SELECT ${baselineKey} AS run_key`,
+  // `gs` joins before the images so that a row left out never reads them.
+  comparedPage: `SELECT rs.story, i.hash AS image_hash, rs.failure, rs.play_error,
   gi.hash AS golden_hash, d.decision, d.actor, d.decided_at
 FROM runs r
 CROSS JOIN run_snapshots rs ON rs.run_key = r.key
-LEFT JOIN run_snapshots gs ON gs.run_key = ${BASELINE_RUN_KEY} AND gs.story = rs.story
+LEFT JOIN run_snapshots gs ON gs.run_key = ${baselineKey} AND gs.story = rs.story
 LEFT JOIN images i ON i.key = rs.image_key
 LEFT JOIN images gi ON gi.key = gs.image_key
 LEFT JOIN decisions d ON d.environment = r.environment AND d.story = rs.story
@@ -93,24 +99,26 @@ WHERE r.id = ?1 AND rs.story > ?3
   AND (CAST(?5 AS INTEGER) = 1 OR rs.image_key IS NULL
     OR rs.image_key IS NOT gs.image_key OR rs.play_error IS NOT NULL)
 ORDER BY rs.story
-LIMIT CAST(?4 AS INTEGER)`;
-
-const SELECT_REMOVED_PAGE = `SELECT gs.story, gi.hash AS golden_hash
+LIMIT CAST(?4 AS INTEGER)`,
+  removedPage: `SELECT gs.story, gi.hash AS golden_hash
 FROM run_snapshots gs
 JOIN images gi ON gi.key = gs.image_key
-WHERE gs.run_key = ${BASELINE_RUN_KEY} AND gs.story > ?3
+WHERE gs.run_key = ${baselineKey} AND gs.story > ?3
   AND NOT EXISTS (SELECT 1 FROM run_snapshots rs
     WHERE rs.run_key = (SELECT key FROM runs WHERE id = ?1) AND rs.story = gs.story)
 ORDER BY gs.story
-LIMIT CAST(?4 AS INTEGER)`;
-
-const SELECT_UNCHANGED_COUNT = `SELECT COUNT(*) AS total
+LIMIT CAST(?4 AS INTEGER)`,
+  unchangedCount: `SELECT COUNT(*) AS total
 FROM run_snapshots rs
-JOIN run_snapshots gs ON gs.run_key = ${BASELINE_RUN_KEY} AND gs.story = rs.story
-WHERE rs.run_key = (SELECT key FROM runs WHERE id = ?1) AND rs.image_key = gs.image_key`;
+JOIN run_snapshots gs ON gs.run_key = ${baselineKey} AND gs.story = rs.story
+WHERE rs.run_key = (SELECT key FROM runs WHERE id = ?1) AND rs.image_key = gs.image_key`,
+});
+
+const AGAINST_GOLDENS = comparisonStatements(GOLDENS_RUN_KEY);
+const AGAINST_RUN = comparisonStatements(NAMED_RUN_KEY);
 
 const COUNT_REMOVED = `(SELECT COUNT(*) FROM run_snapshots gs
-  WHERE gs.run_key = ${BASELINE_RUN_KEY}
+  WHERE gs.run_key = ${GOLDENS_RUN_KEY}
     AND NOT EXISTS (SELECT 1 FROM run_snapshots rs
       WHERE rs.run_key = (SELECT key FROM runs WHERE id = ?1) AND rs.story = gs.story))`;
 
@@ -124,7 +132,7 @@ const ACCEPT_RUN = `INSERT INTO goldens(git_sha, environment, run_key)
 SELECT r.git_sha, r.environment, r.key
 FROM runs r
 WHERE r.id = ?1 AND r.finished_at IS NOT NULL AND r.failed_count = 0 AND r.dirty = 0
-  AND (?2 = '' OR ${BASELINE_RUN_KEY} IS NOT NULL)
+  AND (?2 = '' OR ${GOLDENS_RUN_KEY} IS NOT NULL)
   AND (
     EXISTS (SELECT 1 FROM goldens a
       WHERE a.git_sha = r.git_sha AND a.environment = r.environment AND a.run_key = r.key)
@@ -132,7 +140,7 @@ WHERE r.id = ?1 AND r.finished_at IS NOT NULL AND r.failed_count = 0 AND r.dirty
       ${COUNT_REMOVED} = CAST(?3 AS INTEGER)
       AND NOT EXISTS (
         SELECT 1 FROM run_snapshots rs
-        LEFT JOIN run_snapshots gs ON gs.run_key = ${BASELINE_RUN_KEY} AND gs.story = rs.story
+        LEFT JOIN run_snapshots gs ON gs.run_key = ${GOLDENS_RUN_KEY} AND gs.story = rs.story
         WHERE rs.run_key = r.key AND gs.image_key IS NOT rs.image_key
           AND NOT EXISTS (
             SELECT 1 FROM decisions d
@@ -296,7 +304,8 @@ export type SnapshotErrorCode =
   /** A snapshot named an image that isn't stored. */
   | "unknown-image"
   /** The baseline SHA has no goldens in the run's environment. */
-  | "no-goldens";
+  | "no-goldens"
+  | "no-baseline-run";
 
 /** The request can't apply to the data as it stands. */
 export class SnapshotError extends Error {
@@ -460,20 +469,36 @@ ORDER BY started_at DESC, key DESC`,
    * are none yet, so every rendered snapshot is `new`. Lists only what a reviewer needs
    * unless told otherwise: see `Comparison`.
    */
-  async compareRun(
-    runId: string,
-    baselineSha: string | null,
-    { includeUnchanged = false }: CompareOptions = {},
-  ): Promise<Comparison> {
+  async compareRun(runId: string, baselineSha: string | null, options?: CompareOptions): Promise<Comparison> {
     if (baselineSha !== null) assertGitSha(baselineSha);
-    const baseline = baselineSha ?? "";
+    return this.#compare(runId, baselineSha ?? "", AGAINST_GOLDENS, options, (found, run) =>
+      assertGoldensFound(baselineSha, found, run),
+    );
+  }
+
+  /** As `compareRun`, with the images of another finished run in this environment standing in for goldens. */
+  async compareWithRun(runId: string, baselineRunId: string, options?: CompareOptions): Promise<Comparison> {
+    return this.#compare(runId, baselineRunId, AGAINST_RUN, options, (found, run) => {
+      if (!found) {
+        throw new SnapshotError("no-baseline-run", `${baselineRunId} isn't a finished run in environment ${run.environment}`);
+      }
+    });
+  }
+
+  async #compare(
+    runId: string,
+    baseline: string,
+    statements: typeof AGAINST_GOLDENS,
+    { includeUnchanged = false }: CompareOptions = {},
+    assertFound: (found: boolean, run: Run) => void,
+  ): Promise<Comparison> {
     const comparedPage = (after: string): SqlStatement => ({
-      sql: SELECT_COMPARED_PAGE,
+      sql: statements.comparedPage,
       params: [runId, baseline, after, ROWS_PER_PAGE, includeUnchanged ? 1 : 0],
       idempotent: true,
     });
     const removedPage = (after: string): SqlStatement => ({
-      sql: SELECT_REMOVED_PAGE,
+      sql: statements.removedPage,
       params: [runId, baseline, after, ROWS_PER_PAGE],
       idempotent: true,
     });
@@ -482,14 +507,14 @@ ORDER BY started_at DESC, key DESC`,
     const [runRows, baselineRows, unchangedRows, firstCompared, firstRemoved] =
       (await this.#sql.batch([
         { sql: SELECT_RUN, params: [runId], idempotent: true },
-        { sql: SELECT_BASELINE, params: [runId, baseline], idempotent: true },
-        { sql: SELECT_UNCHANGED_COUNT, params: [runId, baseline], idempotent: true },
+        { sql: statements.baseline, params: [runId, baseline], idempotent: true },
+        { sql: statements.unchangedCount, params: [runId, baseline], idempotent: true },
         comparedPage(START),
         removedPage(START),
       ])) as [SqlRow[], SqlRow[], SqlRow[], SqlRow[], SqlRow[]];
 
     const run = finishedRun(runRows, runId);
-    assertBaselineFound(baselineSha, baselineRows, run);
+    assertFound(baselineRows[0]?.run_key !== null, run);
     const compared = await this.#remainingPages(firstCompared, comparedPage);
     const removed = await this.#remainingPages(firstRemoved, removedPage);
     return {
@@ -556,7 +581,7 @@ ON CONFLICT(environment, story, image_hash) DO UPDATE SET
     const baseline = baselineSha ?? "";
     const [runRows, baselineRows, accepted] = (await this.#sql.batch([
       { sql: SELECT_RUN, params: [runId], idempotent: true },
-      { sql: SELECT_BASELINE, params: [runId, baseline], idempotent: true },
+      { sql: AGAINST_GOLDENS.baseline, params: [runId, baseline], idempotent: true },
       { sql: ACCEPT_RUN, params: [runId, baseline, removedSeen], idempotent: true },
     ])) as [SqlRow[], SqlRow[], SqlRow[]];
 
@@ -573,7 +598,7 @@ ON CONFLICT(environment, story, image_hash) DO UPDATE SET
         `Run ${runId} was recorded on a dirty tree, so it doesn't describe ${run.gitSha}`,
       );
     }
-    assertBaselineFound(baselineSha, baselineRows, run);
+    assertGoldensFound(baselineSha, baselineRows[0]?.run_key !== null, run);
     if (accepted.length > 0) return true;
 
     const [removed] = await this.#sql.run({
@@ -699,12 +724,9 @@ function finishedRun(rows: readonly SqlRow[], runId: string): Run {
   return run;
 }
 
-function assertBaselineFound(baselineSha: string | null, rows: readonly SqlRow[], run: Run): void {
-  if (baselineSha !== null && rows[0]?.run_key === null) {
-    throw new SnapshotError(
-      "no-goldens",
-      `${baselineSha} has no goldens in environment ${run.environment}`,
-    );
+function assertGoldensFound(baselineSha: string | null, found: boolean, run: Run): void {
+  if (baselineSha !== null && !found) {
+    throw new SnapshotError("no-goldens", `${baselineSha} has no goldens in environment ${run.environment}`);
   }
 }
 

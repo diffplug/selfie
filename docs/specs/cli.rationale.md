@@ -10,6 +10,8 @@
 
 **Everything is one document, including failures.** An agent that parses stdout shouldn't need a second path for the failure case. A build command's stdout could break that, so it goes to stderr. Timings are for people, so they went to stderr too.
 
+**Two verbs rather than flags.** `--no-reuse` and `--stability` were flags on `review` because one verb did both jobs. Someone reviewing wants it as fast as possible, and someone recording wants a render, perhaps two a minute apart to look for flakiness, so each is a verb. The `--no-reuse` measurements here are what `selfie record` does now.
+
 ## Library
 
 **Facts and verdicts apart.** The local review UI is the next caller. It approves images one at a time, and must show what's left after each without re-rendering, so whatever computes a verdict must take only what `compareRun` returns. `summarizeRun` does, and the CLI's `blockers`, `advisories`, `undecided`, and a refusal's lists all come from it, so they can't disagree.
@@ -27,6 +29,8 @@
 **A dirty run is recorded, not refused.** Rendering uncommitted work is the point of the loop. It can be compared and approved, and [`accept`](#accept) is where it stops.
 
 **A gitignored build isn't dirty.** It usually is ignored, so counting it would make every review dirty. The cost is the [open question](cli.md#open-questions) about stale builds.
+
+**`--baseline` exits 1 on any difference.** Blockers answer "what stops accepting this run", and two runs that differ can have every image approved. Someone looking for flakiness is asking what differs.
 
 ### What blocks
 
@@ -131,6 +135,8 @@ Without leaving these out, every build hashed differently and the feature would 
 **A column added to `runs`, against the rule.** `docs/specs/store.md` → Open questions allows only new tables and indexes until migrations are decided, and `CREATE TABLE IF NOT EXISTS` can't add a column. It was made anyway since no project database holds this schema yet, and a separate table was the alternative. On a copy of an older store, `selfie review` renders and then fails with exit 2, `table runs has no column named reused_from_run`, and `accept` fails with `no such column: reused_from_run`. Anyone with a store from before this has to delete it.
 
 **`scale`, another column on `runs`.** The same exception, for the same reason, and it comes in the same unmerged stack, so it breaks no store that `reused_from_run` hadn't already. It's a fact about one run that every viewer wants with the run, so a separate table would only add a lookup.
+
+**A run at this commit needs no copy.** A review repeated at one commit used to copy every row into a new run, for nothing. A new commit still needs its own run, since goldens are per SHA, and so does a tree that became dirty or a baseline that moved, since a run records both.
 
 **The newest real render wins.** Pointing a key at the newest reused run would let `reusedFromRun` name a run that rendered nothing, so reuse never chains. Forgetting a key after a bad render means `--no-reuse` can't uncover a deterministic failure only to have the next review hide it behind an older pass.
 

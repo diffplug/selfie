@@ -8,6 +8,7 @@ export type SelfieErrorCode =
   | "head-moved"
   | "bad-run-id"
   | "unknown-run"
+  | "unknown-baseline"
   | "missing-image"
   | "no-actor"
   | "stale-decision"

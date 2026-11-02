@@ -1,15 +1,20 @@
 // What the CLI prints, as pure functions from the library's results. All command wording lives
 // here, since none of it belongs in anything a store or a UI would keep.
 import type { AcceptRefusal, AcceptResult } from "./decisions.ts";
-import type { ReviewResult } from "./review.ts";
+import type { RecordResult, ReviewResult } from "./review.ts";
 import { summarizeRun, type RunSummary } from "./summary.ts";
 
 const DIRTY_PATHS_SHOWN = 20;
 
 function nextSteps(result: ReviewResult, summary: RunSummary): string[] {
-  const { comparison, baseline, dirtyPaths } = result;
-  const { id: runId, gitSha } = comparison.run;
+  const { comparison, baseline, given } = result;
+  const { id: runId, gitSha, dirty, baselineSha } = comparison.run;
   const steps: string[] = [];
+  if (given !== null) {
+    return [
+      `This compared with ${given.run ?? given.sha} for this review alone. selfie approve and selfie accept still compare with ${baselineSha ?? "no baseline"}, the baseline this run recorded.`,
+    ];
+  }
   if (summary.counts.undecided > 0) {
     steps.push(`Look at the images, then: selfie approve ${runId} --all, or with --story <pattern>, or selfie reject.`);
   }
@@ -21,7 +26,7 @@ function nextSteps(result: ReviewResult, summary: RunSummary): string[] {
       `There's no baseline yet, and goldens accepted on a feature branch aren't read by later reviews. To make one, check out ${baseline.mergeBase} on ${baseline.defaultBranch ?? "the default branch"}, then selfie review, selfie approve, and selfie accept there.`,
     );
   }
-  if (dirtyPaths.length > 0) {
+  if (dirty) {
     steps.push("This tree is dirty, so this run can't become goldens. Commit, and review again: approvals carry over.");
   } else if (!offTheBaselineHistory && result.differences.length > 0 && summary.failed.length === 0) {
     const removed = summary.removed.length + summary.notRendered.length;
@@ -34,7 +39,7 @@ function nextSteps(result: ReviewResult, summary: RunSummary): string[] {
 
 /** The one document `selfie review` prints. */
 export function buildReviewDocument(result: ReviewResult) {
-  const { comparison, baseline, dirtyPaths, differences, playErrors, warnings } = result;
+  const { comparison, baseline, given, dirtyPaths, differences, playErrors, warnings } = result;
   const { run } = comparison;
   const summary = summarizeRun(comparison);
   return {
@@ -42,8 +47,12 @@ export function buildReviewDocument(result: ReviewResult) {
     runId: run.id,
     reusedFromRun: run.reusedFromRun,
     gitSha: run.gitSha,
+    dirty: run.dirty,
     dirtyPaths: dirtyPaths.slice(0, DIRTY_PATHS_SHOWN),
-    baseline: { sha: baseline.sha, reason: baseline.reason, message: baseline.message },
+    baseline:
+      given === null
+        ? { sha: baseline.sha, run: null, given: false, reason: baseline.reason, message: baseline.message }
+        : { sha: given.sha ?? null, run: given.run ?? null, given: true, reason: null, message: null },
     environment: run.environment,
     filter:
       run.storyFilter === null
@@ -56,6 +65,23 @@ export function buildReviewDocument(result: ReviewResult) {
     playErrors,
     warnings,
     next: nextSteps(result, summary),
+  };
+}
+
+/** The one document `selfie record` prints. It only says what was recorded: judging it is `selfie review`'s. */
+export function buildRecordDocument({ run, dirtyPaths, baseline, warnings }: RecordResult) {
+  return {
+    schemaVersion: 1,
+    runId: run.id,
+    gitSha: run.gitSha,
+    dirty: run.dirty,
+    dirtyPaths: dirtyPaths.slice(0, DIRTY_PATHS_SHOWN),
+    baseline: { sha: baseline.sha, reason: baseline.reason, message: baseline.message },
+    environment: run.environment,
+    status: run.status,
+    failedCount: run.failedCount,
+    warnings,
+    next: [`See what it changed: selfie review ${run.id}`, `Compare it with another run: selfie review ${run.id} --baseline <run>`],
   };
 }
 

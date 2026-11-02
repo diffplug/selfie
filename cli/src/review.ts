@@ -27,13 +27,14 @@ import {
 import { resolveCaptureSettings, type CaptureSettings } from "./config.ts";
 import { diffToPng, type PixelDiff } from "./diff.ts";
 import { SelfieError } from "./errors.ts";
-import { dirtyPaths, headSha, type BaselineSearch } from "./git.ts";
-import { regularFileInside, storyDirName } from "./paths.ts";
+import { dirtyPaths, headSha, resolveCommit, type BaselineSearch } from "./git.ts";
+import { isRunId, regularFileInside, storyDirName } from "./paths.ts";
 import { encodePng } from "./png.ts";
 import {
   captureDirectory,
   findBaseline,
   pruneOutput,
+  requireRun,
   runDirectory,
   writeReviewCache,
   type Project,
@@ -44,7 +45,7 @@ import { isDecidable, summarizeRun } from "./summary.ts";
 const IMAGES_PER_GROUP = 100;
 const MAX_CONCURRENT_DIFFS = 6;
 
-export interface ReviewOptions {
+export interface RecordOptions {
   /** Relative to the project's `cwd`. */
   readonly storybookDir: string;
   /** The caller's own command, run in a shell. Its stdout goes to stderr. */
@@ -52,14 +53,21 @@ export interface ReviewOptions {
   /** Story ID patterns. Defaults to every story. */
   readonly stories?: readonly string[] | undefined;
   readonly native?: boolean | undefined;
-  /** False renders even if this exact build already rendered, and remembers the new render. Defaults to true. */
-  readonly reuse?: boolean | undefined;
   /** Defaults to the renderer's. */
   readonly capture?: typeof realCapture | undefined;
   readonly signal?: AbortSignal | undefined;
   /** Progress for people. Defaults to nothing. */
   readonly log?: ((line: string) => void) | undefined;
 }
+
+/** A run to review, or else what to record one from if this build has none. */
+export type ReviewOptions = ({ readonly run: string } | (RecordOptions & { readonly run?: undefined })) & {
+  /** A commit with goldens, or a finished run. It changes this review alone: `accept` still checks the run's own. */
+  readonly baseline?: string | undefined;
+};
+
+/** What `--baseline` resolved to. */
+export type GivenBaseline = { readonly sha: string; readonly run?: undefined } | { readonly run: string; readonly sha?: undefined };
 
 export interface Difference {
   readonly story: string;
@@ -78,9 +86,12 @@ export interface Difference {
 export interface ReviewResult {
   /** Everything about the run, as `summarizeRun` reads it. */
   readonly comparison: Comparison;
-  /** Modified, staged, and untracked paths while it rendered. */
+  /** Modified, staged, and untracked paths while it rendered. Empty for a run that was named. */
   readonly dirtyPaths: readonly string[];
+  /** The run's own: what `accept` checks. */
   readonly baseline: BaselineSearch;
+  /** What this review compared with instead, if anything. */
+  readonly given: GivenBaseline | null;
   /** Within the run's filter. */
   readonly differences: readonly Difference[];
   readonly playErrors: readonly {
@@ -271,7 +282,7 @@ interface Recording {
   readonly storyIds: readonly string[];
   readonly warnings: readonly string[];
   readonly records: () => Promise<readonly RecordedSnapshot[]>;
-  /** Called with the finished run. */
+  /** Called with the finished run, if a new one was recorded. */
   readonly finished: (run: Run) => Promise<void>;
 }
 
@@ -309,11 +320,11 @@ async function replay(
     records: async () =>
       chosen.map(({ snapshot: { story, imageHash, playError } }) => ({ story, imageHash: imageHash!, playError })),
     finished: async () =>
-      log(`Reused the images of run ${runId}, since this exact build already rendered. --no-reuse renders again.`),
+      log(`Reused the images of run ${runId}, since this exact build already rendered. selfie record renders again.`),
   };
 }
 
-/** Captures the build. Only a plain review of every story can answer a later one, so only it is remembered. */
+/** Captures the build. Only a render of every story can answer a later review, so only it is remembered. */
 async function renderFresh(
   project: Project,
   captureDir: string,
@@ -322,7 +333,7 @@ async function renderFresh(
     readonly storybookDir: string;
     readonly identity: string | null;
     readonly settings: CaptureSettings;
-    readonly options: ReviewOptions;
+    readonly options: RecordOptions;
     readonly log: (line: string) => void;
   },
 ): Promise<Recording> {
@@ -355,16 +366,19 @@ async function renderFresh(
   };
 }
 
+/** What a run says about where it was recorded. */
+interface RunFacts {
+  readonly gitSha: string;
+  readonly settings: CaptureSettings;
+  readonly dirty: boolean;
+  readonly baselineSha: string | null;
+  readonly storyFilter: StoryFilter | null;
+}
+
 async function recordRun(
   project: Project,
   recording: Recording,
-  fields: {
-    gitSha: string;
-    settings: CaptureSettings;
-    dirty: boolean;
-    baselineSha: string | null;
-    storyFilter: StoryFilter | null;
-  },
+  fields: RunFacts,
 ): Promise<Run> {
   const { snapshots } = project;
   const run = await snapshots.beginRun({
@@ -381,11 +395,31 @@ async function recordRun(
   return snapshots.finishRun(run.id, records.length);
 }
 
-/**
- * Renders a built Storybook, records a run, and exports what differs from the baseline. A story's
- * failure is a fact in the result. Throws if the review couldn't run.
- */
-export async function review(project: Project, options: ReviewOptions): Promise<ReviewResult> {
+/** What recording left, for `record` to report and `review` to go on from. */
+export interface RecordResult {
+  readonly run: Run;
+  /** Modified, staged, and untracked paths while it rendered. */
+  readonly dirtyPaths: readonly string[];
+  readonly baseline: BaselineSearch;
+  readonly warnings: readonly string[];
+  readonly timings: { readonly captureMs: number; readonly storeMs: number; readonly totalMs: number };
+}
+
+/** The run that already says all this about this build at this commit, so a review needs no new one. */
+async function sameRun(project: Project, renderedBy: string, fields: RunFacts): Promise<Run | null> {
+  const runs = await project.snapshots.runsAt(fields.gitSha, fields.settings.environmentId);
+  const same = runs.find(
+    ({ id, reusedFromRun, status, dirty, baselineSha, storyFilter }) =>
+      (id === renderedBy || reusedFromRun === renderedBy) &&
+      status === "complete" &&
+      dirty === fields.dirty &&
+      baselineSha === fields.baselineSha &&
+      JSON.stringify(storyFilter) === JSON.stringify(fields.storyFilter),
+  );
+  return same ?? null;
+}
+
+async function recordBuild(project: Project, options: RecordOptions, { reuse }: { reuse: boolean }): Promise<RecordResult> {
   const { repo } = project;
   const log = options.log ?? (() => {});
   const capture = options.capture ?? realCapture;
@@ -393,7 +427,7 @@ export async function review(project: Project, options: ReviewOptions): Promise<
   const storybookDir = path.resolve(project.cwd, options.storybookDir);
   const captureDir = captureDirectory(project, randomUUID());
   try {
-    // 1. Build. Whatever it writes is part of what this review describes, so it comes first.
+    // 1. Build. Whatever it writes is part of what this describes, so it comes first.
     if (options.buildCommand !== undefined) {
       log(`Building: ${options.buildCommand}`);
       await runBuildCommand(options.buildCommand, project.cwd, options.signal);
@@ -408,10 +442,10 @@ export async function review(project: Project, options: ReviewOptions): Promise<
     const baseline = await findBaseline(project, settings.environmentId);
     const dirtyBefore = await dirtyPaths(repo);
 
-    // 3. Capture, unless this exact build already rendered.
+    // 3. Capture, unless asked to reuse and this exact build already rendered.
     const captureStarted = Date.now();
     const identity = await renderIdentity({ storybookDir, environment: settings.environment, initScript: settings.initScript });
-    const replayed = identity !== null && options.reuse !== false ? await replay(project, identity, options.stories, log) : null;
+    const replayed = identity !== null && reuse ? await replay(project, identity, options.stories, log) : null;
     const recording = replayed ?? (await renderFresh(project, captureDir, capture, { storybookDir, identity, settings, options, log }));
     const captured = Date.now();
     assertStoriesCaptured(recording.storyIds.length, storybookDir, options.stories);
@@ -419,59 +453,116 @@ export async function review(project: Project, options: ReviewOptions): Promise<
     // 4. Check one commit still describes what rendered.
     const shaAfter = await headSha(repo);
     if (shaAfter !== gitSha) {
-      throw new SelfieError("head-moved", `HEAD moved from ${gitSha} to ${shaAfter} during the render, so review again.`);
+      throw new SelfieError("head-moved", `HEAD moved from ${gitSha} to ${shaAfter} during the render, so try again.`);
     }
     const dirty = [...new Set([...dirtyBefore, ...(await dirtyPaths(repo))])];
 
-    // 5. Record.
-    const run = await recordRun(project, recording, {
+    // 5. Record, unless a run already says all this.
+    const fields = {
       gitSha,
       settings,
       dirty: dirty.length > 0,
       baselineSha: baseline.sha,
       storyFilter: storyFilterOf(options.stories, recording.storyIds),
-    });
+    };
+    const existing = recording.reusedFromRun === null ? null : await sameRun(project, recording.reusedFromRun, fields);
+    const run = existing ?? (await recordRun(project, recording, fields));
     const stored = Date.now();
-    log(`Recorded run ${run.id}: ${recording.storyIds.length} stories.`);
-    await recording.finished(run);
-
-    // 6. Compare.
-    const comparison = await project.snapshots.compareRun(run.id, baseline.sha);
-    const compared = Date.now();
-
-    // 7. Export, keep a cache of what was exported, and prune older runs.
-    const runDir = runDirectory(project, run.id);
-    await mkdir(runDir, { recursive: true });
-    const { differences, playErrors } = await exportImages(project, runDir, comparison);
-    const diffed = Date.now();
-    await writeReviewCache(project, run.id, {
-      differences: differences.map(({ story, current, golden, diff, pixelDiff }) => ({
-        story,
-        current,
-        golden,
-        diff,
-        pixelDiff,
-      })),
-      playErrors: playErrors.map(({ story, current }) => ({ story, current })),
-    });
-    await pruneOutput(project, run.id);
-
+    if (existing === null) {
+      log(`Recorded run ${run.id}: ${recording.storyIds.length} stories.`);
+      await recording.finished(run);
+    } else {
+      log(`Run ${run.id} already describes this build at this commit, so nothing new was recorded. selfie record renders again.`);
+    }
     return {
-      comparison,
+      run,
       dirtyPaths: dirty,
       baseline,
-      differences,
-      playErrors,
       warnings: recording.warnings,
-      timings: {
-        captureMs: captured - captureStarted,
-        storeMs: stored - captured,
-        compareMs: compared - stored,
-        diffMs: diffed - compared,
-        totalMs: Date.now() - started,
-      },
+      timings: { captureMs: captured - captureStarted, storeMs: stored - captured, totalMs: Date.now() - started },
     };
   } finally {
     await rm(captureDir, { recursive: true, force: true });
   }
+}
+
+/**
+ * Always renders a built Storybook, and records a run. A story's failure is a fact in the result.
+ * Throws if it couldn't run.
+ */
+export function record(project: Project, options: RecordOptions): Promise<RecordResult> {
+  return recordBuild(project, options, { reuse: false });
+}
+
+/** A review of a run that's already recorded, which is what recording would have given it. */
+async function namedRun(project: Project, runId: string): Promise<RecordResult> {
+  const run = await requireRun(project, runId);
+  return {
+    run,
+    dirtyPaths: [],
+    baseline: { sha: run.baselineSha, reason: null, message: null, defaultBranch: null, mergeBase: null },
+    warnings: (run.storyFilter?.unmatched ?? []).map(unmatchedPatternWarning),
+    timings: { captureMs: 0, storeMs: 0, totalMs: 0 },
+  };
+}
+
+/** What `--baseline` means: a run by its ID, or else a commit by anything Git calls one. */
+async function resolveGiven(project: Project, given: string): Promise<GivenBaseline> {
+  if (isRunId(given)) return { run: given };
+  const sha = await resolveCommit(project.repo, given);
+  if (sha === null) throw new SelfieError("unknown-baseline", `"${given}" is neither a run ID nor a commit here.`);
+  return { sha };
+}
+
+/**
+ * Exports what differs from the baseline in a run: one it's told to look at, or else the one
+ * for this build, recording it only if there's none. A story's failure is a fact in the result.
+ * Throws if the review couldn't run.
+ */
+export async function review(project: Project, options: ReviewOptions): Promise<ReviewResult> {
+  const started = Date.now();
+  const recorded =
+    options.run !== undefined ? await namedRun(project, options.run) : await recordBuild(project, options, { reuse: true });
+  const { run, baseline } = recorded;
+  const given = options.baseline === undefined ? null : await resolveGiven(project, options.baseline);
+
+  // 6. Compare.
+  const comparing = Date.now();
+  const comparison =
+    given?.run !== undefined
+      ? await project.snapshots.compareWithRun(run.id, given.run)
+      : await project.snapshots.compareRun(run.id, given?.sha ?? baseline.sha);
+  const compared = Date.now();
+
+  // 7. Export, keep a cache of what was exported, and prune older runs. A given baseline answers
+  // one question and changes nothing about the run, so it has its own directory and no cache.
+  const runDir = runDirectory(project, run.id);
+  const exportDir = given === null ? runDir : path.join(runDir, "against", (given.run ?? given.sha)!);
+  await mkdir(exportDir, { recursive: true });
+  const { differences, playErrors } = await exportImages(project, exportDir, comparison);
+  const diffed = Date.now();
+  if (given === null) {
+    await writeReviewCache(project, run.id, {
+      differences: differences.map(({ story, current, golden, diff, pixelDiff }) => ({ story, current, golden, diff, pixelDiff })),
+      playErrors: playErrors.map(({ story, current }) => ({ story, current })),
+    });
+  }
+  await pruneOutput(project, run.id);
+
+  return {
+    comparison,
+    dirtyPaths: recorded.dirtyPaths,
+    baseline,
+    given,
+    differences,
+    playErrors,
+    warnings: recorded.warnings,
+    timings: {
+      captureMs: recorded.timings.captureMs,
+      storeMs: recorded.timings.storeMs,
+      compareMs: compared - comparing,
+      diffMs: diffed - compared,
+      totalMs: Date.now() - started,
+    },
+  };
 }

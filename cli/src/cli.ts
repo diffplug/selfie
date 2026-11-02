@@ -3,11 +3,11 @@ import { parseArgs, type ParseArgsConfig } from "node:util";
 import type { capture } from "selfie-render";
 import { resolveCaptureSettings } from "./config.ts";
 import { accept, decide } from "./decisions.ts";
-import { buildAcceptDocument, buildReviewDocument } from "./document.ts";
+import { buildAcceptDocument, buildRecordDocument, buildReviewDocument } from "./document.ts";
 import { SelfieError } from "./errors.ts";
 import { gitUserEmail } from "./git.ts";
 import { compareAsReviewed, findBaseline, openProject, type Project } from "./project.ts";
-import { review } from "./review.ts";
+import { record, review } from "./review.ts";
 import { summarizeRun } from "./summary.ts";
 
 const EXIT_OK = 0;
@@ -16,12 +16,18 @@ const EXIT_COULD_NOT_RUN = 2;
 
 const USAGE = `Usage: selfie <command>
 
-  review [--storybook-dir <dir>] [--build-command <cmd>] [--story <pattern>]... [--native] [--no-reuse]
-      Renders a built Storybook, records a run, and prints a JSON diff against the baseline. If
-      this exact build already rendered, reuses those images and names that run in reusedFromRun,
-      unless --no-reuse.
-      Exits 0 if nothing blocks it, 1 if something does, 2 if the review couldn't run. Play
-      errors are advisories, and don't change the exit code.
+  record [--storybook-dir <dir>] [--build-command <cmd>] [--story <pattern>]... [--native]
+      Always renders a built Storybook, and records a run. Prints what it recorded, and judges
+      nothing. Exits 0 once a run is recorded, even with failed stories, or 2 if it couldn't run.
+
+  review [<run>] [--baseline <commit-or-run>] [--storybook-dir <dir>] [--build-command <cmd>]
+         [--story <pattern>]... [--native]
+      Prints a JSON diff of a run against its baseline. With no <run>, uses the run for this
+      exact build, and records one only if there's none yet, so call record first to render
+      again. --baseline compares with those goldens or that run for this review alone, and is
+      how to look for flakiness: record twice, then review the second --baseline the first.
+      Exits 0 if nothing blocks it, 1 if something does or anything differs from a --baseline,
+      2 if the review couldn't run. Play errors are advisories, and don't change the exit code.
 
   approve <run> (--all | --story <pattern>...) [--actor <who>]
   reject <run> (--all | --story <pattern>...) [--actor <who>]
@@ -37,7 +43,7 @@ const USAGE = `Usage: selfie <command>
 
   ui [<run>] [--port <n>] [--native]
       Serves the review UI on loopback until stopped, and prints its URL. Opens at this run, or
-      else the newest at HEAD. It shows what selfie review recorded, and never renders. Opens no
+      else the newest at HEAD. It shows what's recorded, and never renders. Opens no
       browser by itself.
 
 Local data lives under ~/.config/selfie/<git-origin-slugified>/, or $SELFIE_HOME instead of
@@ -95,35 +101,64 @@ async function withProject(context: Context, work: (project: Project) => Promise
   }
 }
 
+/** What says how to get a run from a build, for `record` and for a `review` that may need one. */
+const BUILD_OPTIONS = {
+  "storybook-dir": { type: "string" },
+  "build-command": { type: "string" },
+  native: { type: "boolean" },
+  story: { type: "string", multiple: true },
+} as const;
+
+function recordOptions(values: ReturnType<typeof parse<typeof BUILD_OPTIONS>>["values"], context: Context) {
+  return {
+    storybookDir: values["storybook-dir"] ?? "storybook-static",
+    buildCommand: values["build-command"],
+    native: values.native,
+    stories: values.story,
+    capture: context.capture,
+    signal: context.signal,
+    log: (line: string) => context.stderr(`${line}\n`),
+  };
+}
+
+function printTimings(context: Context, timings: Readonly<Record<string, number>>): void {
+  const phases = Object.entries(timings).map(([phase, ms]) => `${phase.replace(/Ms$/, "")} ${ms} ms`);
+  context.stderr(`Timings: ${phases.join(", ")}\n`);
+}
+
 async function dispatch(command: string | undefined, args: string[], context: Context): Promise<number> {
   switch (command) {
-    case "review": {
-      const { values, positionals } = parse(args, {
-        "storybook-dir": { type: "string", default: "storybook-static" },
-        "build-command": { type: "string" },
-        native: { type: "boolean" },
-        story: { type: "string", multiple: true },
-        "no-reuse": { type: "boolean" },
-      });
+    case "record": {
+      const { values, positionals } = parse(args, BUILD_OPTIONS);
       noPositionals(command, positionals);
       return withProject(context, async (project) => {
-        const result = await review(project, {
-          storybookDir: values["storybook-dir"] as string,
-          buildCommand: values["build-command"],
-          native: values.native,
-          stories: values.story,
-          reuse: !values["no-reuse"],
-          capture: context.capture,
-          signal: context.signal,
-          log: (line) => context.stderr(`${line}\n`),
-        });
-        const { captureMs, storeMs, compareMs, diffMs, totalMs } = result.timings;
-        context.stderr(
-          `Timings: capture ${captureMs} ms, store ${storeMs} ms, compare ${compareMs} ms, diff ${diffMs} ms, total ${totalMs} ms\n`,
+        const result = await record(project, recordOptions(values, context));
+        printTimings(context, result.timings);
+        printJson(context, buildRecordDocument(result));
+        return EXIT_OK;
+      });
+    }
+    case "review": {
+      const { values, positionals } = parse(args, { ...BUILD_OPTIONS, baseline: { type: "string" } });
+      const [run, ...extra] = positionals;
+      if (extra.length > 0) throw new SelfieError("usage", "Expected at most one run ID. A baseline goes in --baseline.");
+      if (run !== undefined) {
+        const given = Object.keys(BUILD_OPTIONS).filter((flag) => values[flag as keyof typeof BUILD_OPTIONS] !== undefined);
+        if (given.length > 0) {
+          throw new SelfieError("usage", `${run} is already recorded, so --${given.join(", --")} can't apply. Call selfie record first.`);
+        }
+      }
+      return withProject(context, async (project) => {
+        const baseline = values.baseline;
+        const result = await review(
+          project,
+          run === undefined ? { ...recordOptions(values, context), baseline } : { run, baseline },
         );
+        printTimings(context, result.timings);
         const document = buildReviewDocument(result);
         printJson(context, document);
-        return document.blockers.length > 0 ? EXIT_NEEDS_ATTENTION : EXIT_OK;
+        const differs = result.given !== null && document.differences.length > 0;
+        return document.blockers.length > 0 || differs ? EXIT_NEEDS_ATTENTION : EXIT_OK;
       });
     }
     case "approve":

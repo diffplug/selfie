@@ -42,7 +42,7 @@ describe("a first review, with no baseline", () => {
     const { code, json, stderr } = await review();
     expect(code).toBe(1);
     expect(json.schemaVersion).toBe(1);
-    expect(json.baseline).toEqual({ sha: null, reason: "no-goldens", message: expect.any(String) });
+    expect(json.baseline).toEqual({ sha: null, run: null, given: false, reason: "no-goldens", message: expect.any(String) });
     expect(json.gitSha).toBe(git(h.repo, "rev-parse", "HEAD"));
     expect(json.dirtyPaths).toEqual([]);
     expect(json.environment).toMatch(/^container-linux-arm64-/);
@@ -63,7 +63,7 @@ describe("a first review, with no baseline", () => {
 
   test("leaves out what the document no longer carries", async () => {
     const { json } = await review();
-    for (const key of ["failures", "status", "storybookDir", "outputDir", "initScriptSha256", "timings", "dirty", "baselineSha", "needsAttention"]) {
+    for (const key of ["failures", "status", "storybookDir", "outputDir", "initScriptSha256", "timings", "baselineSha", "needsAttention"]) {
       expect(json).not.toHaveProperty(key);
     }
   });

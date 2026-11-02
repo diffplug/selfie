@@ -6,7 +6,7 @@ import path from "node:path";
 import { FilesystemBlobStorage } from "selfie-store/adapters/filesystem-blob";
 import { sharpWebp } from "selfie-store/adapters/sharp-webp";
 import { SqliteAdapter } from "selfie-store/adapters/sqlite";
-import { Blobs, initStoreSchema, Snapshots, Sql, Store, type CompareOptions, type Comparison } from "selfie-store";
+import { Blobs, initStoreSchema, Snapshots, Sql, Store, type CompareOptions, type Comparison, type Run } from "selfie-store";
 import type { PixelDiff } from "./diff.ts";
 import { SelfieError } from "./errors.ts";
 import { openRepo, walkToBaseline, type BaselineSearch, type Repo } from "./git.ts";
@@ -98,10 +98,16 @@ export async function compareAsReviewed(
   runId: string,
   options?: CompareOptions,
 ): Promise<Comparison> {
+  const run = await requireRun(project, runId);
+  return project.snapshots.compareRun(runId, run.baselineSha, options);
+}
+
+/** A run someone named, which must be well formed and in this project's store. */
+export async function requireRun(project: Project, runId: string): Promise<Run> {
   assertRunId(runId);
   const run = await project.snapshots.getRun(runId);
   if (run === null) throw new SelfieError("unknown-run", `No run ${runId} in this project's local store.`);
-  return project.snapshots.compareRun(runId, run.baselineSha, options);
+  return run;
 }
 
 export const runDirectory = (project: Project, runId: string) => path.join(project.directory, "runs", runId);

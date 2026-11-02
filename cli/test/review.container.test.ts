@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import { decodeImage } from "selfie-store";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { openProject } from "../src/project.ts";
-import { createRepo } from "./support.ts";
+import { commit, createRepo } from "./support.ts";
 
 const MAIN = fileURLToPath(new URL("../src/main.ts", import.meta.url));
 const STORYBOOK = fileURLToPath(new URL("../../render/test/fixtures/storybook", import.meta.url));
@@ -99,6 +99,11 @@ describe.runIf(process.env.SELFIE_CLI_CONTAINER === "1")("in the pinned containe
     expect(first.stderr).toContain("render 2/2");
     expect(first.json.reusedFromRun).toBeNull();
 
+    const same = await reviewBuild();
+    expect(same.json.runId).toBe(first.json.runId);
+    expect(same.stderr).not.toContain("render 2/2");
+
+    await commit(repo, "elsewhere");
     const reused = await reviewBuild();
     expect(reused.json.reusedFromRun).toBe(first.json.runId);
     expect(reused.stderr).not.toContain("render 2/2");
@@ -107,9 +112,13 @@ describe.runIf(process.env.SELFIE_CLI_CONTAINER === "1")("in the pinned containe
     expect(filtered.json.reusedFromRun).toBe(first.json.runId);
     expect(filtered.json.counts.stories).toBe(1);
 
-    const rendered = await reviewBuild("--no-reuse");
+    const rendered = await selfie("record", "--storybook-dir", build);
     expect(rendered.stderr).toContain("render 2/2");
-    expect(rendered.json.reusedFromRun).toBeNull();
+    expect((await reviewBuild()).json.runId).toBe(rendered.json.runId);
+
+    const compared = await selfie("review", rendered.json.runId, "--baseline", first.json.runId);
+    expect(compared.status).toBe(0);
+    expect(compared.json.differences).toEqual([]);
     // From the store, since `differences` is empty for images that match the goldens.
     const project = await openProject({ cwd: repo, env: { SELFIE_HOME: home } });
     const images = async ({ json }: { json: any }) =>
