@@ -32,6 +32,8 @@
 
 **`--baseline` exits 1 on any difference.** Blockers answer "what stops accepting this run", and two runs that differ can have every image approved. Someone looking for flakiness is asking what differs.
 
+**A branch's goldens, only to look at.** Reviewing Selfie's own stories on a branch read every story as new, until a run was compared with the branch's own earlier goldens by hand. So a run with no baseline is shown against them. Nothing about acceptance moves: every image still needs its own approval, so an image matching a golden that someone has since rejected is still refused. So what's shown and what's checked can differ. Blockers and the exit code stay with what's checked, or a review could exit 0 before `accept` refused it, and the document's `baseline` stays the real one, with `comparedWith` saying what this review showed.
+
 ### What blocks
 
 **An approved change doesn't.** This is what makes "commit, review again, no re-approval" exit 0, and it's the behavior `docs/specs/system.md` → Approvals asks for. The change stays in `differences`, with who approved it, so nothing is hidden.
@@ -60,7 +62,7 @@
 
 ## find-baseline
 
-**A branch's own goldens aren't its baseline.** The README defines the baseline as a merge-base, so that a pull request's changes are reported against what it will merge into, cumulatively, however many commits it has. A branch accepting at its own commits doesn't move that. The cost is that a branch sees no baseline until someone accepts on the default branch, which is local to one machine until `sync`.
+**A branch's own goldens aren't its baseline.** The README defines the baseline as a merge-base, so that a pull request's changes are reported against what it will merge into, cumulatively, however many commits it has. A branch accepting at its own commits doesn't move that. The cost was that a branch saw no baseline until someone accepted on the default branch, which is local to one machine until `sync`, and a project adopting Selfie on a branch had no commit it could accept at: its merge-base has no Storybook.
 
 **First-parent history.** On a default branch, that is the commits it actually was, rather than whatever a merged branch passed through, whose goldens might describe unreviewed work.
 
@@ -71,6 +73,8 @@
 ## Configuration
 
 **One file, in one place.** Every command that needs an environment must find the same one, or `find-baseline` and `review` disagree. `--config` and `--init-script` let them, so they went. A file at the Git top level does the job without a flag on each call. `--native` stays, for a machine trying something locally, since a checked-in file shouldn't choose that.
+
+**No build command in a config, though a `storybookDir` is fine.** A flag on every run is friction, and a package script covers it, as `pnpm selfie:review` does here. Reading a command from a file would let any checkout run a shell the moment someone reviews it.
 
 **A config can't name a file outside itself.** A checkout's config file isn't the user's choice in the way a flag is. An init script is only ever run in the browser, with no network, so this is a small precaution at the cost of one check.
 

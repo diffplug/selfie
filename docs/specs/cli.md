@@ -86,12 +86,14 @@ A review of a named run starts at step 6. `selfie record` is steps 1 to 5, alway
 
 1. Runs `--build-command`, if given, in a shell. Its stdout goes to stderr. **Never guess a project's build system.** **Never use a shell for anything else.**
 2. Reads HEAD and the working tree, and finds the baseline ([`find-baseline`](#find-baseline)).
-3. Unless that exact build [already rendered](#recording-only-if-necessary), captures `--storybook-dir` (default `storybook-static`) in a new capture directory, with `--story` patterns, and the project's [init script](#configuration).
+3. Unless that exact build [already rendered](#recording-only-if-necessary), captures `--storybook-dir`, or else the config's `storybookDir`, or else `storybook-static`, in a new capture directory, with `--story` patterns, and the project's [init script](#configuration).
 4. Checks HEAD didn't move.
 5. Unless a run [already says all this](#recording-only-if-necessary), begins a run recording whether the tree was dirty, the baseline, and any filter. Stores each PNG with `Store.putImages`, which keeps new ones as WebP, or takes an earlier render's rows, and records and finishes the run with `Snapshots`. Rows carry the failure message and the `play` error.
-6. Compares the run with the baseline it recorded, or with `--baseline`.
+6. Compares the run with `--baseline`, or else the baseline it recorded, or else its branch goldens.
 7. Exports images and pixel diffs for what isn't unchanged, writes `review.json`, and prunes [output](#output-directories).
 
+- **Must take branch goldens from the run's commit back to, not including, its merge-base, on first-parent history, and only show a run against them, never record them** (rationale). `run.baselineSha` stays null, so accepting still needs every image approved, including ones that match, and no `--removed` count.
+- **Must take `blockers`, `counts.undecided`, and the exit code from what accepting checks, whatever a review is shown against**, so exit 0 never comes before a refusal. Only a `--baseline` differs ([below](#review)).
 - **Must refuse a named run with any flag for making a run**, since it's already recorded.
 - **Must take `--baseline` as a run ID, or else anything Git resolves to a commit, whose goldens it means**, and fail with exit 2 if there's no such finished run in this environment or the commit has no goldens.
 - **Must keep `--baseline` to this one review.** It changes nothing about the run: `selfie approve` and `selfie accept` still compare with the baseline the run recorded, its exports go under `runs/<run id>/against/<baseline>/`, and `review.json` isn't written. It exits 1 if anything differs, even when every image is approved, since the question was what differs (rationale).
@@ -153,7 +155,8 @@ Every path is absolute, and names a file that exists until it is pruned.
 | `reusedFromRun` | The run that really rendered these images, or null if this one did ([Recording only if necessary](#recording-only-if-necessary)) |
 | `dirty` | Whether the tree had changes when the run was recorded |
 | `dirtyPaths` | Up to 20 of those changes. Empty for a named run, since only the fact is stored |
-| `baseline` | `sha`, `reason`, and `message`, as [`find-baseline`](#find-baseline) gives them, `run` if it's a run rather than a commit's goldens, and `given` if `--baseline` asked for it |
+| `baseline` | The run's own: `sha`, `reason`, and `message`, as [`find-baseline`](#find-baseline) gives them |
+| `comparedWith` | What this review compared with: `source`, one of `baseline`, `given`, or `branch`, and its `sha`, or its `run` if it's a run |
 | `environment` | Its ID |
 | `filter` | `patterns` and `notRendered`, or null with no `--story` |
 | `counts` | `stories`, `unchanged`, `changed`, `new`, `removed`, `undecided`, and `advisories` |
@@ -166,7 +169,7 @@ Every path is absolute, and names a file that exists until it is pruned.
 `pixelDiff` is `{ kind: "pixels", changedPixels, totalPixels, boundingBox, firstChanged, maxChannelDelta }`, where `firstChanged` is the first changed pixel in reading order, or `{ kind: "size-differs", current, golden }` with their widths and heights, and is null unless `changed`.
 
 - **Must keep a difference's hashes**, so a UI can cache images by content.
-- **Must say, when the baseline is null and HEAD isn't the merge-base, that the next step is to review and accept at the merge-base on the default branch**, since goldens accepted on a feature branch aren't read by later reviews.
+- **Must say, when the baseline is null and HEAD isn't the merge-base, that goldens accepted on this branch only show later reviews here what changed, and that a baseline takes accepting on the default branch**, since its merge-base may not have these stories yet.
 
 ## Output directories
 
@@ -207,7 +210,7 @@ Source of truth: `accept` in `cli/src/decisions.ts`.
 
 - **Must not check the tree as it is now**: only how the run was recorded decides whether its images describe its SHA (rationale). So a run recorded clean may be accepted while HEAD is elsewhere or the tree has moved on.
 - **Must pass `acceptRun` the count the caller gave in `--removed`, and 0 if there are no removals.** `docs/specs/snapshots.md` → Goldens owns what it does with it. A filtered run may be accepted, once acknowledged, and then drops the goldens it left out.
-- **Must report `usableAsBaseline`: whether the SHA is on the default branch's first-parent history, or HEAD's if there is none.** Accepting off it succeeds, and later reviews won't read those goldens ([`find-baseline`](#find-baseline)).
+- **Must report `usableAsBaseline`: whether the SHA is on the default branch's first-parent history, or HEAD's if there is none.** Accepting off it succeeds, and those goldens are only ever [branch goldens](#review).
 - **Must report the run's advisories in its output, accepted or not.**
 
 It prints `accepted`, `runId`, `reusedFromRun`, `gitSha`, `environment`, `baselineSha`, `usableAsBaseline`, `removed`, `refusals[]` with each one's fields and a `message`, and `advisories`.
@@ -218,7 +221,7 @@ Source of truth: `cli/src/git.ts`; tests in `cli/test/git.test.ts`, on real Git 
 
 - **Must run Git only by argument arrays, never through a shell.**
 - **Must choose the default branch as the first of these that exists:** `origin/HEAD`'s target, `origin/main`, `origin/master`, local `main`, local `master`. With none, it walks from HEAD and says so in `message`.
-- **Must start at the merge-base of HEAD and the default branch, and walk first-parent history, nearest first, for at most 1,000 commits, to the first SHA with complete goldens in the environment.** A branch's own goldens are never its baseline (rationale). It asks through `Snapshots.firstWithGoldens`, about 10 queries for 1,000 commits at worst.
+- **Must start at the merge-base of HEAD and the default branch, and walk first-parent history, nearest first, for at most 1,000 commits, to the first SHA with complete goldens in the environment.** A branch's own goldens are never its baseline (rationale), which `selfie accept` and decisions rely on. It asks through `Snapshots.firstWithGoldens`, about 10 queries for 1,000 commits at worst.
 - **Must exit 0 whatever it finds, and explain null** with `reason` and `message`:
 
 | `reason` | When |
@@ -255,6 +258,7 @@ Source of truth: `cli/src/config.ts`.
 |---|---|
 | `environment` | Overrides for `defineEnvironment` (`docs/specs/render.md` → Environment) |
 | `initScript` | A file inside the Git top level, used as `capture`'s `initScript` |
+| `storybookDir` | A directory inside the Git top level, the build to capture. `--storybook-dir` overrides it |
 
 - **May let `--native` win over its `runner`.**
 - **Must refuse an unknown key**, so a typo can't silently render the wrong environment.

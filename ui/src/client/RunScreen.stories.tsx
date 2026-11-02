@@ -4,7 +4,7 @@ import { userEvent, within } from "storybook/test";
 import type { RunView } from "../shared/api.ts";
 import type { RunState } from "./hooks.ts";
 import { RunScreen } from "./RunScreen.tsx";
-import { approved, failure, OTHER_RUN_ID, rejected, rows, runOf, stateOf, viewOf } from "./stories/fixtures.ts";
+import { approved, BASELINE_SHA, failure, OTHER_RUN_ID, rejected, rows, runOf, stateOf, viewOf } from "./stories/fixtures.ts";
 
 interface Args {
   readonly view: RunView;
@@ -88,6 +88,9 @@ export const NewerRunExists: Story = {
 };
 export const NoBaselineOffHistory: Story = {
   args: { view: viewOf(SOME_CHANGES, { run: { baselineSha: null }, usableAsBaseline: false }) },
+};
+export const ComparedOnBranch: Story = {
+  args: { view: viewOf(SOME_CHANGES, { run: { baselineSha: null }, branchGoldens: BASELINE_SHA, usableAsBaseline: false }) },
 };
 export const AcceptedHere: Story = {
   args: {

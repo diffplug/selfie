@@ -11,7 +11,8 @@
 | **Environment** | What decides the pixels apart from the project's own input: the runner, its architecture, the browser and its flags, the viewport and scale, and the capture recipe (`docs/specs/system.md`). Its ID is part of a snapshot's name. |
 | **Run** | One recording of a set of snapshots against a Git sha. |
 | **Golden** | The snapshot accepted as correct for its name. |
-| **Baseline** | The Git sha a run is compared against: the nearest merge-base with a complete set of goldens. |
+| **Baseline** | The Git sha whose goldens a run is held to: the nearest merge-base with a complete set of goldens. |
+| **Branch goldens** | With no baseline, the nearest goldens on a run's own branch, which it's shown against. Only to look at: never a baseline (`docs/specs/cli.md` → Review). |
 | **Approval** | A person's or agent's acceptance of a snapshot change. May be made before the change is pushed (`docs/specs/system.md`). |
 | **Rejection** | A person's or agent's refusal of a snapshot change. |
 | **Decision** | An approval or a rejection, recorded against a snapshot name and an image hash (`docs/specs/snapshots.md`). |

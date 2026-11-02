@@ -42,12 +42,12 @@ Selfie has the following commands:
 
 - find-baseline - returns the Git sha of the nearest merge-base with a complete set of goldens
 - record - always renders the Storybook, and records a run
-- review - shows a run's diff against its baseline, as one JSON document whose exit code says whether anything blocks. With no run, it uses the one for this exact Storybook build, which takes about 0.3 s rather than 70 s on 541 stories, and records one only if there's none yet. `--baseline` compares with a commit's goldens or another run, so recording twice and comparing is how to look for flakiness
+- review - shows a run's diff against its baseline, or until one exists, against the nearest goldens on its branch, as one JSON document whose exit code says whether anything blocks. With no run, it uses the one for this exact Storybook build, which takes about 0.3 s rather than 70 s on 541 stories, and records one only if there's none yet. `--baseline` compares with a commit's goldens or another run, so recording twice and comparing is how to look for flakiness
 - approve, reject - decides on a run's changed snapshots, on a dirty tree if you like, so committing doesn't ask again
 - accept - makes a run's snapshots the goldens for its Git sha, on a clean tree
 - ui - serves a local review page in the browser, to look at a run's images, approve, reject, and accept. It shows what's recorded, and never renders
 
-An agent's loop is `selfie review`, then look at the diff images it names, then `selfie approve <run> --all`, commit, `selfie review`, and `selfie accept <run>`. A project sets its environment and init script in `selfie.config.json` at its Git top level. A person's loop is the same with `selfie ui` for the looking and deciding. These work on local data for now: pushing and pulling goldens, and with them the cloud half of find-baseline, are still to come. See `docs/specs/cli.md` and `docs/specs/ui.md`.
+An agent's loop is `selfie review`, then look at the diff images it names, then `selfie approve <run> --all`, commit, `selfie review`, and `selfie accept <run>`. A project sets its environment, init script, and Storybook directory in `selfie.config.json` at its Git top level. A person's loop is the same with `selfie ui` for the looking and deciding. These work on local data for now: pushing and pulling goldens, and with them the cloud half of find-baseline, are still to come. See `docs/specs/cli.md` and `docs/specs/ui.md`.
 
 ## Implementation details
 

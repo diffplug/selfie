@@ -7,14 +7,15 @@ import { resolveInside } from "./paths.ts";
 
 /** At the Git top level. It's the only place a project configures Selfie. */
 const CONFIG_FILE = "selfie.config.json";
-const KNOWN_KEYS = new Set(["environment", "initScript"]);
+const KNOWN_KEYS = new Set(["environment", "initScript", "storybookDir"]);
 
-// There is deliberately no build command here: a checked-out repository must not be able to
-// run a shell through a file, only someone passing `--build-command` can.
+// Never a build command: docs/specs/cli.md → Configuration.
 interface ProjectConfig {
   readonly environment?: EnvironmentOverrides;
   /** A file path, inside the Git top level. */
   readonly initScript?: string;
+  /** A directory path, inside the Git top level. */
+  readonly storybookDir?: string;
 }
 
 async function loadConfig(repo: Repo): Promise<ProjectConfig> {
@@ -41,9 +42,11 @@ export interface CaptureSettings {
   readonly environment: RenderEnvironment;
   readonly environmentId: string;
   readonly initScript?: string;
+  /** Absolute, if the config names one. */
+  readonly storybookDir?: string;
 }
 
-/** The environment and init script a project uses: the pinned default, then its config. */
+/** The environment, init script, and Storybook a project uses: the pinned default, then its config. */
 export async function resolveCaptureSettings(
   repo: Repo,
   { native = false }: { readonly native?: boolean | undefined } = {},
@@ -65,9 +68,16 @@ export async function resolveCaptureSettings(
       throw new SelfieError("bad-config", `Can't read the init script at ${file}: ${(error as Error).message}`);
     }
   }
+  let storybookDir: string | undefined;
+  if (config.storybookDir !== undefined) {
+    const inside = resolveInside(repo.root, config.storybookDir);
+    if (inside === null) throw new SelfieError("bad-config", `The config's storybookDir must be inside ${repo.root}.`);
+    storybookDir = inside;
+  }
   return {
     environment,
     environmentId: environmentId(environment),
     ...(initScript === undefined ? {} : { initScript }),
+    ...(storybookDir === undefined ? {} : { storybookDir }),
   };
 }

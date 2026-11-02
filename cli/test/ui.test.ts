@@ -625,6 +625,30 @@ describe("accept", () => {
     expect(view.refusals).toMatchObject([{ reason: "removed-unacknowledged", outsideFilter: 1 }]);
   });
 
+  test("shows a run with no baseline against its branch's goldens, and accepts by its own rules", async () => {
+    h.stories = [{ id: "a" }, { id: "b" }];
+    git(h.repo, "switch", "--quiet", "-c", "feature");
+    await commit(h.repo, "on a branch");
+    const first = (await review()).json;
+    await h.cli("approve", first.runId, "--all");
+    await h.cli("accept", first.runId);
+    await commit(h.repo, "more on the branch");
+    h.stories = [{ id: "a", color: BLUE }, { id: "b" }];
+    const { runId } = (await review()).json;
+    const view = await viewOf(runId);
+    expect(view.run.baselineSha).toBeNull();
+    expect(view.branchGoldens).toBe(first.gitSha);
+    expect(view.rows.map(({ story, state }: any) => [story, state])).toEqual([["a", "changed"]]);
+    expect(view.counts).toMatchObject({ unchanged: 1, changed: 1 });
+    expect(view.refusals).toEqual([{ reason: "unapproved", stories: [{ story: "a", state: "new", decision: null }] }]);
+    const unchanged = (await (await get(`/api/runs/${runId}/unchanged`)).json()) as any;
+    expect(unchanged.rows.map(({ story }: any) => story)).toEqual(["b"]);
+
+    const after = (await (await change(`/api/runs/${runId}/decisions`, { decision: "approved", snapshots: view.rows.map(({ story, imageHash }: any) => ({ story, imageHash })) })).json()) as any;
+    expect(after.branchGoldens).toBe(first.gitSha);
+    expect(after.refusals).toEqual([]);
+  });
+
   test("says when a commit can't be a baseline, and still accepts", async () => {
     h.stories = [{ id: "a" }];
     await makeGoldens();

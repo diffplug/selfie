@@ -70,7 +70,7 @@ Source of truth: `ui/src/server/app.ts`; tests in `cli/test/ui.test.ts`.
 - **Must give images, diff images, and diff stats `Cache-Control: private, max-age=31536000, immutable`**, since all are addressed by content (`docs/specs/access.md` → Local review server), and every other API answer `no-store`.
 - **Must decide on exactly the images a request names, or none:** the library's `decide` refuses with `stale-decision` if any named story and hash isn't a changed or new image of that run, and takes the names exactly, never as patterns (rationale).
 - **Must refuse a bulk request no differently from a single one.** Nothing on the server knows "all": the client sends what it showed.
-- **Must compare a run at most twice for a decision, and once for anything else**, never reading unchanged rows unless a route asks for them.
+- **Must compare a run at most twice for a decision, and once for anything else, plus once for each if it's shown against branch goldens**, never reading unchanged rows unless a route asks for them.
 - **Must pass `removedSeen` as given, and let `accept` judge it**, so a count that moved comes back as `wrong-removed-count`.
 - **Must serve any page but `/assets/*` and `/api/*` as the client's one document**, with `no-store`, and a missing asset as 404.
 
@@ -100,7 +100,7 @@ Source of truth: `ui/src/client/`.
 | `/runs/:id/stories/:story` | One snapshot, in the filter from the query |
 | `/runs/:id/accept` | Accepting |
 
-**The run** shows, in order: its commit, run ID, whether its pixels were rendered earlier and by which run, dirty state, baseline, environment, and decision actor; a warning if it was recorded dirty, has no baseline, or its SHA can't be a baseline; the counts; blockers; advisories; and the differences.
+**The run** shows, in order: its commit, run ID, whether its pixels were rendered earlier and by which run, dirty state, baseline, environment, and decision actor; a warning if it was recorded dirty, has no baseline, is shown against branch goldens (`docs/specs/cli.md` → Review), or its SHA can't be a baseline; the counts; blockers; advisories; and the differences.
 
 - **Must group blockers by reason, in words, and offer each as a filter of the list.**
 - **Must keep the filter, text and state, in the URL, and nowhere else**, so back, reload, and next and previous all follow it. A row's link takes the filter from the URL on a click, so a keystroke re-renders only the rows it shows or hides, and a link opened in a new tab has no filter.
@@ -153,7 +153,7 @@ Source of truth: `useHotkeys` in `ui/src/client/hooks.ts`.
 
 Source of truth: `ui/src/client/*.stories.tsx`, `ui/src/client/stories/fixtures.ts`.
 
-`pnpm selfie:storybook` builds them, and `pnpm selfie review --storybook-dir ui/storybook-static` reviews them with Selfie.
+`pnpm selfie:review` builds them, and reviews them with Selfie.
 
 - **Must have a story for every screen and state this spec lists**, including empty and failed ones, dialogs, and keyboard flows, which are play functions.
 - **Must show a screen through its props and fixtures, with no server.** Images come from `ui/storybook-fixtures/`, at the paths the server answers, so a screen doesn't know the difference.
@@ -175,7 +175,7 @@ Source of truth: `ui/src/client/*.stories.tsx`, `ui/src/client/stories/fixtures.
 
 **Scope: cloud-deploy** is defined in `docs/specs/system.md` → Build order. What it must do first, since the local UI needs none of it:
 
-1. **Move the review rules into platform-free code, and narrow `ReviewSource` to platform facts.** A Worker can't load `selfie-cli`, which reaches Git, Docker, and the filesystem, and today `summarizeRun`, `checkAccept`, and diffing live there, and `localReviewSource` applies them. `filterStories`, which `summarizeRun` calls, has to move out of `selfie-render` for that. `isDecidable` has moved already.
+1. **Move the review rules into platform-free code, and narrow `ReviewSource` to platform facts.** A hosted source needs a branch's commits as one of those facts to offer branch goldens, or it offers none. A Worker can't load `selfie-cli`, which reaches Git, Docker, and the filesystem, and today `summarizeRun`, `checkAccept`, and diffing live there, and `localReviewSource` applies them. `filterStories`, which `summarizeRun` calls, has to move out of `selfie-render` for that. `isDecidable` has moved already.
 2. **Make the source a per-request factory, `(context) => ReviewSource`, with a client base path.** A hosted service has many projects and viewers, where `createLocalApp` has one project for its whole life, and a client that always asks at `/api`.
 3. **Fit the Worker's budget.** The shared D1 limit is 1,200 requests per 5 minutes. One approve-and-next is 10 requests as measured on the local adapter: 6 for the decision (read the run, compare, write, compare, read whose goldens these are, list the commit's runs), and 4 lookups for the next story's two images and its diff. That's 120 stories per 5 minutes, for every reviewer of every project, down from 15 requests and 80 stories before the comparisons were reduced. What gets it to about 3:
    - no D1 lookup per image, since a content address needs none before reading R2

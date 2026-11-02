@@ -90,6 +90,8 @@ export type RunListing = Pick<Run, "id" | "startedAt" | "status" | "dirty">;
 /** Everything a screen shows about a run, recomputed from `summarizeRun` after every action. */
 export interface RunView {
   readonly run: Run;
+  /** With no baseline, the nearest goldens on the run's branch, which `rows` compares with. Only to look at. */
+  readonly branchGoldens: string | null;
   /** The run whose images are the goldens of this run's Git SHA, which may be this one. */
   readonly acceptedRunId: string | null;
   /** Who a decision made here is recorded as, or null if Git doesn't say. */

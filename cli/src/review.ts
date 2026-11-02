@@ -31,6 +31,7 @@ import { dirtyPaths, headSha, resolveCommit, type BaselineSearch } from "./git.t
 import { isRunId, regularFileInside, storyDirName } from "./paths.ts";
 import { encodePng } from "./png.ts";
 import {
+  branchGoldens,
   captureDirectory,
   findBaseline,
   pruneOutput,
@@ -46,8 +47,8 @@ const IMAGES_PER_GROUP = 100;
 const MAX_CONCURRENT_DIFFS = 6;
 
 export interface RecordOptions {
-  /** Relative to the project's `cwd`. */
-  readonly storybookDir: string;
+  /** Relative to the project's `cwd`. Defaults to the config's, and then to `storybook-static`. */
+  readonly storybookDir?: string | undefined;
   /** The caller's own command, run in a shell. Its stdout goes to stderr. */
   readonly buildCommand?: string | undefined;
   /** Story ID patterns. Defaults to every story. */
@@ -92,6 +93,10 @@ export interface ReviewResult {
   readonly baseline: BaselineSearch;
   /** What this review compared with instead, if anything. */
   readonly given: GivenBaseline | null;
+  /** With no baseline and nothing given, the nearest goldens on this branch, which it compared with. */
+  readonly branchGoldens: string | null;
+  /** The comparison accepting checks, which says what blocks. `comparison`, unless that's against the branch's goldens. */
+  readonly reviewed: Comparison;
   /** Within the run's filter. */
   readonly differences: readonly Difference[];
   readonly playErrors: readonly {
@@ -424,7 +429,6 @@ async function recordBuild(project: Project, options: RecordOptions, { reuse }: 
   const log = options.log ?? (() => {});
   const capture = options.capture ?? realCapture;
   const started = Date.now();
-  const storybookDir = path.resolve(project.cwd, options.storybookDir);
   const captureDir = captureDirectory(project, randomUUID());
   try {
     // 1. Build. Whatever it writes is part of what this describes, so it comes first.
@@ -439,6 +443,7 @@ async function recordBuild(project: Project, options: RecordOptions, { reuse }: 
       throw new SelfieError("no-commits", "This repository has no commits yet, and a run is recorded against a Git SHA.");
     }
     const settings = await resolveCaptureSettings(repo, { native: options.native });
+    const storybookDir = path.resolve(project.cwd, options.storybookDir ?? settings.storybookDir ?? "storybook-static");
     const baseline = await findBaseline(project, settings.environmentId);
     const dirtyBefore = await dirtyPaths(repo);
 
@@ -528,10 +533,12 @@ export async function review(project: Project, options: ReviewOptions): Promise<
 
   // 6. Compare.
   const comparing = Date.now();
+  const onBranch = given === null ? await branchGoldens(project, run) : null;
   const comparison =
     given?.run !== undefined
       ? await project.snapshots.compareWithRun(run.id, given.run)
-      : await project.snapshots.compareRun(run.id, given?.sha ?? baseline.sha);
+      : await project.snapshots.compareRun(run.id, given?.sha ?? onBranch ?? run.baselineSha);
+  const reviewed = onBranch === null ? comparison : await project.snapshots.compareRun(run.id, run.baselineSha);
   const compared = Date.now();
 
   // 7. Export, keep a cache of what was exported, and prune older runs. A given baseline answers
@@ -554,6 +561,8 @@ export async function review(project: Project, options: ReviewOptions): Promise<
     dirtyPaths: recorded.dirtyPaths,
     baseline,
     given,
+    branchGoldens: onBranch,
+    reviewed,
     differences,
     playErrors,
     warnings: recorded.warnings,

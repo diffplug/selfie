@@ -7,7 +7,7 @@ import { accept, checkAccept, decide } from "./decisions.ts";
 import { diffToPng, type PixelDiff } from "./diff.ts";
 import { SelfieError } from "./errors.ts";
 import { gitUserEmail, headSha, type BaselineSearch } from "./git.ts";
-import { compareAsReviewed, findBaseline, readReviewCache, type Project } from "./project.ts";
+import { branchGoldens, compareAsReviewed, findBaseline, readReviewCache, requireRun, type Project } from "./project.ts";
 import { summarizeRun } from "./summary.ts";
 
 /** Each is about 20 KB of PNG. This is a reviewer going back and forth, not a cache of a run. */
@@ -31,19 +31,26 @@ export function localReviewSource(project: Project, { native }: { readonly nativ
     return compared.map((snapshot) => ({ ...snapshot, pixelDiff: pixelDiffs.get(snapshot.story) ?? null }));
   };
 
-  /** Everything recomputed from one comparison, which the caller already has. */
-  const viewOf = async (comparison: Comparison, actor: string | null): Promise<RunView> => {
-    const { run } = comparison;
+  /**
+   * Everything recomputed from what deciding and accepting compare with, which the caller already
+   * has, and which says what blocks. What it shows may be against the branch's goldens instead.
+   */
+  const viewOf = async (reviewed: Comparison, actor: string | null): Promise<RunView> => {
+    const { run } = reviewed;
+    const onBranch = await branchGoldens(project, run);
+    const comparison = onBranch === null ? reviewed : await snapshots.compareRun(run.id, onBranch);
     const summary = summarizeRun(comparison);
+    const checked = onBranch === null ? summary : summarizeRun(reviewed);
     const notRendered = new Set(summary.notRendered.map(({ story }) => story));
-    const { refusals, usableAsBaseline, removals } = await checkAccept(project, comparison);
+    const { refusals, usableAsBaseline, removals } = await checkAccept(project, reviewed);
     return {
       run,
+      branchGoldens: onBranch,
       acceptedRunId: await snapshots.acceptedRunAt(run.gitSha, run.environment),
       actor,
-      blockers: summary.blockers,
+      blockers: checked.blockers,
       advisories: summary.advisories,
-      counts: { ...summary.counts, failed: summary.failed.length },
+      counts: { ...summary.counts, undecided: checked.counts.undecided, failed: summary.failed.length },
       rows: await toRows(
         run.id,
         comparison.snapshots.filter(({ story }) => !notRendered.has(story)),
@@ -75,12 +82,13 @@ export function localReviewSource(project: Project, { native }: { readonly nativ
     },
 
     async baseline(runId) {
-      const { run } = await compareAsReviewed(project, runId);
+      const run = await requireRun(project, runId);
       return baselineNote(await findBaseline(project, run.environment));
     },
 
     async unchanged(runId) {
-      const { snapshots: compared } = await compareAsReviewed(project, runId, { includeUnchanged: true });
+      const run = await requireRun(project, runId);
+      const { snapshots: compared } = await snapshots.compareRun(runId, (await branchGoldens(project, run)) ?? run.baselineSha, { includeUnchanged: true });
       return toRows(
         runId,
         compared.filter(({ state }) => state === "unchanged"),
