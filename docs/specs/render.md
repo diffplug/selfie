@@ -87,11 +87,36 @@ Source of truth: `render/src/manifest.ts`; tests in `render/test/manifest.test.t
 - **Must report a play function failure under the source `play`, from Storybook's `playFunctionThrewException` channel event, and keep `status: "ok"`**, since the story still rendered and has an image. The console error it also logs stays under `console`. `selfie review` lists the story as needing attention (`docs/specs/cli.md` → What needs attention).
 - **May report other `errors` on an `ok` story:** console errors, page errors, and failed requests that didn't stop the render. Each has a `source`: `render`, `timeout`, `play`, `page`, `console`, `request`, `worker`, or `repeat`. A story keeps at most 20, each cut to 400 characters.
 
+## Render identity
+
+Source of truth: `render/src/identity.ts`; tests in `render/test/identity.test.ts`.
+
+`renderIdentity({ storybookDir, environment, initScript })` returns one string that changes whenever a render of that build could change, for `docs/specs/cli.md` → Recording only if necessary to recognize it by. It lives beside `capture`, so a new capture option that can change pixels sits next to what it has to update.
+
+- **Must depend on all of these, so that any one changing changes the identity:**
+
+| Input | From |
+|---|---|
+| The build | A SHA256 of every file's relative path and bytes, sorted by path. **Never use a file's size or time** |
+| The environment | Its ID |
+| The init script | Its SHA256, or nothing if there's none. An empty script isn't no script |
+| The renderer | A SHA256 of the package's own source, so a change to capture code or a default such as `settleMs` changes it in a checkout, where the package's version never changes |
+
+- **Must leave out of the build's hash exactly this text, of exactly these files, and nothing by a pattern over paths**, since it differs between builds of one source, and nothing in a build loads these files (`docs/specs/cli.rationale.md` → Recording only if necessary):
+
+| File, from the build's root | Text |
+|---|---|
+| `project.json` | A leading `{"generatedAt":<digits>,` |
+| `manifests/components.html` | The first `Generation took <strong><number>s</strong>` |
+
+- **Must return null for a native environment**, since its ID doesn't describe everything about its machine.
+- **Must return null for a build holding anything but files and directories**, since what a symlink reaches isn't in its hash, and for one that's missing.
+
 ## API
 
 Source of truth: `render/src/index.ts`.
 
-`selfie-render` is a library, and `docs/specs/cli.md` is its CLI. It exports `capture(options)`, `defineEnvironment(overrides)`, `environmentId(environment)`, `filterStories(stories, patterns)`, which keeps whatever it is given that has an `id`, `unmatchedPatternWarning(pattern)`, `MANIFEST_FILE`, `DEFAULT_SETTLE_MS`, `hashTree(root, bytesToHash)`, `rendererIdentity()`, `RenderError`, `EnvironmentError`, and the types above. `rendererIdentity()` is `hashTree` of the package's own source, which `docs/specs/cli.md` → Recording only if necessary keys a render on. `selfie-render/testing` exports what a stand-in for `capture` needs in another package's tests, so that it can't drift from what `capture` writes. A native runner is `defineEnvironment({ runner: { kind: "native" } })`. `capture` writes human progress to its `log` option, which defaults to stderr.
+`selfie-render` is a library, and `docs/specs/cli.md` is its CLI. It exports `capture(options)`, `renderIdentity(options)`, `defineEnvironment(overrides)`, `environmentId(environment)`, `filterStories(stories, patterns)`, which keeps whatever it is given that has an `id`, `unmatchedPatternWarning(pattern)`, `MANIFEST_FILE`, `RenderError`, `EnvironmentError`, and the types above. `selfie-render/testing` exports what a stand-in for `capture` needs in another package's tests, so that it can't drift from what `capture` writes. A native runner is `defineEnvironment({ runner: { kind: "native" } })`. `capture` writes human progress to its `log` option, which defaults to stderr.
 
 ## Future
 

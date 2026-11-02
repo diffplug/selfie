@@ -89,31 +89,33 @@ The two exit 0 rows list dormouse's 2 `play` errors as advisories, and no story 
 
 ## Recording only if necessary
 
-**Measured 2026-11**, as in [End to end](#end-to-end), in the real container, on a scratch repository and a new store.
+**Measured 2026-11**, as in [End to end](#end-to-end), in the real container, on a scratch repository and a new store. On a reused run, "capture" is hashing the build and reading the earlier run's rows, about 20 ms for 333 files and 12 MB, so a build many times this size still costs little beside a render.
 
-| 541-story review | Exit | Wall | Hash and lookup | Capture | Store | Diff |
-|---|---|---|---|---|---|---|
-| First, 541 new | 1 | 71.7 s | 17 ms | 62.2 s | 9.1 s | 52 ms |
-| Rendered again with `--no-reuse`, nothing changed, twice | 0 | 69.9 s, 70.3 s | 18 ms, 20 ms | 65.5 s, 65.8 s | 4.2 s, 4.2 s | 3 ms, 2 ms |
-| Same SHA, all still new, reused, three times | 1 | 0.32 s, 0.31 s, 0.31 s | 21 ms, 20 ms, 19 ms | 0 | 15 ms, 15 ms, 16 ms | 53 ms, 56 ms, 54 ms |
-| New commit, nothing changed, reused, twice | 0 | 0.25 s, 0.25 s | 20 ms, 21 ms | 0 | 15 ms, 16 ms | 1 ms, 1 ms |
-| One byte of CSS, 80 stories changed | 1 | 70.4 s | 33 ms | 64.1 s | 4.9 s | 1,140 ms |
-| That build again, reused | 1 | 1.41 s | 23 ms | 0 | 16 ms | 1,086 ms |
-| Filtered to 30, answered from the whole run | 0 | 0.26 s | 23 ms | 0 | 13 ms | 2 ms |
-| Filtered to 30, `--no-reuse`, to compare | 0 | 5.25 s | 18 ms | 4.7 s | 278 ms | 2 ms |
+| 541-story review | Exit | Wall | Capture | Store | Diff |
+|---|---|---|---|---|---|
+| First, 541 new | 1 | 71.8 s | 62.4 s | 9.0 s | 64 ms |
+| Rendered again with `--no-reuse`, nothing changed, twice | 0 | 70.1 s, 70.5 s | 65.7 s, 66.0 s | 4.1 s, 4.1 s | 4 ms, 3 ms |
+| Same SHA, all still new, reused, twice | 1 | 0.38 s, 0.35 s | 20 ms, 20 ms | 37 ms, 37 ms | 57 ms, 54 ms |
+| New commit, nothing changed, reused, twice | 0 | 0.25 s, 0.25 s | 21 ms, 20 ms | 16 ms, 16 ms | 1 ms, 1 ms |
+| One byte of CSS, 80 stories changed | 1 | 70.2 s | 64.0 s | 4.8 s | 1,130 ms |
+| That build again, reused | 1 | 1.36 s | 22 ms | 15 ms | 1,086 ms |
+| Filtered to 30, answered from the whole run, twice | 0 | 0.25 s, 0.26 s | 23 ms, 22 ms | 12 ms, 13 ms | 1 ms, 1 ms |
+| Filtered to 30, `--no-reuse`, to compare | 0 | 5.3 s | 4.8 s | 280 ms | 1 ms |
 
-The estimate here was about 0.5 s, and the feature came in at about 0.25 s of wall time, of which 80 to 90 ms is the review and the rest is starting Node. Hashing 333 files and 12 MB and looking up the key takes about 20 ms, so a build many times this size still costs little beside a render. Diff work stays, since it isn't cached ([Future](#a-render-that-does-change)), which is why a reused review with 80 changes takes 1.4 s.
+The estimate here was about 0.5 s, and the feature came in at about 0.25 s of wall time, of which about 85 ms is the review and the rest is starting Node.
 
 **Reused results match a real render.** Two `--no-reuse` renders and three reused runs each held the same image hash, failure, `play` error, and unstable flag as the first render, on 541 of 541 stories. A reused review of the 80-story change listed the same stories, states, hashes, and pixel diffs as the render it reused.
+
+**One byte can change nothing, and that's right.** Two one-byte edits of `iframe-*.css` made invalid values (`display:flew`, `background-colox`), rendered, and reported 0 changes: those rules are also in `pocket-chrome-*.css`, so the browser used the duplicate. `.bg-transparent` from `#0000` to `#000f` is valid in the last sheet loaded, and changed 80 stories. A miss only means a render happens: what it reports is the render's own answer.
 
 **Do real builds reproduce? Yes, once two things are left out.** Measured by building each project repeatedly with no source change and comparing with `diff -r`, with `STORYBOOK_DISABLE_TELEMETRY=1`:
 
 | Project | Builds | What differed |
 |---|---|---|
-| A minimal project, Storybook 10.6.5 and Vite 7: same directory, with `node_modules/.cache` cleared, and in a second directory with its own install | 4 | `project.json`'s `generatedAt`, every time |
+| A minimal project, Storybook 10.6.5 and Vite 7.3.7: same directory, with `node_modules/.cache` cleared, and in a second directory with its own install | 4 | `project.json`'s `generatedAt`, every time |
 | A copy of dormouse, Storybook 11.0.0-alpha.6 and Vite 8, 326 files and 546 stories, four of them with caches cleared | 6 | `project.json`'s `generatedAt`, every time. `manifests/components.html`'s `Generation took <strong>0.0s</strong>`, which read `0.1s` in some of them |
 
-Without leaving these out, every build hashed differently and the feature would never have hit on rebuilt output. With them left out, all 4 and all 6 hash the same. In the real loop, `selfie review --build-command` running a real Storybook build of that copy reused the first render on every rebuild, including with its caches cleared, in about 3 s, of which about 2.8 s is the build. A one-line change to the copy's `.storybook/preview.css` rendered again, and putting it back reused the first render.
+Without leaving these out, every build hashed differently and the feature would never have hit on rebuilt output. With them left out, all 4 and all 6 hash the same. In the real loop, `selfie review --build-command` running a real Storybook build of that copy reused the first render on every rebuild, including with its caches cleared, in about 3 s, of which about 2.8 s is the build. A one-line change to the copy's `.storybook/preview.css` rendered again, and putting it back reused the first render. That loop was measured before `docs/specs/render.md` → Render identity took over this hash, which kept the same exclusions.
 
 **Why those two can't change pixels.** The worker only answers what the browser asks for, and no other file in either build names `project.json` or `manifests/components.html`, so no story loads them unless its own code fetches that path. So only those two exact pieces of text are left out, and the rest of both files still counts: a different `storybookVersion` in `project.json` misses, and so does the same text in any other file. If Storybook changes either format, the text stops matching and every build misses, which costs a render and nothing else.
 
@@ -123,14 +125,20 @@ Without leaving these out, every build hashed differently and the feature would 
 
 **A failure is never replayed.** A story that timed out under load would otherwise fail forever on a build nobody changed, and the only way out would be a flag the agent has no reason to try. Only one more render is at stake.
 
-**Which errors may be reused.** On dormouse's 541 stories, a real capture's only errors were 2 `play` and the 2 `console` lines those same failures log. `play`, `console`, and `page` come from the project's own code, the same build repeats them, and none of them fails a story. `request` and the soft network `timeout` aren't reused: both can come from load, and neither is visible afterward, since a row doesn't record them. An allowed list means a new source starts out unreusable. The cost is that a project whose page always makes a failing off-origin request never reuses, and stderr says why. A `play` failure that depends on load is replayed too, which is a real gap: it stays listed as an advisory, and `--no-reuse` measures it again.
+**Which errors may be reused.** On dormouse's 541 stories, a real capture's only errors were 2 `play` and the 2 `console` lines those same failures log. `play`, `console`, and `page` come from the project's own code, the same build repeats them, and none of them fails a story. `request` and the soft network `timeout` aren't reused: both can come from load, and neither is visible afterward, since a row doesn't record them. An allowed list means a new source starts out unreusable. The cost is that a project whose page always makes a failing off-origin request never reuses, and stderr names the story and the error. A `play` failure that depends on load is replayed too, which is a real gap: it stays listed as an advisory, and `--no-reuse` measures it again.
 
-**Stability stays separate.** A stability run could answer a plain review, since its first pass is an ordinary render. But the review would then either report flags nobody asked for, or claim nothing was checked while holding the answer. It takes one plain render after a stability run, which isn't the tight loop. An unstable flag is replayed as an advisory, and the image with it stays one real render's result, until someone asks with `--no-reuse`.
+**Stability always renders.** Someone asking for it wants a fresh measurement, and a remembered answer isn't one. It also keeps a remembered run's flags simple: nobody checked them, so nothing about instability is ever replayed, and neither is a `repeat` image the store doesn't keep.
 
-**A filter asks one more key.** A filtered run answers its own patterns, and a whole run answers any patterns, and neither takes more than one extra lookup. On the 30-story sample that's 0.26 s against 5.25 s.
+**A filter is answered only from a whole run.** A whole run holds every answer, and a filtered render is at most a few seconds, so it isn't worth a second key to remember one. On the 30-story sample a hit takes 0.25 s against 5.3 s, once a whole run of that build exists.
 
-**Why local tables.** A key must outlive a pruned `review.json`, and `reused_runs` must be there for `accept`. A table lives and dies with the runs it names, in the same file, and needs no atomic rename. Nothing in the cloud needs either one: a key is about what one machine rendered. After 16 runs here the two tables held 4 and 10 rows.
+**Provenance is on the run, and the key is local.** `reused_from_run` is a fact about the run, which `accept`, the UI, and later `trust` all want, so it's read with the run, with no second lookup. `render_keys` is only what this machine rendered, which nothing in the cloud needs. It must outlive a pruned `review.json`, and in `store.db` it lives and dies with the runs it names. After 15 runs here it held 2 rows.
+
+**A column added to `runs`, against the rule.** `docs/specs/store.md` → Open questions allows only new tables and indexes until migrations are decided, and `CREATE TABLE IF NOT EXISTS` can't add a column. It was made anyway since no project database holds this schema yet, and a separate table was the alternative. On a copy of an older store, `selfie review` renders and then fails with exit 2, `table runs has no column named reused_from_run`, and `accept` fails with `no such column: reused_from_run`. Anyone with a store from before this has to delete it.
 
 **The newest real render wins.** Pointing a key at the newest reused run would let `reusedFromRun` name a run that rendered nothing, so reuse never chains. Forgetting a key after a bad render means `--no-reuse` can't uncover a deterministic failure only to have the next review hide it behind an older pass.
 
 **What a reused run can't change.** It's still only as good as its build. A clean tree with a stale gitignored build records stale pixels against the new SHA whether or not it renders, so reuse neither fixes nor worsens [that open question](cli.md#open-questions).
+
+**What a diff cache would save.** A reused run with 80 changes spent 1,086 ms of its 1.36 s on diffs it had already computed, about 13 ms a story, which is why it stays in `docs/specs/cli.md` → Future.
+
+**What copying rows costs.** Each reused run writes 541 rows. A review of this feature estimated about 450 MB a year at 50 hits a day. In the store above, `run_snapshots` held 5,560 rows in 376,832 bytes by `dbstat`, or 68 bytes a row including page overhead and 2 stories' `play` messages, which comes to about 670 MB for the same 18,250 runs. Either is small beside D1's 10 GB, and these rows are local, but it has no bound, as `docs/specs/snapshots.md` → Storing only what changed says of every run.

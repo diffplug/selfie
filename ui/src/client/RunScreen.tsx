@@ -27,7 +27,7 @@ import { Keys } from "./Keys.tsx";
 import { acceptPath, AppLink, AppLinkButton, followLink, navigate, runPath, storyPath } from "./router.tsx";
 import { ActionFailure, RunNotes } from "./RunNotes.tsx";
 import { StoryLinks } from "./StoryLinks.tsx";
-import { AdvisoryLabels, BLOCKER_WORDS, DecisionLabel, describePixels, plural, shortSha, StateLabel } from "./words.tsx";
+import { AdvisoryLabels, BLOCKER_WORDS, DecisionLabel, describePixels, plural, ReusedPixels, shortSha, StateLabel } from "./words.tsx";
 
 const PATTERNS_LISTED = 3;
 
@@ -50,6 +50,11 @@ function Facts({ view }: { view: RunView }) {
       <Fact term="Run">
         <code>{run.id}</code>
       </Fact>
+      {run.reusedFromRun !== null && (
+        <Fact term="Pixels">
+          <ReusedPixels from={run.reusedFromRun} />
+        </Fact>
+      )}
       <Fact term="Working tree">{run.dirty ? "Dirty when recorded" : "Clean when recorded"}</Fact>
       <Fact term="Baseline">
         {run.baselineSha === null ? "None" : <code title={run.baselineSha}>{shortSha(run.baselineSha)}</code>}

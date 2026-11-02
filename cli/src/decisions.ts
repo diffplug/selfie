@@ -6,7 +6,6 @@ import type { AcceptRefusal, DecisionTarget } from "selfie-ui/app";
 import { SelfieError } from "./errors.ts";
 import { isOnBaselineHistory } from "./git.ts";
 import { compareAsReviewed, type Project } from "./project.ts";
-import { reusedFrom } from "./reuse.ts";
 import { isDecidable, summarizeRun } from "./summary.ts";
 
 export interface DecideRequest {
@@ -91,8 +90,6 @@ export interface AcceptCheck {
 
 export interface AcceptResult extends Omit<AcceptCheck, "removals"> {
   readonly accepted: boolean;
-  /** The run that really rendered these images, if this one didn't. */
-  readonly reusedFromRun: string | null;
   readonly comparison: Comparison;
 }
 
@@ -128,12 +125,10 @@ export async function accept(project: Project, { runId, removedSeen }: AcceptReq
   const comparison = await compareAsReviewed(project, runId);
   const { refusals, usableAsBaseline, removals } = await checkAccept(project, comparison, removedSeen);
   const { run } = comparison;
-  const reusedFromRun = await reusedFrom(project, runId);
   const result = (list: readonly AcceptRefusal[], accepted: boolean): AcceptResult => ({
     accepted,
     refusals: list,
     usableAsBaseline,
-    reusedFromRun,
     comparison,
   });
   if (refusals.length > 0) return result(refusals, false);

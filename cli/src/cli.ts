@@ -119,9 +119,9 @@ async function dispatch(command: string | undefined, args: string[], context: Co
           signal: context.signal,
           log: (line) => context.stderr(`${line}\n`),
         });
-        const { hashMs, captureMs, storeMs, compareMs, diffMs, totalMs } = result.timings;
+        const { captureMs, storeMs, compareMs, diffMs, totalMs } = result.timings;
         context.stderr(
-          `Timings: hash ${hashMs} ms, capture ${captureMs} ms, store ${storeMs} ms, compare ${compareMs} ms, diff ${diffMs} ms, total ${totalMs} ms\n`,
+          `Timings: capture ${captureMs} ms, store ${storeMs} ms, compare ${compareMs} ms, diff ${diffMs} ms, total ${totalMs} ms\n`,
         );
         const document = buildReviewDocument(result);
         printJson(context, document);

@@ -8,7 +8,7 @@ import { useTitle, type RunState } from "./hooks.ts";
 import { AppLink, runPath } from "./router.tsx";
 import { ActionFailure, RunNotes } from "./RunNotes.tsx";
 import { StoryLinks } from "./StoryLinks.tsx";
-import { plural, shortSha } from "./words.tsx";
+import { plural, ReusedPixels, shortSha } from "./words.tsx";
 
 function Refusal({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -124,6 +124,17 @@ export function AcceptScreen({ state, view }: { state: RunState; view: RunView }
       <Text as="p">
         Accepting makes this run's images the goldens of <code>{shortSha(run.gitSha)}</code> in <code>{run.environment}</code>, for later reviews to compare with.
       </Text>
+      {run.reusedFromRun !== null && (
+        <Banner
+          variant="info"
+          title="This run didn't render"
+          description={
+            <>
+              <ReusedPixels from={run.reusedFromRun} /> The build hadn't changed, so nothing rendered at <code>{shortSha(run.gitSha)}</code>.
+            </>
+          }
+        />
+      )}
       <ActionFailure state={state} />
       <RunNotes view={view} />
       {isAccepted ? (

@@ -18,7 +18,8 @@ export const CREATE_SNAPSHOT_TABLES: readonly string[] = [
   failed_count INTEGER,
   dirty INTEGER NOT NULL CHECK (dirty IN (0, 1)),
   baseline_sha TEXT,
-  story_filter TEXT
+  story_filter TEXT,
+  reused_from_run TEXT
 )`,
   "CREATE INDEX IF NOT EXISTS runs_by_sha ON runs(git_sha, environment, started_at)",
   `CREATE TABLE IF NOT EXISTS run_snapshots (
@@ -67,7 +68,7 @@ const MAX_MESSAGE_CHARACTERS = 2_000;
 const GIT_SHA = /^[0-9a-f]{40}(?:[0-9a-f]{24})?$/;
 
 const RUN_COLUMNS =
-  "id, git_sha, environment, started_at, finished_at, failed_count, dirty, baseline_sha, story_filter";
+  "id, git_sha, environment, started_at, finished_at, failed_count, dirty, baseline_sha, story_filter, reused_from_run";
 
 const SELECT_RUN = `SELECT ${RUN_COLUMNS} FROM runs WHERE id = ?1`;
 
@@ -219,6 +220,11 @@ export interface Run {
   readonly baselineSha: string | null;
   /** Null if every story was asked for. */
   readonly storyFilter: StoryFilter | null;
+  /**
+   * The run that really rendered these images, or null if this one did. An ID only: it says where
+   * the pixels came from, and `gitSha` still says what the run was recorded against.
+   */
+  readonly reusedFromRun: string | null;
 }
 
 export type DecisionKind = "approved" | "rejected";
@@ -333,12 +339,14 @@ export class Snapshots {
     dirty,
     baselineSha,
     storyFilter = null,
+    reusedFromRun = null,
   }: {
     gitSha: string;
     environment: string;
     dirty: boolean;
     baselineSha: string | null;
     storyFilter?: StoryFilter | null;
+    reusedFromRun?: string | null;
   }): Promise<Run> {
     assertGitSha(gitSha);
     assertNamePart(environment, "environment");
@@ -347,8 +355,8 @@ export class Snapshots {
     const startedAt = this.#now();
     // Sql binds no nulls, so an empty string stands for one.
     await this.#sql.run({
-      sql: `INSERT INTO runs(id, git_sha, environment, started_at, dirty, baseline_sha, story_filter)
-VALUES (?1, ?2, ?3, CAST(?4 AS INTEGER), CAST(?5 AS INTEGER), NULLIF(?6, ''), NULLIF(?7, ''))
+      sql: `INSERT INTO runs(id, git_sha, environment, started_at, dirty, baseline_sha, story_filter, reused_from_run)
+VALUES (?1, ?2, ?3, CAST(?4 AS INTEGER), CAST(?5 AS INTEGER), NULLIF(?6, ''), NULLIF(?7, ''), NULLIF(?8, ''))
 ON CONFLICT(id) DO NOTHING`,
       params: [
         id,
@@ -358,6 +366,7 @@ ON CONFLICT(id) DO NOTHING`,
         dirty ? 1 : 0,
         baselineSha ?? "",
         storyFilter === null ? "" : JSON.stringify(storyFilter),
+        reusedFromRun ?? "",
       ],
       idempotent: true,
     });
@@ -372,6 +381,7 @@ ON CONFLICT(id) DO NOTHING`,
       dirty,
       baselineSha,
       storyFilter,
+      reusedFromRun,
     };
   }
 
@@ -712,6 +722,7 @@ function toRun(row: SqlRow): Run {
     dirty: row.dirty === 1,
     baselineSha: row.baseline_sha as string | null,
     storyFilter: row.story_filter === null ? null : (JSON.parse(row.story_filter as string) as StoryFilter),
+    reusedFromRun: row.reused_from_run as string | null,
   };
 }
 

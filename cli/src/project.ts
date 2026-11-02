@@ -10,7 +10,6 @@ import type { PixelDiff } from "./diff.ts";
 import { SelfieError } from "./errors.ts";
 import { openRepo, walkToBaseline, type BaselineSearch, type Repo } from "./git.ts";
 import { assertRunId, isRunId, projectSlug, selfieHome } from "./paths.ts";
-import { initReuseTables } from "./reuse.ts";
 
 /** How many runs keep their exported images. Older ones are deleted by the next review. */
 const RUN_DIRECTORIES_KEPT = 20;
@@ -18,14 +17,49 @@ const RUN_DIRECTORIES_KEPT = 20;
 const STALE_CAPTURE_MS = 24 * 60 * 60 * 1000;
 const CACHE_FILE = "review.json";
 
+/**
+ * The newest real render of each build this machine can reuse. Local only: it's in the project's
+ * `store.db`, and not in the store's schema, which D1 also has.
+ */
+export interface Renders {
+  /** The run remembered for a render identity, or null. */
+  readonly find: (identity: string) => Promise<string | null>;
+  /** Remembers a run for it, or with null forgets what was. */
+  readonly remember: (identity: string, runId: string | null) => Promise<void>;
+}
+
+function rendersIn(sql: Sql): Renders {
+  return {
+    async find(identity) {
+      const [row] = await sql.run({
+        sql: "SELECT run_id FROM render_keys WHERE key = ?1",
+        params: [identity],
+        idempotent: true,
+      });
+      return (row?.run_id as string | undefined) ?? null;
+    },
+    async remember(identity, runId) {
+      await sql.run(
+        runId === null
+          ? { sql: "DELETE FROM render_keys WHERE key = ?1", params: [identity], idempotent: true }
+          : {
+              sql: `INSERT INTO render_keys(key, run_id) VALUES (?1, ?2)
+ON CONFLICT(key) DO UPDATE SET run_id = excluded.run_id`,
+              params: [identity, runId],
+              idempotent: true,
+            },
+      );
+    },
+  };
+}
+
 export interface Project {
   /** What a relative path in a request is relative to. */
   readonly cwd: string;
   readonly repo: Repo;
   /** `<home>/<slug>` */
   readonly directory: string;
-  /** The local database, which also holds what `cli/src/reuse.ts` remembers. */
-  readonly sql: Sql;
+  readonly renders: Renders;
   readonly store: Store;
   readonly snapshots: Snapshots;
   readonly close: () => void;
@@ -40,12 +74,12 @@ export async function openProject({ cwd, env }: { cwd: string; env: NodeJS.Proce
   const adapter = new SqliteAdapter(path.join(directory, "store.db"));
   const sql = new Sql(adapter);
   await initStoreSchema(sql);
-  await initReuseTables(sql);
+  await sql.run({ sql: "CREATE TABLE IF NOT EXISTS render_keys (key TEXT PRIMARY KEY, run_id TEXT NOT NULL) WITHOUT ROWID" });
   return {
     cwd,
     repo,
     directory,
-    sql,
+    renders: rendersIn(sql),
     store: new Store({ sql, blob: new Blobs(new FilesystemBlobStorage(path.join(directory, "blobs"))) }),
     snapshots: new Snapshots({ sql }),
     close: () => adapter.close(),

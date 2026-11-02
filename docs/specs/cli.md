@@ -37,10 +37,10 @@ Source of truth: `cli/src/index.ts`; tests in `cli/test/library.test.ts`.
 
 | Export | Does |
 |---|---|
-| `openProject({ cwd, env })` | The repository's `Project`: its `repo`, `directory`, `sql`, `store`, `snapshots`, and `close()` |
-| `review(project, options)` | Returns a `ReviewResult`: the `comparison`, `reusedFromRun`, `dirtyPaths`, `baseline`, `stabilityChecked`, `differences`, `playErrors`, `unstable`, `warnings`, and `timings` |
+| `openProject({ cwd, env })` | The repository's `Project`: its `repo`, `directory`, `renders`, `store`, `snapshots`, and `close()` |
+| `review(project, options)` | Returns a `ReviewResult`: the `comparison`, `dirtyPaths`, `baseline`, `stabilityChecked`, `differences`, `playErrors`, `unstable`, `warnings`, and `timings` |
 | `decide(project, { runId, decision, actor, stories })` | `stories` is `"all"`, patterns, or `{ targets }`: exact stories and image hashes, for a caller that showed them, refused whole with `stale-decision` if any isn't a changed or new image the run holds. Returns `decided`, `skipped`, `unmatchedPatterns`, and the `comparison` after it. It compares twice, and reads unchanged rows only for patterns |
-| `accept(project, { runId, removedSeen })` | Returns `accepted`, `refusals`, `usableAsBaseline`, `reusedFromRun`, and the `comparison` |
+| `accept(project, { runId, removedSeen })` | Returns `accepted`, `refusals`, `usableAsBaseline`, and the `comparison` |
 | `checkAccept(project, comparison, removedSeen)` | What `accept` would refuse of a comparison a caller holds, changing nothing: `refusals`, `usableAsBaseline`, and `removals` |
 | `summarizeRun(comparison)` | Returns `blockers`, `advisories`, `counts`, `undecided`, `unapproved`, `failed`, `removed`, and `notRendered` |
 | `isDecidable(state)` | Whether a snapshot in this state can take a decision: `changed` or `new`. Defined in `selfie-store` |
@@ -62,7 +62,7 @@ Source of truth: `cli/src/paths.ts`, `cli/src/project.ts`; tests in `cli/test/un
 
 ```
 <home>/<slug>/
-  store.db                               SQLite, per docs/specs/store.md, with two tables of its own (Recording only if necessary)
+  store.db                               SQLite, per docs/specs/store.md, with one table of its own (Recording only if necessary)
   blobs/images/<image hash>              Filesystem blobs, per docs/specs/store.md
   runs/<run id>/review.json              A disposable cache of exported paths and pixel diffs
   runs/<run id>/stories/<name>/*.png     current, golden, diff, and repeat
@@ -120,41 +120,22 @@ Source of truth: `summarizeRun` in `cli/src/summary.ts`.
 
 ### Recording only if necessary
 
-Source of truth: `cli/src/reuse.ts`, `hashTree` and `rendererIdentity` in `render/src/identity.ts`; tests in `cli/test/reuse.test.ts`, `render/test/identity.test.ts`.
+Source of truth: `replay` and `renderFresh` in `cli/src/review.ts`, `renderIdentity` in `render/src/identity.ts`; tests in `cli/test/reuse.test.ts`, `render/test/identity.test.ts`.
 
-A review recognizes a build that already rendered, skips capture and storing, and records that render's image hashes, `play` errors, and unstable flags in a new run. Everything else about a review stays: the run has this review's Git SHA, dirtiness, baseline, and filter, and it compares, exports, exits, and can be decided on and accepted like any other. Docker isn't needed for this, since nothing starts.
+A review recognizes a build that already rendered, skips capture and storing, and records that render's image hashes and `play` errors in a new run. Everything else about a review stays: the run has this review's Git SHA, dirtiness, baseline, and filter, and it compares, exports, exits, and can be decided on and accepted like any other. Docker isn't needed for this, since nothing starts.
 
-- **Must key a render on all of these, so that any one changing renders again:**
-
-| Input | From |
-|---|---|
-| The build | A SHA256 of `--storybook-dir` after any `--build-command`: every file's relative path and bytes, sorted by path. **Never use a file's size or time** |
-| The environment | Its ID |
-| The settle time | `DEFAULT_SETTLE_MS` |
-| The init script | Its SHA256 |
-| The renderer | `rendererIdentity()`, a hash of `render/src`, so a change to capture code renders again in a checkout, where the package's version never changes |
-| Stability | Whether `--stability` was asked for |
-| The filter | The sorted, distinct `--story` patterns, or none |
-
-- **Must leave out of the build's hash exactly this text, of exactly these files, and nothing by a pattern over paths**, since it differs between builds of one source, and nothing in a build loads these files (rationale):
-
-| File, from the build's root | Text |
-|---|---|
-| `project.json` | A leading `{"generatedAt":<digits>,` |
-| `manifests/components.html` | The first `Generation took <strong><number>s</strong>` |
-
-- **Never reuse a build holding anything but files and directories**, since what a symlink reaches isn't in its hash.
-- **Never reuse in a native environment.** `--native` always renders, since its ID doesn't describe everything about its machine.
+- **Must recognize a build only by `renderIdentity` (`docs/specs/render.md` → Render identity)**, of `--storybook-dir` after any `--build-command`, with the environment and the init script.
 - **Never reuse a run with a failed story**, including an image the store refused, however many times it fails (rationale).
-- **Never reuse a run where any story has an error other than `play`, `console`, or `page`, or where capture warned of anything but an unmatched pattern** (rationale). Those three are the project's own code, and reuse keeps its `play` errors as advisories. Everything else, such as `request` and the soft `timeout`, might not happen next time.
-- **Must keep only the newest real render of a key, and forget the key if that render can't be reused**, so a forced render that fails isn't hidden by an older one that passed.
-- **Must not remember a render if the build's hash changed while it rendered**, since no key describes those images.
+- **Never reuse a run where any story has an error other than `play`, `console`, or `page`, or where capture warned of anything** (rationale). Those three are the project's own code, and reuse keeps its `play` errors as advisories. Everything else, such as `request` and the soft `timeout`, might not happen next time.
+- **Must keep only the newest real render of a build, and forget the build if that render can't be reused**, so a forced render that fails isn't hidden by an older one that passed.
+- **Must not remember a render if the build's identity changed while it rendered**, since nothing describes those images.
 - **Must always name a run that really rendered:** a reused run is never itself remembered, so reuse doesn't chain.
-- **Must keep stability separate:** a run with it answers only a review with it, and a run without it only a review without it, so `stabilityChecked` always says what this review asked (rationale). A reused run's `unstable[].repeat` is that render's second image if its run directory is still there, and null once pruned, since the store doesn't keep them.
-- **Must answer a filtered review from the build's whole run, by the filter**, or else from a run with the same patterns in any order. **Never answer a wider request from a filtered run.** `filter`, `warnings`, and `blockers` come out as a render's would, and a filter matching nothing still exits 2.
-- **Must render with `--no-reuse` or `"reuse": false` in the [config](#configuration).** Such a render still updates what's remembered, so `--no-reuse` is also how to replace a render.
-- **Must make it visible:** `reusedFromRun` in the document, one line on stderr, and `reusedFromRun` in what `accept` returns and prints, with one line on stderr, since that run's pixels came from an earlier render. A render that can't be reused says why on stderr.
-- **Must keep this in two tables in the local `store.db`, created by `openProject`, and out of the store's schema**, so D1 has no counterpart and a pruned `review.json` loses nothing: `render_keys(key, run_id)` and `reused_runs(run_id, from_run_id)`.
+- **Must always render with `--stability`, and never remember that render or forget one because of it**, since asking for stability asks for a fresh measurement (rationale).
+- **Must answer a filtered review only from the build's whole run, by the filter, and never remember a filtered render or forget one because of it.** `filter`, `warnings`, and `blockers` come out as a render's would, and a filter matching nothing still exits 2.
+- **Must render with `--no-reuse`.** That render still updates what's remembered, so it is also how to replace one.
+- **Must make it visible:** `run.reusedFromRun` (`docs/specs/snapshots.md` → Runs), which is `reusedFromRun` in `review`'s and `accept`'s documents; one line on stderr from each; and the run and accept screens (`docs/specs/ui.md` → Screens).
+- **Must say why on stderr when a plain render of every story can't be reused**, naming the story and the error, since that's how a project finds out why it never hits.
+- **Must keep what's remembered in one table in the local `store.db`, `render_keys(key, run_id)`, reached only through `Project.renders`' `find` and `remember`, and out of the store's schema**, so D1 has no counterpart and a pruned `review.json` loses nothing.
 
 ### The document
 
@@ -270,7 +251,6 @@ Source of truth: `cli/src/config.ts`.
 |---|---|
 | `environment` | Overrides for `defineEnvironment` (`docs/specs/render.md` → Environment) |
 | `initScript` | A file inside the Git top level, used as `capture`'s `initScript` |
-| `reuse` | `false` always renders ([Recording only if necessary](#recording-only-if-necessary)). Defaults to `true` |
 
 - **May let `--native` win over its `runner`.**
 - **Must refuse an unknown key**, so a typo can't silently render the wrong environment.
@@ -293,14 +273,19 @@ Story IDs come from a project's build, and a manifest's paths from a directory i
 - `find-baseline` asking the cloud's goldens as well as local ones.
 - `selfie push` and `selfie pull`, and carrying decisions through them (`docs/specs/snapshots.md` → Future).
 - A way for a branch's reviewer to have a baseline when only other machines accepted the default branch's goldens.
+- A pushed run carrying `reused_from_run`, since the cloud's `trust` must be able to tell a reused run from one rendered at its SHA. That ID may name a run never pushed. Whether to also record the build's identity can wait for `trust`.
 
 ### A render that does change
 
 [Recording only if necessary](#recording-only-if-necessary) is all or nothing, so one changed file renders every story, and a render's non-capture time is unchanged:
 
 - A cache from PNG bytes to image hash, since decoding and hashing unchanged images is most of a review's non-render time.
-- A diff cache by hash pair.
+- A diff cache by hash pair. It would save about 1 s on a reused run with 80 changes (rationale).
 - Reusing only the stories a change can reach.
+
+### Rows copied by a reused run
+
+A reused run writes every row again, about 450 to 670 MB of `store.db` a year at 50 hits a day on 541 stories (rationale). Two ways to fix it, neither built: a reused run could hold no rows and read through `reused_from_run`, which every query on a run's rows would have to learn (`docs/specs/snapshots.md` → Storing only what changed is the same idea); or a review could delete the rows of an earlier reused run at the same SHA and environment that nothing accepted or decided from, which needs `docs/specs/snapshots.md` → Open questions' retention rule first.
 
 ### Open questions
 

@@ -1,4 +1,4 @@
-export { capture, DEFAULT_SETTLE_MS, type CaptureOptions } from "./capture.ts";
+export { capture, type CaptureOptions } from "./capture.ts";
 export {
   defineEnvironment,
   environmentId,
@@ -8,7 +8,7 @@ export {
   type NativeRunner,
   type RenderEnvironment,
 } from "./environment.ts";
-export { hashTree, rendererIdentity } from "./identity.ts";
+export { renderIdentity } from "./identity.ts";
 export {
   MANIFEST_FILE,
   type Manifest,

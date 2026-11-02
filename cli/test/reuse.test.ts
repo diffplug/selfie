@@ -1,12 +1,12 @@
 // Skipping the render of a build that already rendered, against real Git, a real store, real
-// files, and only the browser replaced.
+// files, and only the browser replaced. `render/test/identity.test.ts` covers what makes two
+// builds the same.
 import { writeFileSync } from "node:fs";
-import { mkdir, readdir, readFile, rm, stat, symlink, unlink, utimes, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { defineEnvironment, renderIdentity } from "selfie-render";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
-import type { Manifest } from "selfie-render";
-import type { Run } from "selfie-store";
-import { bytesToHash, renderKey, whyNotReusable, type KeyInputs } from "../src/reuse.ts";
+import { openProject } from "../src/project.ts";
 import { BLUE, commit, createHarness, git, type Harness } from "./support.ts";
 
 let h: Harness;
@@ -22,20 +22,15 @@ async function review(...flags: string[]) {
 const writeConfig = (config: unknown) => writeFile(path.join(h.repo, "selfie.config.json"), JSON.stringify(config));
 const inBuild = (file: string) => path.join(build, file);
 const reasons = (list: readonly any[]) => list.map(({ reason }) => reason);
-
-const GENERATED = (at: number) => `{"generatedAt":${at},"userSince":1,"storybookVersion":"10.6.5"}`;
+const pruneRuns = async () => rm(path.join(h.home, (await readdir(h.home))[0]!, "runs"), { recursive: true });
 
 beforeEach(async () => {
   h = await createHarness();
   build = path.join(h.scratch, "build");
-  await mkdir(path.join(build, "assets", "deep"), { recursive: true });
-  await mkdir(path.join(build, "manifests"));
+  await mkdir(path.join(build, "assets"), { recursive: true });
   await writeFile(inBuild("iframe.html"), "<html></html>");
   await writeFile(inBuild("index.json"), '{"entries":{}}');
-  await writeFile(inBuild("project.json"), GENERATED(1));
   await writeFile(inBuild("assets/app.css"), ".a{color:red}");
-  await writeFile(inBuild("assets/deep/chunk.js"), "export default 1");
-  await writeFile(inBuild("manifests/components.html"), "Generation took <strong>0.0s</strong>.");
   h.stories = [{ id: "a--one" }, { id: "a--two", color: BLUE }];
   captures = 0;
   h.onCapture = () => {
@@ -57,7 +52,6 @@ describe("an unchanged build", () => {
     expect(second.json.reusedFromRun).toBe(first.json.runId);
     expect(second.json.runId).not.toBe(first.json.runId);
     expect(second.stderr).toContain(`Reused the images of run ${first.json.runId}`);
-    expect(second.stderr).toMatch(/Timings: hash \d+ ms, capture 0 ms/);
     expect(second.json.differences.map(({ imageHash }: any) => imageHash)).toEqual(
       first.json.differences.map(({ imageHash }: any) => imageHash),
     );
@@ -73,8 +67,7 @@ describe("an unchanged build", () => {
 
   test("still hits after every exported file is pruned", async () => {
     const first = await review();
-    const slug = (await readdir(h.home))[0]!;
-    await rm(path.join(h.home, slug, "runs"), { recursive: true });
+    await pruneRuns();
     expect((await review()).json.reusedFromRun).toBe(first.json.runId);
   });
 
@@ -85,38 +78,18 @@ describe("an unchanged build", () => {
   });
 });
 
-describe("a key input changing misses", () => {
+describe("a change to what decides pixels renders", () => {
   beforeEach(async () => {
     await review();
   });
 
-  test.each(["iframe.html", "index.json", "project.json", "assets/app.css", "assets/deep/chunk.js", "manifests/components.html"])(
-    "one byte of %s, with the same size and time",
-    async (file) => {
-      const before = await stat(inBuild(file));
-      const bytes = await readFile(inBuild(file));
-      bytes[bytes.length - 1] = bytes[bytes.length - 1]! ^ 1;
-      await writeFile(inBuild(file), bytes);
-      await utimes(inBuild(file), before.atime, before.mtime);
-      expect((await stat(inBuild(file))).size).toBe(before.size);
-      expect((await review()).rendered).toBe(true);
-    },
-  );
-
-  test("a file added, even empty", async () => {
-    await writeFile(inBuild("assets/empty.txt"), "");
+  test("one byte of the build, and going back reuses the first render", async () => {
+    const before = await readFile(inBuild("assets/app.css"));
+    await writeFile(inBuild("assets/app.css"), ".a{color:ted}");
     expect((await review()).rendered).toBe(true);
-  });
-
-  test("a file removed", async () => {
-    await unlink(inBuild("assets/deep/chunk.js"));
-    expect((await review()).rendered).toBe(true);
-  });
-
-  test("a file renamed, with the same bytes", async () => {
-    await writeFile(inBuild("assets/renamed.css"), await readFile(inBuild("assets/app.css")));
-    await unlink(inBuild("assets/app.css"));
-    expect((await review()).rendered).toBe(true);
+    expect((await review()).rendered).toBe(false);
+    await writeFile(inBuild("assets/app.css"), before);
+    expect((await review()).rendered).toBe(false);
   });
 
   test("the init script, by its contents", async () => {
@@ -134,68 +107,9 @@ describe("a key input changing misses", () => {
     expect(rendered).toBe(true);
     expect(json.reusedFromRun).toBeNull();
   });
-
-  test.each<[keyof KeyInputs, unknown]>([
-    ["build", "b2"],
-    ["environment", "e2"],
-    ["settleMs", 101],
-    ["initScriptSha256", null],
-    ["renderer", "r2"],
-    ["stability", true],
-    ["stories", ["a--*"]],
-  ])("%s, in the key itself", (input, value) => {
-    const inputs: KeyInputs = {
-      build: "b",
-      environment: "e",
-      settleMs: 100,
-      initScriptSha256: "i",
-      renderer: "r",
-      stability: false,
-      stories: null,
-    };
-    expect(renderKey({ ...inputs, [input]: value })).not.toBe(renderKey(inputs));
-    expect(renderKey({ ...inputs })).toBe(renderKey(inputs));
-  });
 });
 
-describe("what two builds of one source differ in", () => {
-  beforeEach(async () => {
-    await review();
-  });
-
-  test("project.json's generatedAt alone doesn't miss", async () => {
-    await writeFile(inBuild("project.json"), GENERATED(1793616231907));
-    expect((await review()).rendered).toBe(false);
-  });
-
-  test("the manifest's generation time alone doesn't miss", async () => {
-    await writeFile(inBuild("manifests/components.html"), "Generation took <strong>12.3s</strong>.");
-    expect((await review()).rendered).toBe(false);
-  });
-
-  test("anything else in project.json misses", async () => {
-    await writeFile(inBuild("project.json"), GENERATED(1).replace("10.6.5", "10.6.6"));
-    expect((await review()).rendered).toBe(true);
-  });
-
-  test("the same text anywhere else misses", async () => {
-    await writeFile(inBuild("assets/project.json"), GENERATED(1));
-    expect((await review()).rendered).toBe(true);
-    await writeFile(inBuild("assets/project.json"), GENERATED(2));
-    expect((await review()).rendered).toBe(true);
-    await writeFile(inBuild("assets/components.html"), "Generation took <strong>0.0s</strong>.");
-    expect((await review()).rendered).toBe(true);
-    await writeFile(inBuild("assets/components.html"), "Generation took <strong>0.1s</strong>.");
-    expect((await review()).rendered).toBe(true);
-  });
-
-  test("a file that isn't valid text keeps its every other byte", () => {
-    const bytes = Buffer.from([0xff, 0xfe, 0x41, 0x80]);
-    expect(Buffer.from(bytesToHash("project.json", bytes))).toEqual(bytes);
-  });
-});
-
-describe("a run that isn't reusable", () => {
+describe("a render that isn't reusable", () => {
   test("a failed story is never reused, however often it fails", async () => {
     h.stories = [{ id: "a--one" }, { id: "a--two", failed: "Timed out" }];
     const first = await review();
@@ -206,8 +120,22 @@ describe("a run that isn't reusable", () => {
     h.stories = [{ id: "a--one" }, { id: "a--two" }];
     const fixed = await review();
     expect(fixed.rendered).toBe(true);
-    expect(fixed.json.blockers.map(({ reason }: any) => reason)).not.toContain("failed");
+    expect(reasons(fixed.json.blockers)).not.toContain("failed");
     expect((await review()).json.reusedFromRun).toBe(fixed.json.runId);
+  });
+
+  test("a failed run is never replayed, even if it's somehow remembered", async () => {
+    h.stories = [{ id: "a--one", failed: "Timed out" }];
+    const { json } = await review();
+    const project = await openProject({ cwd: h.repo, env: { SELFIE_HOME: h.home } });
+    const identity = await renderIdentity({ storybookDir: build, environment: defineEnvironment() });
+    await project.renders.remember(identity!, json.runId);
+    project.close();
+
+    h.stories = [{ id: "a--one" }];
+    const next = await review();
+    expect(next.rendered).toBe(true);
+    expect(next.json.reusedFromRun).toBeNull();
   });
 
   test("an image the store refused is a failure too", async () => {
@@ -216,18 +144,18 @@ describe("a run that isn't reusable", () => {
     expect((await review()).rendered).toBe(true);
   });
 
-  test.each(["request", "timeout", "worker", "repeat"] as const)("%s errors on an ok story aren't reused", async (source) => {
-    h.stories = [{ id: "a--one", errors: [{ source, message: "it happened" }] }];
-    const first = await review();
-    expect(first.stderr).toContain(`might not recur (${source})`);
+  test.each(["request", "timeout", "worker", "repeat"] as const)("%s errors on an ok story, and stderr says which", async (source) => {
+    h.stories = [{ id: "a--one", errors: [{ source, message: "it happened\nand more" }] }];
+    const { stderr } = await review();
+    expect(stderr).toContain(`won't be reused: a--one had a ${source} error, which might not recur: it happened.`);
     expect((await review()).rendered).toBe(true);
   });
 
-  test("a capture warning about itself isn't reused, though an unmatched pattern is", () => {
-    const manifest = (warnings: string[]) => ({ stories: [], warnings }) as unknown as Manifest;
-    const run = (unmatched: string[]) => ({ status: "complete", storyFilter: { patterns: [], unmatched } }) as unknown as Run;
-    expect(whyNotReusable(manifest(["The worker stopped early: it crashed"]), run([]))).toContain("warned");
-    expect(whyNotReusable(manifest(['Story pattern "x" matched nothing.']), run(["x"]))).toBeNull();
+  test("a capture warning, and stderr says what it was", async () => {
+    h.stories = [{ id: "a--one", warning: "The worker stopped early: it crashed" }];
+    const { stderr } = await review();
+    expect(stderr).toContain("won't be reused: the capture warned: The worker stopped early: it crashed.");
+    expect((await review()).rendered).toBe(true);
   });
 
   test("a later render's failure forgets the earlier good one", async () => {
@@ -253,9 +181,9 @@ describe("a run that isn't reusable", () => {
     expect((await review()).rendered).toBe(true);
   });
 
-  test("a build holding a symlink always renders", async () => {
+  test("a build holding a symlink always renders, and stderr says why", async () => {
     await symlink(path.join(h.scratch, "elsewhere.css"), inBuild("assets/link.css"));
-    expect((await review()).rendered).toBe(true);
+    expect((await review()).stderr).toContain("won't be reused: a native environment, or a build holding a symlink");
     expect((await review()).rendered).toBe(true);
   });
 
@@ -276,6 +204,7 @@ describe("play errors", () => {
         errors: [
           { source: "play", message: "expected a dialog" },
           { source: "console", message: "expected a dialog" },
+          { source: "page", message: "uncaught" },
         ],
       },
     ];
@@ -291,51 +220,38 @@ describe("play errors", () => {
 });
 
 describe("stability", () => {
-  test("a run without it can't answer a request with it, nor the other way", async () => {
-    h.stories = [{ id: "a--one", stability: "stable" }];
+  beforeEach(() => {
+    h.stories = [{ id: "a--one", stability: "unstable", repeatColor: BLUE }];
+  });
+
+  test("always renders, even after a plain run of this build", async () => {
     await review();
     const checked = await review("--stability");
     expect(checked.rendered).toBe(true);
+    expect(checked.json.reusedFromRun).toBeNull();
     expect(checked.json.stabilityChecked).toBe(true);
-
-    const reused = await review("--stability");
-    expect(reused.json.reusedFromRun).toBe(checked.json.runId);
-    expect(reused.json.stabilityChecked).toBe(true);
-
-    const plain = await review();
-    expect(plain.rendered).toBe(false);
-    expect(plain.json.stabilityChecked).toBe(false);
-    expect(plain.json.reusedFromRun).not.toBe(checked.json.runId);
+    expect(reasons(checked.json.advisories)).toEqual(["unstable"]);
+    await stat(checked.json.unstable[0].repeat);
+    expect((await review("--stability")).rendered).toBe(true);
   });
 
-  test("a stability run with no plain one renders for a plain request", async () => {
-    h.stories = [{ id: "a--one", stability: "stable" }];
+  test("isn't remembered, so it answers nothing", async () => {
     await review("--stability");
-    expect((await review()).rendered).toBe(true);
+    const plain = await review();
+    expect(plain.rendered).toBe(true);
+    expect(plain.json.stabilityChecked).toBe(false);
   });
 
-  test("keeps unstable flags, and the second render until it is pruned", async () => {
-    h.stories = [{ id: "a--one", stability: "unstable", repeatColor: BLUE }];
-    const first = await review("--stability");
-    expect(first.json.unstable[0].repeat).toEqual(expect.any(String));
-
-    const second = await review("--stability");
-    expect(second.json.reusedFromRun).toBe(first.json.runId);
-    expect(reasons(second.json.advisories)).toEqual(["unstable"]);
-    expect(second.json.unstable[0].repeat).toContain(second.json.runId);
-    expect(await readFile(second.json.unstable[0].repeat)).toEqual(await readFile(first.json.unstable[0].repeat));
-
-    const slug = (await readdir(h.home))[0]!;
-    await rm(path.join(h.home, slug, "runs", first.json.runId), { recursive: true });
-    const pruned = await review("--stability");
-    expect(pruned.rendered).toBe(false);
-    expect(reasons(pruned.json.advisories)).toEqual(["unstable"]);
-    expect(pruned.json.unstable[0].repeat).toBeNull();
+  test("leaves the plain run remembered, whatever it found", async () => {
+    const first = await review();
+    h.stories = [{ id: "a--one", failed: "Not this time" }];
+    await review("--stability");
+    expect((await review()).json.reusedFromRun).toBe(first.json.runId);
   });
 });
 
 describe("a filter", () => {
-  test("is answered from a whole run", async () => {
+  test("is answered from the build's whole run", async () => {
     const whole = await review();
     const filtered = await review("--story", "a--one");
     expect(filtered.rendered).toBe(false);
@@ -372,20 +288,19 @@ describe("a filter", () => {
     expect(json.error.code).toBe("no-stories");
   });
 
-  test("a filtered run can't answer a wider request", async () => {
+  test("a filtered render is never remembered, for itself or a wider request", async () => {
     await review("--story", "a--one");
+    expect((await review("--story", "a--one")).rendered).toBe(true);
     const wider = await review();
     expect(wider.rendered).toBe(true);
     expect(wider.json.counts.stories).toBe(2);
-    expect((await review("--story", "a--one", "--story", "a--two", "--no-reuse")).rendered).toBe(true);
   });
 
-  test("a filtered run answers the same patterns, in any order", async () => {
-    const first = await review("--story", "a--one", "--story", "a--two");
-    const again = await review("--story", "a--two", "--story", "a--one");
-    expect(again.rendered).toBe(false);
-    expect(again.json.reusedFromRun).toBe(first.json.runId);
-    expect((await review("--story", "a--one")).rendered).toBe(true);
+  test("a filtered render's failure leaves the whole run remembered", async () => {
+    const whole = await review();
+    h.stories = [{ id: "a--one", failed: "Not this time" }, { id: "a--two" }];
+    await review("--story", "a--one", "--no-reuse");
+    expect((await review()).json.reusedFromRun).toBe(whole.json.runId);
   });
 });
 
@@ -398,16 +313,8 @@ describe("turning it off", () => {
     expect((await review()).json.reusedFromRun).toBe(forced.json.runId);
   });
 
-  test("the config's reuse: false renders", async () => {
+  test("the config has no key for it", async () => {
     await writeConfig({ reuse: false });
-    await review();
-    const second = await review();
-    expect(second.rendered).toBe(true);
-    expect(second.json.reusedFromRun).toBeNull();
-  });
-
-  test("the config's reuse must be a boolean", async () => {
-    await writeConfig({ reuse: "no" });
     const { code, json } = await review();
     expect(code).toBe(2);
     expect(json.error.code).toBe("bad-config");
@@ -450,8 +357,7 @@ describe("a reused run is a real run", () => {
     const first = await review();
     const reused = await review();
     await h.cli("approve", reused.json.runId, "--all");
-    const slug = (await readdir(h.home))[0]!;
-    await rm(path.join(h.home, slug, "runs"), { recursive: true });
+    await pruneRuns();
     expect((await h.cli("accept", reused.json.runId)).json.reusedFromRun).toBe(first.json.runId);
   });
 

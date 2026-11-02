@@ -1,8 +1,8 @@
-import { createHash } from "node:crypto";
 import { access, mkdir, rm } from "node:fs/promises";
 import { availableParallelism } from "node:os";
 import path from "node:path";
 import { defineEnvironment, environmentId, launchArgs, type RenderEnvironment } from "./environment.ts";
+import { initScriptHash } from "./identity.ts";
 import {
   MANIFEST_FILE,
   REPEAT_DIR,
@@ -20,7 +20,7 @@ import { CAPTURE_RECIPE } from "./worker/protocol.ts";
 
 const DEFAULT_MAX_CONCURRENCY = 6;
 const DEFAULT_STORY_TIMEOUT_MS = 60_000;
-export const DEFAULT_SETTLE_MS = 100;
+const DEFAULT_SETTLE_MS = 100;
 /** Browser launch and shutdown, on top of the worst case for the stories themselves. */
 const RUN_OVERHEAD_MS = 90_000;
 /**
@@ -146,8 +146,7 @@ export async function capture(options: CaptureOptions): Promise<Manifest> {
     recipe: CAPTURE_RECIPE,
     settleMs,
     runtime: null,
-    initScriptSha256:
-      options.initScript === undefined ? null : createHash("sha256").update(options.initScript).digest("hex"),
+    initScriptSha256: initScriptHash(options.initScript),
     startedAt: new Date(started).toISOString(),
     durationMs: 0,
     warnings,

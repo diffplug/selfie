@@ -14,10 +14,24 @@ import { Label, Stack, type LabelProps } from "@primer/react";
 import type { ReactNode } from "react";
 import { isDecidable } from "selfie-store";
 import type { BlockerReason, PixelDiff, SnapshotRow, SnapshotState } from "../shared/api.ts";
+import { AppLink, runPath } from "./router.tsx";
 
 export const shortSha = (sha: string) => sha.slice(0, 10);
 
 export const plural = (count: number, one: string, many = `${one}s`) => `${count.toLocaleString()} ${count === 1 ? one : many}`;
+
+/** A run that didn't render: where its pixels came from, which every place that offers a decision on them must say. */
+export function ReusedPixels({ from }: { readonly from: string }) {
+  return (
+    <>
+      These pixels were rendered earlier, by run{" "}
+      <AppLink inline href={runPath(from)}>
+        <code>{from}</code>
+      </AppLink>
+      .
+    </>
+  );
+}
 
 function IconLabel({ variant, icon, children }: { variant: LabelProps["variant"]; icon: ReactNode; children: ReactNode }) {
   return (

@@ -1,14 +1,36 @@
+// What decides a build's pixels, as one string, so a review can recognize a build that already
+// rendered. Beside `capture`, so a new capture option that can change pixels sits next to this.
 import { createHash } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { environmentId, type RenderEnvironment } from "./environment.ts";
+
+const sha256 = (text: string) => createHash("sha256").update(text).digest("hex");
+
+export const initScriptHash = (initScript: string | undefined) => (initScript === undefined ? null : sha256(initScript));
 
 /**
- * A SHA-256 of every file's relative path and bytes under a directory, whatever their sizes and
- * times. Null if it holds anything but files and directories, since what a symlink reaches isn't
- * in the hash. `bytesToHash` may stand in for a file's own bytes.
+ * What differs between two builds of the same source, and which nothing in a build loads, so it
+ * can't change a pixel: docs/specs/cli.rationale.md -> Recording only if necessary. Exact paths
+ * and exact text: a build where these don't match just hashes differently, which only renders.
  */
-export async function hashTree(
+const VOLATILE_TEXT = new Map([
+  ["project.json", /^\{"generatedAt":\d+,/],
+  ["manifests/components.html", /Generation took <strong>[\d.]+s<\/strong>/],
+]);
+
+function withoutVolatileText(file: string, bytes: Buffer): Uint8Array {
+  const volatile = VOLATILE_TEXT.get(file);
+  // latin1 keeps every byte as one character, so nothing else about the file can change here.
+  return volatile === undefined ? bytes : Buffer.from(bytes.toString("latin1").replace(volatile, ""), "latin1");
+}
+
+/**
+ * A SHA-256 of every file's relative path and bytes, whatever their sizes and times. Null if the
+ * directory holds anything but files and directories, since what a symlink reaches isn't hashed.
+ */
+async function hashTree(
   root: string,
   bytesToHash: (file: string, bytes: Buffer) => Uint8Array = (_, bytes) => bytes,
 ): Promise<string | null> {
@@ -27,13 +49,24 @@ export async function hashTree(
   return hash.digest("hex");
 }
 
-let identity: Promise<string> | undefined;
-
 /**
- * The renderer's own code, so a change to how pixels are made is seen whatever the package's
- * version says, which in a checkout never changes.
+ * Changes whenever a render of this build could: its bytes, the environment, the init script, or
+ * the renderer's own code, which also covers its defaults, and which a package version wouldn't
+ * in a checkout. Null if a render can't be recognized: a native machine's ID doesn't describe all
+ * of it, and a build that's missing or holds a symlink can't be hashed.
  */
-export function rendererIdentity(): Promise<string> {
-  identity ??= hashTree(fileURLToPath(new URL(".", import.meta.url))).then((hash) => hash ?? "unhashable");
-  return identity;
+export async function renderIdentity({
+  storybookDir,
+  environment,
+  initScript,
+}: {
+  readonly storybookDir: string;
+  readonly environment: RenderEnvironment;
+  readonly initScript?: string | undefined;
+}): Promise<string | null> {
+  if (environment.runner.kind !== "container") return null;
+  const build = await hashTree(storybookDir, withoutVolatileText).catch(() => null);
+  if (build === null) return null;
+  const renderer = await hashTree(fileURLToPath(new URL(".", import.meta.url)));
+  return sha256(JSON.stringify([build, environmentId(environment), initScriptHash(initScript), renderer]));
 }

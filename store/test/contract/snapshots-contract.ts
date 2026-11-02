@@ -232,6 +232,27 @@ export function describeSnapshotContract(
       expect(await snapshots.getRun(clean.id)).toMatchObject({ dirty: false, baselineSha: null, storyFilter: null });
     });
 
+    it("keeps which run really rendered a run's images, and which didn't", async () => {
+      const environment = "reused";
+      const rendered_ = await snapshots.beginRun({ gitSha: SHA_0, environment, dirty: false, baselineSha: null });
+      expect(rendered_.reusedFromRun).toBeNull();
+      expect((await snapshots.getRun(rendered_.id))?.reusedFromRun).toBeNull();
+
+      const reused = await snapshots.beginRun({
+        gitSha: SHA_1,
+        environment,
+        dirty: false,
+        baselineSha: null,
+        reusedFromRun: rendered_.id,
+      });
+      expect(reused.reusedFromRun).toBe(rendered_.id);
+      await snapshots.recordSnapshots(reused.id, [rendered("a", 11)]);
+      expect((await snapshots.finishRun(reused.id, 1)).reusedFromRun).toBe(rendered_.id);
+      expect((await snapshots.getRun(reused.id))?.reusedFromRun).toBe(rendered_.id);
+      expect((await snapshots.runsAt(SHA_1, environment))[0]?.reusedFromRun).toBe(rendered_.id);
+      expect((await snapshots.compareRun(reused.id, null)).run.reusedFromRun).toBe(rendered_.id);
+    });
+
     it("keeps a play error, and lists its snapshot even when unchanged", async () => {
       const environment = "play";
       const run = await snapshots.beginRun({ gitSha: SHA_0, environment, dirty: false, baselineSha: null });
