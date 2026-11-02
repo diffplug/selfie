@@ -7,16 +7,20 @@
   "exports": {
     ".": "./src/core/index.ts",
     "./adapters/d1-rest": "./src/adapters/d1-rest.ts",
+    "./adapters/r2": "./src/adapters/r2.ts",
     "./adapters/sqlite": "./src/adapters/sqlite.ts",
     "./adapters/filesystem-blob": "./src/adapters/filesystem-blob.ts"
   },
   "scripts": {
     "test": "pnpm typecheck && vitest run",
-    "test:d1": "SELFIE_D1_CONTRACT=1 vitest run --silent=false test/d1-rest.real.test.ts",
-    "typecheck": "tsc -p tsconfig.core.json && tsc -p tsconfig.json",
+    "test:d1": "SELFIE_D1_CONTRACT=1 vitest run --project node --silent=false test/d1-rest.real.test.ts",
+    "test:d1:workerd": "SELFIE_D1_WORKERD=1 vitest run --project workerd --silent=false test/workerd/d1.real.workerd.test.ts",
+    "typecheck": "tsc -p tsconfig.core.json && tsc -p tsconfig.json && tsc -p tsconfig.workerd.json",
     "find-collision": "node scripts/find-collision.ts"
   },
   "devDependencies": {
+    "@cloudflare/vitest-plugin": "^1.4.11",
+    "@cloudflare/workers-types": "^5.20261101.1",
     "@types/node": "^26.6.6",
     "typescript": "^7.0.2",
     "vitest": "^5.0.5"

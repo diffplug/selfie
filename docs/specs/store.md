@@ -1,6 +1,6 @@
 # Store
 
-> Status: partly built — the store core, its local SQLite and filesystem adapters, and the D1 REST adapter exist. The R2 adapter and image decoding do not; see `## Future`.
+> Status: partly built — the store core, its local SQLite and filesystem adapters, and the D1 REST and R2 adapters exist. Image decoding does not; see `## Future`.
 >
 > - See `docs/specs/glossary.md` for image, image hash, image key, and store.
 > - Owns image identity, image keys, and hash collisions. The build order belongs to `docs/specs/system.md`.
@@ -29,7 +29,7 @@ Source of truth: `store/src/core/store.ts`.
 Source of truth: `store/src/core/store.ts`; tests in `store/test/store.test.ts` and `store/test/collision-fixture.test.ts`.
 
 - **Must keep image bytes in blob storage, never in SQL**, since D1 caps a row at 2 MB. A blob holds the image's complete PAM file.
-- **Must key blobs by image hash, never by image key.** The key is `images/<image hash>`. Reserved: cloud blobs add the project, per [R2 adapter](#r2-adapter).
+- **Must key blobs by image hash, never by image key.** The key is `images/<image hash>`; the [R2 adapter](#r2-adapter) adds the project.
 - **Must write image bytes before the metadata row that refers to them**, since blob storage and SQL share no transaction: a failure can orphan bytes but never leave a row without bytes.
 - **Must treat bytes with no row as not stored**, so an orphan is never served as an image.
 - **Must test collisions two ways:** an injected hash function for the logic, and a committed pair of real images whose hashes collide at 53 bits. The test recomputes both hashes from the committed images. `pnpm find-collision` regenerates the pair, separately from the test run.
@@ -43,7 +43,7 @@ The store core runs unchanged locally and in the cloud, the way Hono does for HT
 | Interface | Operations | Adapters |
 |---|---|---|
 | SQL | Run one SQLite-dialect statement, or several in one request with no atomicity across them | Local SQLite, [D1 REST](#d1-rest-adapter) |
-| Blob | Put, get, and check for bytes by key | Filesystem. Reserved: [R2 adapter](#r2-adapter) |
+| Blob | Put, get, and check for bytes by key | Filesystem, [R2](#r2-adapter) |
 
 - **Never import a platform API into the store core**, such as `node:fs` or a Cloudflare type. Only adapters may, and the core uses Web-standard types. Typecheck enforces this: `store/src/core` compiles with no Node types.
 - **Must limit the SQL interface to what every adapter supports**, so a statement that works locally also works on D1. It offers no transactions, and refuses transaction and `ATTACH` statements.
@@ -65,9 +65,9 @@ Neon stays outside these interfaces: accounts are Postgres and only ever in the 
 
 ## D1 REST adapter
 
-Source of truth: `store/src/adapters/d1-rest.ts`; tests in `store/test/d1-rest.test.ts` and, against real D1, `store/test/d1-rest.real.test.ts`.
+Source of truth: `store/src/adapters/d1-rest.ts`; tests in `store/test/d1-rest.test.ts` and, against real D1, `store/test/d1-rest.real.test.ts` and `store/test/workerd/d1.real.workerd.test.ts`.
 
-- **Must reach a project's D1 through the D1 REST API, with Web-standard APIs only**, so it runs in a Worker and in Node. Typecheck enforces this as it does for the core. Moving to a Worker binding replaces only this adapter (`docs/specs/system.md` → `platforms-upgrade`).
+- **Must reach a project's D1 through the D1 REST API, with Web-standard APIs only**, so it runs in a Worker and in Node. Typecheck enforces this as it does for the core, and `store/test/workerd/d1.real.workerd.test.ts` runs it inside workerd. Moving to a Worker binding replaces only this adapter (`docs/specs/system.md` → `platforms-upgrade`).
 - **Must send one `execute` as one REST request**, since every project shares one limit of 1,200 Cloudflare API requests per 5 minutes per user. D1 has no limit of its own on top: [Cloudflare's API limits page](https://developers.cloudflare.com/fundamentals/api/reference/limits/) names the APIs with separate limits, and D1 is not one, and [D1's limits page](https://developers.cloudflare.com/d1/platform/limits/) lists no request rate. D1 responses carry no `Ratelimit` headers, so a client cannot see what remains of the limit.
 - **Must back off and resend on HTTP 429, whatever the statements are**, since exceeding the limit blocks all API calls for 5 minutes and a 429 means the request never ran. It waits as long as `Retry-After` asks, or else a jittered doubling delay.
 - **Never wait out a block.** A 429 asking for longer than the longest allowed wait fails at once, reporting the wait.
@@ -75,7 +75,18 @@ Source of truth: `store/src/adapters/d1-rest.ts`; tests in `store/test/d1-rest.t
 - **Must fail at once on any other failure**, such as a SQL error or a bad token, with D1's message.
 - **Must bound every retry and every attempt**: a limit on attempts, a limit on any one wait, and a timeout on each request.
 - **Never put the token in an error or in anything a log could print.**
-- **Must keep tests against real D1 opt-in**, through `pnpm test:d1`, so `pnpm test` runs offline with no credentials. A run sends about 400 requests against the shared limit, so never loop it, and run one at a time, since all runs share one database.
+- **Must keep tests against real D1 opt-in**, so `pnpm test` runs offline with no credentials. `pnpm test:d1` runs the contract in Node and sends about 400 requests against the shared limit, so never loop it. `pnpm test:d1:workerd` runs inside workerd, with the whole store over this adapter and the [R2 adapter](#r2-adapter), and sends 17. Run one at a time, of either, since all runs share one database.
+
+## R2 adapter
+
+Source of truth: `store/src/adapters/r2.ts`; tests in `store/test/workerd/r2.workerd.test.ts`.
+
+- **Must access R2 through a Worker binding, never the Cloudflare API**, so image traffic doesn't count against the Cloudflare API limit ([D1 REST adapter](#d1-rest-adapter)). The adapter states the binding's shape itself, so nothing imports a Cloudflare type.
+- **Must key cloud blobs by project and image hash**, never by image key, and never shared across projects. The object key is `projects/<project>/<blob key>`, so the same image in two projects is two objects.
+- **Must refuse a project identifier that isn't one blob key segment**, as [Adapters](#adapters) defines a segment, so it holds no `/` and no project's prefix can lie inside another's. A blob key can't climb out of its prefix, by the same rule.
+- **Must give a project an identifier that never passes to another project**, since the identifier is all that separates their objects. Reserved: assigning identifiers belongs to `cloud-deploy` (`docs/specs/system.md` → Build order).
+- **Must treat R2's per-key write limit as a concurrent put, not a failure.** R2 allows [one write per second per key](https://developers.cloudflare.com/r2/platform/limits/) and throws error 10058 for more. If a blob is then at the key, the put is done, since callers only put the same bytes at a key. If not, it resends after a jittered doubling delay, a bounded number of times, then fails with R2's error. Any other error fails at once.
+- **Must run the blob contract against the real binding inside workerd, never a mock or a Node-side proxy**, as part of `pnpm test`, since workerd's local R2 needs no network or credentials. Local R2 does not enforce the per-key write limit, so tests raise error 10058 over the binding. No test has run against real R2.
 
 ## Future
 
@@ -84,11 +95,6 @@ Source of truth: `store/src/adapters/d1-rest.ts`; tests in `store/test/d1-rest.t
 ### Image decoding
 
 - **Must decode every source encoding of the same pixels to the same 8-bit RGBA**, so re-encoding a PNG does not create a new image.
-
-### R2 adapter
-
-- **Must access R2 through a Worker binding, never the Cloudflare API**, so image traffic doesn't count against the Cloudflare API limit ([D1 REST adapter](#d1-rest-adapter)).
-- **Must key cloud blobs by project and image hash**, never by image key, and never shared across projects.
 
 ### Open questions
 

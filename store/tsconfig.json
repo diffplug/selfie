@@ -13,5 +13,6 @@
     "allowImportingTsExtensions": true,
     "skipLibCheck": true
   },
-  "include": ["src", "test", "scripts", "vitest.config.ts"]
+  "include": ["src", "test", "scripts", "vitest.config.ts"],
+  "exclude": ["test/workerd"]
 }
