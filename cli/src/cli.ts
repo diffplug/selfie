@@ -16,8 +16,10 @@ const EXIT_COULD_NOT_RUN = 2;
 
 const USAGE = `Usage: selfie <command>
 
-  review [--storybook-dir <dir>] [--build-command <cmd>] [--story <pattern>]... [--native] [--stability]
-      Renders a built Storybook, records a run, and prints a JSON diff against the baseline.
+  review [--storybook-dir <dir>] [--build-command <cmd>] [--story <pattern>]... [--native] [--stability] [--no-reuse]
+      Renders a built Storybook, records a run, and prints a JSON diff against the baseline. If
+      this exact build already rendered, reuses those images and names that run in reusedFromRun,
+      unless --no-reuse.
       Exits 0 if nothing blocks it, 1 if something does, 2 if the review couldn't run. Play
       errors and unstable stories are advisories, and don't change the exit code.
 
@@ -102,6 +104,7 @@ async function dispatch(command: string | undefined, args: string[], context: Co
         native: { type: "boolean" },
         story: { type: "string", multiple: true },
         stability: { type: "boolean" },
+        "no-reuse": { type: "boolean" },
       });
       noPositionals(command, positionals);
       return withProject(context, async (project) => {
@@ -111,6 +114,7 @@ async function dispatch(command: string | undefined, args: string[], context: Co
           native: values.native,
           stories: values.story,
           stability: values.stability,
+          reuse: !values["no-reuse"],
           capture: context.capture,
           signal: context.signal,
           log: (line) => context.stderr(`${line}\n`),
@@ -165,6 +169,9 @@ async function dispatch(command: string | undefined, args: string[], context: Co
           removedSeen: removed === undefined ? undefined : Number(removed),
         });
         const document = buildAcceptDocument(result);
+        if (document.reusedFromRun !== null) {
+          context.stderr(`This run's pixels came from the render of run ${document.reusedFromRun}.\n`);
+        }
         if (!result.accepted) {
           const reasons = document.refusals.map(({ message }) => `  ${message}`).join("\n");
           context.stderr(`Not accepted:\n${reasons}\n`);

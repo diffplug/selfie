@@ -324,6 +324,20 @@ describe("the run view", () => {
   });
 });
 
+describe("a run that reused an earlier render", () => {
+  test("its view says which run really rendered it, and a rendered run's says none", async () => {
+    const build = path.join(h.scratch, "build");
+    await mkdir(build);
+    await writeFile(path.join(build, "iframe.html"), "<html></html>");
+    h.stories = [{ id: "a--one" }];
+    const rendered = (await h.cli("review", "--storybook-dir", build)).json;
+    const reused = (await h.cli("review", "--storybook-dir", build)).json;
+    expect(reused.reusedFromRun).toBe(rendered.runId);
+    expect((await viewOf(rendered.runId)).run.reusedFromRun).toBeNull();
+    expect((await viewOf(reused.runId)).run.reusedFromRun).toBe(rendered.runId);
+  });
+});
+
 describe("images", () => {
   test("serves a stored PNG, privately, by its hash", async () => {
     h.stories = [{ id: "a" }];

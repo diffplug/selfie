@@ -28,7 +28,8 @@ A run is one recording of a set of snapshots against one full Git SHA in one env
 | `failed` | Finished, and at least one story failed to render | Yes | Refused |
 | `complete` | Finished, and every story rendered | Yes | If approved and not `dirty` |
 
-- **Must be told when it begins whether the working tree was dirty, and the baseline its reviewer saw**, and may be told any story filter, as `patterns` and the `unmatched` among them. A run keeps these for good, so nothing about it depends on a file outside the store.
+- **Must be told when it begins whether the working tree was dirty, and the baseline its reviewer saw**, and may be told any story filter, as `patterns` and the `unmatched` among them, and which run really rendered its images, as `reusedFromRun` (`docs/specs/cli.md` → Recording only if necessary). A run keeps these for good, so nothing about it depends on a file outside the store.
+- **Must treat `reusedFromRun` as a fact about where the pixels came from, and nothing more.** It changes no state, comparison, or acceptance, and it's an ID, not a reference, since sync may move a run without the one it names.
 - **Must record a story that failed to render as a row with its failure message**, never leave it absent, so only a `recording` run can lack a story. A message is cut to 2,000 characters.
 - **Must record a story's play error as a message, cut the same way, whether or not it also has an image.** It changes no state and no acceptance ([Open questions](#open-questions)).
 - **Must refuse a snapshot whose image isn't stored**, so a row always has an image. Rows hold image keys, and the API only takes and returns image hashes, per `docs/specs/store.md` → Image identity.
@@ -100,14 +101,15 @@ Goldens are per Git SHA and environment, and are the images of the one run accep
 Source of truth: `CREATE_SNAPSHOT_TABLES` in `store/src/core/snapshots.ts`, `initStoreSchema` in `store/src/core/store.ts`.
 
 ```sql
-runs(key PK, id UNIQUE, git_sha, environment, started_at, finished_at, failed_count, dirty, baseline_sha, story_filter)
+runs(key PK, id UNIQUE, git_sha, environment, started_at, finished_at, failed_count, dirty, baseline_sha, story_filter, reused_from_run)
   INDEX runs_by_sha(git_sha, environment, started_at)
 run_snapshots(run_key, story, image_key, failure, unstable, play_error)  PK (run_key, story)  WITHOUT ROWID
 decisions(environment, story, image_hash, decision, actor, decided_at)  PK (environment, story, image_hash)  WITHOUT ROWID
 goldens(git_sha, environment, run_key)  PK (git_sha, environment)  WITHOUT ROWID
 ```
 
-- **Must only add what is missing:** `initStoreSchema` is one request of `CREATE ... IF NOT EXISTS`, so running it upgrades a store holding only images. It changes no existing table, and there is no version number. Any other change needs `docs/specs/store.md` → Open questions decided first.
+- **Must leave out the CLI's local table** (`docs/specs/cli.md` → Recording only if necessary): it's in a local `store.db`, not this schema, and D1 doesn't have it.
+- **Must only add what is missing:** `initStoreSchema` is one request of `CREATE ... IF NOT EXISTS`, so running it upgrades a store holding only images. It changes no existing table, and there is no version number. Any other change needs `docs/specs/store.md` → Open questions decided first. `runs.reused_from_run` is the one exception, made before any project database existed (rationale): `CREATE TABLE IF NOT EXISTS` doesn't add it to an older store, whose reviews and accepts fail with exit 2 until the store is recreated.
 - **Must keep `runs.key` and `run_snapshots.image_key` inside the store, as with image keys.** A run's `id`, a UUID, is what leaves it.
 - **Never scan a table:** every statement reaches its rows through one of these keys. `store/test/snapshots.test.ts` checks SQLite's query plan for everything a review sends.
 

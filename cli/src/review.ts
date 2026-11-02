@@ -6,9 +6,11 @@ import path from "node:path";
 import {
   capture as realCapture,
   filterStories,
+  renderIdentity,
   type Manifest,
   type ManifestStory,
   type StoryError,
+  unmatchedPatternWarning,
 } from "selfie-render";
 import {
   chunks,
@@ -17,6 +19,7 @@ import {
   type Comparison,
   type Decision,
   type RecordedSnapshot,
+  type Run,
   type StoryFilter,
 } from "selfie-store";
 import { resolveCaptureSettings, type CaptureSettings } from "./config.ts";
@@ -47,6 +50,8 @@ export interface ReviewOptions {
   readonly stories?: readonly string[] | undefined;
   readonly stability?: boolean | undefined;
   readonly native?: boolean | undefined;
+  /** False renders even if this exact build already rendered, and remembers the new render. Defaults to true. */
+  readonly reuse?: boolean | undefined;
   /** Defaults to the renderer's. */
   readonly capture?: typeof realCapture | undefined;
   readonly signal?: AbortSignal | undefined;
@@ -112,8 +117,8 @@ function runBuildCommand(command: string, cwd: string, signal: AbortSignal | und
 }
 
 /** No stories means nothing to record, and a typo must not pass. */
-function assertStoriesCaptured(manifest: Manifest, storybookDir: string, stories: readonly string[] | undefined) {
-  if (manifest.stories.length > 0) return;
+function assertStoriesCaptured(count: number, storybookDir: string, stories: readonly string[] | undefined) {
+  if (count > 0) return;
   throw new SelfieError(
     "no-stories",
     stories === undefined
@@ -262,7 +267,7 @@ async function exportDifference(project: Project, runDir: string, snapshot: Comp
 }
 
 /** Exports what's needed to act on the comparison: only `changed` snapshots get diff work. */
-async function exportImages(project: Project, runDir: string, comparison: Comparison, captureDir: string, manifest: Manifest) {
+async function exportImages(project: Project, runDir: string, comparison: Comparison, captureDir: string, recording: Recording) {
   const { removed } = summarizeRun(comparison);
   const shown = [...comparison.snapshots.filter(({ state }) => isDecidable(state)), ...removed];
   const differences = await mapConcurrently(
@@ -286,9 +291,8 @@ async function exportImages(project: Project, runDir: string, comparison: Compar
       })),
   );
 
-  const repeatFiles = new Map(manifest.stories.map(({ id, repeatFile }) => [id, repeatFile]));
   const exportRepeat = async (story: string) => {
-    const repeatFile = repeatFiles.get(story) ?? null;
+    const repeatFile = recording.repeatFiles.get(story) ?? null;
     if (repeatFile === null) return null;
     const checked = await regularFileInside(captureDir, repeatFile);
     if ("refused" in checked) return null;
@@ -309,14 +313,109 @@ async function exportImages(project: Project, runDir: string, comparison: Compar
 }
 
 /** What a capture says about a filter, as a fact for the run. */
-function storyFilterOf(patterns: readonly string[] | undefined, manifest: Manifest): StoryFilter | null {
-  return patterns === undefined ? null : { patterns, unmatched: filterStories(manifest.stories, patterns).unmatched };
+function storyFilterOf(patterns: readonly string[] | undefined, stories: readonly string[]): StoryFilter | null {
+  if (patterns === undefined) return null;
+  return { patterns, unmatched: filterStories(stories.map((id) => ({ id })), patterns).unmatched };
+}
+
+/** What a review's later steps read, whether it rendered or found an earlier render. */
+interface Recording {
+  readonly reusedFromRun: string | null;
+  readonly storyIds: readonly string[];
+  readonly warnings: readonly string[];
+  readonly repeatFiles: ReadonlyMap<string, string | null>;
+  readonly records: () => Promise<readonly RecordedSnapshot[]>;
+  /** Called with the finished run. */
+  readonly finished: (run: Run) => Promise<void>;
+}
+
+/** The project's own code, which the same build repeats. Anything else might not recur. */
+const REPEATABLE_ERRORS: ReadonlySet<StoryError["source"]> = new Set(["play", "console", "page"]);
+
+/** Why this render mustn't answer a later review, or null if it may. */
+function whyNotReusable({ stories, warnings }: Manifest, { status }: Run): string | null {
+  if (status !== "complete") return "a story failed";
+  for (const { id, errors } of stories) {
+    const error = errors.find(({ source }) => !REPEATABLE_ERRORS.has(source));
+    if (error !== undefined) return `${id} had a ${error.source} error, which might not recur: ${error.message.split("\n")[0]}`;
+  }
+  return warnings[0] === undefined ? null : `the capture warned: ${warnings[0]}`;
+}
+
+/** The earlier render of this exact build, if there's one, narrowed to the patterns. */
+async function replay(
+  project: Project,
+  identity: string,
+  patterns: readonly string[] | undefined,
+  log: (line: string) => void,
+): Promise<Recording | null> {
+  const runId = await project.renders.find(identity);
+  if (runId === null || (await project.snapshots.getRun(runId))?.status !== "complete") return null;
+  const { snapshots } = await project.snapshots.compareRun(runId, null, { includeUnchanged: true });
+  const stories = snapshots.map((snapshot) => ({ id: snapshot.story, snapshot }));
+  const chosen = patterns === undefined ? stories : filterStories(stories, patterns).stories;
+  const storyIds = chosen.map(({ id }) => id);
+  return {
+    reusedFromRun: runId,
+    storyIds,
+    warnings: (storyFilterOf(patterns, storyIds)?.unmatched ?? []).map(unmatchedPatternWarning),
+    repeatFiles: new Map(),
+    // A remembered run is `complete`, so every row has an image, and nobody checked its stability.
+    records: async () =>
+      chosen.map(({ snapshot: { story, imageHash, playError } }) => ({ story, imageHash: imageHash!, playError })),
+    finished: async () =>
+      log(`Reused the images of run ${runId}, since this exact build already rendered. --no-reuse renders again.`),
+  };
+}
+
+/** Captures the build. Only a plain review of every story can answer a later one, so only it is remembered. */
+async function renderFresh(
+  project: Project,
+  captureDir: string,
+  capture: typeof realCapture,
+  { storybookDir, identity, settings, options, log }: {
+    readonly storybookDir: string;
+    readonly identity: string | null;
+    readonly settings: CaptureSettings;
+    readonly options: ReviewOptions;
+    readonly log: (line: string) => void;
+  },
+): Promise<Recording> {
+  const stability = options.stability ?? false;
+  const manifest = await capture({
+    storybookDir,
+    outDir: captureDir,
+    environment: settings.environment,
+    stability,
+    log,
+    ...(options.stories === undefined ? {} : { stories: [...options.stories] }),
+    ...(settings.initScript === undefined ? {} : { initScript: settings.initScript }),
+    ...(options.signal === undefined ? {} : { signal: options.signal }),
+  });
+  return {
+    reusedFromRun: null,
+    storyIds: manifest.stories.map(({ id }) => id),
+    warnings: manifest.warnings,
+    repeatFiles: new Map(manifest.stories.map(({ id, repeatFile }) => [id, repeatFile])),
+    records: () => storeCapture(project, captureDir, manifest),
+    async finished(run) {
+      if (stability || options.stories !== undefined) return;
+      if (identity === null) {
+        log("This render won't be reused: a native environment, or a build holding a symlink, can't be recognized.");
+        return;
+      }
+      // A build that changed while it rendered has no identity that describes these images.
+      const after = await renderIdentity({ storybookDir, environment: settings.environment, initScript: settings.initScript });
+      const whyNot = after === identity ? whyNotReusable(manifest, run) : "the build changed while it rendered";
+      await project.renders.remember(identity, whyNot === null ? run.id : null);
+      if (whyNot !== null) log(`This render won't be reused: ${whyNot}.`);
+    },
+  };
 }
 
 async function recordRun(
   project: Project,
-  captureDir: string,
-  manifest: Manifest,
+  recording: Recording,
   fields: {
     gitSha: string;
     settings: CaptureSettings;
@@ -324,7 +423,7 @@ async function recordRun(
     baselineSha: string | null;
     storyFilter: StoryFilter | null;
   },
-) {
+): Promise<Run> {
   const { snapshots } = project;
   const run = await snapshots.beginRun({
     gitSha: fields.gitSha,
@@ -332,11 +431,11 @@ async function recordRun(
     dirty: fields.dirty,
     baselineSha: fields.baselineSha,
     storyFilter: fields.storyFilter,
+    reusedFromRun: recording.reusedFromRun,
   });
-  const records = await storeCapture(project, captureDir, manifest);
+  const records = await recording.records();
   await snapshots.recordSnapshots(run.id, records);
-  await snapshots.finishRun(run.id, records.length);
-  return run;
+  return snapshots.finishRun(run.id, records.length);
 }
 
 /**
@@ -366,20 +465,15 @@ export async function review(project: Project, options: ReviewOptions): Promise<
     const baseline = await findBaseline(project, settings.environmentId);
     const dirtyBefore = await dirtyPaths(repo);
 
-    // 3. Capture.
+    // 3. Capture, unless this exact build already rendered. Stability is a fresh measurement.
     const captureStarted = Date.now();
-    const manifest = await capture({
-      storybookDir,
-      outDir: captureDir,
-      environment: settings.environment,
-      stability: options.stability ?? false,
-      log,
-      ...(options.stories === undefined ? {} : { stories: [...options.stories] }),
-      ...(settings.initScript === undefined ? {} : { initScript: settings.initScript }),
-      ...(options.signal === undefined ? {} : { signal: options.signal }),
-    });
+    const identity = options.stability
+      ? null
+      : await renderIdentity({ storybookDir, environment: settings.environment, initScript: settings.initScript });
+    const replayed = identity !== null && options.reuse !== false ? await replay(project, identity, options.stories, log) : null;
+    const recording = replayed ?? (await renderFresh(project, captureDir, capture, { storybookDir, identity, settings, options, log }));
     const captured = Date.now();
-    assertStoriesCaptured(manifest, storybookDir, options.stories);
+    assertStoriesCaptured(recording.storyIds.length, storybookDir, options.stories);
 
     // 4. Check one commit still describes what rendered.
     const shaAfter = await headSha(repo);
@@ -389,15 +483,16 @@ export async function review(project: Project, options: ReviewOptions): Promise<
     const dirty = [...new Set([...dirtyBefore, ...(await dirtyPaths(repo))])];
 
     // 5. Record.
-    const run = await recordRun(project, captureDir, manifest, {
+    const run = await recordRun(project, recording, {
       gitSha,
       settings,
       dirty: dirty.length > 0,
       baselineSha: baseline.sha,
-      storyFilter: storyFilterOf(options.stories, manifest),
+      storyFilter: storyFilterOf(options.stories, recording.storyIds),
     });
     const stored = Date.now();
-    log(`Recorded run ${run.id}: ${manifest.stories.length} stories.`);
+    log(`Recorded run ${run.id}: ${recording.storyIds.length} stories.`);
+    await recording.finished(run);
 
     // 6. Compare.
     const comparison = await project.snapshots.compareRun(run.id, baseline.sha);
@@ -406,7 +501,7 @@ export async function review(project: Project, options: ReviewOptions): Promise<
     // 7. Export, keep a cache of what was exported, and prune older runs.
     const runDir = runDirectory(project, run.id);
     await mkdir(runDir, { recursive: true });
-    const { differences, playErrors, unstable } = await exportImages(project, runDir, comparison, captureDir, manifest);
+    const { differences, playErrors, unstable } = await exportImages(project, runDir, comparison, captureDir, recording);
     const diffed = Date.now();
     await writeReviewCache(project, run.id, {
       differences: differences.map(({ story, current, golden, diff, pixelDiff }) => ({
@@ -429,7 +524,7 @@ export async function review(project: Project, options: ReviewOptions): Promise<
       differences,
       playErrors,
       unstable,
-      warnings: manifest.warnings,
+      warnings: recording.warnings,
       timings: {
         captureMs: captured - captureStarted,
         storeMs: stored - captured,

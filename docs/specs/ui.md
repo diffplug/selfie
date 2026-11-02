@@ -98,7 +98,7 @@ Source of truth: `ui/src/client/`.
 | `/runs/:id/stories/:story` | One snapshot, in the filter from the query |
 | `/runs/:id/accept` | Accepting |
 
-**The run** shows, in order: its commit, run ID, dirty state, baseline, environment, and decision actor; a warning if it was recorded dirty, has no baseline, or its SHA can't be a baseline; the counts; blockers; advisories; and the differences.
+**The run** shows, in order: its commit, run ID, whether its pixels were rendered earlier and by which run, dirty state, baseline, environment, and decision actor; a warning if it was recorded dirty, has no baseline, or its SHA can't be a baseline; the counts; blockers; advisories; and the differences.
 
 - **Must group blockers by reason, in words, and offer each as a filter of the list.**
 - **Must keep the filter, text and state, in the URL, and nowhere else**, so back, reload, and next and previous all follow it. A row's link takes the filter from the URL on a click, so a keystroke re-renders only the rows it shows or hides, and a link opened in a new tab has no filter.
@@ -120,6 +120,7 @@ Source of truth: `ui/src/client/`.
 
 **Accepting** shows, in plain words, every refusal `accept` would give, and what to do about it.
 
+- **Must say, for a run with `reusedFromRun`, that these pixels were rendered earlier, by which run, with a link to it**, so a person accepting here knows as much as `selfie accept` tells an agent (`docs/specs/cli.md` → Recording only if necessary).
 - **Must list every golden accepting would drop, say how many are only outside the run's filter, and require a checkbox before accepting any.** It sends the count it listed, as `removedSeen`.
 - **Must say when another run is the commit's goldens, that this one would replace them.**
 - **Must show when a run is accepted**, and never offer it again.

@@ -8,6 +8,7 @@ export {
   type NativeRunner,
   type RenderEnvironment,
 } from "./environment.ts";
+export { renderIdentity } from "./identity.ts";
 export {
   MANIFEST_FILE,
   type Manifest,
@@ -15,5 +16,5 @@ export {
   type ManifestTotals,
   type StabilityStatus,
 } from "./manifest.ts";
-export { filterStories, RenderError, type StoryEntry } from "./storybook.ts";
+export { filterStories, RenderError, unmatchedPatternWarning, type StoryEntry } from "./storybook.ts";
 export type { StoryError, WorkerRuntime } from "./worker/protocol.ts";

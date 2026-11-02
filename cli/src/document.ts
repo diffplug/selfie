@@ -40,6 +40,7 @@ export function buildReviewDocument(result: ReviewResult) {
   return {
     schemaVersion: 1,
     runId: run.id,
+    reusedFromRun: run.reusedFromRun,
     gitSha: run.gitSha,
     dirtyPaths: dirtyPaths.slice(0, DIRTY_PATHS_SHOWN),
     baseline: { sha: baseline.sha, reason: baseline.reason, message: baseline.message },
@@ -92,6 +93,7 @@ export function buildAcceptDocument({ accepted, refusals, usableAsBaseline, comp
   return {
     accepted,
     runId: run.id,
+    reusedFromRun: run.reusedFromRun,
     gitSha: run.gitSha,
     environment: run.environment,
     baselineSha: run.baselineSha,

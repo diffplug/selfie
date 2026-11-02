@@ -41,7 +41,7 @@ Access follows GitHub through a GitHub App: anyone can view a public repository'
 Selfie has the following commands:
 
 - find-baseline - returns the Git sha of the nearest merge-base with a complete set of goldens
-- review - records snapshots and shows the diff against the baseline, as one JSON document whose exit code says whether anything blocks. Recording only if necessary is still to come
+- review - records snapshots (only if necessary) and shows the diff against the baseline, as one JSON document whose exit code says whether anything blocks. If the Storybook build is one it already rendered, it reuses those images and says so, which takes about 0.3 s rather than 70 s on 541 stories, and `--no-reuse` renders anyway
 - approve, reject - decides on a run's changed snapshots, on a dirty tree if you like, so committing doesn't ask again
 - accept - makes a run's snapshots the goldens for its Git sha, on a clean tree
 - ui - serves a local review page in the browser, to look at a run's images, approve, reject, and accept. It shows what `review` recorded, and never renders

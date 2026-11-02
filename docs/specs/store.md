@@ -112,5 +112,5 @@ Source of truth: `store/src/adapters/r2.ts`; tests in `store/test/workerd/r2.wor
 
 ### Open questions
 
-- **Schema migrations.** How a schema change reaches every project database, and how the app treats a database still on the older schema. Until then a change may only add tables and indexes, through `initStoreSchema` (`docs/specs/snapshots.md` → Schema).
+- **Schema migrations.** How a schema change reaches every project database, and how the app treats a database still on the older schema. Until then a change may only add tables and indexes, through `initStoreSchema`, with one exception made before any project database existed (`docs/specs/snapshots.md` → Schema).
 - **Stored encoding.** PNG is a stand-in, and lossless WebP is the comparison's recommendation (rationale). A switch changes the write path, and needs a decoder behind `decodeImage` that runs in Workers. Whatever stores images must decode to the exact RGB pixels that were hashed, with no alpha, and identify itself by its first bytes.
