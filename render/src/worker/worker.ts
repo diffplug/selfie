@@ -4,7 +4,7 @@
 import { createHash } from "node:crypto";
 import { stat, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { chromium, type Browser, type BrowserContext, type Route } from "playwright-core";
+import { chromium, type Browser, type BrowserContext, type Page, type Route } from "playwright-core";
 import {
   CAPTURE_RECIPE,
   PLAYWRIGHT_VERSION,
@@ -39,6 +39,31 @@ function withTimeout<T>(work: Promise<T>, ms: number, message: string): Promise<
 /** The dimensions from a PNG's IHDR, which the format fixes at the start of the file. */
 function pngDimensions(png: Buffer): { width: number; height: number } {
   return { width: png.readUInt32BE(16), height: png.readUInt32BE(20) };
+}
+
+/**
+ * Counts a page's requests from the start, and returns a wait for none to have been in flight
+ * for a quiet period, which resolves false at the bound. Playwright's `networkidle` is the
+ * same thing with a fixed 500 ms.
+ */
+function trackRequests(page: Page): (quietMs: number, boundMs: number) => Promise<boolean> {
+  let inFlight = 0;
+  let lastChange = Date.now();
+  const change = (delta: number) => () => {
+    inFlight += delta;
+    lastChange = Date.now();
+  };
+  page.on("request", change(1));
+  page.on("requestfinished", change(-1));
+  page.on("requestfailed", change(-1));
+  return async (quietMs, boundMs) => {
+    const deadline = Date.now() + boundMs;
+    while (inFlight > 0 || Date.now() - lastChange < quietMs) {
+      if (Date.now() >= deadline) return false;
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
+    return true;
+  };
 }
 
 /** The file a build-relative URL path names, or null if it is outside the build or absent. */
@@ -122,6 +147,7 @@ async function screenshotStory(
 ): Promise<Buffer> {
   const page = await context.newPage();
   page.setDefaultTimeout(job.storyTimeoutMs);
+  const networkQuiet = trackRequests(page);
   page.on("console", (message) => {
     if (message.type() === "error") record({ source: "console", message: message.text() });
   });
@@ -160,12 +186,12 @@ async function screenshotStory(
   );
   for (const message of playFailures) record({ source: "play", message });
 
-  await page.waitForLoadState("networkidle", { timeout: CAPTURE_RECIPE.networkIdleBoundMs }).catch(() => {
+  if (!(await networkQuiet(CAPTURE_RECIPE.networkQuietMs, CAPTURE_RECIPE.networkQuietBoundMs))) {
     record({
       source: "timeout",
-      message: `network not idle after ${CAPTURE_RECIPE.networkIdleBoundMs}ms; captured anyway`,
+      message: `network not quiet after ${CAPTURE_RECIPE.networkQuietBoundMs}ms; captured anyway`,
     });
-  });
+  }
   await page.evaluate(() => document.fonts.ready.then(() => undefined));
   await page.waitForTimeout(job.settleMs);
   await page.evaluate(

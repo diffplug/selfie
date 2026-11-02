@@ -18,7 +18,7 @@ describe("defaults", () => {
   test("pin the arm64 Playwright image and the measured settings", () => {
     expect(defineEnvironment()).toEqual({
       runner: { kind: "container", image: DEFAULT_IMAGE, platform: "linux/arm64" },
-      browserFlags: ["--disable-lcd-text", "--font-render-hinting=none"],
+      browserFlags: ["--disable-lcd-text", "--font-render-hinting=none", "--disable-partial-raster"],
       viewport: { width: 1200, height: 900 },
       scale: 1,
     });
@@ -29,7 +29,7 @@ describe("environmentId", () => {
   test("is pinned for the default environment", () => {
     // Changing this literal restarts every project's goldens. Upgrading Playwright or editing
     // CAPTURE_RECIPE are the expected reasons, since the ID includes both.
-    expect(environmentId(defineEnvironment())).toBe("container-linux-arm64-887186e20373fded");
+    expect(environmentId(defineEnvironment())).toBe("container-linux-arm64-18da8c72b3ca0ee2");
   });
 
   test("is deterministic and safe in a snapshot name", () => {
@@ -59,7 +59,7 @@ describe("environmentId", () => {
     const reordered: RenderEnvironment = {
       scale: 1,
       viewport: { height: 900, width: 1200 },
-      browserFlags: ["--font-render-hinting=none", "--disable-lcd-text"],
+      browserFlags: ["--disable-partial-raster", "--font-render-hinting=none", "--disable-lcd-text"],
       runner: { platform: "linux/arm64", image: `mcr.microsoft.com/playwright@${DIGEST}`, kind: "container" },
     };
     expect(environmentId(reordered)).toBe(base);
@@ -104,6 +104,7 @@ test("launchArgs adds the keychain flags to the environment's, without changing 
   expect(launchArgs(environment)).toEqual([
     "--disable-lcd-text",
     "--font-render-hinting=none",
+    "--disable-partial-raster",
     "--use-mock-keychain",
     "--password-store=basic",
   ]);

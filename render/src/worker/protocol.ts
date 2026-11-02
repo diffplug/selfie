@@ -13,7 +13,7 @@ export const PLAYWRIGHT_VERSION = (
  * `worker.ts` changes.
  */
 export const CAPTURE_RECIPE = {
-  waitSequence: 1,
+  waitSequence: 2,
   /** No server listens here: the worker answers every request itself. */
   origin: "http://127.0.0.1:6199",
   /** Set to `true` before any story code loads, so a project can freeze its own timers. */
@@ -26,7 +26,8 @@ export const CAPTURE_RECIPE = {
   reducedMotion: "reduce",
   forcedColors: "none",
   fixedTime: "2026-01-15T12:00:00.000Z",
-  networkIdleBoundMs: 15_000,
+  networkQuietMs: 100,
+  networkQuietBoundMs: 15_000,
   screenshot: { animations: "disabled", caret: "hide", scale: "device", fullPage: false },
 } as const;
 

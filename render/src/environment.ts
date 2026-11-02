@@ -5,7 +5,11 @@ import { CAPTURE_RECIPE, PLAYWRIGHT_VERSION } from "./worker/protocol.ts";
 const DEFAULT_IMAGE =
   "mcr.microsoft.com/playwright@sha256:a0f4498920a5dbac63196d9140ed738ef00470f27e2e74029abd8850b7bd5717";
 const DEFAULT_PLATFORM = "linux/arm64";
-const DEFAULT_BROWSER_FLAGS: readonly string[] = ["--disable-lcd-text", "--font-render-hinting=none"];
+const DEFAULT_BROWSER_FLAGS: readonly string[] = [
+  "--disable-lcd-text",
+  "--font-render-hinting=none",
+  "--disable-partial-raster",
+];
 
 /** On every browser launch, so nothing prompts for the macOS keychain. They don't affect pixels, so they stay out of the environment. */
 const HOUSEKEEPING_FLAGS: readonly string[] = ["--use-mock-keychain", "--password-store=basic"];

@@ -18,15 +18,14 @@ import { prepareRunner, runWorker, type WorkerOutcome } from "./runners.ts";
 import { filterStories, readStoryIndex, RenderError, type StoryEntry } from "./storybook.ts";
 import { CAPTURE_RECIPE } from "./worker/protocol.ts";
 
-const DEFAULT_MAX_CONCURRENCY = 4;
+const DEFAULT_MAX_CONCURRENCY = 6;
 const DEFAULT_STORY_TIMEOUT_MS = 60_000;
-const DEFAULT_SETTLE_MS = 500;
+const DEFAULT_SETTLE_MS = 100;
 /** Browser launch and shutdown, on top of the worst case for the stories themselves. */
 const RUN_OVERHEAD_MS = 90_000;
 /**
  * The repeat settles this much longer, so a timer shows up instead of matching by luck: with
- * equal timing, unfrozen stories matched in every run measured. It sits near the half period
- * of common caret blinks (see render.rationale.md).
+ * equal timing, unfrozen stories matched in every run measured (see render.rationale.md).
  */
 const REPEAT_EXTRA_SETTLE_MS = 530;
 
@@ -44,7 +43,7 @@ export interface CaptureOptions {
   stories?: string[];
   /** Render every story a second time, settling longer, and flag those whose PNG differs. */
   stability?: boolean;
-  /** Stories rendered at once. Defaults to the machine's CPUs, at most 4. */
+  /** Stories rendered at once. Defaults to the machine's CPUs, at most 6. */
   concurrency?: number;
   /** The bound on one story, from opening its context to its screenshot. */
   storyTimeoutMs?: number;
