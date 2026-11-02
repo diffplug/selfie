@@ -40,6 +40,7 @@ export function buildReviewDocument(result: ReviewResult) {
   return {
     schemaVersion: 1,
     runId: run.id,
+    reusedFromRun: result.reusedFromRun,
     gitSha: run.gitSha,
     dirtyPaths: dirtyPaths.slice(0, DIRTY_PATHS_SHOWN),
     baseline: { sha: baseline.sha, reason: baseline.reason, message: baseline.message },
@@ -86,12 +87,13 @@ function refusalMessage(refusal: AcceptRefusal, runId: string): string {
 }
 
 /** The one document `selfie accept` prints. */
-export function buildAcceptDocument({ accepted, refusals, usableAsBaseline, comparison }: AcceptResult) {
+export function buildAcceptDocument({ accepted, refusals, usableAsBaseline, reusedFromRun, comparison }: AcceptResult) {
   const { run } = comparison;
   const { advisories, removed, notRendered } = summarizeRun(comparison);
   return {
     accepted,
     runId: run.id,
+    reusedFromRun,
     gitSha: run.gitSha,
     environment: run.environment,
     baselineSha: run.baselineSha,

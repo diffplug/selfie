@@ -107,6 +107,7 @@ decisions(environment, story, image_hash, decision, actor, decided_at)  PK (envi
 goldens(git_sha, environment, run_key)  PK (git_sha, environment)  WITHOUT ROWID
 ```
 
+- **Must leave out the CLI's two local tables** (`docs/specs/cli.md` → Recording only if necessary): they're in a local `store.db`, not this schema, and D1 has neither.
 - **Must only add what is missing:** `initStoreSchema` is one request of `CREATE ... IF NOT EXISTS`, so running it upgrades a store holding only images. It changes no existing table, and there is no version number. Any other change needs `docs/specs/store.md` → Open questions decided first.
 - **Must keep `runs.key` and `run_snapshots.image_key` inside the store, as with image keys.** A run's `id`, a UUID, is what leaves it.
 - **Never scan a table:** every statement reaches its rows through one of these keys. `store/test/snapshots.test.ts` checks SQLite's query plan for everything a review sends.

@@ -58,7 +58,7 @@ describe("a first review, with no baseline", () => {
       expect((await decodeImage(await readFile(difference.current))).width).toBe(8);
     }
     expect(stderr).toContain("Recorded run");
-    expect(stderr).toMatch(/Timings: capture \d+ ms, store \d+ ms, compare \d+ ms, diff \d+ ms, total \d+ ms/);
+    expect(stderr).toMatch(/Timings: hash \d+ ms, capture \d+ ms, store \d+ ms, compare \d+ ms, diff \d+ ms, total \d+ ms/);
   });
 
   test("leaves out what the document no longer carries", async () => {

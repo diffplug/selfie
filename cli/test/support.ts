@@ -14,6 +14,7 @@ import {
   type Manifest,
   type ManifestStory,
   type StoryError,
+  unmatchedPatternWarning,
 } from "selfie-render";
 import { REPEAT_DIR, STORIES_DIR, storyFileName, totalsOf, writeManifest } from "selfie-render/testing";
 import { runCli } from "../src/cli.ts";
@@ -124,7 +125,7 @@ export function fakeCapture(
       runtime: null,
       startedAt: new Date().toISOString(),
       durationMs: 1,
-      warnings: filtered?.unmatched.map((pattern) => `Story pattern "${pattern}" matched nothing.`) ?? [],
+      warnings: filtered?.unmatched.map(unmatchedPatternWarning) ?? [],
       totals: totalsOf(manifestStories),
       stories: manifestStories,
     };

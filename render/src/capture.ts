@@ -15,12 +15,12 @@ import {
   type Manifest,
 } from "./manifest.ts";
 import { prepareRunner, runWorker, type WorkerOutcome } from "./runners.ts";
-import { filterStories, readStoryIndex, RenderError, type StoryEntry } from "./storybook.ts";
+import { filterStories, readStoryIndex, RenderError, unmatchedPatternWarning, type StoryEntry } from "./storybook.ts";
 import { CAPTURE_RECIPE } from "./worker/protocol.ts";
 
 const DEFAULT_MAX_CONCURRENCY = 6;
 const DEFAULT_STORY_TIMEOUT_MS = 60_000;
-const DEFAULT_SETTLE_MS = 100;
+export const DEFAULT_SETTLE_MS = 100;
 /** Browser launch and shutdown, on top of the worst case for the stories themselves. */
 const RUN_OVERHEAD_MS = 90_000;
 /**
@@ -93,7 +93,7 @@ export async function capture(options: CaptureOptions): Promise<Manifest> {
   if (options.stories) {
     const filtered = filterStories(stories, options.stories);
     stories = filtered.stories;
-    for (const pattern of filtered.unmatched) warnings.push(`Story pattern "${pattern}" matched nothing.`);
+    warnings.push(...filtered.unmatched.map(unmatchedPatternWarning));
   }
   if (stories.length === 0) warnings.push("No stories were selected.");
 

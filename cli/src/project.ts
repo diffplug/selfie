@@ -10,6 +10,7 @@ import type { PixelDiff } from "./diff.ts";
 import { SelfieError } from "./errors.ts";
 import { openRepo, walkToBaseline, type BaselineSearch, type Repo } from "./git.ts";
 import { assertRunId, isRunId, projectSlug, selfieHome } from "./paths.ts";
+import { initReuseTables } from "./reuse.ts";
 
 /** How many runs keep their exported images. Older ones are deleted by the next review. */
 const RUN_DIRECTORIES_KEPT = 20;
@@ -23,6 +24,8 @@ export interface Project {
   readonly repo: Repo;
   /** `<home>/<slug>` */
   readonly directory: string;
+  /** The local database, which also holds what `cli/src/reuse.ts` remembers. */
+  readonly sql: Sql;
   readonly store: Store;
   readonly snapshots: Snapshots;
   readonly close: () => void;
@@ -37,10 +40,12 @@ export async function openProject({ cwd, env }: { cwd: string; env: NodeJS.Proce
   const adapter = new SqliteAdapter(path.join(directory, "store.db"));
   const sql = new Sql(adapter);
   await initStoreSchema(sql);
+  await initReuseTables(sql);
   return {
     cwd,
     repo,
     directory,
+    sql,
     store: new Store({ sql, blob: new Blobs(new FilesystemBlobStorage(path.join(directory, "blobs"))) }),
     snapshots: new Snapshots({ sql }),
     close: () => adapter.close(),

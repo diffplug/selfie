@@ -61,6 +61,13 @@ describe.runIf(process.env.SELFIE_CLI_CONTAINER === "1")("in the pinned containe
     expect(same.json.baseline.sha).toBe(first.json.gitSha);
     expect(same.json.differences).toEqual([]);
     expect(same.json.counts.unchanged).toBe(2);
+    expect(same.json.reusedFromRun).toBe(first.json.runId);
+    expect(same.stderr).not.toContain("render 2/2");
+
+    const rendered = await review(...STORIES, "--no-reuse");
+    expect(rendered.status).toBe(0);
+    expect(rendered.json.reusedFromRun).toBeNull();
+    expect(rendered.stderr).toContain("render 2/2");
 
     // An init script is project input, so it reports a change rather than starting new goldens.
     await writeFile(

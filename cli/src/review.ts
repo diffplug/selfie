@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { copyFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { availableParallelism } from "node:os";
 import path from "node:path";
 import {
@@ -9,6 +9,7 @@ import {
   type Manifest,
   type ManifestStory,
   type StoryError,
+  unmatchedPatternWarning,
 } from "selfie-render";
 import {
   chunks,
@@ -17,6 +18,7 @@ import {
   type Comparison,
   type Decision,
   type RecordedSnapshot,
+  type Run,
   type StoryFilter,
 } from "selfie-store";
 import { resolveCaptureSettings, type CaptureSettings } from "./config.ts";
@@ -28,10 +30,12 @@ import {
   captureDirectory,
   findBaseline,
   pruneOutput,
+  readReviewCache,
   runDirectory,
   writeReviewCache,
   type Project,
 } from "./project.ts";
+import { findReusableRender, markReused, rememberRender, renderKeys, whyNotReusable } from "./reuse.ts";
 import { isDecidable, summarizeRun } from "./summary.ts";
 
 /** Each group is read into memory whole. */
@@ -47,6 +51,8 @@ export interface ReviewOptions {
   readonly stories?: readonly string[] | undefined;
   readonly stability?: boolean | undefined;
   readonly native?: boolean | undefined;
+  /** False renders even if this exact build already rendered. Defaults to true. */
+  readonly reuse?: boolean | undefined;
   /** Defaults to the renderer's. */
   readonly capture?: typeof realCapture | undefined;
   readonly signal?: AbortSignal | undefined;
@@ -71,6 +77,8 @@ export interface Difference {
 export interface ReviewResult {
   /** Everything about the run, as `summarizeRun` reads it. */
   readonly comparison: Comparison;
+  /** The run that really rendered these images, if this one didn't. */
+  readonly reusedFromRun: string | null;
   /** Modified, staged, and untracked paths while it rendered. */
   readonly dirtyPaths: readonly string[];
   readonly baseline: BaselineSearch;
@@ -90,6 +98,7 @@ export interface ReviewResult {
   }[];
   readonly warnings: readonly string[];
   readonly timings: {
+    readonly hashMs: number;
     readonly captureMs: number;
     readonly storeMs: number;
     readonly compareMs: number;
@@ -112,8 +121,8 @@ function runBuildCommand(command: string, cwd: string, signal: AbortSignal | und
 }
 
 /** No stories means nothing to record, and a typo must not pass. */
-function assertStoriesCaptured(manifest: Manifest, storybookDir: string, stories: readonly string[] | undefined) {
-  if (manifest.stories.length > 0) return;
+function assertStoriesCaptured(count: number, storybookDir: string, stories: readonly string[] | undefined) {
+  if (count > 0) return;
   throw new SelfieError(
     "no-stories",
     stories === undefined
@@ -262,7 +271,12 @@ async function exportDifference(project: Project, runDir: string, snapshot: Comp
 }
 
 /** Exports what's needed to act on the comparison: only `changed` snapshots get diff work. */
-async function exportImages(project: Project, runDir: string, comparison: Comparison, captureDir: string, manifest: Manifest) {
+async function exportImages(
+  project: Project,
+  runDir: string,
+  comparison: Comparison,
+  repeatSource: (story: string) => Promise<string | null>,
+) {
   const { removed } = summarizeRun(comparison);
   const shown = [...comparison.snapshots.filter(({ state }) => isDecidable(state)), ...removed];
   const differences = await mapConcurrently(
@@ -286,14 +300,11 @@ async function exportImages(project: Project, runDir: string, comparison: Compar
       })),
   );
 
-  const repeatFiles = new Map(manifest.stories.map(({ id, repeatFile }) => [id, repeatFile]));
   const exportRepeat = async (story: string) => {
-    const repeatFile = repeatFiles.get(story) ?? null;
-    if (repeatFile === null) return null;
-    const checked = await regularFileInside(captureDir, repeatFile);
-    if ("refused" in checked) return null;
+    const source = await repeatSource(story);
+    if (source === null) return null;
     const file = path.join(await storyDirectory(runDir, story), "repeat.png");
-    await copyFile(checked.file, file);
+    await copyFile(source, file);
     return file;
   };
   const unstable = await Promise.all(
@@ -309,22 +320,44 @@ async function exportImages(project: Project, runDir: string, comparison: Compar
 }
 
 /** What a capture says about a filter, as a fact for the run. */
-function storyFilterOf(patterns: readonly string[] | undefined, manifest: Manifest): StoryFilter | null {
-  return patterns === undefined ? null : { patterns, unmatched: filterStories(manifest.stories, patterns).unmatched };
+function storyFilterOf(patterns: readonly string[] | undefined, stories: readonly string[]): StoryFilter | null {
+  if (patterns === undefined) return null;
+  return { patterns, unmatched: filterStories(stories.map((id) => ({ id })), patterns).unmatched };
+}
+
+/** Finds a story's second render in a capture directory. */
+function repeatInCapture(captureDir: string, manifest: Manifest) {
+  const repeatFiles = new Map(manifest.stories.map(({ id, repeatFile }) => [id, repeatFile]));
+  return async (story: string) => {
+    const repeatFile = repeatFiles.get(story) ?? null;
+    if (repeatFile === null) return null;
+    const checked = await regularFileInside(captureDir, repeatFile);
+    return "refused" in checked ? null : checked.file;
+  };
+}
+
+/** Finds a story's second render in what an earlier review exported. The store doesn't keep them, so a pruned one is gone. */
+async function repeatInRun(project: Project, runId: string) {
+  const cache = await readReviewCache(project, runId);
+  const repeats = new Map(cache?.unstable.map(({ story, repeat }) => [story, repeat]));
+  return async (story: string) => {
+    const repeat = repeats.get(story) ?? null;
+    return repeat !== null && (await stat(repeat).catch(() => null)) !== null ? repeat : null;
+  };
 }
 
 async function recordRun(
   project: Project,
-  captureDir: string,
-  manifest: Manifest,
+  records: () => Promise<readonly RecordedSnapshot[]>,
   fields: {
     gitSha: string;
     settings: CaptureSettings;
     dirty: boolean;
     baselineSha: string | null;
     storyFilter: StoryFilter | null;
+    reusedFromRun: string | null;
   },
-) {
+): Promise<Run> {
   const { snapshots } = project;
   const run = await snapshots.beginRun({
     gitSha: fields.gitSha,
@@ -333,10 +366,11 @@ async function recordRun(
     baselineSha: fields.baselineSha,
     storyFilter: fields.storyFilter,
   });
-  const records = await storeCapture(project, captureDir, manifest);
-  await snapshots.recordSnapshots(run.id, records);
-  await snapshots.finishRun(run.id, records.length);
-  return run;
+  const recorded = await records();
+  await snapshots.recordSnapshots(run.id, recorded);
+  // Before it finishes, so no finished run can pass for a render it wasn't.
+  if (fields.reusedFromRun !== null) await markReused(project, run.id, fields.reusedFromRun);
+  return snapshots.finishRun(run.id, recorded.length);
 }
 
 /**
@@ -366,20 +400,32 @@ export async function review(project: Project, options: ReviewOptions): Promise<
     const baseline = await findBaseline(project, settings.environmentId);
     const dirtyBefore = await dirtyPaths(repo);
 
-    // 3. Capture.
+    // 3. Capture, unless this exact build already rendered.
+    const hashStarted = Date.now();
+    const stability = options.stability ?? false;
+    const keys = await renderKeys(storybookDir, settings, { stability, stories: options.stories });
+    const reusable =
+      keys !== null && settings.reuse && options.reuse !== false
+        ? await findReusableRender(project, keys.lookup, options.stories)
+        : null;
     const captureStarted = Date.now();
-    const manifest = await capture({
-      storybookDir,
-      outDir: captureDir,
-      environment: settings.environment,
-      stability: options.stability ?? false,
-      log,
-      ...(options.stories === undefined ? {} : { stories: [...options.stories] }),
-      ...(settings.initScript === undefined ? {} : { initScript: settings.initScript }),
-      ...(options.signal === undefined ? {} : { signal: options.signal }),
-    });
+    const manifest =
+      reusable !== null
+        ? null
+        : await capture({
+            storybookDir,
+            outDir: captureDir,
+            environment: settings.environment,
+            stability,
+            log,
+            ...(options.stories === undefined ? {} : { stories: [...options.stories] }),
+            ...(settings.initScript === undefined ? {} : { initScript: settings.initScript }),
+            ...(options.signal === undefined ? {} : { signal: options.signal }),
+          });
     const captured = Date.now();
-    assertStoriesCaptured(manifest, storybookDir, options.stories);
+    const storyIds = manifest?.stories.map(({ id }) => id) ?? reusable!.records.map(({ story }) => story);
+    assertStoriesCaptured(storyIds.length, storybookDir, options.stories);
+    const storyFilter = storyFilterOf(options.stories, storyIds);
 
     // 4. Check one commit still describes what rendered.
     const shaAfter = await headSha(repo);
@@ -389,15 +435,29 @@ export async function review(project: Project, options: ReviewOptions): Promise<
     const dirty = [...new Set([...dirtyBefore, ...(await dirtyPaths(repo))])];
 
     // 5. Record.
-    const run = await recordRun(project, captureDir, manifest, {
-      gitSha,
-      settings,
-      dirty: dirty.length > 0,
-      baselineSha: baseline.sha,
-      storyFilter: storyFilterOf(options.stories, manifest),
-    });
+    const run = await recordRun(
+      project,
+      async () => (manifest === null ? reusable!.records : storeCapture(project, captureDir, manifest)),
+      {
+        gitSha,
+        settings,
+        dirty: dirty.length > 0,
+        baselineSha: baseline.sha,
+        storyFilter,
+        reusedFromRun: reusable?.runId ?? null,
+      },
+    );
     const stored = Date.now();
-    log(`Recorded run ${run.id}: ${manifest.stories.length} stories.`);
+    log(`Recorded run ${run.id}: ${storyIds.length} stories.`);
+    if (reusable !== null) {
+      log(`Reused the images of run ${reusable.runId}, since this exact build already rendered. --no-reuse renders again.`);
+    } else if (manifest !== null && keys !== null) {
+      // A build that changed while it rendered has no key that describes these images.
+      const after = await renderKeys(storybookDir, settings, { stability, stories: options.stories });
+      const whyNot = after?.record === keys.record ? whyNotReusable(manifest, run) : "the build changed while it rendered";
+      await rememberRender(project, keys.record, whyNot === null ? run.id : null);
+      if (whyNot !== null) log(`This render won't be reused: ${whyNot}.`);
+    }
 
     // 6. Compare.
     const comparison = await project.snapshots.compareRun(run.id, baseline.sha);
@@ -406,7 +466,9 @@ export async function review(project: Project, options: ReviewOptions): Promise<
     // 7. Export, keep a cache of what was exported, and prune older runs.
     const runDir = runDirectory(project, run.id);
     await mkdir(runDir, { recursive: true });
-    const { differences, playErrors, unstable } = await exportImages(project, runDir, comparison, captureDir, manifest);
+    const repeatSource =
+      manifest === null ? await repeatInRun(project, reusable!.runId) : repeatInCapture(captureDir, manifest);
+    const { differences, playErrors, unstable } = await exportImages(project, runDir, comparison, repeatSource);
     const diffed = Date.now();
     await writeReviewCache(project, run.id, {
       differences: differences.map(({ story, current, golden, diff, pixelDiff }) => ({
@@ -423,14 +485,16 @@ export async function review(project: Project, options: ReviewOptions): Promise<
 
     return {
       comparison,
+      reusedFromRun: reusable?.runId ?? null,
       dirtyPaths: dirty,
       baseline,
       stabilityChecked: options.stability ?? false,
       differences,
       playErrors,
       unstable,
-      warnings: manifest.warnings,
+      warnings: manifest?.warnings ?? (storyFilter?.unmatched ?? []).map(unmatchedPatternWarning),
       timings: {
+        hashMs: captureStarted - hashStarted,
         captureMs: captured - captureStarted,
         storeMs: stored - captured,
         compareMs: compared - stored,

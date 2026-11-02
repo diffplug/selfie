@@ -34,6 +34,8 @@ export async function readStoryIndex(storybookDir: string): Promise<StoryEntry[]
   return stories.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 }
 
+export const unmatchedPatternWarning = (pattern: string) => `Story pattern "${pattern}" matched nothing.`;
+
 /**
  * Keeps the stories whose ID matches a pattern, where `*` matches any run of characters.
  * `unmatched` lists the patterns that matched nothing, so a typo doesn't look like a pass.

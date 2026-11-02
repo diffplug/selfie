@@ -7,7 +7,7 @@ import { resolveInside } from "./paths.ts";
 
 /** At the Git top level. It's the only place a project configures Selfie. */
 const CONFIG_FILE = "selfie.config.json";
-const KNOWN_KEYS = new Set(["environment", "initScript"]);
+const KNOWN_KEYS = new Set(["environment", "initScript", "reuse"]);
 
 // There is deliberately no build command here: a checked-out repository must not be able to
 // run a shell through a file, only someone passing `--build-command` can.
@@ -15,6 +15,8 @@ interface ProjectConfig {
   readonly environment?: EnvironmentOverrides;
   /** A file path, inside the Git top level. */
   readonly initScript?: string;
+  /** False always renders. */
+  readonly reuse?: boolean;
 }
 
 async function loadConfig(repo: Repo): Promise<ProjectConfig> {
@@ -34,6 +36,10 @@ async function loadConfig(repo: Repo): Promise<ProjectConfig> {
   for (const key of Object.keys(parsed)) {
     if (!KNOWN_KEYS.has(key)) throw new SelfieError("bad-config", `${file} has an unknown key "${key}".`);
   }
+  const { reuse } = parsed as ProjectConfig;
+  if (reuse !== undefined && typeof reuse !== "boolean") {
+    throw new SelfieError("bad-config", `${file}'s "reuse" must be true or false.`);
+  }
   return parsed as ProjectConfig;
 }
 
@@ -41,6 +47,7 @@ export interface CaptureSettings {
   readonly environment: RenderEnvironment;
   readonly environmentId: string;
   readonly initScript?: string;
+  readonly reuse: boolean;
 }
 
 /** The environment and init script a project uses: the pinned default, then its config. */
@@ -68,6 +75,7 @@ export async function resolveCaptureSettings(
   return {
     environment,
     environmentId: environmentId(environment),
+    reuse: config.reuse ?? true,
     ...(initScript === undefined ? {} : { initScript }),
   };
 }
