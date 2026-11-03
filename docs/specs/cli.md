@@ -16,6 +16,7 @@ Source of truth: `cli/src/cli.ts`, `cli/src/document.ts`; the real binary's test
 | `selfie approve <run>`, `selfie reject <run>` | Records a decision on a run's changed and new images, with `--all` or `--story <pattern>` |
 | `selfie accept <run>` | Makes a run the goldens of its Git SHA |
 | `selfie find-baseline` | Prints the baseline this repository and environment would use |
+| `selfie notes` | Prints the notes a person has sent to an agent from this folder (`docs/specs/feedback.md`) |
 | `selfie ui [<run>]` | Serves the review UI until stopped, and prints its URL ([ui](#ui)) |
 
 - **Must print exactly one document on stdout, whatever happens,** and everything for people on stderr, including a review's one line of timings. A command that couldn't run prints `{ "error": { "code", "message" } }`. `--help` prints usage.
@@ -38,7 +39,7 @@ Source of truth: `cli/src/index.ts`; tests in `cli/test/library.test.ts`.
 
 | Export | Does |
 |---|---|
-| `openProject({ cwd, env })` | The repository's `Project`: its `repo`, `directory`, `renders`, `store`, `snapshots`, and `close()` |
+| `openProject({ cwd, env })` | The repository's `Project`: its `repo`, `directory`, `renders`, `notes`, `store`, `snapshots`, and `close()` |
 | `record(project, options)` | Returns a `RecordResult`: the `run`, `dirtyPaths`, `baseline`, `warnings`, and `timings` |
 | `review(project, options)` | `options` is a `run`, or what `record` takes. Returns a `ReviewResult`: the `comparison`, `dirtyPaths`, `baseline`, `differences`, `playErrors`, `warnings`, and `timings` |
 | `decide(project, { runId, decision, actor, stories })` | `stories` is `"all"`, patterns, or `{ targets }`: exact stories and image hashes, for a caller that showed them, refused whole with `stale-decision` if any isn't a changed or new image the run holds. Returns `decided`, `skipped`, `unmatchedPatterns`, and the `comparison` after it. It compares twice, and reads unchanged rows only for patterns |
@@ -64,8 +65,9 @@ Source of truth: `cli/src/paths.ts`, `cli/src/project.ts`; tests in `cli/test/un
 
 ```
 <home>/<slug>/
-  store.db                               SQLite, per docs/specs/store.md, with one table of its own (Recording only if necessary)
+  store.db                               SQLite, per docs/specs/store.md, with tables of its own (Recording only if necessary, and docs/specs/feedback.md)
   blobs/images/<image hash>              Filesystem blobs, per docs/specs/store.md
+  notes/<image hash>[-<box>].png         What a note is about, with its box drawn on it
   runs/<run id>/review.json              A disposable cache of exported paths and pixel diffs
   runs/<run id>/stories/<name>/*.png     current, golden, and diff
   runs/<run id>/against/<baseline>/stories/<name>/*.png     the same, for a --baseline

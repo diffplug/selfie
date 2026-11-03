@@ -9,15 +9,16 @@ import type {
   Attention,
   BlockerReason,
   ComparedSnapshot,
+  Note,
   Run,
   RunView,
   SnapshotRow,
 } from "../../shared/api.ts";
-import type { RunState } from "../hooks.ts";
+import type { FeedbackState, RunState } from "../hooks.ts";
 import { RequestError } from "../api.ts";
 import { HASHES, PIXEL_DIFFS } from "./images.generated.ts";
 
-const RUN_ID = "4f8c2a10-7d3e-4b6a-9c11-2e5f0a7b8c9d";
+export const RUN_ID = "4f8c2a10-7d3e-4b6a-9c11-2e5f0a7b8c9d";
 export const OTHER_RUN_ID = "b1d7e3f4-1a2b-4c3d-8e5f-6a7b8c9d0e1f";
 export const SHA = "c2a01c2f9d8e7b6a5c4d3e2f1a0b9c8d7e6f5a4b";
 export const BASELINE_SHA = "58bfd636768707e03943bcf08a05152f799617bb";
@@ -148,6 +149,33 @@ export function viewOf(
     removals,
     usableAsBaseline: true,
     siblings: [{ id: run.id, startedAt: run.startedAt, status: run.status, dirty: run.dirty }],
+    ...overrides,
+  };
+}
+
+export function note(id: number, { text = "This looks a bit quiet next to the heading.", ...overrides }: Partial<Note> & { readonly text?: string } = {}): Note {
+  const state = overrides.state ?? "draft";
+  return {
+    id,
+    story: "components-button--primary",
+    runId: RUN_ID,
+    imageHash: null,
+    box: null,
+    state,
+    messages: [{ sender: "person", author: "ned@example.com", text, runId: RUN_ID, at: id, sent: state !== "draft" }],
+    ...overrides,
+  };
+}
+
+/** A folder's notes, with actions that are recorded but change nothing. */
+export function feedbackOf(notes: readonly Note[] = [], overrides: Partial<FeedbackState> = {}): FeedbackState {
+  return {
+    view: { folder: "selfie-hackathon", notes },
+    error: null,
+    clearError: fn(),
+    add: fn(async () => true),
+    remove: fn(async () => undefined),
+    send: fn(async () => "Feedback on the Storybook stories in the folder `selfie-hackathon`, as 1 note.\n\nNote 1, on components-button--primary:\nThis looks a bit quiet next to the heading."),
     ...overrides,
   };
 }

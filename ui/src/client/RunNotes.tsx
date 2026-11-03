@@ -5,11 +5,13 @@ import { fetchBaseline } from "./api.ts";
 import { useFetched, type RunState } from "./hooks.ts";
 import { shortSha } from "./words.tsx";
 
+export function ActionFailedBanner({ error, onDismiss }: { readonly error: Error; readonly onDismiss: () => void }) {
+  return <Banner variant="critical" title="That didn't happen" description={error.message} onDismiss={onDismiss} />;
+}
+
 export function ActionFailure({ state }: { readonly state: RunState }) {
   const { actionError, clearActionError, loadError } = state;
-  if (actionError !== null) {
-    return <Banner variant="critical" title="That didn't happen" description={actionError.message} onDismiss={clearActionError} />;
-  }
+  if (actionError !== null) return <ActionFailedBanner error={actionError} onDismiss={clearActionError} />;
   if (loadError !== null) {
     return <Banner variant="warning" title="This may be out of date" description={loadError.message} />;
   }

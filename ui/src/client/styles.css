@@ -4,6 +4,8 @@
   --selfie-kind-changed: #ff0050;
   --selfie-kind-moved: #0969da;
   --selfie-kind-spacing: #ffd666;
+  /* What `withBoxDrawn` in `cli/src/notes.ts` draws. */
+  --selfie-note: #bf00ff;
   /* Room for what's above the images, so they and the buttons fit on a screen together. */
   --selfie-images-height: max(360px, calc(100vh - 290px));
 }
@@ -432,4 +434,106 @@ code {
 
 .selfie-shortcuts dd {
   margin: 0;
+}
+
+.selfie-feedback {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-8);
+  margin-bottom: var(--base-size-16);
+  padding: var(--base-size-8) var(--base-size-12);
+  border: var(--borderWidth-thin) solid var(--borderColor-accent-muted);
+  border-radius: var(--borderRadius-small);
+  background: var(--bgColor-accent-muted);
+}
+
+.selfie-feedback-list,
+.selfie-notes-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.selfie-feedback-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--base-size-8);
+  min-width: 0;
+}
+
+.selfie-feedback-list a {
+  flex-shrink: 0;
+}
+
+.selfie-note-preview {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selfie-copy-text {
+  box-sizing: border-box;
+  width: 100%;
+  font-family: var(--fontStack-monospace);
+  font-size: var(--text-caption-size, 12px);
+}
+
+.selfie-notes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-8);
+}
+
+.selfie-notes-list li {
+  padding: var(--base-size-4) var(--base-size-8);
+  border-left: var(--borderWidth-thick) solid var(--selfie-note);
+}
+
+.selfie-note-number {
+  font-weight: var(--base-text-weight-semibold);
+}
+
+.selfie-note-text {
+  margin: var(--base-size-4) 0 0;
+  white-space: pre-wrap;
+}
+
+.selfie-note-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-4);
+}
+
+.selfie-stack {
+  cursor: crosshair;
+  touch-action: none;
+  user-select: none;
+}
+
+.selfie-note-box {
+  position: absolute;
+  box-sizing: content-box;
+  margin: -3px 0 0 -3px;
+  border: 3px solid var(--selfie-note);
+}
+
+.selfie-note-box[data-drawing] {
+  border-style: dashed;
+  background: color-mix(in srgb, var(--selfie-note) 10%, transparent);
+}
+
+.selfie-note-chip {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: -3px;
+  padding: 0 var(--base-size-4);
+  border-radius: var(--borderRadius-small);
+  background: var(--selfie-note);
+  color: #fff;
+  font-size: var(--text-caption-size, 12px);
+  line-height: 1.5;
+  white-space: nowrap;
 }

@@ -39,6 +39,8 @@ Source of truth: `ReviewSource` in `ui/src/shared/api.ts`.
 | `unchanged(runId)` | The run's unchanged rows |
 | `decide(runId, decision, targets)` | The new `RunView` |
 | `accept(runId, removedSeen)` | `accepted`, `refusals`, and the new `RunView` |
+| `feedback()`, `addNote(note)`, `removeNote(id)` | This session's notes (`docs/specs/feedback.md`) |
+| `sendNotes()` | The notes after sending every draft, and the text to paste into an agent |
 | `image(hash)` | Stored bytes, or null |
 | `diff(current, golden)` | Pixel stats and a PNG, or null if the store lacks either image |
 
@@ -56,6 +58,10 @@ Source of truth: `ui/src/server/app.ts`; tests in `cli/test/ui.test.ts`.
 | `GET /api/runs/:id/unchanged` | `{ rows }` |
 | `POST /api/runs/:id/decisions` | `{ decision, snapshots: [{ story, imageHash }] }` |
 | `POST /api/runs/:id/accept` | `{ removedSeen? }` |
+| `GET /api/feedback` | `feedback` |
+| `POST /api/notes` | `{ story, runId, imageHash, box, text }` |
+| `DELETE /api/notes/:id` | `removeNote` |
+| `POST /api/notes/send` | `sendNotes` |
 | `GET /api/images/:hash` | The stored file, with its media type |
 | `GET /api/diffs/:current/:golden` | The `PixelDiff` |
 | `GET /api/diffs/:current/:golden/image` | The diff PNG |
@@ -150,6 +156,7 @@ Source of truth: `useHotkeys` in `ui/src/client/hooks.ts`.
 | `a`, `r` | A snapshot | Approve or reject, then go to the next |
 | `s`, `f`, `d` | A snapshot | Side by side, stacked then flip, diff |
 | `z`, `c` | A snapshot | Next zoom, center on the region being looked at or else the change |
+| `m` | A snapshot | Write a note |
 | `n`, `p` | A snapshot | Next and previous region |
 | `x` | A snapshot | Select the region being looked at, or the first |
 | `u` | A snapshot | Back to the list, with focus on that story |
@@ -194,11 +201,9 @@ Source of truth: `ui/src/client/*.stories.tsx`, `ui/src/client/stories/fixtures.
 
 Also its own guard in place of `loopbackHosts`, keeping `sameOriginWrites` and `pageHeaders` (`docs/specs/access.md` → Who can do what), and a way to serve `ui/dist/` from a Worker.
 
-**Scope: annotations** is defined in `docs/specs/system.md` → Build order.
-
 ### Not built
 
-- Doing anything with a selection. Approving and rejecting are still on a whole image, until there are decisions on regions (`docs/specs/snapshots.md` → Future).
+- Approving or rejecting a selection. Those are still on a whole image, until there are decisions on regions (`docs/specs/snapshots.md` → Future). A note can be on one.
 - Selecting one region out of a group. Lowering `regionMergeDistance` separates them.
 - Rendering from the UI. A reviewer runs `selfie review` and looks at the result.
 - A way to clear a decision. One can be replaced, and a run can be reviewed again, but `Snapshots.decide` has no way to remove one.

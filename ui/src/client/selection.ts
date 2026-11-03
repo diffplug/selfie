@@ -1,7 +1,7 @@
 // Which of a story's regions someone has picked out, which they're looking at, and how the list says what
 // each one is. Pure, so a test needs no browser.
 import type { BoundingBox } from "../shared/api.ts";
-import { isEmptyBox, type RegionGroup } from "../shared/regions.ts";
+import { describeBox, isEmptyBox, type RegionGroup } from "../shared/regions.ts";
 import { plural } from "./plural.ts";
 
 /** One step through `count` regions, wrapping around, from none to whichever end the step comes in at. */
@@ -17,7 +17,6 @@ export function toggled(selected: ReadonlySet<number>, index: number): ReadonlyS
   return next;
 }
 
-export const describeBox = ({ x, y, width, height }: BoundingBox) => `${width}×${height} at ${x}, ${y}`;
 const sameBox = (p: BoundingBox, q: BoundingBox) => p.x === q.x && p.y === q.y && p.width === q.width && p.height === q.height;
 
 /** Where a group is in the current image, and in the golden if that's different. */

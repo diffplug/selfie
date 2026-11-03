@@ -7,15 +7,14 @@ import { isDecidable } from "selfie-store";
 import type { DecisionKind, PixelDiff, RunView, SnapshotRow } from "../shared/api.ts";
 import { diffImageUrl, fetchDiff, imageUrl } from "./api.ts";
 import { applyFilter, neighbors, parseFilter, targetsOf } from "./filter.ts";
-import { useFetched, useHotkeys, useRegionSelection, useTitle, type RunState } from "./hooks.ts";
+import { useFetched, useHotkeys, useRegionSelection, useTitle, type FeedbackState, type RunState } from "./hooks.ts";
 import { ImageCompare } from "./ImageCompare.tsx";
 import { Keys } from "./Keys.tsx";
 import { acceptPath, AppLink, navigate, runPath, storyPath } from "./router.tsx";
 import { ActionFailure } from "./RunNotes.tsx";
 import { LoadFailure, Loading } from "./Status.tsx";
-import { groupRegions, isLayoutOnly } from "../shared/regions.ts";
+import { describeBox, groupRegions, isLayoutOnly } from "../shared/regions.ts";
 import { plural } from "./plural.ts";
-import { describeBox } from "./selection.ts";
 import { AdvisoryLabels, DecisionLabel, describePixels, sizeChanged, StateLabel } from "./words.tsx";
 
 const SHORTCUTS: readonly (readonly [string, string])[] = [
@@ -28,6 +27,7 @@ const SHORTCUTS: readonly (readonly [string, string])[] = [
   ["d", "Show the diff"],
   ["z", "Next zoom: actual size, 1×, 2×, 4×, 8×"],
   ["c", "Center on the region being looked at, or else the change"],
+  ["m", "Write a note for your agent"],
   ["n", "Next region"],
   ["p", "Previous region"],
   ["x", "Select the region being looked at, or the first"],
@@ -96,7 +96,7 @@ function Notes({ row, diff }: { row: SnapshotRow; diff: PixelDiff | null }) {
   );
 }
 
-export function DetailScreen({ state, view, story, search }: { state: RunState; view: RunView; story: string; search: string }) {
+export function DetailScreen({ state, view, story, search, feedback }: { state: RunState; view: RunView; story: string; search: string; feedback: FeedbackState }) {
   const { unchanged, loadUnchanged } = state;
   const filter = useMemo(() => parseFilter(search), [search]);
   const inRows = view.rows.find((candidate) => candidate.story === story);
@@ -249,7 +249,7 @@ export function DetailScreen({ state, view, story, search }: { state: RunState; 
         />
       )}
       <Notes row={row} diff={diff} />
-      <ImageCompare row={row} diff={diff} scale={view.run.scale} groups={groups} selection={selection} />
+      <ImageCompare row={row} diff={diff} scale={view.run.scale} groups={groups} selection={selection} runId={view.run.id} feedback={feedback} />
       {helpOpen && <ShortcutsDialog onClose={() => setHelpOpen(false)} />}
     </Stack>
   );

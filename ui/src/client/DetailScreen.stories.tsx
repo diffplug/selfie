@@ -1,19 +1,20 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, userEvent, waitFor, within } from "storybook/test";
-import type { RunView, SnapshotRow } from "../shared/api.ts";
+import type { Note, RunView, SnapshotRow } from "../shared/api.ts";
 import { useState } from "react";
 import { DetailScreen } from "./DetailScreen.tsx";
-import { approved, OTHER_RUN_ID, rejected, rows, stateOf, viewOf } from "./stories/fixtures.ts";
+import { approved, feedbackOf, note, OTHER_RUN_ID, rejected, rows, stateOf, viewOf } from "./stories/fixtures.ts";
 
 interface Args {
   readonly row: SnapshotRow;
   readonly others?: readonly SnapshotRow[];
   readonly view?: RunView;
+  readonly notes?: readonly Note[];
 }
 
-function Screen({ row, others = [], view }: Args) {
+function Screen({ row, others = [], view, notes = [] }: Args) {
   const shown = view ?? viewOf([row, ...others]);
-  return <DetailScreen state={stateOf(shown)} view={shown} story={row.story} search="" />;
+  return <DetailScreen state={stateOf(shown)} view={shown} story={row.story} search="" feedback={feedbackOf(notes)} />;
 }
 
 const meta = { title: "Screens/Snapshot", component: Screen } satisfies Meta<typeof Screen>;
@@ -56,7 +57,7 @@ export const RegionsSelected: Story = {
   args: { row: SEVERAL },
   play: async ({ canvasElement }) => {
     await press("x", "n", "n", "x")();
-    await expect(within(canvasElement).getByText(/2 selected/)).toBeVisible();
+    await expect(within(canvasElement).getByText(/, 2 selected/)).toBeVisible();
   },
 };
 export const RegionsStackedOnTheSecond: Story = { args: { row: SEVERAL }, play: press("f", "n", "n") };
@@ -64,7 +65,7 @@ export const RegionsAllSelectedStacked: Story = {
   args: { row: SEVERAL },
   play: async ({ canvasElement }) => {
     await press("f", "x", "n", "x", "n", "x")();
-    await expect(within(canvasElement).getByText(/3 selected/)).toBeVisible();
+    await expect(within(canvasElement).getByText(/, 3 selected/)).toBeVisible();
   },
 };
 export const RegionSelectedByItsOutline: Story = {
@@ -74,7 +75,7 @@ export const RegionSelectedByItsOutline: Story = {
     await stackedImagesLoaded(canvasElement);
     await userEvent.click(canvasElement.querySelector('.selfie-stack [data-region="1"]')!);
     await userEvent.click(canvasElement.querySelector('.selfie-stack [data-region="2"]')!);
-    await expect(within(canvasElement).getByText(/2 selected/)).toBeVisible();
+    await expect(within(canvasElement).getByText(/, 2 selected/)).toBeVisible();
   },
 };
 /** More regions than the list has room for, all far enough apart to stay separate. */
@@ -97,7 +98,7 @@ function BetweenStories() {
       <button type="button" onClick={() => setStory(story === SEVERAL.story ? other.story : SEVERAL.story)}>
         Go to the other story
       </button>
-      <DetailScreen state={stateOf(view)} view={view} story={story} search="" />
+      <DetailScreen state={stateOf(view)} view={view} story={story} search="" feedback={feedbackOf()} />
     </>
   );
 }
@@ -108,12 +109,12 @@ export const SelectionForgottenOnLeaving: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await press("x")();
-    await expect(canvas.getByText(/1 selected/)).toBeVisible();
+    await expect(canvas.getByText(/, 1 selected/)).toBeVisible();
     const leave = canvas.getByRole("button", { name: "Go to the other story" });
     await userEvent.click(leave);
-    await expect(canvas.queryByText(/selected/)).toBeNull();
+    await expect(canvas.queryByText(/, \d selected/)).toBeNull();
     await userEvent.click(leave);
-    await expect(canvas.queryByText(/selected/)).toBeNull();
+    await expect(canvas.queryByText(/, \d selected/)).toBeNull();
   },
 };
 
@@ -153,6 +154,48 @@ export const RegionNotHeldWithoutLookingAtOne: Story = {
   },
 };
 export const OutlinesOnTheGolden: Story = { args: { row: rows.mixed("pages-home--redesigned") }, play: press("f", "f") };
+const onTheButton = { story: BUTTON.story, imageHash: BUTTON.imageHash, box: { x: 32, y: 450, width: 160, height: 36 } };
+
+export const NotesOnThisStory: Story = {
+  args: {
+    row: BUTTON,
+    notes: [
+      note(11, { ...onTheButton, state: "sent", text: "Too quiet. Should this be the page's main action?" }),
+      note(12, { story: BUTTON.story, imageHash: BUTTON.imageHash, text: "Also the whole page feels cramped, so\nlet's give it more room." }),
+    ],
+  },
+};
+export const NotesOnThisStoryStacked: Story = { args: { row: BUTTON, notes: [note(11, onTheButton)] }, play: press("f") };
+export const WritingANote: Story = {
+  args: { row: BUTTON },
+  play: async () => {
+    await press("m")();
+    await userEvent.keyboard("This label is too quiet");
+  },
+};
+export const WritingANoteOnSelectedRegions: Story = {
+  args: { row: SEVERAL },
+  play: async ({ canvasElement }) => {
+    await press("x", "m")();
+    await expect(within(canvasElement).getByText(/on 1 selected region of the current image/)).toBeVisible();
+  },
+};
+export const DrawingABox: Story = {
+  args: { row: BUTTON },
+  play: async ({ canvasElement }) => {
+    await press("f")();
+    await stackedImagesLoaded(canvasElement);
+    const stack = canvasElement.querySelector<HTMLElement>(".selfie-stack")!;
+    const { left, top } = stack.getBoundingClientRect();
+    await userEvent.pointer([
+      { keys: "[MouseLeft>]", target: stack, coords: { clientX: left + 100, clientY: top + 60 } },
+      { target: stack, coords: { clientX: left + 400, clientY: top + 160 } },
+      { keys: "[/MouseLeft]", target: stack, coords: { clientX: left + 400, clientY: top + 160 } },
+    ]);
+    await expect(within(canvasElement).getByText(/on the box you drew/)).toBeVisible();
+    await expect(canvasElement.querySelector(".selfie-note-box[data-drawing]")).not.toBeNull();
+  },
+};
 export const NewStory: Story = { args: { row: rows.fresh("components-badge--new") } };
 export const Removed: Story = { args: { row: rows.removed("components-legacy--old") } };
 export const Failed: Story = { args: { row: rows.failed("components-dialog--open") } };

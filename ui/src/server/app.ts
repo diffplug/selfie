@@ -5,7 +5,7 @@ import { Hono, type Context, type MiddlewareHandler } from "hono";
 import { secureHeaders } from "hono/secure-headers";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { imageMediaType, isImageHash } from "selfie-store";
-import { REQUEST_HEADER, REQUEST_HEADER_VALUE, type ApiError, type DecisionTarget, type ReviewSource } from "../shared/api.ts";
+import { REQUEST_HEADER, REQUEST_HEADER_VALUE, type ApiError, type BoundingBox, type DecisionTarget, type NewNote, type ReviewSource } from "../shared/api.ts";
 
 export type * from "../shared/api.ts";
 export { REQUEST_HEADER_VALUE };
@@ -22,6 +22,7 @@ const ERROR_STATUS: Readonly<Record<string, ContentfulStatusCode>> = {
   "bad-request": 400,
   "bad-config": 500,
   "unknown-run": 404,
+  "unknown-note": 404,
   "stale-decision": 409,
   "no-actor": 409,
   "run-not-finished": 409,
@@ -109,6 +110,32 @@ function decisionTargets(value: unknown): DecisionTarget[] {
   });
 }
 
+const MAX_NOTE_CHARACTERS = 10_000;
+
+function noteBox(value: unknown): BoundingBox | null {
+  if (value === null || value === undefined) return null;
+  const { x, y, width, height } = value as Record<string, unknown>;
+  const whole = (part: unknown, least: number) => Number.isSafeInteger(part) && (part as number) >= least;
+  if (!whole(x, 0) || !whole(y, 0) || !whole(width, 1) || !whole(height, 1)) {
+    throw new BadRequest("box must have a whole x and y, and a width and height of at least 1.");
+  }
+  return { x, y, width, height } as BoundingBox;
+}
+
+function newNote({ story, runId, imageHash, box, text }: Record<string, unknown>): NewNote {
+  if (typeof story !== "string" || story === "") throw new BadRequest("story must name a story.");
+  if (typeof runId !== "string") throw new BadRequest("runId must name a run.");
+  if (imageHash !== null && (typeof imageHash !== "string" || !isImageHash(imageHash))) throw new BadRequest("imageHash must be an image hash, or null.");
+  if (typeof text !== "string" || text.trim() === "" || text.length > MAX_NOTE_CHARACTERS) throw new BadRequest(`text must say something, in at most ${MAX_NOTE_CHARACTERS} characters.`);
+  return { story, runId, imageHash, box: noteBox(box), text };
+}
+
+function noteId(value: string): number {
+  const id = Number(value);
+  if (!Number.isSafeInteger(id) || id < 1) throw new BadRequest("That isn't a note.");
+  return id;
+}
+
 /** The routes under `/api`, which never answer with anything but JSON or an image. */
 export function createReviewApi(source: ReviewSource): Hono {
   const api = new Hono();
@@ -148,6 +175,11 @@ export function createReviewApi(source: ReviewSource): Hono {
     }
     return context.json(await source.accept(context.req.param("runId"), removedSeen as number | undefined));
   });
+
+  api.get("/feedback", async (context) => context.json(await source.feedback()));
+  api.post("/notes", async (context) => context.json(await source.addNote(newNote(await jsonBody(context)))));
+  api.post("/notes/send", async (context) => context.json(await source.sendNotes()));
+  api.delete("/notes/:id", async (context) => context.json(await source.removeNote(noteId(context.req.param("id")))));
 
   api.get("/images/:hash", async (context) => {
     const hash = context.req.param("hash");
