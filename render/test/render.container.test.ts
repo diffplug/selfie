@@ -88,7 +88,7 @@ describe.runIf(process.env.SELFIE_RENDER_CONTAINER === "1")("in the pinned conta
 
     test("renders every story and leaves out docs", () => {
       expect(manifest.stories.map((entry) => entry.id)).not.toContain("guide--docs");
-      expect(manifest.totals.stories).toBe(12);
+      expect(manifest.totals.stories).toBe(14);
     });
 
     test("applies the page conditions before story code runs", () => {
@@ -186,6 +186,21 @@ describe.runIf(process.env.SELFIE_RENDER_CONTAINER === "1")("in the pinned conta
     const manifest = await run({ stories: ["basic--detail"], settleMs: 1 });
     expect(manifest.settleMs).toBe(1);
     expect(manifest.environmentId).toBe(environmentId(defineEnvironment()));
+  });
+
+  test("loads a lazy image below the fold", async () => {
+    const manifest = await run({ stories: ["images--lazy"] });
+    expect(story(manifest, "images--lazy").errors).toContainEqual({ source: "console", message: "the lazy image loaded" });
+  });
+
+  test("a project's recipe reaches the browser", async () => {
+    const recipe = { origin: "http://localhost:6006", locale: "de-DE", timezoneId: "Asia/Tokyo", colorScheme: "dark", fixedTime: "2031-03-04T00:00:00.000Z", snapshotGlobal: "__MY_SNAPSHOT__" } as const;
+    const environment = defineEnvironment({ recipe });
+    const manifest = await run({ environment, stories: ["recipe--says"] });
+    const [said] = story(manifest, "recipe--says").errors;
+    expect(JSON.parse(said!.message)).toEqual({ origin: recipe.origin, locale: "de-DE", timezone: "Asia/Tokyo", dark: true, year: 2031, flag: true });
+    expect(manifest.recipe).toMatchObject(recipe);
+    expect(manifest.environmentId).not.toBe(environmentId(defineEnvironment()));
   });
 
   test("viewport and scale reach the pixels", async () => {

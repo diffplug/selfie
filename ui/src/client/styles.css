@@ -242,7 +242,7 @@ code {
   padding: 0;
   border: var(--borderWidth-thin) solid var(--borderColor-default);
   border-radius: var(--borderRadius-small);
-  background: var(--bgColor-muted);
+  background: none;
   cursor: zoom-in;
 }
 

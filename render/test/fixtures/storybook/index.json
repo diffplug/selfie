@@ -1,18 +1,112 @@
 {
   "v": 5,
   "entries": {
-    "guide--docs": { "id": "guide--docs", "title": "Guide", "name": "Docs", "type": "docs", "importPath": "./guide.mdx" },
-    "basic--detail": { "id": "basic--detail", "title": "Basic", "name": "Detail", "type": "story", "importPath": "./basic.js" },
-    "basic--environment": { "id": "basic--environment", "title": "Basic", "name": "Environment", "type": "story", "importPath": "./basic.js" },
-    "basic--tall": { "id": "basic--tall", "title": "Basic", "name": "Tall", "type": "story", "importPath": "./basic.js" },
-    "basic--animation": { "id": "basic--animation", "title": "Basic", "name": "Animation", "type": "story", "importPath": "./basic.js" },
-    "basic--external-request": { "id": "basic--external-request", "title": "Basic", "name": "External request", "type": "story", "importPath": "./basic.js" },
-    "timers--frozen-by-selfie": { "id": "timers--frozen-by-selfie", "title": "Timers", "name": "Frozen by Selfie", "type": "story", "importPath": "./timers.js" },
-    "timers--frozen-by-project": { "id": "timers--frozen-by-project", "title": "Timers", "name": "Frozen by project", "type": "story", "importPath": "./timers.js" },
-    "play--fails": { "id": "play--fails", "title": "Play", "name": "Fails", "type": "story", "importPath": "./play.js" },
-    "basic--serving": { "id": "basic--serving", "title": "Basic", "name": "Serving", "type": "story", "importPath": "./basic.js" },
-    "broken--throws": { "id": "broken--throws", "title": "Broken", "name": "Throws", "type": "story", "importPath": "./broken.js" },
-    "broken--never-finishes": { "id": "broken--never-finishes", "title": "Broken", "name": "Never finishes", "type": "story", "importPath": "./broken.js" },
-    "broken--blocks-main-thread": { "id": "broken--blocks-main-thread", "title": "Broken", "name": "Blocks main thread", "type": "story", "importPath": "./broken.js" }
+    "guide--docs": {
+      "id": "guide--docs",
+      "title": "Guide",
+      "name": "Docs",
+      "type": "docs",
+      "importPath": "./guide.mdx"
+    },
+    "basic--detail": {
+      "id": "basic--detail",
+      "title": "Basic",
+      "name": "Detail",
+      "type": "story",
+      "importPath": "./basic.js"
+    },
+    "basic--environment": {
+      "id": "basic--environment",
+      "title": "Basic",
+      "name": "Environment",
+      "type": "story",
+      "importPath": "./basic.js"
+    },
+    "basic--tall": {
+      "id": "basic--tall",
+      "title": "Basic",
+      "name": "Tall",
+      "type": "story",
+      "importPath": "./basic.js"
+    },
+    "basic--animation": {
+      "id": "basic--animation",
+      "title": "Basic",
+      "name": "Animation",
+      "type": "story",
+      "importPath": "./basic.js"
+    },
+    "basic--external-request": {
+      "id": "basic--external-request",
+      "title": "Basic",
+      "name": "External request",
+      "type": "story",
+      "importPath": "./basic.js"
+    },
+    "timers--frozen-by-selfie": {
+      "id": "timers--frozen-by-selfie",
+      "title": "Timers",
+      "name": "Frozen by Selfie",
+      "type": "story",
+      "importPath": "./timers.js"
+    },
+    "timers--frozen-by-project": {
+      "id": "timers--frozen-by-project",
+      "title": "Timers",
+      "name": "Frozen by project",
+      "type": "story",
+      "importPath": "./timers.js"
+    },
+    "play--fails": {
+      "id": "play--fails",
+      "title": "Play",
+      "name": "Fails",
+      "type": "story",
+      "importPath": "./play.js"
+    },
+    "basic--serving": {
+      "id": "basic--serving",
+      "title": "Basic",
+      "name": "Serving",
+      "type": "story",
+      "importPath": "./basic.js"
+    },
+    "broken--throws": {
+      "id": "broken--throws",
+      "title": "Broken",
+      "name": "Throws",
+      "type": "story",
+      "importPath": "./broken.js"
+    },
+    "broken--never-finishes": {
+      "id": "broken--never-finishes",
+      "title": "Broken",
+      "name": "Never finishes",
+      "type": "story",
+      "importPath": "./broken.js"
+    },
+    "broken--blocks-main-thread": {
+      "id": "broken--blocks-main-thread",
+      "title": "Broken",
+      "name": "Blocks main thread",
+      "type": "story",
+      "importPath": "./broken.js"
+    },
+    "images--lazy": {
+      "id": "images--lazy",
+      "title": "Images",
+      "name": "Lazy",
+      "type": "story",
+      "importPath": "./images.stories.js",
+      "exportName": "Lazy"
+    },
+    "recipe--says": {
+      "id": "recipe--says",
+      "title": "Recipe",
+      "name": "Says",
+      "type": "story",
+      "importPath": "./recipe.stories.js",
+      "exportName": "Says"
+    }
   }
 }

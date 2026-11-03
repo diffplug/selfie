@@ -26,3 +26,7 @@ A spec is the accurate reference for the current code: it states the invariants 
 - **Named scopes.** A cut is recorded as a named scope in `## Future` (`**Scope: store**`). A scope is defined in exactly one spec; others link it by name.
 - **Reservations.** Unbuilt design that constrains present code is stated in the body, marked `Reserved:`, pointing at the `## Future` item it serves.
 - **Promotion is part of done.** A staged item is finished only when its text moves above the fold, rewritten to present tense, and the built portion is deleted from `## Future`.
+
+## Skills
+
+`cli/skills/` holds guides for a coding agent, linked from `.claude/skills/`, and printed for anyone by `selfie skill`. `fix-flakes` is how to make every story render the same way every time, which `selfie flakes` measures.

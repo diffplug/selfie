@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import os from "node:os";
-import { RENDER_RECIPE, PLAYWRIGHT_VERSION } from "./worker/protocol.ts";
+import { DEFAULT_RECIPE, PLAYWRIGHT_VERSION, type RecipeOverrides, type RenderRecipe } from "./worker/protocol.ts";
 
 const DEFAULT_IMAGE =
   "mcr.microsoft.com/playwright@sha256:a0f4498920a5dbac63196d9140ed738ef00470f27e2e74029abd8850b7bd5717";
@@ -34,9 +34,11 @@ export interface RenderEnvironment {
   browserFlags: string[];
   viewport: { width: number; height: number };
   scale: number;
+  recipe: RenderRecipe;
 }
 
-export interface EnvironmentOverrides extends Partial<Omit<RenderEnvironment, "runner">> {
+export interface EnvironmentOverrides extends Partial<Omit<RenderEnvironment, "runner" | "recipe">> {
+  recipe?: RecipeOverrides;
   /** `{ kind: "native" }` means this machine: what it records can't be chosen. */
   runner?: ContainerRunner | NativeRunner | { kind: "native" };
 }
@@ -61,9 +63,62 @@ export function defineEnvironment(overrides: EnvironmentOverrides = {}): RenderE
     browserFlags: [...(overrides.browserFlags ?? DEFAULT_BROWSER_FLAGS)],
     viewport: { width: 1200, height: 900, ...overrides.viewport },
     scale: overrides.scale ?? 1,
+    recipe: recipeFrom(overrides.recipe),
   };
   validateEnvironment(environment);
   return environment;
+}
+
+const ONE_OF = (...values: readonly unknown[]) => (value: unknown) => values.includes(value);
+const NON_EMPTY = (value: unknown) => typeof value === "string" && value !== "";
+const NOT_NEGATIVE = (value: unknown) => Number.isInteger(value) && (value as number) >= 0;
+const BOOLEAN = ONE_OF(true, false);
+
+const RECIPE_RULES: Readonly<Record<string, { check: (value: unknown) => boolean; expected: string }>> = {
+  origin: {
+    check: (value) => {
+      try {
+        const { origin, protocol } = new URL(String(value));
+        return origin === value && (protocol === "http:" || protocol === "https:");
+      } catch {
+        return false;
+      }
+    },
+    expected: "an http or https origin, like http://localhost:6006",
+  },
+  snapshotGlobal: { check: (value) => typeof value === "string" && /^[A-Za-z_$][\w$]*$/.test(value), expected: "a JavaScript identifier" },
+  locale: { check: NON_EMPTY, expected: "a locale, like de-DE" },
+  timezoneId: { check: NON_EMPTY, expected: "a time zone, like Europe/Berlin" },
+  colorScheme: { check: ONE_OF("light", "dark", "no-preference"), expected: 'one of "light", "dark", "no-preference"' },
+  reducedMotion: { check: ONE_OF("reduce", "no-preference"), expected: 'one of "reduce", "no-preference"' },
+  forcedColors: { check: ONE_OF("none", "active"), expected: 'one of "none", "active"' },
+  fixedTime: { check: (value) => value === null || (typeof value === "string" && !Number.isNaN(Date.parse(value))), expected: "a date and time, or null for the real time" },
+  networkQuietMs: { check: NOT_NEGATIVE, expected: "a whole number of milliseconds" },
+  networkQuietBoundMs: { check: NOT_NEGATIVE, expected: "a whole number of milliseconds" },
+  loadImages: { check: BOOLEAN, expected: "true or false" },
+};
+
+const SCREENSHOT_RULES: Readonly<Record<string, { check: (value: unknown) => boolean; expected: string }>> = {
+  animations: { check: ONE_OF("disabled", "allow"), expected: 'one of "disabled", "allow"' },
+  caret: { check: ONE_OF("hide", "initial"), expected: 'one of "hide", "initial"' },
+  scale: { check: ONE_OF("device", "css"), expected: 'one of "device", "css"' },
+  fullPage: { check: BOOLEAN, expected: "true or false" },
+};
+
+function checkAgainst(rules: typeof RECIPE_RULES, prefix: string, given: object): void {
+  for (const [key, value] of Object.entries(given)) {
+    const rule = rules[key];
+    // Refused, so a typo or a key a project can't set doesn't quietly render the default.
+    if (rule === undefined) throw new EnvironmentError(`The recipe has no setting "${prefix}${key}" to change. It has ${Object.keys(rules).join(", ")}.`);
+    if (!rule.check(value)) throw new EnvironmentError(`The recipe's ${prefix}${key} must be ${rule.expected}, got ${JSON.stringify(value)}.`);
+  }
+}
+
+function recipeFrom(overrides: RecipeOverrides = {}): RenderRecipe {
+  const { screenshot = {}, ...rest } = overrides;
+  checkAgainst(RECIPE_RULES, "", rest);
+  checkAgainst(SCREENSHOT_RULES, "screenshot.", screenshot);
+  return { ...DEFAULT_RECIPE, ...rest, screenshot: { ...DEFAULT_RECIPE.screenshot, ...screenshot } };
 }
 
 function validateEnvironment(environment: RenderEnvironment): void {
@@ -139,7 +194,7 @@ export function launchArgs(environment: RenderEnvironment): string[] {
  */
 export function environmentId(environment: RenderEnvironment): string {
   validateEnvironment(environment);
-  const { runner, browserFlags, viewport, scale } = environment;
+  const { runner, browserFlags, viewport, scale, recipe } = environment;
   const decidesPixels = {
     runner:
       runner.kind === "container"
@@ -148,7 +203,7 @@ export function environmentId(environment: RenderEnvironment): string {
     browserFlags: [...browserFlags].sort(),
     viewport: { width: viewport.width, height: viewport.height },
     scale,
-    recipe: RENDER_RECIPE,
+    recipe,
     playwright: PLAYWRIGHT_VERSION,
   };
   const hash = createHash("sha256").update(canonicalJson(decidesPixels)).digest("hex").slice(0, 16);

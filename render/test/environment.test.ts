@@ -1,3 +1,4 @@
+import { DEFAULT_RECIPE } from "../src/worker/protocol.ts";
 import { describe, expect, test } from "vitest";
 import {
   defineEnvironment,
@@ -21,15 +22,48 @@ describe("defaults", () => {
       browserFlags: ["--disable-lcd-text", "--font-render-hinting=none", "--disable-partial-raster"],
       viewport: { width: 1200, height: 900 },
       scale: 1,
+      recipe: DEFAULT_RECIPE,
     });
+  });
+});
+
+describe("a project's recipe", () => {
+  test("starts from the defaults, and keeps what it doesn't say", () => {
+    const { recipe } = defineEnvironment({ recipe: { locale: "de-DE", screenshot: { fullPage: false } } });
+    expect(recipe).toMatchObject({ locale: "de-DE", timezoneId: "UTC", loadImages: true, screenshot: { fullPage: false, animations: "disabled" } });
+  });
+
+  test("changes the environment's ID, as anything that can decide pixels does", () => {
+    const base = environmentId(defineEnvironment());
+    for (const recipe of [{ locale: "de-DE" }, { colorScheme: "dark" }, { loadImages: false }, { fixedTime: null }, { screenshot: { fullPage: false } }] as const) {
+      expect(environmentId(defineEnvironment({ recipe })), JSON.stringify(recipe)).not.toBe(base);
+    }
+  });
+
+  test.each([
+    [{ colourScheme: "dark" }, /no setting "colourScheme"/],
+    [{ headless: false }, /no setting "headless"/],
+    [{ serviceWorkers: "allow" }, /no setting "serviceWorkers"/],
+    [{ waitSequence: 1 }, /no setting "waitSequence"/],
+    [{ colorScheme: "purple" }, /colorScheme must be/],
+    [{ origin: "localhost:6006" }, /origin must be/],
+    [{ origin: "http://localhost:6006/path" }, /origin must be/],
+    [{ origin: "file:///etc" }, /origin must be/],
+    [{ snapshotGlobal: "a; alert(1)" }, /snapshotGlobal must be/],
+    [{ fixedTime: "not a date" }, /fixedTime must be/],
+    [{ networkQuietMs: -1 }, /networkQuietMs must be/],
+    [{ screenshot: { scale: "big" } }, /screenshot.scale must be/],
+    [{ screenshot: { nope: true } }, /no setting "screenshot.nope"/],
+  ])("refuses %j", (recipe, message) => {
+    expect(() => defineEnvironment({ recipe: recipe as never })).toThrow(message);
   });
 });
 
 describe("environmentId", () => {
   test("is pinned for the default environment", () => {
     // Changing this literal restarts every project's goldens. Upgrading Playwright or editing
-    // RENDER_RECIPE are the expected reasons, since the ID includes both.
-    expect(environmentId(defineEnvironment())).toBe("container-linux-arm64-eb95931ecc85e990");
+    // DEFAULT_RECIPE are the expected reasons, since the ID includes both.
+    expect(environmentId(defineEnvironment())).toBe("container-linux-arm64-f170197017875437");
   });
 
   test("is deterministic and safe in a snapshot name", () => {
@@ -57,6 +91,7 @@ describe("environmentId", () => {
     expect(environmentId(container(`mirror.example:5000/playwright@${DIGEST}`))).toBe(base);
 
     const reordered: RenderEnvironment = {
+      recipe: { ...DEFAULT_RECIPE },
       scale: 1,
       viewport: { height: 900, width: 1200 },
       browserFlags: ["--disable-partial-raster", "--font-render-hinting=none", "--disable-lcd-text"],

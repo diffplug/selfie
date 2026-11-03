@@ -109,4 +109,10 @@ export const RegionNotHeldWithoutLookingAtOne: Story = {
     await expect(viewport.scrollTop).toBe(before);
   },
 };
-export const OutlinesOnTheGolden: Story = { args: { row: rows.mixed("pages-home--redesigned") }, play: press("f", "f") };
+export const OutlinesOnTheGolden: Story = {
+  args: { row: rows.mixed("pages-home--redesigned") },
+  play: async ({ canvasElement }) => {
+    await press("f", "f")();
+    await stackedImagesLoaded(canvasElement);
+  },
+};

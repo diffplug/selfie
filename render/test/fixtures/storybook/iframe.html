@@ -91,10 +91,32 @@
           document.body.style.background = window.__PROJECT_FREEZE__ ? "white" : randomColor();
         },
         // Throws unless the build answers, and nothing outside it does.
+        // Far below the fold, so only something that goes looking would ever load it.
+        async "images--lazy"() {
+          root.innerHTML = '<div style="height: 6000px"></div>';
+          const image = document.createElement("img");
+          image.loading = "lazy";
+          image.addEventListener("load", () => console.error("the lazy image loaded"));
+          image.src = "/a-directory/tall.svg";
+          root.append(image);
+        },
+        async "recipe--says"() {
+          console.error(
+            JSON.stringify({
+              origin: location.origin,
+              locale: navigator.language,
+              timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+              dark: matchMedia("(prefers-color-scheme: dark)").matches,
+              year: new Date().getFullYear(),
+              flag: window.__MY_SNAPSHOT__ === true,
+            }),
+          );
+        },
         async "basic--serving"() {
           const statuses = {
             "/index.json": 200,
             "/missing.txt": 404,
+            "/a-directory": 404,
             "/%2e%2e%2fpackage.json": 404,
             "/..%2f..%2f..%2f..%2fetc%2fpasswd": 404,
           };

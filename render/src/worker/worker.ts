@@ -4,9 +4,8 @@
 import { createHash } from "node:crypto";
 import { stat, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { chromium, type Browser, type BrowserContext, type Page, type Route } from "playwright-core";
+import { chromium, type Browser, type BrowserContext, type Page, type Request, type Route } from "playwright-core";
 import {
-  RENDER_RECIPE,
   PLAYWRIGHT_VERSION,
   type StoryError,
   type WorkerEvent,
@@ -19,8 +18,6 @@ const LAUNCH_TIMEOUT_MS = 60_000;
 const CLOSE_TIMEOUT_MS = 5_000;
 const MAX_ERRORS_PER_STORY = 20;
 const MAX_ERROR_LENGTH = 400;
-
-const { origin: ORIGIN } = RENDER_RECIPE;
 
 class TimeoutError extends Error {}
 
@@ -43,26 +40,30 @@ function pngDimensions(png: Buffer): { width: number; height: number } {
 
 /**
  * Counts a page's requests from the start, and returns a wait for none to have been in flight
- * for a quiet period, which resolves false at the bound. Playwright's `networkidle` is the
+ * for a quiet period, which at the bound resolves to what's still in flight, and otherwise to null. Playwright's `networkidle` is the
  * same thing with a fixed 500 ms.
  */
-function trackRequests(page: Page): (quietMs: number, boundMs: number) => Promise<boolean> {
-  let inFlight = 0;
+function trackRequests(page: Page): (quietMs: number, boundMs: number) => Promise<readonly string[] | null> {
+  const inFlight = new Set<Request>();
   let lastChange = Date.now();
-  const change = (delta: number) => () => {
-    inFlight += delta;
+  const started = (request: Request) => {
+    inFlight.add(request);
     lastChange = Date.now();
   };
-  page.on("request", change(1));
-  page.on("requestfinished", change(-1));
-  page.on("requestfailed", change(-1));
+  const ended = (request: Request) => {
+    inFlight.delete(request);
+    lastChange = Date.now();
+  };
+  page.on("request", started);
+  page.on("requestfinished", ended);
+  page.on("requestfailed", ended);
   return async (quietMs, boundMs) => {
     const deadline = Date.now() + boundMs;
-    while (inFlight > 0 || Date.now() - lastChange < quietMs) {
-      if (Date.now() >= deadline) return false;
+    while (inFlight.size > 0 || Date.now() - lastChange < quietMs) {
+      if (Date.now() >= deadline) return [...inFlight].map((request) => request.url());
       await new Promise((resolve) => setTimeout(resolve, 5));
     }
-    return true;
+    return null;
   };
 }
 
@@ -76,24 +77,29 @@ async function resolveStorybookFile(root: string, pathname: string): Promise<str
   }
   if (!file.startsWith(root + path.sep)) return null;
   const found = await stat(file).catch(() => null);
-  if (found?.isDirectory()) file = path.join(file, "index.html");
-  return found ? file : null;
+  if (!found?.isDirectory()) return found ? file : null;
+  // A missing one must be a 404: a request that's never answered holds the network wait to its bound.
+  const index = path.join(file, "index.html");
+  return (await stat(index).catch(() => null)) === null ? null : index;
 }
 
 /**
  * Answers a request from the build, and aborts any that leaves the origin. That abort is
- * only needed natively, since the container has no network. A failure here means the context
- * has closed, so there is nothing left to answer.
+ * only needed natively, since the container has no network. A request that can't be answered is
+ * aborted, so it's reported rather than holding the network wait to its bound.
  */
-async function answerFromStorybook(route: Route, root: string): Promise<void> {
+async function answerFromStorybook(route: Route, root: string, origin: string): Promise<void> {
   const url = new URL(route.request().url());
   try {
-    if (url.origin !== ORIGIN) return await route.abort();
+    if (url.origin !== origin) return await route.abort();
     const file = await resolveStorybookFile(root, url.pathname);
     await (file
       ? route.fulfill({ path: file, headers: { "cache-control": "no-store" } })
       : route.fulfill({ status: 404 }));
-  } catch {}
+  } catch {
+    // Which only fails if the context has closed, and then there's nothing left to answer.
+    await route.abort().catch(() => {});
+  }
 }
 
 /**
@@ -119,23 +125,29 @@ function watchPlayFailures(): void {
 }
 
 async function prepareContext(browser: Browser, job: WorkerJob): Promise<BrowserContext> {
+  const { recipe } = job;
   const context = await browser.newContext({
     viewport: job.viewport,
     deviceScaleFactor: job.scale,
-    locale: RENDER_RECIPE.locale,
-    timezoneId: RENDER_RECIPE.timezoneId,
-    colorScheme: RENDER_RECIPE.colorScheme,
-    reducedMotion: RENDER_RECIPE.reducedMotion,
-    forcedColors: RENDER_RECIPE.forcedColors,
-    serviceWorkers: RENDER_RECIPE.serviceWorkers,
+    locale: recipe.locale,
+    timezoneId: recipe.timezoneId,
+    colorScheme: recipe.colorScheme,
+    reducedMotion: recipe.reducedMotion,
+    forcedColors: recipe.forcedColors,
+    serviceWorkers: recipe.serviceWorkers,
   });
   // Date only: timers still run, which is why a project may need its own freeze.
-  await context.clock.setFixedTime(new Date(RENDER_RECIPE.fixedTime));
-  await context.addInitScript(`window.${RENDER_RECIPE.snapshotGlobal} = true;`);
+  if (recipe.fixedTime !== null) await context.clock.setFixedTime(new Date(recipe.fixedTime));
+  await context.addInitScript(`window.${recipe.snapshotGlobal} = true;`);
   await context.addInitScript(watchPlayFailures);
   if (job.initScript !== null) await context.addInitScript({ content: job.initScript });
-  await context.route("**/*", (route) => answerFromStorybook(route, path.resolve(job.buildDir)));
+  await context.route("**/*", (route) => answerFromStorybook(route, path.resolve(job.buildDir), recipe.origin));
   return context;
+}
+
+/** A frame can go away at any moment, and then what it held isn't in the screenshot either. */
+async function inEveryFrame(page: Page, work: () => void | Promise<void>): Promise<void> {
+  await Promise.all(page.frames().map((frame) => frame.evaluate(work).catch(() => {})));
 }
 
 /** Waits through Storybook's loaders, render, and play function, then takes the screenshot. */
@@ -145,6 +157,7 @@ async function screenshotStory(
   story: WorkerStory,
   record: (error: StoryError) => void,
 ): Promise<Buffer> {
+  const { recipe } = job;
   const page = await context.newPage();
   page.setDefaultTimeout(job.storyTimeoutMs);
   const networkQuiet = trackRequests(page);
@@ -156,7 +169,7 @@ async function screenshotStory(
     record({ source: "request", message: `${request.url()} ${request.failure()?.errorText ?? ""}`.trim() });
   });
 
-  await page.goto(`${ORIGIN}/iframe.html?id=${encodeURIComponent(story.id)}&viewMode=story`, {
+  await page.goto(`${recipe.origin}/iframe.html?id=${encodeURIComponent(story.id)}&viewMode=story`, {
     waitUntil: "load",
   });
   const state = await page.waitForFunction(() => {
@@ -186,18 +199,33 @@ async function screenshotStory(
   );
   for (const message of playFailures) record({ source: "play", message });
 
-  if (!(await networkQuiet(RENDER_RECIPE.networkQuietMs, RENDER_RECIPE.networkQuietBoundMs))) {
+  const settleNetwork = async () => {
+    const unanswered = await networkQuiet(recipe.networkQuietMs, recipe.networkQuietBoundMs);
+    if (unanswered === null) return;
     record({
       source: "timeout",
-      message: `network not quiet after ${RENDER_RECIPE.networkQuietBoundMs}ms; rendered anyway`,
+      message: `network not quiet after ${recipe.networkQuietBoundMs}ms; rendered anyway${unanswered.length === 0 ? "" : `, with these in flight: ${unanswered.join(", ")}`}`,
     });
+  };
+  await settleNetwork();
+  if (recipe.loadImages) {
+    // Eager first, since a lazy image below the fold isn't even asked for yet. Sync, since one decoded
+    // asynchronously can paint scaled differently from one render to the next.
+    await inEveryFrame(page, () => {
+      for (const image of document.images) {
+        image.loading = "eager";
+        image.decoding = "sync";
+      }
+    });
+    await settleNetwork();
+    await inEveryFrame(page, () => Promise.all([...document.images].map((image) => image.decode().catch(() => {}))).then(() => undefined));
   }
   await page.evaluate(() => document.fonts.ready.then(() => undefined));
   await page.waitForTimeout(job.settleMs);
   await page.evaluate(
     () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
   );
-  return page.screenshot({ ...RENDER_RECIPE.screenshot, type: "png" });
+  return page.screenshot({ ...recipe.screenshot, type: "png" });
 }
 
 async function renderStory(
@@ -261,7 +289,7 @@ async function main(): Promise<void> {
   setTimeout(() => process.exit(3), job.runTimeoutMs).unref();
 
   const launch = () =>
-    chromium.launch({ headless: RENDER_RECIPE.headless, args: job.launchArgs, timeout: LAUNCH_TIMEOUT_MS });
+    chromium.launch({ headless: job.recipe.headless, args: job.launchArgs, timeout: LAUNCH_TIMEOUT_MS });
   let launched = launch();
   const first = await launched;
   // A crash takes out the stories in flight, not the ones still queued.

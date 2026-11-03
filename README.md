@@ -46,6 +46,7 @@ Selfie has the following commands:
 - approve, reject - decides on a run's changed snapshots, on a dirty tree if you like, so committing doesn't ask again
 - accept - makes a run's snapshots the goldens for its Git sha, on a clean tree
 - push, pull - move a run, its decisions, and its goldens to and from the cloud, whose goldens win
+- flakes - renders a built Storybook several times, and says what wasn't the same each time. `selfie skill fix-flakes` is a guide for a coding agent to fix what it finds
 - ui - serves a local review page in the browser, to look at a run's images, approve, reject, and accept. It renders only when you ask it to on the page.
 - selfie, with no command - opens every story of a built Storybook, running, to write notes on, which renders what they're on
 - notes, agent-await-feedback, reply - how a person's notes on the images reach a coding agent, and how it answers

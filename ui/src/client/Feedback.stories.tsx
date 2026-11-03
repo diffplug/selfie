@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, userEvent, within } from "storybook/test";
+import { expect, userEvent, within, waitFor } from "storybook/test";
 import type { Note } from "../shared/api.ts";
 import { FeedbackBar, NewerRunBanner } from "./Feedback.tsx";
 import { storyPath } from "./router.tsx";
@@ -40,6 +40,7 @@ export const CopyDialog: Story = {
   args: { notes: SOME },
   play: async ({ canvasElement }) => {
     await userEvent.click(within(canvasElement).getByRole("button", { name: "Copy for agent" }));
-    await expect(within(document.body).findByRole("textbox", { name: "Text for your agent" })).resolves.toBeVisible();
+    // A dialog's content is there before it's visible, as it opens, so this has to keep asking.
+    await waitFor(() => expect(within(document.body).getByRole("textbox", { name: "Text for your agent" })).toBeVisible());
   },
 };

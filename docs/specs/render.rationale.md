@@ -100,3 +100,14 @@ The reverse was left out too, for the same complexity: retrying a story that doe
 **Equal timing can miss a timer.** Two renders with equal timing called all 30 unfrozen sample stories stable in 4 of 4 runs, though two of them hold running timers: load timing is repeatable enough for a blink to land on the same phase each time. At the 100 ms settle, the second render needed about 730 ms more settling to catch both in every run: 530 ms caught both in 0 of 4 runs, and 730 and 930 ms in 4 of 4, while 1130 ms caught both in only 2 of 4.
 
 **Limits.** One app's stories, on one machine, so a timer whose period happens to fit the delay can still match. A fixture cycling every 700 ms did exactly that at 730 ms, so a match is not proof.
+
+## A project's recipe
+
+**The app decides, and the renderer adapts.** Measured on this repository's 134 stories, 2026-11: `loading="lazy"` and `decoding="async"` made images below the fold differ between renders. Changing the app would have fixed them here, and left every other project with the same flake and the advice to change how its product loads images. So the renderer loads and decodes them itself, and the app kept its attributes.
+
+**Configurable, with new goldens.** A project may really want dark mode, its own locale, or its own origin. These are hashed, so changing one starts new goldens for that project alone, rather than reading as every story changing.
+
+**What stays fixed.** A setting that would stop the worker answering every request, or that couldn't work in a container, isn't a choice a project can usefully make.
+
+**What didn't work.** Rendering with `--disable-checker-imaging`, with and without `--num-raster-threads=1`, didn't stop images differing. Forcing a repaint after decoding, by hiding the root for a frame, made it much worse, with 14 of 23 stories differing rather than 3.
+
