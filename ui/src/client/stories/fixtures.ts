@@ -162,15 +162,15 @@ export function note(id: number, { text = "This looks a bit quiet next to the he
     imageHash: null,
     box: null,
     state,
-    messages: [{ sender: "person", author: "ned@example.com", text, runId: RUN_ID, at: id, sent: state !== "draft" }],
+    messages: [{ id, sender: "person", author: "ned@example.com", text, runId: RUN_ID, at: id, sent: state !== "draft" }],
     ...overrides,
   };
 }
 
 /** A folder's notes, with actions that are recorded but change nothing. */
-export function feedbackOf(notes: readonly Note[] = [], overrides: Partial<FeedbackState> = {}): FeedbackState {
+export function feedbackOf(notes: readonly Note[] = [], overrides: Partial<FeedbackState> = {}, agentWaiting = false): FeedbackState {
   return {
-    view: { folder: "selfie-hackathon", notes },
+    view: { folder: "selfie-hackathon", notes, agentWaiting },
     error: null,
     clearError: fn(),
     add: fn(async () => true),

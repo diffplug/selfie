@@ -9,11 +9,13 @@ import { gitUserEmail } from "./git.ts";
 import { compareAsReviewed, findBaseline, openProject, type Project } from "./project.ts";
 import { record, review } from "./review.ts";
 import { summarizeRun } from "./summary.ts";
-import { notesForAgent } from "./notes.ts";
+import { awaitFeedback, notesForAgent } from "./notes.ts";
 
 const EXIT_OK = 0;
 const EXIT_NEEDS_ATTENTION = 1;
 const EXIT_COULD_NOT_RUN = 2;
+const EXIT_TIMED_OUT = 3;
+const EXIT_STOPPED = 130;
 
 const USAGE = `Usage: selfie <command>
 
@@ -51,6 +53,12 @@ const USAGE = `Usage: selfie <command>
   notes
       Prints the notes a person has sent to an agent from this folder's review UI, each with a
       picture of what it's about. Never their drafts. Each worktree's folder has its own notes.
+
+  agent-await-feedback [--timeout <seconds>]
+      Blocks until a person sends notes from this folder's review UI, and prints them as notes
+      does, with what's new marked. While it runs, the UI says an agent is waiting. Exits 0 with
+      notes, 3 if --timeout passed first so it's worth asking again, 130 if stopped by a signal, or
+      2 if another agent is already waiting here.
 
 Local data lives under ~/.config/selfie/<git-origin-slugified>/, or $SELFIE_HOME instead of
 ~/.config/selfie. A project configures Selfie in selfie.config.json at its Git top level:
@@ -239,6 +247,20 @@ async function dispatch(command: string | undefined, args: string[], context: Co
       return withProject(context, async (project) => {
         printJson(context, await notesForAgent(project));
         return EXIT_OK;
+      });
+    }
+    case "agent-await-feedback": {
+      const { values, positionals } = parse(args, { timeout: { type: "string" } });
+      noPositionals(command, positionals);
+      const seconds = values.timeout === undefined ? Infinity : Number(values.timeout);
+      if (values.timeout !== undefined && !(Number.isFinite(seconds) && seconds >= 0)) {
+        throw new SelfieError("usage", `--timeout must be a number of seconds, got "${values.timeout}".`);
+      }
+      return withProject(context, async (project) => {
+        context.stderr("Waiting for feedback. The review UI now offers Send to agent.\n");
+        const result = await awaitFeedback(project, { timeoutMs: seconds * 1000, signal: context.signal });
+        printJson(context, result);
+        return result.outcome === "notes" ? EXIT_OK : result.outcome === "timed-out" ? EXIT_TIMED_OUT : EXIT_STOPPED;
       });
     }
     case "ui": {

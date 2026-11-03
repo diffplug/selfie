@@ -2,11 +2,13 @@
 import { execFileSync } from "node:child_process";
 import { mkdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { decodeImage } from "selfie-store";
 import { REQUEST_HEADER_VALUE } from "selfie-ui/app";
 import { createLocalApp } from "selfie-ui/local";
-import { afterEach, beforeEach, describe, expect, test } from "vitest";
-import { textForAgent, withBoxDrawn } from "../src/notes.ts";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { runCli } from "../src/cli.ts";
+import { awaitFeedback, textForAgent, WAITER_STALE_MS, withBoxDrawn } from "../src/notes.ts";
 import { openProject, type Project } from "../src/project.ts";
 import { localReviewSource } from "../src/ui.ts";
 import { createHarness, git, type Harness } from "./support.ts";
@@ -107,7 +109,7 @@ describe("writing a note", () => {
 
     await writeNote();
     const [{ id: sent }] = (await feedback()).notes;
-    await send(app, "POST", "/api/notes/send", {});
+    await send(app, "POST", "/api/notes/send", { via: "copy" });
     expect((await send(app, "DELETE", `/api/notes/${sent}`)).status).toBe(404);
     expect((await feedback()).notes).toHaveLength(1);
   });
@@ -120,7 +122,7 @@ describe("writing a note", () => {
 describe("copying for an agent", () => {
   test("sends the drafts, and answers with the text to paste", async () => {
     await writeNote({ box: { x: 1, y: 2, width: 3, height: 4 } });
-    const response = await send(app, "POST", "/api/notes/send", {});
+    const response = await send(app, "POST", "/api/notes/send", { via: "copy" });
     const { feedback: view, text } = (await response.json()) as any;
     expect(view.notes[0].state).toBe("sent");
     expect(text).toContain(`Note ${view.notes[0].id}, on a, in the box 3×4 at 1, 2:\nToo quiet`);
@@ -130,16 +132,16 @@ describe("copying for an agent", () => {
 
   test("includes what was sent before, so copying again loses nothing", async () => {
     await writeNote({ text: "First" });
-    await send(app, "POST", "/api/notes/send", {});
+    await send(app, "POST", "/api/notes/send", { via: "copy" });
     await writeNote({ text: "Second" });
-    const { text } = (await (await send(app, "POST", "/api/notes/send", {})).json()) as any;
+    const { text } = (await (await send(app, "POST", "/api/notes/send", { via: "copy" })).json()) as any;
     expect(text).toContain("First");
     expect(text).toContain("Second");
   });
 
   test("names no path, since a response never does", async () => {
     await writeNote();
-    const { text } = (await (await send(app, "POST", "/api/notes/send", {})).json()) as any;
+    const { text } = (await (await send(app, "POST", "/api/notes/send", { via: "copy" })).json()) as any;
     expect(text).not.toContain(h.repo);
     expect(text).not.toContain(h.home);
   });
@@ -154,7 +156,7 @@ describe("copying for an agent", () => {
 describe("selfie notes", () => {
   test("prints what was sent, never a draft", async () => {
     await writeNote({ text: "Sent one" });
-    await send(app, "POST", "/api/notes/send", {});
+    await send(app, "POST", "/api/notes/send", { via: "copy" });
     await writeNote({ text: "Still writing" });
     const { json, code } = await h.cli("notes");
     expect(code).toBe(0);
@@ -164,7 +166,7 @@ describe("selfie notes", () => {
 
   test("with a picture of the note's box drawn on its image", async () => {
     await writeNote({ box: { x: 3, y: 3, width: 2, height: 2 } });
-    await send(app, "POST", "/api/notes/send", {});
+    await send(app, "POST", "/api/notes/send", { via: "copy" });
     const { json } = await h.cli("notes");
     const picture = await decodeImage(await readFile(json.notes[0].image));
     const original = await project.store.getPixels(imageHash);
@@ -177,7 +179,7 @@ describe("selfie notes", () => {
 
   test("has no picture for a note on no image", async () => {
     await writeNote({ imageHash: null });
-    await send(app, "POST", "/api/notes/send", {});
+    await send(app, "POST", "/api/notes/send", { via: "copy" });
     expect((await h.cli("notes")).json.notes[0].image).toBeNull();
   });
 
@@ -203,7 +205,7 @@ describe("a session is a folder", () => {
       // Nor can one touch the other's.
       const [{ id }] = (await feedback()).notes;
       expect((await send(otherApp, "DELETE", `/api/notes/${id}`)).status).toBe(404);
-      await send(otherApp, "POST", "/api/notes/send", {});
+      await send(otherApp, "POST", "/api/notes/send", { via: "copy" });
       expect((await feedback()).notes[0].state).toBe("draft");
     } finally {
       otherProject.close();
@@ -223,9 +225,158 @@ describe("a session is a folder", () => {
   });
 });
 
+describe("waiting for feedback", () => {
+  const waiting = () => feedback().then(({ agentWaiting }) => agentWaiting);
+  const untilWaiting = () => vi.waitFor(async () => expect(await waiting()).toBe(true), { timeout: 5_000 });
+  const sendTo = (via: string) => send(app, "POST", "/api/notes/send", { via });
+
+  test("nobody is waiting until an agent says so", async () => {
+    expect(await waiting()).toBe(false);
+  });
+
+  test("the UI says an agent is waiting, and sending to it ends the wait with those notes", async () => {
+    await writeNote({ text: "Already here" });
+    const wait = h.cli("agent-await-feedback");
+    await untilWaiting();
+    expect((await sendTo("agent")).status).toBe(200);
+    const { code, json } = await wait;
+    expect(code).toBe(0);
+    expect(json.outcome).toBe("notes");
+    expect(json.notes.map(({ messages }: any) => messages[0].text)).toEqual(["Already here"]);
+    expect(await waiting()).toBe(false);
+  });
+
+  test("only what's new comes back, and not what an agent already received", async () => {
+    await writeNote({ text: "First" });
+    const first = h.cli("agent-await-feedback");
+    await untilWaiting();
+    await sendTo("agent");
+    await first;
+
+    await writeNote({ text: "Second" });
+    const second = h.cli("agent-await-feedback");
+    await untilWaiting();
+    await sendTo("agent");
+    const { json } = await second;
+    expect(json.notes.map(({ messages }: any) => messages[0].text)).toEqual(["Second"]);
+    // Everything's still there to read.
+    expect((await h.cli("notes")).json.notes).toHaveLength(2);
+  });
+
+  test("what a waiter didn't collect goes to the next one at once", async () => {
+    await writeNote({ text: "Left behind" });
+    await project.notes.send();
+    const { code, json } = await h.cli("agent-await-feedback");
+    expect(code).toBe(0);
+    expect(json.notes.map(({ messages }: any) => messages[0].text)).toEqual(["Left behind"]);
+  });
+
+  test("what was copied has been handed over, so nothing waits for it", async () => {
+    await writeNote({ text: "Pasted" });
+    await sendTo("copy");
+    const { code, json } = await h.cli("agent-await-feedback", "--timeout", "0");
+    expect(code).toBe(3);
+    expect(json).toMatchObject({ outcome: "timed-out", notes: [] });
+  });
+
+  test("a timeout has its own exit code, and stops saying an agent is waiting", async () => {
+    expect((await h.cli("agent-await-feedback", "--timeout", "0")).code).toBe(3);
+    expect(await waiting()).toBe(false);
+  });
+
+  test("a second agent in one folder is refused, and the first keeps waiting", async () => {
+    const stop = new AbortController();
+    const first = awaitFeedback(project, { timeoutMs: Infinity, signal: stop.signal });
+    await untilWaiting();
+    const refused = await h.cli("agent-await-feedback", "--timeout", "0");
+    expect(refused.code).toBe(2);
+    expect(refused.json.error.code).toBe("already-waiting");
+    expect(await waiting()).toBe(true);
+    stop.abort();
+    expect((await first).outcome).toBe("stopped");
+    expect(await waiting()).toBe(false);
+  });
+
+  test("an agent that died stops counting, and another can take over", async () => {
+    expect(await project.notes.beat("dead")).toBe(true);
+    expect(await waiting()).toBe(true);
+    expect(await project.notes.beat("alive")).toBe(false);
+    const raw = new DatabaseSync(path.join(project.directory, "store.db"));
+    raw.prepare("UPDATE note_waiters SET heartbeat_at = ?").run(Date.now() - WAITER_STALE_MS - 1);
+    raw.close();
+    expect(await waiting()).toBe(false);
+    expect(await project.notes.beat("alive")).toBe(true);
+  });
+
+  test("sending to an agent that's gone is refused, and sends nothing", async () => {
+    await writeNote();
+    const response = await sendTo("agent");
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ error: { code: "no-agent-waiting" } });
+    expect((await feedback()).notes[0].state).toBe("draft");
+  });
+
+  test("refuses a way of sending it doesn't know", async () => {
+    expect((await sendTo("carrier-pigeon")).status).toBe(400);
+  });
+
+  test("an agent in another worktree waits for its own folder's notes", async () => {
+    const other = path.join(h.scratch, "another");
+    execFileSync("git", ["worktree", "add", "-q", "-b", "another", other], { cwd: h.repo });
+    const otherProject = await openProject({ cwd: other, env: { SELFIE_HOME: h.home } });
+    try {
+      expect(await otherProject.notes.beat("there")).toBe(true);
+      expect(await waiting()).toBe(false);
+      await writeNote();
+      await sendTo("copy");
+      expect((await otherProject.notes.undelivered()).size).toBe(0);
+    } finally {
+      otherProject.close();
+    }
+  });
+
+  test("marks what's new in what it prints", async () => {
+    await writeNote({ text: "Ready" });
+    const wait = h.cli("agent-await-feedback");
+    await untilWaiting();
+    await sendTo("agent");
+    expect((await wait).json.notes[0].messages).toMatchObject([{ text: "Ready", new: true }]);
+  });
+
+  test("what's been copied isn't received again, even if it was sent to an agent that died", async () => {
+    await writeNote({ text: "Sent, and never collected" });
+    await project.notes.send();
+    await sendTo("copy");
+    expect((await project.notes.undelivered()).size).toBe(0);
+  });
+
+  test("an agent's own reply doesn't end its wait", async () => {
+    await writeNote();
+    await sendTo("copy");
+    const raw = new DatabaseSync(path.join(project.directory, "store.db"));
+    raw.prepare("INSERT INTO note_messages(note_id, sender, author, text, at, sent_at) SELECT id, 'agent', 'agent', 'Done', 1, 1 FROM notes").run();
+    raw.close();
+    expect((await project.notes.undelivered()).size).toBe(0);
+  });
+
+  test("a signal has its own exit code, so asking again on 3 can be stopped", async () => {
+    const stop = new AbortController();
+    let stdout = "";
+    const running = runCli(["agent-await-feedback"], { cwd: h.repo, env: { SELFIE_HOME: h.home }, stdout: (text) => void (stdout += text), stderr: () => undefined, signal: stop.signal });
+    await untilWaiting();
+    stop.abort();
+    expect(await running).toBe(130);
+    expect(JSON.parse(stdout)).toMatchObject({ outcome: "stopped", notes: [] });
+  });
+
+  test("refuses a timeout that isn't a number", async () => {
+    expect((await h.cli("agent-await-feedback", "--timeout", "soon")).code).toBe(2);
+  });
+});
+
 test("a picture is made once, however many times it's asked for", async () => {
   await writeNote({ box: { x: 3, y: 3, width: 2, height: 2 } });
-  await send(app, "POST", "/api/notes/send", {});
+  await send(app, "POST", "/api/notes/send", { via: "copy" });
   const first = (await h.cli("notes")).json.notes[0].image;
   const { mtimeMs } = await stat(first);
   const second = (await h.cli("notes")).json.notes[0].image;
