@@ -13,3 +13,5 @@
 ## Goldens
 
 **Why CI can make goldens.** A merge commit's run happens on CI, which can't decide, so if making goldens took Decide, no merge commit would get any without a person re-rendering it, and the next branch's baseline would drift ever further back. With nothing removed, `acceptRun` makes no judgment of its own: every image already matches the baseline, or has an approval from someone who could give one.
+
+**Why the sender names the baseline.** CI's first design was to pull, record, then push, but CI on a private repository can't view it, so it can't pull. A run's recorded baseline is a fact about what its machine knew, and `acceptRun` has always taken its baseline separately. Asking which commit the cloud would hold it to only needs what Upload may already learn. A sender can name an older baseline than the nearest, whose goldens it may still match, but it needs write access to send anything, and every image still has to have been a golden or approved.

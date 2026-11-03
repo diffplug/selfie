@@ -277,28 +277,28 @@ describe("goldens", () => {
   test("a person's approval, and then CI can make them, with nothing to remove", async () => {
     const hash = await sendRun();
     await approve(hash);
-    expect(await (await goldens({ runId: RUN, removed: [] }, "ci")).json()).toEqual({ outcome: "accepted", acceptedRunId: RUN, refusal: null });
+    expect(await (await goldens({ runId: RUN, baselineSha: null, removed: [] }, "ci")).json()).toEqual({ outcome: "accepted", acceptedRunId: RUN, refusal: null });
     expect(await cloud.snapshots.acceptedRunAt(SHA, ENV)).toBe(RUN);
   });
 
   test("are refused for what nobody approved, and leave the run", async () => {
     await sendRun();
-    expect(await (await goldens({ runId: RUN, removed: [] }, "ci")).json()).toMatchObject({ outcome: "refused", refusal: { code: "not-approved" } });
+    expect(await (await goldens({ runId: RUN, baselineSha: null, removed: [] }, "ci")).json()).toMatchObject({ outcome: "refused", refusal: { code: "not-approved" } });
     expect(await cloud.snapshots.acceptedRunAt(SHA, ENV)).toBeNull();
     expect(await cloud.snapshots.getRun(RUN)).not.toBeNull();
   });
 
   test("the same run again is fine", async () => {
     await approve(await sendRun());
-    await goldens({ runId: RUN, removed: [] });
-    expect(await (await goldens({ runId: RUN, removed: [] })).json()).toEqual({ outcome: "already", acceptedRunId: RUN, refusal: null });
+    await goldens({ runId: RUN, baselineSha: null, removed: [] });
+    expect(await (await goldens({ runId: RUN, baselineSha: null, removed: [] })).json()).toEqual({ outcome: "already", acceptedRunId: RUN, refusal: null });
   });
 
   test("a different run never replaces them", async () => {
     await approve(await sendRun());
-    await goldens({ runId: RUN, removed: [] });
+    await goldens({ runId: RUN, baselineSha: null, removed: [] });
     await approve(await sendRun(OTHER_RUN, GREEN));
-    expect(await (await goldens({ runId: OTHER_RUN, removed: [] })).json()).toMatchObject({ outcome: "conflict", acceptedRunId: RUN });
+    expect(await (await goldens({ runId: OTHER_RUN, baselineSha: null, removed: [] })).json()).toMatchObject({ outcome: "conflict", acceptedRunId: RUN });
     expect(await cloud.snapshots.acceptedRunAt(SHA, ENV)).toBe(RUN);
   });
 
@@ -310,42 +310,51 @@ describe("goldens", () => {
       await send("POST", `/runs/${RUN}/snapshots`, "writer", { snapshots: [{ story: "a", imageHash: a }, { story: "b", imageHash: b }] });
       await send("POST", `/runs/${RUN}/finish`, "writer", { count: 2, finishedAt: 600 });
       await send("POST", "/decisions", "writer", { environment: ENV, decisions: [{ story: "a", imageHash: a, decision: "approved", at: 700 }, { story: "b", imageHash: b, decision: "approved", at: 700 }] });
-      await goldens({ runId: RUN, removed: [] });
+      await goldens({ runId: RUN, baselineSha: null, removed: [] });
       await send("PUT", `/runs/${OTHER_RUN}`, "writer", runFacts({ gitSha: OTHER_SHA, baselineSha: SHA }));
       await send("POST", `/runs/${OTHER_RUN}/snapshots`, "writer", { snapshots: [{ story: "a", imageHash: a }] });
       await send("POST", `/runs/${OTHER_RUN}/finish`, "writer", { count: 1, finishedAt: 800 });
     });
 
     test("need someone who may decide", async () => {
-      expect((await goldens({ runId: OTHER_RUN, removed: ["b"] }, "ci")).status).toBe(403);
+      expect((await goldens({ runId: OTHER_RUN, baselineSha: SHA, removed: ["b"] }, "ci")).status).toBe(403);
     });
 
     test("are refused if nothing was named, whoever asks", async () => {
-      expect(await (await goldens({ runId: OTHER_RUN, removed: [] }, "ci")).json()).toMatchObject({ outcome: "refused", refusal: { code: "wrong-removed" } });
+      expect(await (await goldens({ runId: OTHER_RUN, baselineSha: SHA, removed: [] }, "ci")).json()).toMatchObject({ outcome: "refused", refusal: { code: "wrong-removed" } });
     });
 
     test("are refused for naming something else", async () => {
-      expect(await (await goldens({ runId: OTHER_RUN, removed: ["c"] })).json()).toMatchObject({ outcome: "refused", refusal: { code: "wrong-removed" } });
+      expect(await (await goldens({ runId: OTHER_RUN, baselineSha: SHA, removed: ["c"] })).json()).toMatchObject({ outcome: "refused", refusal: { code: "wrong-removed" } });
     });
 
     test("go through for naming just what they remove", async () => {
-      expect(await (await goldens({ runId: OTHER_RUN, removed: ["b"] })).json()).toMatchObject({ outcome: "accepted" });
+      expect(await (await goldens({ runId: OTHER_RUN, baselineSha: SHA, removed: ["b"] })).json()).toMatchObject({ outcome: "accepted" });
     });
   });
 
   test("whose baseline isn't here are refused, saying so", async () => {
     const hash = await sendRun(RUN, RED, { baselineSha: OTHER_SHA });
     await approve(hash);
-    expect(await (await goldens({ runId: RUN, removed: [] })).json()).toMatchObject({ outcome: "refused", refusal: { code: "no-goldens" } });
+    expect(await (await goldens({ runId: RUN, baselineSha: OTHER_SHA, removed: [] })).json()).toMatchObject({ outcome: "refused", refusal: { code: "no-goldens" } });
+  });
+
+  test("hold a run to whichever goldens the sender names, since CI records no baseline", async () => {
+    await approve(await sendRun());
+    await goldens({ runId: RUN, baselineSha: null, removed: [] });
+    // The same image, at another commit, with no approval or recorded baseline of its own.
+    await sendRun(OTHER_RUN, RED, { gitSha: OTHER_SHA });
+    await cloud.snapshots.mergeDecisions(ENV, []);
+    expect(await (await goldens({ runId: OTHER_RUN, baselineSha: SHA, removed: [] }, "ci")).json()).toMatchObject({ outcome: "accepted" });
   });
 
   test("of a run from nowhere are a 404", async () => {
-    expect((await goldens({ runId: OTHER_RUN, removed: [] })).status).toBe(404);
+    expect((await goldens({ runId: OTHER_RUN, baselineSha: SHA, removed: [] })).status).toBe(404);
   });
 
   test("CI can find which commits have them, and no more", async () => {
     await approve(await sendRun());
-    await goldens({ runId: RUN, removed: [] });
+    await goldens({ runId: RUN, baselineSha: null, removed: [] });
     expect(await (await send("POST", "/goldens/first", "ci", { shas: [OTHER_SHA, SHA], environment: ENV })).json()).toEqual({ sha: SHA });
     expect(await (await send("GET", `/goldens?sha=${SHA}&environment=${ENV}`, "ci")).json()).toEqual({ runId: RUN });
     expect((await send("GET", `/runs/${RUN}`, "ci")).status).toBe(403);

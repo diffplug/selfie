@@ -5,11 +5,12 @@ import { resolveCaptureSettings } from "./config.ts";
 import { accept, decide } from "./decisions.ts";
 import { buildAcceptDocument, buildRecordDocument, buildReviewDocument } from "./document.ts";
 import { SelfieError } from "./errors.ts";
-import { gitUserEmail } from "./git.ts";
+import { gitUserEmail, resolveCommit } from "./git.ts";
 import { compareAsReviewed, findBaseline, openProject, type Project } from "./project.ts";
 import { record, review } from "./review.ts";
 import { summarizeRun } from "./summary.ts";
 import { notesForAgent } from "./notes.ts";
+import { findBaselineWithRemote, pull, push, requireRemote, resolveRemote, type Fetch } from "./sync.ts";
 
 const EXIT_OK = 0;
 const EXIT_NEEDS_ATTENTION = 1;
@@ -52,6 +53,16 @@ const USAGE = `Usage: selfie <command>
       Prints the notes a person has sent to an agent from this folder's review UI, each with a
       picture of what it's about. Never their drafts. Each worktree's folder has its own notes.
 
+  push [<run>] [--accept] [--remote <url>] [--native]
+      Sends a run to the remote, by default the newest from a clean tree at HEAD, and its goldens
+      if it's accepted here or --accept asks, which is what CI uses after record. Needs its commit
+      on GitHub. Safe to run again. Exits 1 if its goldens were refused or there's a different run
+      there already.
+
+  pull [<commit>] [--remote <url>] [--native]
+      Takes a commit's goldens from the remote, by default the nearest baseline it has, replacing
+      any here. Exits 1 if it has none.
+
 Local data lives under ~/.config/selfie/<git-origin-slugified>/, or $SELFIE_HOME instead of
 ~/.config/selfie. A project configures Selfie in selfie.config.json at its Git top level:
 environment, initScript, regionMergeDistance, and storybookDir, which --storybook-dir overrides. A build command
@@ -70,6 +81,8 @@ interface Context {
   readonly signal?: AbortSignal;
   /** Defaults to the built client in `selfie-ui`. */
   readonly uiClientDir?: string;
+  /** Defaults to the real one. */
+  readonly fetch?: Fetch;
 }
 
 const printJson = (context: Context, document: unknown) => context.stdout(`${JSON.stringify(document, null, 2)}\n`);
@@ -224,12 +237,38 @@ async function dispatch(command: string | undefined, args: string[], context: Co
         return result.accepted ? EXIT_OK : EXIT_NEEDS_ATTENTION;
       });
     }
+    case "push": {
+      const { values, positionals } = parse(args, { accept: { type: "boolean" }, remote: { type: "string" }, native: { type: "boolean" } });
+      const [run, ...extra] = positionals;
+      if (extra.length > 0) throw new SelfieError("usage", "Expected at most one run ID.");
+      const remote = requireRemote(values.remote, context.env, context.fetch);
+      return withProject(context, async (project) => {
+        const result = await push(project, remote, { run, accept: values.accept, native: values.native });
+        printJson(context, result);
+        return result.goldens === null || result.goldens.outcome === "accepted" || result.goldens.outcome === "already" ? EXIT_OK : EXIT_NEEDS_ATTENTION;
+      });
+    }
+    case "pull": {
+      const { values, positionals } = parse(args, { remote: { type: "string" }, native: { type: "boolean" } });
+      const [commit, ...extra] = positionals;
+      if (extra.length > 0) throw new SelfieError("usage", "Expected at most one commit.");
+      const remote = requireRemote(values.remote, context.env, context.fetch);
+      return withProject(context, async (project) => {
+        const sha = commit === undefined ? undefined : await resolveCommit(project.repo, commit);
+        if (sha === null) throw new SelfieError("usage", `"${commit}" isn't a commit here.`);
+        const result = await pull(project, remote, { commit: sha, native: values.native });
+        printJson(context, result);
+        return result.runId === null ? EXIT_NEEDS_ATTENTION : EXIT_OK;
+      });
+    }
     case "find-baseline": {
-      const { values, positionals } = parse(args, { native: { type: "boolean" } });
+      const { values, positionals } = parse(args, { native: { type: "boolean" }, remote: { type: "string" } });
       noPositionals(command, positionals);
+      const remote = resolveRemote(values.remote, context.env, context.fetch);
       return withProject(context, async (project) => {
         const { environmentId } = await resolveCaptureSettings(project.repo, { native: values.native });
-        printJson(context, { ...(await findBaseline(project, environmentId)), environment: environmentId });
+        const found = remote === null ? await findBaseline(project, environmentId) : await findBaselineWithRemote(project, remote, environmentId);
+        printJson(context, { ...found, environment: environmentId });
         return EXIT_OK;
       });
     }

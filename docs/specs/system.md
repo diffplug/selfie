@@ -49,7 +49,7 @@ Selfie is for fully opaque images, and transparency is never allowed: `docs/spec
 
 ### Approvals across stores
 
-- **Must not make a user re-approve at push a snapshot change they already approved locally.** A user can approve changes on an unpushed PR, and those approvals carry through the push. The record is built ([Approvals](#approvals)) and keyed so it can move between stores. Moving it is `sync`'s job, as `docs/specs/snapshots.md` → Future says.
+- **Must not make a user re-approve at push a snapshot change they already approved locally.** A user can approve changes on an unpushed PR, and those approvals carry through the push. The record is built ([Approvals](#approvals)), and `docs/specs/sync.md` moves it, which isn't deployed yet.
 
 ### Cloud data
 
@@ -68,8 +68,6 @@ Selfie is for fully opaque images, and transparency is never allowed: `docs/spec
 **Scope: cloud-deploy** — The same Hono app ([Local review](#local-review)) deployed at `hackathon.selfie.dev`, with accounts in Neon through pgstencil and Hyperdrive, per-project D1, and R2 ([Cloud data](#cloud-data)). Serves no image before `github-access`.
 
 **Scope: github-access** — The GitHub App, sign-in, and access checks (`docs/specs/access.md`). Ships with `cloud-deploy`, since a deployed service needs them before it holds anyone's images.
-
-**Scope: sync** — Push and pull between stores, and the cloud half of `find-baseline`, whose local half is built (`docs/specs/cli.md` → find-baseline). Local approvals carry through here ([Approvals across stores](#approvals-across-stores)). Designed in `docs/specs/sync.md`.
 
 **Scope: trust** — The cloud accepts local results without re-rendering.
 

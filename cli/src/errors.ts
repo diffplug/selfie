@@ -12,6 +12,8 @@ export type SelfieErrorCode =
   | "missing-image"
   | "no-actor"
   | "stale-decision"
+  | "no-remote"
+  | "bad-remote"
   | "unknown-note"
   | "usage";
 
