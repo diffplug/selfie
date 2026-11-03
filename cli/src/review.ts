@@ -119,7 +119,7 @@ export interface ReviewResult {
   };
 }
 
-function runBuildCommand(command: string, cwd: string, signal: AbortSignal | undefined): Promise<void> {
+export function runBuildCommand(command: string, cwd: string, signal: AbortSignal | undefined): Promise<void> {
   return new Promise((resolve, reject) => {
     const child = spawn(command, { shell: true, cwd, stdio: ["ignore", 2, 2], ...(signal ? { signal } : {}) });
     child.once("error", (error) =>

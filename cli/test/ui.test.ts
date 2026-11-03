@@ -7,7 +7,7 @@ import { networkInterfaces, tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { decodeImage } from "./support.ts";
-import { REQUEST_HEADER_VALUE } from "selfie-ui/app";
+import { REQUEST_HEADER_VALUE, type StoriesView } from "selfie-ui/app";
 import { createLocalApp, createStorybookApp, serveLocal, serveStorybook, type LocalServer } from "selfie-ui/local";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { runCli } from "../src/cli.ts";
@@ -739,6 +739,82 @@ describe("selfie ui", () => {
     await Promise.race([printed, exit]);
     return { stop, exit, json: () => JSON.parse(stdout), stderr: () => stderr };
   };
+
+  describe("selfie feedback", () => {
+    const feedback = async (...argv: string[]) => {
+      const stop = new AbortController();
+      let stdout = "";
+      let stderr = "";
+      let onPrinted: () => void;
+      const printed = new Promise<void>((resolve) => {
+        onPrinted = resolve;
+      });
+      const exit = runCli(["feedback", ...argv], {
+        cwd: h.repo,
+        env: { SELFIE_HOME: h.home },
+        stdout: (text) => {
+          stdout += text;
+          onPrinted();
+        },
+        stderr: (text) => {
+          stderr += text;
+        },
+        signal: stop.signal,
+        uiClientDir: clientDir,
+      });
+      await Promise.race([printed, exit]);
+      return { stop, exit, json: () => JSON.parse(stdout), stderr: () => stderr };
+    };
+    const builtAt = async (dir: string) => {
+      await mkdir(dir, { recursive: true });
+      await writeFile(path.join(dir, "iframe.html"), "<!doctype html><title>the preview</title>");
+      await writeFile(path.join(dir, "index.json"), JSON.stringify({ entries: { a: { type: "story", id: "a" } } }));
+    };
+
+    test("opens at every story, and says how an agent joins in", async () => {
+      const dir = path.join(h.scratch, "a-storybook");
+      await builtAt(dir);
+      const { stop, exit, json, stderr } = await feedback("--storybook-dir", dir);
+      const { url, port, storybookUrl, runId } = json();
+      expect(url).toBe(`http://127.0.0.1:${port}/stories`);
+      expect(runId).toBeNull();
+      expect(stderr()).toContain("selfie agent-await-feedback");
+      const { stories, canCapture } = (await (await fetch(`http://127.0.0.1:${port}/api/stories`)).json()) as StoriesView;
+      expect(stories).toEqual([{ story: "a", capture: null }]);
+      expect(canCapture).toBe(true);
+      expect(await (await fetch(`${storybookUrl}iframe.html`)).text()).toContain("the preview");
+      stop.abort();
+      expect(await exit).toBe(0);
+    });
+
+    test("builds first, if it's told how", async () => {
+      const dir = path.join(h.scratch, "built-by-command");
+      const script = path.join(h.scratch, "build.mjs");
+      await writeFile(script, `import { mkdirSync, writeFileSync } from "node:fs"; mkdirSync(${JSON.stringify(dir)}, { recursive: true }); writeFileSync(${JSON.stringify(path.join(dir, "iframe.html"))}, "built"); writeFileSync(${JSON.stringify(path.join(dir, "index.json"))}, '{"entries":{}}');`);
+      const { stop, exit, json, stderr } = await feedback("--storybook-dir", dir, "--build-command", `node ${script}`);
+      expect(stderr()).toContain("Building:");
+      expect(await (await fetch(`${json().storybookUrl}iframe.html`)).text()).toBe("built");
+      stop.abort();
+      expect(await exit).toBe(0);
+    });
+
+    test("says what to do if there's nothing to give feedback on, or the build fails", async () => {
+      const none = await feedback("--storybook-dir", path.join(h.scratch, "nothing-here"));
+      expect(await none.exit).toBe(2);
+      expect(none.json().error).toMatchObject({ code: "no-stories", message: expect.stringContaining("--build-command") });
+      const failing = await feedback("--build-command", "exit 3");
+      expect(await failing.exit).toBe(2);
+      expect(failing.json().error.code).toBe("build-failed");
+    });
+
+    test("refuses a bad port, and arguments", async () => {
+      for (const argv of [["--port", "http"], ["a-run"]]) {
+        const refused = await feedback(...argv);
+        expect(await refused.exit, argv.join(" ")).toBe(2);
+        expect(refused.json().error.code).toBe("usage");
+      }
+    });
+  });
 
   test("hosts a Storybook on a port of its own, saying where, and --storybook-dir picks which", async () => {
     const dir = path.join(h.scratch, "a-storybook");

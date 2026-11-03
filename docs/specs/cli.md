@@ -21,6 +21,7 @@ Source of truth: `cli/src/cli.ts`, `cli/src/document.ts`; the real binary's test
 | `selfie reply <note> <text>` | Answers a note (`docs/specs/feedback.md`) |
 | `selfie agent-await-feedback` | Blocks until a person sends notes from this folder (`docs/specs/feedback.md`) |
 | `selfie ui [<run>]` | Serves the review UI until stopped, and prints its URL ([ui](#ui)) |
+| `selfie feedback` | The same, opening at every story, for notes on a Storybook with nothing captured yet ([feedback](#feedback)) |
 
 - **Must print exactly one document on stdout, whatever happens,** and everything for people on stderr, including a review's one line of timings. A command that couldn't run prints `{ "error": { "code", "message" } }`. `--help` prints usage.
 - **Must use these exit codes:**
@@ -267,6 +268,16 @@ Source of truth: `cli/src/ui.ts`, and `selfie ui` in `cli/src/cli.ts`; tests in 
 - **Must load `selfie-ui` and Hono only in this command**, by a dynamic `import()`, so no other command pays for a web server. `cli/test/ui.test.ts` checks what `cli/src/cli.ts` loads.
 - **Must fail with `ui-not-built` and exit 2 if the client isn't built**, saying what to run: `pnpm --filter selfie-ui build`. `pnpm install` builds it, through `prepare`.
 - **Must take a decision's actor from `git config user.email`, or refuse with `no-actor`.** There's no `--actor` here, since a page has no way to be anyone else.
+
+## feedback
+
+Source of truth: `selfie feedback` in `cli/src/cli.ts`; tests in `cli/test/ui.test.ts`. `docs/specs/feedback.md` owns what happens to a note.
+
+It's [`selfie ui`](#ui), but for `runId`, always null, with its URL at every story.
+
+- **Must run `--build-command` first, if given, as `selfie review` does**, and only once: a page never builds. Rebuilding after a change is the agent's own `--build-command`.
+- **Must fail with `no-stories` and exit 2, saying what to do, if there's no built Storybook after that**, since there's nothing to give feedback on.
+- **Must run in the foreground until a signal**, and say on stderr how an agent joins in, with `selfie agent-await-feedback`.
 
 ## Configuration
 

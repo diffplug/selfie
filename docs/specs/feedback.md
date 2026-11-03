@@ -42,6 +42,10 @@ A note is where something is. Its messages are the conversation about it.
 - **Must keep whether something's been sent on the message, and not on the note**, so an answer to a note that's already been read can be a draft (rationale).
 - **May delete only what hasn't been sent**, since what has been sent has been read. A note goes when nothing's left of it.
 
+## Starting from a Storybook
+
+`selfie feedback` opens at every story (`docs/specs/ui.md` → Screens), so someone can look at a real Storybook and say what's wrong, with nothing captured yet. A note is on an image, so writing one captures its story first. An agent's answer is `selfie agent-await-feedback`, its change, `selfie record --story <story> --build-command <command>`, and `selfie reply`, and the page then shows what changed since the note.
+
 ## Handing notes to an agent
 
 **The default is to copy and paste**, since it needs nothing of the agent but that it can read.
