@@ -8,7 +8,8 @@ import { useTitle, type RunState } from "./hooks.ts";
 import { AppLink, runPath } from "./router.tsx";
 import { ActionFailure, RunNotes } from "./RunNotes.tsx";
 import { StoryLinks } from "./StoryLinks.tsx";
-import { plural, ReusedPixels, shortSha } from "./words.tsx";
+import { plural } from "./plural.ts";
+import { ReusedPixels, shortSha } from "./words.tsx";
 
 function Refusal({ title, children }: { title: string; children: ReactNode }) {
   return (

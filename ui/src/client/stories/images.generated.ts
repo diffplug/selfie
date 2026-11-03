@@ -2,18 +2,21 @@
 import type { PixelDiff } from "../../shared/api.ts";
 
 export const HASHES = {
-  "golden": "e1278d9df1d60906ce12331f230ba831afad494c66687616da53f9cbd0bbc107",
-  "changed": "aee725c3c1ea6a3a1488ba88a140e15b825fc08cce8a45c649f45713d7f66a30",
-  "tallGolden": "cb2550d256f91d5245e2e07e4ae73a80e31193a005421f5f69b797bfd98589f7",
-  "tallChanged": "f1b7fb62f358cb4e33f0a97caa8fb5cbf000442c8ba6b32faec0699d95cc1908",
-  "taller": "7675075ddbea8f5c9a348013044d8c7be7f507ea58c10f73a9b87adebeb0a678",
-  "spaced": "360d5e7c529db03c551cac768baf98b7879cc8e7ee9baa84ec5530575d4de855",
-  "moved": "821a335703480460ff5f7dbb52545147b4fe020d860b231453cafbf3fb6e2816",
-  "mixed": "c6780a212f0216ee2b111b224b1d5a06f803438f22ee16f786d73c5c7577ca3e",
-  "fresh": "0e99b436fdc9928c9bed9987a3286bcce4c9e04c0a9707982f08e170b2b3e933",
-  "gone": "c438ad9dc877e21f9f0d53290f6b484bd36507c98c3809cfeaff3d959a3856a8",
-  "doubleGolden": "f683741c6f371fc3a87d953dfd3d71d8a2ac05d21f302db66d69280a0eae232a",
-  "doubleChanged": "647cf5fde5bf48f2bd9b99d93445e4c670cb868de1f28a580a983f6695661dbf"
+  "golden": "8eb1cb73427e1b80972d624131d556027ed0ac32b5e4553c60ff822b728f4e9d",
+  "changed": "47140e3cf57f82ec71b40fd6002a275d9bc0bfb34ffa9bbd4edd3c1085fff47c",
+  "tallGolden": "cfd1ea367d623767479ee4b062368b182620612e5623718d03553c64f717b095",
+  "tallChanged": "9cdf8ff0beb7131502fac4253dae398855a143c2c6e0596c9354480176f5ed32",
+  "taller": "d89e98200799b28d2440028144a726c4d4e78ede9c28283e9780b163fff3d44e",
+  "spaced": "a6056a68182dd0be036bced4470839576418ae3b49b38942f9a1399cfb8be63e",
+  "moved": "068872dfe6b9fac475faa749428bd8ec99cb31d81284b648a3ae505e2856c5aa",
+  "mixed": "bad91b4a65fc421de386316d2ad07c858633744ee15084f65a88fc03a93d4f13",
+  "several": "94fee94adbb739e3755e54b01fc0a7a08680767cc405c855a7aba98f85105b7f",
+  "long": "62ae56a8842fde9efaac85e58f0c8ee109488c013601100f65d0e9218f0c70bd",
+  "pushed": "737720ef7fe26981023bb5ee33fddbdd29f3dea1e73ebeba3b6bda885ad15847",
+  "fresh": "d0fb32554529d88cb72f7affb05a1919dc738fc2b84bd677a801359f5c77a80e",
+  "gone": "d54e4ae5605f70ee991d9899a4e7e55c7c6fe858b5d91960ef7a8bc94e3a54ad",
+  "doubleGolden": "91c8f702c3414b0463f34b1b6368ef446ed7d1ebd877f7998fdf9edd466bc791",
+  "doubleChanged": "090df5767ccac5a79cefc10cedcb44758eef68420f0c8bd9fd5baa4d8aad02ca"
 } as const;
 
 export const PIXEL_DIFFS = {
@@ -371,6 +374,160 @@ export const PIXEL_DIFFS = {
       "y": 882
     },
     "maxChannelDelta": 199
+  },
+  "several-golden": {
+    "current": {
+      "width": 1200,
+      "height": 900
+    },
+    "golden": {
+      "width": 1200,
+      "height": 900
+    },
+    "regions": [
+      {
+        "current": {
+          "x": 32,
+          "y": 450,
+          "width": 160,
+          "height": 36
+        },
+        "golden": {
+          "x": 32,
+          "y": 450,
+          "width": 160,
+          "height": 36
+        },
+        "kind": "moved",
+        "changedPixels": 0,
+        "moved": []
+      },
+      {
+        "current": {
+          "x": 600,
+          "y": 450,
+          "width": 160,
+          "height": 36
+        },
+        "golden": {
+          "x": 600,
+          "y": 450,
+          "width": 160,
+          "height": 36
+        },
+        "kind": "moved",
+        "changedPixels": 0,
+        "moved": [
+          {
+            "current": {
+              "x": 600,
+              "y": 450,
+              "width": 160,
+              "height": 36
+            },
+            "golden": {
+              "x": 32,
+              "y": 450,
+              "width": 160,
+              "height": 36
+            }
+          }
+        ]
+      },
+      {
+        "current": {
+          "x": 32,
+          "y": 852,
+          "width": 1136,
+          "height": 16
+        },
+        "golden": {
+          "x": 32,
+          "y": 852,
+          "width": 1136,
+          "height": 16
+        },
+        "kind": "changed",
+        "changedPixels": 18176,
+        "moved": []
+      }
+    ],
+    "changedPixels": 18176,
+    "movedPixels": 5760,
+    "spacingPixels": 0,
+    "totalPixels": 1080000,
+    "boundingBox": {
+      "x": 32,
+      "y": 852,
+      "width": 1136,
+      "height": 16
+    },
+    "firstChanged": {
+      "x": 32,
+      "y": 852
+    },
+    "maxChannelDelta": 199
+  },
+  "pushed-long": {
+    "current": {
+      "width": 1200,
+      "height": 1430
+    },
+    "golden": {
+      "width": 1200,
+      "height": 1400
+    },
+    "regions": [
+      {
+        "current": {
+          "x": 0,
+          "y": 88,
+          "width": 1200,
+          "height": 30
+        },
+        "golden": {
+          "x": 0,
+          "y": 88,
+          "width": 1200,
+          "height": 0
+        },
+        "kind": "spacing",
+        "changedPixels": 0,
+        "moved": []
+      },
+      {
+        "current": {
+          "x": 32,
+          "y": 480,
+          "width": 160,
+          "height": 36
+        },
+        "golden": {
+          "x": 32,
+          "y": 450,
+          "width": 160,
+          "height": 36
+        },
+        "kind": "changed",
+        "changedPixels": 5760,
+        "moved": []
+      }
+    ],
+    "changedPixels": 5760,
+    "movedPixels": 0,
+    "spacingPixels": 36000,
+    "totalPixels": 1716000,
+    "boundingBox": {
+      "x": 32,
+      "y": 480,
+      "width": 160,
+      "height": 36
+    },
+    "firstChanged": {
+      "x": 32,
+      "y": 480
+    },
+    "maxChannelDelta": 163
   },
   "doubleChanged-doubleGolden": {
     "current": {

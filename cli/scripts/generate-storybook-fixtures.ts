@@ -40,23 +40,27 @@ interface Page {
   readonly gap?: number;
   /** Where the button sits across the page, which moves it without moving anything else. */
   readonly buttonAt?: number;
+  /** Blank space added above the heading, so everything from the heading down is elsewhere, and still lines up. */
+  readonly lead?: number;
 }
 
 /** Something that reads as a page: a header, some text and cards, a button, and a footer. */
-function page({ height = 900, button = ACCENT, footer = MUTED, cards = 3, scale = 1, gap = 0, buttonAt = 32 }: Page): RawImage {
+function page({ height = 900, button = ACCENT, footer = MUTED, cards = 3, scale = 1, gap = 0, buttonAt = 32, lead = 0 }: Page): RawImage {
   const at = (value: number) => value * scale;
   const { box, image } = canvas(at(1200), at(height));
   box(0, 0, at(1200), at(56), INK);
   box(at(32), at(20), at(120), at(16), PAPER);
-  box(at(32), at(88), at(420), at(24), INK);
-  box(at(32), at(124), at(640), at(12), MUTED);
+  box(at(32), at(88 + lead), at(420), at(24), INK);
+  // Every row of it is its own, as with real text, which is what lets the rows below it line up.
+  for (let row = 0; row < 24; row++) box(at(40 + row * 16), at(88 + lead + row), at(8), at(1), PAPER);
+  box(at(32), at(124 + lead), at(640), at(12), MUTED);
   for (let row = 0; row < cards; row++) {
-    const y = 164 + gap + row * 90;
+    const y = 164 + lead + gap + row * 90;
     box(at(32), at(y), at(1136), at(74), [246, 248, 250]);
     box(at(48), at(y + 18), at(280), at(12), INK);
     box(at(48), at(y + 42), at(520), at(10), MUTED);
   }
-  const below = 164 + gap + cards * 90 + 16;
+  const below = 164 + lead + gap + cards * 90 + 16;
   box(at(buttonAt), at(below), at(160), at(36), button);
   box(at(32), at(height - 48), at(1136), at(16), footer);
   return image();
@@ -71,6 +75,9 @@ const IMAGES = {
   spaced: page({ height: 930, gap: 30 }),
   moved: page({ buttonAt: 600 }),
   mixed: page({ height: 930, gap: 30, buttonAt: 600, footer: ACCENT }),
+  several: page({ buttonAt: 600, footer: ACCENT }),
+  long: page({ height: 1400 }),
+  pushed: page({ height: 1430, lead: 30, button: GREEN }),
   fresh: page({ cards: 2, button: GREEN }),
   gone: page({ cards: 5, button: INK }),
   doubleGolden: page({ scale: 2 }),
@@ -85,6 +92,8 @@ const DIFFS = [
   ["spaced", "golden"],
   ["moved", "golden"],
   ["mixed", "golden"],
+  ["several", "golden"],
+  ["pushed", "long"],
   ["doubleChanged", "doubleGolden"],
 ] as const satisfies readonly (readonly [keyof typeof IMAGES, keyof typeof IMAGES])[];
 

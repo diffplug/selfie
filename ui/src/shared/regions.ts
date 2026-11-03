@@ -14,9 +14,12 @@ export const isLayoutOnly = ({ changedPixels }: PixelDiff) => changedPixels === 
 
 const strongest = (p: RegionKind, q: RegionKind): RegionKind => (p === "changed" || q === "changed" ? "changed" : p === "moved" || q === "moved" ? "moved" : "spacing");
 
+/** A side of a region that only the other image has. */
+export const isEmptyBox = ({ width, height }: BoundingBox) => width === 0 || height === 0;
+
 function hull(p: BoundingBox, q: BoundingBox): BoundingBox {
-  if (p.width === 0 || p.height === 0) return q;
-  if (q.width === 0 || q.height === 0) return p;
+  if (isEmptyBox(p)) return q;
+  if (isEmptyBox(q)) return p;
   const x = Math.min(p.x, q.x);
   const y = Math.min(p.y, q.y);
   return { x, y, width: Math.max(p.x + p.width, q.x + q.width) - x, height: Math.max(p.y + p.height, q.y + q.height) - y };

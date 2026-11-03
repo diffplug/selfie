@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { AcceptRefusal, DecisionKind, DecisionTarget, RunView, SnapshotRow } from "../shared/api.ts";
 import { fetchRun, fetchUnchanged, postAccept, postDecision, RequestError } from "./api.ts";
 import { reuseRows } from "./filter.ts";
+import { toggled } from "./selection.ts";
 
 export interface RunState {
   readonly view: RunView | null;
@@ -111,7 +112,8 @@ export function useHotkeys(keys: Readonly<Record<string, () => void>>): void {
       // Never a held key, which would approve one image after another with nobody looking.
       if (event.metaKey || event.ctrlKey || event.altKey || event.defaultPrevented || event.repeat) return;
       const target = event.target as Element | null;
-      if (target?.closest("input, textarea, select, [contenteditable], [role=dialog], [role=alertdialog]")) return;
+      // A checkbox takes no typing, and keeping the keys after clicking one is the point of having them.
+      if (target?.closest("input:not([type=checkbox]), textarea, select, [contenteditable], [role=dialog], [role=alertdialog]")) return;
       const handler = current.current[event.key];
       if (handler === undefined) return;
       event.preventDefault();
@@ -120,6 +122,30 @@ export function useHotkeys(keys: Readonly<Record<string, () => void>>): void {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
+}
+
+export interface RegionSelection {
+  readonly selected: ReadonlySet<number>;
+  readonly focused: number | null;
+  readonly toggle: (index: number) => void;
+  readonly setSelected: (selected: ReadonlySet<number>) => void;
+  readonly setFocused: (focused: number) => void;
+}
+
+/** Regions picked out by their place in a story's list, which last only as long as someone stays on `story`. */
+export function useRegionSelection(story: string): RegionSelection {
+  const nothing = () => ({ story, selected: new Set<number>() as ReadonlySet<number>, focused: null as number | null });
+  const [state, setState] = useState(nothing);
+  // Forgotten on leaving, and not just hidden, so coming back can't bring it back.
+  if (state.story !== story) setState(nothing());
+  return {
+    selected: state.selected,
+    focused: state.focused,
+    // From what's latest, since one click can set both.
+    toggle: (index) => setState((latest) => ({ ...latest, selected: toggled(latest.selected, index) })),
+    setSelected: (selected) => setState((latest) => ({ ...latest, selected })),
+    setFocused: (focused) => setState((latest) => ({ ...latest, focused })),
+  };
 }
 
 export function useTitle(title: string): void {

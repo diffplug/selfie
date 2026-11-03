@@ -27,7 +27,8 @@ import { Keys } from "./Keys.tsx";
 import { acceptPath, AppLink, AppLinkButton, followLink, navigate, runPath, storyPath } from "./router.tsx";
 import { ActionFailure, RunNotes } from "./RunNotes.tsx";
 import { StoryLinks } from "./StoryLinks.tsx";
-import { AdvisoryLabels, BLOCKER_WORDS, DecisionLabel, describePixels, plural, ReusedPixels, shortSha, StateLabel } from "./words.tsx";
+import { plural } from "./plural.ts";
+import { AdvisoryLabels, BLOCKER_WORDS, DecisionLabel, describePixels, ReusedPixels, shortSha, StateLabel } from "./words.tsx";
 
 const PATTERNS_LISTED = 3;
 

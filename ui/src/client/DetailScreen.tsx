@@ -7,14 +7,16 @@ import { isDecidable } from "selfie-store";
 import type { DecisionKind, PixelDiff, RunView, SnapshotRow } from "../shared/api.ts";
 import { diffImageUrl, fetchDiff, imageUrl } from "./api.ts";
 import { applyFilter, neighbors, parseFilter, targetsOf } from "./filter.ts";
-import { useFetched, useHotkeys, useTitle, type RunState } from "./hooks.ts";
+import { useFetched, useHotkeys, useRegionSelection, useTitle, type RunState } from "./hooks.ts";
 import { ImageCompare } from "./ImageCompare.tsx";
 import { Keys } from "./Keys.tsx";
 import { acceptPath, AppLink, navigate, runPath, storyPath } from "./router.tsx";
 import { ActionFailure } from "./RunNotes.tsx";
 import { LoadFailure, Loading } from "./Status.tsx";
 import { groupRegions, isLayoutOnly } from "../shared/regions.ts";
-import { AdvisoryLabels, DecisionLabel, describePixels, plural, sizeChanged, StateLabel } from "./words.tsx";
+import { plural } from "./plural.ts";
+import { describeBox } from "./selection.ts";
+import { AdvisoryLabels, DecisionLabel, describePixels, sizeChanged, StateLabel } from "./words.tsx";
 
 const SHORTCUTS: readonly (readonly [string, string])[] = [
   ["j", "Next story"],
@@ -25,7 +27,10 @@ const SHORTCUTS: readonly (readonly [string, string])[] = [
   ["f", "Stacked at the current zoom, then flip between current and golden"],
   ["d", "Show the diff"],
   ["z", "Next zoom: actual size, 1×, 2×, 4×, 8×"],
-  ["c", "Center on the change"],
+  ["c", "Center on the region being looked at, or else the change"],
+  ["n", "Next region"],
+  ["p", "Previous region"],
+  ["x", "Select the region being looked at, or the first"],
   ["u", "Back to the list"],
   ["?", "This list"],
 ];
@@ -47,9 +52,8 @@ function ShortcutsDialog({ onClose }: { readonly onClose: () => void }) {
   );
 }
 
-function PixelStats({ stats, mergeDistance }: { stats: PixelDiff; mergeDistance: number }) {
+function PixelStats({ stats }: { stats: PixelDiff }) {
   const box = stats.boundingBox;
-  const groups = plural(groupRegions(stats.regions, mergeDistance).length, "region");
   const account = [
     stats.movedPixels > 0 && `${stats.movedPixels.toLocaleString()} moved`,
     stats.spacingPixels > 0 && `${stats.spacingPixels.toLocaleString()} spacing`,
@@ -58,7 +62,7 @@ function PixelStats({ stats, mergeDistance }: { stats: PixelDiff; mergeDistance:
     <Text className="selfie-muted">
       <strong>{describePixels(stats)}</strong>
       {!isLayoutOnly(stats) && ` of ${stats.totalPixels.toLocaleString()} changed`}
-      {box === null ? "" : `, within ${box.width}×${box.height} at ${box.x}, ${box.y}`}. {groups}.
+      {box === null ? "" : `, within ${describeBox(box)}`}.
       {account.length > 0 && ` ${account.join(", ")} pixels.`}
       {stats.maxChannelDelta > 0 && ` The largest difference in a channel is ${stats.maxChannelDelta} of 255.`}
       {account.length > 0 && " In the diff, pink changed, blue moved, and yellow is spacing that grew or shrank."}
@@ -124,6 +128,9 @@ export function DetailScreen({ state, view, story, search }: { state: RunState; 
     fetchDiff(row!.imageHash!, row!.goldenHash!, signal),
   );
   const diff = row?.pixelDiff ?? fetched;
+  const mergeDistance = view.regionMergeDistance * view.run.scale;
+  const groups = useMemo(() => (diff === null ? [] : groupRegions(diff.regions, mergeDistance)), [diff, mergeDistance]);
+  const selection = useRegionSelection(story);
 
   // The next story's images are likely wanted within seconds, so have them ready.
   useEffect(() => {
@@ -217,7 +224,7 @@ export function DetailScreen({ state, view, story, search }: { state: RunState; 
             by {row.decision.actor}, <RelativeTime date={new Date(row.decision.at)} />.
           </Text>
         )}
-        {diff !== null && <PixelStats stats={diff} mergeDistance={view.regionMergeDistance * view.run.scale} />}
+        {diff !== null && <PixelStats stats={diff} />}
         {changedPair && diff === null && diffError === null && <Text className="selfie-muted">Comparing pixels…</Text>}
         {diffError !== null && <Text className="selfie-muted">The pixels couldn't be compared: {diffError.message}</Text>}
       </Stack>
@@ -242,7 +249,7 @@ export function DetailScreen({ state, view, story, search }: { state: RunState; 
         />
       )}
       <Notes row={row} diff={diff} />
-      <ImageCompare row={row} diff={diff} scale={view.run.scale} />
+      <ImageCompare row={row} diff={diff} scale={view.run.scale} groups={groups} selection={selection} />
       {helpOpen && <ShortcutsDialog onClose={() => setHelpOpen(false)} />}
     </Stack>
   );

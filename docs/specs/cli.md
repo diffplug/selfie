@@ -296,9 +296,9 @@ Story IDs come from a project's build, and a manifest's paths from a directory i
 
 ### Regions
 
-- Showing and selecting them in the UI.
 - Decisions on them (`docs/specs/snapshots.md` → Future).
 - Content that moved inside something with a fill of its own, such as text in an input in a modal, still ghosts: the input's borders keep its rows from being flat, and its fill isn't the image's background, so no block of the text comes out identical. A scrolled pane does too, since what's cut off at its edge differs.
+- With no row unique to anchor on and two different heights, the 9-slice stops, so a page of identical rows whose height changed is one region, however far apart its changes are. Its moves and spacing are still told apart inside it, but they can't be selected or decided on separately.
 - Pixels alone can't tell that a button's four rounded corners are one thing. The renderer could record each element's box, so regions snap to them, at the cost of tying the differ to the browser.
 
 ### A render that does change
