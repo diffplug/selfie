@@ -16,8 +16,10 @@ Source of truth: `cli/src/cli.ts`, `cli/src/document.ts`; the real binary's test
 | `selfie approve <run>`, `selfie reject <run>` | Records a decision on a run's changed and new images, with `--all` or `--story <pattern>` |
 | `selfie accept <run>` | Makes a run the goldens of its Git SHA |
 | `selfie find-baseline` | Prints the baseline this repository and environment would use |
-| `selfie notes` | Prints the notes a person has sent to an agent from this folder (`docs/specs/feedback.md`) |
 | `selfie push`, `selfie pull` | Moves a run and its goldens to and from a remote (`docs/specs/sync.md`) |
+| `selfie notes` | Prints the open notes a person has sent to an agent from this folder (`docs/specs/feedback.md`) |
+| `selfie reply <note> <text>` | Answers a note (`docs/specs/feedback.md`) |
+| `selfie agent-await-feedback` | Blocks until a person sends notes from this folder (`docs/specs/feedback.md`) |
 | `selfie ui [<run>]` | Serves the review UI until stopped, and prints its URL ([ui](#ui)) |
 
 - **Must print exactly one document on stdout, whatever happens,** and everything for people on stderr, including a review's one line of timings. A command that couldn't run prints `{ "error": { "code", "message" } }`. `--help` prints usage.
@@ -28,6 +30,8 @@ Source of truth: `cli/src/cli.ts`, `cli/src/document.ts`; the real binary's test
 | 0 | Nothing blocks | A review with no blockers, a run recorded, even with failed stories, a decision recorded, a run accepted, any `find-baseline` result, `ui` stopped by a signal |
 | 1 | The command ran, and something blocks | A review listing anything in `blockers`, or showing any difference from a `--baseline`, `accept` refusing, a `--story` pattern on `approve` or `reject` that matched nothing |
 | 2 | The command couldn't run | Not a Git repository, no commits, no Storybook, no Docker, a failed `--build-command`, a bad flag, an unknown run, `--story` matching no story at all, a `ui` that can't start |
+| 3 | Nothing yet, and it's worth asking again | `agent-await-feedback` past its `--timeout` |
+| 130 | Stopped by a signal, where stopping isn't success | `agent-await-feedback` |
 
 - **Decision for the user to review: advisories don't change the exit code.** A project with two known `play` errors can reach exit 0, so 1 keeps its meaning of "something here stops you". It also means **an agent checking only the exit code won't see a `play` failure**: it has to read `advisories`, which is why the document always carries the list and its count ([What blocks](#what-blocks)) (rationale).
 - **Must take a story pattern as `docs/specs/render.md` → Capture defines it:** an ID, where `*` matches any run of characters.

@@ -170,11 +170,12 @@ export interface DecisionTarget {
   readonly imageHash: string;
 }
 
-/** `draft` is still the person's, and `sent` is the agent's to act on. */
-export type NoteState = "draft" | "sent";
+/** `draft` is still the person's, `sent` is the agent's to act on, and `replied` and `resolved` are the person's to look at, or done. */
+export type NoteState = "draft" | "sent" | "replied" | "resolved";
 
 /** One thing said about a note, which is a draft until it's sent. */
 export interface NoteMessage {
+  readonly id: number;
   readonly sender: "person" | "agent";
   readonly author: string;
   readonly text: string;
@@ -203,7 +204,14 @@ export interface FeedbackView {
   /** Only its name, since a response never holds a path. */
   readonly folder: string;
   readonly notes: readonly Note[];
+  /** Whether `selfie agent-await-feedback` is running in this folder now. */
+  readonly agentWaiting: boolean;
+  /** The newest run recorded from this folder, which is the one to look at, if it's known. */
+  readonly latestRunId: string | null;
 }
+
+/** `agent` to a waiting agent, or `copy` if the person is pasting them somewhere themselves. */
+export type SendVia = "agent" | "copy";
 
 /**
  * The seam between the routes and a platform: how they reach a project's data. `cli/src/ui.ts`
@@ -222,8 +230,10 @@ export interface ReviewSource {
   feedback(): Promise<FeedbackView>;
   addNote(note: NewNote): Promise<FeedbackView>;
   removeNote(id: number): Promise<FeedbackView>;
+  answerNote(id: number, text: string, runId: string): Promise<FeedbackView>;
+  resolveNote(id: number): Promise<FeedbackView>;
   /** Sends every draft, and answers with all that's been sent, as text to paste into an agent. */
-  sendNotes(): Promise<{ readonly feedback: FeedbackView; readonly text: string }>;
+  sendNotes(via: SendVia): Promise<{ readonly feedback: FeedbackView; readonly text: string }>;
   /** The stored bytes, or null if this store doesn't hold it. */
   image(hash: string): Promise<Uint8Array | null>;
   /** Null if the store doesn't hold both. */

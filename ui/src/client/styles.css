@@ -229,6 +229,10 @@ code {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.selfie-panes[data-count="4"] {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .selfie-pane {
   margin: 0;
 }
@@ -536,4 +540,23 @@ code {
   font-size: var(--text-caption-size, 12px);
   line-height: 1.5;
   white-space: nowrap;
+}
+
+.selfie-notes-list li[data-state="resolved"] {
+  border-left-color: var(--borderColor-default);
+  color: var(--fgColor-muted);
+}
+
+.selfie-note-unmoved {
+  margin: var(--base-size-4) 0 0;
+  color: var(--fgColor-attention);
+  font-weight: var(--base-text-weight-semibold);
+}
+
+.selfie-notes-list .selfie-note-form {
+  margin-top: var(--base-size-4);
+}
+
+.selfie-newer-run {
+  margin-bottom: var(--base-size-16);
 }

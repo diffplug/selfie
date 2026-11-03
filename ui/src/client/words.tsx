@@ -4,6 +4,7 @@ import {
   ArrowSwitchIcon,
   CheckIcon,
   ClockIcon,
+  CommentIcon,
   DiffAddedIcon,
   DiffModifiedIcon,
   DiffRemovedIcon,
@@ -65,6 +66,8 @@ const KIND_LABELS: Readonly<Record<RegionKind, { variant: LabelProps["variant"];
 const NOTE_LABELS: Readonly<Record<NoteState, { variant: LabelProps["variant"]; icon: ReactNode; words: string }>> = {
   draft: { variant: "secondary", icon: <PencilIcon size={12} />, words: "Draft" },
   sent: { variant: "accent", icon: <PaperAirplaneIcon size={12} />, words: "Sent" },
+  replied: { variant: "attention", icon: <CommentIcon size={12} />, words: "Agent replied" },
+  resolved: { variant: "success", icon: <CheckIcon size={12} />, words: "Resolved" },
 };
 
 export function NoteLabel({ state }: { readonly state: NoteState }) {

@@ -47,8 +47,9 @@ Selfie has the following commands:
 - accept - makes a run's snapshots the goldens for its Git sha, on a clean tree
 - push, pull - move a run, its decisions, and its goldens to and from the cloud, whose goldens win
 - ui - serves a local review page in the browser, to look at a run's images, approve, reject, and accept. It shows what's recorded, and never renders
+- notes, agent-await-feedback, reply - how a person's notes on the images reach a coding agent, and how it answers
 
-An agent's loop is `selfie review`, then look at the diff images it names, then `selfie approve <run> --all`, commit, `selfie review`, and `selfie accept <run>`. A project sets its environment, init script, Storybook directory, and how close changed regions join in `selfie.config.json` at its Git top level. A person's loop is the same with `selfie ui` for the looking and deciding. These work on local data, and push and pull are built, but no server is deployed for them yet. See `docs/specs/cli.md` and `docs/specs/ui.md`.
+An agent's loop is `selfie review`, then look at the diff images it names, then `selfie approve <run> --all`, commit, `selfie review`, and `selfie accept <run>`. A project sets its environment, init script, Storybook directory, and how close changed regions join in `selfie.config.json` at its Git top level. A person's loop is the same with `selfie ui` for the looking and deciding. To work together, a person leaves notes on any story in `selfie ui`, and either copies them into any agent, or presses Send while the agent runs `selfie agent-await-feedback`. The agent acts on them, runs `selfie record`, and answers each with `selfie reply`, and the person flips against the image they commented on, and resolves it or answers back. See `docs/specs/feedback.md`. These work on local data, and push and pull are built, but no server is deployed for them yet. See `docs/specs/cli.md` and `docs/specs/ui.md`.
 
 ## Implementation details
 
