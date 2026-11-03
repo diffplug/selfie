@@ -54,6 +54,8 @@ export interface RecordOptions {
   readonly storybookDir?: string | undefined;
   /** The caller's own command, run in a shell. Its stdout goes to stderr. */
   readonly buildCommand?: string | undefined;
+  /** Run the config's `buildCommand`, from the Git top level. Only ever because someone asked. */
+  readonly buildFromConfig?: boolean | undefined;
   /** Story ID patterns. Defaults to every story. */
   readonly stories?: readonly string[] | undefined;
   readonly native?: boolean | undefined;
@@ -119,7 +121,7 @@ export interface ReviewResult {
   };
 }
 
-/** Builds, if a person's command line said how. Nothing else ever runs a shell. */
+/** Builds, if someone asked to. Nothing else ever runs a shell. */
 export async function buildIfAsked(command: string | undefined, cwd: string, signal: AbortSignal | undefined, log: (line: string) => void): Promise<void> {
   if (command === undefined) return;
   log(`Building: ${command}`);
@@ -460,14 +462,20 @@ async function recordBuild(project: Project, options: RecordOptions, { reuse }: 
   const captureDir = captureDirectory(project, randomUUID());
   try {
     // 1. Build. Whatever it writes is part of what this describes, so it comes first.
-    await buildIfAsked(options.buildCommand, project.cwd, options.signal, log);
+    // Before building, so a bad config doesn't cost a whole build to find out.
+    const settings = await resolveCaptureSettings(repo, { native: options.native });
+    if (options.buildFromConfig === true) {
+      if (settings.buildCommand === undefined) throw new SelfieError("usage", "--build runs the config's buildCommand, and selfie.config.json doesn't have one.");
+      await buildIfAsked(settings.buildCommand, repo.root, options.signal, log);
+    } else {
+      await buildIfAsked(options.buildCommand, project.cwd, options.signal, log);
+    }
 
     // 2. Read where we are.
     const gitSha = await headSha(repo);
     if (gitSha === null) {
       throw new SelfieError("no-commits", "This repository has no commits yet, and a run is recorded against a Git SHA.");
     }
-    const settings = await resolveCaptureSettings(repo, { native: options.native });
     const storybookDir = resolveStorybookDir(project.cwd, options.storybookDir, settings);
     const baseline = await findBaseline(project, settings.environmentId);
     const dirtyBefore = await dirtyPaths(repo);

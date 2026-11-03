@@ -300,7 +300,6 @@ describe("selfie.config.json", () => {
   });
 
   test.each([
-    [{ buildCommand: "rm -rf /" }, 'unknown key "buildCommand"'],
     [{ initScript: "../outside.js" }, "must be inside"],
     [{ initScript: "missing.js" }, "Can't read the init script"],
     [[1], "must hold a JSON object"],

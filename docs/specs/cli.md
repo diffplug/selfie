@@ -11,6 +11,7 @@ Source of truth: `cli/src/cli.ts`, `cli/src/document.ts`; the real binary's test
 
 | Command | Does |
 |---|---|
+| `selfie` | Opens every story of a built Storybook, running, to look at and write notes on ([selfie alone](#selfie-alone)) |
 | `selfie record` | Always renders a built Storybook and records a run, and judges nothing |
 | `selfie review [<run>]` | Prints the diff of a run against its baseline. With no run, uses the one for this build, and records one [only if necessary](#recording-only-if-necessary) |
 | `selfie approve <run>`, `selfie reject <run>` | Records a decision on a run's changed and new images, with `--all` or `--story <pattern>` |
@@ -21,7 +22,6 @@ Source of truth: `cli/src/cli.ts`, `cli/src/document.ts`; the real binary's test
 | `selfie reply <note> <text>` | Answers a note (`docs/specs/feedback.md`) |
 | `selfie agent-await-feedback` | Blocks until a person sends notes from this folder (`docs/specs/feedback.md`) |
 | `selfie ui [<run>]` | Serves the review UI until stopped, and prints its URL ([ui](#ui)) |
-| `selfie feedback` | The same, opening at every story, for notes on a Storybook with nothing captured yet ([feedback](#feedback)) |
 
 - **Must print exactly one document on stdout, whatever happens,** and everything for people on stderr, including a review's one line of timings. A command that couldn't run prints `{ "error": { "code", "message" } }`. `--help` prints usage.
 - **Must use these exit codes:**
@@ -92,7 +92,7 @@ Source of truth: `cli/src/review.ts`, `cli/src/diff.ts`, `cli/src/regions.ts`, `
 
 A review of a named run starts at step 6. `selfie record` is steps 1 to 5, always captures, and prints what it recorded. Otherwise, in order, a review:
 
-1. Runs `--build-command`, if given, in a shell. Its stdout goes to stderr. **Never guess a project's build system.** **Never use a shell for anything else.**
+1. Runs `--build-command`, or with `--build` the config's `buildCommand`, in a shell. Its stdout goes to stderr. **Never guess a project's build system.** **Never use a shell for anything else.**
 2. Reads HEAD and the working tree, and finds the baseline ([`find-baseline`](#find-baseline)).
 3. Unless that exact build [already rendered](#recording-only-if-necessary), captures `--storybook-dir`, or else the config's `storybookDir`, or else `storybook-static`, in a new capture directory, with `--story` patterns, and the project's [init script](#configuration).
 4. Checks HEAD didn't move.
@@ -264,20 +264,21 @@ Source of truth: `cli/src/ui.ts`, and `selfie ui` in `cli/src/cli.ts`; tests in 
 - **Must host the build the other commands would capture, or `--storybook-dir`'s, and the kept builds, on a free port of its own** (`docs/specs/ui.md` → Routes), whether or not there's a build yet.
 - **Must take an optional run**, and refuse a bad or unknown one with exit 2 before listening. With none, the page opens at the newest finished run at HEAD in this project's environment, or `--native`'s.
 - **Must ask the system for a free port unless given `--port`**, so two projects can both be served.
-- **Never open a browser.** Whoever ran it decides what to do with the URL.
+- **Never open a browser.** Whoever ran it decides what to do with the URL. [`selfie` alone](#selfie-alone) is the one that does.
 - **Must load `selfie-ui` and Hono only in the commands that serve**, by a dynamic `import()`, so no other command pays for a web server. `cli/test/ui.test.ts` checks what `cli/src/cli.ts` loads.
 - **Must fail with `ui-not-built` and exit 2 if the client isn't built**, saying what to run: `pnpm --filter selfie-ui build`. `pnpm install` builds it, through `prepare`.
 - **Must take a decision's actor from `git config user.email`, or refuse with `no-actor`.** There's no `--actor` here, since a page has no way to be anyone else.
 
-## feedback
+## selfie alone
 
-Source of truth: `selfie feedback` in `cli/src/cli.ts`; tests in `cli/test/ui.test.ts`. `docs/specs/feedback.md` owns what happens to a note.
+Source of truth: `openEveryStory` in `cli/src/cli.ts`; tests in `cli/test/ui.test.ts`. `docs/specs/feedback.md` owns what happens to a note.
 
-It's [`selfie ui`](#ui), except as below, and with `runId` always null, and its URL at every story.
+It's [`selfie ui`](#ui), except as below, with `runId` always null, and its URL at every story.
 
-- **Must run `--build-command` first, if given, as `selfie review` does**, once, after the config is known to be good (rationale).
+- **Must run the config's `buildCommand` first, once, unless `--no-build`** ([Configuration](#configuration)).
 - **Must fail with `no-stories` and exit 2, saying what to do, if there's no built Storybook after that.**
-- **Must say on stderr how an agent joins in**, with `selfie agent-await-feedback`.
+- **Must open a browser at its URL if it's at a terminal, unless `--no-open`, and never for anything else**, such as an agent or a script (rationale).
+- **Must say on stderr what address it's serving**, since a browser may not open.
 
 ## Configuration
 
@@ -290,11 +291,12 @@ Source of truth: `cli/src/config.ts`.
 | `environment` | Overrides for `defineEnvironment` (`docs/specs/render.md` → Environment) |
 | `initScript` | A file inside the Git top level, used as `capture`'s `initScript` |
 | `storybookDir` | A directory inside the Git top level, the build to capture. `--storybook-dir` overrides it |
+| `buildCommand` | How this project builds its Storybook, run from the Git top level |
 | `regionMergeDistance` | How close changed regions group for showing, in CSS pixels, multiplied by the run's scale. Default 12 |
 
 - **May let `--native` win over its `runner`.**
 - **Must refuse an unknown key**, so a typo can't silently render the wrong environment.
-- **Never read a build command from a file.** A checkout must not be able to run a shell; only `--build-command` can.
+- **Must run `buildCommand` only when a person asks: `selfie` alone, or `--build` on `record` or `review`, and never from a page or by default**, printing it first, so a checkout can only run a command on someone who asked for its build (rationale).
 
 ## Untrusted input
 

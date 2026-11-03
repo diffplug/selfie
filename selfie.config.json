@@ -1,1 +1,4 @@
-{ "storybookDir": "ui/storybook-static" }
+{
+  "storybookDir": "ui/storybook-static",
+  "buildCommand": "pnpm --filter selfie-ui build-storybook"
+}

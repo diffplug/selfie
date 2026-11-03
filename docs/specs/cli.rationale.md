@@ -108,7 +108,8 @@ It takes 4 to 10 ms an image on average, 17 ms at worst, and a story's stats com
 
 **One file, in one place.** Every command that needs an environment must find the same one, or `find-baseline` and `review` disagree. `--config` and `--init-script` let them, so they went. A file at the Git top level does the job without a flag on each call. `--native` stays, for a machine trying something locally, since a checked-in file shouldn't choose that.
 
-**No build command in a config, though a `storybookDir` is fine.** A flag on every run is friction, and a package script covers it, as `pnpm selfie:review` does here. Reading a command from a file would let any checkout run a shell the moment someone reviews it.
+**A build command in the config, only when asked.** This was once refused, since reading a command from a file lets a checkout run a shell, and rendering is otherwise safe on an untrusted one: stories run in a container with no network. But a project's build is a fact about that project, and retyping it is the friction `selfie` alone exists to remove. So it's in the config, and runs only for someone who asked for that build, by typing `selfie` or `--build`, and it prints first. What's given up: `selfie` in a stranger's checkout runs their command. `--no-build` is the way not to, and `selfie record`, `review`, and `ui` still never do it by themselves, so CI and agents can't run it by accident.
+
 
 **A config can't name a file outside itself.** A checkout's config file isn't the user's choice in the way a flag is. An init script is only ever run in the browser, with no network, so this is a small precaution at the cost of one check.
 
@@ -186,6 +187,8 @@ Without leaving these out, every build hashed differently and the feature would 
 
 **What copying rows costs.** Each reused run writes 541 rows. A review of this feature estimated about 450 MB a year at 50 hits a day. In the store above, `run_snapshots` held 5,560 rows in 376,832 bytes by `dbstat`, or 68 bytes a row including page overhead and 2 stories' `play` messages, which comes to about 670 MB for the same 18,250 runs. Either is small beside D1's 10 GB, and these rows are local, but it has no bound, as `docs/specs/snapshots.md` → Storing only what changed says of every run.
 
-## feedback
+## selfie alone
 
-**Building only on the way up.** Later builds are the agent's own, with its own `--build-command`, since a page must not be able to run a shell. The config is read first, since a bad one would otherwise cost a whole build to find out.
+**Building only on the way up.** Later builds are the agent's own, with `--build`, since a page must not be able to run a shell. The config is read first, since a bad one would otherwise cost a whole build to find out.
+
+**Opening a browser here, and not from `selfie ui`.** `selfie` alone is what a person types to look at something. `selfie ui` is also what an agent runs, and a browser opening on it would be a surprise. A terminal is what tells a person from the rest.

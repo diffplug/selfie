@@ -1,6 +1,6 @@
 // `selfie record`, and `selfie review` of a run it's told about, against real Git, a real store,
 // real files, and only the browser replaced.
-import { mkdir, readFile, realpath, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, realpath, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { BLUE, commit, createHarness, git, GREEN, type Harness } from "./support.ts";
@@ -250,11 +250,21 @@ describe("the config's storybookDir", () => {
     expect(json.error.code).toBe("bad-config");
   });
 
-  test.each(["buildCommand", "build-command", "build"])("has no %s, since a checkout must not run a shell", async (key) => {
+  test.each(["build-command", "build"])("has no %s, since a checkout must not run a shell", async (key) => {
     await config({ [key]: "touch pwned" });
     const { code, json } = await h.cli("record");
     expect(code).toBe(2);
     expect(json.error.code).toBe("bad-config");
+  });
+
+  test("a buildCommand isn't run unless someone asks, since a checkout must not run a shell by itself", async () => {
+    const marker = path.join(h.scratch, "ran");
+    await writeFile(path.join(h.repo, "selfie.config.json"), JSON.stringify({ buildCommand: `touch ${marker}` }));
+    h.stories = [{ id: "a" }];
+    await h.cli("record", "--storybook-dir", "ignored");
+    await expect(access(marker)).rejects.toThrow();
+    await h.cli("record", "--storybook-dir", "ignored", "--build");
+    await expect(access(marker)).resolves.toBeUndefined();
   });
 });
 
