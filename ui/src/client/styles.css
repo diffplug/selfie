@@ -25,11 +25,20 @@ body {
   padding: var(--base-size-8) var(--base-size-24);
   border-bottom: var(--borderWidth-thin) solid var(--borderColor-default);
   background: var(--bgColor-muted);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--base-size-4) var(--base-size-16);
 }
 
 .selfie-brand {
   font-size: var(--text-title-size-small);
   margin: 0;
+}
+
+.selfie-header-facts {
+  color: var(--fgColor-muted);
+  font-size: var(--text-body-size-small);
 }
 
 .selfie-main {

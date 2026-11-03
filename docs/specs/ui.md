@@ -59,6 +59,7 @@ Source of truth: `ui/src/server/app.ts`; tests in `cli/test/ui-*.test.ts`.
 | Route | Does |
 |---|---|
 | `GET /api/stories` | `storiesView` |
+| `GET /api/runs/:id/context` | `runContext(id)` |
 | `POST /api/renders` | `{ stories }`, which `render` records as a run |
 | `GET /api/runs/:id` | `runView` |
 | `GET /api/runs/:id/baseline` | `baseline` |
@@ -120,6 +121,12 @@ Source of truth: `ui/src/client/`.
 | `/runs/:id/stories/:story` | One snapshot, in the filter from the query |
 | `/runs/:id/accept` | Accepting |
 
+**The top bar** says what a page is looking at: on every story, the built Storybook, its commit and branch, and whether it's clean; on a run's pages, the diff, between the run's commit and what it's compared with, and how that relates to the merge base with the default branch.
+
+**A run's pages** have the same list at their left, of what differs, which is what's changed, new, removed, or failed, and never what's unchanged.
+
+- **Must say a story is renamed if it's new and a removed story's golden is its very image**, one to one, and the closest names first where several share an image (rationale). The list has it once, under its new name. This is only to look at: to decisions and accepting they're still one new and one removed.
+
 **The run** shows, in order: its commit, run ID, whether its pixels were rendered earlier and by which run, dirty state, baseline, environment, and decision actor; a warning if it was recorded dirty, has no baseline, is shown against branch goldens (`docs/specs/cli.md` → Review), or its SHA can't be a baseline; the counts; blockers; advisories; and the differences.
 
 - **Must group blockers by reason, in words, and offer each as a filter of the list.**
@@ -158,7 +165,7 @@ Source of truth: `ui/src/client/`.
 - **Must say where this commit stands, in order:** the commit and branch; the built Storybook, how many stories it has, and whether it's from a clean checkout; and how many stories have a render (rationale). What's missing says what to do, the page moves on by itself as it's done, and with no renders it offers to render the first story, or all of them, opening that story's page after the first.
 - **Must call a built Storybook clean only if nothing is uncommitted and it was built since HEAD last moved**, which is the most Selfie can know of a built Storybook it may not have made (rationale). Otherwise it says which, and may still render.
 - **Must say, before rendering from uncommitted changes, what they are, that a render is marked so and can't become a golden, and when the built Storybook itself is one of those files.**
-- **Must keep the list beside `/` and each `/stories/:story`, on the left, as Storybook's sidebar is** (rationale), with what `/` says, or that story, on the right. A filter stays in the query from page to page. A run's own screens don't have it.
+- **Must keep the list beside `/` and each `/stories/:story`, on the left, as Storybook's sidebar is** (rationale), with what `/` says, or that story, on the right. A filter stays in the query from page to page, and may be cleared in one click.
 - **Must nest by a story's title, keep the built Storybook's order, and use its names**: a top-level section, then a component, then each story, with Storybook's own icons and colors, so a person finds what they know from it (rationale). Only the sections start open. Moving to a story opens the way to it, and a filter opens everything.
 - **Must mark each story in the list with its state, in words for a screen reader and on hover, and with any caveat**, and give a story's decision and when it was rendered on its page.
 - **Must list a story nothing has rendered, show it running, and offer to render it**, since it's still a real story to look at. A note is written on an image, so starting one renders the story first, and then opens the note box. With no way to render here, it says what command does.

@@ -110,6 +110,15 @@ export type RunListing = Pick<Run, "id" | "startedAt" | "status" | "dirty">;
 /** Where a kept built Storybook is, on a hosted Storybook's origin, ending in a slash. Crosses into `selfie-cli` from here. */
 export const keptStorybookPath = (build: string) => `/built-storybooks/${build}/`;
 
+/** Where a run stands against this checkout, and where the baselines come from, for saying so. */
+export interface RunContext {
+  readonly head: string | null;
+  /** The branch HEAD is on, or null if it's detached. */
+  readonly branch: string | null;
+  readonly mergeBase: string | null;
+  readonly defaultBranch: string | null;
+}
+
 /** A Storybook to open a run's stories in, on an origin of its own. */
 export interface StorybookLink {
   /** Ending in a slash. */
@@ -127,6 +136,8 @@ export interface RunView {
   readonly goldenStorybookUrl: string | null;
   /** The size this run's stories rendered at, so a live one lays out as its image did. Null if that wasn't recorded. */
   readonly viewport: { readonly width: number; readonly height: number } | null;
+  /** What its Storybook calls `rows`' stories, in the order its sidebar has them, as far as its kept built Storybooks say. */
+  readonly storyNames: readonly { readonly story: string; readonly title: string; readonly name: string }[];
   /** With no baseline, the nearest goldens on the run's branch, which `rows` compares with. Only to look at. */
   readonly branchGoldens: string | null;
   /** How close a diff's regions group here, in CSS pixels. */
@@ -287,6 +298,7 @@ export interface ReviewSource {
   runView(runId: string): Promise<RunView>;
   /** Why the run has no baseline: only a screen showing that asks. */
   baseline(runId: string): Promise<BaselineNote>;
+  runContext(runId: string): Promise<RunContext>;
   unchanged(runId: string): Promise<readonly SnapshotRow[]>;
   /** Decides on exactly these images, or refuses all of them if one isn't what the run holds. */
   decide(runId: string, decision: DecisionKind, targets: readonly DecisionTarget[]): Promise<RunView>;

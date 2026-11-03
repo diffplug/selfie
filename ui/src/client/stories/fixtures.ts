@@ -131,6 +131,7 @@ export function viewOf(
     storybook: null,
     goldenStorybookUrl: null,
     viewport: { width: 1200, height: 900 },
+    storyNames: [],
     branchGoldens: null,
     regionMergeDistance: 12,
     acceptedRunId: null,

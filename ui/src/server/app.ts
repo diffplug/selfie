@@ -162,6 +162,7 @@ export function createReviewApi(source: ReviewSource): Hono {
     return context.json(await source.render(stories as string[]));
   });
   api.get("/runs/:runId", async (context) => context.json(await source.runView(context.req.param("runId"))));
+  api.get("/runs/:runId/context", async (context) => context.json(await source.runContext(context.req.param("runId"))));
   api.get("/runs/:runId/baseline", async (context) => context.json(await source.baseline(context.req.param("runId"))));
   api.get("/runs/:runId/unchanged", async (context) =>
     context.json({ rows: await source.unchanged(context.req.param("runId")) }),

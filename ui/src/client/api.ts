@@ -5,6 +5,7 @@ import {
   type AcceptOutcome,
   type ApiError,
   type BaselineNote,
+  type RunContext,
   type DecisionKind,
   type DecisionTarget,
   type FeedbackView,
@@ -49,6 +50,7 @@ const post = <T>(path: string, body: unknown) => request<T>(path, { method: "POS
 const runRoute = (runId: string) => `/runs/${encodeURIComponent(runId)}`;
 
 export const fetchRun = (runId: string, signal: AbortSignal) => request<RunView>(runRoute(runId), { signal });
+export const fetchRunContext = (runId: string, signal: AbortSignal) => request<RunContext>(`/runs/${encodeURIComponent(runId)}/context`, { signal });
 export const fetchBaseline = (runId: string, signal: AbortSignal) => request<BaselineNote>(`${runRoute(runId)}/baseline`, { signal });
 export const fetchUnchanged = async (runId: string) => (await request<{ rows: readonly SnapshotRow[] }>(`${runRoute(runId)}/unchanged`)).rows;
 export const fetchDiff = (current: string, golden: string, signal: AbortSignal) => request<PixelDiff>(`/diffs/${current}/${golden}`, { signal });

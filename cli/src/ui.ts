@@ -5,13 +5,13 @@ import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
 import { isBuiltStorybook } from "selfie-ui/local";
 import { keptStorybookPath } from "selfie-ui/api";
-import { storybookHash, readStoriesInOrder, readStoryIndex } from "selfie-render";
+import { storybookHash, readStoriesInOrder, readStoryIndex, storiesInIndex, type StoryEntry } from "selfie-render";
 import type { AcceptOutcome, DecisionTarget, FeedbackView, NewNote, ReviewSource, RunView, SnapshotRow, StoriesView, StorybookLink, StorySetup } from "selfie-ui/app";
 import { resolveRenderSettings, resolveRegionMergeDistance } from "./config.ts";
 import { accept, checkAccept, decide } from "./decisions.ts";
 import { diffToPng, type PixelDiff } from "./diff.ts";
 import { SelfieError } from "./errors.ts";
-import { currentBranch, dirtyPaths, gitUserEmail, headMovedAt, type BaselineSearch } from "./git.ts";
+import { currentBranch, dirtyPaths, gitUserEmail, headMovedAt, headSha, type BaselineSearch } from "./git.ts";
 import { isOpenNote } from "selfie-ui/notes";
 import { sentNotes, textForAgent } from "./notes.ts";
 import { branchGoldens, compareAsReviewed, compareAsShown, findBaseline, readReviewCache, requireRun, runsAtHead, type Project } from "./project.ts";
@@ -74,6 +74,30 @@ export function localReviewSource(
     return goldens === null ? null : keptStorybookUrl(goldens);
   };
 
+  /** A kept built Storybook's stories, which never change, or nothing if it can't say. */
+  const keptIndexes = new Map<string, Promise<readonly StoryEntry[]>>();
+  const storiesOfKept = (hash: string) => {
+    let index = keptIndexes.get(hash);
+    if (index === undefined) {
+      index = project.storybooks.readFile(hash, "index.json").then(
+        (bytes) => (bytes === null ? [] : storiesInIndex(JSON.parse(new TextDecoder().decode(bytes)), "a kept index.json")),
+        () => [],
+      ).catch(() => []);
+      keptIndexes.set(hash, index);
+    }
+    return index;
+  };
+
+  /** What the run's own Storybook calls its stories, then what its goldens' called those it no longer has. */
+  const storyNamesFor = async (run: Run, goldensSha: string | null, stories: ReadonlySet<string>) => {
+    const goldens = goldensSha === null ? null : await snapshots.acceptedRunAt(goldensSha, run.environment);
+    const kept = await Promise.all([run.id, goldens].map((id) => (id === null ? null : project.storybooks.keptStorybookOfRun(id))));
+    const entries = (await Promise.all(kept.map((hash) => (hash === null ? [] : storiesOfKept(hash))))).flat();
+    const named = new Map<string, StoryEntry>();
+    for (const entry of entries) if (stories.has(entry.id) && !named.has(entry.id)) named.set(entry.id, entry);
+    return [...named.values()].map(({ id: story, title, name }) => ({ story, title, name }));
+  };
+
   /** A corrupt cache costs only pixel stats in a list, so it isn't worth failing a page over. */
   const cachedDiffs = async (runId: string): Promise<ReadonlyMap<string, PixelDiff>> => {
     const cache = await readReviewCache(project, runId).catch(() => null);
@@ -99,6 +123,10 @@ export function localReviewSource(
     const checked = onBranch === null ? summary : summarizeRun(reviewed);
     const notRendered = new Set(summary.notRendered.map(({ story }) => story));
     const { refusals, usableAsBaseline, removals } = await checkAccept(project, reviewed);
+    const rows = await toRows(
+      run.id,
+      comparison.snapshots.filter(({ story }) => !notRendered.has(story)),
+    );
     return {
       run,
       storybook: await storybookFor(run.id),
@@ -111,10 +139,8 @@ export function localReviewSource(
       blockers: checked.blockers,
       advisories: summary.advisories,
       counts: { ...summary.counts, undecided: checked.counts.undecided, failed: summary.failed.length },
-      rows: await toRows(
-        run.id,
-        comparison.snapshots.filter(({ story }) => !notRendered.has(story)),
-      ),
+      rows,
+      storyNames: await storyNamesFor(run, onBranch ?? run.baselineSha, new Set(rows.map(({ story }) => story))),
       refusals,
       removals,
       usableAsBaseline,
@@ -264,6 +290,12 @@ export function localReviewSource(
     async baseline(runId) {
       const run = await requireRun(project, runId);
       return baselineNote(await findBaseline(project, run.environment));
+    },
+
+    async runContext(runId) {
+      const run = await requireRun(project, runId);
+      const [head, branch, { mergeBase, defaultBranch }] = await Promise.all([headSha(repo), currentBranch(repo), findBaseline(project, run.environment)]);
+      return { head, branch, mergeBase, defaultBranch };
     },
 
     async unchanged(runId) {

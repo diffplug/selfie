@@ -1,11 +1,16 @@
 import { Heading } from "@primer/react";
-import { useLayoutEffect, useRef, type ReactNode } from "react";
+import { useLayoutEffect, useMemo, useRef, type ReactNode } from "react";
+import { findRenames } from "../shared/renames.ts";
+import { fetchRunContext } from "./api.ts";
 import { AcceptScreen } from "./AcceptScreen.tsx";
 import { DetailScreen } from "./DetailScreen.tsx";
 import { FeedbackBar, NewerRunBanner } from "./Feedback.tsx";
-import { useFeedback, useRun } from "./hooks.ts";
+import { useFeedback, useFetched, useRun } from "./hooks.ts";
 import { StoriesRoutes } from "./StoriesScreen.tsx";
+import { StoryNavLayout } from "./StoryNav.tsx";
+import { differingStories } from "./storyTree.ts";
 import { AppLink, parseRoute, storyPath, useLocation, type Route } from "./router.tsx";
+import { PageFactsLine, PageFactsProvider, usePageFacts } from "./PageFacts.tsx";
 import { RunScreen } from "./RunScreen.tsx";
 import { LoadFailure, Loading, NotFound } from "./Status.tsx";
 
@@ -13,6 +18,12 @@ import { LoadFailure, Loading, NotFound } from "./Status.tsx";
 function RunRoutes({ runId, route, search }: { runId: string; route: Route; search: string }) {
   const state = useRun(runId);
   const feedback = useFeedback();
+  const { data: context } = useFetched(runId, (signal) => fetchRunContext(runId, signal));
+  const { view } = state;
+  usePageFacts(view === null ? null : { kind: "diff", run: view.run, branchGoldens: view.branchGoldens, context });
+  const rows = view?.rows;
+  const renames = useMemo(() => findRenames(rows ?? []), [rows]);
+  const stories = useMemo(() => (view === null ? [] : differingStories(view, renames)), [view, renames]);
   // Where to put focus on coming back to the list.
   const lastStory = useRef<string | null>(null);
   if (state.view === null) {
@@ -20,7 +31,15 @@ function RunRoutes({ runId, route, search }: { runId: string; route: Route; sear
   }
   if (route.kind === "story") lastStory.current = route.story;
   return (
-    <>
+    <StoryNavLayout
+      stories={stories}
+      story={route.kind === "story" ? route.story : null}
+      search={search}
+      hrefOf={(story, query) => storyPath(runId, story, query)}
+      renames={renames}
+      startOpen
+      emptyWords="Nothing differs."
+    >
       {/* The run's screen has its own banner for the newest at its commit, so this one isn't said twice. */}
       {(route.kind !== "run" || feedback.view?.latestRunId !== state.view.siblings.find(({ status }) => status !== "recording")?.id) && (
         <NewerRunBanner latestRunId={feedback.view?.latestRunId} runId={runId} story={route.kind === "story" ? route.story : null} />
@@ -33,7 +52,7 @@ function RunRoutes({ runId, route, search }: { runId: string; route: Route; sear
       ) : (
         <RunScreen state={state} view={state.view} search={search} returningFrom={lastStory} />
       )}
-    </>
+    </StoryNavLayout>
   );
 }
 
@@ -41,14 +60,25 @@ function RunRoutes({ runId, route, search }: { runId: string; route: Route; sear
 export function Page({ children }: { readonly children: ReactNode }) {
   return (
     <div className="selfie-page">
-      <header className="selfie-header">
-        <Heading as="h1" className="selfie-brand">
-          <AppLink href="/" muted>
-            Selfie review
-          </AppLink>
-        </Heading>
-      </header>
-      <main className="selfie-main">{children}</main>
+      <PageFactsProvider>
+        {(facts) => (
+          <>
+            <header className="selfie-header">
+              <Heading as="h1" className="selfie-brand">
+                <AppLink href="/" muted>
+                  Selfie
+                </AppLink>
+              </Heading>
+              {facts !== null && (
+                <span className="selfie-header-facts">
+                  <PageFactsLine facts={facts} />
+                </span>
+              )}
+            </header>
+            <main className="selfie-main">{children}</main>
+          </>
+        )}
+      </PageFactsProvider>
     </div>
   );
 }

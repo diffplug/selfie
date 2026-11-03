@@ -1,5 +1,4 @@
 // The run: its facts, what blocks it, what to look at, and every difference, with bulk decisions.
-import { SearchIcon } from "@primer/octicons-react";
 import {
   Banner,
   Button,
@@ -13,16 +12,16 @@ import {
   Select,
   Stack,
   Text,
-  TextInput,
   useDetails,
   VisuallyHidden,
 } from "@primer/react";
 import { Blankslate, ScrollableRegion, Table } from "@primer/react/experimental";
-import { memo, useDeferredValue, useEffect, useMemo, useRef, useState, type ComponentProps, type MouseEvent, type RefObject } from "react";
+import { findRenames } from "../shared/renames.ts";
+import { memo, useDeferredValue, useEffect, useMemo, useState, type ComponentProps, type MouseEvent, type RefObject } from "react";
 import type { AdvisoryReason, BlockerReason, DecisionKind, RunView, SnapshotRow } from "../shared/api.ts";
 import { imageUrl } from "./api.ts";
 import { applyFilter, decidableIn, filterQuery, hasAdvisory, NO_FILTER, parseFilter, showQuery, SHOW_OPTIONS, targetsOf, type RowFilter, type Show } from "./filter.ts";
-import { useStoryListKeys, useTitle, type RunState } from "./hooks.ts";
+import { useStoryFocusKeys, useTitle, type RunState } from "./hooks.ts";
 import { Keys } from "./Keys.tsx";
 import { acceptPath, AppLink, AppLinkButton, followLink, navigate, runPath, storiesPath, storyPath } from "./router.tsx";
 import { ActionFailure, RunNotes } from "./RunNotes.tsx";
@@ -221,7 +220,7 @@ function Advisories({ view }: { view: RunView }) {
  * Its filter isn't a prop, so a keystroke re-renders only the rows it shows or hides: a click takes
  * the filter from the URL as it is by then.
  */
-const Row = memo(function Row({ row, runId }: { row: SnapshotRow; runId: string }) {
+const Row = memo(function Row({ row, runId, renamed }: { row: SnapshotRow; runId: string; renamed: string | undefined }) {
   const thumbnail = row.imageHash ?? row.goldenHash;
   return (
     <Table.Row>
@@ -236,11 +235,11 @@ const Row = memo(function Row({ row, runId }: { row: SnapshotRow; runId: string 
         <Link
           href={storyPath(runId, row.story)}
           onClick={(event: MouseEvent) => followLink(event, storyPath(runId, row.story, window.location.search))}
-          data-story={row.story}
           className="selfie-story-link"
         >
           {row.story}
         </Link>
+        {renamed !== undefined && <div className="selfie-muted selfie-small">{renamed}</div>}
       </Table.Cell>
       <Table.Cell>
         <StateLabel state={row.state} />
@@ -260,7 +259,13 @@ const Row = memo(function Row({ row, runId }: { row: SnapshotRow; runId: string 
   );
 });
 
-function StoriesTable({ rows, runId }: { rows: readonly SnapshotRow[]; runId: string }) {
+function StoriesTable({ rows, runId, renames }: { rows: readonly SnapshotRow[]; runId: string; renames: ReadonlyMap<string, string> }) {
+  const renamedTo = useMemo(() => new Map([...renames].map(([to, from]) => [from, to])), [renames]);
+  const renamedWords = (story: string) => {
+    const from = renames.get(story);
+    const to = renamedTo.get(story);
+    return from !== undefined ? `Renamed from ${from}` : to !== undefined ? `Renamed to ${to}` : undefined;
+  };
   return (
     <ScrollableRegion aria-labelledby="differences-heading">
       <Table aria-labelledby="differences-heading" cellPadding="condensed" gridTemplateColumns="80px minmax(200px, 1fr) 120px 170px 190px 130px">
@@ -278,7 +283,7 @@ function StoriesTable({ rows, runId }: { rows: readonly SnapshotRow[]; runId: st
         </Table.Head>
         <Table.Body>
           {rows.map((row) => (
-            <Row key={row.story} row={row} runId={runId} />
+            <Row key={row.story} row={row} runId={runId} renamed={renamedWords(row.story)} />
           ))}
         </Table.Body>
       </Table>
@@ -370,13 +375,11 @@ function Differences({
   view,
   filter,
   setFilter,
-  filterInput,
 }: {
   state: RunState;
   view: RunView;
   filter: RowFilter;
   setFilter: (filter: RowFilter, replace?: boolean) => void;
-  filterInput: RefObject<HTMLInputElement | null>;
 }) {
   const [pending, setPending] = useState<PendingBulk | null>(null);
 
@@ -386,6 +389,7 @@ function Differences({
     if (wantsUnchanged && unchanged === null) loadUnchanged();
   }, [wantsUnchanged, unchanged, loadUnchanged]);
 
+  const renames = useMemo(() => findRenames(view.rows), [view.rows]);
   const deferredFilter = useDeferredValue(filter);
   const source = deferredFilter.show === "unchanged" ? (unchanged ?? []) : view.rows;
   const shown = useMemo(() => applyFilter(source, deferredFilter), [source, deferredFilter]);
@@ -415,16 +419,6 @@ function Differences({
       </Stack>
       <Stack direction="horizontal" wrap="wrap" align="end" gap="normal">
         <FormControl>
-          <FormControl.Label>Filter by story</FormControl.Label>
-          <TextInput
-            ref={filterInput}
-            leadingVisual={SearchIcon}
-            value={filter.text}
-            placeholder="Press / to search"
-            onChange={(event) => setFilter({ ...filter, text: event.target.value }, true)}
-          />
-        </FormControl>
-        <FormControl>
           <FormControl.Label>Show</FormControl.Label>
           <Select value={filter.show} onChange={(event) => setFilter({ ...filter, show: event.target.value as Show })}>
             {SHOW_OPTIONS.map(([value, words]) => (
@@ -450,7 +444,7 @@ function Differences({
         <Keys keys="j" /> and <Keys keys="k" /> move through the list, <Keys keys="/" /> searches.
       </Text>
       {shown.length > 0 ? (
-        <StoriesTable rows={shown} runId={view.run.id} />
+        <StoriesTable rows={shown} runId={view.run.id} renames={renames} />
       ) : loadingUnchanged ? null : (
         <Blankslate border>
           <Blankslate.Heading as="h4">
@@ -484,7 +478,6 @@ export function RunScreen({
 }) {
   const { run, counts, refusals, acceptedRunId, removals } = view;
   const filter = useMemo(() => parseFilter(search), [search]);
-  const filterInput = useRef<HTMLInputElement>(null);
   const setFilter = (next: RowFilter, replace = false) => navigate(runPath(run.id, filterQuery(next)), { replace });
   const showInList = (show: Show) => {
     setFilter({ ...NO_FILTER, show });
@@ -499,7 +492,7 @@ export function RunScreen({
     document.querySelector<HTMLElement>(`[data-story="${CSS.escape(story)}"]`)?.focus();
   }, [returningFrom]);
 
-  useStoryListKeys(filterInput);
+  useStoryFocusKeys();
 
   useTitle(`Run at ${shortSha(run.gitSha)}`);
   const newest = view.siblings.find(({ status }) => status !== "recording");
@@ -554,7 +547,7 @@ export function RunScreen({
       )}
       <Blockers view={view} onShow={showInList} />
       <Advisories view={view} />
-      <Differences state={state} view={view} filter={filter} setFilter={setFilter} filterInput={filterInput} />
+      <Differences state={state} view={view} filter={filter} setFilter={setFilter} />
     </Stack>
   );
 }

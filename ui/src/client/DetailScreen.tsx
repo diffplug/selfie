@@ -3,6 +3,7 @@ import { ArrowLeftIcon, CheckIcon, XIcon } from "@primer/octicons-react";
 import { Banner, Button, Dialog, Heading, RelativeTime, Stack, Text } from "@primer/react";
 import { AriaStatus } from "@primer/react/experimental";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { findRenames } from "../shared/renames.ts";
 import { isDecidable } from "selfie-store";
 import type { DecisionKind, PixelDiff, RunView, SnapshotRow } from "../shared/api.ts";
 import { diffImageUrl, fetchDiff, imageUrl } from "./api.ts";
@@ -74,14 +75,28 @@ function PixelStats({ stats }: { stats: PixelDiff }) {
   );
 }
 
-function Notes({ row, diff }: { row: SnapshotRow; diff: PixelDiff | null }) {
+function Notes({ row, diff, renamedFrom, renamedTo }: { row: SnapshotRow; diff: PixelDiff | null; renamedFrom?: string | undefined; renamedTo?: string | undefined }) {
   return (
     <>
       {row.state === "failed" && (
         <Banner variant="critical" title="This story failed to render" description={<code className="selfie-pre">{row.failure ?? "No message was recorded."}</code>} />
       )}
-      {row.state === "new" && (
-        <Banner variant="info" title="New story" description="The baseline has no golden for it, so there's nothing to compare. Approving lets this image become its first golden." />
+      {row.state === "new" &&
+        (renamedFrom !== undefined ? (
+          <Banner
+            variant="info"
+            title="Renamed story"
+            description={
+              <>
+                This image is the very one <code>{renamedFrom}</code> has as its golden, and this run doesn't have that story. Approving lets this be its first golden under this name. Accepting still asks you to acknowledge that <code>{renamedFrom}</code> is gone.
+              </>
+            }
+          />
+        ) : (
+          <Banner variant="info" title="New story" description="The baseline has no golden for it, so there's nothing to compare. Approving lets this image become its first golden." />
+        ))}
+      {row.state === "removed" && renamedTo !== undefined && (
+        <Banner variant="info" title="Renamed story" description={<>The new story <code>{renamedTo}</code> has this very image, so it looks to have been renamed.</>} />
       )}
       {row.state === "removed" && (
         <Banner variant="warning" title="Removed story" description="The baseline has this golden, and this run doesn't have the story. There's no image to decide on: accepting asks you to acknowledge the removal." />
@@ -149,6 +164,7 @@ export function DetailScreen({
 }) {
   const { unchanged, loadUnchanged } = state;
   const filter = useMemo(() => parseFilter(search), [search]);
+  const renames = useMemo(() => findRenames(view.rows), [view.rows]);
   const inRows = view.rows.find((candidate) => candidate.story === story);
   const needsUnchanged = (filter.show === "unchanged" || inRows === undefined) && unchanged === null;
   useEffect(() => {
@@ -310,7 +326,7 @@ export function DetailScreen({
       {comparedWithNote ? (
         <Banner variant="info" title="Compared with the image when noted" description="This story has no golden, so what's shown is what's changed since its newest note. Approving lets this image become its first golden." />
       ) : (
-        <Notes row={row} diff={diff} />
+        <Notes row={row} diff={diff} renamedFrom={renames.get(row.story)} renamedTo={[...renames].find(([, from]) => from === row.story)?.[0]} />
       )}
       <LiveStories row={row} view={view} open={liveOpen} onToggle={() => setLiveOpen(!liveOpen)} />
       <ImageCompare row={row} diff={diff} scale={view.run.scale} groups={groups} selection={selection} runId={view.run.id} feedback={feedback} startNote={startNote} />

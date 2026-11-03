@@ -8,6 +8,7 @@ import { FeedbackBar } from "./Feedback.tsx";
 import { neighbors, parseFilter, positionWords } from "./filter.ts";
 import { useRender, useFeedback, useHotkeys, useRun, useStories, useStoryFocusKeys, useTitle, type RenderState, type FeedbackState, type RunState } from "./hooks.ts";
 import { Keys } from "./Keys.tsx";
+import { usePageFacts } from "./PageFacts.tsx";
 import { OpenInStorybook, StoryFrame, storyFrameUrl } from "./LiveStories.tsx";
 import { plural } from "./plural.ts";
 import { ActionFailedBanner } from "./RunNotes.tsx";
@@ -213,6 +214,7 @@ function OneStory({
 export function StoriesRoutes({ story, search }: { story: string | null; search: string }) {
   const feedback = useFeedback();
   const stories = useStories(feedback.view?.latestRunId);
+  usePageFacts(stories.view === null ? null : { kind: "view", view: stories.view });
   // Here, since each run a story is from has a page of its own.
   const liveStories = useState(false);
   const renders = useRender(stories.view?.canRender ?? false, stories.reload);

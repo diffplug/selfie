@@ -1,6 +1,6 @@
 // Stories as Storybook's own sidebar nests them, by the path in each one's title. Pure, so a test
 // needs no browser.
-import type { ListedStory } from "../shared/api.ts";
+import type { ListedStory, RunView } from "../shared/api.ts";
 
 export interface StoryFolder {
   readonly kind: "folder";
@@ -78,4 +78,30 @@ export function openedAround(closed: ReadonlySet<string>, entry: ListedStory | u
   const names = entry.title.split("/").filter(Boolean);
   names.forEach((_, at) => next.delete(names.slice(0, at + 1).join("/")));
   return next;
+}
+
+/** What a sidebar would call a story, from its ID alone, for when its built Storybook isn't kept. */
+export function nameFromId(story: string): { readonly title: string; readonly name: string } {
+  const [path = "", name = ""] = story.split("--");
+  const words = (text: string) => text.split("-").filter(Boolean).map((word) => word[0]!.toUpperCase() + word.slice(1)).join(" ");
+  return name === "" ? { title: "", name: words(path) } : { title: words(path), name: words(name) };
+}
+
+/** A run's differences as a tree's list, in its Storybook's order, with a renamed story there once, under its new name. */
+export function differingStories(
+  { run, rows, storyNames }: Pick<RunView, "run" | "rows" | "storyNames">,
+  renames: ReadonlyMap<string, string>,
+): readonly ListedStory[] {
+  const hidden = new Set(renames.values());
+  const order = new Map(storyNames.map(({ story }, at) => [story, at]));
+  const names = new Map(storyNames.map(({ story, title, name }) => [story, { title, name }]));
+  const at = (story: string) => order.get(story) ?? order.size;
+  return rows
+    .filter(({ state, story }) => state !== "unchanged" && !hidden.has(story))
+    .sort((a, b) => at(a.story) - at(b.story) || a.story.localeCompare(b.story))
+    .map(({ story, state, decision }) => ({
+      story,
+      ...(names.get(story) ?? nameFromId(story)),
+      render: { runId: run.id, state, decision, renderedAt: run.startedAt, dirty: false, fromHostedStorybook: null },
+    }));
 }

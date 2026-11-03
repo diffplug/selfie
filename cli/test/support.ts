@@ -150,6 +150,8 @@ const templateRepo = () =>
     git(repo, "config", "user.email", "tester@example.com");
     git(repo, "config", "user.name", "Tester");
     git(repo, "config", "commit.gpgsign", "false");
+    // A commit starts this in the background, whose lock file could vanish in the middle of a copy.
+    git(repo, "config", "maintenance.auto", "false");
     await commit(repo, "first");
     return repo;
   })());

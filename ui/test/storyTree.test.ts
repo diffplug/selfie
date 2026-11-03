@@ -1,6 +1,6 @@
-import { expect, test } from "vitest";
+import { describe, expect, test } from "vitest";
 import type { ListedStory } from "../src/shared/api.ts";
-import { buildStoryTree, initiallyClosed, isSection, openedAround, storiesIn, visibleRows, type StoryFolder } from "../src/client/storyTree.ts";
+import { buildStoryTree, differingStories, initiallyClosed, nameFromId, isSection, openedAround, storiesIn, visibleRows, type StoryFolder } from "../src/client/storyTree.ts";
 
 const story = (title: string, name: string): ListedStory => ({ story: `${title}--${name}`.toLowerCase(), title, name, render: null });
 const labels = (nodes: ReturnType<typeof visibleRows>) => nodes.map((row) => `${" ".repeat(row.depth)}${row.kind === "folder" ? row.name : row.entry.name}`);
@@ -47,4 +47,28 @@ test("opens the way to a story, and leaves the rest as they were", () => {
   const closed = new Set(["A", "A/B", "A/B/C", "D"]);
   expect([...openedAround(closed, story("A/B", "One"))]).toEqual(["A/B/C", "D"]);
   expect(openedAround(closed, undefined)).toBe(closed);
+});
+
+test("names a story from its ID when nothing else says", () => {
+  expect(nameFromId("screens-accept--ready-now")).toEqual({ title: "Screens Accept", name: "Ready Now" });
+  expect(nameFromId("plain")).toEqual({ title: "", name: "Plain" });
+});
+
+describe("a run's differences", () => {
+  const row = (story: string, state: string) => ({ story, state, decision: null }) as never;
+  const run = { id: "r", startedAt: 1 } as never;
+  const stories = (rows: never[], storyNames: never[] = [], renames: ReadonlyMap<string, string> = new Map()) => differingStories({ run, rows, storyNames }, renames).map(({ story }) => story);
+
+  test("leave out what's unchanged, as one with only a play error is", () => {
+    expect(stories([row("a", "changed"), row("b", "unchanged"), row("c", "new"), row("d", "removed"), row("e", "failed")])).toEqual(["a", "c", "d", "e"]);
+  });
+
+  test("are in the Storybook's order, then by ID where it doesn't say", () => {
+    const named = [{ story: "z", title: "Z", name: "Z" }, { story: "m", title: "M", name: "M" }] as never[];
+    expect(stories([row("a", "changed"), row("m", "changed"), row("z", "changed")], named)).toEqual(["z", "m", "a"]);
+  });
+
+  test("have a renamed story once, under its new name", () => {
+    expect(stories([row("new", "new"), row("old", "removed")], [], new Map([["new", "old"]]))).toEqual(["new"]);
+  });
 });

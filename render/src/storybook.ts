@@ -27,6 +27,11 @@ export async function readStoriesInOrder(storybookDir: string): Promise<StoryEnt
       `Can't read a Storybook index at ${file}: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
+  return storiesInIndex(parsed, file);
+}
+
+/** The stories in a parsed `index.json`, in its order. `file` says where it's from, for an error. */
+export function storiesInIndex(parsed: unknown, file: string): StoryEntry[] {
   const entries = (parsed as { entries?: unknown } | null)?.entries;
   if (entries === null || typeof entries !== "object")
     throw new RenderError(`${file} has no "entries" object. Selfie needs Storybook 7 or later.`);

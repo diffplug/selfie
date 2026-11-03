@@ -7,6 +7,17 @@ import { BLUE, commit, git } from "./support.ts";
 import { UNKNOWN_HASH, UNKNOWN_RUN, h, project, review, get, decideOn, acceptRun, viewOf, makeGoldens } from "./ui-support.ts";
 
 describe("which run", () => {
+  test("says where a run stands against this checkout, and what its baseline is to it", async () => {
+    h.stories = [{ id: "a" }];
+    const { runId } = (await review()).json;
+    const head = git(h.repo, "rev-parse", "HEAD");
+    expect(await (await get(`/api/runs/${runId}/context`)).json()).toEqual({ head, branch: "main", mergeBase: head, defaultBranch: "main" });
+    git(h.repo, "checkout", "--quiet", "-b", "topic");
+    const moved = await commit(h.repo, "on a branch");
+    expect(await (await get(`/api/runs/${runId}/context`)).json()).toEqual({ head: moved, branch: "topic", mergeBase: head, defaultBranch: "main" });
+    expect((await get(`/api/runs/${UNKNOWN_RUN}/context`)).status).toBe(404);
+  });
+
   const newest = async () => ((await (await get("/api/stories")).json()) as StoriesView);
 
   test("says the commit, with no run yet", async () => {
