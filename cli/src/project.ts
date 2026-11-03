@@ -28,6 +28,9 @@ export interface Renders {
   readonly find: (identity: string) => Promise<string | null>;
   /** Remembers a run for it, or with null forgets what was. */
   readonly remember: (identity: string, runId: string | null) => Promise<void>;
+  /** The hash of the build that rendered a run, or null if that isn't known. */
+  readonly buildOf: (runId: string) => Promise<string | null>;
+  readonly rememberBuild: (runId: string, build: string) => Promise<void>;
 }
 
 function rendersIn(sql: Sql): Renders {
@@ -51,6 +54,17 @@ ON CONFLICT(key) DO UPDATE SET run_id = excluded.run_id`,
               idempotent: true,
             },
       );
+    },
+    async buildOf(runId) {
+      const [row] = await sql.run({ sql: "SELECT build FROM run_builds WHERE run_id = ?1", params: [runId], idempotent: true });
+      return (row?.build as string | undefined) ?? null;
+    },
+    async rememberBuild(runId, build) {
+      await sql.run({
+        sql: "INSERT INTO run_builds(run_id, build) VALUES (?1, ?2) ON CONFLICT(run_id) DO UPDATE SET build = excluded.build",
+        params: [runId, build],
+        idempotent: true,
+      });
     },
   };
 }
@@ -78,6 +92,7 @@ export async function openProject({ cwd, env }: { cwd: string; env: NodeJS.Proce
   const sql = new Sql(adapter);
   await initStoreSchema(sql);
   await sql.run({ sql: "CREATE TABLE IF NOT EXISTS render_keys (key TEXT PRIMARY KEY, run_id TEXT NOT NULL) WITHOUT ROWID" });
+  await sql.run({ sql: "CREATE TABLE IF NOT EXISTS run_builds (run_id TEXT PRIMARY KEY, build TEXT NOT NULL) WITHOUT ROWID" });
   for (const statement of CREATE_NOTES_TABLES) await sql.run({ sql: statement });
   return {
     cwd,

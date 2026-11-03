@@ -8,7 +8,7 @@ export {
   type NativeRunner,
   type RenderEnvironment,
 } from "./environment.ts";
-export { renderIdentity } from "./identity.ts";
+export { buildHash, renderIdentity } from "./identity.ts";
 export {
   MANIFEST_FILE,
   type Manifest,

@@ -128,6 +128,7 @@ export function viewOf(
   ];
   return {
     run,
+    storybook: null,
     branchGoldens: null,
     regionMergeDistance: 12,
     acceptedRunId: null,

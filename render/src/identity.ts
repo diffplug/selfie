@@ -50,6 +50,14 @@ async function hashTree(
 }
 
 /**
+ * A build's own files, however it came to be built: what the same build always hashes to. Null
+ * if it's missing, or holds a symlink.
+ */
+export function buildHash(storybookDir: string): Promise<string | null> {
+  return hashTree(storybookDir, withoutVolatileText).catch(() => null);
+}
+
+/**
  * Changes whenever a render of this build could: its bytes, the environment, the init script, or
  * the renderer's own code, which also covers its defaults, and which a package version wouldn't
  * in a checkout. Null if a render can't be recognized: a native machine's ID doesn't describe all
@@ -65,7 +73,7 @@ export async function renderIdentity({
   readonly initScript?: string | undefined;
 }): Promise<string | null> {
   if (environment.runner.kind !== "container") return null;
-  const build = await hashTree(storybookDir, withoutVolatileText).catch(() => null);
+  const build = await buildHash(storybookDir);
   if (build === null) return null;
   const renderer = await hashTree(fileURLToPath(new URL(".", import.meta.url)));
   return sha256(JSON.stringify([build, environmentId(environment), initScriptHash(initScript), renderer]));

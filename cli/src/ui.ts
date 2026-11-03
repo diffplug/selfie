@@ -1,8 +1,11 @@
 // The review UI's window on a local repository: the library, as the shape its routes want. Nothing
 // here renders, so the UI only reads what `selfie review` recorded and records decisions on it.
 import type { Comparison, DecisionKind } from "selfie-store";
-import type { AcceptOutcome, CurrentView, DecisionTarget, FeedbackView, NewNote, ReviewSource, RunView, SnapshotRow } from "selfie-ui/app";
+import { stat } from "node:fs/promises";
 import path from "node:path";
+import { buildHash } from "selfie-render";
+import { isBuiltStorybook } from "selfie-ui/local";
+import type { AcceptOutcome, CurrentView, DecisionTarget, FeedbackView, NewNote, ReviewSource, RunView, SnapshotRow, StorybookLink } from "selfie-ui/app";
 import { resolveCaptureSettings, resolveRegionMergeDistance } from "./config.ts";
 import { accept, checkAccept, decide } from "./decisions.ts";
 import { diffToPng, type PixelDiff } from "./diff.ts";
@@ -18,8 +21,25 @@ const DIFFS_KEPT = 32;
 
 const baselineNote = ({ sha, message }: BaselineSearch) => ({ sha, message });
 
-export function localReviewSource(project: Project, { native }: { readonly native?: boolean | undefined } = {}): ReviewSource {
+export function localReviewSource(
+  project: Project,
+  { native, storybook }: { readonly native?: boolean | undefined; readonly storybook?: { readonly dir: string; readonly url: string } | undefined } = {},
+): ReviewSource {
   const { snapshots, store, repo } = project;
+
+  /** Hashing a whole build is too slow for every view, and a rebuild rewrites these. */
+  let knownBuild: { readonly stamp: string; readonly hash: Promise<string | null> } | null = null;
+  const hostedBuild = async (dir: string): Promise<string | null> => {
+    const stamp = (await Promise.all(["iframe.html", "index.json"].map((file) => stat(path.join(dir, file)).then(({ mtimeMs }) => mtimeMs, () => null)))).join();
+    if (knownBuild?.stamp !== stamp) knownBuild = { stamp, hash: buildHash(dir) };
+    return knownBuild.hash;
+  };
+
+  const storybookFor = async (runId: string): Promise<StorybookLink | null> => {
+    if (storybook === undefined || !isBuiltStorybook(storybook.dir)) return null;
+    const [hosted, rendered] = await Promise.all([hostedBuild(storybook.dir), project.renders.buildOf(runId)]);
+    return { url: storybook.url, renderedThisRun: hosted === null || rendered === null ? null : hosted === rendered };
+  };
 
   /** A corrupt cache costs only pixel stats in a list, so it isn't worth failing a page over. */
   const cachedDiffs = async (runId: string): Promise<ReadonlyMap<string, PixelDiff>> => {
@@ -48,6 +68,7 @@ export function localReviewSource(project: Project, { native }: { readonly nativ
     const { refusals, usableAsBaseline, removals } = await checkAccept(project, reviewed);
     return {
       run,
+      storybook: await storybookFor(run.id),
       branchGoldens: onBranch,
       regionMergeDistance: await resolveRegionMergeDistance(repo),
       acceptedRunId: await snapshots.acceptedRunAt(run.gitSha, run.environment),

@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { serve, type ServerType } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono, type MiddlewareHandler } from "hono";
+import { secureHeaders } from "hono/secure-headers";
 import type { ReviewSource } from "../shared/api.ts";
 import { createReviewApi, failure, pageHeaders, sameOriginWrites } from "./app.ts";
 
@@ -34,6 +35,39 @@ function cacheAs(value: string): MiddlewareHandler {
     await next();
     if (context.res.ok) context.res.headers.set("Cache-Control", value);
   };
+}
+
+/**
+ * Headers for a hosted Storybook, which loads its own preview in a frame and runs inline scripts, so
+ * the review page's are too strict for it. The port is what keeps it from the review API.
+ */
+const storybookHeaders = secureHeaders({
+  contentSecurityPolicy: { frameAncestors: ["'self'"] },
+  crossOriginResourcePolicy: "same-origin",
+  referrerPolicy: "no-referrer",
+  xFrameOptions: "SAMEORIGIN",
+  strictTransportSecurity: false,
+});
+
+/** What a built Storybook has, so that a directory that isn't one is never served. */
+export const isBuiltStorybook = (dir: string): boolean => existsSync(path.join(dir, "iframe.html"));
+
+/**
+ * A built Storybook, read only, ready for any Hono caller. It's the code of whatever branch was
+ * built, so it must never share an origin with the review API (`docs/specs/access.md`).
+ */
+export function createStorybookApp({ dir, port }: { readonly dir: string; readonly port: () => number }): Hono {
+  const app = new Hono();
+  app.use(storybookHeaders);
+  app.use(loopbackHosts(port));
+  app.use(cacheAs("no-store"));
+  app.use(async (context, next) => {
+    if (context.req.method !== "GET" && context.req.method !== "HEAD") return context.text("Only to read.", 405);
+    if (!isBuiltStorybook(dir)) return context.text("There's no built Storybook here.", 404);
+    return next();
+  });
+  app.use("*", serveStatic({ root: dir }));
+  return app;
 }
 
 /** The whole local app, ready for any Hono caller, which lets a test skip the socket. */
@@ -69,7 +103,7 @@ export interface LocalServer {
 /** Listens on loopback only. `port` 0 asks the system for a free one. */
 export async function serveLocal({
   source,
-  port: requested,
+  port,
   clientDir = CLIENT_DIR,
 }: {
   readonly source: ReviewSource;
@@ -81,8 +115,17 @@ export async function serveLocal({
       code: "ui-not-built",
     });
   }
+  return listen(port, (actual) => createLocalApp({ source, port: actual, clientDir }));
+}
+
+/** Hosts a built Storybook on a free loopback port, whether or not it has been built yet. */
+export function serveStorybook({ dir }: { readonly dir: string }): Promise<LocalServer> {
+  return listen(0, (actual) => createStorybookApp({ dir, port: actual }));
+}
+
+async function listen(requested: number, appFor: (port: () => number) => Hono): Promise<LocalServer> {
   let port = requested;
-  const app = createLocalApp({ source, port: () => port, clientDir });
+  const app = appFor(() => port);
   const server = await new Promise<ServerType>((resolve, reject) => {
     const listening = serve({ fetch: app.fetch, hostname: LOOPBACK, port: requested }, (info) => {
       port = info.port;
