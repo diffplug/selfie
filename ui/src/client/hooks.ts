@@ -220,7 +220,7 @@ export function useRegionSelection(story: string): RegionSelection {
 
 export function useTitle(title: string): void {
   useEffect(() => {
-    document.title = `${title} - Selfie review`;
+    document.title = `${title} - Selfie`;
   }, [title]);
 }
 
