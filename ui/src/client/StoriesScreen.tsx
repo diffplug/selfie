@@ -15,6 +15,7 @@ import { OpenInStorybook, StoryFrame, storyFrameUrl } from "./LiveStories.tsx";
 import { plural } from "./plural.ts";
 import { ActionFailedBanner } from "./RunNotes.tsx";
 import { anyStoryPath, AppLink, followLink, navigate, runPath, storiesPath } from "./router.tsx";
+import { listsStories, Setup, setupStage } from "./Setup.tsx";
 import { LoadFailure, Loading } from "./Status.tsx";
 import { buildStoryTree, isSection, storiesIn, visibleRows, type StoryFolder } from "./storyTree.ts";
 import { DecisionLabel, shortSha, StateLabel } from "./words.tsx";
@@ -129,13 +130,14 @@ export function CaptureStatus({ capture }: { capture: CaptureState }) {
 /** Whether a capture is missing or known to be out of date, which is what's left to fan out to. */
 const needsCapture = ({ capture }: ListedStory) => capture === null || capture.fromHostedBuild === false;
 
-export function StoriesScreen({ view, search, capture }: { view: StoriesView; search: string; capture: CaptureState }) {
+export function StoriesScreen({ view, search, capture, recheck }: { view: StoriesView; search: string; capture: CaptureState; recheck: () => void }) {
   useTitle("Every story");
   const filter = useMemo(() => parseFilter(search), [search]);
   const input = useRef<HTMLInputElement>(null);
   const shown = useMemo(() => matching(view.stories, filter.text), [view.stories, filter.text]);
   const captured = view.stories.filter((entry) => entry.capture !== null).length;
   const rest = view.stories.filter(needsCapture);
+  const stage = setupStage(view);
 
   useStoryListKeys(input);
 
@@ -153,44 +155,49 @@ export function StoriesScreen({ view, search, capture }: { view: StoriesView; se
         </Heading>
         <Stack direction="horizontal" align="center" gap="condensed">
           {view.newestRunId !== null && <AppLink href={runPath(view.newestRunId)}>Review the newest run</AppLink>}
-          {capture.can && rest.length > 0 && (
+          {capture.can && stage === null && rest.length > 0 && (
             <Button variant="primary" disabled={capture.capturing > 0} onClick={() => void capture.capture(rest.map(({ story }) => story))}>
               {`Capture the rest (${rest.length.toLocaleString()})`}
             </Button>
           )}
         </Stack>
       </Stack>
-      {view.storybookUrl === null && (
+      {stage !== null && <Setup view={view} stage={stage} capture={capture} recheck={recheck} />}
+      {stage === null && view.storybookUrl === null && (
         <Banner
           variant="warning"
           title="There's no built Storybook here"
           description="Only what's been captured is listed. Build one, or point selfie ui at it with --storybook-dir, to see every story running."
         />
       )}
-      <Text as="p" className="selfie-muted" role="status">
-        {captured.toLocaleString()} of {plural(view.stories.length, "story", "stories")} captured at this commit. <Keys keys="j" /> and <Keys keys="k" /> move through the list, <Keys keys="/" /> searches.
-      </Text>
-      <FormControl>
-        <FormControl.Label>Filter by story</FormControl.Label>
-        <TextInput
-          ref={input}
-          leadingVisual={SearchIcon}
-          value={filter.text}
-          placeholder="Press / to search"
-          onChange={(event) => navigate(storiesPath(filterQuery({ ...NO_FILTER, text: event.target.value })), { replace: true })}
-        />
-      </FormControl>
-      {shown.length > 0 ? (
-        <StoryTree stories={shown} search={search} filtering={filter.text !== ""} />
-      ) : (
-        <Blankslate border>
-          <Blankslate.Heading as="h3">{filter.text === "" ? "No stories yet" : "Nothing matches this filter"}</Blankslate.Heading>
-          {filter.text !== "" && (
-            <Stack direction="horizontal" justify="center">
-              <Button onClick={() => navigate(storiesPath())}>Clear the filter</Button>
-            </Stack>
+      {listsStories(stage) && (
+        <>
+          <Text as="p" className="selfie-muted" role="status">
+            {captured.toLocaleString()} of {plural(view.stories.length, "story", "stories")} captured at this commit. <Keys keys="j" /> and <Keys keys="k" /> move through the list, <Keys keys="/" /> searches.
+          </Text>
+          <FormControl>
+            <FormControl.Label>Filter by story</FormControl.Label>
+            <TextInput
+              ref={input}
+              leadingVisual={SearchIcon}
+              value={filter.text}
+              placeholder="Press / to search"
+              onChange={(event) => navigate(storiesPath(filterQuery({ ...NO_FILTER, text: event.target.value })), { replace: true })}
+            />
+          </FormControl>
+          {shown.length > 0 ? (
+            <StoryTree stories={shown} search={search} filtering={filter.text !== ""} />
+          ) : (
+            <Blankslate border>
+              <Blankslate.Heading as="h3">{filter.text === "" ? "No stories yet" : "Nothing matches this filter"}</Blankslate.Heading>
+              {filter.text !== "" && (
+                <Stack direction="horizontal" justify="center">
+                  <Button onClick={() => navigate(storiesPath())}>Clear the filter</Button>
+                </Stack>
+              )}
+            </Blankslate>
           )}
-        </Blankslate>
+        </>
       )}
     </Stack>
   );
@@ -365,7 +372,7 @@ export function StoriesRoutes({ story, search }: { story: string | null; search:
       <FeedbackBar feedback={feedback} storyHref={(name) => anyStoryPath(name)} showList={story === null} />
       <CaptureStatus capture={capture} />
       {story === null ? (
-        <StoriesScreen view={stories.view} search={search} capture={capture} />
+        <StoriesScreen view={stories.view} search={search} capture={capture} recheck={stories.reload} />
       ) : (
         <OneStory
           view={stories.view}

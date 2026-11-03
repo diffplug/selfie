@@ -293,7 +293,8 @@ export interface CaptureState {
   readonly capturing: number;
   readonly error: RequestError | null;
   readonly clearError: () => void;
-  readonly capture: (stories: readonly string[]) => Promise<void>;
+  /** Says whether it worked. If it didn't, `error` says why. */
+  readonly capture: (stories: readonly string[]) => Promise<boolean>;
 }
 
 /** Asks the server to capture stories, and reads every story again once it has. */
@@ -311,8 +312,10 @@ export function useCapture(can: boolean, onCaptured: () => void): CaptureState {
       try {
         await postCapture(stories);
         onCaptured();
+        return true;
       } catch (failed) {
         setError(asRequestError(failed));
+        return false;
       } finally {
         setCapturing(0);
       }

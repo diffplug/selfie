@@ -825,10 +825,18 @@ describe("selfie ui", () => {
       expect(await exit).toBe(0);
     });
 
-    test("says what to do if there's nothing to show, or the build fails", async () => {
-      const none = await bare("--storybook-dir", path.join(h.scratch, "nothing-here"));
-      expect(await none.exit).toBe(2);
-      expect(none.json().error).toMatchObject({ code: "no-stories", message: expect.stringContaining("buildCommand") });
+    test("with no build yet, still serves, for the page to say what to do", async () => {
+      const { stop, exit, json, stderr } = await bare("--storybook-dir", path.join(h.scratch, "nothing-here"));
+      expect(stderr()).toContain("There's no built Storybook");
+      expect(opened).toEqual([json().url]);
+      const { canCapture, setup } = (await (await fetch(`${json().url}api/stories`)).json()) as StoriesView;
+      expect(canCapture).toBe(false);
+      expect(setup?.buildCommand).toBeNull();
+      stop.abort();
+      expect(await exit).toBe(0);
+    });
+
+    test("says so if the build fails", async () => {
       await config({ buildCommand: "exit 3" });
       const failing = await bare();
       expect(await failing.exit).toBe(2);
@@ -1203,6 +1211,26 @@ describe("the hosted Storybook", () => {
       const view = await live();
       expect(view.storybookUrl).toBeNull();
       expect(view.stories.map(({ story }) => story)).toEqual(["a"]);
+    });
+
+    test("says where saving a first story stands", async () => {
+      expect((await live()).setup).toEqual({ storybookDir: expect.any(String), buildCommand: null, uncommitted: [], usesDocker: true });
+      await writeFile(path.join(h.repo, "changed.txt"), "not committed");
+      expect((await live()).setup?.uncommitted).toEqual(["changed.txt"]);
+      await writeFile(path.join(h.repo, "selfie.config.json"), JSON.stringify({ buildCommand: "make stories" }));
+      expect((await live()).setup?.buildCommand).toBe("make stories");
+    });
+
+    test("can't capture with no commit to keep it with, nor say more than a server that hosts nothing knows", async () => {
+      expect((await localReviewSource(project).storiesView()).setup).toBeNull();
+      await withStories("a");
+      const record = async () => "r";
+      expect((await localReviewSource(project, { storybook: { dir, url: hostedAt, record } }).storiesView()).canCapture).toBe(true);
+      const empty = path.join(h.scratch, "no-commits");
+      git(h.scratch, "init", "--quiet", "--initial-branch=main", empty);
+      const uncommitted = await openProject({ cwd: empty, env: { SELFIE_HOME: h.home } });
+      const view = await localReviewSource(uncommitted, { storybook: { dir, url: hostedAt, record } }).storiesView();
+      expect(view).toMatchObject({ head: null, canCapture: false });
     });
 
     test("answers at /api/stories", async () => {

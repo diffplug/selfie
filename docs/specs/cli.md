@@ -11,7 +11,7 @@ Source of truth: `cli/src/cli.ts`, `cli/src/document.ts`; the real binary's test
 
 | Command | Does |
 |---|---|
-| `selfie` | Opens every story of a built Storybook, running, to look at and write notes on ([selfie alone](#selfie-alone)) |
+| `selfie` | Opens every story of a built Storybook, running, to look at, save, and write notes on, or says how to get there ([selfie alone](#selfie-alone)) |
 | `selfie record` | Always renders a built Storybook and records a run, and judges nothing |
 | `selfie review [<run>]` | Prints the diff of a run against its baseline. With no run, uses the one for this build, and records one [only if necessary](#recording-only-if-necessary) |
 | `selfie approve <run>`, `selfie reject <run>` | Records a decision on a run's changed and new images, with `--all` or `--story <pattern>` |
@@ -276,7 +276,7 @@ Source of truth: `openEveryStory` in `cli/src/cli.ts`; tests in `cli/test/ui.tes
 It's [`selfie ui`](#ui) with no run, except as below.
 
 - **Must run the config's `buildCommand` first, once, unless `--no-build`** ([Configuration](#configuration)).
-- **Must fail with `no-stories` and exit 2, saying what to do, if there's no built Storybook after that.**
+- **Must serve anyway if there's no built Storybook after that**, saying so on stderr, since the page says what to do (`docs/specs/ui.md` → Screens). A build command that fails still fails with `build-failed` and exit 2.
 - **Must open a browser at its URL if it's at a terminal, unless `--no-open`, and never for anything else**, such as an agent or a script (rationale).
 - **Must say on stderr what address it's serving**, since a browser may not open.
 

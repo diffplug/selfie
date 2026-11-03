@@ -29,6 +29,7 @@ const view = (stories: readonly ListedStory[], overrides: Partial<StoriesView> =
   stories,
   newestRunId: RUN_ID,
   canCapture: true,
+  setup: { storybookDir: "storybook-static", buildCommand: null, uncommitted: [], usesDocker: true },
   ...overrides,
 });
 
@@ -42,22 +43,35 @@ const MIXED = view([
   uncaptured("pages-settings--account"),
 ]);
 
-const screens = { title: "Screens/Every story", component: StoriesScreen } satisfies Meta<typeof StoriesScreen>;
+const screens = { title: "Screens/Every story", component: StoriesScreen, args: { recheck: () => undefined } } satisfies Meta<typeof StoriesScreen>;
 export default screens;
 type Story = StoryObj<typeof screens>;
 
-const capturing = (overrides: Partial<CaptureState> = {}): CaptureState => ({ can: true, capturing: 0, error: null, clearError: () => undefined, capture: async () => undefined, ...overrides });
+const capturing = (overrides: Partial<CaptureState> = {}): CaptureState => ({ can: true, capturing: 0, error: null, clearError: () => undefined, capture: async () => true, ...overrides });
 const FAILED = new RequestError("capture-failed", "That didn't capture: Docker is unavailable.");
 
 export const SomeCaptured: Story = { args: { view: MIXED, search: "", capture: capturing() } };
 export const Filtered: Story = { args: { view: MIXED, search: "?q=button", capture: capturing() } };
 export const NothingMatches: Story = { args: { view: MIXED, search: "?q=nothing-like-this", capture: capturing() } };
-export const NothingCaptured: Story = { args: { view: view([uncaptured("a--one"), uncaptured("a--two")], { newestRunId: null }), search: "", capture: capturing() } };
+const NOTHING_SAVED = [uncaptured("components-button--primary"), uncaptured("components-button--secondary")];
+const setupOf = (setup: Partial<NonNullable<StoriesView["setup"]>>) => ({ storybookDir: "storybook-static", buildCommand: null, uncommitted: [], usesDocker: true, ...setup });
+const NOT_BUILT = { storybookUrl: null, canCapture: false, newestRunId: null };
+export const SetupNoCommits: Story = { args: { view: view([], { ...NOT_BUILT, head: null }), search: "", capture: capturing({ can: false }) } };
+export const SetupNoBuild: Story = { args: { view: view([], NOT_BUILT), search: "", capture: capturing({ can: false }) } };
+export const SetupNoBuildWithItsCommand: Story = {
+  args: { view: view([], { ...NOT_BUILT, setup: setupOf({ storybookDir: "ui/storybook-static", buildCommand: "pnpm --filter ui build-storybook" }) }), search: "", capture: capturing({ can: false }) },
+};
+export const SetupNoStories: Story = { args: { view: view([], { newestRunId: null, canCapture: false }), search: "", capture: capturing({ can: false }) } };
+export const NothingCaptured: Story = { args: { view: view(NOTHING_SAVED, { newestRunId: null }), search: "", capture: capturing() } };
+export const NothingCapturedNatively: Story = { args: { view: view(NOTHING_SAVED, { newestRunId: null, setup: setupOf({ usesDocker: false }) }), search: "", capture: capturing() } };
+export const NothingCapturedWithUncommittedChanges: Story = {
+  args: { view: view(NOTHING_SAVED, { newestRunId: null, setup: setupOf({ uncommitted: ["src/Button.tsx", "src/Card.tsx", "storybook-static/", "README.md", "package.json"] }) }), search: "", capture: capturing() },
+};
 export const NoBuild: Story = { args: { view: view([captured("components-card--default")], { storybookUrl: null, canCapture: false }), search: "", capture: capturing({ can: false }) } };
 const withStatus = ({ view: shown, search, capture }: { view: StoriesView; search: string; capture: CaptureState }) => (
   <>
     <CaptureStatus capture={capture} />
-    <StoriesScreen view={shown} search={search} capture={capture} />
+    <StoriesScreen view={shown} search={search} capture={capture} recheck={() => undefined} />
   </>
 );
 export const CapturingTheRest: Story = { args: { view: MIXED, search: "", capture: capturing({ capturing: 3 }) }, render: withStatus };

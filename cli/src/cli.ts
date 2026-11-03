@@ -23,8 +23,9 @@ const USAGE = `Usage: selfie [--port <n>] [--storybook-dir <dir>] [--native] [--
        selfie <command>
 
   With no command, opens every story of a built Storybook, running, to look at and write notes
-  on, and serves it until stopped. It first runs the config's buildCommand, unless --no-build, and
-  opens a browser if it's at a terminal, unless --no-open.
+  on, and serves it until stopped. With no build yet, the page says what to do. It first runs the
+  config's buildCommand, unless --no-build, and opens a browser if it's at a terminal, unless
+  --no-open.
 
   record [--storybook-dir <dir>] [--build | --build-command <cmd>] [--story <pattern>]... [--native]
       Always renders a built Storybook, and records a run. Prints what it recorded, and judges
@@ -175,7 +176,7 @@ async function serveReview(
     /** Which page to say to open. */
     readonly path: string;
     readonly runId: string | null;
-    /** Run the config's `buildCommand` on the way up, and need a build to show. */
+    /** Run the config's `buildCommand` on the way up, and open a browser. */
     readonly forStories?: { readonly build: boolean; readonly open: boolean };
   },
 ): Promise<number> {
@@ -186,9 +187,7 @@ async function serveReview(
   const dir = resolveStorybookDir(project.cwd, options.storybookDir, settings);
   if (forStories !== undefined) {
     if (forStories.build) await buildIfAsked(settings.buildCommand, project.repo.root, context.signal, (line) => context.stderr(`${line}\n`));
-    if (!isBuiltStorybook(dir)) {
-      throw new SelfieError("no-stories", `There's no built Storybook at ${dir}, so there's nothing to show. Build one, or set buildCommand in selfie.config.json to say how.`);
-    }
+    if (!isBuiltStorybook(dir)) context.stderr(`There's no built Storybook at ${dir} yet. The page says what to do.\n`);
   }
   const servers = await serveReviewWithStorybook({
     source: (url) =>

@@ -11,7 +11,7 @@ import { resolveCaptureSettings, resolveRegionMergeDistance } from "./config.ts"
 import { accept, checkAccept, decide } from "./decisions.ts";
 import { diffToPng, type PixelDiff } from "./diff.ts";
 import { SelfieError } from "./errors.ts";
-import { gitUserEmail, type BaselineSearch } from "./git.ts";
+import { dirtyPaths, gitUserEmail, type BaselineSearch } from "./git.ts";
 import { isOpenNote } from "selfie-ui/notes";
 import { sentNotes, textForAgent } from "./notes.ts";
 import { branchGoldens, compareAsReviewed, compareAsShown, findBaseline, readReviewCache, requireRun, runsAtHead, type Project } from "./project.ts";
@@ -217,7 +217,16 @@ export function localReviewSource(
           }),
         ),
         newestRunId: finished[0]?.id ?? null,
-        canCapture: built && storybook.record !== undefined,
+        canCapture: built && head !== null && storybook.record !== undefined,
+        setup:
+          storybook === undefined
+            ? null
+            : {
+                storybookDir: path.relative(repo.root, storybook.dir) || ".",
+                buildCommand: settings.buildCommand ?? null,
+                uncommitted: await dirtyPaths(repo),
+                usesDocker: settings.environment.runner.kind === "container",
+              },
       };
     },
 
