@@ -33,6 +33,7 @@ import { encodePng } from "./png.ts";
 import {
   branchGoldens,
   captureDirectory,
+  compareAsReviewed,
   findBaseline,
   pruneOutput,
   requireRun,
@@ -479,6 +480,7 @@ async function recordBuild(project: Project, options: RecordOptions, { reuse }: 
     } else {
       log(`Run ${run.id} already describes this build at this commit, so nothing new was recorded. selfie record renders again.`);
     }
+    await project.notes.rememberRun(run.id);
     return {
       run,
       dirtyPaths: dirty,
@@ -575,4 +577,23 @@ export async function review(project: Project, options: ReviewOptions): Promise<
       totalMs: Date.now() - started,
     },
   };
+}
+
+/**
+ * An agent's answer to a note, on the newest run if it doesn't say. Says whether the note's image is
+ * still what the run has, so a claimed fix that moved nothing shows at once.
+ */
+export async function replyToNote(project: Project, id: number, text: string, givenRun: string | undefined): Promise<{ readonly note: number; readonly runId: string | null; readonly imageChanged: boolean | null }> {
+  const { notes } = project;
+  const runId = givenRun ?? (await notes.latestRun());
+  if (givenRun !== undefined) {
+    await requireRun(project, givenRun);
+    await notes.rememberRun(givenRun);
+  }
+  await notes.reply(id, text, runId);
+  const note = (await notes.list()).find((candidate) => candidate.id === id)!;
+  if (runId === null || note.imageHash === null) return { note: id, runId, imageChanged: null };
+  const { snapshots: compared } = await compareAsReviewed(project, runId, { includeUnchanged: true });
+  const now = compared.find(({ story }) => story === note.story)?.imageHash ?? null;
+  return { note: id, runId, imageChanged: now !== note.imageHash };
 }

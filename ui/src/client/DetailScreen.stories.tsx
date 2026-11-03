@@ -3,7 +3,8 @@ import { expect, userEvent, waitFor, within } from "storybook/test";
 import type { Note, RunView, SnapshotRow } from "../shared/api.ts";
 import { useState } from "react";
 import { DetailScreen } from "./DetailScreen.tsx";
-import { approved, feedbackOf, note, OTHER_RUN_ID, rejected, rows, stateOf, viewOf } from "./stories/fixtures.ts";
+import { approved, feedbackOf, note, OTHER_RUN_ID, rejected, replied, rows, stateOf, viewOf } from "./stories/fixtures.ts";
+import { HASHES } from "./stories/images.generated.ts";
 
 interface Args {
   readonly row: SnapshotRow;
@@ -194,6 +195,61 @@ export const DrawingABox: Story = {
     ]);
     await expect(within(canvasElement).getByText(/on the box you drew/)).toBeVisible();
     await expect(canvasElement.querySelector(".selfie-note-box[data-drawing]")).not.toBeNull();
+  },
+};
+/** A button an agent has since changed, and a note on the image from before that. */
+const FIXED = rows.changed("components-button--primary");
+const ON_THE_OLD_IMAGE = note(21, { story: FIXED.story, imageHash: HASHES.fresh, box: { x: 32, y: 360, width: 160, height: 36 }, state: "sent", text: "Make this green." });
+
+export const AgentReplied: Story = { args: { row: FIXED, notes: [replied(ON_THE_OLD_IMAGE, "Made it green, in `Button.tsx`.")] } };
+export const WhenNotedLayer: Story = {
+  args: { row: FIXED, notes: [replied(ON_THE_OLD_IMAGE, "Made it green, in `Button.tsx`.")] },
+  play: async ({ canvasElement }) => {
+    await press("w")();
+    await stackedImagesLoaded(canvasElement);
+    await expect(within(canvasElement).getByText(/Showing/).textContent).toContain("when noted");
+    await expect(canvasElement.querySelector(".selfie-note-box")).not.toBeNull();
+  },
+};
+export const SelectedRegionsMeanNothingOnTheImageWhenNoted: Story = {
+  args: { row: FIXED, notes: [replied(ON_THE_OLD_IMAGE, "Made it green, in `Button.tsx`.")] },
+  play: async ({ canvasElement }) => {
+    await press("x", "w")();
+    await stackedImagesLoaded(canvasElement);
+    await expect(within(canvasElement).getByText(/on all of the image when noted/)).toBeVisible();
+    await expect(canvasElement.querySelector(".selfie-stack .selfie-region")).toBeNull();
+  },
+};
+export const AgentClaimedAFixAndNothingMoved: Story = {
+  args: { row: FIXED, notes: [replied(note(22, { story: FIXED.story, imageHash: FIXED.imageHash, state: "sent", text: "Make this bigger." }), "Made it bigger.")] },
+  play: async ({ canvasElement }) => {
+    await expect(within(canvasElement).getByText(/identical to the one the note was written on/)).toBeVisible();
+  },
+};
+export const AgentRepliedFromANewerRun: Story = {
+  args: {
+    row: FIXED,
+    notes: [
+      (() => {
+        const answered = replied(note(25, { story: FIXED.story, imageHash: FIXED.imageHash, state: "sent", text: "Make this bigger." }), "Made it bigger.");
+        return { ...answered, messages: answered.messages.map((message) => (message.sender === "agent" ? { ...message, runId: OTHER_RUN_ID } : message)) };
+      })(),
+    ],
+  },
+  play: async ({ canvasElement }) => {
+    await expect(within(canvasElement).queryByText(/identical to the one the note was written on/)).toBeNull();
+  },
+};
+export const ResolvedNote: Story = { args: { row: FIXED, notes: [note(23, { story: FIXED.story, imageHash: FIXED.imageHash, state: "resolved" })] } };
+export const AnswerNotSentYet: Story = {
+  args: {
+    row: FIXED,
+    notes: [
+      (() => {
+        const answered = replied(note(24, { story: FIXED.story, imageHash: FIXED.imageHash, state: "sent", text: "Make this bigger." }), "How much bigger?");
+        return { ...answered, messages: [...answered.messages, { id: 9024, sender: "person" as const, author: "ned@example.com", text: "About double.", runId: null, at: 2, sent: false }] };
+      })(),
+    ],
   },
 };
 export const NewStory: Story = { args: { row: rows.fresh("components-badge--new") } };

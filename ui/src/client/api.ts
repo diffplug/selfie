@@ -12,6 +12,7 @@ import {
   type NewNote,
   type PixelDiff,
   type RunView,
+  type SendVia,
   type SnapshotRow,
 } from "../shared/api.ts";
 
@@ -60,7 +61,9 @@ export const postAccept = (runId: string, removedSeen: number | undefined) =>
 
 export const fetchFeedback = (signal: AbortSignal) => request<FeedbackView>("/feedback", { signal });
 export const postNote = (note: NewNote) => post<FeedbackView>("/notes", note);
-export const postSendNotes = () => post<{ readonly feedback: FeedbackView; readonly text: string }>("/notes/send", {});
+export const postSendNotes = (via: SendVia) => post<{ readonly feedback: FeedbackView; readonly text: string }>("/notes/send", { via });
+export const postAnswer = (id: number, text: string, runId: string) => post<FeedbackView>(`/notes/${id}/answers`, { text, runId });
+export const postResolve = (id: number) => post<FeedbackView>(`/notes/${id}/resolve`, {});
 export const deleteNote = (id: number) => request<FeedbackView>(`/notes/${id}`, { method: "DELETE", headers: WRITE_HEADERS });
 
 export const imageUrl = (hash: string) => `/api/images/${hash}`;
