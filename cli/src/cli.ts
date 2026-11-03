@@ -7,14 +7,17 @@ import { buildAcceptDocument, buildRecordDocument, buildReviewDocument } from ".
 import { SelfieError } from "./errors.ts";
 import { gitUserEmail, resolveCommit } from "./git.ts";
 import { compareAsReviewed, findBaseline, openProject, type Project } from "./project.ts";
-import { record, review } from "./review.ts";
+import { record, review, replyToNote } from "./review.ts";
 import { summarizeRun } from "./summary.ts";
-import { notesForAgent } from "./notes.ts";
 import { findBaselineWithRemote, pull, push, requireRemote, resolveRemote, type Fetch } from "./sync.ts";
+import { isNoteId, isNoteText, MAX_NOTE_CHARACTERS } from "selfie-ui/notes";
+import { awaitFeedback, notesForAgent } from "./notes.ts";
 
 const EXIT_OK = 0;
 const EXIT_NEEDS_ATTENTION = 1;
 const EXIT_COULD_NOT_RUN = 2;
+const EXIT_TIMED_OUT = 3;
+const EXIT_STOPPED = 130;
 
 const USAGE = `Usage: selfie <command>
 
@@ -49,9 +52,20 @@ const USAGE = `Usage: selfie <command>
       else the newest at HEAD. It shows what's recorded, and never renders. Opens no
       browser by itself.
 
-  notes
-      Prints the notes a person has sent to an agent from this folder's review UI, each with a
-      picture of what it's about. Never their drafts. Each worktree's folder has its own notes.
+  notes [--all]
+      Prints the open notes a person has sent to an agent from this folder's review UI, each with
+      a picture of what it's about, and with --all the resolved ones too. Never their drafts. Each
+      worktree's folder has its own notes.
+
+  reply <note> <text> [--run <run>]
+      Answers a note, on the newest run recorded from this folder if --run doesn't say. Prints
+      whether the note's image changed in that run. Only a person closes a note.
+
+  agent-await-feedback [--timeout <seconds>]
+      Blocks until a person sends notes from this folder's review UI, and prints them as notes
+      does, with what's new marked. While it runs, the UI says an agent is waiting. Exits 0 with
+      notes, 3 if --timeout passed first so it's worth asking again, 130 if stopped by a signal, or
+      2 if another agent is already waiting here.
 
   push [<run>] [--accept] [--remote <url>] [--native]
       Sends a run to the remote, by default the newest from a clean tree at HEAD, and its goldens
@@ -273,11 +287,37 @@ async function dispatch(command: string | undefined, args: string[], context: Co
       });
     }
     case "notes": {
-      const { positionals } = parse(args, {});
+      const { values, positionals } = parse(args, { all: { type: "boolean" } });
       noPositionals(command, positionals);
       return withProject(context, async (project) => {
-        printJson(context, await notesForAgent(project));
+        printJson(context, await notesForAgent(project, { all: values.all ?? false }));
         return EXIT_OK;
+      });
+    }
+    case "reply": {
+      const { values, positionals } = parse(args, { run: { type: "string" } });
+      const [note, text, ...extra] = positionals;
+      const id = Number(note);
+      if (!isNoteId(id) || !isNoteText(text) || extra.length > 0) {
+        throw new SelfieError("usage", `Expected a note number and what to say, in at most ${MAX_NOTE_CHARACTERS} characters: selfie reply 12 "Made it bigger".`);
+      }
+      return withProject(context, async (project) => {
+        printJson(context, await replyToNote(project, id, text, values.run));
+        return EXIT_OK;
+      });
+    }
+    case "agent-await-feedback": {
+      const { values, positionals } = parse(args, { timeout: { type: "string" } });
+      noPositionals(command, positionals);
+      const seconds = values.timeout === undefined ? Infinity : Number(values.timeout);
+      if (values.timeout !== undefined && !(Number.isFinite(seconds) && seconds >= 0)) {
+        throw new SelfieError("usage", `--timeout must be a number of seconds, got "${values.timeout}".`);
+      }
+      return withProject(context, async (project) => {
+        context.stderr("Waiting for feedback. The review UI now offers Send to agent.\n");
+        const result = await awaitFeedback(project, { timeoutMs: seconds * 1000, signal: context.signal });
+        printJson(context, result);
+        return result.outcome === "notes" ? EXIT_OK : result.outcome === "timed-out" ? EXIT_TIMED_OUT : EXIT_STOPPED;
       });
     }
     case "ui": {
