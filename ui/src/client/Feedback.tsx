@@ -1,9 +1,10 @@
 // What's on its way to an agent, on every screen of a run: how many notes, and how to hand them over.
-import { Button, Dialog, Stack, Text } from "@primer/react";
+import { Banner, Button, Dialog, Stack, Text } from "@primer/react";
 import { useEffect, useRef, useState } from "react";
+import { isOpenNote } from "../shared/notes.ts";
 import type { FeedbackState } from "./hooks.ts";
 import { plural } from "./plural.ts";
-import { AppLink, storyPath } from "./router.tsx";
+import { AppLink, runPath, storyPath } from "./router.tsx";
 import { ActionFailedBanner } from "./RunNotes.tsx";
 import { NoteLabel } from "./words.tsx";
 
@@ -41,21 +42,53 @@ function CopyDialog({ text, onClose }: { readonly text: string; readonly onClose
   );
 }
 
-/** Nothing at all with no notes, so a person who isn't using an agent never sees it. */
+/**
+ * When something's been recorded from this folder since. It offers to go there, and never goes by
+ * itself, so an image can't change while someone is looking at it.
+ */
+export function NewerRunBanner({ latestRunId, runId, story }: { readonly latestRunId: string | null | undefined; readonly runId: string; readonly story: string | null }) {
+  if (latestRunId === null || latestRunId === undefined || latestRunId === runId) return null;
+  return (
+    <div className="selfie-newer-run">
+      <Banner
+        variant="info"
+        title="This isn't the newest run from this folder"
+        description={
+          <AppLink inline href={story === null ? runPath(latestRunId) : storyPath(latestRunId, story, "")}>
+            Go to the newest{story === null ? "" : ", on this story"}
+          </AppLink>
+        }
+      />
+    </div>
+  );
+}
+
+/** Nothing at all with no notes and no agent waiting, so a person who isn't using an agent never sees it. */
 export function FeedbackBar({ feedback, runId, showList }: { readonly feedback: FeedbackState; readonly runId: string; readonly showList: boolean }) {
   const { view, error, clearError, send } = feedback;
   const [text, setText] = useState<string | null>(null);
-  const notes = view?.notes ?? [];
-  if (notes.length === 0 && error === null && text === null) return null;
+  const notes = (view?.notes ?? []).filter(isOpenNote);
+  const agentWaiting = view?.agentWaiting ?? false;
+  const drafts = notes.filter(({ messages }) => messages.some(({ sent }) => !sent)).length;
+  if (notes.length === 0 && !agentWaiting && error === null && text === null) return null;
   return (
     <section className="selfie-feedback" aria-label="Notes for your agent">
       <Stack direction="horizontal" align="center" justify="space-between" wrap="wrap" gap="condensed">
         <Text>
-          <strong>{plural(notes.length, "note")}</strong> for your agent.
+          {agentWaiting && <strong>Your agent is waiting for feedback. </strong>}
+          {plural(drafts, "draft")}, {plural(notes.length, "note")} in all.
+          {agentWaiting && drafts === 0 && " Write a note on any story to send it."}
         </Text>
-        <Button variant="primary" onClick={() => void send().then(setText)}>
-          Copy for agent
-        </Button>
+        <Stack direction="horizontal" align="center" gap="condensed">
+          <Button variant={agentWaiting ? "default" : "primary"} disabled={notes.length === 0} onClick={() => void send("copy").then(setText)}>
+            Copy for agent
+          </Button>
+          {agentWaiting && (
+            <Button variant="primary" disabled={drafts === 0} onClick={() => void send("agent")}>
+              Send to agent
+            </Button>
+          )}
+        </Stack>
       </Stack>
       {error !== null && <ActionFailedBanner error={error} onDismiss={clearError} />}
       {showList && (

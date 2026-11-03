@@ -13,6 +13,8 @@ export type SelfieErrorCode =
   | "no-actor"
   | "stale-decision"
   | "unknown-note"
+  | "already-waiting"
+  | "no-agent-waiting"
   | "usage";
 
 /** The work couldn't be done. `code` says which case this is, for a caller that isn't reading the message. */

@@ -1,17 +1,18 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, userEvent, within } from "storybook/test";
 import type { Note } from "../shared/api.ts";
-import { FeedbackBar } from "./Feedback.tsx";
-import { failure, feedbackOf, note, RUN_ID } from "./stories/fixtures.ts";
+import { FeedbackBar, NewerRunBanner } from "./Feedback.tsx";
+import { failure, feedbackOf, note, OTHER_RUN_ID, RUN_ID } from "./stories/fixtures.ts";
 
 interface Args {
   readonly notes?: readonly Note[];
   readonly showList?: boolean;
   readonly failed?: boolean;
+  readonly agentWaiting?: boolean;
 }
 
-function Bar({ notes = [], showList = true, failed = false }: Args) {
-  const feedback = feedbackOf(notes, failed ? { error: failure("unreachable", "Can't reach the Selfie server. Is selfie ui still running?") } : {});
+function Bar({ notes = [], showList = true, failed = false, agentWaiting = false }: Args) {
+  const feedback = feedbackOf(notes, failed ? { error: failure("unreachable", "Can't reach the Selfie server. Is selfie ui still running?") } : {}, agentWaiting);
   return <FeedbackBar feedback={feedback} runId={RUN_ID} showList={showList} />;
 }
 
@@ -28,6 +29,12 @@ export const NoNotesShowsNothing: Story = { args: {} };
 export const NotesInTheRunList: Story = { args: { notes: SOME } };
 export const NotesOnAStorysPage: Story = { args: { notes: SOME, showList: false } };
 export const CouldNotReachTheServer: Story = { args: { notes: SOME, failed: true } };
+export const AgentWaitingWithDrafts: Story = { args: { notes: SOME, agentWaiting: true } };
+export const AgentWaitingWithNothingToSend: Story = { args: { notes: [], agentWaiting: true } };
+export const AgentWaitingWithAllSent: Story = { args: { notes: [SOME[0]!], agentWaiting: true } };
+export const ANewerRunFromThisFolder: Story = { render: () => <NewerRunBanner latestRunId={OTHER_RUN_ID} runId={RUN_ID} story={null} /> };
+export const ANewerRunWhileOnAStory: Story = { render: () => <NewerRunBanner latestRunId={OTHER_RUN_ID} runId={RUN_ID} story="components-button--primary" /> };
+export const ResolvedNotesDontCount: Story = { args: { notes: [note(9, { state: "resolved" }), SOME[0]!] } };
 export const CopyDialog: Story = {
   args: { notes: SOME },
   play: async ({ canvasElement }) => {
