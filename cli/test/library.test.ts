@@ -10,7 +10,7 @@ import {
   isDecidable,
   openProject,
   readReviewCache,
-  resolveCaptureSettings,
+  resolveRenderSettings,
   review,
   SelfieError,
   summarizeRun,
@@ -20,7 +20,7 @@ import { BLUE, createHarness, git, type Harness } from "./support.ts";
 
 let h: Harness;
 let project: Project;
-const options = () => ({ storybookDir: "ignored", capture: h.capture });
+const options = () => ({ storybookDir: "ignored", render: h.render });
 
 beforeEach(async () => {
   h = await createHarness();
@@ -104,7 +104,7 @@ describe("review", () => {
     await decide(project, { runId, decision: "approved", actor: "ui", stories: "all" });
     const accepted = await accept(project, { runId });
     expect(accepted).toMatchObject({ accepted: true, refusals: [], usableAsBaseline: true });
-    const { environmentId } = await resolveCaptureSettings(project.repo);
+    const { environmentId } = await resolveRenderSettings(project.repo);
     expect((await findBaseline(project, environmentId)).sha).toBe(git(h.repo, "rev-parse", "HEAD"));
   });
 

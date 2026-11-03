@@ -1,30 +1,23 @@
 import { Heading } from "@primer/react";
-import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
-import { fetchCurrent } from "./api.ts";
+import { useLayoutEffect, useRef, type ReactNode } from "react";
+import { fetchRunContext } from "./api.ts";
 import { AcceptScreen } from "./AcceptScreen.tsx";
 import { DetailScreen } from "./DetailScreen.tsx";
 import { FeedbackBar, NewerRunBanner } from "./Feedback.tsx";
-import { useFeedback, useFetched, useRun, useTitle } from "./hooks.ts";
+import { useFeedback, useFetched, useRun } from "./hooks.ts";
 import { StoriesRoutes } from "./StoriesScreen.tsx";
-import { AppLink, navigate, parseRoute, runPath, storyPath, useLocation, type Route } from "./router.tsx";
+import { AppLink, parseRoute, storyPath, useLocation, type Route } from "./router.tsx";
+import { PageFactsLine, PageFactsProvider } from "./PageFacts.tsx";
+import { RunLayout, useRunTree } from "./RunLayout.tsx";
 import { RunScreen } from "./RunScreen.tsx";
-import { LoadFailure, Loading, NoRuns, NotFound } from "./Status.tsx";
-
-function Home() {
-  useTitle("Newest run");
-  const { data: current, error } = useFetched("current", fetchCurrent);
-  useEffect(() => {
-    if (current?.runId) navigate(runPath(current.runId), { replace: true });
-  }, [current?.runId]);
-  if (error !== null) return <LoadFailure error={error} />;
-  if (current === null || current.runId !== null) return <Loading label="Finding the newest run" />;
-  return <NoRuns current={current} />;
-}
+import { LoadFailure, Loading, NotFound } from "./Status.tsx";
 
 /** Holds the run across its screens, so moving between them doesn't read it again. */
 function RunRoutes({ runId, route, search }: { runId: string; route: Route; search: string }) {
   const state = useRun(runId);
   const feedback = useFeedback();
+  const { data: context } = useFetched(runId, (signal) => fetchRunContext(runId, signal));
+  const tree = useRunTree(state.view, state.unchanged, search, route.kind === "story" ? route.story : null);
   // Where to put focus on coming back to the list.
   const lastStory = useRef<string | null>(null);
   if (state.view === null) {
@@ -32,20 +25,20 @@ function RunRoutes({ runId, route, search }: { runId: string; route: Route; sear
   }
   if (route.kind === "story") lastStory.current = route.story;
   return (
-    <>
+    <RunLayout view={state.view} tree={tree} story={route.kind === "story" ? route.story : null} search={search} context={context}>
       {/* The run's screen has its own banner for the newest at its commit, so this one isn't said twice. */}
       {(route.kind !== "run" || feedback.view?.latestRunId !== state.view.siblings.find(({ status }) => status !== "recording")?.id) && (
         <NewerRunBanner latestRunId={feedback.view?.latestRunId} runId={runId} story={route.kind === "story" ? route.story : null} />
       )}
       <FeedbackBar feedback={feedback} storyHref={(story) => storyPath(runId, story, "")} showList={route.kind === "run"} />
-      {route.kind === "story" ? (
-        <DetailScreen state={state} view={state.view} story={route.story} search={search} feedback={feedback} />
+      {route.kind === "story" && tree.navigation !== null ? (
+        <DetailScreen state={state} view={state.view} story={route.story} search={search} feedback={feedback} navigation={tree.navigation} />
       ) : route.kind === "accept" ? (
         <AcceptScreen state={state} view={state.view} />
       ) : (
         <RunScreen state={state} view={state.view} search={search} returningFrom={lastStory} />
       )}
-    </>
+    </RunLayout>
   );
 }
 
@@ -53,14 +46,25 @@ function RunRoutes({ runId, route, search }: { runId: string; route: Route; sear
 export function Page({ children }: { readonly children: ReactNode }) {
   return (
     <div className="selfie-page">
-      <header className="selfie-header">
-        <Heading as="h1" className="selfie-brand">
-          <AppLink href="/" muted>
-            Selfie review
-          </AppLink>
-        </Heading>
-      </header>
-      <main className="selfie-main">{children}</main>
+      <PageFactsProvider>
+        {(facts) => (
+          <>
+            <header className="selfie-header">
+              <Heading as="h1" className="selfie-brand">
+                <AppLink href="/" muted>
+                  Selfie
+                </AppLink>
+              </Heading>
+              {facts !== null && (
+                <span className="selfie-header-facts">
+                  <PageFactsLine facts={facts} />
+                </span>
+              )}
+            </header>
+            <main className="selfie-main">{children}</main>
+          </>
+        )}
+      </PageFactsProvider>
     </div>
   );
 }
@@ -75,7 +79,6 @@ export function App() {
   }, [pathname]);
   return (
     <Page>
-      {route.kind === "home" && <Home />}
       {route.kind === "missing" && <NotFound />}
       {(route.kind === "stories" || route.kind === "anyStory") && <StoriesRoutes story={route.kind === "anyStory" ? route.story : null} search={search} />}
       {(route.kind === "run" || route.kind === "story" || route.kind === "accept") && (

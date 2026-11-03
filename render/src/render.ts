@@ -14,7 +14,7 @@ import {
 } from "./manifest.ts";
 import { prepareRunner, runWorker } from "./runners.ts";
 import { filterStories, readStoryIndex, RenderError, unmatchedPatternWarning } from "./storybook.ts";
-import { CAPTURE_RECIPE } from "./worker/protocol.ts";
+import { RENDER_RECIPE } from "./worker/protocol.ts";
 
 const DEFAULT_MAX_CONCURRENCY = 6;
 const DEFAULT_STORY_TIMEOUT_MS = 60_000;
@@ -24,7 +24,7 @@ const RUN_OVERHEAD_MS = 90_000;
 const NATIVE_WARNING =
   "Native runner: these images won't match other machines or the container. Use them for local experiments only.";
 
-export interface CaptureOptions {
+export interface RenderOptions {
   /** A built Storybook: the directory holding `index.json` and `iframe.html`. */
   storybookDir: string;
   /** Receives `manifest.json` and `stories/`. Those are replaced; nothing else is touched. */
@@ -51,7 +51,7 @@ export interface CaptureOptions {
  * manifest. Throws a `RenderError` only when no story could be attempted, such as a bad
  * build directory or an unavailable Docker.
  */
-export async function capture(options: CaptureOptions): Promise<Manifest> {
+export async function render(options: RenderOptions): Promise<Manifest> {
   const started = Date.now();
   const log = options.log ?? ((line: string) => process.stderr.write(`${line}\n`));
   const environment = options.environment ?? defineEnvironment();
@@ -100,7 +100,7 @@ export async function capture(options: CaptureOptions): Promise<Manifest> {
     schemaVersion: 1,
     environmentId: id,
     environment,
-    recipe: CAPTURE_RECIPE,
+    recipe: RENDER_RECIPE,
     settleMs,
     runtime: null,
     initScriptSha256: initScriptHash(options.initScript),

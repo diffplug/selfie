@@ -5,7 +5,7 @@ import {
   type AcceptOutcome,
   type ApiError,
   type BaselineNote,
-  type CurrentView,
+  type RunContext,
   type DecisionKind,
   type DecisionTarget,
   type FeedbackView,
@@ -49,8 +49,8 @@ const post = <T>(path: string, body: unknown) => request<T>(path, { method: "POS
 
 const runRoute = (runId: string) => `/runs/${encodeURIComponent(runId)}`;
 
-export const fetchCurrent = (signal: AbortSignal) => request<CurrentView>("/current", { signal });
 export const fetchRun = (runId: string, signal: AbortSignal) => request<RunView>(runRoute(runId), { signal });
+export const fetchRunContext = (runId: string, signal: AbortSignal) => request<RunContext>(`/runs/${encodeURIComponent(runId)}/context`, { signal });
 export const fetchBaseline = (runId: string, signal: AbortSignal) => request<BaselineNote>(`${runRoute(runId)}/baseline`, { signal });
 export const fetchUnchanged = async (runId: string) => (await request<{ rows: readonly SnapshotRow[] }>(`${runRoute(runId)}/unchanged`)).rows;
 export const fetchDiff = (current: string, golden: string, signal: AbortSignal) => request<PixelDiff>(`/diffs/${current}/${golden}`, { signal });
@@ -61,7 +61,7 @@ export const postAccept = (runId: string, removedSeen: number | undefined) =>
   post<AcceptOutcome>(`${runRoute(runId)}/accept`, removedSeen === undefined ? {} : { removedSeen });
 
 export const fetchStories = (signal: AbortSignal) => request<StoriesView>("/stories", { signal });
-export const postCapture = (stories: readonly string[]) => post<{ readonly runId: string }>("/captures", { stories });
+export const postRender = (stories: readonly string[]) => post<{ readonly runId: string }>("/renders", { stories });
 export const fetchFeedback = (signal: AbortSignal) => request<FeedbackView>("/feedback", { signal });
 export const postNote = (note: NewNote) => post<FeedbackView>("/notes", note);
 export const postSendNotes = (via: SendVia) => post<{ readonly feedback: FeedbackView; readonly text: string }>("/notes/send", { via });

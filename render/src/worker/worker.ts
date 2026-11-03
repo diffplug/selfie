@@ -1,4 +1,4 @@
-// Screenshots one Storybook build's stories, answering the browser's requests from the build
+// Screenshots one built Storybook's stories, answering the browser's requests from the build
 // directory. Runs the same way inside the container and natively. See protocol.ts for what
 // it may depend on.
 import { createHash } from "node:crypto";
@@ -6,7 +6,7 @@ import { stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { chromium, type Browser, type BrowserContext, type Page, type Route } from "playwright-core";
 import {
-  CAPTURE_RECIPE,
+  RENDER_RECIPE,
   PLAYWRIGHT_VERSION,
   type StoryError,
   type WorkerEvent,
@@ -20,7 +20,7 @@ const CLOSE_TIMEOUT_MS = 5_000;
 const MAX_ERRORS_PER_STORY = 20;
 const MAX_ERROR_LENGTH = 400;
 
-const { origin: ORIGIN } = CAPTURE_RECIPE;
+const { origin: ORIGIN } = RENDER_RECIPE;
 
 class TimeoutError extends Error {}
 
@@ -67,7 +67,7 @@ function trackRequests(page: Page): (quietMs: number, boundMs: number) => Promis
 }
 
 /** The file a build-relative URL path names, or null if it is outside the build or absent. */
-async function resolveBuildFile(root: string, pathname: string): Promise<string | null> {
+async function resolveStorybookFile(root: string, pathname: string): Promise<string | null> {
   let file: string;
   try {
     file = path.join(root, decodeURIComponent(pathname));
@@ -85,11 +85,11 @@ async function resolveBuildFile(root: string, pathname: string): Promise<string 
  * only needed natively, since the container has no network. A failure here means the context
  * has closed, so there is nothing left to answer.
  */
-async function answerFromBuild(route: Route, root: string): Promise<void> {
+async function answerFromStorybook(route: Route, root: string): Promise<void> {
   const url = new URL(route.request().url());
   try {
     if (url.origin !== ORIGIN) return await route.abort();
-    const file = await resolveBuildFile(root, url.pathname);
+    const file = await resolveStorybookFile(root, url.pathname);
     await (file
       ? route.fulfill({ path: file, headers: { "cache-control": "no-store" } })
       : route.fulfill({ status: 404 }));
@@ -122,19 +122,19 @@ async function prepareContext(browser: Browser, job: WorkerJob): Promise<Browser
   const context = await browser.newContext({
     viewport: job.viewport,
     deviceScaleFactor: job.scale,
-    locale: CAPTURE_RECIPE.locale,
-    timezoneId: CAPTURE_RECIPE.timezoneId,
-    colorScheme: CAPTURE_RECIPE.colorScheme,
-    reducedMotion: CAPTURE_RECIPE.reducedMotion,
-    forcedColors: CAPTURE_RECIPE.forcedColors,
-    serviceWorkers: CAPTURE_RECIPE.serviceWorkers,
+    locale: RENDER_RECIPE.locale,
+    timezoneId: RENDER_RECIPE.timezoneId,
+    colorScheme: RENDER_RECIPE.colorScheme,
+    reducedMotion: RENDER_RECIPE.reducedMotion,
+    forcedColors: RENDER_RECIPE.forcedColors,
+    serviceWorkers: RENDER_RECIPE.serviceWorkers,
   });
   // Date only: timers still run, which is why a project may need its own freeze.
-  await context.clock.setFixedTime(new Date(CAPTURE_RECIPE.fixedTime));
-  await context.addInitScript(`window.${CAPTURE_RECIPE.snapshotGlobal} = true;`);
+  await context.clock.setFixedTime(new Date(RENDER_RECIPE.fixedTime));
+  await context.addInitScript(`window.${RENDER_RECIPE.snapshotGlobal} = true;`);
   await context.addInitScript(watchPlayFailures);
   if (job.initScript !== null) await context.addInitScript({ content: job.initScript });
-  await context.route("**/*", (route) => answerFromBuild(route, path.resolve(job.buildDir)));
+  await context.route("**/*", (route) => answerFromStorybook(route, path.resolve(job.buildDir)));
   return context;
 }
 
@@ -186,10 +186,10 @@ async function screenshotStory(
   );
   for (const message of playFailures) record({ source: "play", message });
 
-  if (!(await networkQuiet(CAPTURE_RECIPE.networkQuietMs, CAPTURE_RECIPE.networkQuietBoundMs))) {
+  if (!(await networkQuiet(RENDER_RECIPE.networkQuietMs, RENDER_RECIPE.networkQuietBoundMs))) {
     record({
       source: "timeout",
-      message: `network not quiet after ${CAPTURE_RECIPE.networkQuietBoundMs}ms; captured anyway`,
+      message: `network not quiet after ${RENDER_RECIPE.networkQuietBoundMs}ms; rendered anyway`,
     });
   }
   await page.evaluate(() => document.fonts.ready.then(() => undefined));
@@ -197,10 +197,10 @@ async function screenshotStory(
   await page.evaluate(
     () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
   );
-  return page.screenshot({ ...CAPTURE_RECIPE.screenshot, type: "png" });
+  return page.screenshot({ ...RENDER_RECIPE.screenshot, type: "png" });
 }
 
-async function captureStory(
+async function renderStory(
   browser: () => Promise<Browser>,
   job: WorkerJob,
   story: WorkerStory,
@@ -261,7 +261,7 @@ async function main(): Promise<void> {
   setTimeout(() => process.exit(3), job.runTimeoutMs).unref();
 
   const launch = () =>
-    chromium.launch({ headless: CAPTURE_RECIPE.headless, args: job.launchArgs, timeout: LAUNCH_TIMEOUT_MS });
+    chromium.launch({ headless: RENDER_RECIPE.headless, args: job.launchArgs, timeout: LAUNCH_TIMEOUT_MS });
   let launched = launch();
   const first = await launched;
   // A crash takes out the stories in flight, not the ones still queued.
@@ -287,7 +287,7 @@ async function main(): Promise<void> {
   await Promise.all(
     Array.from({ length: job.concurrency }, async () => {
       for (let story = queue.shift(); story; story = queue.shift()) {
-        emit({ type: "story", result: await captureStory(liveBrowser, job, story) });
+        emit({ type: "story", result: await renderStory(liveBrowser, job, story) });
       }
     }),
   );

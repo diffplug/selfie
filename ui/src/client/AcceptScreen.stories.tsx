@@ -1,12 +1,18 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import type { ComponentProps } from "react";
 import type { RunView } from "../shared/api.ts";
+import { RunFrame } from "./stories/RunFrame.tsx";
 import { AcceptScreen } from "./AcceptScreen.tsx";
 import { approved, OTHER_RUN_ID, rejected, rows, runOf, stateOf, viewOf } from "./stories/fixtures.ts";
 
+function Screen({ view, state }: ComponentProps<typeof AcceptScreen>) {
+  return <RunFrame view={view} state={state}>{() => <AcceptScreen view={view} state={state} />}</RunFrame>;
+}
+
 const meta = {
-  title: "Screens/Accept",
-  component: AcceptScreen,
-} satisfies Meta<typeof AcceptScreen>;
+  title: "Pages/Accept",
+  component: Screen,
+} satisfies Meta<typeof Screen>;
 export default meta;
 type Story = StoryObj<typeof meta>;
 

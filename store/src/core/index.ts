@@ -14,7 +14,7 @@ export {
   isDecidable,
   isGitSha,
   isRunId,
-  newestCaptures,
+  newestRenders,
   Snapshots,
   SnapshotError,
   type CompareOptions,
@@ -32,7 +32,7 @@ export {
   type SnapshotErrorCode,
   type SnapshotsOptions,
   type SnapshotState,
-  type StoryCapture,
+  type StoryRender,
   type StoryFilter,
 } from "./snapshots.ts";
 export {
@@ -44,7 +44,7 @@ export {
   type SqlStatement,
   type SqlValue,
 } from "./sql.ts";
-export { StorybookBuilds, type StoryViewport, type StorybookBuildFile } from "./storybook-builds.ts";
+export { BuiltStorybooks, type StoryViewport, type BuiltStorybookFile } from "./built-storybooks.ts";
 export {
   ImageHashMismatchError,
   imageInsertStatement,

@@ -217,7 +217,7 @@ export function runWorker(run: WorkerRun): Promise<WorkerOutcome> {
       clearTimeout(watchdog);
       run.signal?.removeEventListener("abort", stop);
       if (run.signal?.aborted) {
-        reject(new RenderError("Capture aborted."));
+        reject(new RenderError("Render aborted."));
       } else if (runtime === undefined || (fatal !== undefined && results.size === 0 && !done)) {
         reject(
           new RenderError(

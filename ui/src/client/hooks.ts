@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { AcceptRefusal, DecisionKind, DecisionTarget, FeedbackView, StoriesView, NewNote, RunView, SendVia, SnapshotRow } from "../shared/api.ts";
-import { deleteNote, fetchFeedback, fetchStories, fetchRun, fetchUnchanged, postAccept, postAnswer, postCapture, postDecision, postNote, postResolve, postSendNotes, RequestError } from "./api.ts";
+import { deleteNote, fetchFeedback, fetchStories, fetchRun, fetchUnchanged, postAccept, postAnswer, postRender, postDecision, postNote, postResolve, postSendNotes, RequestError } from "./api.ts";
 import { reuseRows } from "./filter.ts";
 import { toggled } from "./selection.ts";
 
@@ -250,7 +250,7 @@ export function useFetched<T>(key: string | null, load: (signal: AbortSignal) =>
  * Every story of the hosted Storybook, as the server last described them. Read again whenever the
  * page regains focus, or something new is recorded, since an agent records from outside this page.
  */
-export function useStories(latestRunId: string | null | undefined): { readonly view: StoriesView | null; readonly error: RequestError | null; readonly reload: () => void } {
+export function useStories(latestRunId: string | null | undefined): { readonly view: StoriesView | null; readonly error: RequestError | null; readonly reload: () => void; readonly recheck: () => void } {
   const [view, setView] = useState<StoriesView | null>(null);
   const [error, setError] = useState<RequestError | null>(null);
   const reading = useRef<AbortController | null>(null);
@@ -267,8 +267,14 @@ export function useStories(latestRunId: string | null | undefined): { readonly v
       (failed: unknown) => {
         if (!controller.signal.aborted) setError(asRequestError(failed));
       },
-    );
+    ).finally(() => {
+      if (reading.current === controller) reading.current = null;
+    });
   }, []);
+  /** For a timer: nothing's waiting on it, so it lets a read finish, and rests while nobody's looking. */
+  const recheck = useCallback(() => {
+    if (!document.hidden && reading.current === null) reload();
+  }, [reload]);
   useEffect(() => {
     reload();
     window.addEventListener("focus", reload);
@@ -284,55 +290,54 @@ export function useStories(latestRunId: string | null | undefined): { readonly v
     lastRun.current = latestRunId;
     if (known !== undefined && known !== latestRunId) reload();
   }, [latestRunId, reload]);
-  return { view, error, reload };
+  return { view, error, reload, recheck };
 }
 
-export interface CaptureState {
+export interface RenderState {
   readonly can: boolean;
-  /** How many stories are being captured right now. */
-  readonly capturing: number;
+  /** How many stories are being rendered right now. */
+  readonly rendering: number;
   readonly error: RequestError | null;
   readonly clearError: () => void;
-  readonly capture: (stories: readonly string[]) => Promise<void>;
+  /** Says whether it worked. If it didn't, `error` says why. */
+  readonly render: (stories: readonly string[]) => Promise<boolean>;
 }
 
-/** Asks the server to capture stories, and reads every story again once it has. */
-export function useCapture(can: boolean, onCaptured: () => void): CaptureState {
-  const [capturing, setCapturing] = useState(0);
+/** Asks the server to render stories, and reads every story again once it has. */
+export function useRender(can: boolean, onRendered: () => void): RenderState {
+  const [rendering, setRendering] = useState(0);
   const [error, setError] = useState<RequestError | null>(null);
   return {
     can,
-    capturing,
+    rendering,
     error,
     clearError: useCallback(() => setError(null), []),
-    capture: async (stories) => {
-      setCapturing(stories.length);
+    render: async (stories) => {
+      setRendering(stories.length);
       setError(null);
       try {
-        await postCapture(stories);
-        onCaptured();
+        await postRender(stories);
+        onRendered();
+        return true;
       } catch (failed) {
         setError(asRequestError(failed));
+        return false;
       } finally {
-        setCapturing(0);
+        setRendering(0);
       }
     },
   };
 }
 
-/** A list of stories' keys: next and previous move focus through its links, and / goes to its search. */
-export function useStoryListKeys(search: RefObject<HTMLInputElement | null>): void {
+/** Next and previous move focus through a list of stories' links. */
+export function useStoryFocusKeys(): void {
   const moveFocus = (delta: number) => {
     const links = [...document.querySelectorAll<HTMLElement>("[data-story]")];
     if (links.length === 0) return;
     const at = links.indexOf(document.activeElement as HTMLElement);
     links[at === -1 ? 0 : Math.max(0, Math.min(links.length - 1, at + delta))]?.focus();
   };
-  useHotkeys({
-    j: () => moveFocus(1),
-    k: () => moveFocus(-1),
-    "/": () => search.current?.focus(),
-  });
+  useHotkeys({ j: () => moveFocus(1), k: () => moveFocus(-1) });
 }
 
 /** Device pixels per CSS pixel, which changes with browser zoom or on moving to another display. */

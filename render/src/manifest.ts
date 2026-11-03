@@ -2,7 +2,7 @@ import { rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { RenderEnvironment } from "./environment.ts";
 import type { StoryEntry } from "./storybook.ts";
-import type { CAPTURE_RECIPE, StoryError, WorkerRuntime, WorkerStoryResult } from "./worker/protocol.ts";
+import type { RENDER_RECIPE, StoryError, WorkerRuntime, WorkerStoryResult } from "./worker/protocol.ts";
 
 export const MANIFEST_FILE = "manifest.json";
 export const STORIES_DIR = "stories";
@@ -34,7 +34,7 @@ export interface Manifest {
   schemaVersion: 1;
   environmentId: string;
   environment: RenderEnvironment;
-  recipe: typeof CAPTURE_RECIPE;
+  recipe: typeof RENDER_RECIPE;
   /** Project input rather than environment, so outside the environment ID. */
   settleMs: number;
   initScriptSha256: string | null;

@@ -7,7 +7,7 @@
 
 ## Local review server
 
-Source of truth: `loopbackHosts` in `ui/src/server/local.ts`, and `sameOriginWrites` and `pageHeaders` in `ui/src/server/app.ts`, which any deployment keeps; tests in `cli/test/ui.test.ts`. `docs/specs/ui.md` owns the routes.
+Source of truth: `loopbackHosts` in `ui/src/server/local.ts`, and `sameOriginWrites` and `pageHeaders` in `ui/src/server/app.ts`, which any deployment keeps; tests in `cli/test/ui-*.test.ts`. `docs/specs/ui.md` owns the routes.
 
 There's no login on this server, since anyone who can reach loopback on the machine already has the store's files.
 
@@ -15,7 +15,7 @@ There's no login on this server, since anyone who can reach loopback on the mach
 - **Must refuse a request whose `Origin` isn't this server's**, whatever its method.
 - **Must require `Content-Type: application/json` and the header `X-Selfie-Request: review-ui` on anything but GET and HEAD**, so a form or a page on another site can't approve anything, and must send no CORS headers, so a page's own attempt fails its preflight (rationale).
 - **Must refuse to be framed and to be embedded**, with `frame-ancestors 'none'`, `X-Frame-Options: DENY`, and `Cross-Origin-Resource-Policy: same-origin`, so another site can't steer a click on Approve (rationale), on every response, refusals included. `Content-Security-Policy` is exactly `default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'none'`, with `frame-src` naming the hosted Storybook's origin if there is one, through `hono/secure-headers`.
-- **Must host a Storybook on a loopback port of its own, read only, never on the review server's origin**, since its code is whatever branch was built, and on that origin it could approve its own images (rationale). The `Host` check applies to it too. It may be framed only by itself, since Storybook frames its own preview, and by the review page, and it serves nothing from a directory with no `iframe.html`. Kept builds share that origin (`docs/specs/ui.md` → Routes).
+- **Must host a Storybook on a loopback port of its own, read only, never on the review server's origin**, since its code is whatever branch was built, and on that origin it could approve its own images (rationale). The `Host` check applies to it too. It may be framed only by itself, since Storybook frames its own preview, and by the review page, and it serves nothing from a directory with no `iframe.html`. Kept built Storybooks share that origin (`docs/specs/ui.md` → Routes).
 - **Must let the review page frame only the hosted Storybook's origin, and sandbox every frame, without `allow-top-navigation`**, so a story can't steer the review page, and can't read it, being another origin (rationale).
 - **Must serve an image only through the app, by a validated hash, with `Cache-Control: private`**, and never name a file path in a response. Reserved: [Serving images](#serving-images) holds the same for the cloud.
 
@@ -72,7 +72,7 @@ GitHub decides. Selfie keeps no member list of its own.
 ### Pull requests from forks
 
 - **Must give a fork's pull request only what read access gives**: its author can read the repository's snapshots as anyone with read access can, and can't upload or approve.
-- **Must fail a fork's pull request's snapshot check until a maintainer approves running the capture pass.** Nothing from the fork is stored before that.
+- **Must fail a fork's pull request's snapshot check until a maintainer approves running the render pass.** Nothing from the fork is stored before that.
 
 **Later:** a fork's pull request could keep its changed snapshots somewhere like Actions artifacts until a maintainer accepts them.
 
@@ -80,5 +80,5 @@ GitHub decides. Selfie keeps no member list of its own.
 
 A run isn't uploaded until GitHub has its commit (`docs/specs/sync.md` → What goes), so anonymous viewers see no unpushed work.
 
-- **Running an approved capture pass.** Decide how a maintainer approves it and how it runs, since it executes the fork's code and needs a token to upload. GitHub's docs don't say whether a fork's `pull_request` run can get an OIDC token, and `pull_request_target` runs with write access even from a public fork, so both need testing. The fork's code could forge its screenshots, so its run must stay subject to normal approval. It would also be the one uploader without write access, so it must not reach the project's images through the route that takes a client's hash on trust: it could plant a false picture under the hash of an image that hasn't been rendered yet.
+- **Running an approved render pass.** Decide how a maintainer approves it and how it runs, since it executes the fork's code and needs a token to upload. GitHub's docs don't say whether a fork's `pull_request` run can get an OIDC token, and `pull_request_target` runs with write access even from a public fork, so both need testing. The fork's code could forge its screenshots, so its run must stay subject to normal approval. It would also be the one uploader without write access, so it must not reach the project's images through the route that takes a client's hash on trust: it could plant a false picture under the hash of an image that hasn't been rendered yet.
 - **Reading code for `change-grouping`.** That scope sends code diffs to a Meta model, which needs more app permissions and means private code leaves GitHub. Decide how a repository owner consents.

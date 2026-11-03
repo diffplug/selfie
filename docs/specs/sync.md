@@ -57,7 +57,7 @@ Inside `POST /goldens`, a refusal is an answer, with a code of `not-approved`, `
 - **Must take a decision only from someone who may decide, so a CI upload carries none**, and record a new one's author as whoever is pushing, as the server knows them, not what the client says (rationale). A decision the server already holds keeps its author. `docs/specs/snapshots.md` → Decisions says stores agree on the verdict, which the author need not match.
 - **Must not let a received decision's time, or a run's, be later than the server's clock**, so a wrong clock can't win every later disagreement, or post-date a run. Sending a run again keeps the time it was first given.
 
-Reserved: a fork's capture pass must not upload through this (`docs/specs/access.md` → Open questions).
+Reserved: a fork's render pass must not upload through this (`docs/specs/access.md` → Open questions).
 
 ### Goldens
 

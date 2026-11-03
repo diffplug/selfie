@@ -107,6 +107,9 @@ importers:
       '@primer/react':
         specifier: 38.43.0
         version: 38.43.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react-is@19.3.0)(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react-is@19.3.1)(react@19.3.1)
+      '@storybook/icons':
+        specifier: 2.2.0
+        version: 2.2.0(react@19.3.1)
       '@storybook/react-vite':
         specifier: 10.6.5
         version: 10.6.5(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(storybook@10.6.5(@types/react@19.3.0)(react@19.3.1))(typescript@7.0.2)(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2))

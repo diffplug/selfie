@@ -12,7 +12,7 @@
     "selfie": "node --disable-warning=ExperimentalWarning cli/src/main.ts",
     "selfie:storybook": "pnpm --filter selfie-ui build-storybook",
     "selfie:review": "pnpm selfie:storybook >&2 && pnpm --silent selfie review",
-    "test": "pnpm -r test",
+    "test": "pnpm -r --parallel test",
     "test:d1": "pnpm --filter selfie-store test:d1",
     "test:d1:workerd": "pnpm --filter selfie-store test:d1:workerd",
     "typecheck": "pnpm -r typecheck",

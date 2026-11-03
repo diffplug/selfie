@@ -15,7 +15,7 @@ import {
   UnfoldIcon,
   XIcon,
 } from "@primer/octicons-react";
-import { Label, Stack, type LabelProps } from "@primer/react";
+import { Label, Stack, VisuallyHidden, type LabelProps } from "@primer/react";
 import type { ReactNode } from "react";
 import { isDecidable } from "selfie-store";
 import type { BlockerReason, NoteState, PixelDiff, RegionKind, SnapshotRow, SnapshotState } from "../shared/api.ts";
@@ -24,6 +24,9 @@ import { plural } from "./plural.ts";
 import { AppLink, runPath } from "./router.tsx";
 
 export const shortSha = (sha: string) => sha.slice(0, 10);
+
+/** A commit, short, with the whole of it on hover. */
+export const Sha = ({ sha }: { readonly sha: string }) => <code title={sha}>{shortSha(sha)}</code>;
 
 /** A run that didn't render: where its pixels came from, which every place that offers a decision on them must say. */
 export function ReusedPixels({ from }: { readonly from: string }) {
@@ -56,6 +59,19 @@ const STATE_LABELS: Readonly<Record<SnapshotState, { variant: LabelProps["varian
   failed: { variant: "danger", icon: <StopIcon size={12} />, words: "Failed" },
   unchanged: { variant: "secondary", icon: <DotIcon size={12} />, words: "Unchanged" },
 };
+
+export const renamedWords = (from: string) => `Renamed from ${from}`;
+
+/** A state's icon and words, small enough for a list's row. */
+export function StateMark({ state, renamedFrom }: { readonly state: SnapshotState; readonly renamedFrom?: string | undefined }) {
+  const { icon, words } = renamedFrom === undefined ? STATE_LABELS[state] : { icon: <ArrowSwitchIcon size={12} />, words: renamedWords(renamedFrom) };
+  return (
+    <span className="selfie-state-mark" data-state={renamedFrom === undefined ? state : "renamed"} title={words}>
+      {icon}
+      <VisuallyHidden>{words}</VisuallyHidden>
+    </span>
+  );
+}
 
 const KIND_LABELS: Readonly<Record<RegionKind, { variant: LabelProps["variant"]; icon: ReactNode; words: string }>> = {
   changed: { variant: "danger", icon: <DiffModifiedIcon size={12} />, words: "Changed" },

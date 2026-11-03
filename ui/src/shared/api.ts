@@ -107,15 +107,24 @@ export interface BaselineNote {
 
 export type RunListing = Pick<Run, "id" | "startedAt" | "status" | "dirty">;
 
-/** Where a kept build is, on a hosted Storybook's origin, ending in a slash. Crosses into `selfie-cli` from here. */
-export const keptBuildPath = (build: string) => `/storybook-builds/${build}/`;
+/** Where a kept built Storybook is, on a hosted Storybook's origin, ending in a slash. Crosses into `selfie-cli` from here. */
+export const keptStorybookPath = (build: string) => `/built-storybooks/${build}/`;
+
+/** Where a run stands against this checkout, and where the baselines come from, for saying so. */
+export interface RunContext {
+  readonly head: string | null;
+  /** The branch HEAD is on, or null if it's detached. */
+  readonly branch: string | null;
+  readonly mergeBase: string | null;
+  readonly defaultBranch: string | null;
+}
 
 /** A Storybook to open a run's stories in, on an origin of its own. */
 export interface StorybookLink {
   /** Ending in a slash. */
   readonly url: string;
   /** Whether it's the very build that rendered this run. If it isn't, a story may not look like its image. */
-  readonly exactBuild: boolean;
+  readonly exactStorybook: boolean;
 }
 
 /** Everything a screen shows about a run, recomputed from `summarizeRun` after every action. */
@@ -123,10 +132,12 @@ export interface RunView {
   readonly run: Run;
   /** Null if there's no built Storybook to host. */
   readonly storybook: StorybookLink | null;
-  /** The kept build of the goldens this run is compared with, or null if there's none. */
+  /** The kept built Storybook of the goldens this run is compared with, or null if there's none. */
   readonly goldenStorybookUrl: string | null;
   /** The size this run's stories rendered at, so a live one lays out as its image did. Null if that wasn't recorded. */
   readonly viewport: { readonly width: number; readonly height: number } | null;
+  /** What its Storybook calls `rows`' stories, in the order its sidebar has them, as far as its kept built Storybooks say. */
+  readonly storyNames: readonly { readonly story: string; readonly title: string; readonly name: string }[];
   /** With no baseline, the nearest goldens on the run's branch, which `rows` compares with. Only to look at. */
   readonly branchGoldens: string | null;
   /** How close a diff's regions group here, in CSS pixels. */
@@ -162,46 +173,58 @@ export interface RunView {
 }
 
 /** A story's newest image at HEAD, from whichever run took it. */
-export interface StoryCaptureInfo {
+export interface StoryRenderInfo {
   readonly runId: string;
   readonly state: SnapshotRow["state"];
   readonly decision: SnapshotRow["decision"];
-  readonly capturedAt: number;
+  readonly renderedAt: number;
   /** Recorded with uncommitted changes, so it can't become a golden. */
   readonly dirty: boolean;
-  /** Whether the hosted build rendered it, or null if that's not known. If not, it may be out of date. */
-  readonly fromHostedBuild: boolean | null;
+  /** Whether the hosted built Storybook rendered it, or null if that's not known. If not, it may be out of date. */
+  readonly fromHostedStorybook: boolean | null;
 }
 
 export interface ListedStory {
   readonly story: string;
-  /** Null if no run at HEAD has captured it. */
-  readonly capture: StoryCaptureInfo | null;
+  /** Its path in the Storybook's sidebar, such as `Screens/Accept`, or nothing if that's not known. */
+  readonly title: string;
+  /** What the sidebar calls it, or its ID if that's not known. */
+  readonly name: string;
+  /** Null if no run at HEAD has rendered it. */
+  readonly render: StoryRenderInfo | null;
 }
 
-/** Every story of the hosted Storybook, each with its newest capture, which a single run is a special case of. */
+/** What a server that hosts a Storybook can say about it. */
+export interface StorySetup {
+  /** Where it looks for a built Storybook, from the Git top level. */
+  readonly storybookDir: string;
+  /** How the config says to build one, if it does. */
+  readonly buildCommand: string | null;
+  /** What differs from HEAD now, as Git names it, which a render now would be marked with. */
+  readonly uncommitted: readonly string[];
+  /** The hosted built Storybook is older than HEAD's last move, so it can't be of this commit. */
+  readonly builtBeforeHead: boolean;
+  /** Renders in the pinned container, and not in this machine's browser. */
+  readonly usesDocker: boolean;
+}
+
+/** Every story of the hosted Storybook, each with its newest render, which a single run is a special case of. */
 export interface StoriesView {
   readonly head: string | null;
-  /** The hosted Storybook as it stands, or null if there's no build there. */
+  /** The branch HEAD is on, or null if it's detached. */
+  readonly branch: string | null;
+  /** The hosted Storybook as it stands, or null if there's no built Storybook there. */
   readonly storybookUrl: string | null;
   /** The size a story renders at here now. */
   readonly viewport: { readonly width: number; readonly height: number };
-  /** In ID order. */
+  /** In the order the Storybook's sidebar shows them. */
   readonly stories: readonly ListedStory[];
   /** The newest finished run at HEAD, to review and accept. */
   readonly newestRunId: string | null;
-  /** Whether this server can capture a story when asked, which takes a build and a browser to do it with. */
-  readonly canCapture: boolean;
-}
-
-/** Which run the UI opens to: the newest finished one at HEAD, in the project's environment. */
-export interface CurrentView {
-  readonly head: string | null;
-  readonly runId: string | null;
-  /** HEAD has runs, and none finished. */
-  readonly hasUnfinishedRun: boolean;
-  /** Only asked for if there's no run to open. */
-  readonly baseline: BaselineNote | null;
+  /** Whether this server can render a story when asked, which takes a commit, a built Storybook, and a browser to do it with. */
+  readonly canRender: boolean;
+  /** Null if this server hosts no Storybook. */
+  readonly setup: StorySetup | null;
 }
 
 export interface AcceptOutcome {
@@ -269,13 +292,13 @@ export type SendVia = "agent" | "copy";
  * status with its message.
  */
 export interface ReviewSource {
-  current(): Promise<CurrentView>;
   storiesView(): Promise<StoriesView>;
   /** Records a run of just these stories from the hosted Storybook, one at a time. */
-  capture(stories: readonly string[]): Promise<{ readonly runId: string }>;
+  render(stories: readonly string[]): Promise<{ readonly runId: string }>;
   runView(runId: string): Promise<RunView>;
   /** Why the run has no baseline: only a screen showing that asks. */
   baseline(runId: string): Promise<BaselineNote>;
+  runContext(runId: string): Promise<RunContext>;
   unchanged(runId: string): Promise<readonly SnapshotRow[]>;
   /** Decides on exactly these images, or refuses all of them if one isn't what the run holds. */
   decide(runId: string, decision: DecisionKind, targets: readonly DecisionTarget[]): Promise<RunView>;

@@ -44,7 +44,7 @@ A note is where something is. Its messages are the conversation about it.
 
 ## Starting from a Storybook
 
-`selfie feedback` (`docs/specs/cli.md` → feedback) opens at every story (`docs/specs/ui.md` → Screens). An agent's answer is `selfie agent-await-feedback`, its change, `selfie record --story <story> --build-command <command>`, and `selfie reply`.
+`selfie` alone (`docs/specs/cli.md` → selfie alone) opens at every story (`docs/specs/ui.md` → Screens). An agent's answer is `selfie agent-await-feedback`, its change, `selfie record --story <story> --build`, and `selfie reply`.
 
 ## Handing notes to an agent
 

@@ -1,7 +1,7 @@
 // Arguments in, one document and an exit code out. The work is the library's.
 import { parseArgs, type ParseArgsConfig } from "node:util";
-import type { capture } from "selfie-render";
-import { resolveCaptureSettings, resolveStorybookDir } from "./config.ts";
+import type { render } from "selfie-render";
+import { resolveRenderSettings, resolveStorybookDir } from "./config.ts";
 import { accept, decide } from "./decisions.ts";
 import { buildAcceptDocument, buildRecordDocument, buildReviewDocument } from "./document.ts";
 import { SelfieError } from "./errors.ts";
@@ -19,16 +19,22 @@ const EXIT_COULD_NOT_RUN = 2;
 const EXIT_TIMED_OUT = 3;
 const EXIT_STOPPED = 130;
 
-const USAGE = `Usage: selfie <command>
+const USAGE = `Usage: selfie [--port <n>] [--storybook-dir <dir>] [--native] [--no-build] [--no-open]
+       selfie <command>
 
-  record [--storybook-dir <dir>] [--build-command <cmd>] [--story <pattern>]... [--native]
+  With no command, opens every story of a built Storybook, running, to look at and write notes
+  on, and serves it until stopped. With no built Storybook yet, the page says what to do. It first runs the
+  config's buildCommand, unless --no-build, and opens a browser if it's at a terminal, unless
+  --no-open.
+
+  record [--storybook-dir <dir>] [--build | --build-command <cmd>] [--story <pattern>]... [--native]
       Always renders a built Storybook, and records a run. Prints what it recorded, and judges
       nothing. Exits 0 once a run is recorded, even with failed stories, or 2 if it couldn't run.
 
-  review [<run>] [--baseline <commit-or-run>] [--storybook-dir <dir>] [--build-command <cmd>]
+  review [<run>] [--baseline <commit-or-run>] [--storybook-dir <dir>] [--build | --build-command <cmd>]
          [--story <pattern>]... [--native]
       Prints a JSON diff of a run against its baseline. With no <run>, uses the run for this
-      exact build, and records one only if there's none yet, so call record first to render
+      exact built Storybook, and records one only if there's none yet, so call record first to render
       again. --baseline compares with those goldens or that run for this review alone, and is
       how to look for flakiness: record twice, then review the second --baseline the first.
       If the default branch has no goldens yet, it compares with the nearest on this branch and
@@ -49,14 +55,9 @@ const USAGE = `Usage: selfie <command>
 
   ui [<run>] [--port <n>] [--storybook-dir <dir>] [--native]
       Serves the review UI on loopback until stopped, and prints its URL. Opens at this run, or
-      else the newest at HEAD. It renders only when someone asks it to on the page. Opens no
-      browser by itself. Hosts the built Storybook on a port of its own, so a story's page links
-      to the real thing, and /stories lists every story, each with its newest capture.
-
-  feedback [--build-command <cmd>] [--port <n>] [--storybook-dir <dir>] [--native]
-      Serves every story of a built Storybook, running, to write notes on, and prints its URL, until
-      stopped. A note captures the story it's on. An agent answers with agent-await-feedback,
-      a change, record --story, and reply, and then the page shows what changed since the note.
+      else every story, each with its newest render. It renders only when someone asks it to on
+      the page. Opens no browser by itself. Hosts the built Storybook on a port of its own, so a
+      story's page links to the real thing.
 
   notes [--all]
       Prints the open notes a person has sent to an agent from this folder's review UI, each with
@@ -85,8 +86,8 @@ const USAGE = `Usage: selfie <command>
 
 Local data lives under ~/.config/selfie/<git-origin-slugified>/, or $SELFIE_HOME instead of
 ~/.config/selfie. A project configures Selfie in selfie.config.json at its Git top level:
-environment, initScript, regionMergeDistance, and storybookDir, which --storybook-dir overrides. A build command
-is never read from a file. A story pattern matches IDs, where * matches any run of characters.
+environment, initScript, regionMergeDistance, storybookDir, which --storybook-dir overrides, and
+buildCommand, which only selfie alone and --build run, and which runs from that top level. A story pattern matches IDs, where * matches any run of characters.
 `;
 
 /** What a command reaches the outside through, so tests can supply their own. */
@@ -97,7 +98,9 @@ interface Context {
   readonly stdout: (text: string) => void;
   /** Progress and messages for people. */
   readonly stderr: (text: string) => void;
-  readonly capture?: typeof capture;
+  /** Opens a page for a person at a terminal. Not set for anything else, such as an agent. */
+  readonly openBrowser?: ((url: string) => void) | undefined;
+  readonly render?: typeof render;
   readonly signal?: AbortSignal;
   /** Defaults to the built client in `selfie-ui`. */
   readonly uiClientDir?: string;
@@ -141,10 +144,11 @@ async function withProject(context: Context, work: (project: Project) => Promise
   }
 }
 
-/** What says how to get a run from a build, for `record` and for a `review` that may need one. */
+/** What says how to get a run from a built Storybook, for `record` and for a `review` that may need one. */
 const BUILD_OPTIONS = {
   "storybook-dir": { type: "string" },
   "build-command": { type: "string" },
+  build: { type: "boolean" },
   native: { type: "boolean" },
   story: { type: "string", multiple: true },
 } as const;
@@ -172,19 +176,18 @@ async function serveReview(
     /** Which page to say to open. */
     readonly path: string;
     readonly runId: string | null;
-    readonly afterListening?: string;
-    /** Run once on the way up, after the config is known to be good, since a build can take minutes. */
-    readonly buildCommand?: string | undefined;
-    readonly needsBuild?: boolean;
+    /** Run the config's `buildCommand` on the way up, and open a browser. */
+    readonly forStories?: { readonly build: boolean; readonly open: boolean };
   },
 ): Promise<number> {
-  const { native, buildCommand } = options;
+  const { native, forStories } = options;
   // Only here, so that no other command loads a web server.
   const [{ isBuiltStorybook, serveReviewWithStorybook }, { localReviewSource }] = await Promise.all([import("selfie-ui/local"), import("./ui.ts")]);
-  const dir = resolveStorybookDir(project.cwd, options.storybookDir, await resolveCaptureSettings(project.repo, { native }));
-  await buildIfAsked(buildCommand, project.cwd, context.signal, (line) => context.stderr(`${line}\n`));
-  if (options.needsBuild === true && !isBuiltStorybook(dir)) {
-    throw new SelfieError("no-stories", `There's no built Storybook at ${dir}, so there's nothing to give feedback on. Build one, or pass --build-command.`);
+  const settings = await resolveRenderSettings(project.repo, { native });
+  const dir = resolveStorybookDir(project.cwd, options.storybookDir, settings);
+  if (forStories !== undefined) {
+    if (forStories.build) await buildIfAsked(settings.buildCommand, project.repo.root, context.signal, (line) => context.stderr(`${line}\n`));
+    if (!isBuiltStorybook(dir)) context.stderr(`There's no built Storybook at ${dir} yet. The page says what to do.\n`);
   }
   const servers = await serveReviewWithStorybook({
     source: (url) =>
@@ -194,18 +197,19 @@ async function serveReview(
           dir,
           url,
           record: async (stories) =>
-            (await record(project, { storybookDir: dir, native, stories, capture: context.capture, log: (line) => context.stderr(`${line}\n`) })).run.id,
+            (await record(project, { storybookDir: dir, native, stories, render: context.render, log: (line) => context.stderr(`${line}\n`) })).run.id,
         },
       }),
     port: options.port,
     clientDir: context.uiClientDir,
     dir,
-    readBuildFile: (build, file) => project.builds.readFile(build, file),
+    readStorybookFile: (build, file) => project.storybooks.readFile(build, file),
   });
   try {
-    printJson(context, { url: `${servers.review.url}${options.path}`, port: servers.review.port, runId: options.runId, storybookUrl: servers.storybook.url });
-    context.stderr("Serving the review UI until this is stopped.\n");
-    if (options.afterListening !== undefined) context.stderr(options.afterListening);
+    const url = `${servers.review.url}${options.path}`;
+    printJson(context, { url, port: servers.review.port, runId: options.runId, storybookUrl: servers.storybook.url });
+    context.stderr(`Serving ${url} until this is stopped.\n`);
+    if (forStories?.open === true) context.openBrowser?.(url);
     await stopped(context.signal);
   } finally {
     await servers.close();
@@ -213,13 +217,31 @@ async function serveReview(
   return EXIT_OK;
 }
 
+/** What `selfie` alone does: every story of the Storybook, to look at and write notes on. */
+function openEveryStory(args: string[], context: Context): Promise<number> {
+  const { values, positionals } = parse(args, { ...SERVING_OPTIONS, "no-build": { type: "boolean" }, "no-open": { type: "boolean" } });
+  noPositionals("selfie", positionals);
+  const port = portFrom(values.port);
+  return withProject(context, (project) =>
+    serveReview(context, project, {
+      port,
+      native: values.native,
+      storybookDir: values["storybook-dir"],
+      path: "",
+      runId: null,
+      forStories: { build: values["no-build"] !== true, open: values["no-open"] !== true },
+    }),
+  );
+}
+
 function recordOptions(values: ReturnType<typeof parse<typeof BUILD_OPTIONS>>["values"], context: Context) {
   return {
     storybookDir: values["storybook-dir"],
     buildCommand: values["build-command"],
+    buildFromConfig: values.build,
     native: values.native,
     stories: values.story,
-    capture: context.capture,
+    render: context.render,
     signal: context.signal,
     log: (line: string) => context.stderr(`${line}\n`),
   };
@@ -350,7 +372,7 @@ async function dispatch(command: string | undefined, args: string[], context: Co
       noPositionals(command, positionals);
       const remote = resolveRemote(values.remote, context.env, context.fetch);
       return withProject(context, async (project) => {
-        const { environmentId } = await resolveCaptureSettings(project.repo, { native: values.native });
+        const { environmentId } = await resolveRenderSettings(project.repo, { native: values.native });
         const found = remote === null ? await findBaseline(project, environmentId) : await findBaselineWithRemote(project, remote, environmentId);
         printJson(context, { ...found, environment: environmentId });
         return EXIT_OK;
@@ -400,27 +422,10 @@ async function dispatch(command: string | undefined, args: string[], context: Co
         return serveReview(context, project, { port, native: values.native, storybookDir: values["storybook-dir"], path: runId === undefined ? "" : `runs/${runId}`, runId: runId ?? null });
       });
     }
-    case "feedback": {
-      const { values, positionals } = parse(args, { ...SERVING_OPTIONS, "build-command": { type: "string" } });
-      noPositionals(command, positionals);
-      const port = portFrom(values.port);
-      return withProject(context, async (project) => {
-        return serveReview(context, project, {
-          port,
-          native: values.native,
-          storybookDir: values["storybook-dir"],
-          path: "stories",
-          runId: null,
-          buildCommand: values["build-command"],
-          needsBuild: true,
-          afterListening: "Open that page, and write a note on any story. For an agent to be sent them, have it run: selfie agent-await-feedback\n",
-        });
-      });
-    }
     default:
       throw new SelfieError(
         "usage",
-        command === undefined ? "No command given." : `Unknown command "${command}". See selfie --help.`,
+        `Unknown command "${command}". See selfie --help.`,
       );
   }
 }
@@ -438,6 +443,7 @@ export async function runCli(argv: readonly string[], context: Context): Promise
     return EXIT_OK;
   }
   try {
+    if (command === undefined || command.startsWith("-")) return await openEveryStory([...argv], context);
     return await dispatch(command, args, context);
   } catch (error) {
     const { message } = error as Error;

@@ -66,6 +66,37 @@ export const decidableIn = (rows: readonly SnapshotRow[]) => rows.filter(({ stat
 export const targetsOf = (rows: readonly SnapshotRow[]): DecisionTarget[] =>
   rows.map(({ story, imageHash }) => ({ story, imageHash: imageHash! }));
 
+/** Where the keys go from a story, and how far along it is. */
+export interface StoryNavigation {
+  readonly previous: string | null;
+  readonly next: string | null;
+  /** The story `next` goes to, to have its images ready if this page knows them. */
+  readonly nextStory: string | null;
+  readonly list: string;
+  readonly position: string;
+}
+
+/**
+ * Through `shown`, as the list beside a story's page has it. `all` is the same list with no filter,
+ * so a story a decision just took out of the filter still has neighbors.
+ */
+export function navigationThrough<Row extends { readonly story: string }>(
+  all: readonly Row[],
+  shown: readonly Row[],
+  story: string,
+  hrefOf: (story: string) => string,
+  list: string,
+): StoryNavigation {
+  const { previous, next } = neighbors(all, shown, story);
+  return {
+    previous: previous === null ? null : hrefOf(previous.story),
+    next: next === null ? null : hrefOf(next.story),
+    nextStory: next?.story ?? null,
+    list,
+    position: positionWords(shown.findIndex((row) => row.story === story), shown.length),
+  };
+}
+
 /**
  * The shown rows on either side of a story, by position in `all`, so a story a decision just took
  * out of the filter still has neighbors.

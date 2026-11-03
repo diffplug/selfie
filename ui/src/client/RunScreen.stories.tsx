@@ -3,6 +3,7 @@ import { useRef } from "react";
 import { userEvent, within } from "storybook/test";
 import type { RunView } from "../shared/api.ts";
 import type { RunState } from "./hooks.ts";
+import { RunFrame } from "./stories/RunFrame.tsx";
 import { RunScreen } from "./RunScreen.tsx";
 import { approved, BASELINE_SHA, failure, OTHER_RUN_ID, rejected, rows, runOf, stateOf, viewOf } from "./stories/fixtures.ts";
 
@@ -14,10 +15,15 @@ interface Args {
 
 function Screen({ view, state, search = "" }: Args) {
   const returningFrom = useRef<string | null>(null);
-  return <RunScreen state={stateOf(view, state)} view={view} search={search} returningFrom={returningFrom} />;
+  const shown = stateOf(view, state);
+  return (
+    <RunFrame view={view} state={shown} search={search}>
+      {() => <RunScreen state={shown} view={view} search={search} returningFrom={returningFrom} />}
+    </RunFrame>
+  );
 }
 
-const meta = { title: "Screens/Run", component: Screen } satisfies Meta<typeof Screen>;
+const meta = { title: "Pages/Run", component: Screen } satisfies Meta<typeof Screen>;
 export default meta;
 type Story = StoryObj<typeof meta>;
 
@@ -77,8 +83,7 @@ export const Filtered: Story = {
     }),
   },
 };
-export const FilteredList: Story = { args: { view: viewOf(SOME_CHANGES), search: "?show=changed&text=button" } };
-export const NothingMatchesFilter: Story = { args: { view: viewOf(SOME_CHANGES), search: "?text=no-such-story" } };
+export const ShowingOnlyWhatChanged: Story = { args: { view: viewOf(SOME_CHANGES), search: "?show=changed" } };
 export const NewerRunExists: Story = {
   args: {
     view: viewOf(SOME_CHANGES, {

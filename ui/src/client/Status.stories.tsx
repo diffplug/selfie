@@ -1,8 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { LoadFailure, Loading, NoRuns, NotFound } from "./Status.tsx";
-import { BASELINE_SHA, failure, SHA } from "./stories/fixtures.ts";
+import { LoadFailure, Loading, NotFound } from "./Status.tsx";
+import { failure } from "./stories/fixtures.ts";
 
-const meta = { title: "Screens/Status" } satisfies Meta;
+const meta = { title: "Pages/Status" } satisfies Meta;
 export default meta;
 type Story = StoryObj<typeof meta>;
 
@@ -14,24 +14,7 @@ export const NoSuchRun: Story = {
 export const ServerGone: Story = {
   render: () => <LoadFailure error={failure("unreachable", "Can't reach the Selfie server. Is selfie ui still running?")} />,
 };
+export const Dark: Story = { render: () => <NotFound />, parameters: { colorMode: "night" } };
 export const OtherFailure: Story = {
   render: () => <LoadFailure error={failure("bad-response", "The server answered 500.")} />,
-};
-export const NoCommits: Story = {
-  render: () => <NoRuns current={{ head: null, runId: null, hasUnfinishedRun: false, baseline: null }} />,
-};
-export const NoRunsAtHead: Story = {
-  render: () => (
-    <NoRuns
-      current={{
-        head: SHA,
-        runId: null,
-        hasUnfinishedRun: false,
-        baseline: { sha: BASELINE_SHA, message: null },
-      }}
-    />
-  ),
-};
-export const OnlyAnUnfinishedRun: Story = {
-  render: () => <NoRuns current={{ head: SHA, runId: null, hasUnfinishedRun: true, baseline: null }} />,
 };

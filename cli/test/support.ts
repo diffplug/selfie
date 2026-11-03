@@ -1,16 +1,17 @@
-// A temp Git repository and Selfie home, and a stand-in for `capture` that writes what a test
+// A temp Git repository and Selfie home, and a stand-in for `render` that writes what a test
 // says, so everything but the browser runs with no Docker. `review.container.test.ts` runs the
 // real one.
 import { execFileSync } from "node:child_process";
-import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import { rmSync } from "node:fs";
+import { cp, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import {
   defineEnvironment,
   environmentId,
   filterStories,
-  type capture,
-  type CaptureOptions,
+  type render,
+  type RenderOptions,
   type Manifest,
   type ManifestStory,
   type StoryError,
@@ -50,7 +51,7 @@ export interface FakeStory {
   readonly patch?: readonly [number, number, number, number, Color];
   readonly failed?: string;
   readonly errors?: readonly StoryError[];
-  /** A warning from the capture itself, in the manifest. */
+  /** A warning from the render itself, in the manifest. */
   readonly warning?: string;
   /** Replaces the manifest's path to the image, to test what an unsafe one does. */
   readonly fileOverride?: string;
@@ -60,13 +61,13 @@ export interface FakeStory {
   readonly symlinkTo?: string;
 }
 
-/** Writes what `capture` writes for these stories. */
-export function fakeCapture(
+/** Writes what `render` writes for these stories. */
+export function fakeRender(
   stories: () => readonly FakeStory[],
-  onCapture?: (options: CaptureOptions) => void,
-): typeof capture {
-  return async (options: CaptureOptions) => {
-    onCapture?.(options);
+  onRender?: (options: RenderOptions) => void,
+): typeof render {
+  return async (options: RenderOptions) => {
+    onRender?.(options);
     const environment = options.environment ?? defineEnvironment();
     const filtered = options.stories ? filterStories(stories(), options.stories) : null;
     const selected = filtered?.stories ?? stories();
@@ -136,15 +137,29 @@ export function fakeCapture(
 export const git = (cwd: string, ...args: string[]): string =>
   execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 
+let repoTemplate: Promise<string> | undefined;
+
+/** Made once per test file, since nearly every test wants one, and copying it costs no Git processes. */
+const templateRepo = () =>
+  (repoTemplate ??= (async () => {
+    const parent = await mkdtemp(path.join(tmpdir(), "selfie-cli-template-"));
+    process.once("exit", () => rmSync(parent, { recursive: true, force: true }));
+    const repo = path.join(parent, "repo");
+    await mkdir(repo);
+    git(repo, "init", "--quiet", "--initial-branch=main", "--template=");
+    git(repo, "config", "user.email", "tester@example.com");
+    git(repo, "config", "user.name", "Tester");
+    git(repo, "config", "commit.gpgsign", "false");
+    // A commit starts this in the background, whose lock file could vanish in the middle of a copy.
+    git(repo, "config", "maintenance.auto", "false");
+    await commit(repo, "first");
+    return repo;
+  })());
+
 /** A new repository on `main` with one commit, and its identity set for this repository only. */
 export async function createRepo(parent: string, name = "repo"): Promise<string> {
   const repo = path.join(parent, name);
-  await mkdir(repo, { recursive: true });
-  git(repo, "init", "--quiet", "--initial-branch=main");
-  git(repo, "config", "user.email", "tester@example.com");
-  git(repo, "config", "user.name", "Tester");
-  git(repo, "config", "commit.gpgsign", "false");
-  await commit(repo, "first");
+  await cp(await templateRepo(), repo, { recursive: true });
   return repo;
 }
 
@@ -160,14 +175,14 @@ export interface Harness {
   readonly scratch: string;
   readonly repo: string;
   readonly home: string;
-  /** What the next capture renders. */
+  /** What the next render renders. */
   stories: readonly FakeStory[];
   /** Runs a command in-process. `json` is stdout parsed, which fails if it isn't one document. */
   cli: (...argv: string[]) => Promise<{ code: number; json: any; stdout: string; stderr: string }>;
-  /** The capture to hand to the library directly. */
-  capture: typeof capture;
-  /** Called at the start of each capture. */
-  onCapture?: (options: CaptureOptions) => void;
+  /** The render to hand to the library directly. */
+  render: typeof render;
+  /** Called at the start of each render. */
+  onRender?: (options: RenderOptions) => void;
   destroy: () => Promise<void>;
 }
 
@@ -175,16 +190,16 @@ export async function createHarness(): Promise<Harness> {
   const scratch = await mkdtemp(path.join(tmpdir(), "selfie-cli-test-"));
   const repo = await createRepo(scratch);
   const home = path.join(scratch, "home");
-  const fake = fakeCapture(
+  const fake = fakeRender(
     () => harness.stories,
-    (options) => harness.onCapture?.(options),
+    (options) => harness.onRender?.(options),
   );
   const harness: Harness = {
     scratch,
     repo,
     home,
     stories: [],
-    capture: fake,
+    render: fake,
     cli: async (...argv) => {
       let stdout = "";
       let stderr = "";
@@ -197,7 +212,7 @@ export async function createHarness(): Promise<Harness> {
         stderr: (text) => {
           stderr += text;
         },
-        capture: fake,
+        render: fake,
       });
       return { code, stdout, stderr, json: JSON.parse(stdout) };
     },

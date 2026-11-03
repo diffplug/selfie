@@ -4,7 +4,7 @@
 
 ## Image identity
 
-**Opaque only.** All 1,016 Chromium screenshots captured so far, 2026-11, are 8-bit RGB PNGs with no alpha channel. They came from one app's Storybook through Playwright, without `omitBackground`. Taking RGB directly means a bulk copy, where taking RGBA cost about 6.7 ms per 1200×900 image to scan alpha and strip it, in a micro-benchmark of equivalent loops. Support for transparency could be added later without changing any existing hash, because an RGBA PAM has a different header.
+**Opaque only.** All 1,016 Chromium screenshots rendered so far, 2026-11, are 8-bit RGB PNGs with no alpha channel. They came from one app's Storybook through Playwright, without `omitBackground`. Taking RGB directly means a bulk copy, where taking RGBA cost about 6.7 ms per 1200×900 image to scan alpha and strip it, in a micro-benchmark of equivalent loops. Support for transparency could be added later without changing any existing hash, because an RGBA PAM has a different header.
 
 ## Image decoding
 
@@ -40,7 +40,7 @@ A color profile is why the chunk rule isn't only tidiness: it would change a has
 
 **First bytes, not strictly.** The store checks and then writes, so concurrent first puts can both write, and the blob ends as either. Making that strict would take a conditional put in every adapter, for no change in what the bytes decode to.
 
-**Why WebP.** A lossless comparison over 434 screenshots at 1× and 2×, 2026-11, recommended it over keeping PNG and over JPEG XL. Its full report isn't in the repo. On dormouse's 541 stories captured as whole pages, in the same comparison's terms:
+**Why WebP.** A lossless comparison over 434 screenshots at 1× and 2×, 2026-11, recommended it over keeping PNG and over JPEG XL. Its full report isn't in the repo. On dormouse's 541 stories rendered as whole pages, in the same comparison's terms:
 
 | | 1× | 1.5× | 2× |
 |---|---|---|---|
@@ -59,11 +59,11 @@ All 1,623 of those images came back from `sharp` with exactly the same pixels, i
 
 **`sharp`'s license.** `sharp` is Apache-2.0. Its prebuilt `@img/sharp-libvips-*` packages are LGPL-3.0-or-later, installed as separate npm packages and linked dynamically. That was read from their `package.json` files, and isn't legal advice.
 
-## Storybook builds
+## Built Storybooks
 
-**Why by file, and why one list.** Storybook names most of its files by their content, so most of a build survives a rebuild. This repository's build is 10 MB in 65 files, and Dormouse's 568 stories are 12 MB in 390 files, both measured 2026-11. Dormouse's first keep added about 3.4 s to a record. A row per file would write that many rows for every build, and take a request for every file a page loads. One list is one blob, read once.
+**Why by file, and why one list.** Storybook names most of its files by their content, so most of a built Storybook survives a rebuild. This repository's build is 10 MB in 65 files, and Dormouse's 568 stories are 12 MB in 390 files, both measured 2026-11. Dormouse's first keep added about 3.4 s to a record. A row per file would write that many rows for every built Storybook, and take a request for every file a page loads. One list is one blob, read once.
 
-**Why the first list stays.** A build's hash ignores what can't change a pixel (`docs/specs/render.md`), so two builds with one hash can differ in `project.json`. Either answer is fine, and keeping the first means a kept build never changes, which a browser's cache relies on.
+**Why the first list stays.** A built Storybook's hash ignores what can't change a pixel (`docs/specs/render.md`), so two builds with one hash can differ in `project.json`. Either answer is fine, and keeping the first means a kept built Storybook never changes, which a browser's cache relies on.
 
 ## Adapters
 

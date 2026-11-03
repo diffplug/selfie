@@ -1,12 +1,12 @@
 // One project's local data: `<home>/<slug>/`, which holds its store, the per-run directories
-// reviews write, and the scratch directories captures use. Every fact about a run is in the
+// reviews write, and the scratch directories renders use. Every fact about a run is in the
 // store: a run directory is only a disposable cache of what was exported for it.
 import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { FilesystemBlobStorage } from "selfie-store/adapters/filesystem-blob";
 import { sharpCodec } from "selfie-store/adapters/sharp-codec";
 import { SqliteAdapter } from "selfie-store/adapters/sqlite";
-import { Blobs, initStoreSchema, Snapshots, Sql, Store, StorybookBuilds, type CompareOptions, type Comparison, type Run } from "selfie-store";
+import { Blobs, initStoreSchema, Snapshots, Sql, Store, BuiltStorybooks, type CompareOptions, type Comparison, type Run } from "selfie-store";
 import type { PixelDiff } from "./diff.ts";
 import { SelfieError } from "./errors.ts";
 import { headSha, nearestOnBranch, openRepo, walkToBaseline, type BaselineSearch, type Repo } from "./git.ts";
@@ -15,8 +15,8 @@ import { assertRunId, isRunId, projectSlug, selfieHome } from "./paths.ts";
 
 /** How many runs keep their exported images. Older ones are deleted by the next review. */
 const RUN_DIRECTORIES_KEPT = 20;
-/** A capture directory this old belongs to a process that crashed. */
-const STALE_CAPTURE_MS = 24 * 60 * 60 * 1000;
+/** A render directory this old belongs to a process that crashed. */
+const STALE_RENDER_MS = 24 * 60 * 60 * 1000;
 const CACHE_FILE = "review.json";
 
 /**
@@ -64,7 +64,7 @@ export interface Project {
   readonly renders: Renders;
   readonly notes: Notes;
   readonly store: Store;
-  readonly builds: StorybookBuilds;
+  readonly storybooks: BuiltStorybooks;
   readonly snapshots: Snapshots;
   readonly close: () => void;
 }
@@ -88,7 +88,7 @@ export async function openProject({ cwd, env }: { cwd: string; env: NodeJS.Proce
     renders: rendersIn(sql),
     notes: notesIn(sql, repo.root),
     store: new Store({ sql, blob, codec: sharpCodec }),
-    builds: new StorybookBuilds({ sql, blob }),
+    storybooks: new BuiltStorybooks({ sql, blob }),
     snapshots: new Snapshots({ sql }),
     close: () => adapter.close(),
   };
@@ -141,8 +141,8 @@ export async function branchGoldens(project: Project, run: Run): Promise<string 
 
 export const runDirectory = (project: Project, runId: string) => path.join(project.directory, "runs", runId);
 
-/** A new directory for one capture, so concurrent reviews never share one. */
-export const captureDirectory = (project: Project, id: string) => path.join(project.directory, "capture", id);
+/** A new directory for one render, so concurrent reviews never share one. */
+export const renderDirectory = (project: Project, id: string) => path.join(project.directory, "render", id);
 
 /** What a review exported, kept beside the images. Losing it loses no fact: the store has them all. */
 export interface ReviewCache {
@@ -171,7 +171,7 @@ export async function readReviewCache(project: Project, runId: string): Promise<
 }
 
 /**
- * Keeps the newest runs' directories, and drops capture directories left by a crash. Only ever
+ * Keeps the newest runs' directories, and drops render directories left by a crash. Only ever
  * touches names it would have created itself, directly under these two directories.
  */
 export async function pruneOutput(project: Project, keepRunId: string): Promise<void> {
@@ -194,11 +194,11 @@ export async function pruneOutput(project: Project, keepRunId: string): Promise<
       .map(({ name }) => rm(path.join(runsRoot, name), { recursive: true, force: true })),
   );
 
-  const captureRoot = path.join(project.directory, "capture");
-  const oldest = Date.now() - STALE_CAPTURE_MS;
+  const renderRoot = path.join(project.directory, "render");
+  const oldest = Date.now() - STALE_RENDER_MS;
   await Promise.all(
-    (await dated(captureRoot))
+    (await dated(renderRoot))
       .filter(({ modified }) => modified < oldest)
-      .map(({ name }) => rm(path.join(captureRoot, name), { recursive: true, force: true })),
+      .map(({ name }) => rm(path.join(renderRoot, name), { recursive: true, force: true })),
   );
 }

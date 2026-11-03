@@ -1,17 +1,17 @@
 // The review UI's window on a local repository: the library, as the shape its routes want. It reads
-// what's been recorded, records decisions on it, and renders only when a page asks it to capture.
-import { newestCaptures, type Comparison, type DecisionKind, type Run } from "selfie-store";
+// what's been recorded, records decisions on it, and renders only when a page asks it to render.
+import { newestRenders, type Comparison, type DecisionKind, type Run } from "selfie-store";
 import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
 import { isBuiltStorybook } from "selfie-ui/local";
-import { keptBuildPath } from "selfie-ui/api";
-import { buildHash, readStoryIndex } from "selfie-render";
-import type { AcceptOutcome, CurrentView, DecisionTarget, FeedbackView, NewNote, ReviewSource, RunView, SnapshotRow, StoriesView, StorybookLink } from "selfie-ui/app";
-import { resolveCaptureSettings, resolveRegionMergeDistance } from "./config.ts";
+import { keptStorybookPath } from "selfie-ui/api";
+import { storybookHash, readStoriesInOrder, readStoryIndex, storiesInIndex, type StoryEntry } from "selfie-render";
+import type { AcceptOutcome, DecisionTarget, FeedbackView, NewNote, ReviewSource, RunView, SnapshotRow, StoriesView, StorybookLink, StorySetup } from "selfie-ui/app";
+import { resolveRenderSettings, resolveRegionMergeDistance } from "./config.ts";
 import { accept, checkAccept, decide } from "./decisions.ts";
 import { diffToPng, type PixelDiff } from "./diff.ts";
 import { SelfieError } from "./errors.ts";
-import { gitUserEmail, type BaselineSearch } from "./git.ts";
+import { currentBranch, dirtyPaths, gitUserEmail, headMovedAt, headSha, type BaselineSearch } from "./git.ts";
 import { isOpenNote } from "selfie-ui/notes";
 import { sentNotes, textForAgent } from "./notes.ts";
 import { branchGoldens, compareAsReviewed, compareAsShown, findBaseline, readReviewCache, requireRun, runsAtHead, type Project } from "./project.ts";
@@ -19,6 +19,9 @@ import { summarizeRun } from "./summary.ts";
 
 /** Each is about 20 KB of PNG. This is a reviewer going back and forth, not a cache of a run. */
 const DIFFS_KEPT = 32;
+
+/** A person looks at a few runs at a time. */
+const KEPT_INDEXES_HELD = 8;
 
 const baselineNote = ({ sha, message }: BaselineSearch) => ({ sha, message });
 
@@ -32,12 +35,12 @@ export function localReviewSource(
   const { snapshots, store, repo } = project;
 
   // One at a time from a page, since two can't both be what someone is waiting on. An agent's own
-  // `selfie record` isn't held to this: each capture has a directory of its own.
-  let capturing = false;
+  // `selfie record` isn't held to this: each render has a directory of its own.
+  let rendering = false;
 
-  /** Hashing a whole build is too slow for every read of a page, and any change to it changes a file's time or size. */
-  let knownBuild: { readonly stamp: string; readonly hash: Promise<string | null> } | null = null;
-  const hostedBuild = async (dir: string): Promise<string | null> => {
+  /** Hashing a whole built Storybook is too slow for every read of a page, and any change to it changes a file's time or size. */
+  let knownStorybook: { readonly stamp: string; readonly hash: Promise<string | null> } | null = null;
+  const hostedStorybook = async (dir: string): Promise<string | null> => {
     const files = (await readdir(dir, { recursive: true, withFileTypes: true }).catch(() => [])).filter((entry) => entry.isFile());
     const stats = await Promise.all(files.map(async (entry) => {
       const file = path.join(entry.parentPath, entry.name);
@@ -45,26 +48,60 @@ export function localReviewSource(
       return `${file}:${mtimeMs}:${size}`;
     }));
     const stamp = stats.sort().join();
-    if (knownBuild?.stamp !== stamp) knownBuild = { stamp, hash: buildHash(dir) };
-    return knownBuild.hash;
+    if (knownStorybook?.stamp !== stamp) knownStorybook = { stamp, hash: storybookHash(dir) };
+    return knownStorybook.hash;
+  };
+
+  // Nothing says what a built Storybook was built from, since it may not have been built by Selfie. A built Storybook
+  // newer than HEAD's last move can only have come from this commit or from changes made since.
+  const builtBeforeHead = async (dir: string): Promise<boolean> => {
+    const moved = await headMovedAt(repo);
+    return moved !== null && (await stat(path.join(dir, "iframe.html"))).mtimeMs < moved;
   };
 
   const keptStorybookUrl = async (runId: string): Promise<string | null> => {
-    const kept = storybook === undefined ? null : await project.builds.keptBuildOfRun(runId);
-    return kept === null ? null : new URL(keptBuildPath(kept), storybook!.url).href;
+    const kept = storybook === undefined ? null : await project.storybooks.keptStorybookOfRun(runId);
+    return kept === null ? null : new URL(keptStorybookPath(kept), storybook!.url).href;
   };
 
   /** The very build that rendered a run, if that's kept, or else the directory as it stands. */
   const storybookFor = async (runId: string): Promise<StorybookLink | null> => {
     const kept = await keptStorybookUrl(runId);
-    if (kept !== null) return { url: kept, exactBuild: true };
-    return storybook !== undefined && isBuiltStorybook(storybook.dir) ? { url: storybook.url, exactBuild: false } : null;
+    if (kept !== null) return { url: kept, exactStorybook: true };
+    return storybook !== undefined && isBuiltStorybook(storybook.dir) ? { url: storybook.url, exactStorybook: false } : null;
   };
 
-  /** The kept build of the goldens a run is compared with. Never the directory, which wouldn't be them. */
+  /** The kept built Storybook of the goldens a run is compared with. Never the directory, which wouldn't be them. */
   const goldenStorybookFor = async ({ environment }: Run, sha: string | null): Promise<string | null> => {
     const goldens = sha === null ? null : await snapshots.acceptedRunAt(sha, environment);
     return goldens === null ? null : keptStorybookUrl(goldens);
+  };
+
+  /** A kept built Storybook's stories, which never change, or nothing if it can't say. */
+  const keptIndexes = new Map<string, Promise<readonly StoryEntry[]>>();
+  const storiesOfKept = (hash: string) => {
+    let index = keptIndexes.get(hash);
+    if (index === undefined) {
+      index = project.storybooks.readFile(hash, "index.json").then(
+        (bytes) => (bytes === null ? [] : storiesInIndex(JSON.parse(new TextDecoder().decode(bytes)), "a kept index.json")),
+      ).catch(() => []);
+      keptIndexes.set(hash, index);
+      for (const oldest of keptIndexes.keys()) {
+        if (keptIndexes.size <= KEPT_INDEXES_HELD) break;
+        keptIndexes.delete(oldest);
+      }
+    }
+    return index;
+  };
+
+  /** What the run's own Storybook calls its stories, then what its goldens' called those it no longer has. */
+  const storyNamesFor = async (run: Run, goldensSha: string | null, stories: ReadonlySet<string>) => {
+    const goldens = goldensSha === null ? null : await snapshots.acceptedRunAt(goldensSha, run.environment);
+    const kept = await Promise.all([run.id, goldens].map((id) => (id === null ? null : project.storybooks.keptStorybookOfRun(id))));
+    const entries = (await Promise.all(kept.map((hash) => (hash === null ? [] : storiesOfKept(hash))))).flat();
+    const named = new Map<string, StoryEntry>();
+    for (const entry of entries) if (stories.has(entry.id) && !named.has(entry.id)) named.set(entry.id, entry);
+    return [...named.values()].map(({ id: story, title, name }) => ({ story, title, name }));
   };
 
   /** A corrupt cache costs only pixel stats in a list, so it isn't worth failing a page over. */
@@ -92,11 +129,15 @@ export function localReviewSource(
     const checked = onBranch === null ? summary : summarizeRun(reviewed);
     const notRendered = new Set(summary.notRendered.map(({ story }) => story));
     const { refusals, usableAsBaseline, removals } = await checkAccept(project, reviewed);
+    const rows = await toRows(
+      run.id,
+      comparison.snapshots.filter(({ story }) => !notRendered.has(story)),
+    );
     return {
       run,
       storybook: await storybookFor(run.id),
       goldenStorybookUrl: await goldenStorybookFor(run, onBranch ?? run.baselineSha),
-      viewport: await project.builds.viewportOf(run.environment),
+      viewport: await project.storybooks.viewportOf(run.environment),
       branchGoldens: onBranch,
       regionMergeDistance: await resolveRegionMergeDistance(repo),
       acceptedRunId: await snapshots.acceptedRunAt(run.gitSha, run.environment),
@@ -104,10 +145,8 @@ export function localReviewSource(
       blockers: checked.blockers,
       advisories: summary.advisories,
       counts: { ...summary.counts, undecided: checked.counts.undecided, failed: summary.failed.length },
-      rows: await toRows(
-        run.id,
-        comparison.snapshots.filter(({ story }) => !notRendered.has(story)),
-      ),
+      rows,
+      storyNames: await storyNamesFor(run, onBranch ?? run.baselineSha, new Set(rows.map(({ story }) => story))),
       refusals,
       removals,
       usableAsBaseline,
@@ -170,12 +209,11 @@ export function localReviewSource(
     runView: async (runId) => viewOf(await compareAsReviewed(project, runId), await gitUserEmail(repo)),
 
     async storiesView(): Promise<StoriesView> {
-      const settings = await resolveCaptureSettings(repo, { native });
+      const settings = await resolveRenderSettings(repo, { native });
       const { head, runs } = await runsAtHead(project, settings.environmentId);
       const finished = runs.filter(({ status }) => status !== "recording");
       const built = storybook !== undefined && isBuiltStorybook(storybook.dir);
-      const index = built ? await readStoryIndex(storybook.dir) : [];
-      const hosted = built ? await hostedBuild(storybook.dir) : null;
+      const index = built ? await readStoriesInOrder(storybook.dir) : [];
 
       // Runs at one commit all find the same goldens on its branch, and finding them takes Git.
       let onBranch: Promise<string | null> | undefined;
@@ -183,48 +221,63 @@ export function localReviewSource(
         const against = run.baselineSha ?? (await (onBranch ??= branchGoldens(project, run)));
         return (await compareAsShown(project, run, against)).snapshots;
       };
-      const captures = await newestCaptures(finished, rowsOf, index.length > 0 ? new Set(index.map(({ id }) => id)) : undefined);
+      const renders = await newestRenders(finished, rowsOf, index.length > 0 ? new Set(index.map(({ id }) => id)) : undefined);
 
+      // Hashing a whole build isn't worth it until there's a render to compare it with.
+      const hosted = built && renders.size > 0 ? await hostedStorybook(storybook.dir) : null;
       const builds = new Map<string, string | null>();
       const buildOf = async (runId: string) => {
-        if (!builds.has(runId)) builds.set(runId, await project.builds.buildOfRun(runId));
+        if (!builds.has(runId)) builds.set(runId, await project.storybooks.storybookOfRun(runId));
         return builds.get(runId)!;
       };
-      const ids = index.length > 0 ? index.map(({ id }) => id) : [...captures.keys()].sort();
+      const listed = index.length > 0 ? index : [...renders.keys()].sort().map((id) => ({ id, title: "", name: id }));
       return {
         head,
+        branch: await currentBranch(repo),
         storybookUrl: built ? storybook.url : null,
         viewport: settings.environment.viewport,
         stories: await Promise.all(
-          ids.map(async (story) => {
-            const found = captures.get(story);
-            if (found === undefined) return { story, capture: null };
+          listed.map(async ({ id: story, title, name }) => {
+            const found = renders.get(story);
+            if (found === undefined) return { story, title, name, render: null };
             const { run, row } = found;
             const build = await buildOf(run.id);
             return {
               story,
-              capture: {
+              title,
+              name,
+              render: {
                 runId: run.id,
                 state: row.state,
                 decision: row.decision,
-                capturedAt: run.startedAt,
+                renderedAt: run.startedAt,
                 dirty: run.dirty,
-                fromHostedBuild: hosted === null || build === null ? null : build === hosted,
+                fromHostedStorybook: hosted === null || build === null ? null : build === hosted,
               },
             };
           }),
         ),
         newestRunId: finished[0]?.id ?? null,
-        canCapture: built && storybook.record !== undefined,
+        canRender: built && head !== null && storybook.record !== undefined,
+        setup:
+          storybook === undefined
+            ? null
+            : {
+                storybookDir: path.relative(repo.root, storybook.dir) || ".",
+                buildCommand: settings.buildCommand ?? null,
+                uncommitted: await dirtyPaths(repo),
+                builtBeforeHead: built && head !== null && (await builtBeforeHead(storybook.dir)),
+                usesDocker: settings.environment.runner.kind === "container",
+              },
       };
     },
 
-    async capture(stories) {
+    async render(stories) {
       if (storybook === undefined || storybook.record === undefined || !isBuiltStorybook(storybook.dir)) {
-        throw new SelfieError("capture-failed", "This server has no built Storybook to capture.");
+        throw new SelfieError("render-failed", "This server has no built Storybook to render a story from.");
       }
-      if (capturing) throw new SelfieError("capture-busy", "A capture is already running here. Try again once it's done.");
-      capturing = true;
+      if (rendering) throw new SelfieError("render-busy", "A render is already running here. Try again once it's done.");
+      rendering = true;
       try {
         const index = new Set((await readStoryIndex(storybook.dir)).map(({ id }) => id));
         const unknown = stories.find((story) => !index.has(story));
@@ -233,27 +286,21 @@ export function localReviewSource(
         return { runId: await storybook.record(new Set(stories).size === index.size ? undefined : stories) };
       } catch (error) {
         if (error instanceof SelfieError && error.code === "unknown-story") throw error;
-        throw new SelfieError("capture-failed", `That didn't capture: ${(error as Error).message}`);
+        throw new SelfieError("render-failed", `That didn't render: ${(error as Error).message}`);
       } finally {
-        capturing = false;
+        rendering = false;
       }
-    },
-
-    async current(): Promise<CurrentView> {
-      const { environmentId: environment } = await resolveCaptureSettings(repo, { native });
-      const { head, runs } = await runsAtHead(project, environment);
-      const runId = runs.find(({ status }) => status !== "recording")?.id ?? null;
-      return {
-        head,
-        runId,
-        hasUnfinishedRun: runs.length > 0,
-        baseline: runId === null ? baselineNote(await findBaseline(project, environment)) : null,
-      };
     },
 
     async baseline(runId) {
       const run = await requireRun(project, runId);
       return baselineNote(await findBaseline(project, run.environment));
+    },
+
+    async runContext(runId) {
+      const run = await requireRun(project, runId);
+      const [head, branch, { mergeBase, defaultBranch }] = await Promise.all([headSha(repo), currentBranch(repo), findBaseline(project, run.environment)]);
+      return { head, branch, mergeBase, defaultBranch };
     },
 
     async unchanged(runId) {

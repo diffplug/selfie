@@ -1,13 +1,13 @@
 // `selfie record`, and `selfie review` of a run it's told about, against real Git, a real store,
 // real files, and only the browser replaced.
-import { mkdir, readFile, realpath, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, realpath, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { BLUE, commit, createHarness, git, GREEN, type Harness } from "./support.ts";
 
 let h: Harness;
 let build: string;
-let captures: number;
+let renders: number;
 
 const record = (...flags: string[]) => h.cli("record", "--storybook-dir", build, ...flags);
 const reviewBuild = (...flags: string[]) => h.cli("review", "--storybook-dir", build, ...flags);
@@ -18,9 +18,9 @@ beforeEach(async () => {
   await mkdir(build, { recursive: true });
   await writeFile(path.join(build, "iframe.html"), "<html></html>");
   h.stories = [{ id: "a--one" }, { id: "a--two" }];
-  captures = 0;
-  h.onCapture = () => {
-    captures += 1;
+  renders = 0;
+  h.onRender = () => {
+    renders += 1;
   };
 });
 afterEach(async () => {
@@ -65,10 +65,10 @@ describe("selfie review <run>", () => {
     h.stories = [{ id: "a--one", color: BLUE }, { id: "a--two" }];
     await writeFile(path.join(build, "iframe.html"), "<html>changed</html>");
     const head = await record();
-    expect(captures).toBe(2);
+    expect(renders).toBe(2);
 
     const reviewed = await h.cli("review", head.json.runId);
-    expect(captures).toBe(2);
+    expect(renders).toBe(2);
     expect(reviewed.code).toBe(1);
     expect(reviewed.json).toMatchObject({ runId: head.json.runId, comparedWith: { source: "baseline", sha: first.json.gitSha } });
     expect(reviewed.json.differences.map(({ story }: any) => story)).toEqual(["a--one"]);
@@ -224,8 +224,8 @@ describe("the config's storybookDir", () => {
   beforeEach(async () => {
     await mkdir(path.join(h.repo, "built"));
     await writeFile(path.join(h.repo, "built", "iframe.html"), "<html></html>");
-    h.onCapture = (options) => {
-      captures += 1;
+    h.onRender = (options) => {
+      renders += 1;
       seen = options.storybookDir;
     };
   });
@@ -250,11 +250,21 @@ describe("the config's storybookDir", () => {
     expect(json.error.code).toBe("bad-config");
   });
 
-  test.each(["buildCommand", "build-command", "build"])("has no %s, since a checkout must not run a shell", async (key) => {
+  test.each(["build-command", "build"])("has no %s, since a checkout must not run a shell", async (key) => {
     await config({ [key]: "touch pwned" });
     const { code, json } = await h.cli("record");
     expect(code).toBe(2);
     expect(json.error.code).toBe("bad-config");
+  });
+
+  test("a buildCommand isn't run unless someone asks, since a checkout must not run a shell by itself", async () => {
+    const marker = path.join(h.scratch, "ran");
+    await writeFile(path.join(h.repo, "selfie.config.json"), JSON.stringify({ buildCommand: `touch ${marker}` }));
+    h.stories = [{ id: "a" }];
+    await h.cli("record", "--storybook-dir", "ignored");
+    await expect(access(marker)).rejects.toThrow();
+    await h.cli("record", "--storybook-dir", "ignored", "--build");
+    await expect(access(marker)).resolves.toBeUndefined();
   });
 });
 
@@ -373,6 +383,6 @@ describe("selfie review --baseline", () => {
     const { code, json } = await reviewBuild("--baseline", one.json.runId);
     expect(code).toBe(0);
     expect(json.runId).toBe(one.json.runId);
-    expect(captures).toBe(1);
+    expect(renders).toBe(1);
   });
 });

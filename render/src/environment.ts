@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import os from "node:os";
-import { CAPTURE_RECIPE, PLAYWRIGHT_VERSION } from "./worker/protocol.ts";
+import { RENDER_RECIPE, PLAYWRIGHT_VERSION } from "./worker/protocol.ts";
 
 const DEFAULT_IMAGE =
   "mcr.microsoft.com/playwright@sha256:a0f4498920a5dbac63196d9140ed738ef00470f27e2e74029abd8850b7bd5717";
@@ -148,7 +148,7 @@ export function environmentId(environment: RenderEnvironment): string {
     browserFlags: [...browserFlags].sort(),
     viewport: { width: viewport.width, height: viewport.height },
     scale,
-    recipe: CAPTURE_RECIPE,
+    recipe: RENDER_RECIPE,
     playwright: PLAYWRIGHT_VERSION,
   };
   const hash = createHash("sha256").update(canonicalJson(decidesPixels)).digest("hex").slice(0, 16);

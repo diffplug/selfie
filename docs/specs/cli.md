@@ -3,7 +3,7 @@
 > Status: built — the `selfie-cli` library and the `selfie` binary: `review`, `approve`, `reject`, `accept`, `find-baseline`, and `ui`, on the local store. `docs/specs/sync.md` owns `push`, `pull`, and what a remote adds to `find-baseline`; see `## Future`.
 >
 > - See `docs/specs/glossary.md` for run, snapshot, golden, baseline, decision, and environment.
-> - Owns local data's layout, each command's checks and exit code, and the shape of what they print and return. `docs/specs/snapshots.md` owns what a run, a decision, and a golden are. `docs/specs/render.md` owns capture. `docs/specs/store.md` owns images.
+> - Owns local data's layout, each command's checks and exit code, and the shape of what they print and return. `docs/specs/snapshots.md` owns what a run, a decision, and a golden are. `docs/specs/render.md` owns render. `docs/specs/store.md` owns images.
 
 ## Commands
 
@@ -11,8 +11,9 @@ Source of truth: `cli/src/cli.ts`, `cli/src/document.ts`; the real binary's test
 
 | Command | Does |
 |---|---|
+| `selfie` | Opens every story of a built Storybook, running, to look at, save, and write notes on, or says how to get there ([selfie alone](#selfie-alone)) |
 | `selfie record` | Always renders a built Storybook and records a run, and judges nothing |
-| `selfie review [<run>]` | Prints the diff of a run against its baseline. With no run, uses the one for this build, and records one [only if necessary](#recording-only-if-necessary) |
+| `selfie review [<run>]` | Prints the diff of a run against its baseline. With no run, uses the one for this built Storybook, and records one [only if necessary](#recording-only-if-necessary) |
 | `selfie approve <run>`, `selfie reject <run>` | Records a decision on a run's changed and new images, with `--all` or `--story <pattern>` |
 | `selfie accept <run>` | Makes a run the goldens of its Git SHA |
 | `selfie find-baseline` | Prints the baseline this repository and environment would use |
@@ -21,7 +22,6 @@ Source of truth: `cli/src/cli.ts`, `cli/src/document.ts`; the real binary's test
 | `selfie reply <note> <text>` | Answers a note (`docs/specs/feedback.md`) |
 | `selfie agent-await-feedback` | Blocks until a person sends notes from this folder (`docs/specs/feedback.md`) |
 | `selfie ui [<run>]` | Serves the review UI until stopped, and prints its URL ([ui](#ui)) |
-| `selfie feedback` | The same, opening at every story, for notes on a Storybook with nothing captured yet ([feedback](#feedback)) |
 
 - **Must print exactly one document on stdout, whatever happens,** and everything for people on stderr, including a review's one line of timings. A command that couldn't run prints `{ "error": { "code", "message" } }`. `--help` prints usage.
 - **Must use these exit codes:**
@@ -35,7 +35,7 @@ Source of truth: `cli/src/cli.ts`, `cli/src/document.ts`; the real binary's test
 | 130 | Stopped by a signal, where stopping isn't success | `agent-await-feedback` |
 
 - **Decision for the user to review: advisories don't change the exit code.** A project with two known `play` errors can reach exit 0, so 1 keeps its meaning of "something here stops you". It also means **an agent checking only the exit code won't see a `play` failure**: it has to read `advisories`, which is why the document always carries the list and its count ([What blocks](#what-blocks)) (rationale).
-- **Must take a story pattern as `docs/specs/render.md` → Capture defines it:** an ID, where `*` matches any run of characters.
+- **Must take a story pattern as `docs/specs/render.md` → Render defines it:** an ID, where `*` matches any run of characters.
 
 ## Library
 
@@ -54,7 +54,7 @@ Source of truth: `cli/src/index.ts`; tests in `cli/test/library.test.ts`.
 | `summarizeRun(comparison)` | Returns `blockers`, `advisories`, `counts`, `undecided`, `unapproved`, `failed`, `removed`, and `notRendered` |
 | `isDecidable(state)` | Whether a snapshot in this state can take a decision: `changed` or `new`. Defined in `selfie-store` |
 | `compareAsReviewed(project, runId, options)` | A run compared with the baseline its reviewer saw |
-| `findBaseline(project, environment)`, `resolveCaptureSettings(repo, { native })`, `gitUserEmail(repo)` | What the commands use for these |
+| `findBaseline(project, environment)`, `resolveRenderSettings(repo, { native })`, `gitUserEmail(repo)` | What the commands use for these |
 | `readReviewCache(project, runId)` | The paths and pixel diffs a review exported, or null once pruned |
 | `SelfieError` | Has a `code`, so a caller can tell cases apart without reading its message |
 
@@ -77,7 +77,7 @@ Source of truth: `cli/src/paths.ts`, `cli/src/project.ts`; tests in `cli/test/un
   runs/<run id>/review.json              A disposable cache of exported paths and pixel diffs
   runs/<run id>/stories/<name>/*.png     current, golden, and diff
   runs/<run id>/against/<baseline>/stories/<name>/*.png     the same, for a --baseline
-  capture/<uuid>/                        One capture's output, deleted when recording ends
+  render/<uuid>/                        One render's output, deleted when recording ends
 ```
 
 - **Never read `<home>/d1.env`**, or anything else in `<home>` that isn't under a project's slug.
@@ -88,13 +88,13 @@ Source of truth: `cli/src/paths.ts`, `cli/src/project.ts`; tests in `cli/test/un
 
 ## Review
 
-Source of truth: `cli/src/review.ts`, `cli/src/diff.ts`, `cli/src/regions.ts`, `cli/src/explain.ts`, `cli/src/png.ts`; tests in `cli/test/commands.test.ts` with a stand-in for `capture`, and `cli/test/review.container.test.ts` with the real one.
+Source of truth: `cli/src/review.ts`, `cli/src/diff.ts`, `cli/src/regions.ts`, `cli/src/explain.ts`, `cli/src/png.ts`; tests in `cli/test/commands.test.ts` with a stand-in for `render`, and `cli/test/review.container.test.ts` with the real one.
 
-A review of a named run starts at step 6. `selfie record` is steps 1 to 5, always captures, and prints what it recorded. Otherwise, in order, a review:
+A review of a named run starts at step 6. `selfie record` is steps 1 to 5, always renders, and prints what it recorded. Otherwise, in order, a review:
 
-1. Runs `--build-command`, if given, in a shell. Its stdout goes to stderr. **Never guess a project's build system.** **Never use a shell for anything else.**
+1. Runs `--build-command`, or with `--build` the config's `buildCommand`, in a shell. Its stdout goes to stderr. **Never guess a project's build system.** **Never use a shell for anything else.**
 2. Reads HEAD and the working tree, and finds the baseline ([`find-baseline`](#find-baseline)).
-3. Unless that exact build [already rendered](#recording-only-if-necessary), captures `--storybook-dir`, or else the config's `storybookDir`, or else `storybook-static`, in a new capture directory, with `--story` patterns, and the project's [init script](#configuration).
+3. Unless that exact built Storybook [already rendered](#recording-only-if-necessary), renders `--storybook-dir`, or else the config's `storybookDir`, or else `storybook-static`, in a new render directory, with `--story` patterns, and the project's [init script](#configuration).
 4. Checks HEAD didn't move.
 5. Unless a run [already says all this](#recording-only-if-necessary), begins a run recording whether the tree was dirty, the baseline, and any filter. Stores each PNG with `Store.putImages`, which keeps new ones as WebP, or takes an earlier render's rows, and records and finishes the run with `Snapshots`. Rows carry the failure message and the `play` error.
 6. Compares the run with `--baseline`, or else the baseline it recorded, or else its branch goldens.
@@ -119,8 +119,8 @@ A review of a named run starts at step 6. `selfie record` is steps 1 to 5, alway
 - **Must compare a region in place from its top left, past spacing, and count what only one image has as changed**, whether rows or columns, so images of any two sizes have stats and a diff image.
 - **Must mark a seam for a region with nothing different in the current image, because something was only taken away**, one row where it was, in the color of what happened to it, so every region has a place in the current image.
 - **Must make the diff image from the current image, faded to light gray, with changed pixels solid `#ff0050`, what moved tinted `#0969da` both where it landed and where it left, and spacing solid `#ffd666`.**
-- **Must treat a capture's unusable file as that story's failure**: a manifest path outside the capture directory, a path that isn't a regular file, or a PNG the store refuses. Other stories continue.
-- **Must fail with exit 2 if HEAD moves during the render, or if no story was captured**, since one Git SHA must describe the run, and a typo must not pass.
+- **Must treat a render's unusable file as that story's failure**: a manifest path outside the render directory, a path that isn't a regular file, or a PNG the store refuses. Other stories continue.
+- **Must fail with exit 2 if HEAD moves during the render, or if no story was rendered**, since one Git SHA must describe the run, and a typo must not pass.
 - **Must record a run as dirty if the tree had changes either before or after the render.** Ignored files don't count, so a gitignored `storybook-static` doesn't dirty the tree, and neither does a stale one (rationale).
 - **Must not call a golden removed when `--story` left its story out.** Such goldens are counted in `filter.notRendered`, and are not in `differences`, `counts.removed`, or `blockers`. A removed story matching a pattern still is.
 
@@ -147,21 +147,21 @@ Source of truth: `summarizeRun` in `cli/src/summary.ts`.
 
 Source of truth: `replay` and `renderFresh` in `cli/src/review.ts`, `renderIdentity` in `render/src/identity.ts`; tests in `cli/test/reuse.test.ts`, `render/test/identity.test.ts`.
 
-A review recognizes a build that already rendered, and skips capture and storing. Otherwise it records that render's image hashes and `play` errors in a new run. Everything else about a review stays: the run has this review's Git SHA, dirtiness, baseline, and filter, and it compares, exports, exits, and can be decided on and accepted like any other. Docker isn't needed for this, since nothing starts.
+A review recognizes a built Storybook that already rendered, and skips rendering and storing. Otherwise it records that render's image hashes and `play` errors in a new run. Everything else about a review stays: the run has this review's Git SHA, dirtiness, baseline, and filter, and it compares, exports, exits, and can be decided on and accepted like any other. Docker isn't needed for this, since nothing starts.
 
 - **Must show the existing run and record nothing when one at this commit came from that render with the same dirtiness, baseline, and filter** (rationale).
-- **Must recognize a build only by `renderIdentity` (`docs/specs/render.md` → Render identity)**, of `--storybook-dir` after any `--build-command`, with the environment and the init script.
+- **Must recognize a built Storybook only by `renderIdentity` (`docs/specs/render.md` → Render identity)**, of `--storybook-dir` after any `--build-command`, with the environment and the init script.
 - **Never reuse a run with a failed story**, including an image the store refused, however many times it fails (rationale).
-- **Never reuse a run where any story has an error other than `play`, `console`, or `page`, or where capture warned of anything** (rationale). Those three are the project's own code, and reuse keeps its `play` errors as advisories. Everything else, such as `request` and the soft `timeout`, might not happen next time.
-- **Must keep only the newest real render of a build, and forget the build if that render can't be reused**, so a forced render that fails isn't hidden by an older one that passed.
-- **Must not remember a render if the build's identity changed while it rendered**, since nothing describes those images.
+- **Never reuse a run where any story has an error other than `play`, `console`, or `page`, or where render warned of anything** (rationale). Those three are the project's own code, and reuse keeps its `play` errors as advisories. Everything else, such as `request` and the soft `timeout`, might not happen next time.
+- **Must keep only the newest real render of a built Storybook, and forget the built Storybook if that render can't be reused**, so a forced render that fails isn't hidden by an older one that passed.
+- **Must not remember a render if the built Storybook's identity changed while it rendered**, since nothing describes those images.
 - **Must always name a run that really rendered:** a reused run is never itself remembered, so reuse doesn't chain.
-- **Must answer a filtered review only from the build's whole run, by the filter, and never remember a filtered render or forget one because of it.** `filter`, `warnings`, and `blockers` come out as a render's would, and a filter matching nothing still exits 2.
+- **Must answer a filtered review only from the built Storybook's whole run, by the filter, and never remember a filtered render or forget one because of it.** `filter`, `warnings`, and `blockers` come out as a render's would, and a filter matching nothing still exits 2.
 - **Must always render in `selfie record`.** That render still updates what's remembered, so it is also how to replace one, and a later review shows the run it recorded.
 - **Must make it visible:** `run.reusedFromRun` (`docs/specs/snapshots.md` → Runs), which is `reusedFromRun` in `review`'s and `accept`'s documents; one line on stderr from each; and the run and accept screens (`docs/specs/ui.md` → Screens).
 - **Must say why on stderr when a plain render of every story can't be reused**, naming the story and the error, since that's how a project finds out why it never hits.
-- **Must keep the build that rendered each new run, reused or filtered or failed or not, named by `buildHash` (`docs/specs/render.md` → Render identity), unless it changed while it rendered**, so `selfie ui` can open the very build that rendered a run (`docs/specs/store.md` → Storybook builds, rationale).
-- **Must keep the bytes it read for that hash**, so a build rewritten meanwhile can't be kept under another's name, **and must not fail a run for failing to keep its build**, since the run is sound, and only its stories' links are lost.
+- **Must keep the built Storybook that rendered each new run, reused or filtered or failed or not, named by `storybookHash` (`docs/specs/render.md` → Render identity), unless it changed while it rendered**, so `selfie ui` can open the very build that rendered a run (`docs/specs/store.md` → Built Storybooks, rationale).
+- **Must keep the bytes it read for that hash**, so a built Storybook rewritten meanwhile can't be kept under another's name, **and must not fail a run for failing to keep its built Storybook**, since the run is sound, and only its stories' links are lost.
 - **Must keep what's remembered in one table in the local `store.db`, `render_keys(key, run_id)`, reached only through `Project.renders`' `find` and `remember`, and out of the store's schema**, so D1 has no counterpart and a pruned `review.json` loses nothing.
 
 ### The document
@@ -196,8 +196,8 @@ Every path is absolute, and names a file that exists until it is pruned.
 Source of truth: `cli/src/project.ts`.
 
 - **Must keep every fact about a run in the store**, so that deleting a run directory loses nothing but the exported files: a pruned run can be decided on and accepted, and its images come from `Store.getImage`.
-- **Must give each review its own capture directory and run directory, named by UUID**, so concurrent reviews can't touch each other's files.
-- **Must delete a capture directory when its review ends, however it ends.** A later review deletes one over 24 hours old, left by a crash.
+- **Must give each review its own render directory and run directory, named by UUID**, so concurrent reviews can't touch each other's files.
+- **Must delete a render directory when its review ends, however it ends.** A later review deletes one over 24 hours old, left by a crash.
 - **Must keep the newest 20 run directories, and delete older ones at the end of each review** (rationale). A run is never deleted from the store, per `docs/specs/snapshots.md` → Open questions, and an image's blob stays with it.
 - **Must write `review.json` atomically.** It holds exported paths and pixel diffs, which are all it can lose.
 
@@ -258,26 +258,27 @@ It prints `sha`, `reason`, `message`, `defaultBranch`, `mergeBase`, and `environ
 
 ## ui
 
-Source of truth: `cli/src/ui.ts`, and `selfie ui` in `cli/src/cli.ts`; tests in `cli/test/ui.test.ts`. `docs/specs/ui.md` owns what it serves.
+Source of truth: `cli/src/ui.ts`, and `selfie ui` in `cli/src/cli.ts`; tests in `cli/test/ui-*.test.ts`. `docs/specs/ui.md` owns what it serves.
 
 - **Must print `{ url, port, runId, storybookUrl }` once it is listening, then keep serving until a signal**, and exit 0. `runId` is the run it was asked to open, or null.
-- **Must host the build the other commands would capture, or `--storybook-dir`'s, and the kept builds, on a free port of its own** (`docs/specs/ui.md` → Routes), whether or not there's a build yet.
-- **Must take an optional run**, and refuse a bad or unknown one with exit 2 before listening. With none, the page opens at the newest finished run at HEAD in this project's environment, or `--native`'s.
+- **Must host the built Storybook the other commands would render, or `--storybook-dir`'s, and the kept built Storybooks, on a free port of its own** (`docs/specs/ui.md` → Routes), whether or not there's a built Storybook yet.
+- **Must take an optional run**, and refuse a bad or unknown one with exit 2 before listening. With none, the page opens at every story (`docs/specs/ui.md` → Screens), in this project's environment, or `--native`'s.
 - **Must ask the system for a free port unless given `--port`**, so two projects can both be served.
-- **Never open a browser.** Whoever ran it decides what to do with the URL.
-- **Must load `selfie-ui` and Hono only in the commands that serve**, by a dynamic `import()`, so no other command pays for a web server. `cli/test/ui.test.ts` checks what `cli/src/cli.ts` loads.
+- **Never open a browser.** Whoever ran it decides what to do with the URL. [`selfie` alone](#selfie-alone) is the one that does.
+- **Must load `selfie-ui` and Hono only in the commands that serve**, by a dynamic `import()`, so no other command pays for a web server. `cli/test/ui-*.test.ts` checks what `cli/src/cli.ts` loads.
 - **Must fail with `ui-not-built` and exit 2 if the client isn't built**, saying what to run: `pnpm --filter selfie-ui build`. `pnpm install` builds it, through `prepare`.
 - **Must take a decision's actor from `git config user.email`, or refuse with `no-actor`.** There's no `--actor` here, since a page has no way to be anyone else.
 
-## feedback
+## selfie alone
 
-Source of truth: `selfie feedback` in `cli/src/cli.ts`; tests in `cli/test/ui.test.ts`. `docs/specs/feedback.md` owns what happens to a note.
+Source of truth: `openEveryStory` in `cli/src/cli.ts`; tests in `cli/test/ui-*.test.ts`. `docs/specs/feedback.md` owns what happens to a note.
 
-It's [`selfie ui`](#ui), except as below, and with `runId` always null, and its URL at every story.
+It's [`selfie ui`](#ui) with no run, except as below.
 
-- **Must run `--build-command` first, if given, as `selfie review` does**, once, after the config is known to be good (rationale).
-- **Must fail with `no-stories` and exit 2, saying what to do, if there's no built Storybook after that.**
-- **Must say on stderr how an agent joins in**, with `selfie agent-await-feedback`.
+- **Must run the config's `buildCommand` first, once, unless `--no-build`** ([Configuration](#configuration)).
+- **Must serve anyway if there's no built Storybook after that**, saying so on stderr, since the page says what to do (`docs/specs/ui.md` → Screens). A build command that fails still fails with `build-failed` and exit 2.
+- **Must open a browser at its URL if it's at a terminal, unless `--no-open`, and never for anything else**, such as an agent or a script (rationale).
+- **Must say on stderr what address it's serving**, since a browser may not open.
 
 ## Configuration
 
@@ -288,22 +289,23 @@ Source of truth: `cli/src/config.ts`.
 | Key | Meaning |
 |---|---|
 | `environment` | Overrides for `defineEnvironment` (`docs/specs/render.md` → Environment) |
-| `initScript` | A file inside the Git top level, used as `capture`'s `initScript` |
-| `storybookDir` | A directory inside the Git top level, the build to capture. `--storybook-dir` overrides it |
+| `initScript` | A file inside the Git top level, used as `render`'s `initScript` |
+| `storybookDir` | A directory inside the Git top level, the built Storybook to render. `--storybook-dir` overrides it |
+| `buildCommand` | How this project builds its Storybook, run from the Git top level |
 | `regionMergeDistance` | How close changed regions group for showing, in CSS pixels, multiplied by the run's scale. Default 12 |
 
 - **May let `--native` win over its `runner`.**
 - **Must refuse an unknown key**, so a typo can't silently render the wrong environment.
-- **Never read a build command from a file.** A checkout must not be able to run a shell; only `--build-command` can.
+- **Must run `buildCommand` only when a person asks: `selfie` alone, or `--build` on `record` or `review`, and never from a page or by default**, printing it first, so a checkout can only run a command on someone who asked for its built Storybook (rationale).
 
 ## Untrusted input
 
 Source of truth: `cli/src/paths.ts`.
 
-Story IDs come from a project's build, and a manifest's paths from a directory its worker can write.
+Story IDs come from a project's built Storybook, and a manifest's paths from a directory its worker can write.
 
 - **Must make a story's directory name only `[A-Za-z0-9_-]`, cut to 80 characters, followed by 10 hex digits of the ID's SHA256**, so it can't climb out, and IDs differing only by case or punctuation stay apart on any filesystem.
-- **Must read a capture's file only if it lies under the capture directory and is a regular file, not a symlink.**
+- **Must read a render's file only if it lies under the render directory and is a regular file, not a symlink.**
 - **Must refuse a run ID that isn't a lowercase UUID before it reaches a path.**
 
 ## Future
@@ -317,7 +319,7 @@ Story IDs come from a project's build, and a manifest's paths from a directory i
 
 ### A render that does change
 
-[Recording only if necessary](#recording-only-if-necessary) is all or nothing, so one changed file renders every story, and a render's non-capture time is unchanged:
+[Recording only if necessary](#recording-only-if-necessary) is all or nothing, so one changed file renders every story, and the time around a render is unchanged:
 
 - A cache from PNG bytes to image hash, since decoding and hashing unchanged images is most of a review's non-render time.
 - A diff cache by hash pair. It would save about 1 s on a reused run with 80 changes (rationale).

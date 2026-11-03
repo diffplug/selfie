@@ -4,9 +4,9 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { availableParallelism } from "node:os";
 import path from "node:path";
 import {
-  capture as realCapture,
+  render as realRender,
   filterStories,
-  buildHash,
+  storybookHash,
   renderIdentity,
   type Manifest,
   type ManifestStory,
@@ -23,10 +23,10 @@ import {
   type RecordedSnapshot,
   type RawImage,
   type Run,
-  type StorybookBuildFile,
+  type BuiltStorybookFile,
   type StoryFilter,
 } from "selfie-store";
-import { resolveCaptureSettings, resolveRegionMergeDistance, resolveStorybookDir, type CaptureSettings } from "./config.ts";
+import { resolveRenderSettings, resolveRegionMergeDistance, resolveStorybookDir, type RenderSettings } from "./config.ts";
 import { diffToPng, type PixelDiff } from "./diff.ts";
 import { SelfieError } from "./errors.ts";
 import { dirtyPaths, headSha, resolveCommit, type BaselineSearch } from "./git.ts";
@@ -34,7 +34,7 @@ import { isRunId, regularFileInside, storyDirName } from "./paths.ts";
 import { encodePng } from "./png.ts";
 import {
   branchGoldens,
-  captureDirectory,
+  renderDirectory,
   compareAsReviewed,
   findBaseline,
   pruneOutput,
@@ -54,17 +54,19 @@ export interface RecordOptions {
   readonly storybookDir?: string | undefined;
   /** The caller's own command, run in a shell. Its stdout goes to stderr. */
   readonly buildCommand?: string | undefined;
+  /** Run the config's `buildCommand`, from the Git top level. Only ever because someone asked. */
+  readonly buildFromConfig?: boolean | undefined;
   /** Story ID patterns. Defaults to every story. */
   readonly stories?: readonly string[] | undefined;
   readonly native?: boolean | undefined;
   /** Defaults to the renderer's. */
-  readonly capture?: typeof realCapture | undefined;
+  readonly render?: typeof realRender | undefined;
   readonly signal?: AbortSignal | undefined;
   /** Progress for people. Defaults to nothing. */
   readonly log?: ((line: string) => void) | undefined;
 }
 
-/** A run to review, or else what to record one from if this build has none. */
+/** A run to review, or else what to record one from if this built Storybook has none. */
 export type ReviewOptions = ({ readonly run: string } | (RecordOptions & { readonly run?: undefined })) & {
   /** A commit with goldens, or a finished run. It changes this review alone: `accept` still checks the run's own. */
   readonly baseline?: string | undefined;
@@ -111,7 +113,7 @@ export interface ReviewResult {
   }[];
   readonly warnings: readonly string[];
   readonly timings: {
-    readonly captureMs: number;
+    readonly renderMs: number;
     readonly storeMs: number;
     readonly compareMs: number;
     readonly diffMs: number;
@@ -119,7 +121,7 @@ export interface ReviewResult {
   };
 }
 
-/** Builds, if a person's command line said how. Nothing else ever runs a shell. */
+/** Builds, if someone asked to. Nothing else ever runs a shell. */
 export async function buildIfAsked(command: string | undefined, cwd: string, signal: AbortSignal | undefined, log: (line: string) => void): Promise<void> {
   if (command === undefined) return;
   log(`Building: ${command}`);
@@ -140,7 +142,7 @@ function runBuildCommand(command: string, cwd: string, signal: AbortSignal | und
 }
 
 /** No stories means nothing to record, and a typo must not pass. */
-function assertStoriesCaptured(count: number, storybookDir: string, stories: readonly string[] | undefined) {
+function assertStoriesRendered(count: number, storybookDir: string, stories: readonly string[] | undefined) {
   if (count > 0) return;
   throw new SelfieError(
     "no-stories",
@@ -185,8 +187,8 @@ async function storeGroup(
   return { hashes, refused };
 }
 
-/** Puts the capture's images in the store, and returns one row per story. */
-async function storeCapture(project: Project, captureDir: string, manifest: Manifest): Promise<RecordedSnapshot[]> {
+/** Puts the render's images in the store, and returns one row per story. */
+async function storeRender(project: Project, renderDir: string, manifest: Manifest): Promise<RecordedSnapshot[]> {
   const records: RecordedSnapshot[] = [];
   for (const group of chunks(manifest.stories, IMAGES_PER_GROUP)) {
     const failures = new Map<string, string>();
@@ -196,8 +198,8 @@ async function storeCapture(project: Project, captureDir: string, manifest: Mani
         failures.set(story.id, describeErrors(story.errors));
         continue;
       }
-      const checked = await regularFileInside(captureDir, story.file);
-      if ("refused" in checked) failures.set(story.id, `The capture is unusable: ${checked.refused}`);
+      const checked = await regularFileInside(renderDir, story.file);
+      if ("refused" in checked) failures.set(story.id, `The render is unusable: ${checked.refused}`);
       else files.push({ story: story.id, png: await readFile(checked.file) });
     }
     const stored = await storeGroup(project, files);
@@ -285,7 +287,7 @@ async function exportImages(project: Project, runDir: string, comparison: Compar
   return { differences, playErrors };
 }
 
-/** What a capture says about a filter, as a fact for the run. */
+/** What a render says about a filter, as a fact for the run. */
 function storyFilterOf(patterns: readonly string[] | undefined, stories: readonly string[]): StoryFilter | null {
   if (patterns === undefined) return null;
   return { patterns, unmatched: filterStories(stories.map((id) => ({ id })), patterns).unmatched };
@@ -301,7 +303,7 @@ interface Recording {
   readonly finished: (run: Run) => Promise<void>;
 }
 
-/** The project's own code, which the same build repeats. Anything else might not recur. */
+/** The project's own code, which the same built Storybook repeats. Anything else might not recur. */
 const REPEATABLE_ERRORS: ReadonlySet<StoryError["source"]> = new Set(["play", "console", "page"]);
 
 /** Why this render mustn't answer a later review, or null if it may. */
@@ -311,10 +313,10 @@ function whyNotReusable({ stories, warnings }: Manifest, { status }: Run): strin
     const error = errors.find(({ source }) => !REPEATABLE_ERRORS.has(source));
     if (error !== undefined) return `${id} had a ${error.source} error, which might not recur: ${error.message.split("\n")[0]}`;
   }
-  return warnings[0] === undefined ? null : `the capture warned: ${warnings[0]}`;
+  return warnings[0] === undefined ? null : `the render warned: ${warnings[0]}`;
 }
 
-/** The earlier render of this exact build, if there's one, narrowed to the patterns. */
+/** The earlier render of this exact built Storybook, if there's one, narrowed to the patterns. */
 async function replay(
   project: Project,
   identity: string,
@@ -335,26 +337,26 @@ async function replay(
     records: async () =>
       chosen.map(({ snapshot: { story, imageHash, playError } }) => ({ story, imageHash: imageHash!, playError })),
     finished: async () =>
-      log(`Reused the images of run ${runId}, since this exact build already rendered. selfie record renders again.`),
+      log(`Reused the images of run ${runId}, since this exact built Storybook already rendered. selfie record renders again.`),
   };
 }
 
-/** Captures the build. Only a render of every story can answer a later review, so only it is remembered. */
+/** Renders the built Storybook. Only a render of every story can answer a later review, so only it is remembered. */
 async function renderFresh(
   project: Project,
-  captureDir: string,
-  capture: typeof realCapture,
+  renderDir: string,
+  render: typeof realRender,
   { storybookDir, identity, settings, options, log }: {
     readonly storybookDir: string;
     readonly identity: string | null;
-    readonly settings: CaptureSettings;
+    readonly settings: RenderSettings;
     readonly options: RecordOptions;
     readonly log: (line: string) => void;
   },
 ): Promise<Recording> {
-  const manifest = await capture({
+  const manifest = await render({
     storybookDir,
-    outDir: captureDir,
+    outDir: renderDir,
     environment: settings.environment,
     log,
     ...(options.stories === undefined ? {} : { stories: [...options.stories] }),
@@ -365,16 +367,16 @@ async function renderFresh(
     reusedFromRun: null,
     storyIds: manifest.stories.map(({ id }) => id),
     warnings: manifest.warnings,
-    records: () => storeCapture(project, captureDir, manifest),
+    records: () => storeRender(project, renderDir, manifest),
     async finished(run) {
       if (options.stories !== undefined) return;
       if (identity === null) {
-        log("This render won't be reused: a native environment, or a build holding a symlink, can't be recognized.");
+        log("This render won't be reused: a native environment, or a built Storybook holding a symlink, can't be recognized.");
         return;
       }
-      // A build that changed while it rendered has no identity that describes these images.
+      // A built Storybook that changed while it rendered has no identity that describes these images.
       const after = await renderIdentity({ storybookDir, environment: settings.environment, initScript: settings.initScript });
-      const whyNot = after === identity ? whyNotReusable(manifest, run) : "the build changed while it rendered";
+      const whyNot = after === identity ? whyNotReusable(manifest, run) : "the built Storybook changed while it rendered";
       await project.renders.remember(identity, whyNot === null ? run.id : null);
       if (whyNot !== null) log(`This render won't be reused: ${whyNot}.`);
     },
@@ -382,18 +384,18 @@ async function renderFresh(
 }
 
 /**
- * Says which build rendered a run, and keeps that build so its stories can still be opened. A build
+ * Says which build rendered a run, and keeps that built Storybook so its stories can still be opened. A built Storybook
  * that changed while it rendered isn't what rendered these images, so nothing is said of it. The run
- * is sound either way, so failing to keep a build only costs its stories' links.
+ * is sound either way, so failing to keep a built Storybook only costs its stories' links.
  */
-async function keepBuild(project: Project, run: Run, storybookDir: string, before: string | null, log: (line: string) => void): Promise<void> {
+async function keepStorybook(project: Project, run: Run, storybookDir: string, before: string | null, log: (line: string) => void): Promise<void> {
   if (before === null) return;
   try {
-    const files: StorybookBuildFile[] = [];
-    const after = await buildHash(storybookDir, async (path, bytes) => void files.push({ path, fileHash: await project.builds.putFile(bytes) }));
+    const files: BuiltStorybookFile[] = [];
+    const after = await storybookHash(storybookDir, async (path, bytes) => void files.push({ path, fileHash: await project.storybooks.putFile(bytes) }));
     if (after !== before) return;
-    await project.builds.putBuild(before, files);
-    await project.builds.recordRunBuild(run.id, before);
+    await project.storybooks.putStorybook(before, files);
+    await project.storybooks.recordRunStorybook(run.id, before);
   } catch (error) {
     log(`This run's Storybook wasn't kept: ${(error as Error).message}`);
   }
@@ -402,7 +404,7 @@ async function keepBuild(project: Project, run: Run, storybookDir: string, befor
 /** What a run says about where it was recorded. */
 interface RunFacts {
   readonly gitSha: string;
-  readonly settings: CaptureSettings;
+  readonly settings: RenderSettings;
   readonly dirty: boolean;
   readonly baselineSha: string | null;
   readonly storyFilter: StoryFilter | null;
@@ -435,10 +437,10 @@ export interface RecordResult {
   readonly dirtyPaths: readonly string[];
   readonly baseline: BaselineSearch;
   readonly warnings: readonly string[];
-  readonly timings: { readonly captureMs: number; readonly storeMs: number; readonly totalMs: number };
+  readonly timings: { readonly renderMs: number; readonly storeMs: number; readonly totalMs: number };
 }
 
-/** The run that already says all this about this build at this commit, so a review needs no new one. */
+/** The run that already says all this about this built Storybook at this commit, so a review needs no new one. */
 async function sameRun(project: Project, renderedBy: string, fields: RunFacts): Promise<Run | null> {
   const runs = await project.snapshots.runsAt(fields.gitSha, fields.settings.environmentId);
   const same = runs.find(
@@ -455,31 +457,37 @@ async function sameRun(project: Project, renderedBy: string, fields: RunFacts): 
 async function recordBuild(project: Project, options: RecordOptions, { reuse }: { reuse: boolean }): Promise<RecordResult> {
   const { repo } = project;
   const log = options.log ?? (() => {});
-  const capture = options.capture ?? realCapture;
+  const render = options.render ?? realRender;
   const started = Date.now();
-  const captureDir = captureDirectory(project, randomUUID());
+  const renderDir = renderDirectory(project, randomUUID());
   try {
     // 1. Build. Whatever it writes is part of what this describes, so it comes first.
-    await buildIfAsked(options.buildCommand, project.cwd, options.signal, log);
+    // Before building, so a bad config doesn't cost a whole built Storybook to find out.
+    const settings = await resolveRenderSettings(repo, { native: options.native });
+    if (options.buildFromConfig === true) {
+      if (settings.buildCommand === undefined) throw new SelfieError("usage", "--build runs the config's buildCommand, and selfie.config.json doesn't have one.");
+      await buildIfAsked(settings.buildCommand, repo.root, options.signal, log);
+    } else {
+      await buildIfAsked(options.buildCommand, project.cwd, options.signal, log);
+    }
 
     // 2. Read where we are.
     const gitSha = await headSha(repo);
     if (gitSha === null) {
       throw new SelfieError("no-commits", "This repository has no commits yet, and a run is recorded against a Git SHA.");
     }
-    const settings = await resolveCaptureSettings(repo, { native: options.native });
     const storybookDir = resolveStorybookDir(project.cwd, options.storybookDir, settings);
     const baseline = await findBaseline(project, settings.environmentId);
     const dirtyBefore = await dirtyPaths(repo);
 
-    // 3. Capture, unless asked to reuse and this exact build already rendered.
-    const captureStarted = Date.now();
-    const buildBefore = await buildHash(storybookDir);
+    // 3. Render, unless asked to reuse and this exact built Storybook already rendered.
+    const renderStarted = Date.now();
+    const buildBefore = await storybookHash(storybookDir);
     const identity = await renderIdentity({ storybookDir, environment: settings.environment, initScript: settings.initScript });
     const replayed = identity !== null && reuse ? await replay(project, identity, options.stories, log) : null;
-    const recording = replayed ?? (await renderFresh(project, captureDir, capture, { storybookDir, identity, settings, options, log }));
-    const captured = Date.now();
-    assertStoriesCaptured(recording.storyIds.length, storybookDir, options.stories);
+    const recording = replayed ?? (await renderFresh(project, renderDir, render, { storybookDir, identity, settings, options, log }));
+    const rendered = Date.now();
+    assertStoriesRendered(recording.storyIds.length, storybookDir, options.stories);
 
     // 4. Check one commit still describes what rendered.
     const shaAfter = await headSha(repo);
@@ -502,10 +510,10 @@ async function recordBuild(project: Project, options: RecordOptions, { reuse }: 
     if (existing === null) {
       log(`Recorded run ${run.id}: ${recording.storyIds.length} stories.`);
       await recording.finished(run);
-      await project.builds.recordViewport(run.environment, settings.environment.viewport);
-      await keepBuild(project, run, storybookDir, buildBefore, log);
+      await project.storybooks.recordViewport(run.environment, settings.environment.viewport);
+      await keepStorybook(project, run, storybookDir, buildBefore, log);
     } else {
-      log(`Run ${run.id} already describes this build at this commit, so nothing new was recorded. selfie record renders again.`);
+      log(`Run ${run.id} already describes this built Storybook at this commit, so nothing new was recorded. selfie record renders again.`);
     }
     await project.notes.rememberRun(run.id);
     return {
@@ -513,10 +521,10 @@ async function recordBuild(project: Project, options: RecordOptions, { reuse }: 
       dirtyPaths: dirty,
       baseline,
       warnings: recording.warnings,
-      timings: { captureMs: captured - captureStarted, storeMs: stored - captured, totalMs: Date.now() - started },
+      timings: { renderMs: rendered - renderStarted, storeMs: stored - rendered, totalMs: Date.now() - started },
     };
   } finally {
-    await rm(captureDir, { recursive: true, force: true });
+    await rm(renderDir, { recursive: true, force: true });
   }
 }
 
@@ -536,7 +544,7 @@ async function namedRun(project: Project, runId: string): Promise<RecordResult> 
     dirtyPaths: [],
     baseline: { sha: run.baselineSha, reason: null, message: null, defaultBranch: null, mergeBase: null },
     warnings: (run.storyFilter?.unmatched ?? []).map(unmatchedPatternWarning),
-    timings: { captureMs: 0, storeMs: 0, totalMs: 0 },
+    timings: { renderMs: 0, storeMs: 0, totalMs: 0 },
   };
 }
 
@@ -550,7 +558,7 @@ async function resolveGiven(project: Project, given: string): Promise<GivenBasel
 
 /**
  * Exports what differs from the baseline in a run: one it's told to look at, or else the one
- * for this build, recording it only if there's none. A story's failure is a fact in the result.
+ * for this built Storybook, recording it only if there's none. A story's failure is a fact in the result.
  * Throws if the review couldn't run.
  */
 export async function review(project: Project, options: ReviewOptions): Promise<ReviewResult> {
@@ -597,7 +605,7 @@ export async function review(project: Project, options: ReviewOptions): Promise<
     playErrors,
     warnings: recorded.warnings,
     timings: {
-      captureMs: recorded.timings.captureMs,
+      renderMs: recorded.timings.renderMs,
       storeMs: recorded.timings.storeMs,
       compareMs: compared - comparing,
       diffMs: diffed - compared,

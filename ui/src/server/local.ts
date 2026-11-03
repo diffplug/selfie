@@ -8,7 +8,7 @@ import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { ReviewSource } from "../shared/api.ts";
 import { createReviewApi, failure, pageHeaders, sameOriginWrites } from "./app.ts";
-import { keptBuildRoutes, storybookHeaders, type BuildFileReader } from "./storybook.ts";
+import { keptStorybookRoutes, storybookHeaders, type StorybookFileReader } from "./storybook.ts";
 
 const LOOPBACK = "127.0.0.1";
 const IMMUTABLE_ASSET = "public, max-age=31536000, immutable";
@@ -49,20 +49,20 @@ export const isBuiltStorybook = (dir: string): boolean => existsSync(path.join(d
 export function createStorybookApp({
   dir,
   port,
-  readBuildFile,
+  readStorybookFile,
   reviewOrigins,
 }: {
   readonly dir: string;
   readonly port: () => number;
-  /** A file of a kept build, or null. */
-  readonly readBuildFile: BuildFileReader;
+  /** A file of a kept built Storybook, or null. */
+  readonly readStorybookFile: StorybookFileReader;
   /** The review pages allowed to show its stories in a frame. */
   readonly reviewOrigins: () => readonly string[];
 }): Hono {
   const app = new Hono();
   app.use(storybookHeaders(reviewOrigins));
   app.use(loopbackHosts(port));
-  app.route("/", keptBuildRoutes(readBuildFile));
+  app.route("/", keptStorybookRoutes(readStorybookFile));
   app.use(cacheAs("no-store"));
   app.use(async (context, next) => {
     if (context.req.method !== "GET" && context.req.method !== "HEAD") return context.text("Only to read.", 405);
@@ -129,14 +129,14 @@ export async function serveLocal({
 /** Hosts a built Storybook on a free loopback port, whether or not it has been built yet. */
 export function serveStorybook({
   dir,
-  readBuildFile,
+  readStorybookFile,
   reviewOrigins,
 }: {
   readonly dir: string;
-  readonly readBuildFile: BuildFileReader;
+  readonly readStorybookFile: StorybookFileReader;
   readonly reviewOrigins: () => readonly string[];
 }): Promise<LocalServer> {
-  return listen(0, (actual) => createStorybookApp({ dir, port: actual, readBuildFile, reviewOrigins }));
+  return listen(0, (actual) => createStorybookApp({ dir, port: actual, readStorybookFile, reviewOrigins }));
 }
 
 
@@ -172,16 +172,16 @@ export async function serveReviewWithStorybook({
   port,
   clientDir,
   dir,
-  readBuildFile,
+  readStorybookFile,
 }: {
   readonly source: (storybookUrl: string) => ReviewSource;
   readonly port: number;
   readonly clientDir?: string | undefined;
   readonly dir: string;
-  readonly readBuildFile: BuildFileReader;
+  readonly readStorybookFile: StorybookFileReader;
 }): Promise<{ readonly review: LocalServer; readonly storybook: LocalServer; readonly close: () => Promise<void> }> {
   let reviewOrigins: readonly string[] = [];
-  const storybook = await serveStorybook({ dir, readBuildFile, reviewOrigins: () => reviewOrigins });
+  const storybook = await serveStorybook({ dir, readStorybookFile, reviewOrigins: () => reviewOrigins });
   try {
     const review = await serveLocal({ source: source(storybook.url), port, clientDir, storybookOrigin: new URL(storybook.url).origin });
     reviewOrigins = loopbackOrigins(review.port);

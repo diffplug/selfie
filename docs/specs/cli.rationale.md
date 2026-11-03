@@ -28,13 +28,13 @@
 
 **A dirty run is recorded, not refused.** Rendering uncommitted work is the point of the loop. It can be compared and approved, and [`accept`](#accept) is where it stops.
 
-**A gitignored build isn't dirty.** It usually is ignored, so counting it would make every review dirty. The cost is the [open question](cli.md#open-questions) about stale builds.
+**A gitignored built Storybook isn't dirty.** It usually is ignored, so counting it would make every review dirty. The cost is the [open question](cli.md#open-questions) about stale builds.
 
 **`--baseline` exits 1 on any difference.** Blockers answer "what stops accepting this run", and two runs that differ can have every image approved. Someone looking for flakiness is asking what differs.
 
 **A branch's goldens, only to look at.** Reviewing Selfie's own stories on a branch read every story as new, until a run was compared with the branch's own earlier goldens by hand. So a run with no baseline is shown against them. Nothing about acceptance moves: every image still needs its own approval, so an image matching a golden that someone has since rejected is still refused. So what's shown and what's checked can differ. Blockers and the exit code stay with what's checked, or a review could exit 0 before `accept` refused it, and the document's `baseline` stays the real one, with `comparedWith` saying what this review showed.
 
-**Regions, by a recursive 9-slice.** Whole-page capture made any change in a page's height a size change, and a size change once compared nothing: on Selfie's own stories, moving one row put 5 of 18 changed stories there with nothing highlighted. Matching from the edges fixed that, but a heading changed near the top and rows moved near the bottom were then one band, where shifted rows ghost. Trimming all four sides and recursing gives the heading its own 182×18 box, and separates changes side by side, which rows alone can't.
+**Regions, by a recursive 9-slice.** Whole-page render made any change in a page's height a size change, and a size change once compared nothing: on Selfie's own stories, moving one row put 5 of 18 changed stories there with nothing highlighted. Matching from the edges fixed that, but a heading changed near the top and rows moved near the bottom were then one band, where shifted rows ghost. Trimming all four sides and recursing gives the heading its own 182×18 box, and separates changes side by side, which rows alone can't.
 
 **Why anchors must be unique.** The first prototype cut at the longest run of identical rows, and table rows matched the wrong table rows, pairing 27 rows of one image with 153 of the other. Requiring a row that appears once in each stopped that on Selfie's stories, and a story that had split into 11 regions came out as 2.
 
@@ -64,7 +64,7 @@ It takes 4 to 10 ms an image on average, 17 ms at worst, and a story's stats com
 
 **Why the merge distance only groups.** It first changed the regions themselves, which meant it changed diff images, two caches keyed without it, and any approval keyed by a region's content. So regions are now a pure result of two images, and grouping happens when something is shown, so a project can change its distance freely.
 
-**Why the cut sizes don't follow the scale.** A 2x capture cuts at half the CSS size, which only makes regions finer, and grouping follows the scale. Scaling the cuts would make a diff depend on more than its two images.
+**Why the cut sizes don't follow the scale.** A 2x render cuts at half the CSS size, which only makes regions finer, and grouping follows the scale. Scaling the cuts would make a diff depend on more than its two images.
 
 **Why the distance leans small.** On a style tweak to dormouse changing 290 of 541 stories, groups by distance totaled 1,694 at 12 px, 1,061 at 48, 693 at 96, and 467 at 200, with the most in one story falling from 19 to 6. Selfie's own two-edit change gave 2 at every distance. Much of dormouse's count is the four corners of a rounded button, whose middle didn't change. Someone can select groups to join them, and nothing yet splits one, so too many is the error to prefer.
 
@@ -80,7 +80,7 @@ It takes 4 to 10 ms an image on average, 17 ms at worst, and a story's stats com
 
 **Per-run directories rather than one reused one.** A reused directory would be smaller to describe, but a concurrent review, or an agent still reading the last review's images, would see files change underneath it. A run ID in the path also means a run's JSON keeps pointing at its own images.
 
-**Twenty.** It is meant to outlast an agent's review, fix, review cycle within one task, and be small. Run directories only hold what differs: the 541-story review with nothing changed left 48 KB, holding the images of the 2 stories with `play` errors, and one with 130 changed stories left 14 MB, or about 110 KB per changed story. Twenty runs each changing all 541 would hold about 1.2 GB. A capture directory holds every story's PNG, so it can't outlive its review.
+**Twenty.** It is meant to outlast an agent's review, fix, review cycle within one task, and be small. Run directories only hold what differs: the 541-story review with nothing changed left 48 KB, holding the images of the 2 stories with `play` errors, and one with 130 changed stories left 14 MB, or about 110 KB per changed story. Twenty runs each changing all 541 would hold about 1.2 GB. A render directory holds every story's PNG, so it can't outlive its review.
 
 **The store still grows.** Blobs grow only with new images, but nothing deletes either them or a run's rows: `docs/specs/snapshots.md` → Open questions owns retention. After the 12 runs below and in the sample loop, holding 2,914 run rows and 650 images, `store.db` was 512 KB and `blobs/` 25 MB.
 
@@ -108,7 +108,8 @@ It takes 4 to 10 ms an image on average, 17 ms at worst, and a story's stats com
 
 **One file, in one place.** Every command that needs an environment must find the same one, or `find-baseline` and `review` disagree. `--config` and `--init-script` let them, so they went. A file at the Git top level does the job without a flag on each call. `--native` stays, for a machine trying something locally, since a checked-in file shouldn't choose that.
 
-**No build command in a config, though a `storybookDir` is fine.** A flag on every run is friction, and a package script covers it, as `pnpm selfie:review` does here. Reading a command from a file would let any checkout run a shell the moment someone reviews it.
+**A build command in the config, only when asked.** This was once refused, since reading a command from a file lets a checkout run a shell, and rendering is otherwise safe on an untrusted one: stories run in a container with no network. But a project's build is a fact about that project, and retyping it is the friction `selfie` alone exists to remove. So it's in the config, and runs only for someone who asked for that build, by typing `selfie` or `--build`, and it prints first. What's given up: `selfie` in a stranger's checkout runs their command. `--no-build` is the way not to, and `selfie record`, `review`, and `ui` still never do it by themselves, so CI and agents can't run it by accident.
+
 
 **A config can't name a file outside itself.** A checkout's config file isn't the user's choice in the way a flag is. An init script is only ever run in the browser, with no network, so this is a small precaution at the cost of one check.
 
@@ -116,28 +117,28 @@ It takes 4 to 10 ms an image on average, 17 ms at worst, and a story's stats com
 
 **Measured 2026-11**, on a copy of dormouse's built Storybook (541 stories) in a scratch Git repository, on a Mac, in the pinned arm64 container, with `window.__ARGOS_SNAPSHOT__ = true` as the init script in `selfie.config.json`, and 6 stories at once.
 
-| 541-story review | Exit | Wall | Capture | Store | Compare | Diff |
+| 541-story review | Exit | Wall | Render | Store | Compare | Diff |
 |---|---|---|---|---|---|---|
 | First, 512 new images, 29 unchanged | 1 | 72.3 s | 63.1 s | 8.9 s | 2 ms | 56 ms |
 | Nothing changed, twice | 0 | 68.6 s, 70.1 s | 64.2 s, 65.7 s | 4.2 s, 4.1 s | 1 ms, 1 ms | 3 ms, 3 ms |
 | 130 changed by a CSS color | 1 | 73.9 s | 66.6 s | 5.3 s | 1 ms | 1,656 ms |
 
-The exit 0 row lists dormouse's 2 `play` errors as advisories. Capture is most of the time, as `docs/specs/render.rationale.md` found. Storing costs about 7.6 ms per image to decode and hash when it's already stored, and about 17 ms when it's new. A diff costs about 13 ms per changed story, for decoding two images, comparing 1.08 million pixels, and encoding. `approve` and `accept` take about 0.2 s on the same store, including on a run of 541 whose directory had been deleted.
+The exit 0 row lists dormouse's 2 `play` errors as advisories. Render is most of the time, as `docs/specs/render.rationale.md` found. Storing costs about 7.6 ms per image to decode and hash when it's already stored, and about 17 ms when it's new. A diff costs about 13 ms per changed story, for decoding two images, comparing 1.08 million pixels, and encoding. `approve` and `accept` take about 0.2 s on the same store, including on a run of 541 whose directory had been deleted.
 
-**The loop on the 30-story sample** takes about 4.8 s, of which capture is about 4.3 s, storing about 280 ms, and comparing about 1 ms. A CSS color change touching 10 of the 30 added about 175 ms of diff work.
+**The loop on the 30-story sample** takes about 4.8 s, of which render is about 4.3 s, storing about 280 ms, and comparing about 1 ms. A CSS color change touching 10 of the 30 added about 175 ms of diff work.
 
 ## Recording only if necessary
 
-**Measured 2026-11**, as in [End to end](#end-to-end), in the real container, on a scratch repository and a new store. On a reused run, "capture" is hashing the build and reading the earlier run's rows, about 20 ms for 333 files and 12 MB, so a build many times this size still costs little beside a render.
+**Measured 2026-11**, as in [End to end](#end-to-end), in the real container, on a scratch repository and a new store. On a reused run, "render" is hashing the built Storybook and reading the earlier run's rows, about 20 ms for 333 files and 12 MB, so a built Storybook many times this size still costs little beside a render.
 
-| 541-story review | Exit | Wall | Capture | Store | Diff |
+| 541-story review | Exit | Wall | Render | Store | Diff |
 |---|---|---|---|---|---|
 | First, 541 new | 1 | 71.8 s | 62.4 s | 9.0 s | 64 ms |
 | Rendered again with `--no-reuse`, nothing changed, twice | 0 | 70.1 s, 70.5 s | 65.7 s, 66.0 s | 4.1 s, 4.1 s | 4 ms, 3 ms |
 | Same SHA, all still new, reused, twice | 1 | 0.38 s, 0.35 s | 20 ms, 20 ms | 37 ms, 37 ms | 57 ms, 54 ms |
 | New commit, nothing changed, reused, twice | 0 | 0.25 s, 0.25 s | 21 ms, 20 ms | 16 ms, 16 ms | 1 ms, 1 ms |
 | One byte of CSS, 80 stories changed | 1 | 70.2 s | 64.0 s | 4.8 s | 1,130 ms |
-| That build again, reused | 1 | 1.36 s | 22 ms | 15 ms | 1,086 ms |
+| That built Storybook again, reused | 1 | 1.36 s | 22 ms | 15 ms | 1,086 ms |
 | Filtered to 30, answered from the whole run, twice | 0 | 0.25 s, 0.26 s | 23 ms, 22 ms | 12 ms, 13 ms | 1 ms, 1 ms |
 | Filtered to 30, `--no-reuse`, to compare | 0 | 5.3 s | 4.8 s | 280 ms | 1 ms |
 
@@ -154,21 +155,21 @@ The estimate here was about 0.5 s, and the feature came in at about 0.25 s of wa
 | A minimal project, Storybook 10.6.5 and Vite 7.3.7: same directory, with `node_modules/.cache` cleared, and in a second directory with its own install | 4 | `project.json`'s `generatedAt`, every time |
 | A copy of dormouse, Storybook 11.0.0-alpha.6 and Vite 8, 326 files and 546 stories, four of them with caches cleared | 6 | `project.json`'s `generatedAt`, every time. `manifests/components.html`'s `Generation took <strong>0.0s</strong>`, which read `0.1s` in some of them |
 
-Without leaving these out, every build hashed differently and the feature would never have hit on rebuilt output. With them left out, all 4 and all 6 hash the same. In the real loop, `selfie review --build-command` running a real Storybook build of that copy reused the first render on every rebuild, including with its caches cleared, in about 3 s, of which about 2.8 s is the build. A one-line change to the copy's `.storybook/preview.css` rendered again, and putting it back reused the first render. That loop was measured before `docs/specs/render.md` → Render identity took over this hash, which kept the same exclusions.
+Without leaving these out, every built Storybook hashed differently and the feature would never have hit on rebuilt output. With them left out, all 4 and all 6 hash the same. In the real loop, `selfie review --build-command` running a real build of that copy reused the first render on every rebuild, including with its caches cleared, in about 3 s, of which about 2.8 s is the built Storybook. A one-line change to the copy's `.storybook/preview.css` rendered again, and putting it back reused the first render. That loop was measured before `docs/specs/render.md` → Render identity took over this hash, which kept the same exclusions.
 
-**Why those two can't change pixels.** The worker only answers what the browser asks for, and no other file in either build names `project.json` or `manifests/components.html`, so no story loads them unless its own code fetches that path. So only those two exact pieces of text are left out, and the rest of both files still counts: a different `storybookVersion` in `project.json` misses, and so does the same text in any other file. If Storybook changes either format, the text stops matching and every build misses, which costs a render and nothing else.
+**Why those two can't change pixels.** The worker only answers what the browser asks for, and no other file in either build names `project.json` or `manifests/components.html`, so no story loads them unless its own code fetches that path. So only those two exact pieces of text are left out, and the rest of both files still counts: a different `storybookVersion` in `project.json` misses, and so does the same text in any other file. If Storybook changes either format, the text stops matching and every built Storybook misses, which costs a render and nothing else.
 
 **What this doesn't cover.** These are one machine's builds. A different machine doesn't share a local store anyway. `project.json`'s `userSince` didn't vary here, and would if Storybook's user cache were cleared, which would miss once. Webpack builds and builds with telemetry on weren't measured. A project whose build embeds its own timestamp or a Git SHA will miss every time it rebuilds: reuse then still helps when a build isn't rerun, and is otherwise no worse than rendering.
 
-**All or nothing per build.** Knowing which stories a file can reach would take the build's module graph, and a wrong answer replays pixels a real render wouldn't produce.
+**All or nothing per build.** Knowing which stories a file can reach would take the built Storybook's module graph, and a wrong answer replays pixels a real render wouldn't produce.
 
-**A failure is never replayed.** A story that timed out under load would otherwise fail forever on a build nobody changed, and the only way out would be a flag the agent has no reason to try. Only one more render is at stake.
+**A failure is never replayed.** A story that timed out under load would otherwise fail forever on a built Storybook nobody changed, and the only way out would be a flag the agent has no reason to try. Only one more render is at stake.
 
-**Which errors may be reused.** On dormouse's 541 stories, a real capture's only errors were 2 `play` and the 2 `console` lines those same failures log. `play`, `console`, and `page` come from the project's own code, the same build repeats them, and none of them fails a story. `request` and the soft network `timeout` aren't reused: both can come from load, and neither is visible afterward, since a row doesn't record them. An allowed list means a new source starts out unreusable. The cost is that a project whose page always makes a failing off-origin request never reuses, and stderr names the story and the error. A `play` failure that depends on load is replayed too, which is a real gap: it stays listed as an advisory, and `--no-reuse` measures it again.
+**Which errors may be reused.** On dormouse's 541 stories, a real render's only errors were 2 `play` and the 2 `console` lines those same failures log. `play`, `console`, and `page` come from the project's own code, the same built Storybook repeats them, and none of them fails a story. `request` and the soft network `timeout` aren't reused: both can come from load, and neither is visible afterward, since a row doesn't record them. An allowed list means a new source starts out unreusable. The cost is that a project whose page always makes a failing off-origin request never reuses, and stderr names the story and the error. A `play` failure that depends on load is replayed too, which is a real gap: it stays listed as an advisory, and `--no-reuse` measures it again.
 
-**A filter is answered only from a whole run.** A whole run holds every answer, and a filtered render is at most a few seconds, so it isn't worth a second key to remember one. On the 30-story sample a hit takes 0.25 s against 5.3 s, once a whole run of that build exists.
+**A filter is answered only from a whole run.** A whole run holds every answer, and a filtered render is at most a few seconds, so it isn't worth a second key to remember one. On the 30-story sample a hit takes 0.25 s against 5.3 s, once a whole run of that built Storybook exists.
 
-**A run's build isn't `render_keys`.** Those keys say what a later review may skip rendering, so they hold only a build's newest reusable render, and forget reused, filtered, and failed runs. `selfie ui` asked them first, and called all of those a different build. So a run says for itself, by a hash of the build's own files, since the environment and the renderer's code don't change whether a story's page is the one in the image.
+**A run's built Storybook isn't `render_keys`.** Those keys say what a later review may skip rendering, so they hold only a built Storybook's newest reusable render, and forget reused, filtered, and failed runs. `selfie ui` asked them first, and called all of those a different build. So a run says for itself, by a hash of the built Storybook's own files, since the environment and the renderer's code don't change whether a story's page is the one in the image.
 
 **Provenance is on the run, and the key is local.** `reused_from_run` is a fact about the run, which `accept`, the UI, and later `trust` all want, so it's read with the run, with no second lookup. `render_keys` is only what this machine rendered, which nothing in the cloud needs. It must outlive a pruned `review.json`, and in `store.db` it lives and dies with the runs it names. After 15 runs here it held 2 rows.
 
@@ -180,12 +181,14 @@ Without leaving these out, every build hashed differently and the feature would 
 
 **The newest real render wins.** Pointing a key at the newest reused run would let `reusedFromRun` name a run that rendered nothing, so reuse never chains. Forgetting a key after a bad render means `--no-reuse` can't uncover a deterministic failure only to have the next review hide it behind an older pass.
 
-**What a reused run can't change.** It's still only as good as its build. A clean tree with a stale gitignored build records stale pixels against the new SHA whether or not it renders, so reuse neither fixes nor worsens [that open question](cli.md#open-questions).
+**What a reused run can't change.** It's still only as good as its built Storybook. A clean tree with a stale gitignored build records stale pixels against the new SHA whether or not it renders, so reuse neither fixes nor worsens [that open question](cli.md#open-questions).
 
 **What a diff cache would save.** A reused run with 80 changes spent 1,086 ms of its 1.36 s on diffs it had already computed, about 13 ms a story, which is why it stays in `docs/specs/cli.md` → Future.
 
 **What copying rows costs.** Each reused run writes 541 rows. A review of this feature estimated about 450 MB a year at 50 hits a day. In the store above, `run_snapshots` held 5,560 rows in 376,832 bytes by `dbstat`, or 68 bytes a row including page overhead and 2 stories' `play` messages, which comes to about 670 MB for the same 18,250 runs. Either is small beside D1's 10 GB, and these rows are local, but it has no bound, as `docs/specs/snapshots.md` → Storing only what changed says of every run.
 
-## feedback
+## selfie alone
 
-**Building only on the way up.** Later builds are the agent's own, with its own `--build-command`, since a page must not be able to run a shell. The config is read first, since a bad one would otherwise cost a whole build to find out.
+**Building only on the way up.** Later builds are the agent's own, with `--build`, since a page must not be able to run a shell. The config is read first, since a bad one would otherwise cost a whole built Storybook to find out.
+
+**Opening a browser here, and not from `selfie ui`.** `selfie` alone is what a person types to look at something. `selfie ui` is also what an agent runs, and a browser opening on it would be a surprise. A terminal is what tells a person from the rest.
