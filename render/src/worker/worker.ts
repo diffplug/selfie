@@ -76,8 +76,10 @@ async function resolveStorybookFile(root: string, pathname: string): Promise<str
   }
   if (!file.startsWith(root + path.sep)) return null;
   const found = await stat(file).catch(() => null);
-  if (found?.isDirectory()) file = path.join(file, "index.html");
-  return found ? file : null;
+  if (!found?.isDirectory()) return found ? file : null;
+  // A missing one must be a 404: a request that's never answered holds the network wait to its bound.
+  const index = path.join(file, "index.html");
+  return (await stat(index).catch(() => null)) === null ? null : index;
 }
 
 /**

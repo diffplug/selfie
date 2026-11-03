@@ -236,12 +236,13 @@ code {
   position: relative;
 }
 
+/* Square, since a rounded corner over an image antialiases differently from one render to the next. */
 .selfie-pane-button {
   display: block;
   width: 100%;
   padding: 0;
   border: var(--borderWidth-thin) solid var(--borderColor-default);
-  border-radius: var(--borderRadius-small);
+  border-radius: 0;
   background: var(--bgColor-muted);
   cursor: zoom-in;
 }

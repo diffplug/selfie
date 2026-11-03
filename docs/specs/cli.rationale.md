@@ -192,3 +192,23 @@ Without leaving these out, every built Storybook hashed differently and the feat
 **Building only on the way up.** Later builds are the agent's own, with `--build`, since a page must not be able to run a shell. The config is read first, since a bad one would otherwise cost a whole built Storybook to find out.
 
 **Opening a browser here, and not from `selfie ui`.** `selfie` alone is what a person types to look at something. `selfie ui` is also what an agent runs, and a browser opening on it would be a surprise. A terminal is what tells a person from the rest.
+
+## Flakes
+
+**Why a command, when `review --baseline` already compares two runs.** That records runs, and compares just two, and a run keeps only a render's `play` errors. So the network wait on two stories showed as one line naming one of them, and nothing showed for a play failure that came and went. Measured on this repository's 134 stories, 2026-11: comparing four whole runs that way took about 3 minutes, and gave no way to see the rest.
+
+**What counts.** A `play`, `console`, or `page` error in every render is the project's own code being wrong in the same way, which `review` already says. In only some renders, it's a flake. A `timeout` or a `request` error counts even in every render: the image may be the same each time so far, but it only got there by running out the wait.
+
+**What the first real use found.** 31 of 134 stories differed across four renders, and two more ran out the network wait in every one. The causes were few. Each count is from the measure that found it, since each fix let the next one show:
+
+| Stories | What differed | Cause |
+|---|---|---|
+| 21 | Whole pages, delta 255 | A Primer pane with a named width, clamped to its minimum if the window measured small as it loaded |
+| 2 | The network wait, every render | A renderer bug: a directory with no `index.html` was never answered |
+| 1 | One frame, delta 248 | A play function waiting for a frame to exist, not for its content |
+| 7, and more on later measures | 8 to 18 pixels, delta 1, at the corners of images | A rounded corner over a scaled image, and asynchronous decoding |
+| 1 | A play failure, in 2 of 5 renders | `findByRole` retried finding a dialog's text box, and not asserting it's visible |
+
+So the skill says to look at pictures and group first, since working down the list by story would have meant the same fix 21 times. It's why the skill's table is by symptom too.
+
+**A skill's table comes from real cases.** A list of everything that could flake reads well and sends an agent looking for causes that aren't there. Some rows came from the renderer's own design, such as what it already freezes, and those say so.

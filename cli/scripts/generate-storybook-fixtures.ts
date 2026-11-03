@@ -116,6 +116,8 @@ for (const [current, golden] of DIFFS) {
   const directory = path.join(output, "diffs", hashes[current]!, hashes[golden]!);
   await mkdir(directory, { recursive: true });
   await writeFile(path.join(directory, "image"), png);
+  // What `/api/diffs/:current/:golden` answers, which a static server finds as this directory's index.
+  await writeFile(path.join(directory, "index.html"), JSON.stringify(diff));
 }
 
 // What a live story's frame shows in a story of the screen itself, which has no other Storybook to frame.

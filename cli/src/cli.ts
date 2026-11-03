@@ -41,6 +41,16 @@ const USAGE = `Usage: selfie [--port <n>] [--storybook-dir <dir>] [--native] [--
       says so, which accept doesn't rely on. Exits 0 if nothing blocks it, 1 if something does or
       anything differs from a --baseline, 2 if the review couldn't run. Play errors are advisories, and don't change the exit code.
 
+  flakes [--runs <n>] [--concurrency <n>] [--storybook-dir <dir>] [--build | --build-command <cmd>]
+         [--story <pattern>]... [--native]
+      Renders a built Storybook --runs times, 3 by default, and prints what wasn't the same each
+      time, biggest difference first, with the images to look at. Records no run and stores
+      nothing. Exits 0 if every story held still, 1 if any didn't, 2 if it couldn't run.
+
+  skill [<name>]
+      Prints a guide for a coding agent, in the format of an agent skill, or with no name, lists
+      them. selfie skill fix-flakes is how to make every story render the same way every time.
+
   approve <run> (--all | --story <pattern>...) [--actor <who>]
   reject <run> (--all | --story <pattern>...) [--actor <who>]
       Decides on a run's changed and new images. Works on a dirty tree.
@@ -124,6 +134,12 @@ const parse = <Options extends NonNullable<ParseArgsConfig["options"]>>(args: st
     throw new SelfieError("usage", (error as Error).message);
   }
 };
+
+function positiveInteger(flag: string, value: string): number {
+  const number = Number(value);
+  if (!Number.isInteger(number) || number < 1) throw new SelfieError("usage", `${flag} must be a positive whole number, got ${value}.`);
+  return number;
+}
 
 function noPositionals(command: string, positionals: readonly string[]): void {
   if (positionals.length > 0) throw new SelfieError("usage", `${command} takes no arguments, got "${positionals[0]}".`);
@@ -263,6 +279,31 @@ async function dispatch(command: string | undefined, args: string[], context: Co
         printJson(context, buildRecordDocument(result));
         return EXIT_OK;
       });
+    }
+    case "flakes": {
+      const { values, positionals } = parse(args, { ...BUILD_OPTIONS, runs: { type: "string", default: "3" }, concurrency: { type: "string" } });
+      noPositionals(command, positionals);
+      const runs = positiveInteger("--runs", values.runs);
+      if (runs < 2) throw new SelfieError("usage", "--runs must be at least 2, since a flake is a difference between renders.");
+      const concurrency = values.concurrency === undefined ? undefined : positiveInteger("--concurrency", values.concurrency);
+      return withProject(context, async (project) => {
+        const { findFlakes } = await import("./flakes.ts");
+        const report = await findFlakes(project, { ...recordOptions(values, context), runs, concurrency });
+        printJson(context, { schemaVersion: 1, ...report });
+        return report.flaky.length === 0 ? EXIT_OK : EXIT_NEEDS_ATTENTION;
+      });
+    }
+    case "skill": {
+      const { positionals } = parse(args, {});
+      const [name, ...extra] = positionals;
+      if (extra.length > 0) throw new SelfieError("usage", "Expected at most one skill name.");
+      const { readSkill, SKILLS } = await import("./skills.ts");
+      if (name === undefined) {
+        printJson(context, { skills: SKILLS });
+        return EXIT_OK;
+      }
+      context.stdout(await readSkill(name));
+      return EXIT_OK;
     }
     case "review": {
       const { values, positionals } = parse(args, { ...BUILD_OPTIONS, baseline: { type: "string" } });

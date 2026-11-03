@@ -23,8 +23,10 @@ const liveView = (row: SnapshotRow, overrides: Partial<RunView> = {}): RunView =
 });
 const liveLoaded = async ({ canvasElement }: { canvasElement: HTMLElement }) => {
   await press("l")();
-  await waitFor(() => expect(within(canvasElement).getAllByTitle(/running/).length).toBeGreaterThan(0));
-  await new Promise((resolve) => setTimeout(resolve, 300));
+  await waitFor(() => {
+    const frames = within(canvasElement).getAllByTitle<HTMLIFrameElement>(/running/);
+    for (const frame of frames) expect(frame.contentDocument?.body?.childElementCount).toBeGreaterThan(0);
+  });
 };
 export const Open: Story = { args: { row: BUTTON, view: liveView(BUTTON) }, play: liveLoaded };
 export const NewStory: Story = { args: { row: FRESH, view: liveView(FRESH) }, play: liveLoaded };

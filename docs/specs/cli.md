@@ -13,6 +13,8 @@ Source of truth: `cli/src/cli.ts`, `cli/src/document.ts`; the real binary's test
 |---|---|
 | `selfie` | Opens every story of a built Storybook, running, to look at, save, and write notes on, or says how to get there ([selfie alone](#selfie-alone)) |
 | `selfie record` | Always renders a built Storybook and records a run, and judges nothing |
+| `selfie flakes` | Renders a built Storybook several times, and prints what wasn't the same each time ([Flakes](#flakes)) |
+| `selfie skill [<name>]` | Prints a guide for a coding agent, or with no name, lists them ([Flakes](#flakes)) |
 | `selfie review [<run>]` | Prints the diff of a run against its baseline. With no run, uses the one for this built Storybook, and records one [only if necessary](#recording-only-if-necessary) |
 | `selfie approve <run>`, `selfie reject <run>` | Records a decision on a run's changed and new images, with `--all` or `--story <pattern>` |
 | `selfie accept <run>` | Makes a run the goldens of its Git SHA |
@@ -279,6 +281,23 @@ It's [`selfie ui`](#ui) with no run, except as below.
 - **Must serve anyway if there's no built Storybook after that**, saying so on stderr, since the page says what to do (`docs/specs/ui.md` → Screens). A build command that fails still fails with `build-failed` and exit 2.
 - **Must open a browser at its URL if it's at a terminal, unless `--no-open`, and never for anything else**, such as an agent or a script (rationale).
 - **Must say on stderr what address it's serving**, since a browser may not open.
+
+## Flakes
+
+Source of truth: `cli/src/flakes.ts`, `cli/src/skills.ts`, `cli/skills/`; tests in `cli/test/flakes.test.ts`.
+
+`selfie flakes [--runs <n>] [--concurrency <n>]`, with `record`'s options for what to render.
+
+- **Must record no run and store nothing**, so it can't change a review. It keeps each render's images in `<project>/flakes/`, for looking at, until the next time it runs.
+- **Must take at least 2 renders, and 3 by default.**
+- **Must exit 0 if nothing is reported, and 1 if anything is**, printing `{ schemaVersion, environment, renders, stories, flaky, warnings, directory }`, with `flaky` biggest pixel difference first, since what's biggest most often has one big cause.
+- **Must report a story whose images differ, or that failed in any render, or with a `timeout` or `request` error in any render, or with any other error in only some renders** (rationale).
+- **Must compare by pixels**, naming the most different pair and a picture of what differs.
+
+`selfie skill` prints a guide for a coding agent, in the format of an agent skill, so it works for a project that only has the CLI. `selfie skill fix-flakes` is how to use the above. This repository links the same file from `.claude/skills/`.
+
+- **Must keep a skill's text in `cli/skills/<name>/SKILL.md`, as the one copy.**
+- **Must say only what's been seen to work:** a row in a skill's table comes from a real case (rationale).
 
 ## Configuration
 

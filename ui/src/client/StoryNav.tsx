@@ -173,12 +173,16 @@ export function StorySidebar({ emptyWords, ...tree }: TreeProps & { emptyWords: 
   );
 }
 
+// In numbers, since a named width clamps to its minimum if the window measures small while it loads,
+// which made whole pages differ between renders of the same stories.
+const PANE_WIDTH = { min: "256px", default: "296px", max: "1400px" } as const;
+
 /** Stories at the left and whatever's being looked at on the right, as in Storybook. */
 export function StoryNavLayout({ children, emptyWords = "No stories yet.", ...tree }: TreeProps & { children: ReactNode; emptyWords?: string }) {
   return (
     <div className="selfie-stories">
       <PageLayout containerWidth="full" padding="none" columnGap="none" rowGap="none">
-        <PageLayout.Pane position="start" sticky resizable width="medium" divider="line" widthStorageKey="selfie-story-nav" aria-label="Stories">
+        <PageLayout.Pane position="start" sticky resizable width={PANE_WIDTH} divider="line" widthStorageKey="selfie-story-nav" aria-label="Stories">
           <StorySidebar {...tree} emptyWords={emptyWords} />
         </PageLayout.Pane>
         <PageLayout.Content padding="normal" width="full">

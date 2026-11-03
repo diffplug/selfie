@@ -115,7 +115,7 @@ function Pane({ layer, src, story, onOpen, onLoad, children }: { layer: Layer; s
       <figcaption>{LAYER_WORDS[layer]}</figcaption>
       <div className="selfie-pane-image">
         <button type="button" className="selfie-pane-button" onClick={onOpen} aria-label={`Show the ${layer} image stacked`}>
-          <img src={src} alt={`${LAYER_WORDS[layer]} image of ${story}`} loading="lazy" decoding="async" onLoad={onLoad} />
+          <img src={src} alt={`${LAYER_WORDS[layer]} image of ${story}`} decoding="sync" onLoad={onLoad} />
         </button>
         {children}
       </div>
