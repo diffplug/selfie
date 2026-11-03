@@ -65,7 +65,8 @@ export function storybookHash(
 }
 
 /**
- * Changes whenever a render of this build could: its bytes, the environment, the init script, or
+ * Changes whenever a render of this build could: its bytes, the environment, the init script, how
+ * long it settles, or
  * the renderer's own code, which also covers its defaults, and which a package version wouldn't
  * in a checkout. Null if a render can't be recognized: a native machine's ID doesn't describe all
  * of it, and a build that's missing or holds a symlink can't be hashed.
@@ -74,14 +75,16 @@ export async function renderIdentity({
   storybookDir,
   environment,
   initScript,
+  settleMs,
 }: {
   readonly storybookDir: string;
   readonly environment: RenderEnvironment;
   readonly initScript?: string | undefined;
+  readonly settleMs?: number | undefined;
 }): Promise<string | null> {
   if (environment.runner.kind !== "container") return null;
   const build = await storybookHash(storybookDir);
   if (build === null) return null;
   const renderer = await hashTree(fileURLToPath(new URL(".", import.meta.url)));
-  return sha256(JSON.stringify([build, environmentId(environment), initScriptHash(initScript), renderer]));
+  return sha256(JSON.stringify([build, environmentId(environment), initScriptHash(initScript), settleMs ?? null, renderer]));
 }

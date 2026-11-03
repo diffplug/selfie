@@ -8,6 +8,7 @@ export {
   type NativeRunner,
   type RenderEnvironment,
 } from "./environment.ts";
+export { DEFAULT_RECIPE, type RecipeOverrides, type RenderRecipe } from "./worker/protocol.ts";
 export { storybookHash, renderIdentity } from "./identity.ts";
 export {
   MANIFEST_FILE,

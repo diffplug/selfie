@@ -7,6 +7,8 @@ description: Make every Storybook story render the same image every time, using 
 
 A flaky story costs more than one false diff: people stop trusting the review. So the goal is a Storybook that renders identically every time, and the only fix that counts is removing the cause. **Never** add a tolerance, a retry, a longer sleep, or a blanket approval.
 
+Fix what's wrong, and don't change how the product really works to suit a screenshot. The renderer already loads and decodes every image, however lazily, and freezes the clock and CSS animations. If a project needs it to render differently, such as in dark mode or another locale, that's `environment.recipe` in `selfie.config.json`, and `settleMs` and `storyTimeoutMs` beside it. Changing the recipe starts new goldens.
+
 Always work from a built Storybook, and rebuild after every change. `selfie flakes` renders what's on disk, so without a rebuild it re-measures your old code.
 
 ## 1. Measure
@@ -48,11 +50,11 @@ Most flakes in one Storybook share a few causes, and fixing the biggest usually 
 | What you see | Likely cause | The fix |
 |---|---|---|
 | Huge box, delta near 255, and everything beside or below one element moved | Something's size is decided by timing, like a pane that measures the window as it loads | Give it a fixed size. Look for what reads `innerWidth`, measures on mount, or restores a saved size |
-| Huge box over one image, often below the fold, delta near 255 | It wasn't loaded or decoded at the screenshot | Drop `loading="lazy"` and use `decoding="sync"`, at least in a snapshot |
+| Huge box, delta low, a band at the top and bottom of something that scrolls | A scroll position decided before everything's size is known | Wait until every size is known before scrolling. It's a bug for real users too |
 | Huge box inside something a play function opened | The wait ended before it had content | In the play function, wait for the thing itself, such as an iframe's document having content, not a sleep |
-| A few pixels, delta 1 or 2, exactly at the corners of something | A rounded corner over an image or a scaled layer, antialiased differently from one render to the next | Square that corner, or don't clip an image with it |
+| A few pixels, delta 1 or 2, exactly at the corners of something | A background showing through the antialiased edge of a rounded border, around something that covers it | Remove the background, which nothing sees once the content's there. Don't square the corner |
 | Text, a date, or a number differs | The current time, a random value, or an ID generated at render | A fixed value in the story's args. The renderer already fixes the page's clock, so look for a server's time or a seeded generator |
-| Something's caught part way through moving | A JavaScript animation or a timer. CSS animations are already stopped | Have the code test `window.__SELFIE_SNAPSHOT__`, which is true before story code runs, or set your own flag in `initScript` in `selfie.config.json` |
+| Something's caught part way through moving | A JavaScript animation or a timer. CSS animations are already stopped | Have the code test `window.__SELFIE_SNAPSHOT__`, which is true before story code runs. `recipe.snapshotGlobal` can rename it, to reach a freeze the project already has |
 | `errors` with a play message like "not visible" | An assertion that only checks once, while something's still opening | Retry it: `await waitFor(() => expect(canvas.getByRole(...)).toBeVisible())`. `findBy*` retries finding it, and not what you then assert about it |
 | `timeout`: "network not quiet", in every render | A request nobody answers, or a repeating poll. The message names what was in flight | Look at that URL. The render has no network, so stub what's external, and stop any poll in a snapshot |
 | `request` errors | A request leaving the Storybook, which is aborted | Serve it from `staticDirs`, or stub it |

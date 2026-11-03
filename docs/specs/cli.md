@@ -307,10 +307,12 @@ Source of truth: `cli/src/config.ts`.
 
 | Key | Meaning |
 |---|---|
-| `environment` | Overrides for `defineEnvironment` (`docs/specs/render.md` → Environment) |
+| `environment` | Overrides for `defineEnvironment`, including its `recipe` (`docs/specs/render.md` → Environment) |
 | `initScript` | A file inside the Git top level, used as `render`'s `initScript` |
 | `storybookDir` | A directory inside the Git top level, the built Storybook to render. `--storybook-dir` overrides it |
 | `buildCommand` | How this project builds its Storybook, run from the Git top level |
+| `settleMs` | How long to wait after the network, images, and fonts, before a screenshot. Default 100. Changing it renders again |
+| `storyTimeoutMs` | The bound on one story, from opening its context to its screenshot. Default 60000 |
 | `regionMergeDistance` | How close changed regions group for showing, in CSS pixels, multiplied by the run's scale. Default 12 |
 
 - **May let `--native` win over its `runner`.**

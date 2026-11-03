@@ -115,7 +115,7 @@ function Pane({ layer, src, story, onOpen, onLoad, children }: { layer: Layer; s
       <figcaption>{LAYER_WORDS[layer]}</figcaption>
       <div className="selfie-pane-image">
         <button type="button" className="selfie-pane-button" onClick={onOpen} aria-label={`Show the ${layer} image stacked`}>
-          <img src={src} alt={`${LAYER_WORDS[layer]} image of ${story}`} decoding="sync" onLoad={onLoad} />
+          <img src={src} alt={`${LAYER_WORDS[layer]} image of ${story}`} loading="lazy" decoding="async" onLoad={onLoad} />
         </button>
         {children}
       </div>
@@ -178,7 +178,9 @@ export function ImageCompare({ row, diff, scale, groups, selection, runId, feedb
 
   const shownSize = shown === undefined ? undefined : sizes[shown.src];
   const { drawn, clear: clearDrawn, handlers: drawing } = useDrawnBox({ story, cssPixels, size: shownSize, onDrawn: () => writing.current?.focus() });
-  const hasSize = shownSize !== undefined;
+  // Every image, since flipping between different heights moves what scrolling can reach, so
+  // otherwise where this lands depends on which one loaded first.
+  const allSized = sources.every(({ src }) => sizes[src] !== undefined);
 
   const focusedGroup = focused === null ? null : (groups[focused] ?? null);
 
@@ -209,8 +211,8 @@ export function ImageCompare({ row, diff, scale, groups, selection, runId, feedb
   // A small change is usually off-screen when zoomed, so go to it whenever the zoom changes, and as
   // soon as the image and the change are known. Never on just looking at another region or layer.
   useLayoutEffect(() => {
-    if (mode === "flip" && hasSize) center();
-  }, [mode, hasSize, cssPixels, box, firstChanged]);
+    if (mode === "flip" && allSized) center();
+  }, [mode, allSized, cssPixels, box, firstChanged]);
 
   // A region can be somewhere else in the golden, so keep the one being looked at still when flipping,
   // which is what makes a flip show it changing and not the page jumping.

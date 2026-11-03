@@ -7,16 +7,45 @@ export const PLAYWRIGHT_VERSION = (
   createRequire(import.meta.url)("playwright-core/package.json") as { version: string }
 ).version;
 
-/**
- * Everything fixed that can decide pixels. It is hashed into the environment ID, so editing
- * a value starts new goldens by itself. Bump `waitSequence` when the order of waits in
- * `worker.ts` changes.
- */
-export const RENDER_RECIPE = {
-  waitSequence: 2,
+/** How a story is rendered, past what the environment's other fields say. All of it can decide pixels, so it's in the environment's ID. */
+export interface RenderRecipe {
+  /** Bumped when the order of waits in `worker.ts` changes. Not a project's to set. */
+  waitSequence: number;
   /** No server listens here: the worker answers every request itself. */
-  origin: "http://127.0.0.1:6199",
+  origin: string;
   /** Set to `true` before any story code loads, so a project can freeze its own timers. */
+  snapshotGlobal: string;
+  /** A container has no display. Not a project's to set. */
+  headless: true;
+  /** One could answer requests that the worker has to. Not a project's to set. */
+  serviceWorkers: "block";
+  locale: string;
+  timezoneId: string;
+  colorScheme: "light" | "dark" | "no-preference";
+  reducedMotion: "reduce" | "no-preference";
+  forcedColors: "none" | "active";
+  /** What `Date` says, or null for the real time, which a story showing it can't hold still under. */
+  fixedTime: string | null;
+  networkQuietMs: number;
+  networkQuietBoundMs: number;
+  /** Load every image in the page, however lazily, and decode it, so a screenshot never races one. */
+  loadImages: boolean;
+  screenshot: {
+    animations: "disabled" | "allow";
+    caret: "hide" | "initial";
+    scale: "device" | "css";
+    fullPage: boolean;
+  };
+}
+
+/** What a project may set. Everything's optional, and the rest comes from `DEFAULT_RECIPE`. */
+export type RecipeOverrides = Partial<Omit<RenderRecipe, "waitSequence" | "headless" | "serviceWorkers" | "screenshot">> & {
+  screenshot?: Partial<RenderRecipe["screenshot"]>;
+};
+
+export const DEFAULT_RECIPE: RenderRecipe = {
+  waitSequence: 3,
+  origin: "http://127.0.0.1:6199",
   snapshotGlobal: "__SELFIE_SNAPSHOT__",
   headless: true,
   serviceWorkers: "block",
@@ -28,8 +57,9 @@ export const RENDER_RECIPE = {
   fixedTime: "2026-01-15T12:00:00.000Z",
   networkQuietMs: 100,
   networkQuietBoundMs: 15_000,
+  loadImages: true,
   screenshot: { animations: "disabled", caret: "hide", scale: "device", fullPage: true },
-} as const;
+};
 
 export interface WorkerStory {
   id: string;
@@ -44,6 +74,7 @@ export interface WorkerJob {
   launchArgs: string[];
   viewport: { width: number; height: number };
   scale: number;
+  recipe: RenderRecipe;
   settleMs: number;
   initScript: string | null;
   concurrency: number;

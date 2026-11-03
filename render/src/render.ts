@@ -14,7 +14,6 @@ import {
 } from "./manifest.ts";
 import { prepareRunner, runWorker } from "./runners.ts";
 import { filterStories, readStoryIndex, RenderError, unmatchedPatternWarning } from "./storybook.ts";
-import { RENDER_RECIPE } from "./worker/protocol.ts";
 
 const DEFAULT_MAX_CONCURRENCY = 6;
 const DEFAULT_STORY_TIMEOUT_MS = 60_000;
@@ -100,7 +99,7 @@ export async function render(options: RenderOptions): Promise<Manifest> {
     schemaVersion: 1,
     environmentId: id,
     environment,
-    recipe: RENDER_RECIPE,
+    recipe: environment.recipe,
     settleMs,
     runtime: null,
     initScriptSha256: initScriptHash(options.initScript),
@@ -136,6 +135,7 @@ export async function render(options: RenderOptions): Promise<Manifest> {
       launchArgs: launchArgs(environment),
       viewport: environment.viewport,
       scale: environment.scale,
+      recipe: environment.recipe,
       settleMs,
       initScript: options.initScript ?? null,
       concurrency,

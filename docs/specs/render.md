@@ -20,11 +20,27 @@ A `RenderEnvironment` is a typed object:
 
 - **Must refuse a container image that isn't exactly `name@sha256:<digest>`**, including one that also has a tag.
 - **Must keep one ID format:** `container-<os>-<arch>-<hash>` or `native-<os>-<arch>-<hash>`, where the hash is 16 hex digits and the prefix is only for reading. `environmentId()` is what a snapshot's name carries (`docs/specs/snapshots.md` → Snapshot names).
-- **Must hash the image digest and platform, or the native OS, OS release, and architecture; the browser flags; viewport; scale; `RENDER_RECIPE`; and the Playwright version.**
+- **Must hash the image digest and platform, or the native OS, OS release, and architecture; the browser flags; viewport; scale; `recipe`; and the Playwright version.**
 - **Never hash an image's registry, the order of flags, or the order of properties**, since they can't change pixels.
 - **Never hash `settleMs` or `initScript`.** They are project input like story code, so changing them reports changed stories rather than starting new goldens. The manifest records both (rationale).
 - **Must refuse a browser flag given twice**, since the ID sorts flags and Chromium's last duplicate wins.
-- **Must keep everything fixed that can decide pixels in `RENDER_RECIPE`**, which the worker reads directly: the origin, the snapshot global's name, headless mode, service workers, locale `en-US`, timezone UTC, light scheme, reduced motion, forced colors, a fixed `Date`, the network quiet period and its bound, and the screenshot options. **Must bump its `waitSequence` when the order of waits changes.**
+- **Must take everything else that can decide pixels from the environment's `recipe`**, which the worker reads directly, and which starts from `DEFAULT_RECIPE`:
+
+| Setting | Default |
+|---|---|
+| `origin` | `http://127.0.0.1:6199` |
+| `snapshotGlobal` | `__SELFIE_SNAPSHOT__` |
+| `locale`, `timezoneId` | `en-US`, `UTC` |
+| `colorScheme`, `reducedMotion`, `forcedColors` | `light`, `reduce`, `none` |
+| `fixedTime` | `2026-01-15T12:00:00.000Z`, or null for the real time |
+| `networkQuietMs`, `networkQuietBoundMs` | 100, 15000 |
+| `loadImages` | `true` |
+| `screenshot` | `{ animations: "disabled", caret: "hide", scale: "device", fullPage: true }` |
+
+- **Must let a project set any of those, and start new goldens by changing one**, since they're hashed like the rest (rationale).
+- **Must refuse a recipe setting it doesn't have, or a value it can't use**, so a typo can't quietly render the default.
+- **Never let a project set `waitSequence`, `headless`, or `serviceWorkers`.** The first says what the worker does, a container has no display, and a service worker could answer requests that the worker has to (rationale).
+- **Must bump `waitSequence` when the order of waits changes.**
 - **Must pass `--use-mock-keychain --password-store=basic` on every browser launch, and keep them out of the environment and its ID** (rationale).
 - **Must refuse a native environment recorded on a different machine**, so its ID can't claim an OS it didn't run on. `{ kind: "native" }` in `defineEnvironment` means this machine.
 - **Must warn through `log` and in the manifest's `warnings` that a native run's images won't match other machines.**
@@ -39,7 +55,7 @@ Source of truth: `render/src/render.ts`, `render/src/runners.ts`, `render/src/wo
 - **Must check the runner before clearing any output:** a native environment against this machine, and for a container, Docker and the image on the declared platform, pulling it once if absent. That check compares the OS and architecture `docker image inspect` reports with the declared platform (rationale), so a digest for another platform is refused, and so is a multi-platform digest unless the declared platform is the host's. **Must use a single-platform digest for any other platform.**
 - **Must run a container with no network, no capabilities, a read-only root, read-only mounts except the output directory, a non-root user, and only `HOME` in its environment.** Never pass credentials or the host's environment into it. It runs by digest with `--pull=never`, so it works offline once pulled and can't use a different image.
 - **Must give each story a fresh browser context.**
-- **Must wait, in order, for:** the page load, Storybook's render phase, no request in flight for the network quiet period, `document.fonts.ready`, `settleMs` (default 100 ms), and two animation frames. Then it screenshots the whole page, with `animations: "disabled"`, so an image is at least the viewport's size and may be taller or wider (rationale). Content in an inner scroller, or a layout fixed to the viewport's height, shows only what the viewport does.
+- **Must wait, in order, for:** the page load, Storybook's render phase, no request in flight for the network quiet period; with `loadImages`, every image made eager and synchronous, the network quiet again, and every image decoded; `document.fonts.ready`, `settleMs` (default 100 ms), and two animation frames. Then it screenshots the whole page, with `animations: "disabled"`, so an image is at least the viewport's size and may be taller or wider (rationale). Content in an inner scroller, or a layout fixed to the viewport's height, shows only what the viewport does.
 - **Must not treat Storybook's `errored` phase as final.** A play failure passes through it on the way to `completed`, so the error display, `aborted`, and the timeout are what fail a story (rationale).
 - **Must bound every wait.** `storyTimeoutMs` (default 60 s) bounds a story from context to screenshot. The network wait alone is soft and independent of it: it records an error after 15 s and renders anyway. The worker exits on its own at a deadline derived from the story count, so a container outlives no host process.
 - **Must treat a story's failure as data.** A thrown render, Storybook's error display, or a timeout marks that story `failed` and the run continues. A browser crash relaunches the browser for later stories. A worker crash marks the unreported stories `failed`.

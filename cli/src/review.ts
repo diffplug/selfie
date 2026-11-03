@@ -356,6 +356,8 @@ export function renderInput(
     log,
     ...(options.stories === undefined ? {} : { stories: [...options.stories] }),
     ...(settings.initScript === undefined ? {} : { initScript: settings.initScript }),
+    ...(settings.settleMs === undefined ? {} : { settleMs: settings.settleMs }),
+    ...(settings.storyTimeoutMs === undefined ? {} : { storyTimeoutMs: settings.storyTimeoutMs }),
     ...(options.signal === undefined ? {} : { signal: options.signal }),
   };
 }
@@ -395,7 +397,7 @@ async function renderFresh(
         return;
       }
       // A built Storybook that changed while it rendered has no identity that describes these images.
-      const after = await renderIdentity({ storybookDir, environment: settings.environment, initScript: settings.initScript });
+      const after = await renderIdentity({ storybookDir, environment: settings.environment, initScript: settings.initScript, settleMs: settings.settleMs });
       const whyNot = after === identity ? whyNotReusable(manifest, run) : "the built Storybook changed while it rendered";
       await project.renders.remember(identity, whyNot === null ? run.id : null);
       if (whyNot !== null) log(`This render won't be reused: ${whyNot}.`);
@@ -498,7 +500,7 @@ async function recordBuild(project: Project, options: RecordOptions, { reuse }: 
     // 3. Render, unless asked to reuse and this exact built Storybook already rendered.
     const renderStarted = Date.now();
     const buildBefore = await storybookHash(storybookDir);
-    const identity = await renderIdentity({ storybookDir, environment: settings.environment, initScript: settings.initScript });
+    const identity = await renderIdentity({ storybookDir, environment: settings.environment, initScript: settings.initScript, settleMs: settings.settleMs });
     const replayed = identity !== null && reuse ? await replay(project, identity, options.stories, log) : null;
     const recording = replayed ?? (await renderFresh(project, renderDir, render, { storybookDir, identity, settings, options, log }));
     const rendered = Date.now();

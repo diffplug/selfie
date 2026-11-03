@@ -1,13 +1,13 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { defineEnvironment, environmentId, type EnvironmentOverrides, type RenderEnvironment } from "selfie-render";
+import { defineEnvironment, EnvironmentError, environmentId, type EnvironmentOverrides, type RenderEnvironment } from "selfie-render";
 import { SelfieError } from "./errors.ts";
 import type { Repo } from "./git.ts";
 import { resolveInside } from "./paths.ts";
 
 /** At the Git top level. It's the only place a project configures Selfie. */
 const CONFIG_FILE = "selfie.config.json";
-const KNOWN_KEYS = new Set(["environment", "initScript", "storybookDir", "buildCommand", "regionMergeDistance"]);
+const KNOWN_KEYS = new Set(["environment", "initScript", "storybookDir", "buildCommand", "regionMergeDistance", "settleMs", "storyTimeoutMs"]);
 
 // Never a build command: docs/specs/cli.md → Configuration.
 interface ProjectConfig {
@@ -17,6 +17,8 @@ interface ProjectConfig {
   /** A directory path, inside the Git top level. */
   readonly storybookDir?: string;
   readonly buildCommand?: string;
+  readonly settleMs?: number;
+  readonly storyTimeoutMs?: number;
   /** In CSS pixels. Only groups what's shown. */
   readonly regionMergeDistance?: number;
 }
@@ -49,6 +51,10 @@ export interface RenderSettings {
   readonly storybookDir?: string;
   /** How this project builds its Storybook, run from the Git top level, only when a person asks. */
   readonly buildCommand?: string;
+  /** How long to wait after the network, fonts, and images, before a screenshot. */
+  readonly settleMs?: number;
+  /** The bound on one story, from opening its context to its screenshot. */
+  readonly storyTimeoutMs?: number;
 }
 
 /** The build a command means: the flag, relative to where it ran, then the config's, then the default. */
@@ -61,10 +67,16 @@ export async function resolveRenderSettings(
   { native = false }: { readonly native?: boolean | undefined } = {},
 ): Promise<RenderSettings> {
   const config = await loadConfig(repo);
-  const environment = defineEnvironment({
-    ...config.environment,
-    ...(native ? { runner: { kind: "native" as const } } : {}),
-  });
+  let environment: RenderEnvironment;
+  try {
+    environment = defineEnvironment({
+      ...config.environment,
+      ...(native ? { runner: { kind: "native" as const } } : {}),
+    });
+  } catch (error) {
+    if (error instanceof EnvironmentError) throw new SelfieError("bad-config", error.message);
+    throw error;
+  }
 
   let initScript: string | undefined;
   if (config.initScript !== undefined) {
@@ -86,12 +98,18 @@ export async function resolveRenderSettings(
   if (config.buildCommand !== undefined && (typeof config.buildCommand !== "string" || config.buildCommand.trim() === "")) {
     throw new SelfieError("bad-config", "The config's buildCommand must be a command to run.");
   }
+  for (const key of ["settleMs", "storyTimeoutMs"] as const) {
+    const value = config[key];
+    if (value !== undefined && (!Number.isInteger(value) || value < 0)) throw new SelfieError("bad-config", `The config's ${key} must be a whole number of milliseconds, got ${JSON.stringify(value)}.`);
+  }
   return {
     environment,
     environmentId: environmentId(environment),
     ...(initScript === undefined ? {} : { initScript }),
     ...(storybookDir === undefined ? {} : { storybookDir }),
     ...(config.buildCommand === undefined ? {} : { buildCommand: config.buildCommand }),
+    ...(config.settleMs === undefined ? {} : { settleMs: config.settleMs }),
+    ...(config.storyTimeoutMs === undefined ? {} : { storyTimeoutMs: config.storyTimeoutMs }),
   };
 }
 

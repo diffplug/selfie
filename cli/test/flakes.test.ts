@@ -1,4 +1,6 @@
-import { access } from "node:fs/promises";
+import { access, writeFile } from "node:fs/promises";
+import path from "node:path";
+import type { RenderOptions } from "selfie-render";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { runCli } from "../src/cli.ts";
 import { BLUE, createHarness, GREEN, RED, type Harness } from "./support.ts";
@@ -113,5 +115,34 @@ describe("selfie skill", () => {
     const { code, json } = await h.cli("skill", "nope");
     expect(code).toBe(2);
     expect(json.error.code).toBe("usage");
+  });
+});
+
+describe("a project's recipe and timings", () => {
+  const config = (settings: unknown) => writeFile(path.join(h.repo, "selfie.config.json"), JSON.stringify(settings));
+  const seen: RenderOptions[] = [];
+
+  beforeEach(() => {
+    seen.length = 0;
+    h.stories = [{ id: "a" }];
+    h.onRender = (options) => void seen.push(options);
+  });
+
+  test("reach the render", async () => {
+    await config({ environment: { recipe: { colorScheme: "dark" } }, settleMs: 250, storyTimeoutMs: 9000 });
+    expect((await h.cli("record", "--storybook-dir", "ignored")).code).toBe(0);
+    expect(seen[0]).toMatchObject({ environment: { recipe: { colorScheme: "dark", locale: "en-US" } }, settleMs: 250, storyTimeoutMs: 9000 });
+  });
+
+  test.each([
+    [{ environment: { recipe: { colourScheme: "dark" } } }, "colourScheme"],
+    [{ environment: { recipe: { headless: false } } }, "headless"],
+    [{ settleMs: -1 }, "settleMs"],
+    [{ storyTimeoutMs: "soon" }, "storyTimeoutMs"],
+  ])("refuses %j as a bad config", async (settings, named) => {
+    await config(settings);
+    const { code, json } = await h.cli("record", "--storybook-dir", "ignored");
+    expect(code).toBe(2);
+    expect(json.error).toMatchObject({ code: "bad-config", message: expect.stringContaining(named) });
   });
 });
