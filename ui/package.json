@@ -18,7 +18,7 @@
     "storybook": "node --disable-warning=ExperimentalWarning ../cli/scripts/generate-storybook-fixtures.ts && storybook dev -p 6007",
     "prepare": "vite build",
     "test": "pnpm typecheck && vite build --logLevel warn && vitest run",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.workerd.json"
   },
   "dependencies": {
     "@hono/node-server": "2.1.5",
@@ -26,6 +26,8 @@
     "selfie-store": "workspace:*"
   },
   "devDependencies": {
+    "@cloudflare/vitest-plugin": "^1.4.11",
+    "@cloudflare/workers-types": "^5.20261101.1",
     "@primer/octicons-react": "19.42.0",
     "@primer/primitives": "11.10.0",
     "@primer/react": "38.43.0",
