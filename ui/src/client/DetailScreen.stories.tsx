@@ -58,6 +58,17 @@ const liveLoaded = async ({ canvasElement }: { canvasElement: HTMLElement }) => 
 export const LiveStoriesOpen: Story = { args: { row: BUTTON, view: liveView(BUTTON) }, play: liveLoaded };
 export const LiveStoriesNewStory: Story = { args: { row: FRESH, view: liveView(FRESH) }, play: liveLoaded };
 export const LiveStoriesGoldenNotKept: Story = { args: { row: BUTTON, view: liveView(BUTTON, { goldenStorybookUrl: null }) }, play: liveLoaded };
+/** Its story focuses itself as it loads, and the page's keys must still reach the page. */
+export const LiveStoriesKeepTheKeyboard: Story = {
+  args: { row: BUTTON, view: liveView(BUTTON, { storybook: { url: "./live-story/grabbing/", exactBuild: true }, goldenStorybookUrl: null }) },
+  play: async (context) => {
+    await liveLoaded(context);
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    await waitFor(() => expect(document.activeElement?.tagName).not.toBe("IFRAME"));
+    await press("l")();
+    await waitFor(() => expect(within(context.canvasElement).queryByTitle(/running/)).toBeNull());
+  },
+};
 export const LiveStoriesSizeUnknown: Story = { args: { row: BUTTON, view: liveView(BUTTON, { viewport: null }) }, play: liveLoaded };
 /** The agent's change to a new story, which has no golden: what's compared is the image the note is on. */
 const SINCE_NOTED = { ...BUTTON, state: "new" as const, goldenHash: null, pixelDiff: null };

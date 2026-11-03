@@ -2,7 +2,7 @@
 // most reviews don't need them and each one is a whole page to load.
 import { ChevronDownIcon, ChevronRightIcon, LinkExternalIcon } from "@primer/octicons-react";
 import { Button, Heading, Link, Text } from "@primer/react";
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { RunView, SnapshotRow } from "../shared/api.ts";
 import { LAYER_WORDS } from "./ImageCompare.tsx";
 import { Keys } from "./Keys.tsx";
@@ -43,8 +43,33 @@ export function StoryFrame({ title, url, viewport }: { title: string; url: strin
     return () => observer.disconnect();
   }, []);
   const scale = viewport === null ? 1 : width / viewport.width;
+
+  // A story may focus itself as it loads, as a terminal does, and then this page's keys would go to
+  // it. A frame gets the keyboard only by being clicked, which the pointer being over it tells.
+  const pointerInside = useRef(false);
+  useEffect(() => {
+    const takeBack = () => {
+      const focused = document.activeElement;
+      if (!pointerInside.current && focused instanceof HTMLIFrameElement && box.current?.contains(focused)) focused.blur();
+    };
+    // After the event, since the browser only says which element has focus once it's moved.
+    const onBlur = () => setTimeout(takeBack);
+    window.addEventListener("blur", onBlur);
+    takeBack();
+    return () => window.removeEventListener("blur", onBlur);
+  }, [url]);
+
   return (
-    <div ref={box} className="selfie-live-frame" style={{ height: viewport === null ? UNKNOWN_SIZE_HEIGHT : viewport.height * scale }}>
+    <div
+      ref={box}
+      className="selfie-live-frame"
+      onPointerEnter={() => {
+        pointerInside.current = true;
+      }}
+      onPointerLeave={() => {
+        pointerInside.current = false;
+      }}
+      style={{ height: viewport === null ? UNKNOWN_SIZE_HEIGHT : viewport.height * scale }}>
       {/* A new element per story, since moving one frame along would add to the browser's history. */}
       <iframe
         key={url}

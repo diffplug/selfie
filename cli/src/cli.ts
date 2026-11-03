@@ -7,7 +7,7 @@ import { buildAcceptDocument, buildRecordDocument, buildReviewDocument } from ".
 import { SelfieError } from "./errors.ts";
 import { gitUserEmail, resolveCommit } from "./git.ts";
 import { compareAsReviewed, findBaseline, openProject, type Project } from "./project.ts";
-import { record, review, replyToNote } from "./review.ts";
+import { buildIfAsked, record, review, replyToNote } from "./review.ts";
 import { summarizeRun } from "./summary.ts";
 import { findBaselineWithRemote, pull, push, requireRemote, resolveRemote, type Fetch } from "./sync.ts";
 import { isNoteId, isNoteText, MAX_NOTE_CHARACTERS } from "selfie-ui/notes";
@@ -52,6 +52,11 @@ const USAGE = `Usage: selfie <command>
       else the newest at HEAD. It renders only when someone asks it to on the page. Opens no
       browser by itself. Hosts the built Storybook on a port of its own, so a story's page links
       to the real thing, and /stories lists every story, each with its newest capture.
+
+  feedback [--build-command <cmd>] [--port <n>] [--storybook-dir <dir>] [--native]
+      Serves every story of a built Storybook, running, to write notes on, and prints its URL, until
+      stopped. A note captures the story it's on. An agent answers with agent-await-feedback,
+      a change, record --story, and reply, and then the page shows what changed since the note.
 
   notes [--all]
       Prints the open notes a person has sent to an agent from this folder's review UI, each with
@@ -143,6 +148,70 @@ const BUILD_OPTIONS = {
   native: { type: "boolean" },
   story: { type: "string", multiple: true },
 } as const;
+
+const SERVING_OPTIONS = {
+  port: { type: "string", default: "0" },
+  native: { type: "boolean" },
+  "storybook-dir": { type: "string" },
+} as const;
+
+function portFrom(value: string | undefined): number {
+  const port = Number(value);
+  if (!Number.isInteger(port) || port < 0 || port > 65_535) throw new SelfieError("usage", `--port must be a port number, got "${value}".`);
+  return port;
+}
+
+/** Serves the review UI and the hosted Storybook until told to stop, saying where. */
+async function serveReview(
+  context: Context,
+  project: Project,
+  options: {
+    readonly port: number;
+    readonly native: boolean | undefined;
+    readonly storybookDir: string | undefined;
+    /** Which page to say to open. */
+    readonly path: string;
+    readonly runId: string | null;
+    readonly afterListening?: string;
+    /** Run once on the way up, after the config is known to be good, since a build can take minutes. */
+    readonly buildCommand?: string | undefined;
+    readonly needsBuild?: boolean;
+  },
+): Promise<number> {
+  const { native, buildCommand } = options;
+  // Only here, so that no other command loads a web server.
+  const [{ isBuiltStorybook, serveReviewWithStorybook }, { localReviewSource }] = await Promise.all([import("selfie-ui/local"), import("./ui.ts")]);
+  const dir = resolveStorybookDir(project.cwd, options.storybookDir, await resolveCaptureSettings(project.repo, { native }));
+  await buildIfAsked(buildCommand, project.cwd, context.signal, (line) => context.stderr(`${line}\n`));
+  if (options.needsBuild === true && !isBuiltStorybook(dir)) {
+    throw new SelfieError("no-stories", `There's no built Storybook at ${dir}, so there's nothing to give feedback on. Build one, or pass --build-command.`);
+  }
+  const servers = await serveReviewWithStorybook({
+    source: (url) =>
+      localReviewSource(project, {
+        native,
+        storybook: {
+          dir,
+          url,
+          record: async (stories) =>
+            (await record(project, { storybookDir: dir, native, stories, capture: context.capture, log: (line) => context.stderr(`${line}\n`) })).run.id,
+        },
+      }),
+    port: options.port,
+    clientDir: context.uiClientDir,
+    dir,
+    readBuildFile: (build, file) => project.builds.readFile(build, file),
+  });
+  try {
+    printJson(context, { url: `${servers.review.url}${options.path}`, port: servers.review.port, runId: options.runId, storybookUrl: servers.storybook.url });
+    context.stderr("Serving the review UI until this is stopped.\n");
+    if (options.afterListening !== undefined) context.stderr(options.afterListening);
+    await stopped(context.signal);
+  } finally {
+    await servers.close();
+  }
+  return EXIT_OK;
+}
 
 function recordOptions(values: ReturnType<typeof parse<typeof BUILD_OPTIONS>>["values"], context: Context) {
   return {
@@ -322,59 +391,30 @@ async function dispatch(command: string | undefined, args: string[], context: Co
       });
     }
     case "ui": {
-      const { values, positionals } = parse(args, {
-        port: { type: "string", default: "0" },
-        native: { type: "boolean" },
-        "storybook-dir": { type: "string" },
-      });
+      const { values, positionals } = parse(args, SERVING_OPTIONS);
       const [runId, ...extra] = positionals;
       if (extra.length > 0) throw new SelfieError("usage", "Expected at most one run ID.");
-      const port = Number(values.port);
-      if (!Number.isInteger(port) || port < 0 || port > 65_535) {
-        throw new SelfieError("usage", `--port must be a port number, got "${values.port}".`);
-      }
+      const port = portFrom(values.port);
       return withProject(context, async (project) => {
         if (runId !== undefined) await compareAsReviewed(project, runId);
-        // Only here, so that no other command loads a web server.
-        const [{ serveReviewWithStorybook }, { localReviewSource }] = await Promise.all([import("selfie-ui/local"), import("./ui.ts")]);
-        const dir = resolveStorybookDir(project.cwd, values["storybook-dir"], await resolveCaptureSettings(project.repo, { native: values.native }));
-        const servers = await serveReviewWithStorybook({
-          source: (url) =>
-            localReviewSource(project, {
-              native: values.native,
-              storybook: {
-                dir,
-                url,
-                record: async (stories) =>
-                  (
-                    await record(project, {
-                      storybookDir: dir,
-                      native: values.native,
-                      stories,
-                      capture: context.capture,
-                      log: (line) => context.stderr(`${line}\n`),
-                    })
-                  ).run.id,
-              },
-            }),
+        return serveReview(context, project, { port, native: values.native, storybookDir: values["storybook-dir"], path: runId === undefined ? "" : `runs/${runId}`, runId: runId ?? null });
+      });
+    }
+    case "feedback": {
+      const { values, positionals } = parse(args, { ...SERVING_OPTIONS, "build-command": { type: "string" } });
+      noPositionals(command, positionals);
+      const port = portFrom(values.port);
+      return withProject(context, async (project) => {
+        return serveReview(context, project, {
           port,
-          clientDir: context.uiClientDir,
-          dir,
-          readBuildFile: (build, file) => project.builds.readFile(build, file),
+          native: values.native,
+          storybookDir: values["storybook-dir"],
+          path: "stories",
+          runId: null,
+          buildCommand: values["build-command"],
+          needsBuild: true,
+          afterListening: "Open that page, and write a note on any story. For an agent to be sent them, have it run: selfie agent-await-feedback\n",
         });
-        try {
-          printJson(context, {
-            url: runId === undefined ? servers.review.url : `${servers.review.url}runs/${runId}`,
-            port: servers.review.port,
-            runId: runId ?? null,
-            storybookUrl: servers.storybook.url,
-          });
-          context.stderr("Serving the review UI until this is stopped.\n");
-          await stopped(context.signal);
-        } finally {
-          await servers.close();
-        }
-        return EXIT_OK;
       });
     }
     default:

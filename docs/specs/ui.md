@@ -146,6 +146,7 @@ Source of truth: `ui/src/client/`.
 - **Must keep the region being looked at still when flipping between images**, since it can be somewhere else in the other one (rationale).
 - **Must link a snapshot to its story in the very build that rendered its run, if that's kept, or else the directory `selfie ui` hosts, and then say it may not match** (`RunView.storybook`). A removed story has no link.
 - **Must offer the live stories, closed and loading nothing until opened, and stay open or closed from story to story**: the golden's kept build beside the run's, in frames (`docs/specs/access.md` → Local review server), at the size its environment renders at and scaled to fit, or else saying that size wasn't recorded, each saying why if it has none (rationale).
+- **Must give a live story the keyboard only when it's clicked in**, taking focus back from one that focuses itself as it loads, so this page's keys keep working (rationale).
 - **Must leave the browser's history alone when moving a live story along**, so Back leaves the screen as it does anywhere else (rationale).
 - **Must keep how someone is looking when moving between stories**, and must never show one story's image under another's name while it loads.
 - **Must compute diff images, and pixel stats a run's `review.json` no longer holds, on demand, from the store, by hash pair**, so a pruned run reads like any other. A list shows stats only from `review.json`, and one snapshot uses them rather than ask (rationale).

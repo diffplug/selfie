@@ -119,6 +119,13 @@ export interface ReviewResult {
   };
 }
 
+/** Builds, if a person's command line said how. Nothing else ever runs a shell. */
+export async function buildIfAsked(command: string | undefined, cwd: string, signal: AbortSignal | undefined, log: (line: string) => void): Promise<void> {
+  if (command === undefined) return;
+  log(`Building: ${command}`);
+  await runBuildCommand(command, cwd, signal);
+}
+
 function runBuildCommand(command: string, cwd: string, signal: AbortSignal | undefined): Promise<void> {
   return new Promise((resolve, reject) => {
     const child = spawn(command, { shell: true, cwd, stdio: ["ignore", 2, 2], ...(signal ? { signal } : {}) });
@@ -453,10 +460,7 @@ async function recordBuild(project: Project, options: RecordOptions, { reuse }: 
   const captureDir = captureDirectory(project, randomUUID());
   try {
     // 1. Build. Whatever it writes is part of what this describes, so it comes first.
-    if (options.buildCommand !== undefined) {
-      log(`Building: ${options.buildCommand}`);
-      await runBuildCommand(options.buildCommand, project.cwd, options.signal);
-    }
+    await buildIfAsked(options.buildCommand, project.cwd, options.signal, log);
 
     // 2. Read where we are.
     const gitSha = await headSha(repo);

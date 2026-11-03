@@ -21,6 +21,7 @@ Source of truth: `cli/src/cli.ts`, `cli/src/document.ts`; the real binary's test
 | `selfie reply <note> <text>` | Answers a note (`docs/specs/feedback.md`) |
 | `selfie agent-await-feedback` | Blocks until a person sends notes from this folder (`docs/specs/feedback.md`) |
 | `selfie ui [<run>]` | Serves the review UI until stopped, and prints its URL ([ui](#ui)) |
+| `selfie feedback` | The same, opening at every story, for notes on a Storybook with nothing captured yet ([feedback](#feedback)) |
 
 - **Must print exactly one document on stdout, whatever happens,** and everything for people on stderr, including a review's one line of timings. A command that couldn't run prints `{ "error": { "code", "message" } }`. `--help` prints usage.
 - **Must use these exit codes:**
@@ -264,9 +265,19 @@ Source of truth: `cli/src/ui.ts`, and `selfie ui` in `cli/src/cli.ts`; tests in 
 - **Must take an optional run**, and refuse a bad or unknown one with exit 2 before listening. With none, the page opens at the newest finished run at HEAD in this project's environment, or `--native`'s.
 - **Must ask the system for a free port unless given `--port`**, so two projects can both be served.
 - **Never open a browser.** Whoever ran it decides what to do with the URL.
-- **Must load `selfie-ui` and Hono only in this command**, by a dynamic `import()`, so no other command pays for a web server. `cli/test/ui.test.ts` checks what `cli/src/cli.ts` loads.
+- **Must load `selfie-ui` and Hono only in the commands that serve**, by a dynamic `import()`, so no other command pays for a web server. `cli/test/ui.test.ts` checks what `cli/src/cli.ts` loads.
 - **Must fail with `ui-not-built` and exit 2 if the client isn't built**, saying what to run: `pnpm --filter selfie-ui build`. `pnpm install` builds it, through `prepare`.
 - **Must take a decision's actor from `git config user.email`, or refuse with `no-actor`.** There's no `--actor` here, since a page has no way to be anyone else.
+
+## feedback
+
+Source of truth: `selfie feedback` in `cli/src/cli.ts`; tests in `cli/test/ui.test.ts`. `docs/specs/feedback.md` owns what happens to a note.
+
+It's [`selfie ui`](#ui), except as below, and with `runId` always null, and its URL at every story.
+
+- **Must run `--build-command` first, if given, as `selfie review` does**, once, after the config is known to be good (rationale).
+- **Must fail with `no-stories` and exit 2, saying what to do, if there's no built Storybook after that.**
+- **Must say on stderr how an agent joins in**, with `selfie agent-await-feedback`.
 
 ## Configuration
 
