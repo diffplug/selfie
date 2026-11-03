@@ -214,11 +214,13 @@ Source of truth: `useHotkeys` in `ui/src/client/hooks.ts`.
 
 ## Stories
 
-Source of truth: `ui/src/client/*.stories.tsx`, `ui/src/client/stories/fixtures.ts`.
+Source of truth: `ui/src/client/*.stories.tsx`, `ui/src/client/stories/`.
 
 `pnpm selfie:review` builds them, and reviews them with Selfie.
 
 - **Must have a story for every screen and state this spec lists**, including empty and failed ones, dialogs, and keyboard flows, which are play functions.
+- **Must show a page in the layout the app does, with its tree and top bar**, so what's reviewed is what ships.
+- **Must list pages in the order someone moves through them, then the parts they're made of**, through `storySort` in `ui/.storybook/preview.tsx`.
 - **Must show a screen through its props and fixtures, with no server.** Images come from `ui/storybook-fixtures/`, at the paths the server answers, so a screen doesn't know the difference.
 - **Must make fixture images real**, with their real hashes and pixel diffs, from `cli/scripts/generate-storybook-fixtures.ts`, which uses the CLI's own diff, so `selfie-ui` still doesn't depend on `selfie-cli`.
 - **Must set on `<html>` and `<body>` what `ui/index.html` sets**, since Primer's themes read it (rationale).

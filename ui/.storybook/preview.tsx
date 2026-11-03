@@ -3,7 +3,15 @@ import { Page } from "../src/client/App.tsx";
 import { Shell } from "../src/client/Shell.tsx";
 
 const preview: Preview = {
-  parameters: { layout: "fullscreen" },
+  parameters: {
+    layout: "fullscreen",
+    // In the order someone moves through the app.
+    options: {
+      storySort: {
+        order: ["Pages", ["Every story", "Run", "Story", ["Comparing", "Notes", "Regions", "Live", "States"], "Accept", "Status"], "Parts", ["Story tree", "Top bar", "Feedback bar"]],
+      },
+    },
+  },
   decorators: [
     (Story, { parameters }) => {
       const dark = parameters["colorMode"] === "night";

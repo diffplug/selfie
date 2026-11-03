@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { LoadFailure, Loading, NotFound } from "./Status.tsx";
 import { failure } from "./stories/fixtures.ts";
 
-const meta = { title: "Screens/Status" } satisfies Meta;
+const meta = { title: "Pages/Status" } satisfies Meta;
 export default meta;
 type Story = StoryObj<typeof meta>;
 
@@ -14,6 +14,7 @@ export const NoSuchRun: Story = {
 export const ServerGone: Story = {
   render: () => <LoadFailure error={failure("unreachable", "Can't reach the Selfie server. Is selfie ui still running?")} />,
 };
+export const Dark: Story = { render: () => <NotFound />, parameters: { colorMode: "night" } };
 export const OtherFailure: Story = {
   render: () => <LoadFailure error={failure("bad-response", "The server answered 500.")} />,
 };

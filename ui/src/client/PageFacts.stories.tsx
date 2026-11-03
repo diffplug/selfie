@@ -24,7 +24,7 @@ const SAYINGS: readonly PageFacts[] = [
   diff({ context: null }),
 ];
 
-const meta = { title: "Screens/Top bar" } satisfies Meta;
+const meta = { title: "Parts/Top bar" } satisfies Meta;
 export default meta;
 
 export const EverythingItSays: StoryObj<typeof meta> = {

@@ -133,7 +133,7 @@ function StoryTree({ stories, story, search, hrefOf, renames, startOpen = false,
   );
 }
 
-function StorySidebar({ emptyWords, ...tree }: TreeProps & { emptyWords: string }) {
+export function StorySidebar({ emptyWords, ...tree }: TreeProps & { emptyWords: string }) {
   const { stories, search } = tree;
   const filter = useMemo(() => parseFilter(search), [search]);
   const input = useRef<HTMLInputElement>(null);

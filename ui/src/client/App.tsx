@@ -1,18 +1,14 @@
 import { Heading } from "@primer/react";
-import { useLayoutEffect, useMemo, useRef, type ReactNode } from "react";
-import { findRenames } from "../shared/renames.ts";
+import { useLayoutEffect, useRef, type ReactNode } from "react";
 import { fetchRunContext } from "./api.ts";
 import { AcceptScreen } from "./AcceptScreen.tsx";
 import { DetailScreen } from "./DetailScreen.tsx";
 import { FeedbackBar, NewerRunBanner } from "./Feedback.tsx";
 import { useFeedback, useFetched, useRun } from "./hooks.ts";
 import { StoriesRoutes } from "./StoriesScreen.tsx";
-import { StoryNavLayout } from "./StoryNav.tsx";
-import { differingStories, inTreeOrder } from "./storyTree.ts";
-import { AdvisoryLabels, describePixels } from "./words.tsx";
-import { applyFilter, NO_FILTER, parseFilter } from "./filter.ts";
 import { AppLink, parseRoute, storyPath, useLocation, type Route } from "./router.tsx";
-import { PageFactsLine, PageFactsProvider, usePageFacts } from "./PageFacts.tsx";
+import { PageFactsLine, PageFactsProvider } from "./PageFacts.tsx";
+import { RunLayout, useRunTree } from "./RunLayout.tsx";
 import { RunScreen } from "./RunScreen.tsx";
 import { LoadFailure, Loading, NotFound } from "./Status.tsx";
 
@@ -21,17 +17,7 @@ function RunRoutes({ runId, route, search }: { runId: string; route: Route; sear
   const state = useRun(runId);
   const feedback = useFeedback();
   const { data: context } = useFetched(runId, (signal) => fetchRunContext(runId, signal));
-  const { view } = state;
-  usePageFacts(view === null ? null : { kind: "diff", run: view.run, branchGoldens: view.branchGoldens, context });
-  const rows = view?.rows;
-  const renames = useMemo(() => findRenames(rows ?? []), [rows]);
-  // The tree shows what the page's Show says, and its own search does the text.
-  const { show } = parseFilter(search);
-  const { unchanged } = state;
-  const shownRows = useMemo(() => applyFilter(show === "unchanged" ? (unchanged ?? []) : (rows ?? []), { ...NO_FILTER, show }), [show, unchanged, rows]);
-  const stories = useMemo(() => (view === null ? [] : differingStories({ ...view, rows: shownRows }, renames, show === "unchanged")), [view, shownRows, renames, show]);
-  const treeOrder = useMemo(() => inTreeOrder(stories).map(({ story }) => story), [stories]);
-  const rowOf = useMemo(() => new Map(shownRows.map((row) => [row.story, row])), [shownRows]);
+  const tree = useRunTree(state.view, state.unchanged, search);
   // Where to put focus on coming back to the list.
   const lastStory = useRef<string | null>(null);
   if (state.view === null) {
@@ -39,42 +25,20 @@ function RunRoutes({ runId, route, search }: { runId: string; route: Route; sear
   }
   if (route.kind === "story") lastStory.current = route.story;
   return (
-    <StoryNavLayout
-      stories={stories}
-      story={route.kind === "story" ? route.story : null}
-      search={search}
-      hrefOf={(story, query) => storyPath(runId, story, query)}
-      renames={renames}
-      startOpen
-      emptyWords="Nothing differs."
-      more={({ story }) => {
-        const row = rowOf.get(story);
-        if (row === undefined) return null;
-        return (
-          <>
-            <span className="selfie-nav-col" data-size="wide" title={describePixels(row.pixelDiff)}>
-              {row.state === "failed" ? "No image" : describePixels(row.pixelDiff)}
-            </span>
-            <span className="selfie-nav-col">
-              <AdvisoryLabels row={row} />
-            </span>
-          </>
-        );
-      }}
-    >
+    <RunLayout view={state.view} tree={tree} story={route.kind === "story" ? route.story : null} search={search} context={context}>
       {/* The run's screen has its own banner for the newest at its commit, so this one isn't said twice. */}
       {(route.kind !== "run" || feedback.view?.latestRunId !== state.view.siblings.find(({ status }) => status !== "recording")?.id) && (
         <NewerRunBanner latestRunId={feedback.view?.latestRunId} runId={runId} story={route.kind === "story" ? route.story : null} />
       )}
       <FeedbackBar feedback={feedback} storyHref={(story) => storyPath(runId, story, "")} showList={route.kind === "run"} />
       {route.kind === "story" ? (
-        <DetailScreen state={state} view={state.view} story={route.story} search={search} feedback={feedback} treeOrder={treeOrder} />
+        <DetailScreen state={state} view={state.view} story={route.story} search={search} feedback={feedback} treeOrder={tree.treeOrder} />
       ) : route.kind === "accept" ? (
         <AcceptScreen state={state} view={state.view} />
       ) : (
         <RunScreen state={state} view={state.view} search={search} returningFrom={lastStory} />
       )}
-    </StoryNavLayout>
+    </RunLayout>
   );
 }
 

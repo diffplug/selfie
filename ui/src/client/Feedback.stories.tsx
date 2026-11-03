@@ -17,7 +17,7 @@ function Bar({ notes = [], showList = true, failed = false, agentWaiting = false
   return <FeedbackBar feedback={feedback} storyHref={(story) => storyPath(RUN_ID, story, "")} showList={showList} />;
 }
 
-const meta = { title: "Screens/Feedback", component: Bar } satisfies Meta<typeof Bar>;
+const meta = { title: "Parts/Feedback bar", component: Bar } satisfies Meta<typeof Bar>;
 export default meta;
 type Story = StoryObj<typeof meta>;
 

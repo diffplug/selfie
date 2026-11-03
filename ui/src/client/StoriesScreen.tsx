@@ -20,6 +20,7 @@ import { LoadFailure, Loading } from "./Status.tsx";
 
 /** Every story at the left and whatever's being looked at on the right. */
 export function StoriesLayout({ view, story, search, children }: { view: StoriesView; story: string | null; search: string; children: ReactNode }) {
+  usePageFacts({ kind: "view", view });
   return (
     <StoryNavLayout
       stories={view.stories}
@@ -228,7 +229,6 @@ function OneStory({
 export function StoriesRoutes({ story, search }: { story: string | null; search: string }) {
   const feedback = useFeedback();
   const stories = useStories(feedback.view?.latestRunId);
-  usePageFacts(stories.view === null ? null : { kind: "view", view: stories.view });
   // Here, since each run a story is from has a page of its own.
   const liveStories = useState(false);
   const renders = useRender(stories.view?.canRender ?? false, stories.reload);
