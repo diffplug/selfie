@@ -2,7 +2,8 @@
 // says, so everything but the browser runs with no Docker. `review.container.test.ts` runs the
 // real one.
 import { execFileSync } from "node:child_process";
-import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import { rmSync } from "node:fs";
+import { cp, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import {
@@ -136,15 +137,27 @@ export function fakeCapture(
 export const git = (cwd: string, ...args: string[]): string =>
   execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 
+let repoTemplate: Promise<string> | undefined;
+
+/** Made once, since nearly every test wants one, and copying it costs no Git processes. */
+const templateRepo = () =>
+  (repoTemplate ??= (async () => {
+    const parent = await mkdtemp(path.join(tmpdir(), "selfie-cli-template-"));
+    process.once("exit", () => rmSync(parent, { recursive: true, force: true }));
+    const repo = path.join(parent, "repo");
+    await mkdir(repo);
+    git(repo, "init", "--quiet", "--initial-branch=main", "--template=");
+    git(repo, "config", "user.email", "tester@example.com");
+    git(repo, "config", "user.name", "Tester");
+    git(repo, "config", "commit.gpgsign", "false");
+    await commit(repo, "first");
+    return repo;
+  })());
+
 /** A new repository on `main` with one commit, and its identity set for this repository only. */
 export async function createRepo(parent: string, name = "repo"): Promise<string> {
   const repo = path.join(parent, name);
-  await mkdir(repo, { recursive: true });
-  git(repo, "init", "--quiet", "--initial-branch=main");
-  git(repo, "config", "user.email", "tester@example.com");
-  git(repo, "config", "user.name", "Tester");
-  git(repo, "config", "commit.gpgsign", "false");
-  await commit(repo, "first");
+  await cp(await templateRepo(), repo, { recursive: true });
   return repo;
 }
 

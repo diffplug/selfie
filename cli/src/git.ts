@@ -11,6 +11,7 @@ const MAX_COMMITS = 1000;
 
 // origin/HEAD is what a clone records. The rest are the usual names, for a repository whose
 // remote was added by hand, or which has no remote at all.
+const ORIGIN_HEAD = "refs/remotes/origin/HEAD";
 const DEFAULT_BRANCH_CANDIDATES = [
   "refs/remotes/origin/main",
   "refs/remotes/origin/master",
@@ -54,9 +55,8 @@ export interface Repo {
 }
 
 export async function openRepo(cwd: string): Promise<Repo> {
-  const root = await ask(cwd, ["rev-parse", "--show-toplevel"]);
-  const commonDir = await ask(cwd, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
-  if (root === null || commonDir === null || root === "") {
+  const [root, commonDir] = (await ask(cwd, ["rev-parse", "--show-toplevel", "--path-format=absolute", "--git-common-dir"]))?.split("\n") ?? [];
+  if (!root || !commonDir) {
     throw new SelfieError(
       "not-a-repository",
       `${cwd} isn't inside a Git working tree, and Selfie records every run against a Git SHA.`,
@@ -126,13 +126,18 @@ export interface BaselineSearch extends Baseline {
   readonly mergeBase: string | null;
 }
 
+/** One process however many names it tries, since every command that finds a baseline asks this. */
 async function defaultBranchRef(repo: Repo): Promise<string | null> {
-  const remoteHead = await ask(repo.root, ["symbolic-ref", "--quiet", "refs/remotes/origin/HEAD"]);
-  const candidates = remoteHead === null ? DEFAULT_BRANCH_CANDIDATES : [remoteHead, ...DEFAULT_BRANCH_CANDIDATES];
-  for (const ref of candidates) {
-    if ((await ask(repo.root, ["rev-parse", "--verify", "--quiet", `${ref}^{commit}`])) !== null) return ref;
-  }
-  return null;
+  const listed = await ask(repo.root, ["for-each-ref", "--format=%(objecttype) %(refname) %(symref)", ORIGIN_HEAD, ...DEFAULT_BRANCH_CANDIDATES]);
+  const commits = new Map(
+    (listed ?? "")
+      .split("\n")
+      .map((line) => line.split(" "))
+      .filter(([type]) => type === "commit")
+      .map(([, ref, target]) => [ref!, target ?? ""]),
+  );
+  const remoteHead = commits.get(ORIGIN_HEAD);
+  return remoteHead || (DEFAULT_BRANCH_CANDIDATES.find((ref) => commits.has(ref)) ?? null);
 }
 
 async function firstParentHistory(repo: Repo, start: string, maxCommits: number): Promise<string[]> {
@@ -156,7 +161,7 @@ export async function walkToBaseline(
   maxCommits: number = MAX_COMMITS,
 ): Promise<BaselineSearch> {
   const head = await headSha(repo);
-  const shallow = (await ask(repo.root, ["rev-parse", "--is-shallow-repository"])) === "true";
+  const isShallow = async () => (await ask(repo.root, ["rev-parse", "--is-shallow-repository"])) === "true";
   if (head === null) {
     return {
       sha: null,
@@ -172,7 +177,7 @@ export async function walkToBaseline(
   const mergeBase = ref === null ? head : await ask(repo.root, ["merge-base", "HEAD", ref]);
   if (mergeBase === null) {
     const found = { sha: null, defaultBranch, mergeBase: null };
-    return shallow
+    return (await isShallow())
       ? {
           ...found,
           reason: "shallow-history",
@@ -192,7 +197,7 @@ export async function walkToBaseline(
   if (commits.length === maxCommits) {
     return { ...none, reason: "limit-reached", message: `${looked}, and the search stops at ${maxCommits}.` };
   }
-  if (shallow) {
+  if (await isShallow()) {
     return {
       ...none,
       reason: "shallow-history",

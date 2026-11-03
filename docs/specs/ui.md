@@ -23,7 +23,7 @@ Source of truth: `ui/`.
 | `ui/.storybook/`, `ui/src/client/*.stories.tsx`, `ui/src/client/stories/` | Every screen as a story, which Selfie reviews itself by ([Stories](#stories)) |
 | `ui/storybook-fixtures/` | Images generated before each Storybook build, at the paths the server answers. Not in Git |
 
-- **Must keep `ui/src/server/app.ts` free of anything specific to a platform**: no Node, no file, no Git. It knows Hono, `selfie-store`'s core, and `ReviewSource`. `cli/test/ui.test.ts` checks what it loads.
+- **Must keep `ui/src/server/app.ts` free of anything specific to a platform**: no Node, no file, no Git. It knows Hono, `selfie-store`'s core, and `ReviewSource`. `cli/test/ui-*.test.ts` checks what it loads.
 - **Must have `selfie-cli` depend on `selfie-ui`, never the reverse** (rationale). `docs/specs/cli.md` → ui owns how it loads it.
 - **Must define what crosses into `selfie-cli` once, in `ui/src/shared/api.ts`.** `isDecidable` and `isImageHash` are in `selfie-store`, since the client, the routes, and the CLI all need them at runtime.
 - **Must use Primer's components and tokens**, with `ui/src/client/styles.css` for layout only, and pin Primer's versions. The one exception is the list of every story, which uses Storybook's own icons and their colors ([Screens](#screens)).
@@ -54,7 +54,7 @@ Source of truth: `ReviewSource` in `ui/src/shared/api.ts`.
 
 ## Routes
 
-Source of truth: `ui/src/server/app.ts`; tests in `cli/test/ui.test.ts`.
+Source of truth: `ui/src/server/app.ts`; tests in `cli/test/ui-*.test.ts`.
 
 | Route | Does |
 |---|---|

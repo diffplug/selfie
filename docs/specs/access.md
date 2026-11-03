@@ -7,7 +7,7 @@
 
 ## Local review server
 
-Source of truth: `loopbackHosts` in `ui/src/server/local.ts`, and `sameOriginWrites` and `pageHeaders` in `ui/src/server/app.ts`, which any deployment keeps; tests in `cli/test/ui.test.ts`. `docs/specs/ui.md` owns the routes.
+Source of truth: `loopbackHosts` in `ui/src/server/local.ts`, and `sameOriginWrites` and `pageHeaders` in `ui/src/server/app.ts`, which any deployment keeps; tests in `cli/test/ui-*.test.ts`. `docs/specs/ui.md` owns the routes.
 
 There's no login on this server, since anyone who can reach loopback on the machine already has the store's files.
 

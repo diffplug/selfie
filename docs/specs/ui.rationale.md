@@ -9,12 +9,12 @@ Evidence and reasoning for `docs/specs/ui.md`, keyed by its headings.
 - **Why `isDecidable` and `isImageHash` are in the store.** The client and the routes can't import `selfie-cli`, and a value from `selfie-ui` would load Hono into `selfie review`. The store's core is platform-free, and tree-shaking keeps the rest of it out of the client's bundle, which shrank slightly when this moved.
 - **Why `dist/` is built by `prepare`, and by `pnpm test`.** `vite build` takes about 0.2 s here, against about 0.9 s for the package's typecheck, so it slows neither an install nor a test run noticeably, and a fresh checkout works. Building inside `selfie ui` would need Vite at runtime, and the `ui-not-built` error still covers an install with scripts turned off.
 - **Why the protections are in `app.ts`.** A login-protected Worker replaces the allowed hosts, and mustn't lose same-origin writes or the page's headers by replacing a single guard along with them.
-- **Why `hono/secure-headers`.** It can say the exact policy, which `cli/test/ui.test.ts` checks string for string. Its other defaults (`Cross-Origin-Opener-Policy`, `Origin-Agent-Cluster`, and a few legacy ones) are harmless here. `Strict-Transport-Security` is turned off, since browsers ignore it over plain HTTP and a hosted edge will decide it.
+- **Why `hono/secure-headers`.** It can say the exact policy, which `cli/test/ui-*.test.ts` checks string for string. Its other defaults (`Cross-Origin-Opener-Policy`, `Origin-Agent-Cluster`, and a few legacy ones) are harmless here. `Strict-Transport-Security` is turned off, since browsers ignore it over plain HTTP and a hosted edge will decide it.
 - **Why no router or state package.** There are four routes, and one piece of shared state, a run's `RunView`. `router.tsx` and `useRun` together are about 150 lines, and a router would add more than that to the bundle and the dependency list.
 
 ## Routes
 
-- **Why targets are taken exactly.** `decide` also takes patterns, where `*` matches anything, and a story's ID comes from a project's build. An ID `a*` passed as a pattern also approves `ab`, which the reviewer never saw. `cli/test/ui.test.ts` checks this with those two IDs.
+- **Why targets are taken exactly.** `decide` also takes patterns, where `*` matches anything, and a story's ID comes from a project's build. An ID `a*` passed as a pattern also approves `ab`, which the reviewer never saw. `cli/test/ui-*.test.ts` checks this with those two IDs.
 - **Why a request names hashes.** A decision belongs to a name and a hash, so naming them says what the reviewer saw. A later accepted run can change a baseline's goldens, and so a run's differences, while a page is open. `stale-decision` is the difference between a confused screen and a wrong approval.
 - **Why bulk has no route of its own.** A server-side "all" would approve whatever is there at that moment, and the dialog would describe something else.
 
