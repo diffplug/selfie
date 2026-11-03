@@ -33,6 +33,7 @@ function withoutVolatileText(file: string, bytes: Buffer): Uint8Array {
 async function hashTree(
   root: string,
   bytesToHash: (file: string, bytes: Buffer) => Uint8Array = (_, bytes) => bytes,
+  onFile?: (file: string, bytes: Buffer) => Promise<void>,
 ): Promise<string | null> {
   const entries = await readdir(root, { recursive: true, withFileTypes: true });
   if (entries.some((entry) => !entry.isFile() && !entry.isDirectory())) return null;
@@ -42,7 +43,9 @@ async function hashTree(
     .sort();
   const hash = createHash("sha256");
   for (const file of files) {
-    const bytes = bytesToHash(file, await readFile(path.join(root, file)));
+    const whole = await readFile(path.join(root, file));
+    await onFile?.(file, whole);
+    const bytes = bytesToHash(file, whole);
     // The length keeps one file's end from reading as the next one's start.
     hash.update(`${file}\0${bytes.length}\0`).update(bytes);
   }
@@ -51,10 +54,14 @@ async function hashTree(
 
 /**
  * A build's own files, however it came to be built: what the same build always hashes to. Null
- * if it's missing, or holds a symlink.
+ * if it's missing, or holds a symlink. `onFile` sees each file's bytes as read for the hash, before its
+ * volatile text is ignored, so keeping them can't disagree with it, however the directory changes.
  */
-export function buildHash(storybookDir: string): Promise<string | null> {
-  return hashTree(storybookDir, withoutVolatileText).catch(() => null);
+export function buildHash(
+  storybookDir: string,
+  onFile?: (file: string, bytes: Uint8Array) => Promise<void>,
+): Promise<string | null> {
+  return hashTree(storybookDir, withoutVolatileText, onFile).catch(() => null);
 }
 
 /**

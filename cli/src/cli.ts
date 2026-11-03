@@ -338,7 +338,7 @@ async function dispatch(command: string | undefined, args: string[], context: Co
         // Only here, so that no other command loads a web server.
         const [{ serveLocal, serveStorybook }, { localReviewSource }] = await Promise.all([import("selfie-ui/local"), import("./ui.ts")]);
         const dir = resolveStorybookDir(project.cwd, values["storybook-dir"], await resolveCaptureSettings(project.repo, { native: values.native }));
-        const hosted = await serveStorybook({ dir });
+        const hosted = await serveStorybook({ dir, readBuildFile: (build, file) => project.builds.readFile(build, file) });
         try {
           const server = await serveLocal({
             source: localReviewSource(project, { native: values.native, storybook: { dir, url: hosted.url } }),

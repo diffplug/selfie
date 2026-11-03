@@ -16,7 +16,8 @@ Source of truth: `ui/`.
 | `ui/src/shared/notes.ts`, exported as `selfie-ui/notes` | Shared note validation and open-note state (`docs/specs/feedback.md`) |
 | `selfie-ui/sync`, `selfie-ui/sync-api` | `docs/specs/sync.md` → Routes |
 | `ui/src/server/app.ts`, exported as `selfie-ui/app` | The routes under `/api`, over a `ReviewSource`, on Hono, and `sameOriginWrites` and `pageHeaders`. It re-exports the wire types |
-| `ui/src/server/local.ts`, exported as `selfie-ui/local` | Node's serving, the allowed hosts, and hosting a Storybook |
+| `ui/src/server/storybook.ts`, exported as `selfie-ui/storybook` | A hosted Storybook's headers and kept builds, for any platform |
+| `ui/src/server/local.ts`, exported as `selfie-ui/local` | Node's serving, the allowed hosts, and hosting a Storybook's directory |
 | `ui/src/client/` | The React client, on Primer, built by Vite into `ui/dist/` |
 | `cli/src/ui.ts` | `localReviewSource`: a `ReviewSource` over a repository, through the CLI's library |
 | `ui/.storybook/`, `ui/src/client/*.stories.tsx`, `ui/src/client/stories/` | Every screen as a story, which Selfie reviews itself by ([Stories](#stories)) |
@@ -78,6 +79,9 @@ Source of truth: `ui/src/server/app.ts`; tests in `cli/test/ui.test.ts`.
 | 404 | `unknown-run`, `unknown-image`, `no-diff-image`, `not-found` | |
 | 409 | `no-agent-waiting`, `stale-decision`, `no-actor`, `run-not-finished`, `no-goldens`, `run-dirty`, `run-has-failures`, `wrong-removed-count` | The request can't apply to the data as it stands |
 
+On a hosted Storybook's own origin (`docs/specs/access.md` → Local review server), `selfie-ui/storybook` serves each kept build's files at `/storybook-builds/<hash>/`, and locally the directory as it stands is at `/`.
+
+- **Must give a kept build's files `Cache-Control: private, max-age=31536000, immutable`**, since a kept build never changes, and the directory as it stands `no-store`, since a rebuild does.
 - **Must refuse an image hash that isn't 64 lowercase hex digits before it reaches the store.**
 - **Must give images, diff images, and diff stats `Cache-Control: private, max-age=31536000, immutable`**, since all are addressed by content (`docs/specs/access.md` → Local review server), and every other API answer `no-store`.
 - **Must decide on exactly the images a request names, or none:** the library's `decide` refuses with `stale-decision` if any named story and hash isn't a changed or new image of that run, and takes the names exactly, never as patterns (rationale).
@@ -134,7 +138,7 @@ Source of truth: `ui/src/client/`.
 - **Must outline each region on every image, in that image's own coordinates, numbered as in the list, in its kind's color from the diff image**, side by side and stacked, and let the outlines be turned off.
 - **Must let someone select any set of regions, from the list, from an outline, or with a key, and keep that only while they stay on the story.** Clicking a stacked region's outline selects it, and side by side only its number does, since clicking an image there stacks it.
 - **Must keep the region being looked at still when flipping between images**, since it can be somewhere else in the other one (rationale).
-- **Must link a snapshot to its story in the Storybook `selfie ui` hosts, if there's a build and the story isn't removed, and say so unless that build is known to have rendered this run** (`RunView.storybook`), since the page may then not match the image.
+- **Must link a snapshot to its story in the very build that rendered its run, if that's kept, or else the directory `selfie ui` hosts, and then say it may not match** (`RunView.storybook`). A removed story has no link.
 - **Must keep how someone is looking when moving between stories**, and must never show one story's image under another's name while it loads.
 - **Must compute diff images, and pixel stats a run's `review.json` no longer holds, on demand, from the store, by hash pair**, so a pruned run reads like any other. A list shows stats only from `review.json`, and one snapshot uses them rather than ask (rationale).
 - **Must explain each kind of snapshot:** new has no golden, removed has no current and takes no decision, failed shows its message, and a changed size says so, and shows the images from their top left corners.
@@ -218,6 +222,5 @@ Also its own guard in place of `loopbackHosts`, keeping `sameOriginWrites` and `
 - A way to clear a decision. One can be replaced, and a run can be reviewed again, but `Snapshots.decide` has no way to remove one.
 - Finding runs at other commits. `/runs/:id` opens any of them, and `selfie ui <run>` prints that URL, but nothing lists them: `runs` has no index that would serve it without a scan.
 - Sorting the list by size of change.
-- The exact build a run rendered. Only the directory as it stands is hosted, so an older run's link may not match. Keeping each run's build, by the hash of each file as images are kept, would fix that. This repository's is 10 MB in 65 files, unmeasured for a larger one.
 - A story running in the page, next to its image. It needs the review page's CSP to allow framing that one origin.
 - A hosted Storybook in the cloud (**Scope: cloud-deploy**), where its origin needs the same separation, and a build needs uploading.

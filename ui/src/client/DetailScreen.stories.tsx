@@ -38,13 +38,10 @@ const NEIGHBORS = [rows.fresh("components-badge--new"), rows.tall("pages-setting
 
 export const Changed: Story = { args: { row: BUTTON, others: NEIGHBORS } };
 export const WithStorybook: Story = {
-  args: { row: BUTTON, view: { ...viewOf([BUTTON]), storybook: { url: "http://127.0.0.1:51234/", renderedThisRun: true } } },
+  args: { row: BUTTON, view: { ...viewOf([BUTTON]), storybook: { url: "http://127.0.0.1:51234/storybook-builds/abc/", exactBuild: true } } },
 };
 export const WithStorybookOfAnotherBuild: Story = {
-  args: { row: BUTTON, view: { ...viewOf([BUTTON]), storybook: { url: "http://127.0.0.1:51234/", renderedThisRun: false } } },
-};
-export const WithStorybookOfAnUnknownBuild: Story = {
-  args: { row: BUTTON, view: { ...viewOf([BUTTON]), storybook: { url: "http://127.0.0.1:51234/", renderedThisRun: null } } },
+  args: { row: BUTTON, view: { ...viewOf([BUTTON]), storybook: { url: "http://127.0.0.1:51234/", exactBuild: false } } },
 };
 export const Stacked: Story = { args: { row: BUTTON }, play: press("f") };
 export const StackedGolden: Story = { args: { row: BUTTON }, play: press("f", "f") };

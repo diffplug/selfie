@@ -159,7 +159,8 @@ A review recognizes a build that already rendered, and skips capture and storing
 - **Must always render in `selfie record`.** That render still updates what's remembered, so it is also how to replace one, and a later review shows the run it recorded.
 - **Must make it visible:** `run.reusedFromRun` (`docs/specs/snapshots.md` → Runs), which is `reusedFromRun` in `review`'s and `accept`'s documents; one line on stderr from each; and the run and accept screens (`docs/specs/ui.md` → Screens).
 - **Must say why on stderr when a plain render of every story can't be reused**, naming the story and the error, since that's how a project finds out why it never hits.
-- **Must record which build rendered each new run, reused or filtered or failed or not, as `buildHash` (`docs/specs/render.md` → Render identity), in a local table, `run_builds(run_id, build)`, unless the build changed while it rendered**, so `selfie ui` can say whether what it hosts rendered a run (rationale).
+- **Must keep the build that rendered each new run, reused or filtered or failed or not, named by `buildHash` (`docs/specs/render.md` → Render identity), unless it changed while it rendered**, so `selfie ui` can open the very build that rendered a run (`docs/specs/store.md` → Storybook builds, rationale).
+- **Must keep the bytes it read for that hash**, so a build rewritten meanwhile can't be kept under another's name, **and must not fail a run for failing to keep its build**, since the run is sound, and only its stories' links are lost.
 - **Must keep what's remembered in one table in the local `store.db`, `render_keys(key, run_id)`, reached only through `Project.renders`' `find` and `remember`, and out of the store's schema**, so D1 has no counterpart and a pruned `review.json` loses nothing.
 
 ### The document
@@ -259,7 +260,7 @@ It prints `sha`, `reason`, `message`, `defaultBranch`, `mergeBase`, and `environ
 Source of truth: `cli/src/ui.ts`, and `selfie ui` in `cli/src/cli.ts`; tests in `cli/test/ui.test.ts`. `docs/specs/ui.md` owns what it serves.
 
 - **Must print `{ url, port, runId, storybookUrl }` once it is listening, then keep serving until a signal**, and exit 0. `runId` is the run it was asked to open, or null.
-- **Must host the build the other commands would capture, or `--storybook-dir`'s, on a free port of its own** (`docs/specs/access.md` → Local review server), whether or not it's built yet.
+- **Must host the build the other commands would capture, or `--storybook-dir`'s, and the kept builds, on a free port of its own** (`docs/specs/ui.md` → Routes), whether or not there's a build yet.
 - **Must take an optional run**, and refuse a bad or unknown one with exit 2 before listening. With none, the page opens at the newest finished run at HEAD in this project's environment, or `--native`'s.
 - **Must ask the system for a free port unless given `--port`**, so two projects can both be served.
 - **Never open a browser.** Whoever ran it decides what to do with the URL.

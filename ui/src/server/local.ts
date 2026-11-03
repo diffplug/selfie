@@ -6,9 +6,9 @@ import { fileURLToPath } from "node:url";
 import { serve, type ServerType } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono, type MiddlewareHandler } from "hono";
-import { secureHeaders } from "hono/secure-headers";
 import type { ReviewSource } from "../shared/api.ts";
 import { createReviewApi, failure, pageHeaders, sameOriginWrites } from "./app.ts";
+import { keptBuildRoutes, storybookHeaders, type BuildFileReader } from "./storybook.ts";
 
 const LOOPBACK = "127.0.0.1";
 const IMMUTABLE_ASSET = "public, max-age=31536000, immutable";
@@ -37,18 +37,6 @@ function cacheAs(value: string): MiddlewareHandler {
   };
 }
 
-/**
- * Headers for a hosted Storybook, which loads its own preview in a frame and runs inline scripts, so
- * the review page's are too strict for it. The port is what keeps it from the review API.
- */
-const storybookHeaders = secureHeaders({
-  contentSecurityPolicy: { frameAncestors: ["'self'"] },
-  crossOriginResourcePolicy: "same-origin",
-  referrerPolicy: "no-referrer",
-  xFrameOptions: "SAMEORIGIN",
-  strictTransportSecurity: false,
-});
-
 /** What a built Storybook has, so that a directory that isn't one is never served. */
 export const isBuiltStorybook = (dir: string): boolean => existsSync(path.join(dir, "iframe.html"));
 
@@ -56,10 +44,20 @@ export const isBuiltStorybook = (dir: string): boolean => existsSync(path.join(d
  * A built Storybook, read only, ready for any Hono caller. It's the code of whatever branch was
  * built, so it must never share an origin with the review API (`docs/specs/access.md`).
  */
-export function createStorybookApp({ dir, port }: { readonly dir: string; readonly port: () => number }): Hono {
+export function createStorybookApp({
+  dir,
+  port,
+  readBuildFile,
+}: {
+  readonly dir: string;
+  readonly port: () => number;
+  /** A file of a kept build, or null. */
+  readonly readBuildFile: BuildFileReader;
+}): Hono {
   const app = new Hono();
   app.use(storybookHeaders);
   app.use(loopbackHosts(port));
+  app.route("/", keptBuildRoutes(readBuildFile));
   app.use(cacheAs("no-store"));
   app.use(async (context, next) => {
     if (context.req.method !== "GET" && context.req.method !== "HEAD") return context.text("Only to read.", 405);
@@ -119,8 +117,8 @@ export async function serveLocal({
 }
 
 /** Hosts a built Storybook on a free loopback port, whether or not it has been built yet. */
-export function serveStorybook({ dir }: { readonly dir: string }): Promise<LocalServer> {
-  return listen(0, (actual) => createStorybookApp({ dir, port: actual }));
+export function serveStorybook({ dir, readBuildFile }: { readonly dir: string; readonly readBuildFile: BuildFileReader }): Promise<LocalServer> {
+  return listen(0, (actual) => createStorybookApp({ dir, port: actual, readBuildFile }));
 }
 
 async function listen(requested: number, appFor: (port: () => number) => Hono): Promise<LocalServer> {

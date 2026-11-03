@@ -384,8 +384,8 @@ describe("D1RestAdapter replay against a real SQL engine", () => {
     const store = new Store({ codec: sharpCodec, sql, blob: temp.blob });
     const { hash: imageHash, key } = await store.putImage(pngOf(image(1)));
     expect(await store.lookupKey(imageHash)).toBe(key);
-    // Twice each: the schema's 6 statements, and the put's lookup, insert, and lookup.
-    expect(sent).toHaveLength(18);
+    // Twice each: the schema's 7 statements, and the put's lookup, insert, and lookup.
+    expect(sent).toHaveLength(20);
   });
 
   it("resends everything the snapshot model sends, so a lost response never fails it", async () => {

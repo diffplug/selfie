@@ -168,7 +168,7 @@ Without leaving these out, every build hashed differently and the feature would 
 
 **A filter is answered only from a whole run.** A whole run holds every answer, and a filtered render is at most a few seconds, so it isn't worth a second key to remember one. On the 30-story sample a hit takes 0.25 s against 5.3 s, once a whole run of that build exists.
 
-**A run's build isn't `render_keys`.** Those keys say what a later review may skip rendering, so they hold only a build's newest reusable render, and forget reused, filtered, and failed runs. `selfie ui` asked them first, and called all of those a different build. A new table says what rendered a run, and takes only the build's own hash, since the environment and the renderer's code don't change whether a story's page is the one in the image.
+**A run's build isn't `render_keys`.** Those keys say what a later review may skip rendering, so they hold only a build's newest reusable render, and forget reused, filtered, and failed runs. `selfie ui` asked them first, and called all of those a different build. So a run says for itself, by a hash of the build's own files, since the environment and the renderer's code don't change whether a story's page is the one in the image.
 
 **Provenance is on the run, and the key is local.** `reused_from_run` is a fact about the run, which `accept`, the UI, and later `trust` all want, so it's read with the run, with no second lookup. `render_keys` is only what this machine rendered, which nothing in the cloud needs. It must outlive a pruned `review.json`, and in `store.db` it lives and dies with the runs it names. After 15 runs here it held 2 rows.
 
