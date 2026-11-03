@@ -1,6 +1,7 @@
 // Every story of the hosted Storybook, each with its newest capture at HEAD, whichever run that was.
 // A story's page is its run's, so looking at one here and in that run's review is the same screen.
-import { ArrowLeftIcon, BookmarkIcon, ChevronDownIcon, ChevronRightIcon, FileDirectoryIcon, PackageIcon, SearchIcon } from "@primer/octicons-react";
+import { ArrowLeftIcon, SearchIcon } from "@primer/octicons-react";
+import { BookmarkHollowIcon, ChevronSmallDownIcon, ChevronSmallRightIcon, ComponentIcon, FolderIcon } from "@storybook/icons";
 import { Banner, Button, FormControl, Heading, RelativeTime, Stack, Text, TextInput } from "@primer/react";
 import { Blankslate, ScrollableRegion, Table } from "@primer/react/experimental";
 import { useMemo, useRef, useState } from "react";
@@ -36,7 +37,7 @@ function StoryRow({ entry, depth, search }: { entry: ListedStory; depth: number;
     <Table.Row>
       <Table.Cell>
         <span className="selfie-tree-label" style={indented(depth)}>
-          <BookmarkIcon className="selfie-tree-story-icon" />
+          <BookmarkHollowIcon className="selfie-tree-icon" data-kind="story" />
           <a href={href} data-story={entry.story} title={entry.story} onClick={(event) => followLink(event, href)}>
             {entry.name}
           </a>
@@ -56,14 +57,15 @@ function FolderRow({ folder, depth, open, onToggle }: { folder: StoryFolder; dep
   const stories = storiesIn(folder);
   const captured = stories.filter(({ capture }) => capture !== null).length;
   const section = isSection(folder, depth);
-  const Icon = folder.children.every((child) => child.kind === "story") ? PackageIcon : FileDirectoryIcon;
+  const isComponent = folder.children.every((child) => child.kind === "story");
+  const Icon = isComponent ? ComponentIcon : FolderIcon;
   return (
     <Table.Row className="selfie-tree-folder">
       <Table.Cell style={{ gridColumn: "1 / -1" }}>
         <span className="selfie-tree-label" style={indented(depth)}>
           <button type="button" className="selfie-tree-toggle" aria-expanded={open} onClick={onToggle}>
-            {open ? <ChevronDownIcon /> : <ChevronRightIcon />}
-            {!section && <Icon className="selfie-tree-folder-icon" />}
+            {open ? <ChevronSmallDownIcon /> : <ChevronSmallRightIcon />}
+            {!section && <Icon className="selfie-tree-icon" data-kind={isComponent ? "component" : "folder"} />}
             <span className={section ? "selfie-tree-section" : undefined}>{folder.name}</span>
           </button>
           <span className="selfie-muted">

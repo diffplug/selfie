@@ -33,6 +33,7 @@
     "@primer/octicons-react": "19.42.0",
     "@primer/primitives": "11.10.0",
     "@primer/react": "38.43.0",
+    "@storybook/icons": "2.2.0",
     "@storybook/react-vite": "10.6.5",
     "@types/node": "catalog:",
     "@types/react": "19.3.0",

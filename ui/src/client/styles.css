@@ -598,14 +598,27 @@ code {
   min-width: 0;
 }
 
-.selfie-tree-story-icon {
+/* Storybook's own sidebar colors, so a story looks here as it does there. */
+.selfie-tree-icon {
   flex: none;
-  color: var(--fgColor-accent);
+  width: 14px;
+  height: 14px;
 }
 
-.selfie-tree-folder-icon {
-  flex: none;
-  color: var(--fgColor-accent);
+.selfie-tree-icon[data-kind="story"] {
+  color: #37d5d3;
+}
+
+.selfie-tree-icon[data-kind="component"] {
+  color: #006deb;
+}
+
+.selfie-tree-icon[data-kind="folder"] {
+  color: #2a0481;
+}
+
+[data-color-mode="dark"] .selfie-tree-icon[data-kind="folder"] {
+  color: #ff4785;
 }
 
 .selfie-tree-toggle {
