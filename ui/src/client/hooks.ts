@@ -194,7 +194,7 @@ export function useFeedback(): FeedbackState {
   };
 }
 
-export interface RegionSelection {
+export interface HunkSelection {
   readonly selected: ReadonlySet<number>;
   readonly focused: number | null;
   readonly toggle: (index: number) => void;
@@ -202,8 +202,8 @@ export interface RegionSelection {
   readonly setFocused: (focused: number) => void;
 }
 
-/** Regions picked out by their place in a story's list, which last only as long as someone stays on `story`. */
-export function useRegionSelection(story: string): RegionSelection {
+/** Hunks picked out by their place in a story's list, which last only as long as someone stays on `story`. */
+export function useHunkSelection(story: string): HunkSelection {
   const nothing = () => ({ story, selected: new Set<number>() as ReadonlySet<number>, focused: null as number | null });
   const [state, setState] = useState(nothing);
   // Forgotten on leaving, and not just hidden, so coming back can't bring it back.

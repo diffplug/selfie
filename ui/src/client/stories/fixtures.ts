@@ -133,7 +133,7 @@ export function viewOf(
     viewport: { width: 1200, height: 900 },
     storyNames: [],
     branchGoldens: null,
-    regionMergeDistance: 12,
+    hunkMergeDistance: 12,
     acceptedRunId: null,
     actor: "ned@example.com",
     blockers,

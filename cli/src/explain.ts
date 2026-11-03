@@ -1,11 +1,11 @@
-// What a region's difference really is. Content that's identical but elsewhere has moved, and a band
+// What a hunk's difference really is. Content that's identical but elsewhere has moved, and a band
 // of the surrounding color that grew or shrank is spacing. Whatever those can't account for is changed.
 // The account is checked rather than trusted: the current side is rebuilt from what was matched, any
 // pixel that comes out different is changed, and so is anything in the golden that matched nothing.
 import { createHash } from "node:crypto";
 import type { RawImage } from "selfie-store";
-import type { BoundingBox, BoxPair, RegionKind } from "selfie-ui/app";
-import { isFlat, rowOf } from "./regions.ts";
+import type { BoundingBox, BoxPair, HunkKind } from "selfie-ui/app";
+import { isFlat, rowOf } from "./hunks.ts";
 
 /** A narrower gap is usually between words, and a word on its own could match anywhere. */
 const MIN_COLUMN_GAP = 6;
@@ -137,31 +137,31 @@ function hashOf(image: RawImage, box: BoundingBox): string {
 interface Block {
   readonly box: BoundingBox;
   readonly hash: string;
-  readonly region: number;
-  /** Where it is in its region past any spacing, so what spacing pushed along has stayed where it was. */
+  readonly hunk: number;
+  /** Where it is in its hunk past any spacing, so what spacing pushed along has stayed where it was. */
   readonly offset: string;
 }
 
-/** A region's blocks, past the rows that are spacing. */
-function blocksOf(image: RawImage, box: BoundingBox, spacing: ReadonlySet<number>, background: Packed, region: number): Block[] {
+/** A hunk's blocks, past the rows that are spacing. */
+function blocksOf(image: RawImage, box: BoundingBox, spacing: ReadonlySet<number>, background: Packed, hunk: number): Block[] {
   const boxes: BoundingBox[] = [];
   blocksIn(image, box, background, boxes);
   const spacingAbove = (y: number) => [...spacing].filter((row) => row < y).length;
   return boxes
     .filter(({ y, height }) => !(height === 1 && spacing.has(y)))
     .sort(inReadingOrder)
-    .map((block) => ({ box: block, hash: hashOf(image, block), region, offset: `${block.x - box.x},${block.y - box.y - spacingAbove(block.y)}` }));
+    .map((block) => ({ box: block, hash: hashOf(image, block), hunk, offset: `${block.x - box.x},${block.y - box.y - spacingAbove(block.y)}` }));
 }
 
 const inReadingOrder = (p: BoundingBox, q: BoundingBox) => p.y - q.y || p.x - q.x;
 
-/** What the current side should hold at each pixel of a region, and what of the golden that leaves out. */
+/** What the current side should hold at each pixel of a hunk, and what of the golden that leaves out. */
 interface Account {
-  /** By row and column within the region: a color, or -1 where the golden has nothing to compare with. */
+  /** By row and column within the hunk: a color, or -1 where the golden has nothing to compare with. */
   readonly expected: Int32Array;
   /** What landed here from somewhere else, in the golden. */
   readonly moved: readonly BoxPair[];
-  /** Where in the current image's region something left from, for somewhere else. */
+  /** Where in the current image's hunk something left from, for somewhere else. */
   readonly movedOut: readonly BoundingBox[];
   /** Pixels of the golden nothing accounts for. */
   readonly goldenOnly: number;
@@ -192,8 +192,8 @@ interface Pair {
 }
 
 /**
- * Pairs blocks: those that stayed put, then those that moved within a region, then those that moved
- * anywhere, all identical. What's left of the same size in a region was replaced, so its pixels
+ * Pairs blocks: those that stayed put, then those that moved within a hunk, then those that moved
+ * anywhere, all identical. What's left of the same size in a hunk was replaced, so its pixels
  * compare, and count only once. Only staying put takes a block too small to say it's the same thing.
  */
 function pairUp(heres: readonly Block[], theres: readonly Block[]): readonly Pair[] {
@@ -222,10 +222,10 @@ function pairUp(heres: readonly Block[], theres: readonly Block[]): readonly Pai
     thereLeft = thereLeft.filter((there) => !used.has(there));
   };
   const bigEnough = ({ box }: Block) => box.width * box.height >= MIN_MOVED_AREA;
-  pass("stayed", ({ offset, hash, region }) => `${region},${offset},${hash}`, () => true);
-  pass("moved", ({ hash, region }) => `${region},${hash}`, bigEnough);
+  pass("stayed", ({ offset, hash, hunk }) => `${hunk},${offset},${hash}`, () => true);
+  pass("moved", ({ hash, hunk }) => `${hunk},${hash}`, bigEnough);
   pass("moved", ({ hash }) => hash, bigEnough);
-  pass("replaced", ({ box, region }) => `${region},${box.width}x${box.height}`, bigEnough);
+  pass("replaced", ({ box, hunk }) => `${hunk},${box.width}x${box.height}`, bigEnough);
   return pairs;
 }
 
@@ -248,7 +248,7 @@ function addMoved(moved: BoxPair[], block: BoxPair): void {
   moved[moved.length - 1] = { current: grow(last.current, block.current.height), golden: grow(last.golden, block.current.height) };
 }
 
-/** A golden box where it would be in the current image's side of a region, as far as that's in the region. */
+/** A golden box where it would be in the current image's side of a hunk, as far as that's in the hunk. */
 function inCurrent(box: BoundingBox, { current: here, golden: there }: BoxPair): BoundingBox {
   const x = Math.max(box.x + here.x - there.x, here.x);
   const y = Math.max(box.y + here.y - there.y, here.y);
@@ -257,13 +257,13 @@ function inCurrent(box: BoundingBox, { current: here, golden: there }: BoxPair):
   return { x, y, width: Math.max(right - x, 0), height: Math.max(bottom - y, 0) };
 }
 
-/** What a region's pairs say about it, which takes no pixels, so a region with no moves costs nothing. */
-function movesOf(region: BoxPair, index: number, pairs: readonly Pair[], theres: readonly Block[]): Omit<Account, "expected"> {
+/** What a hunk's pairs say about it, which takes no pixels, so a hunk with no moves costs nothing. */
+function movesOf(hunk: BoxPair, index: number, pairs: readonly Pair[], theres: readonly Block[]): Omit<Account, "expected"> {
   const paired = new Set(pairs.map(({ there }) => there));
-  const landed = pairs.filter(({ here, how }) => how === "moved" && here.region === index).sort((p, q) => inReadingOrder(p.here.box, q.here.box));
+  const landed = pairs.filter(({ here, how }) => how === "moved" && here.hunk === index).sort((p, q) => inReadingOrder(p.here.box, q.here.box));
   const moved: BoxPair[] = [];
   for (const { here, there } of landed) addMoved(moved, { current: here.box, golden: there.box });
-  const movedOut = pairs.filter(({ here, there, how }) => how === "moved" && here.region !== index && there.region === index).map(({ there }) => inCurrent(there.box, region));
+  const movedOut = pairs.filter(({ here, there, how }) => how === "moved" && here.hunk !== index && there.hunk === index).map(({ there }) => inCurrent(there.box, hunk));
   let goldenOnly = 0;
   for (const there of theres) if (!paired.has(there)) goldenOnly += there.box.width * there.box.height;
   return { moved, movedOut, goldenOnly };
@@ -273,7 +273,7 @@ function movesOf(region: BoxPair, index: number, pairs: readonly Pair[], theres:
 function rebuilt(golden: RawImage, here: BoundingBox, index: number, pairs: readonly Pair[], background: Packed): Int32Array {
   const expected = new Int32Array(here.width * here.height).fill(background);
   for (const { here: block, there } of pairs) {
-    if (block.region !== index) continue;
+    if (block.hunk !== index) continue;
     const { x, y, width, height } = block.box;
     for (let row = 0; row < height; row++) {
       for (let column = 0; column < width; column++) {
@@ -284,7 +284,7 @@ function rebuilt(golden: RawImage, here: BoundingBox, index: number, pairs: read
   return expected;
 }
 
-/** Calls back with each pixel of a region, past spacing, that isn't what its account expected. */
+/** Calls back with each pixel of a hunk, past spacing, that isn't what its account expected. */
 export function forEachUnexplained(
   current: RawImage,
   here: BoundingBox,
@@ -316,46 +316,46 @@ export interface Explanation extends Account {
   readonly spacing: ReadonlySet<number>;
   readonly goldenSpacingRows: number;
   readonly changedPixels: number;
-  readonly kind: RegionKind;
+  readonly kind: HunkKind;
 }
 
 /**
- * Accounts for each region's difference both ways, and keeps whichever leaves less unexplained. Blocks
- * pair across regions, since what moved sideways is two regions: one that lost it, one that gained it.
- * A region compared in place gives up its pairs, since its pixels are already judged where they are,
- * which can leave another region worse off, so this repeats until every region that's left still gains.
+ * Accounts for each hunk's difference both ways, and keeps whichever leaves less unexplained. Blocks
+ * pair across hunks, since what moved sideways is two hunks: one that lost it, one that gained it.
+ * A hunk compared in place gives up its pairs, since its pixels are already judged where they are,
+ * which can leave another hunk worse off, so this repeats until every hunk that's left still gains.
  */
-export function explainRegions(current: RawImage, golden: RawImage, regions: readonly BoxPair[]): readonly Explanation[] {
+export function explainHunks(current: RawImage, golden: RawImage, hunks: readonly BoxPair[]): readonly Explanation[] {
   const background = backgroundOf(golden);
-  const facts = regions.map((region, index) => {
-    const spacing = spacingRows(current, region.current, region.current.height - region.golden.height, background);
-    const goldenSpacing = spacingRows(golden, region.golden, region.golden.height - region.current.height, background);
-    const inPlace = comparedInPlace(golden, region, spacing, goldenSpacing);
+  const facts = hunks.map((hunk, index) => {
+    const spacing = spacingRows(current, hunk.current, hunk.current.height - hunk.golden.height, background);
+    const goldenSpacing = spacingRows(golden, hunk.golden, hunk.golden.height - hunk.current.height, background);
+    const inPlace = comparedInPlace(golden, hunk, spacing, goldenSpacing);
     return {
       spacing,
       goldenSpacingRows: goldenSpacing.size,
       inPlace,
-      inPlaceCost: unexplained(current, region.current, spacing, inPlace.expected, inPlace.goldenOnly),
-      heres: blocksOf(current, region.current, spacing, background, index),
-      theres: blocksOf(golden, region.golden, goldenSpacing, background, index),
+      inPlaceCost: unexplained(current, hunk.current, spacing, inPlace.expected, inPlace.goldenOnly),
+      heres: blocksOf(current, hunk.current, spacing, background, index),
+      theres: blocksOf(golden, hunk.golden, goldenSpacing, background, index),
     };
   });
 
-  let rebuilding = regions.map((_, index) => index);
+  let rebuilding = hunks.map((_, index) => index);
   let claimed = new Map<number, { readonly account: Account; readonly cost: number }>();
   for (;;) {
     const pairs = pairUp(rebuilding.flatMap((index) => facts[index]!.heres), rebuilding.flatMap((index) => facts[index]!.theres));
     const touching = new Map<number, Pair[]>(rebuilding.map((index) => [index, []]));
     for (const pair of pairs) {
-      touching.get(pair.here.region)!.push(pair);
-      if (pair.there.region !== pair.here.region) touching.get(pair.there.region)!.push(pair);
+      touching.get(pair.here.hunk)!.push(pair);
+      if (pair.there.hunk !== pair.here.hunk) touching.get(pair.there.hunk)!.push(pair);
     }
     claimed = new Map();
     for (const index of rebuilding) {
       const { spacing, inPlaceCost, theres } = facts[index]!;
-      const here = regions[index]!.current;
+      const here = hunks[index]!.current;
       const own = touching.get(index)!;
-      const moves = movesOf(regions[index]!, index, own, theres);
+      const moves = movesOf(hunks[index]!, index, own, theres);
       if (moves.moved.length + moves.movedOut.length === 0) continue;
       const expected = rebuilt(golden, here, index, own, background);
       const cost = unexplained(current, here, spacing, expected, moves.goldenOnly);

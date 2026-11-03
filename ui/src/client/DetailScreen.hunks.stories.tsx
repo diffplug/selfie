@@ -6,43 +6,43 @@ import { feedbackOf, rows, stateOf, viewOf } from "./stories/fixtures.ts";
 import { RunFrame } from "./stories/RunFrame.tsx";
 import { SEVERAL, StoryPage, press, stackedImagesLoaded } from "./stories/storyPage.tsx";
 
-const meta = { title: "Pages/Story/Regions", component: StoryPage } satisfies Meta<typeof StoryPage>;
+const meta = { title: "Pages/Story/Hunks", component: StoryPage } satisfies Meta<typeof StoryPage>;
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const RegionsSelected: Story = {
+export const HunksSelected: Story = {
   args: { row: SEVERAL },
   play: async ({ canvasElement }) => {
     await press("x", "n", "n", "x")();
     await expect(within(canvasElement).getByText(/, 2 selected/)).toBeVisible();
   },
 };
-export const RegionsStackedOnTheSecond: Story = { args: { row: SEVERAL }, play: press("f", "n", "n") };
-export const RegionsAllSelectedStacked: Story = {
+export const HunksStackedOnTheSecond: Story = { args: { row: SEVERAL }, play: press("f", "n", "n") };
+export const HunksAllSelectedStacked: Story = {
   args: { row: SEVERAL },
   play: async ({ canvasElement }) => {
     await press("f", "x", "n", "x", "n", "x")();
     await expect(within(canvasElement).getByText(/, 3 selected/)).toBeVisible();
   },
 };
-export const RegionSelectedByItsOutline: Story = {
+export const HunkSelectedByItsOutline: Story = {
   args: { row: SEVERAL },
   play: async ({ canvasElement }) => {
     await press("f")();
     await stackedImagesLoaded(canvasElement);
-    await userEvent.click(canvasElement.querySelector('.selfie-stack [data-region="1"]')!);
-    await userEvent.click(canvasElement.querySelector('.selfie-stack [data-region="2"]')!);
+    await userEvent.click(canvasElement.querySelector('.selfie-stack [data-hunk="1"]')!);
+    await userEvent.click(canvasElement.querySelector('.selfie-stack [data-hunk="2"]')!);
     await expect(within(canvasElement).getByText(/, 2 selected/)).toBeVisible();
   },
 };
-/** More regions than the list has room for, all far enough apart to stay separate. */
-const MANY_REGIONS = (() => {
+/** More hunks than the list has room for, all far enough apart to stay separate. */
+const MANY_HUNKS = (() => {
   const row = rows.several("pages-home--with-many-changes");
-  const regions = Array.from({ length: 14 }, (_, index) => {
+  const hunks = Array.from({ length: 14 }, (_, index) => {
     const box = { x: 40, y: 20 + index * 60, width: 200, height: 20 };
     return { current: box, golden: box, kind: "changed" as const, changedPixels: 4000, moved: [] };
   });
-  return { ...row, pixelDiff: { ...row.pixelDiff!, regions } };
+  return { ...row, pixelDiff: { ...row.pixelDiff!, hunks } };
 })();
 /** Moves between two stories by a prop, as following a link does. */
 function BetweenStories() {
@@ -74,17 +74,17 @@ export const SelectionForgottenOnLeaving: Story = {
     await expect(canvas.queryByText(/, \d selected/)).toBeNull();
   },
 };
-export const ManyRegionsKeepTheFocusedOneInView: Story = {
-  args: { row: MANY_REGIONS },
+export const ManyHunksKeepTheFocusedOneInView: Story = {
+  args: { row: MANY_HUNKS },
   play: async ({ canvasElement }) => {
     await press(...Array.from({ length: 12 }, () => "n"))();
-    const focused = canvasElement.querySelector<HTMLElement>(".selfie-regions-list [data-focused]")!;
-    const list = canvasElement.querySelector<HTMLElement>(".selfie-regions-list")!;
+    const focused = canvasElement.querySelector<HTMLElement>(".selfie-hunks-list [data-focused]")!;
+    const list = canvasElement.querySelector<HTMLElement>(".selfie-hunks-list")!;
     await expect(list.scrollTop).toBeGreaterThan(0);
     await expect(focused.getBoundingClientRect().bottom).toBeLessThanOrEqual(list.getBoundingClientRect().bottom + 1);
   },
 };
-export const RegionKeptStillOnFlip: Story = {
+export const HunkKeptStillOnFlip: Story = {
   args: { row: rows.pushed("pages-home--pushed-down") },
   play: async ({ canvasElement }) => {
     await press("f", "n", "n")();
@@ -97,7 +97,7 @@ export const RegionKeptStillOnFlip: Story = {
     await expect(viewport.scrollTop).toBe(before - 30);
   },
 };
-export const RegionNotHeldWithoutLookingAtOne: Story = {
+export const HunkNotHeldWithoutLookingAtOne: Story = {
   args: { row: rows.pushed("pages-home--pushed-down") },
   play: async ({ canvasElement }) => {
     await press("f")();

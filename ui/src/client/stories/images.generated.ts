@@ -29,7 +29,7 @@ export const PIXEL_DIFFS = {
       "width": 1200,
       "height": 900
     },
-    "regions": [
+    "hunks": [
       {
         "current": {
           "x": 32,
@@ -73,7 +73,7 @@ export const PIXEL_DIFFS = {
       "width": 1200,
       "height": 2400
     },
-    "regions": [
+    "hunks": [
       {
         "current": {
           "x": 32,
@@ -117,7 +117,7 @@ export const PIXEL_DIFFS = {
       "width": 1200,
       "height": 900
     },
-    "regions": [
+    "hunks": [
       {
         "current": {
           "x": 0,
@@ -161,7 +161,7 @@ export const PIXEL_DIFFS = {
       "width": 1200,
       "height": 990
     },
-    "regions": [
+    "hunks": [
       {
         "current": {
           "x": 0,
@@ -205,7 +205,7 @@ export const PIXEL_DIFFS = {
       "width": 1200,
       "height": 900
     },
-    "regions": [
+    "hunks": [
       {
         "current": {
           "x": 0,
@@ -249,7 +249,7 @@ export const PIXEL_DIFFS = {
       "width": 1200,
       "height": 900
     },
-    "regions": [
+    "hunks": [
       {
         "current": {
           "x": 32,
@@ -325,7 +325,7 @@ export const PIXEL_DIFFS = {
       "width": 1200,
       "height": 900
     },
-    "regions": [
+    "hunks": [
       {
         "current": {
           "x": 0,
@@ -384,7 +384,7 @@ export const PIXEL_DIFFS = {
       "width": 1200,
       "height": 900
     },
-    "regions": [
+    "hunks": [
       {
         "current": {
           "x": 32,
@@ -477,7 +477,7 @@ export const PIXEL_DIFFS = {
       "width": 1200,
       "height": 1400
     },
-    "regions": [
+    "hunks": [
       {
         "current": {
           "x": 0,
@@ -538,7 +538,7 @@ export const PIXEL_DIFFS = {
       "width": 2400,
       "height": 1800
     },
-    "regions": [
+    "hunks": [
       {
         "current": {
           "x": 64,

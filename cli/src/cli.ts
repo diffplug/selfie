@@ -97,7 +97,7 @@ const USAGE = `Usage: selfie [--port <n>] [--storybook-dir <dir>] [--native] [--
 
 Local data lives under ~/.config/selfie/<git-origin-slugified>/, or $SELFIE_HOME instead of
 ~/.config/selfie. A project configures Selfie in selfie.config.json at its Git top level:
-environment, initScript, regionMergeDistance, storybookDir, which --storybook-dir overrides, and
+environment, initScript, hunkMergeDistance, storybookDir, which --storybook-dir overrides, and
 buildCommand, which only selfie alone and --build run, and which runs from that top level. A story pattern matches IDs, where * matches any run of characters.
 `;
 

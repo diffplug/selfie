@@ -47,7 +47,7 @@ export interface FakeStory {
   readonly color?: Color;
   readonly width?: number;
   readonly height?: number;
-  /** Changes one region of the solid color: x, y, width, height, and its color. */
+  /** Changes one hunk of the solid color: x, y, width, height, and its color. */
   readonly patch?: readonly [number, number, number, number, Color];
   readonly failed?: string;
   readonly errors?: readonly StoryError[];

@@ -268,7 +268,7 @@ describe("the config's storybookDir", () => {
   });
 });
 
-describe("regionMergeDistance", () => {
+describe("hunkMergeDistance", () => {
   const config = (value: unknown) => writeFile(path.join(h.repo, "selfie.config.json"), JSON.stringify(value));
 
   test("groups what a review shows, and never what it compares", async () => {
@@ -278,16 +278,16 @@ describe("regionMergeDistance", () => {
     const review = async () => (await h.cli("review", two.json.runId, "--baseline", one.json.runId)).json.differences[0];
 
     const standard = await review();
-    expect(standard.regionGroups).toEqual([{ current: { x: 1, y: 1, width: 2, height: 2 }, golden: { x: 1, y: 1, width: 2, height: 2 }, kind: "changed" }]);
-    await config({ regionMergeDistance: 100 });
+    expect(standard.hunkGroups).toEqual([{ current: { x: 1, y: 1, width: 2, height: 2 }, golden: { x: 1, y: 1, width: 2, height: 2 }, kind: "changed" }]);
+    await config({ hunkMergeDistance: 100 });
     const wide = await review();
     expect(wide.pixelDiff).toEqual(standard.pixelDiff);
     expect(wide.diff.endsWith("diff.png")).toBe(true);
   });
 
-  test.each([-1, "12"])("refuses %s", async (regionMergeDistance) => {
+  test.each([-1, "12"])("refuses %s", async (hunkMergeDistance) => {
     const { json } = await record();
-    await config({ regionMergeDistance });
+    await config({ hunkMergeDistance });
     const refused = await h.cli("review", json.runId);
     expect(refused.code).toBe(2);
     expect(refused.json.error.code).toBe("bad-config");

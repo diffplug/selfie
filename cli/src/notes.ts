@@ -11,7 +11,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import type { RawImage, Sql, SqlRow } from "selfie-store";
 import type { BoundingBox, NewNote, Note, NoteMessage, NoteState } from "selfie-ui/app";
 import { isOpenNote } from "selfie-ui/notes";
-import { describeBox } from "selfie-ui/regions";
+import { describeBox } from "selfie-ui/hunks";
 import { SelfieError } from "./errors.ts";
 import { encodePng } from "./png.ts";
 import type { Project } from "./project.ts";

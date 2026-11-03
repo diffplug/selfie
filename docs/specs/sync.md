@@ -108,7 +108,7 @@ A project's first push is the expensive one. Each new image takes one upload and
 ### Not yet
 
 - Replacing an image the cloud holds wrongly. Today a pull of it fails, naming it, every time, and a browser shows it as it is. A repair needs someone with write access, and a client that decodes.
-- Decisions on regions (`docs/specs/snapshots.md` → Future), which add their own table, and travel the same way.
+- Decisions on hunks (`docs/specs/snapshots.md` → Future), which add their own table, and travel the same way.
 - Notes (**Scope: remote-notes**, `docs/specs/feedback.md`).
 - A review using the cloud's baseline. A review's own search is still local, so for now a person runs `selfie pull` first. It also needs telling when this store's goldens at a SHA aren't the cloud's, which `source` doesn't say.
 - Pulling a run other than a commit's goldens.

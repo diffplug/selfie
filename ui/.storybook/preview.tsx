@@ -8,7 +8,7 @@ const preview: Preview = {
     // In the order someone moves through the app.
     options: {
       storySort: {
-        order: ["Pages", ["Every story", "Run", "Story", ["Comparing", "Notes", "Regions", "Live", "States"], "Accept", "Status"], "Parts", ["Story tree", "Top bar", "Feedback bar"]],
+        order: ["Pages", ["Every story", "Run", "Story", ["Comparing", "Notes", "Hunks", "Live", "States"], "Accept", "Status"], "Parts", ["Story tree", "Top bar", "Feedback bar"]],
       },
     },
   },

@@ -27,7 +27,7 @@ import {
   type BuiltStorybookFile,
   type StoryFilter,
 } from "selfie-store";
-import { resolveRenderSettings, resolveRegionMergeDistance, resolveStorybookDir, type RenderSettings } from "./config.ts";
+import { resolveRenderSettings, resolveHunkMergeDistance, resolveStorybookDir, type RenderSettings } from "./config.ts";
 import { diffToPng, type PixelDiff } from "./diff.ts";
 import { SelfieError } from "./errors.ts";
 import { dirtyPaths, headSha, resolveCommit, type BaselineSearch } from "./git.ts";
@@ -103,8 +103,8 @@ export interface ReviewResult {
   readonly branchGoldens: string | null;
   /** The comparison accepting checks, which says what blocks. `comparison`, unless that's against the branch's goldens. */
   readonly reviewed: Comparison;
-  /** How close regions group here, in image pixels. */
-  readonly regionMergeDistance: number;
+  /** How close hunks group here, in image pixels. */
+  readonly hunkMergeDistance: number;
   /** Within the run's filter. */
   readonly differences: readonly Difference[];
   readonly playErrors: readonly {
@@ -617,7 +617,7 @@ export async function review(project: Project, options: ReviewOptions): Promise<
     given,
     branchGoldens: onBranch,
     reviewed,
-    regionMergeDistance: (await resolveRegionMergeDistance(project.repo)) * run.scale,
+    hunkMergeDistance: (await resolveHunkMergeDistance(project.repo)) * run.scale,
     differences,
     playErrors,
     warnings: recorded.warnings,

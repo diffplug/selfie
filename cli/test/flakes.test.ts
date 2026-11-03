@@ -41,7 +41,7 @@ describe("selfie flakes", () => {
     const [big] = json.flaky;
     expect(big).toMatchObject({ kinds: ["pixels"], distinctImages: 2, errors: [] });
     expect(big.worst.changedPixels).toBe(64);
-    expect(big.worst.regions).toBeUndefined();
+    expect(big.worst.hunks).toBeUndefined();
     for (const file of Object.values(big.images) as string[]) await access(file);
   });
 

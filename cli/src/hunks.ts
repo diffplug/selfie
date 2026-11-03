@@ -1,7 +1,7 @@
 // Which parts of two images correspond and differ: a recursive 9-slice. Trimming what matches from
 // all four sides leaves the center of a 9-slice, whose outer cells are unchanged. A center that can
-// be cut at a long enough identical span is sliced again on each side, and what's left is a region.
-// This depends on the two images alone, so the same pair always gives the same regions.
+// be cut at a long enough identical span is sliced again on each side, and what's left is a hunk.
+// This depends on the two images alone, so the same pair always gives the same hunks.
 import { createHash } from "node:crypto";
 import type { RawImage } from "selfie-store";
 import type { BoundingBox, BoxPair } from "selfie-ui/app";
@@ -10,7 +10,7 @@ import type { BoundingBox, BoxPair } from "selfie-ui/app";
 const MIN_ANCHOR_ROWS = 4;
 /** A shorter gap is usually inside one thing, such as between lines of text. */
 const MIN_GAP = 12;
-/** Past this, a pathological image stops being cut, and what's left is one region. */
+/** Past this, a pathological image stops being cut, and what's left is one hunk. */
 const MAX_DEPTH = 60;
 
 type Box = { -readonly [K in keyof BoundingBox]: BoundingBox[K] };
@@ -152,10 +152,10 @@ function slice(a: RawImage, aFrom: BoundingBox, b: RawImage, bFrom: BoundingBox,
 }
 
 /**
- * Everything outside the regions matches, once what's between them has been lined up. In reading
+ * Everything outside the hunks matches, once what's between them has been lined up. In reading
  * order. Two images of different widths, whose rows can't compare, are cut no further.
  */
-export function findRegions(current: RawImage, golden: RawImage): readonly BoxPair[] {
+export function findHunks(current: RawImage, golden: RawImage): readonly BoxPair[] {
   const found: BoxPair[] = [];
   const whole = ({ width, height }: RawImage) => ({ x: 0, y: 0, width, height });
   slice(current, whole(current), golden, whole(golden), 0, found);

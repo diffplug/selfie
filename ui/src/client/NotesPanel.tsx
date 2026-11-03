@@ -3,7 +3,7 @@ import { CheckIcon, TrashIcon } from "@primer/octicons-react";
 import { Button, IconButton, Stack, Text, Textarea } from "@primer/react";
 import { useState, type ReactNode, type RefObject } from "react";
 import type { Note } from "../shared/api.ts";
-import { describeBox } from "../shared/regions.ts";
+import { describeBox } from "../shared/hunks.ts";
 import { Keys } from "./Keys.tsx";
 import { NoteLabel } from "./words.tsx";
 

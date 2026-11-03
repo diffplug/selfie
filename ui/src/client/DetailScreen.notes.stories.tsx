@@ -38,11 +38,11 @@ export const WritingANote: Story = {
     await userEvent.keyboard("This label is too quiet");
   },
 };
-export const WritingANoteOnSelectedRegions: Story = {
+export const WritingANoteOnSelectedHunks: Story = {
   args: { row: SEVERAL },
   play: async ({ canvasElement }) => {
     await press("x", "m")();
-    await expect(within(canvasElement).getByText(/on 1 selected region of the current image/)).toBeVisible();
+    await expect(within(canvasElement).getByText(/on 1 selected hunk of the current image/)).toBeVisible();
   },
 };
 export const DrawingABox: Story = {
@@ -74,13 +74,13 @@ export const WhenNotedLayer: Story = {
     await expect(canvasElement.querySelector(".selfie-note-box")).not.toBeNull();
   },
 };
-export const SelectedRegionsMeanNothingOnTheImageWhenNoted: Story = {
+export const SelectedHunksMeanNothingOnTheImageWhenNoted: Story = {
   args: { row: FIXED, notes: [replied(ON_THE_OLD_IMAGE, "Made it green, in `Button.tsx`.")] },
   play: async ({ canvasElement }) => {
     await press("x", "w")();
     await stackedImagesLoaded(canvasElement);
     await expect(within(canvasElement).getByText(/on all of the image when noted/)).toBeVisible();
-    await expect(canvasElement.querySelector(".selfie-stack .selfie-region")).toBeNull();
+    await expect(canvasElement.querySelector(".selfie-stack .selfie-hunk")).toBeNull();
   },
 };
 export const AgentClaimedAFixAndNothingMoved: Story = {

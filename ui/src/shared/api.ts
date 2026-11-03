@@ -18,15 +18,15 @@ export interface BoxPair {
   readonly golden: BoundingBox;
 }
 
-/** What a region's difference is. Anything not accounted for by moves and spacing is `changed`. */
-export type RegionKind = "changed" | "moved" | "spacing";
+/** What a hunk's difference is. Anything not accounted for by moves and spacing is `changed`. */
+export type HunkKind = "changed" | "moved" | "spacing";
 
-/** Boxes that differ. Everything outside a region matches. */
-export interface ChangedRegion extends BoxPair {
-  readonly kind: RegionKind;
+/** Boxes that differ. Everything outside a hunk matches. */
+export interface ChangedHunk extends BoxPair {
+  readonly kind: HunkKind;
   /** What moves and spacing don't account for. */
   readonly changedPixels: number;
-  /** What landed here, identical to what was elsewhere in the golden. A region that only lost something to another region is `moved` with none of these. */
+  /** What landed here, identical to what was elsewhere in the golden. A hunk that only lost something to another hunk is `moved` with none of these. */
   readonly moved: readonly BoxPair[];
 }
 
@@ -34,7 +34,7 @@ export interface PixelDiff {
   readonly current: { readonly width: number; readonly height: number };
   readonly golden: { readonly width: number; readonly height: number };
   /** Top to bottom. */
-  readonly regions: readonly ChangedRegion[];
+  readonly hunks: readonly ChangedHunk[];
   /** What moves and spacing don't account for, including what only the golden has, which isn't in `boundingBox`. */
   readonly changedPixels: number;
   /** Of blocks that are identical, but elsewhere. */
@@ -140,8 +140,8 @@ export interface RunView {
   readonly storyNames: readonly { readonly story: string; readonly title: string; readonly name: string }[];
   /** With no baseline, the nearest goldens on the run's branch, which `rows` compares with. Only to look at. */
   readonly branchGoldens: string | null;
-  /** How close a diff's regions group here, in CSS pixels. */
-  readonly regionMergeDistance: number;
+  /** How close a diff's hunks group here, in CSS pixels. */
+  readonly hunkMergeDistance: number;
   /** The run whose images are the goldens of this run's Git SHA, which may be this one. */
   readonly acceptedRunId: string | null;
   /** Who a decision made here is recorded as, or null if Git doesn't say. */

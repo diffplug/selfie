@@ -8,14 +8,14 @@ import { isDecidable } from "selfie-store";
 import type { DecisionKind, PixelDiff, RunView, SnapshotRow } from "../shared/api.ts";
 import { diffImageUrl, fetchDiff, imageUrl } from "./api.ts";
 import { parseFilter, targetsOf, type StoryNavigation } from "./filter.ts";
-import { useFetched, useHotkeys, useRegionSelection, useTitle, type FeedbackState, type RunState } from "./hooks.ts";
+import { useFetched, useHotkeys, useHunkSelection, useTitle, type FeedbackState, type RunState } from "./hooks.ts";
 import { ImageCompare } from "./ImageCompare.tsx";
 import { Keys } from "./Keys.tsx";
 import { acceptPath, AppLink, navigate } from "./router.tsx";
 import { ActionFailure } from "./RunNotes.tsx";
 import { LiveStories, StorybookLinkTo } from "./LiveStories.tsx";
 import { LoadFailure, Loading } from "./Status.tsx";
-import { describeBox, groupRegions, isLayoutOnly } from "../shared/regions.ts";
+import { describeBox, groupHunks, isLayoutOnly } from "../shared/hunks.ts";
 import { comparedImage, newestNotedImage } from "../shared/notes.ts";
 import { AdvisoryLabels, DecisionLabel, describePixels, sizeChanged, StateLabel } from "./words.tsx";
 
@@ -28,13 +28,13 @@ const SHORTCUTS: readonly (readonly [string, string])[] = [
   ["f", "Stacked at the current zoom, then flip between current and golden"],
   ["d", "Show the diff"],
   ["z", "Next zoom: actual size, 1×, 2×, 4×, 8×"],
-  ["c", "Center on the region being looked at, or else the change"],
+  ["c", "Center on the hunk being looked at, or else the change"],
   ["l", "Open or close the live stories"],
   ["m", "Write a note for your agent"],
   ["w", "Show the image a note was written on"],
-  ["n", "Next region"],
-  ["p", "Previous region"],
-  ["x", "Select the region being looked at, or the first"],
+  ["n", "Next hunk"],
+  ["p", "Previous hunk"],
+  ["x", "Select the hunk being looked at, or the first"],
   ["u", "Up to the run, or to where this commit stands"],
   ["?", "This list"],
 ];
@@ -183,9 +183,9 @@ export function DetailScreen({
     fetchDiff(row!.imageHash!, compared!.hash, signal),
   );
   const diff = row?.pixelDiff ?? fetched;
-  const mergeDistance = view.regionMergeDistance * view.run.scale;
-  const groups = useMemo(() => (diff === null ? [] : groupRegions(diff.regions, mergeDistance)), [diff, mergeDistance]);
-  const selection = useRegionSelection(story);
+  const mergeDistance = view.hunkMergeDistance * view.run.scale;
+  const groups = useMemo(() => (diff === null ? [] : groupHunks(diff.hunks, mergeDistance)), [diff, mergeDistance]);
+  const selection = useHunkSelection(story);
 
   // The next story's images are likely wanted within seconds, so have them ready. Across many runs,
   // what comes next may not be in this one, and then it just loads when it's asked for.

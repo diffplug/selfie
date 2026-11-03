@@ -21,8 +21,8 @@ export interface FlakyStory {
   readonly kinds: readonly FlakeKind[];
   /** How many different images the renders made. */
   readonly distinctImages: number;
-  /** The biggest difference from the first render, without its regions. */
-  readonly worst: Omit<PixelDiff, "regions"> | null;
+  /** The biggest difference from the first render, without its hunks. */
+  readonly worst: Omit<PixelDiff, "hunks"> | null;
   /** That pair, and a picture of what differs. */
   readonly images: { readonly first: string; readonly other: string; readonly diff: string } | null;
   /** Each different error, and in how many of the renders. */
@@ -97,7 +97,7 @@ async function compare(
   const diffFile = path.join(directory, "diffs", `${storyDirName(id)}.png`);
   await mkdir(path.dirname(diffFile), { recursive: true });
   await writeFile(diffFile, await encodePng(worst!.highlighted));
-  const { regions: _regions, ...summary } = worst!.diff;
+  const { hunks: _hunks, ...summary } = worst!.diff;
   return { distinctImages: distinct.length, worst: summary, images: { first: first.file, other: worst!.other, diff: diffFile } };
 }
 

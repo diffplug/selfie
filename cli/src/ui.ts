@@ -7,7 +7,7 @@ import { isBuiltStorybook } from "selfie-ui/local";
 import { keptStorybookPath } from "selfie-ui/api";
 import { storybookHash, readStoriesInOrder, readStoryIndex, storiesInIndex, type StoryEntry } from "selfie-render";
 import type { AcceptOutcome, DecisionTarget, FeedbackView, NewNote, ReviewSource, RunView, SnapshotRow, StoriesView, StorybookLink, StorySetup } from "selfie-ui/app";
-import { resolveRenderSettings, resolveRegionMergeDistance } from "./config.ts";
+import { resolveRenderSettings, resolveHunkMergeDistance } from "./config.ts";
 import { accept, checkAccept, decide } from "./decisions.ts";
 import { diffToPng, type PixelDiff } from "./diff.ts";
 import { SelfieError } from "./errors.ts";
@@ -139,7 +139,7 @@ export function localReviewSource(
       goldenStorybookUrl: await goldenStorybookFor(run, onBranch ?? run.baselineSha),
       viewport: await project.storybooks.viewportOf(run.environment),
       branchGoldens: onBranch,
-      regionMergeDistance: await resolveRegionMergeDistance(repo),
+      hunkMergeDistance: await resolveHunkMergeDistance(repo),
       acceptedRunId: await snapshots.acceptedRunAt(run.gitSha, run.environment),
       actor,
       blockers: checked.blockers,

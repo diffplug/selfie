@@ -36,7 +36,7 @@ A note is where something is. Its messages are the conversation about it.
 | `sent` | Whether it's the agent's yet |
 
 - **Must let a note be on any story with any state**, not only on one that changed, since most feedback is that something looks wrong (rationale).
-- **Must take a note's box from what someone drew on a stacked image, or else the box around the regions they selected, or else all of the image**, on whichever image is showing, where the diff image counts as the current one.
+- **Must take a note's box from what someone drew on a stacked image, or else the box around the hunks they selected, or else all of the image**, on whichever image is showing, where the diff image counts as the current one.
 - **Must draw a note's box on the image it's about, and on no other**, since a box is only meaningful on the pixels it was drawn on.
 - **Must never let a note approve, reject, or block anything.** `selfie accept` doesn't know notes exist (rationale).
 - **Must keep whether something's been sent on the message, and not on the note**, so an answer to a note that's already been read can be a draft (rationale).
@@ -95,7 +95,7 @@ A note is where something is. Its messages are the conversation about it.
 - **Must say when the run being looked at isn't the session's newest, and offer to go there, to the same story if on one, and never switch by itself**, so an image can't change while someone is looking at it (rationale).
 - **Must keep each story's diff as current against golden, or with no golden, against the image its newest open note is on, and say so** (rationale). A run's diff doesn't accumulate. That's only to look at: a decision is still on the story's new image.
 - **Must show open notes on their story in any run**, whether or not they've been answered.
-- **Must offer one more layer on a story whose newest open note is on an image other than its current and golden ones: When noted**, which is that image, with the boxes of the notes on it. With a golden, it has no regions, since those are between the current image and the golden, so a note written there can't be on selected ones. With no golden, it's what the current image is compared with, so the regions and the diff are between those two.
+- **Must offer one more layer on a story whose newest open note is on an image other than its current and golden ones: When noted**, which is that image, with the boxes of the notes on it. With a golden, it has no hunks, since those are between the current image and the golden, so a note written there can't be on selected ones. With no golden, it's what the current image is compared with, so the hunks and the diff are between those two.
 - **Must say on a replied note, on the run the agent answered from, when its image is identical to the story's there**, so a claimed fix that moved nothing shows at once (rationale). On an older run, the note's image is simply what's there.
 - Decisions need nothing here, since they're on image hashes (`docs/specs/snapshots.md` → Decisions).
 

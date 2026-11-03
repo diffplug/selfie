@@ -34,9 +34,9 @@
 
 **A branch's goldens, only to look at.** Reviewing Selfie's own stories on a branch read every story as new, until a run was compared with the branch's own earlier goldens by hand. So a run with no baseline is shown against them. Nothing about acceptance moves: every image still needs its own approval, so an image matching a golden that someone has since rejected is still refused. So what's shown and what's checked can differ. Blockers and the exit code stay with what's checked, or a review could exit 0 before `accept` refused it, and the document's `baseline` stays the real one, with `comparedWith` saying what this review showed.
 
-**Regions, by a recursive 9-slice.** Whole-page render made any change in a page's height a size change, and a size change once compared nothing: on Selfie's own stories, moving one row put 5 of 18 changed stories there with nothing highlighted. Matching from the edges fixed that, but a heading changed near the top and rows moved near the bottom were then one band, where shifted rows ghost. Trimming all four sides and recursing gives the heading its own 182×18 box, and separates changes side by side, which rows alone can't.
+**Hunks, by a recursive 9-slice.** Whole-page render made any change in a page's height a size change, and a size change once compared nothing: on Selfie's own stories, moving one row put 5 of 18 changed stories there with nothing highlighted. Matching from the edges fixed that, but a heading changed near the top and rows moved near the bottom were then one band, where shifted rows ghost. Trimming all four sides and recursing gives the heading its own 182×18 box, and separates changes side by side, which rows alone can't.
 
-**Why anchors must be unique.** The first prototype cut at the longest run of identical rows, and table rows matched the wrong table rows, pairing 27 rows of one image with 153 of the other. Requiring a row that appears once in each stopped that on Selfie's stories, and a story that had split into 11 regions came out as 2.
+**Why anchors must be unique.** The first prototype cut at the longest run of identical rows, and table rows matched the wrong table rows, pairing 27 rows of one image with 153 of the other. Requiring a row that appears once in each stopped that on Selfie's stories, and a story that had split into 11 hunks came out as 2.
 
 **Moved and spacing.** Rows that line up only take a differ so far: a change in one column defeats them, so a list whose thumbnails changed height has its text shift beside them, and the shifted text ghosts, showing in pink twice over. On three real changes:
 
@@ -50,11 +50,11 @@ It takes 4 to 10 ms an image on average, 17 ms at worst, and a story's stats com
 
 **Why the account is checked.** Calling something moved can hide a change, so the claim isn't taken on trust. The current side is rebuilt from what was matched and compared with what's really there, and what the golden had that matched nothing counts too. Without that last part, deleting one block while moving another would read as nothing changed. Measured on the three changes above, it adds 175,318 changed pixels on Selfie's stories, 2,525 on the restyle, and 5,163 on the layout shift, and no story's label depends on it. It's the difference between a label that's usually right and one that can be relied on.
 
-**Why a region must gain from it.** Rebuilding a region that was restyled counts its pixels on both sides, so taking moves everywhere made the restyle above 18% worse than comparing in place, in a prototype. Comparing whichever is better fixes that, and a region compared in place gives up its blocks, since its pixels are already judged where they are.
+**Why a hunk must gain from it.** Rebuilding a hunk that was restyled counts its pixels on both sides, so taking moves everywhere made the restyle above 18% worse than comparing in place, in a prototype. Comparing whichever is better fixes that, and a hunk compared in place gives up its blocks, since its pixels are already judged where they are.
 
-**Why matching crosses regions.** Moving a button sideways leaves matching columns between where it was and where it is, so the 9-slice makes two regions, and neither alone holds a move. The most obvious kind of move read as two changes until blocks could match across regions.
+**Why matching crosses hunks.** Moving a button sideways leaves matching columns between where it was and where it is, so the 9-slice makes two hunks, and neither alone holds a move. The most obvious kind of move read as two changes until blocks could match across hunks.
 
-**Why what spacing pushes along has stayed put.** A block's place is measured within its region, past any spacing. Measured in the image instead, everything below a gap that grew read as moved, and a page with a taller gap, a moved button, and a changed footer was blue from top to bottom, with the one thing that really moved lost in it.
+**Why what spacing pushes along has stayed put.** A block's place is measured within its hunk, past any spacing. Measured in the image instead, everything below a gap that grew read as moved, and a page with a taller gap, a moved button, and a changed footer was blue from top to bottom, with the one thing that really moved lost in it.
 
 **Why a block has a minimum size.** A single pixel identical to one elsewhere is a coincidence, and a row of little ones floods the document. Letting blocks of any size move gave 131 entries on the layout shift, against 75 at 9 pixels, for 593,522 changed pixels against 595,950, and the same 59 stories. 25 pixels was hardly different again, at 73 entries and 597,639, so 9 is what's small enough to keep a 3×3 bullet.
 
@@ -62,9 +62,9 @@ It takes 4 to 10 ms an image on average, 17 ms at worst, and a story's stats com
 
 **Why moved stories still need a decision.** A layout shift can be the bug. The label says how little there is to look at, and the "Moved and spacing only" filter means a person can approve them all at once, but that's their decision to make. It also keeps what a run's blockers and exit code say from depending on how a differ reads pixels.
 
-**Why the merge distance only groups.** It first changed the regions themselves, which meant it changed diff images, two caches keyed without it, and any approval keyed by a region's content. So regions are now a pure result of two images, and grouping happens when something is shown, so a project can change its distance freely.
+**Why the merge distance only groups.** It first changed the hunks themselves, which meant it changed diff images, two caches keyed without it, and any approval keyed by a hunk's content. So hunks are now a pure result of two images, and grouping happens when something is shown, so a project can change its distance freely.
 
-**Why the cut sizes don't follow the scale.** A 2x render cuts at half the CSS size, which only makes regions finer, and grouping follows the scale. Scaling the cuts would make a diff depend on more than its two images.
+**Why the cut sizes don't follow the scale.** A 2x render cuts at half the CSS size, which only makes hunks finer, and grouping follows the scale. Scaling the cuts would make a diff depend on more than its two images.
 
 **Why the distance leans small.** On a style tweak to dormouse changing 290 of 541 stories, groups by distance totaled 1,694 at 12 px, 1,061 at 48, 693 at 96, and 467 at 200, with the most in one story falling from 19 to 6. Selfie's own two-edit change gave 2 at every distance. Much of dormouse's count is the four corners of a rounded button, whose middle didn't change. Someone can select groups to join them, and nothing yet splits one, so too many is the error to prefer.
 

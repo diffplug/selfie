@@ -1,7 +1,7 @@
 // Which rows a filter shows, and where next and previous go. Pure, so a test needs no browser.
 import { isDecidable } from "selfie-store";
 import type { DecisionTarget, SnapshotRow } from "../shared/api.ts";
-import { isLayoutOnly } from "../shared/regions.ts";
+import { isLayoutOnly } from "../shared/hunks.ts";
 import { plural } from "./plural.ts";
 
 export const SHOW_OPTIONS = [

@@ -1,4 +1,4 @@
-// What a region's difference is: changed, moved, or spacing. Moved and spacing can make a real change
+// What a hunk's difference is: changed, moved, or spacing. Moved and spacing can make a real change
 // look like nothing, so most of this is about what they must never hide.
 import type { RawImage } from "selfie-store";
 import { describe, expect, test } from "vitest";
@@ -49,9 +49,9 @@ describe("moved", () => {
     const current = draw(200, 40, [text(100, 10, 3)]);
     const { diff } = diffImages(current, golden);
     expect(diff).toMatchObject({ changedPixels: 0, movedPixels: 180, spacingPixels: 0, maxChannelDelta: 0 });
-    // Two regions, since the columns between them match: one lost it, and one gained it.
-    expect(diff.regions.map(({ kind, changedPixels }) => [kind, changedPixels])).toEqual([["moved", 0], ["moved", 0]]);
-    expect(diff.regions.flatMap(({ moved }) => moved)).toEqual([{ current: { x: 100, y: 10, width: 30, height: 6 }, golden: { x: 10, y: 10, width: 30, height: 6 } }]);
+    // Two hunks, since the columns between them match: one lost it, and one gained it.
+    expect(diff.hunks.map(({ kind, changedPixels }) => [kind, changedPixels])).toEqual([["moved", 0], ["moved", 0]]);
+    expect(diff.hunks.flatMap(({ moved }) => moved)).toEqual([{ current: { x: 100, y: 10, width: 30, height: 6 }, golden: { x: 10, y: 10, width: 30, height: 6 } }]);
   });
 
   test("what moved beside what changed is counted apart", () => {
@@ -66,7 +66,7 @@ describe("moved", () => {
     const button = (x: number) => [{ x, y: 10, width: 100, height: 20, color: BLUE }];
     const { diff } = diffImages(draw(400, 40, button(250)), draw(400, 40, button(10)));
     expect(diff).toMatchObject({ changedPixels: 0, movedPixels: 2000 });
-    expect(diff.regions.flatMap(({ moved }) => moved)).toEqual([{ current: { x: 250, y: 10, width: 100, height: 20 }, golden: { x: 10, y: 10, width: 100, height: 20 } }]);
+    expect(diff.hunks.flatMap(({ moved }) => moved)).toEqual([{ current: { x: 250, y: 10, width: 100, height: 20 }, golden: { x: 10, y: 10, width: 100, height: 20 } }]);
   });
 
   test("the diff image tints what moved and marks what changed", () => {
@@ -78,7 +78,7 @@ describe("moved", () => {
     expect(pixelAt(highlighted, 150, 30)).toEqual([255, 0, 80]);
   });
 
-  test("what's in the same place in its region stayed, though rows above pushed the region down", () => {
+  test("what's in the same place in its hunk stayed, though rows above pushed the hunk down", () => {
     const blocks = (top: number, first: number, last: number) => [
       text(first, top, 2),
       { x: 20, y: top + 7, width: 30, height: 1, color: RED, pattern: 3 },
@@ -87,14 +87,14 @@ describe("moved", () => {
     const heading = text(10, 4, 5);
     const { diff } = diffImages(draw(120, 90, [heading, ...blocks(60, 40, 30)]), draw(120, 70, [heading, ...blocks(40, 10, 60)]));
     expect(diff).toMatchObject({ changedPixels: 0, spacingPixels: 2400 });
-    expect(diff.regions.flatMap(({ moved }) => moved).map(({ current }) => current.x).sort()).toEqual([30, 40]);
+    expect(diff.hunks.flatMap(({ moved }) => moved).map(({ current }) => current.x).sort()).toEqual([30, 40]);
   });
 
   test("a panel of flat rows that moved is one entry, not one per row", () => {
     const panel = (y: number) => [{ x: 0, y, width: 200, height: 50, color: [240, 240, 240] }, text(20, y + 10, 4)];
     const { diff } = diffImages(draw(200, 120, panel(40)), draw(200, 120, panel(10)));
     expect(diff.changedPixels).toBe(0);
-    expect(diff.regions.flatMap(({ moved }) => moved).length).toBeLessThanOrEqual(3);
+    expect(diff.hunks.flatMap(({ moved }) => moved).length).toBeLessThanOrEqual(3);
   });
 
   test("identical content doesn't get matched twice", () => {
@@ -108,7 +108,7 @@ describe("moved", () => {
     const current = draw(200, 40, [text(100, 10, 3)]);
     const { diff } = diffImages(current, golden);
     expect(diff.changedPixels).toBeGreaterThanOrEqual(179);
-    expect(diff.regions[0]?.kind).toBe("changed");
+    expect(diff.hunks[0]?.kind).toBe("changed");
   });
 
   test("isn't claimed of a block too small to say it's the same thing", () => {
@@ -125,16 +125,16 @@ describe("spacing", () => {
   test("a band of background that grew is spacing, and nothing changed", () => {
     const { diff, highlighted } = diffImages(draw(200, 50, [above, below(10)]), draw(200, 40, [above, below(0)]));
     expect(diff).toMatchObject({ changedPixels: 0, movedPixels: 0, spacingPixels: 2000 });
-    expect(diff.regions).toMatchObject([{ kind: "spacing", changedPixels: 0 }]);
-    const { y } = diff.regions[0]!.current;
+    expect(diff.hunks).toMatchObject([{ kind: "spacing", changedPixels: 0 }]);
+    const { y } = diff.hunks[0]!.current;
     expect(pixelAt(highlighted, 0, y)).toEqual([255, 214, 102]);
-    expect(diff.boundingBox).toEqual(diff.regions[0]!.current);
+    expect(diff.boundingBox).toEqual(diff.hunks[0]!.current);
   });
 
   test("a band of background that shrank is spacing, with a seam for where", () => {
     const { diff, highlighted } = diffImages(draw(200, 40, [above, below(0)]), draw(200, 50, [above, below(10)]));
     expect(diff).toMatchObject({ changedPixels: 0, spacingPixels: 2000 });
-    const { y } = diff.regions[0]!.current;
+    const { y } = diff.hunks[0]!.current;
     expect(pixelAt(highlighted, 0, y)).toEqual([255, 214, 102]);
   });
 
@@ -142,7 +142,7 @@ describe("spacing", () => {
     const banner = { x: 0, y: 14, width: 200, height: 10, color: RED };
     const { diff } = diffImages(draw(200, 50, [above, banner, below(10)]), draw(200, 40, [above, below(0)]));
     expect(diff).toMatchObject({ changedPixels: 2000, spacingPixels: 0 });
-    expect(diff.regions[0]?.kind).toBe("changed");
+    expect(diff.hunks[0]?.kind).toBe("changed");
   });
 
   test("a colored panel that grew is spacing, since it's the color around the band", () => {
@@ -193,15 +193,15 @@ describe("what moved and spacing can't hide", () => {
     for (let seed = 1; seed <= 150; seed++) {
       const next = random(seed);
       const before = layout(next);
-      // Only sideways, so a row outside a region is at the same place in both.
+      // Only sideways, so a row outside a hunk is at the same place in both.
       const after = before.boxes.map((block) => ({ ...block, x: 4 + next(80) }));
       const golden = draw(120, before.height, before.boxes);
       const current = draw(120, before.height, after);
       const { diff } = diffImages(current, golden);
-      // Rows can line up with identical rows elsewhere, and then what's outside a region isn't in place.
-      if (diff.changedPixels !== 0 || diff.regions.some(({ current: here, golden: there }) => here.y !== there.y)) continue;
+      // Rows can line up with identical rows elsewhere, and then what's outside a hunk isn't in place.
+      if (diff.changedPixels !== 0 || diff.hunks.some(({ current: here, golden: there }) => here.y !== there.y)) continue;
       explained += 1;
-      const movedTo = (x: number, y: number) => diff.regions.flatMap(({ moved }) => moved).find((block) => x >= block.current.x && x < block.current.x + block.current.width && y >= block.current.y && y < block.current.y + block.current.height);
+      const movedTo = (x: number, y: number) => diff.hunks.flatMap(({ moved }) => moved).find((block) => x >= block.current.x && x < block.current.x + block.current.width && y >= block.current.y && y < block.current.y + block.current.height);
       for (let y = 0; y < current.height; y++) {
         for (let x = 0; x < current.width; x++) {
           const actual = pixelAt(current, x, y);

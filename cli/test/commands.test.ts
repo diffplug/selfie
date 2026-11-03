@@ -154,7 +154,7 @@ describe("comparing with a baseline", () => {
     expect(difference.pixelDiff).toEqual({
       current: { width: 8, height: 8 },
       golden: { width: 8, height: 8 },
-      regions: [{ current: { x: 2, y: 3, width: 4, height: 2 }, golden: { x: 2, y: 3, width: 4, height: 2 }, kind: "changed", changedPixels: 8, moved: [] }],
+      hunks: [{ current: { x: 2, y: 3, width: 4, height: 2 }, golden: { x: 2, y: 3, width: 4, height: 2 }, kind: "changed", changedPixels: 8, moved: [] }],
       changedPixels: 8,
       movedPixels: 0,
       spacingPixels: 0,

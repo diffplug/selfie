@@ -12,7 +12,7 @@ Source of truth: `ui/`.
 | Path | Holds |
 |---|---|
 | `ui/src/shared/api.ts` | The JSON on the wire, and `ReviewSource` |
-| `ui/src/shared/regions.ts`, exported as `selfie-ui/regions` | Grouping a diff's regions for showing, for the client and the CLI's document |
+| `ui/src/shared/hunks.ts`, exported as `selfie-ui/hunks` | Grouping a diff's hunks for showing, for the client and the CLI's document |
 | `ui/src/shared/notes.ts`, exported as `selfie-ui/notes` | Shared note validation and open-note state (`docs/specs/feedback.md`) |
 | `selfie-ui/sync`, `selfie-ui/sync-api` | `docs/specs/sync.md` → Routes |
 | `ui/src/server/app.ts`, exported as `selfie-ui/app` | The routes under `/api`, over a `ReviewSource`, on Hono, and `sameOriginWrites` and `pageHeaders`. It re-exports the wire types |
@@ -146,11 +146,11 @@ Source of truth: `ui/src/client/`.
 - **Must fit an image's width side by side, and scroll all of them as one**, so a tall page's images stay level.
 - **Must also offer zoom at 1×, 2×, 4×, and 8×, where 1× is one image pixel to one device pixel** (rationale), following the display's `devicePixelRatio`.
 - **Must draw nearest-neighbor only at a whole number of device pixels per image pixel, and smooth anything else**, as with a 2× image on a 1× display or a 1.5× image on a 2× display at actual size, since uneven blocks would look like changes.
-- **Must center a change on stacking the images and on every zoom:** the region being looked at if there is one, or else the bounding box if it fits, or else the first changed pixel, since a large box's center may hold no change at all (rationale).
-- **Must list a changed snapshot's regions, however few, grouped by `regionMergeDistance`, in reading order, each with its number, kind, how much it holds, and where it is on each side.** One region gets no special case (rationale).
-- **Must outline each region on every image, in that image's own coordinates, numbered as in the list, in its kind's color from the diff image**, side by side and stacked, and let the outlines be turned off.
-- **Must let someone select any set of regions, from the list, from an outline, or with a key, and keep that only while they stay on the story.** Clicking a stacked region's outline selects it, and side by side only its number does, since clicking an image there stacks it.
-- **Must keep the region being looked at still when flipping between images**, since it can be somewhere else in the other one (rationale).
+- **Must center a change on stacking the images and on every zoom:** the hunk being looked at if there is one, or else the bounding box if it fits, or else the first changed pixel, since a large box's center may hold no change at all (rationale).
+- **Must list a changed snapshot's hunks, however few, grouped by `hunkMergeDistance`, in reading order, each with its number, kind, how much it holds, and where it is on each side.** One hunk gets no special case (rationale).
+- **Must outline each hunk on every image, in that image's own coordinates, numbered as in the list, in its kind's color from the diff image**, side by side and stacked, and let the outlines be turned off.
+- **Must let someone select any set of hunks, from the list, from an outline, or with a key, and keep that only while they stay on the story.** Clicking a stacked hunk's outline selects it, and side by side only its number does, since clicking an image there stacks it.
+- **Must keep the hunk being looked at still when flipping between images**, since it can be somewhere else in the other one (rationale).
 - **Must link a snapshot to its story in the very built Storybook that rendered its run, if that's kept, or else the directory `selfie ui` hosts, and then say it may not match** (`RunView.storybook`). A removed story has no link.
 - **Must offer the live stories, closed and loading nothing until opened, and stay open or closed from story to story**: the golden's kept built Storybook beside the run's, in frames (`docs/specs/access.md` → Local review server), at the size its environment renders at and scaled to fit, or else saying that size wasn't recorded, each saying why if it has none (rationale).
 - **Must give a live story the keyboard only when it's clicked in**, taking focus back from one that focuses itself as it loads, so this page's keys keep working (rationale).
@@ -199,13 +199,13 @@ Source of truth: `useHotkeys` in `ui/src/client/hooks.ts`.
 | `/` | The run | Search |
 | `a`, `r` | A snapshot | Approve or reject, then go to the next |
 | `s`, `f`, `d` | A snapshot | Side by side, stacked then flip, diff |
-| `z`, `c` | A snapshot | Next zoom, center on the region being looked at or else the change |
+| `z`, `c` | A snapshot | Next zoom, center on the hunk being looked at or else the change |
 | `l` | A snapshot | Open or close the live stories |
 | `m` | A snapshot | Write a note |
 | `c`, `m` | A story with no render | Render it, or render it to write a note on it |
 | `w` | A snapshot | Show the image a note was written on, or go back |
-| `n`, `p` | A snapshot | Next and previous region |
-| `x` | A snapshot | Select the region being looked at, or the first |
+| `n`, `p` | A snapshot | Next and previous hunk |
+| `x` | A snapshot | Select the hunk being looked at, or the first |
 | `u` | A snapshot | Back to the list, with focus on that story |
 | `?` | A snapshot | Lists these |
 
@@ -252,8 +252,8 @@ Also its own guard in place of `loopbackHosts`, keeping `sameOriginWrites` and `
 
 ### Not built
 
-- Approving or rejecting a selection. Those are still on a whole image, until there are decisions on regions (`docs/specs/snapshots.md` → Future). A note can be on one.
-- Selecting one region out of a group. Lowering `regionMergeDistance` separates them.
+- Approving or rejecting a selection. Those are still on a whole image, until there are decisions on hunks (`docs/specs/snapshots.md` → Future). A note can be on one.
+- Selecting one hunk out of a group. Lowering `hunkMergeDistance` separates them.
 - A way to clear a decision. One can be replaced, and a run can be reviewed again, but `Snapshots.decide` has no way to remove one.
 - Finding runs at other commits. `/runs/:id` opens any of them, and `selfie ui <run>` prints that URL, but nothing lists them: `runs` has no index that would serve it without a scan.
 - Keeping how someone's looking at the images when the next story's render is from another run, since each run's page is its own, and it reads that run again. The live stories do stay as they were.

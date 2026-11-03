@@ -18,8 +18,8 @@ import {
 import { Label, Stack, VisuallyHidden, type LabelProps } from "@primer/react";
 import type { ReactNode } from "react";
 import { isDecidable } from "selfie-store";
-import type { BlockerReason, NoteState, PixelDiff, RegionKind, SnapshotRow, SnapshotState } from "../shared/api.ts";
-import { isLayoutOnly } from "../shared/regions.ts";
+import type { BlockerReason, NoteState, PixelDiff, HunkKind, SnapshotRow, SnapshotState } from "../shared/api.ts";
+import { isLayoutOnly } from "../shared/hunks.ts";
 import { plural } from "./plural.ts";
 import { AppLink, runPath } from "./router.tsx";
 
@@ -73,7 +73,7 @@ export function StateMark({ state, renamedFrom }: { readonly state: SnapshotStat
   );
 }
 
-const KIND_LABELS: Readonly<Record<RegionKind, { variant: LabelProps["variant"]; icon: ReactNode; words: string }>> = {
+const KIND_LABELS: Readonly<Record<HunkKind, { variant: LabelProps["variant"]; icon: ReactNode; words: string }>> = {
   changed: { variant: "danger", icon: <DiffModifiedIcon size={12} />, words: "Changed" },
   moved: { variant: "accent", icon: <ArrowSwitchIcon size={12} />, words: "Moved" },
   spacing: { variant: "attention", icon: <UnfoldIcon size={12} />, words: "Spacing" },
@@ -95,7 +95,7 @@ export function NoteLabel({ state }: { readonly state: NoteState }) {
   );
 }
 
-export function KindLabel({ kind }: { readonly kind: RegionKind }) {
+export function KindLabel({ kind }: { readonly kind: HunkKind }) {
   const { variant, icon, words } = KIND_LABELS[kind];
   return (
     <IconLabel variant={variant} icon={icon}>

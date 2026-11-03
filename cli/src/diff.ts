@@ -1,14 +1,14 @@
 import type { RawImage } from "selfie-store";
-import type { BoundingBox, ChangedRegion, PixelDiff, RegionKind } from "selfie-ui/app";
-import { explainRegions, forEachUnexplained } from "./explain.ts";
+import type { BoundingBox, ChangedHunk, PixelDiff, HunkKind } from "selfie-ui/app";
+import { explainHunks, forEachUnexplained } from "./explain.ts";
 import { encodePng } from "./png.ts";
-import { findRegions } from "./regions.ts";
+import { findHunks } from "./hunks.ts";
 
 export type { BoundingBox, PixelDiff } from "selfie-ui/app";
 
 type Color = readonly [number, number, number];
 
-const COLORS: Readonly<Record<RegionKind, Color>> = { changed: [255, 0, 80], moved: [9, 105, 218], spacing: [255, 214, 102] };
+const COLORS: Readonly<Record<HunkKind, Color>> = { changed: [255, 0, 80], moved: [9, 105, 218], spacing: [255, 214, 102] };
 // An unchanged pixel fades into gray from this level to white, so the page stays readable
 // behind the highlight and no color in it can be mistaken for one.
 const FADED_FLOOR = 190;
@@ -42,7 +42,7 @@ function tintBox(out: Uint8Array, imageWidth: number, { x, y, width, height }: B
 
 /**
  * Compares two images, and draws the current one faded, with what changed highlighted, what moved
- * tinted, and spacing marked. See `explainRegions` for how each is told apart.
+ * tinted, and spacing marked. See `explainHunks` for how each is told apart.
  */
 export function diffImages(current: RawImage, golden: RawImage): { readonly diff: PixelDiff; readonly highlighted: RawImage } {
   const { width, height, pixels: a } = current;
@@ -63,13 +63,13 @@ export function diffImages(current: RawImage, golden: RawImage): { readonly diff
     if (y > maxY) maxY = y;
   };
 
-  const found = findRegions(current, golden);
-  const explanations = explainRegions(current, golden, found);
+  const found = findHunks(current, golden);
+  const explanations = explainHunks(current, golden, found);
   let changedPixels = 0;
   let movedPixels = 0;
   let spacingPixels = 0;
-  const regions = found.map((region, index): ChangedRegion => {
-    const { current: here, golden: there } = region;
+  const hunks = found.map((hunk, index): ChangedHunk => {
+    const { current: here, golden: there } = hunk;
     const explanation = explanations[index]!;
     const { moved, movedOut, goldenOnly, spacing, goldenSpacingRows, kind } = explanation;
 
@@ -102,12 +102,12 @@ export function diffImages(current: RawImage, golden: RawImage): { readonly diff
         paint(out, (seam * width + x) * 3, COLORS[kind]);
       }
     }
-    return { ...region, kind, changedPixels: explanation.changedPixels, moved };
+    return { ...hunk, kind, changedPixels: explanation.changedPixels, moved };
   });
 
   // With nothing really changed, the box is what a person should look at: what moved or grew.
   if (firstChanged === null) {
-    for (const { current: here } of regions) {
+    for (const { current: here } of hunks) {
       mark(here.x, Math.min(here.y, height - 1));
       mark(here.x + Math.max(here.width, 1) - 1, Math.min(here.y + Math.max(here.height, 1) - 1, height - 1));
     }
@@ -117,7 +117,7 @@ export function diffImages(current: RawImage, golden: RawImage): { readonly diff
     diff: {
       current: { width, height },
       golden: { width: golden.width, height: golden.height },
-      regions,
+      hunks,
       changedPixels,
       movedPixels,
       spacingPixels,
