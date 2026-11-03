@@ -1,6 +1,6 @@
 # Sync
 
-> Status: built, between a client and any server that mounts the routes. Nothing deployed mounts them yet, and they've only run on local stores with a stand-in for GitHub. See `## Future`.
+> Status: built, between a client and any server that mounts the routes. Nothing deployed mounts them yet. They've run on local stores, and inside workerd on its local D1 and R2, always with a stand-in for GitHub. See `## Future`.
 >
 > - Owns moving runs, images, decisions, and goldens between stores, and the routes and commands that do it. `docs/specs/snapshots.md` owns what each store does with them, `docs/specs/access.md` who may ask, and `docs/specs/system.md` where cloud data lives.
 
@@ -15,7 +15,7 @@
 
 ## Routes
 
-Source of truth: `ui/src/server/sync.ts`, exported as `selfie-ui/sync`, and `ui/src/shared/sync-api.ts`, as `selfie-ui/sync-api`, for what crosses the wire; tests in `cli/test/sync-routes.test.ts`, on a real store with a stand-in for GitHub.
+Source of truth: `ui/src/server/sync.ts`, exported as `selfie-ui/sync`, and `ui/src/shared/sync-api.ts`, as `selfie-ui/sync-api`, for what crosses the wire; tests in `cli/test/sync-routes.test.ts`, on a real store with a stand-in for GitHub, and `ui/test/workerd/sync.workerd.test.ts`, inside workerd.
 
 To mount under `/api`. `GET /repositories/:owner/:name` finds a repository's project. The rest are under `/projects/:project`, where `:project` is the repository's numeric ID (`docs/specs/access.md` → GitHub App). Every one is JSON but an image's bytes.
 
@@ -97,7 +97,7 @@ A push sends a run's goldens if it's accepted locally, or `--accept` asks for th
 
 ## Future
 
-**Scope: cloud-deploy** mounts the routes, and **Scope: github-access** answers the seam, both defined in `docs/specs/system.md` → Build order.
+**Scope: cloud-deploy** mounts the routes, and **Scope: github-access** answers the seam, both defined in `docs/specs/system.md` → Build order. **A real client's push can't reach a Worker until cloud-deploy gives it a WebP codec** (`docs/specs/store.md` → A Worker reading a WebP), since a client sends what its store keeps, and a Worker refuses WebP with `bad-image`.
 
 ### At scale
 

@@ -1,0 +1,10 @@
+// Checks the tests that run inside workerd, with the Workers runtime's types and no Node types.
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2023"],
+    "types": ["@cloudflare/workers-types", "@cloudflare/vitest-plugin/types"]
+  },
+  "include": ["test/workerd"],
+  "exclude": []
+}
