@@ -2,6 +2,7 @@
 import { isDecidable } from "selfie-store";
 import type { DecisionTarget, SnapshotRow } from "../shared/api.ts";
 import { isLayoutOnly } from "../shared/regions.ts";
+import { plural } from "./plural.ts";
 
 export const SHOW_OPTIONS = [
   ["all", "All differences"],
@@ -47,13 +48,16 @@ function inShow(row: SnapshotRow, show: Show): boolean {
 }
 
 /** Every word of the text must appear in the story's ID, in any order, ignoring case. */
+export function matchesText(story: string, text: string): boolean {
+  const lowered = story.toLowerCase();
+  return text.toLowerCase().split(/\s+/).filter(Boolean).every((word) => lowered.includes(word));
+}
+
+/** Where a story is in what's shown, in words. */
+export const positionWords = (at: number, shown: number) => (at === -1 ? `Not in this filter, which shows ${plural(shown, "other")}` : `${at + 1} of ${shown}`);
+
 export function applyFilter(rows: readonly SnapshotRow[], { text, show }: RowFilter): SnapshotRow[] {
-  const words = text.toLowerCase().split(/\s+/).filter(Boolean);
-  return rows.filter((row) => {
-    if (!inShow(row, show)) return false;
-    const story = row.story.toLowerCase();
-    return words.every((word) => story.includes(word));
-  });
+  return rows.filter((row) => inShow(row, show) && matchesText(row.story, text));
 }
 
 /** What these rows have to decide on. */
@@ -66,15 +70,15 @@ export const targetsOf = (rows: readonly SnapshotRow[]): DecisionTarget[] =>
  * The shown rows on either side of a story, by position in `all`, so a story a decision just took
  * out of the filter still has neighbors.
  */
-export function neighbors(
-  all: readonly SnapshotRow[],
-  shown: readonly SnapshotRow[],
+export function neighbors<Row extends { readonly story: string }>(
+  all: readonly Row[],
+  shown: readonly Row[],
   story: string,
-): { readonly previous: SnapshotRow | null; readonly next: SnapshotRow | null } {
+): { readonly previous: Row | null; readonly next: Row | null } {
   const position = new Map(all.map((row, index) => [row.story, index]));
   const here = position.get(story) ?? -1;
-  let previous: SnapshotRow | null = null;
-  let next: SnapshotRow | null = null;
+  let previous: Row | null = null;
+  let next: Row | null = null;
   for (const row of shown) {
     const at = position.get(row.story) ?? -1;
     if (at < here) previous = row;

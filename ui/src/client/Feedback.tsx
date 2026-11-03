@@ -64,7 +64,7 @@ export function NewerRunBanner({ latestRunId, runId, story }: { readonly latestR
 }
 
 /** Nothing at all with no notes and no agent waiting, so a person who isn't using an agent never sees it. */
-export function FeedbackBar({ feedback, runId, showList }: { readonly feedback: FeedbackState; readonly runId: string; readonly showList: boolean }) {
+export function FeedbackBar({ feedback, storyHref, showList }: { readonly feedback: FeedbackState; readonly storyHref: (story: string) => string; readonly showList: boolean }) {
   const { view, error, clearError, send } = feedback;
   const [text, setText] = useState<string | null>(null);
   const notes = (view?.notes ?? []).filter(isOpenNote);
@@ -96,7 +96,7 @@ export function FeedbackBar({ feedback, runId, showList }: { readonly feedback: 
           {notes.map(({ id, story, state, messages }) => (
             <li key={id}>
               <NoteLabel state={state} />
-              <AppLink href={storyPath(runId, story, "")}>{story}</AppLink>
+              <AppLink href={storyHref(story)}>{story}</AppLink>
               <span className="selfie-muted selfie-note-preview">{messages.at(-1)?.text}</span>
             </li>
           ))}

@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { isDecidable } from "selfie-store";
 import type { DecisionKind, PixelDiff, RunView, SnapshotRow } from "../shared/api.ts";
 import { diffImageUrl, fetchDiff, imageUrl } from "./api.ts";
-import { applyFilter, neighbors, parseFilter, targetsOf } from "./filter.ts";
+import { applyFilter, neighbors, parseFilter, positionWords, targetsOf } from "./filter.ts";
 import { useFetched, useHotkeys, useRegionSelection, useTitle, type FeedbackState, type RunState } from "./hooks.ts";
 import { ImageCompare } from "./ImageCompare.tsx";
 import { Keys } from "./Keys.tsx";
@@ -99,7 +99,50 @@ function Notes({ row, diff }: { row: SnapshotRow; diff: PixelDiff | null }) {
   );
 }
 
-export function DetailScreen({ state, view, story, search, feedback }: { state: RunState; view: RunView; story: string; search: string; feedback: FeedbackState }) {
+/** Where the keys go on a story that's part of something larger than its run. By default, its run's list. */
+export interface StoryNavigation {
+  readonly previous: string | null;
+  readonly next: string | null;
+  readonly list: string;
+  readonly position: string;
+}
+
+/** Where this story is, and the way to the ones either side of it. */
+export function StoryPager({ previous, next, position }: Pick<StoryNavigation, "previous" | "next" | "position">) {
+  const go = (href: string | null) => {
+    if (href !== null) navigate(href, { replace: true });
+  };
+  return (
+    <>
+      <Text className="selfie-muted">{position}</Text>
+      <Button onClick={() => go(previous)} disabled={previous === null} trailingVisual={() => <Keys keys="k" />}>
+        Previous
+      </Button>
+      <Button onClick={() => go(next)} disabled={next === null} trailingVisual={() => <Keys keys="j" />}>
+        Next
+      </Button>
+    </>
+  );
+}
+
+export function DetailScreen({
+  state,
+  view,
+  story,
+  search,
+  feedback,
+  navigation,
+  liveStories,
+}: {
+  state: RunState;
+  view: RunView;
+  story: string;
+  search: string;
+  feedback: FeedbackState;
+  navigation?: StoryNavigation;
+  /** Whether the live stories are open, if it's kept above this screen, which a new run starts afresh. */
+  liveStories?: readonly [boolean, (open: boolean) => void];
+}) {
   const { unchanged, loadUnchanged } = state;
   const filter = useMemo(() => parseFilter(search), [search]);
   const inRows = view.rows.find((candidate) => candidate.story === story);
@@ -111,21 +154,24 @@ export function DetailScreen({ state, view, story, search, feedback }: { state: 
   const all = filter.show === "unchanged" ? (unchanged ?? []) : view.rows;
   const shown = useMemo(() => applyFilter(all, filter), [all, filter]);
   const row = inRows ?? unchanged?.find((candidate) => candidate.story === story) ?? null;
-  const { previous, next } = useMemo(() => neighbors(all, shown, story), [all, shown, story]);
-  const position = shown.findIndex((candidate) => candidate.story === story);
+  const { previous: previousRow, next: nextRow } = useMemo(() => neighbors(all, shown, story), [all, shown, story]);
+  const hrefOf = (target: SnapshotRow | null) => (target === null ? null : storyPath(view.run.id, target.story, search));
+  const { previous, next, list: listHref, position } = navigation ?? {
+    previous: hrefOf(previousRow),
+    next: hrefOf(nextRow),
+    list: runPath(view.run.id, search),
+    position: positionWords(shown.findIndex((candidate) => candidate.story === story), shown.length),
+  };
 
   const [helpOpen, setHelpOpen] = useState(false);
   const [message, setMessage] = useState("");
   // Here, so that it stays as it is from story to story, like how someone's looking at the images.
-  const [liveOpen, setLiveOpen] = useState(false);
+  const ownLiveOpen = useState(false);
+  const [liveOpen, setLiveOpen] = liveStories ?? ownLiveOpen;
 
-  const go = useCallback(
-    (target: SnapshotRow | null) => {
-      if (target !== null) navigate(storyPath(view.run.id, target.story, search), { replace: true });
-    },
-    [view.run.id, search],
-  );
-  const listHref = runPath(view.run.id, search);
+  const go = useCallback((href: string | null) => {
+    if (href !== null) navigate(href, { replace: true });
+  }, []);
 
   // Its review's stats, if they're still on disk, and otherwise computed from the store.
   const changedPair = row?.state === "changed" && row.imageHash !== null && row.goldenHash !== null;
@@ -137,18 +183,20 @@ export function DetailScreen({ state, view, story, search, feedback }: { state: 
   const groups = useMemo(() => (diff === null ? [] : groupRegions(diff.regions, mergeDistance)), [diff, mergeDistance]);
   const selection = useRegionSelection(story);
 
-  // The next story's images are likely wanted within seconds, so have them ready.
+  // The next story's images are likely wanted within seconds, so have them ready. Across many runs,
+  // what comes next isn't in this one, so it just loads when it's asked for.
+  const preloading = navigation === undefined ? nextRow : null;
   useEffect(() => {
-    if (next === null) return;
+    if (preloading === null) return;
     const urls = [
-      next.imageHash === null ? null : imageUrl(next.imageHash),
-      next.goldenHash === null ? null : imageUrl(next.goldenHash),
-      next.state === "changed" && next.imageHash !== null && next.goldenHash !== null ? diffImageUrl(next.imageHash, next.goldenHash) : null,
+      preloading.imageHash === null ? null : imageUrl(preloading.imageHash),
+      preloading.goldenHash === null ? null : imageUrl(preloading.goldenHash),
+      preloading.state === "changed" && preloading.imageHash !== null && preloading.goldenHash !== null ? diffImageUrl(preloading.imageHash, preloading.goldenHash) : null,
     ];
     for (const url of urls) {
       if (url !== null) new Image().src = url;
     }
-  }, [next]);
+  }, [preloading]);
 
   const decide = async (decision: DecisionKind) => {
     if (row === null || state.busy) return;
@@ -170,7 +218,7 @@ export function DetailScreen({ state, view, story, search, feedback }: { state: 
     a: () => void decide("approved"),
     r: () => void decide("rejected"),
     u: () => navigate(listHref),
-    l: () => setLiveOpen((open) => !open),
+    l: () => setLiveOpen(!liveOpen),
     "?": () => setHelpOpen(true),
   });
 
@@ -192,13 +240,7 @@ export function DetailScreen({ state, view, story, search, feedback }: { state: 
           <AriaStatus className="selfie-muted">{message}</AriaStatus>
         </Stack>
         <Stack direction="horizontal" align="center" gap="condensed">
-          <Text className="selfie-muted">{position === -1 ? `Not in this filter, which shows ${plural(shown.length, "other")}` : `${position + 1} of ${shown.length}`}</Text>
-          <Button onClick={() => go(previous)} disabled={previous === null} trailingVisual={() => <Keys keys="k" />}>
-            Previous
-          </Button>
-          <Button onClick={() => go(next)} disabled={next === null} trailingVisual={() => <Keys keys="j" />}>
-            Next
-          </Button>
+          <StoryPager previous={previous} next={next} position={position} />
           <Button variant="invisible" onClick={() => setHelpOpen(true)} trailingVisual={() => <Keys keys="?" />}>
             Shortcuts
           </Button>
@@ -258,7 +300,7 @@ export function DetailScreen({ state, view, story, search, feedback }: { state: 
         />
       )}
       <Notes row={row} diff={diff} />
-      <LiveStories row={row} view={view} open={liveOpen} onToggle={() => setLiveOpen((open) => !open)} />
+      <LiveStories row={row} view={view} open={liveOpen} onToggle={() => setLiveOpen(!liveOpen)} />
       <ImageCompare row={row} diff={diff} scale={view.run.scale} groups={groups} selection={selection} runId={view.run.id} feedback={feedback} />
       {helpOpen && <ShortcutsDialog onClose={() => setHelpOpen(false)} />}
     </Stack>

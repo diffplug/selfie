@@ -22,4 +22,6 @@
 | **Snapshot state** | How a run's snapshot compares with the baseline's goldens: unchanged, changed, new, removed, or failed (`docs/specs/snapshots.md`). |
 | **Project** | One GitHub repository's cloud snapshot data, held in its own D1 database. Exists once the GitHub App is installed on that repository (`docs/specs/access.md`). |
 | **Store** | One place that holds images, their metadata, and Storybook builds: a local store on a machine, or a project's cloud store. |
+| **Capture** | One story's image from one run. A story's newest capture is the one from the newest finished run at HEAD that has it (`docs/specs/ui.md` → Screens). |
+| **Hosted Storybook** | The Storybook `selfie ui` serves on an origin of its own: the built directory, and each kept build (`docs/specs/access.md` → Local review server). |
 | **Storybook build** | A built Storybook, named by the hash of its files, and kept so a run's stories can still be opened (`docs/specs/store.md` → Storybook builds). |

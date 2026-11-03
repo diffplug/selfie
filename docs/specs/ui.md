@@ -37,6 +37,7 @@ Source of truth: `ReviewSource` in `ui/src/shared/api.ts`.
 | Method | Returns |
 |---|---|
 | `current()` | HEAD, the newest finished run there, whether it has only unfinished ones, and the baseline search if there's no run to open |
+| `storiesView()` | Every story of the hosted Storybook, each with its newest capture at HEAD ([Every story](#screens)) |
 | `runView(runId)` | A `RunView` ([Recomputing](#recomputing)) |
 | `baseline(runId)` | The baseline search of a run's environment, for a screen saying why it has none |
 | `unchanged(runId)` | The run's unchanged rows |
@@ -57,6 +58,7 @@ Source of truth: `ui/src/server/app.ts`; tests in `cli/test/ui.test.ts`.
 | Route | Does |
 |---|---|
 | `GET /api/current` | `current()` |
+| `GET /api/stories` | `storiesView` |
 | `GET /api/runs/:id` | `runView` |
 | `GET /api/runs/:id/baseline` | `baseline` |
 | `GET /api/runs/:id/unchanged` | `{ rows }` |
@@ -103,7 +105,7 @@ Source of truth: `localReviewSource` in `cli/src/ui.ts`, `useRun` in `ui/src/cli
 ## Which run
 
 - **Must open `/` at the newest finished run at HEAD in the project's environment.** A run still recording, or crashed, is listed and can't be opened (`docs/specs/snapshots.md` → Crashes and retries).
-- **Must say when a newer run exists at the viewed run's commit.**
+- **Must say when a newer run exists at the viewed run's commit, on a run's own screens.** On [every story](#screens), an older run is what's newest for that story.
 
 ## Screens
 
@@ -115,6 +117,8 @@ Source of truth: `ui/src/client/`.
 | `/runs/:id` | The run |
 | `/runs/:id/stories/:story` | One snapshot, in the filter from the query |
 | `/runs/:id/accept` | Accepting |
+| `/stories` | Every story |
+| `/stories/:story` | One story, whichever run its newest capture is from |
 
 **The run** shows, in order: its commit, run ID, whether its pixels were rendered earlier and by which run, dirty state, baseline, environment, and decision actor; a warning if it was recorded dirty, has no baseline, is shown against branch goldens (`docs/specs/cli.md` → Review), or its SHA can't be a baseline; the counts; blockers; advisories; and the differences.
 
@@ -147,6 +151,14 @@ Source of truth: `ui/src/client/`.
 - **Must say when a changed snapshot is only moves and spacing, in the list, the pixel stats, and a banner, and that it still needs a decision**, and offer those as a filter of the list, so they can be approved together (rationale).
 - **Must say what the diff image's colors mean wherever it has more than one.**
 - **Must not offer a decision on what has no image to decide on.**
+
+**Every story** is the hosted Storybook's stories, each with its newest capture from the runs [`/` would choose from](#which-run), so several partial runs read as one (rationale). A story's page is that capture's run's, as it would be from that run's own review.
+
+- **Must list a story nothing has captured, show it running, and say how to capture it**, since it's still a real story to look at.
+- **Must never read a story a filtered run left out as removed**, through `newestCaptures` in `selfie-store`. It takes that story from an older run, or else lists it as not captured.
+- **Must say when a capture is from uncommitted changes, or known to be from another build than the one hosted**, since a capture is whichever is newest, not whichever is reliable.
+- **Must leave out a story the hosted build no longer has**, and with no build at all, list only what's been captured, and say so.
+- **Must move next and previous through every story**, not through that story's run. Decisions go to the run that captured the image, and accepting stays a thing one run does.
 
 **Accepting** shows, in plain words, every refusal `accept` would give, and what to do about it.
 
@@ -207,7 +219,7 @@ Source of truth: `ui/src/client/*.stories.tsx`, `ui/src/client/stories/fixtures.
 
 **Scope: cloud-deploy** is defined in `docs/specs/system.md` → Build order. What it must do first, since the local UI needs none of it:
 
-1. **Move the review rules into platform-free code, and narrow `ReviewSource` to platform facts.** A hosted source needs a branch's commits as one of those facts to offer branch goldens, or it offers none. A Worker can't load `selfie-cli`, which reaches Git, Docker, and the filesystem, and today `summarizeRun`, `checkAccept`, and diffing live there, and `localReviewSource` applies them. `filterStories`, which `summarizeRun` calls, has to move out of `selfie-render` for that. `isDecidable` has moved already.
+1. **Move the review rules into platform-free code, and narrow `ReviewSource` to platform facts.** `storiesView` is the newest such rule that needs moving, beyond `newestCaptures` itself. A hosted source needs a branch's commits as one of those facts to offer branch goldens, or it offers none. A Worker can't load `selfie-cli`, which reaches Git, Docker, and the filesystem, and today `summarizeRun`, `checkAccept`, and diffing live there, and `localReviewSource` applies them. `filterStories`, which `summarizeRun` calls, has to move out of `selfie-render` for that. `isDecidable` has moved already.
 2. **Make the source a per-request factory, `(context) => ReviewSource`, with a client base path.** A hosted service has many projects and viewers, where `createLocalApp` has one project for its whole life, and a client that always asks at `/api`.
 3. **Fit the Worker's budget.** The shared D1 limit is 1,200 requests per 5 minutes. One approve-and-next is 10 requests as measured on the local adapter: 6 for the decision (read the run, compare, write, compare, read whose goldens these are, list the commit's runs), and 4 lookups for the next story's two images and its diff. That's 120 stories per 5 minutes, for every reviewer of every project, down from 15 requests and 80 stories before the comparisons were reduced. What gets it to about 3:
    - no D1 lookup per image, since a content address needs none before reading R2
@@ -224,5 +236,6 @@ Also its own guard in place of `loopbackHosts`, keeping `sameOriginWrites` and `
 - Rendering from the UI. A reviewer runs `selfie review` and looks at the result.
 - A way to clear a decision. One can be replaced, and a run can be reviewed again, but `Snapshots.decide` has no way to remove one.
 - Finding runs at other commits. `/runs/:id` opens any of them, and `selfie ui <run>` prints that URL, but nothing lists them: `runs` has no index that would serve it without a scan.
+- Keeping how someone's looking at the images when the next story's capture is from another run, since each run's page is its own, and it reads that run again. The live stories do stay as they were.
 - Sorting the list by size of change.
 - A hosted Storybook in the cloud (**Scope: cloud-deploy**), where its origin needs the same separation, and a build needs uploading.

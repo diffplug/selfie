@@ -1,10 +1,12 @@
 // The review UI's window on a local repository: the library, as the shape its routes want. Nothing
 // here renders, so the UI only reads what `selfie review` recorded and records decisions on it.
-import type { Comparison, DecisionKind, Run } from "selfie-store";
+import { newestCaptures, type Comparison, type DecisionKind, type Run } from "selfie-store";
+import { stat } from "node:fs/promises";
 import path from "node:path";
 import { isBuiltStorybook } from "selfie-ui/local";
 import { keptBuildPath } from "selfie-ui/api";
-import type { AcceptOutcome, CurrentView, DecisionTarget, FeedbackView, NewNote, ReviewSource, RunView, SnapshotRow, StorybookLink } from "selfie-ui/app";
+import { buildHash, readStoryIndex } from "selfie-render";
+import type { AcceptOutcome, CurrentView, DecisionTarget, FeedbackView, NewNote, ReviewSource, RunView, SnapshotRow, StoriesView, StorybookLink } from "selfie-ui/app";
 import { resolveCaptureSettings, resolveRegionMergeDistance } from "./config.ts";
 import { accept, checkAccept, decide } from "./decisions.ts";
 import { diffToPng, type PixelDiff } from "./diff.ts";
@@ -12,7 +14,7 @@ import { SelfieError } from "./errors.ts";
 import { gitUserEmail, type BaselineSearch } from "./git.ts";
 import { isOpenNote } from "selfie-ui/notes";
 import { sentNotes, textForAgent } from "./notes.ts";
-import { branchGoldens, compareAsReviewed, findBaseline, readReviewCache, requireRun, runsAtHead, type Project } from "./project.ts";
+import { branchGoldens, compareAsReviewed, compareAsShown, findBaseline, readReviewCache, requireRun, runsAtHead, type Project } from "./project.ts";
 import { summarizeRun } from "./summary.ts";
 
 /** Each is about 20 KB of PNG. This is a reviewer going back and forth, not a cache of a run. */
@@ -25,6 +27,15 @@ export function localReviewSource(
   { native, storybook }: { readonly native?: boolean | undefined; readonly storybook?: { readonly dir: string; readonly url: string } | undefined } = {},
 ): ReviewSource {
   const { snapshots, store, repo } = project;
+
+  /** Hashing a whole build is too slow for every read of a page, and a rebuild rewrites these. */
+  let knownBuild: { readonly stamp: string; readonly hash: Promise<string | null> } | null = null;
+  const hostedBuild = async (dir: string): Promise<string | null> => {
+    const times = await Promise.all(["iframe.html", "index.json"].map((file) => stat(path.join(dir, file)).then(({ mtimeMs }) => mtimeMs, () => null)));
+    const stamp = times.join();
+    if (knownBuild?.stamp !== stamp) knownBuild = { stamp, hash: buildHash(dir) };
+    return knownBuild.hash;
+  };
 
   const keptStorybookUrl = async (runId: string): Promise<string | null> => {
     const kept = storybook === undefined ? null : await project.builds.keptBuildOfRun(runId);
@@ -146,6 +157,55 @@ export function localReviewSource(
 
     runView: async (runId) => viewOf(await compareAsReviewed(project, runId), await gitUserEmail(repo)),
 
+    async storiesView(): Promise<StoriesView> {
+      const settings = await resolveCaptureSettings(repo, { native });
+      const { head, runs } = await runsAtHead(project, settings.environmentId);
+      const finished = runs.filter(({ status }) => status !== "recording");
+      const built = storybook !== undefined && isBuiltStorybook(storybook.dir);
+      const index = built ? await readStoryIndex(storybook.dir) : [];
+      const hosted = built ? await hostedBuild(storybook.dir) : null;
+
+      // Runs at one commit all find the same goldens on its branch, and finding them takes Git.
+      let onBranch: Promise<string | null> | undefined;
+      const rowsOf = async (run: Run) => {
+        const against = run.baselineSha ?? (await (onBranch ??= branchGoldens(project, run)));
+        return (await compareAsShown(project, run, against)).snapshots;
+      };
+      const captures = await newestCaptures(finished, rowsOf, index.length > 0 ? new Set(index.map(({ id }) => id)) : undefined);
+
+      const builds = new Map<string, string | null>();
+      const buildOf = async (runId: string) => {
+        if (!builds.has(runId)) builds.set(runId, await project.builds.buildOfRun(runId));
+        return builds.get(runId)!;
+      };
+      const ids = index.length > 0 ? index.map(({ id }) => id) : [...captures.keys()].sort();
+      return {
+        head,
+        storybookUrl: built ? storybook.url : null,
+        viewport: settings.environment.viewport,
+        stories: await Promise.all(
+          ids.map(async (story) => {
+            const found = captures.get(story);
+            if (found === undefined) return { story, capture: null };
+            const { run, row } = found;
+            const build = await buildOf(run.id);
+            return {
+              story,
+              capture: {
+                runId: run.id,
+                state: row.state,
+                decision: row.decision,
+                capturedAt: run.startedAt,
+                dirty: run.dirty,
+                fromHostedBuild: hosted === null || build === null ? null : build === hosted,
+              },
+            };
+          }),
+        ),
+        newestRunId: finished[0]?.id ?? null,
+      };
+    },
+
     async current(): Promise<CurrentView> {
       const { environmentId: environment } = await resolveCaptureSettings(repo, { native });
       const { head, runs } = await runsAtHead(project, environment);
@@ -165,7 +225,7 @@ export function localReviewSource(
 
     async unchanged(runId) {
       const run = await requireRun(project, runId);
-      const { snapshots: compared } = await snapshots.compareRun(runId, (await branchGoldens(project, run)) ?? run.baselineSha, { includeUnchanged: true });
+      const { snapshots: compared } = await compareAsShown(project, run);
       return toRows(
         runId,
         compared.filter(({ state }) => state === "unchanged"),

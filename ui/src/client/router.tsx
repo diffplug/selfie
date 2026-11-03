@@ -7,15 +7,28 @@ export type Route =
   | { readonly kind: "run"; readonly runId: string }
   | { readonly kind: "story"; readonly runId: string; readonly story: string }
   | { readonly kind: "accept"; readonly runId: string }
+  | { readonly kind: "stories" }
+  | { readonly kind: "anyStory"; readonly story: string }
   | { readonly kind: "missing" };
 
 export const runPath = (runId: string, query = "") => `/runs/${runId}${query}`;
 export const storyPath = (runId: string, story: string, query = "") =>
   `/runs/${runId}/stories/${encodeURIComponent(story)}${query}`;
 export const acceptPath = (runId: string) => `/runs/${runId}/accept`;
+export const storiesPath = (query = "") => `/stories${query}`;
+export const anyStoryPath = (story: string, query = "") => `/stories/${encodeURIComponent(story)}${query}`;
 
 export function parseRoute(pathname: string): Route {
   if (pathname === "/") return { kind: "home" };
+  if (pathname === "/stories") return { kind: "stories" };
+  const listed = /^\/stories\/([^/]+)$/.exec(pathname);
+  if (listed !== null) {
+    try {
+      return { kind: "anyStory", story: decodeURIComponent(listed[1]!) };
+    } catch {
+      return { kind: "missing" };
+    }
+  }
   const [, runs, runId, section, story, ...rest] = pathname.split("/");
   if (runs !== "runs" || runId === undefined || runId === "" || rest.length > 0) return { kind: "missing" };
   if (section === undefined) return { kind: "run", runId };

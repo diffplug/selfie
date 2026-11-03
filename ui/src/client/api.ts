@@ -14,6 +14,7 @@ import {
   type RunView,
   type SendVia,
   type SnapshotRow,
+  type StoriesView,
 } from "../shared/api.ts";
 
 /** What went wrong, in words a screen can show. `code` tells the cases apart. */
@@ -59,6 +60,7 @@ export const postDecision = (runId: string, decision: DecisionKind, snapshots: r
 export const postAccept = (runId: string, removedSeen: number | undefined) =>
   post<AcceptOutcome>(`${runRoute(runId)}/accept`, removedSeen === undefined ? {} : { removedSeen });
 
+export const fetchStories = (signal: AbortSignal) => request<StoriesView>("/stories", { signal });
 export const fetchFeedback = (signal: AbortSignal) => request<FeedbackView>("/feedback", { signal });
 export const postNote = (note: NewNote) => post<FeedbackView>("/notes", note);
 export const postSendNotes = (via: SendVia) => post<{ readonly feedback: FeedbackView; readonly text: string }>("/notes/send", { via });

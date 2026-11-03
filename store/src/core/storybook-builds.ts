@@ -110,10 +110,15 @@ export class StorybookBuilds {
     return row === undefined ? null : { width: row.width as number, height: row.height as number };
   }
 
-  /** The build that rendered a run, if it's known and kept here. */
-  async keptBuildOfRun(runId: string): Promise<string | null> {
+  /** The build that rendered a run, if that's known. */
+  async buildOfRun(runId: string): Promise<string | null> {
     const [row] = await this.#sql.run({ sql: "SELECT build FROM run_builds WHERE run_id = ?1", params: [runId], idempotent: true });
-    const build = (row?.build as string | undefined) ?? null;
+    return (row?.build as string | undefined) ?? null;
+  }
+
+  /** The build that rendered a run, if that's known and kept here. */
+  async keptBuildOfRun(runId: string): Promise<string | null> {
+    const build = await this.buildOfRun(runId);
     return build !== null && (await this.has(build)) ? build : null;
   }
 }

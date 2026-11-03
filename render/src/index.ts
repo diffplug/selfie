@@ -15,5 +15,5 @@ export {
   type ManifestStory,
   type ManifestTotals,
 } from "./manifest.ts";
-export { filterStories, RenderError, unmatchedPatternWarning, type StoryEntry } from "./storybook.ts";
+export { filterStories, readStoryIndex, RenderError, unmatchedPatternWarning, type StoryEntry } from "./storybook.ts";
 export type { StoryError, WorkerRuntime } from "./worker/protocol.ts";
