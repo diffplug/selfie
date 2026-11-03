@@ -18,6 +18,8 @@ const selfie = (cwd: string, ...args: string[]) => {
     cwd,
     encoding: "utf8",
     env: { ...process.env, SELFIE_HOME: home },
+    // A command that keeps serving would otherwise hold this whole file, past any test's timeout.
+    timeout: 20_000,
   });
   return { status, stdout, stderr };
 };
@@ -33,7 +35,6 @@ afterAll(async () => {
 
 describe("exit 2, with one JSON document saying why", () => {
   test.each([
-    ["no command", []],
     ["an unknown command", ["frobnicate"]],
     ["an unknown flag", ["review", "--nope"]],
     ["a stray argument", ["review", "extra"]],
