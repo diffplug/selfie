@@ -3,7 +3,7 @@ import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
 import { fetchCurrent } from "./api.ts";
 import { AcceptScreen } from "./AcceptScreen.tsx";
 import { DetailScreen } from "./DetailScreen.tsx";
-import { FeedbackBar } from "./Feedback.tsx";
+import { FeedbackBar, NewerRunBanner } from "./Feedback.tsx";
 import { useFeedback, useFetched, useRun, useTitle } from "./hooks.ts";
 import { AppLink, navigate, parseRoute, runPath, useLocation, type Route } from "./router.tsx";
 import { RunScreen } from "./RunScreen.tsx";
@@ -32,6 +32,10 @@ function RunRoutes({ runId, route, search }: { runId: string; route: Route; sear
   if (route.kind === "story") lastStory.current = route.story;
   return (
     <>
+      {/* The run's screen has its own banner for the newest at its commit, so this one isn't said twice. */}
+      {(route.kind !== "run" || feedback.view?.latestRunId !== state.view.siblings.find(({ status }) => status !== "recording")?.id) && (
+        <NewerRunBanner latestRunId={feedback.view?.latestRunId} runId={runId} story={route.kind === "story" ? route.story : null} />
+      )}
       <FeedbackBar feedback={feedback} runId={runId} showList={route.kind === "run"} />
       {route.kind === "story" ? (
         <DetailScreen state={state} view={state.view} story={route.story} search={search} feedback={feedback} />

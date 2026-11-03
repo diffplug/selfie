@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { AcceptRefusal, DecisionKind, DecisionTarget, FeedbackView, NewNote, RunView, SendVia, SnapshotRow } from "../shared/api.ts";
-import { deleteNote, fetchFeedback, fetchRun, fetchUnchanged, postAccept, postDecision, postNote, postSendNotes, RequestError } from "./api.ts";
+import { deleteNote, fetchFeedback, fetchRun, fetchUnchanged, postAccept, postAnswer, postDecision, postNote, postResolve, postSendNotes, RequestError } from "./api.ts";
 import { reuseRows } from "./filter.ts";
 import { toggled } from "./selection.ts";
 
@@ -132,6 +132,9 @@ export interface FeedbackState {
   /** True if the note was saved. */
   readonly add: (note: NewNote) => Promise<boolean>;
   readonly remove: (id: number) => Promise<void>;
+  /** True if the answer was saved. */
+  readonly answer: (id: number, text: string, runId: string) => Promise<boolean>;
+  readonly resolve: (id: number) => Promise<void>;
   /** The text to paste into an agent, or null if the request failed. */
   readonly send: (via: SendVia) => Promise<string | null>;
 }
@@ -185,6 +188,8 @@ export function useFeedback(): FeedbackState {
     clearError: useCallback(() => setError(null), []),
     add: async (note) => (await act(() => postNote(note), (next) => next)) !== null,
     remove: async (id) => void (await act(() => deleteNote(id), (next) => next)),
+    answer: async (id, text, runId) => (await act(() => postAnswer(id, text, runId), (next) => next)) !== null,
+    resolve: async (id) => void (await act(() => postResolve(id), (next) => next)),
     send: async (via) => (await act(() => postSendNotes(via), ({ feedback }) => feedback))?.text ?? null,
   };
 }

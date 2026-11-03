@@ -167,14 +167,21 @@ export function note(id: number, { text = "This looks a bit quiet next to the he
   };
 }
 
+/** The same note, once an agent has answered it. */
+export function replied(original: Note, text: string): Note {
+  return { ...original, state: "replied", messages: [...original.messages, { id: original.id + 1000, sender: "agent", author: "agent", text, runId: RUN_ID, at: 1, sent: true }] };
+}
+
 /** A folder's notes, with actions that are recorded but change nothing. */
-export function feedbackOf(notes: readonly Note[] = [], overrides: Partial<FeedbackState> = {}, agentWaiting = false): FeedbackState {
+export function feedbackOf(notes: readonly Note[] = [], overrides: Partial<FeedbackState> = {}, agentWaiting = false, latestRunId: string | null = RUN_ID): FeedbackState {
   return {
-    view: { folder: "selfie-hackathon", notes, agentWaiting },
+    view: { folder: "selfie-hackathon", notes, agentWaiting, latestRunId },
     error: null,
     clearError: fn(),
     add: fn(async () => true),
     remove: fn(async () => undefined),
+    answer: fn(async () => true),
+    resolve: fn(async () => undefined),
     send: fn(async () => "Feedback on the Storybook stories in the folder `selfie-hackathon`, as 1 note.\n\nNote 1, on components-button--primary:\nThis looks a bit quiet next to the heading."),
     ...overrides,
   };

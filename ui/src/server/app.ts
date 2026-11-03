@@ -5,6 +5,7 @@ import { Hono, type Context, type MiddlewareHandler } from "hono";
 import { secureHeaders } from "hono/secure-headers";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { imageMediaType, isImageHash } from "selfie-store";
+import { isNoteId, isNoteText, MAX_NOTE_CHARACTERS } from "../shared/notes.ts";
 import { REQUEST_HEADER, REQUEST_HEADER_VALUE, type ApiError, type BoundingBox, type DecisionTarget, type NewNote, type ReviewSource } from "../shared/api.ts";
 
 export type * from "../shared/api.ts";
@@ -111,8 +112,6 @@ function decisionTargets(value: unknown): DecisionTarget[] {
   });
 }
 
-const MAX_NOTE_CHARACTERS = 10_000;
-
 function noteBox(value: unknown): BoundingBox | null {
   if (value === null || value === undefined) return null;
   const { x, y, width, height } = value as Record<string, unknown>;
@@ -123,17 +122,21 @@ function noteBox(value: unknown): BoundingBox | null {
   return { x, y, width, height } as BoundingBox;
 }
 
+function noteText(text: unknown): string {
+  if (!isNoteText(text)) throw new BadRequest(`text must say something, in at most ${MAX_NOTE_CHARACTERS} characters.`);
+  return text;
+}
+
 function newNote({ story, runId, imageHash, box, text }: Record<string, unknown>): NewNote {
   if (typeof story !== "string" || story === "") throw new BadRequest("story must name a story.");
   if (typeof runId !== "string") throw new BadRequest("runId must name a run.");
   if (imageHash !== null && (typeof imageHash !== "string" || !isImageHash(imageHash))) throw new BadRequest("imageHash must be an image hash, or null.");
-  if (typeof text !== "string" || text.trim() === "" || text.length > MAX_NOTE_CHARACTERS) throw new BadRequest(`text must say something, in at most ${MAX_NOTE_CHARACTERS} characters.`);
-  return { story, runId, imageHash, box: noteBox(box), text };
+  return { story, runId, imageHash, box: noteBox(box), text: noteText(text) };
 }
 
 function noteId(value: string): number {
   const id = Number(value);
-  if (!Number.isSafeInteger(id) || id < 1) throw new BadRequest("That isn't a note.");
+  if (!isNoteId(id)) throw new BadRequest("That isn't a note.");
   return id;
 }
 
@@ -184,6 +187,12 @@ export function createReviewApi(source: ReviewSource): Hono {
     if (via !== "agent" && via !== "copy") throw new BadRequest('via must be "agent" or "copy".');
     return context.json(await source.sendNotes(via));
   });
+  api.post("/notes/:id/answers", async (context) => {
+    const { text, runId } = await jsonBody(context);
+    if (typeof runId !== "string") throw new BadRequest("runId must name a run.");
+    return context.json(await source.answerNote(noteId(context.req.param("id")), noteText(text), runId));
+  });
+  api.post("/notes/:id/resolve", async (context) => context.json(await source.resolveNote(noteId(context.req.param("id")))));
   api.delete("/notes/:id", async (context) => context.json(await source.removeNote(noteId(context.req.param("id")))));
 
   api.get("/images/:hash", async (context) => {

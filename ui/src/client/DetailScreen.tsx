@@ -28,6 +28,7 @@ const SHORTCUTS: readonly (readonly [string, string])[] = [
   ["z", "Next zoom: actual size, 1×, 2×, 4×, 8×"],
   ["c", "Center on the region being looked at, or else the change"],
   ["m", "Write a note for your agent"],
+  ["w", "Show the image a note was written on"],
   ["n", "Next region"],
   ["p", "Previous region"],
   ["x", "Select the region being looked at, or the first"],

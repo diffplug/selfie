@@ -16,7 +16,8 @@ Source of truth: `cli/src/cli.ts`, `cli/src/document.ts`; the real binary's test
 | `selfie approve <run>`, `selfie reject <run>` | Records a decision on a run's changed and new images, with `--all` or `--story <pattern>` |
 | `selfie accept <run>` | Makes a run the goldens of its Git SHA |
 | `selfie find-baseline` | Prints the baseline this repository and environment would use |
-| `selfie notes` | Prints the notes a person has sent to an agent from this folder (`docs/specs/feedback.md`) |
+| `selfie notes` | Prints the open notes a person has sent to an agent from this folder (`docs/specs/feedback.md`) |
+| `selfie reply <note> <text>` | Answers a note (`docs/specs/feedback.md`) |
 | `selfie agent-await-feedback` | Blocks until a person sends notes from this folder (`docs/specs/feedback.md`) |
 | `selfie ui [<run>]` | Serves the review UI until stopped, and prints its URL ([ui](#ui)) |
 

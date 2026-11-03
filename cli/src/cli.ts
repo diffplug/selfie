@@ -7,8 +7,9 @@ import { buildAcceptDocument, buildRecordDocument, buildReviewDocument } from ".
 import { SelfieError } from "./errors.ts";
 import { gitUserEmail } from "./git.ts";
 import { compareAsReviewed, findBaseline, openProject, type Project } from "./project.ts";
-import { record, review } from "./review.ts";
+import { record, review, replyToNote } from "./review.ts";
 import { summarizeRun } from "./summary.ts";
+import { isNoteId, isNoteText, MAX_NOTE_CHARACTERS } from "selfie-ui/notes";
 import { awaitFeedback, notesForAgent } from "./notes.ts";
 
 const EXIT_OK = 0;
@@ -50,9 +51,14 @@ const USAGE = `Usage: selfie <command>
       else the newest at HEAD. It shows what's recorded, and never renders. Opens no
       browser by itself.
 
-  notes
-      Prints the notes a person has sent to an agent from this folder's review UI, each with a
-      picture of what it's about. Never their drafts. Each worktree's folder has its own notes.
+  notes [--all]
+      Prints the open notes a person has sent to an agent from this folder's review UI, each with
+      a picture of what it's about, and with --all the resolved ones too. Never their drafts. Each
+      worktree's folder has its own notes.
+
+  reply <note> <text> [--run <run>]
+      Answers a note, on the newest run recorded from this folder if --run doesn't say. Prints
+      whether the note's image changed in that run. Only a person closes a note.
 
   agent-await-feedback [--timeout <seconds>]
       Blocks until a person sends notes from this folder's review UI, and prints them as notes
@@ -242,10 +248,22 @@ async function dispatch(command: string | undefined, args: string[], context: Co
       });
     }
     case "notes": {
-      const { positionals } = parse(args, {});
+      const { values, positionals } = parse(args, { all: { type: "boolean" } });
       noPositionals(command, positionals);
       return withProject(context, async (project) => {
-        printJson(context, await notesForAgent(project));
+        printJson(context, await notesForAgent(project, { all: values.all ?? false }));
+        return EXIT_OK;
+      });
+    }
+    case "reply": {
+      const { values, positionals } = parse(args, { run: { type: "string" } });
+      const [note, text, ...extra] = positionals;
+      const id = Number(note);
+      if (!isNoteId(id) || !isNoteText(text) || extra.length > 0) {
+        throw new SelfieError("usage", `Expected a note number and what to say, in at most ${MAX_NOTE_CHARACTERS} characters: selfie reply 12 "Made it bigger".`);
+      }
+      return withProject(context, async (project) => {
+        printJson(context, await replyToNote(project, id, text, values.run));
         return EXIT_OK;
       });
     }

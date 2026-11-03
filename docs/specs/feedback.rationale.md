@@ -17,3 +17,15 @@
 **Why a heartbeat in the store, and not a socket.** The command and the UI's server are separate processes, and either may start first or not at all. The store is what they already share, and a row that goes stale needs no cleanup when a process dies.
 
 **Why a timeout and a signal each have an exit code.** Some agents can't leave a command running for hours, so they need to tell "nothing yet, ask again" from "something went wrong". A signal means someone wants it to stop, so a loop that asks again on a timeout mustn't ask again on that.
+
+## Answers
+
+**Why only a person closes a note.** It's the same reason moved stories need a decision: the agent is the one claiming it's fixed, so it can't also be the one saying so.
+
+## A new run
+
+**Why no stacking.** Stepping through diffs from run to run raises what each is against, and how to show it, before anyone has needed it. One run, one diff, and one image per note answers "did this get fixed?" with a single flip. Earlier runs are still reachable by URL.
+
+**Why a banner, and not switching.** A person reading an image shouldn't have it change under them because an agent finished. Whether someone actively waiting would rather it switched is an open question for using it.
+
+**Why say when nothing moved.** An agent can sincerely believe it fixed something, when its change didn't reach the story. `imageChanged` tells the agent before it replies, and the note tells the person.

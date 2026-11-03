@@ -8,6 +8,7 @@ import { accept, checkAccept, decide } from "./decisions.ts";
 import { diffToPng, type PixelDiff } from "./diff.ts";
 import { SelfieError } from "./errors.ts";
 import { gitUserEmail, headSha, type BaselineSearch } from "./git.ts";
+import { isOpenNote } from "selfie-ui/notes";
 import { sentNotes, textForAgent } from "./notes.ts";
 import { branchGoldens, compareAsReviewed, findBaseline, readReviewCache, requireRun, type Project } from "./project.ts";
 import { summarizeRun } from "./summary.ts";
@@ -72,6 +73,7 @@ export function localReviewSource(project: Project, { native }: { readonly nativ
     folder: path.basename(repo.root),
     notes: await project.notes.list(),
     agentWaiting: await project.notes.isWaiting(),
+    latestRunId: await project.notes.latestRun(),
   });
 
   const requireActor = async (consequence: string) => {
@@ -94,6 +96,17 @@ export function localReviewSource(project: Project, { native }: { readonly nativ
       return feedback();
     },
 
+    async answerNote(id: number, text: string, runId: string) {
+      await requireRun(project, runId);
+      await project.notes.answer(id, text, await requireActor("this answer wasn't saved"), runId);
+      return feedback();
+    },
+
+    async resolveNote(id: number) {
+      await project.notes.resolve(id);
+      return feedback();
+    },
+
     async sendNotes(via) {
       if (via === "agent" && !(await project.notes.isWaiting())) {
         throw new SelfieError("no-agent-waiting", "The agent stopped waiting, so nothing was sent. Copy these for an agent instead.");
@@ -102,7 +115,7 @@ export function localReviewSource(project: Project, { native }: { readonly nativ
       // The person has what's been sent in hand now, so nobody is waiting for it.
       if (via === "copy") await project.notes.markDelivered();
       const view = await feedback();
-      return { feedback: view, text: textForAgent(sentNotes(view.notes), view.folder) };
+      return { feedback: view, text: textForAgent(sentNotes(view.notes).filter(isOpenNote), view.folder) };
     },
 
     runView: async (runId) => viewOf(await compareAsReviewed(project, runId), await gitUserEmail(repo)),
