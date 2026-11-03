@@ -7,11 +7,11 @@ import { render as realRender, type Manifest, type ManifestStory, type StoryErro
 import { decodeImage } from "selfie-store";
 import { sharpCodec } from "selfie-store/adapters/sharp-codec";
 import { resolveRenderSettings, resolveStorybookDir } from "./config.ts";
-import { diffToPng, type PixelDiff } from "./diff.ts";
-import { SelfieError } from "./errors.ts";
-import { regularFileInside } from "./paths.ts";
+import { diffImages, type PixelDiff } from "./diff.ts";
+import { regularFileInside, storyDirName } from "./paths.ts";
 import type { Project } from "./project.ts";
-import { buildIfAsked } from "./review.ts";
+import { encodePng } from "./png.ts";
+import { buildAsAsked, renderInput, type RecordOptions } from "./review.ts";
 
 /** What can vary about a story from one render to the next, or shouldn't happen in any of them. */
 export type FlakeKind = "pixels" | "failed" | "timeout" | "request" | "errors";
@@ -40,39 +40,28 @@ export interface FlakeReport {
   readonly directory: string;
 }
 
-export interface FlakeOptions {
-  readonly storybookDir?: string | undefined;
-  readonly native?: boolean | undefined;
-  readonly stories?: readonly string[] | undefined;
+export interface FlakeOptions extends RecordOptions {
   readonly runs: number;
   readonly concurrency?: number | undefined;
-  readonly buildCommand?: string | undefined;
-  readonly buildFromConfig?: boolean | undefined;
-  readonly render?: typeof realRender | undefined;
-  readonly signal?: AbortSignal | undefined;
-  readonly log?: ((line: string) => void) | undefined;
 }
 
 const sha256 = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex");
 
-/** Other sources are the project's own code, which is only a flake if it comes and goes. */
-const ALWAYS_WORTH_SAYING: Readonly<Partial<Record<StoryError["source"], FlakeKind>>> = { timeout: "timeout", request: "request" };
-
 function kindsOfErrors(perRender: readonly (readonly StoryError[])[]): { kinds: FlakeKind[]; errors: (StoryError & { renders: number })[] } {
   const seen = new Map<string, StoryError & { renders: number }>();
   for (const errors of perRender) {
-    for (const key of new Set(errors.map((error) => `${error.source}\n${error.message}`))) {
-      const [source, ...message] = key.split("\n");
+    for (const [key, error] of new Map(errors.map((error) => [`${error.source}\n${error.message}`, error]))) {
       const known = seen.get(key);
-      if (known === undefined) seen.set(key, { source: source as StoryError["source"], message: message.join("\n"), renders: 1 });
+      if (known === undefined) seen.set(key, { ...error, renders: 1 });
       else known.renders += 1;
     }
   }
   const errors = [...seen.values()];
   const kinds = new Set<FlakeKind>();
   for (const { source, renders } of errors) {
-    const always = ALWAYS_WORTH_SAYING[source];
-    if (always !== undefined) kinds.add(always);
+    // Waiting on the network always counts. Anything else is the project's own code, which is only
+    // a flake if it comes and goes.
+    if (source === "timeout" || source === "request") kinds.add(source);
     else if (renders < perRender.length) kinds.add("errors");
   }
   return { kinds: [...kinds], errors };
@@ -81,14 +70,14 @@ function kindsOfErrors(perRender: readonly (readonly StoryError[])[]): { kinds: 
 async function compare(
   id: string,
   directory: string,
-  rendered: readonly { readonly render: number; readonly story: ManifestStory }[],
+  rendered: readonly { readonly at: number; readonly story: ManifestStory }[],
 ): Promise<Pick<FlakyStory, "distinctImages" | "worst" | "images">> {
   // The worker can write here, so a manifest's path is checked as a review checks it.
   const images = (
     await Promise.all(
-      rendered.map(async ({ render, story }) => {
+      rendered.map(async ({ at, story }) => {
         if (story.file === null) return [];
-        const checked = await regularFileInside(path.join(directory, String(render)), story.file);
+        const checked = await regularFileInside(path.join(directory, String(at)), story.file);
         if ("refused" in checked) return [];
         const bytes = await readFile(checked.file);
         return [{ file: checked.file, bytes, hash: sha256(bytes) }];
@@ -100,14 +89,14 @@ async function compare(
   if (first === undefined || distinct.length < 2) return { distinctImages: distinct.length, worst: null, images: null };
 
   const firstPixels = await decodeImage(first.bytes, sharpCodec);
-  let worst: { diff: PixelDiff; png: Uint8Array; other: string } | null = null;
+  let worst: (ReturnType<typeof diffImages> & { other: string }) | null = null;
   for (const other of distinct.slice(1)) {
-    const { diff, png } = await diffToPng(await decodeImage(other.bytes, sharpCodec), firstPixels);
-    if (worst === null || diff.changedPixels > worst.diff.changedPixels) worst = { diff, png, other: other.file };
+    const compared = diffImages(await decodeImage(other.bytes, sharpCodec), firstPixels);
+    if (worst === null || compared.diff.changedPixels > worst.diff.changedPixels) worst = { ...compared, other: other.file };
   }
-  const diffFile = path.join(directory, "diffs", `${encodeURIComponent(id)}.png`);
+  const diffFile = path.join(directory, "diffs", `${storyDirName(id)}.png`);
   await mkdir(path.dirname(diffFile), { recursive: true });
-  await writeFile(diffFile, worst!.png);
+  await writeFile(diffFile, await encodePng(worst!.highlighted));
   const { regions: _regions, ...summary } = worst!.diff;
   return { distinctImages: distinct.length, worst: summary, images: { first: first.file, other: worst!.other, diff: diffFile } };
 }
@@ -117,36 +106,22 @@ export async function findFlakes(project: Project, options: FlakeOptions): Promi
   const log = options.log ?? (() => {});
   const render = options.render ?? realRender;
   const settings = await resolveRenderSettings(repo, { native: options.native });
-  if (options.buildFromConfig === true) {
-    if (settings.buildCommand === undefined) throw new SelfieError("usage", "--build runs the config's buildCommand, and selfie.config.json has none.");
-    await buildIfAsked(settings.buildCommand, repo.root, options.signal, log);
-  } else {
-    await buildIfAsked(options.buildCommand, project.cwd, options.signal, log);
-  }
+  await buildAsAsked(project, settings, options, log);
 
   const directory = path.join(project.directory, "flakes");
   await rm(directory, { recursive: true, force: true });
+  const storybookDir = resolveStorybookDir(project.cwd, options.storybookDir, settings);
   const manifests: Manifest[] = [];
   for (let at = 0; at < options.runs; at++) {
     log(`Render ${at + 1} of ${options.runs}`);
-    manifests.push(
-      await render({
-        storybookDir: resolveStorybookDir(project.cwd, options.storybookDir, settings),
-        outDir: path.join(directory, String(at)),
-        environment: settings.environment,
-        log: () => {},
-        ...(options.stories === undefined ? {} : { stories: [...options.stories] }),
-        ...(options.concurrency === undefined ? {} : { concurrency: options.concurrency }),
-        ...(settings.initScript === undefined ? {} : { initScript: settings.initScript }),
-        ...(options.signal === undefined ? {} : { signal: options.signal }),
-      }),
-    );
+    const input = renderInput({ storybookDir, outDir: path.join(directory, String(at)), log: () => {} }, settings, options);
+    manifests.push(await render(options.concurrency === undefined ? input : { ...input, concurrency: options.concurrency }));
   }
 
   const ids = new Set(manifests.flatMap(({ stories }) => stories.map(({ id }) => id)));
   const flaky: FlakyStory[] = [];
   for (const id of ids) {
-    const rendered = manifests.flatMap(({ stories }, render) => stories.filter((story) => story.id === id).map((story) => ({ render, story })));
+    const rendered = manifests.flatMap(({ stories }, at) => stories.filter((story) => story.id === id).map((story) => ({ at, story })));
     const { kinds, errors } = kindsOfErrors(rendered.map(({ story }) => story.errors));
     const compared = await compare(id, directory, rendered);
     if (rendered.some(({ story }) => story.status === "failed")) kinds.unshift("failed");

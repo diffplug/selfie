@@ -47,9 +47,9 @@ const USAGE = `Usage: selfie [--port <n>] [--storybook-dir <dir>] [--native] [--
       time, biggest difference first, with the images to look at. Records no run and stores
       nothing. Exits 0 if every story held still, 1 if any didn't, 2 if it couldn't run.
 
-  skill [<name>]
-      Prints a guide for a coding agent, in the format of an agent skill, or with no name, lists
-      them. selfie skill fix-flakes is how to make every story render the same way every time.
+  skill <name>
+      Prints a guide for a coding agent, in the format of an agent skill. selfie skill fix-flakes
+      is how to make every story render the same way every time.
 
   approve <run> (--all | --story <pattern>...) [--actor <who>]
   reject <run> (--all | --story <pattern>...) [--actor <who>]
@@ -296,12 +296,8 @@ async function dispatch(command: string | undefined, args: string[], context: Co
     case "skill": {
       const { positionals } = parse(args, {});
       const [name, ...extra] = positionals;
-      if (extra.length > 0) throw new SelfieError("usage", "Expected at most one skill name.");
-      const { readSkill, SKILLS } = await import("./skills.ts");
-      if (name === undefined) {
-        printJson(context, { skills: SKILLS });
-        return EXIT_OK;
-      }
+      if (name === undefined || extra.length > 0) throw new SelfieError("usage", "Expected one skill name, such as fix-flakes.");
+      const { readSkill } = await import("./skills.ts");
       context.stdout(await readSkill(name));
       return EXIT_OK;
     }

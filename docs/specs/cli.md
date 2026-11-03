@@ -14,7 +14,7 @@ Source of truth: `cli/src/cli.ts`, `cli/src/document.ts`; the real binary's test
 | `selfie` | Opens every story of a built Storybook, running, to look at, save, and write notes on, or says how to get there ([selfie alone](#selfie-alone)) |
 | `selfie record` | Always renders a built Storybook and records a run, and judges nothing |
 | `selfie flakes` | Renders a built Storybook several times, and prints what wasn't the same each time ([Flakes](#flakes)) |
-| `selfie skill [<name>]` | Prints a guide for a coding agent, or with no name, lists them ([Flakes](#flakes)) |
+| `selfie skill <name>` | Prints a guide for a coding agent ([Flakes](#flakes)) |
 | `selfie review [<run>]` | Prints the diff of a run against its baseline. With no run, uses the one for this built Storybook, and records one [only if necessary](#recording-only-if-necessary) |
 | `selfie approve <run>`, `selfie reject <run>` | Records a decision on a run's changed and new images, with `--all` or `--story <pattern>` |
 | `selfie accept <run>` | Makes a run the goldens of its Git SHA |

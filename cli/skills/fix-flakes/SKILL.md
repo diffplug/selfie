@@ -48,13 +48,13 @@ Most flakes in one Storybook share a few causes, and fixing the biggest usually 
 | What you see | Likely cause | The fix |
 |---|---|---|
 | Huge box, delta near 255, and everything beside or below one element moved | Something's size is decided by timing, like a pane that measures the window as it loads | Give it a fixed size. Look for what reads `innerWidth`, measures on mount, or restores a saved size |
-| Huge box inside one image, frame, or chart, delta near 255 | It wasn't finished at the screenshot. In a play function, the wait ended early | In the play function, wait for the thing itself: an iframe's document having content, an image's `complete`, not a sleep |
+| Huge box over one image, often below the fold, delta near 255 | It wasn't loaded or decoded at the screenshot | Drop `loading="lazy"` and use `decoding="sync"`, at least in a snapshot |
+| Huge box inside something a play function opened | The wait ended before it had content | In the play function, wait for the thing itself, such as an iframe's document having content, not a sleep |
 | A few pixels, delta 1 or 2, exactly at the corners of something | A rounded corner over an image or a scaled layer, antialiased differently from one render to the next | Square that corner, or don't clip an image with it |
-| A few scattered pixels, delta 1 or 2, inside a scaled image | The image decoded asynchronously, or lazily, at a different moment | `decoding="sync"` and no `loading="lazy"`, at least in a snapshot |
 | Text, a date, or a number differs | The current time, a random value, or an ID generated at render | A fixed value in the story's args. The renderer already fixes the page's clock, so look for a server's time or a seeded generator |
 | Something's caught part way through moving | A JavaScript animation or a timer. CSS animations are already stopped | Have the code test `window.__SELFIE_SNAPSHOT__`, which is true before story code runs, or set your own flag in `initScript` in `selfie.config.json` |
 | `errors` with a play message like "not visible" | An assertion that only checks once, while something's still opening | Retry it: `await waitFor(() => expect(canvas.getByRole(...)).toBeVisible())`. `findBy*` retries finding it, and not what you then assert about it |
-| `timeout`: "network not quiet", in every render | A request nobody answers, or a repeating poll | Find it in the story's requests. The render has no network, so stub what's external, and stop any poll in a snapshot |
+| `timeout`: "network not quiet", in every render | A request nobody answers, or a repeating poll. The message names what was in flight | Look at that URL. The render has no network, so stub what's external, and stop any poll in a snapshot |
 | `request` errors | A request leaving the Storybook, which is aborted | Serve it from `staticDirs`, or stub it |
 | `failed` in some renders | A real intermittent crash, or a story near its time limit | Read `errors`. Treat a crash as a bug in the component, not in the story |
 | Only fails with many stories rendering at once | The story depends on timing, and load exposes it | Same fixes. Confirm with `--concurrency 1`, then keep the fix and measure at the default |

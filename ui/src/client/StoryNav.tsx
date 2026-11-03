@@ -173,8 +173,8 @@ export function StorySidebar({ emptyWords, ...tree }: TreeProps & { emptyWords: 
   );
 }
 
-// In numbers, since a named width clamps to its minimum if the window measures small while it loads,
-// which made whole pages differ between renders of the same stories.
+// In numbers, since `width="medium"` came out at 256 or 296 from one render to the next, which moved
+// everything beside it. Why wasn't pinned down: see docs/specs/cli.rationale.md -> Flakes.
 const PANE_WIDTH = { min: "256px", default: "296px", max: "1400px" } as const;
 
 /** Stories at the left and whatever's being looked at on the right, as in Storybook. */

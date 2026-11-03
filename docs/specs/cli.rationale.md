@@ -203,10 +203,10 @@ Without leaving these out, every built Storybook hashed differently and the feat
 
 | Stories | What differed | Cause |
 |---|---|---|
-| 21 | Whole pages, delta 255 | A Primer pane with a named width, clamped to its minimum if the window measured small as it loaded |
+| 21 | Whole pages, delta 255 | A Primer pane with a named width, which came out at 256 or 296. Numbers fixed it. Primer does limit a named width by the window, which is the likely way, but a probe of `innerWidth` on a plain page never read small, so why isn't pinned down |
 | 2 | The network wait, every render | A renderer bug: a directory with no `index.html` was never answered |
-| 1 | One frame, delta 248 | A play function waiting for a frame to exist, not for its content |
-| 7, and more on later measures | 8 to 18 pixels, delta 1, at the corners of images | A rounded corner over a scaled image, and asynchronous decoding |
+| 7, and more on later measures | 8 to 18 pixels, delta 1, at the corners of images | A rounded corner over a scaled image. With the corner squared, these were gone across 6 renders |
+| 2 | One image, below the fold, delta up to 248 | `loading="lazy"` and `decoding="async"`. Putting them back brought these back across 6 renders, while the corners stayed clean |
 | 1 | A play failure, in 2 of 5 renders | `findByRole` retried finding a dialog's text box, and not asserting it's visible |
 
 So the skill says to look at pictures and group first, since working down the list by story would have meant the same fix 21 times. It's why the skill's table is by symptom too.

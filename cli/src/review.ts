@@ -10,6 +10,7 @@ import {
   renderIdentity,
   type Manifest,
   type ManifestStory,
+  type RenderOptions,
   type StoryError,
   unmatchedPatternWarning,
 } from "selfie-render";
@@ -342,6 +343,33 @@ async function replay(
 }
 
 /** Renders the built Storybook. Only a render of every story can answer a later review, so only it is remembered. */
+/** What a render takes from a project's settings and a command's options. */
+export function renderInput(
+  { storybookDir, outDir, log }: { readonly storybookDir: string; readonly outDir: string; readonly log: (line: string) => void },
+  settings: RenderSettings,
+  options: Pick<RecordOptions, "stories" | "signal">,
+): RenderOptions {
+  return {
+    storybookDir,
+    outDir,
+    environment: settings.environment,
+    log,
+    ...(options.stories === undefined ? {} : { stories: [...options.stories] }),
+    ...(settings.initScript === undefined ? {} : { initScript: settings.initScript }),
+    ...(options.signal === undefined ? {} : { signal: options.signal }),
+  };
+}
+
+/** Whatever build was asked for, if one was: the config's from the Git top level, or a given command from here. */
+export async function buildAsAsked(project: Project, settings: RenderSettings, options: Pick<RecordOptions, "buildCommand" | "buildFromConfig" | "signal">, log: (line: string) => void): Promise<void> {
+  if (options.buildFromConfig === true) {
+    if (settings.buildCommand === undefined) throw new SelfieError("usage", "--build runs the config's buildCommand, and selfie.config.json doesn't have one.");
+    await buildIfAsked(settings.buildCommand, project.repo.root, options.signal, log);
+  } else {
+    await buildIfAsked(options.buildCommand, project.cwd, options.signal, log);
+  }
+}
+
 async function renderFresh(
   project: Project,
   renderDir: string,
@@ -354,15 +382,7 @@ async function renderFresh(
     readonly log: (line: string) => void;
   },
 ): Promise<Recording> {
-  const manifest = await render({
-    storybookDir,
-    outDir: renderDir,
-    environment: settings.environment,
-    log,
-    ...(options.stories === undefined ? {} : { stories: [...options.stories] }),
-    ...(settings.initScript === undefined ? {} : { initScript: settings.initScript }),
-    ...(options.signal === undefined ? {} : { signal: options.signal }),
-  });
+  const manifest = await render(renderInput({ storybookDir, outDir: renderDir, log }, settings, options));
   return {
     reusedFromRun: null,
     storyIds: manifest.stories.map(({ id }) => id),
@@ -464,12 +484,7 @@ async function recordBuild(project: Project, options: RecordOptions, { reuse }: 
     // 1. Build. Whatever it writes is part of what this describes, so it comes first.
     // Before building, so a bad config doesn't cost a whole built Storybook to find out.
     const settings = await resolveRenderSettings(repo, { native: options.native });
-    if (options.buildFromConfig === true) {
-      if (settings.buildCommand === undefined) throw new SelfieError("usage", "--build runs the config's buildCommand, and selfie.config.json doesn't have one.");
-      await buildIfAsked(settings.buildCommand, repo.root, options.signal, log);
-    } else {
-      await buildIfAsked(options.buildCommand, project.cwd, options.signal, log);
-    }
+    await buildAsAsked(project, settings, options, log);
 
     // 2. Read where we are.
     const gitSha = await headSha(repo);

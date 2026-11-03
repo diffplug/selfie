@@ -4,7 +4,7 @@
 import { createHash } from "node:crypto";
 import { stat, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { chromium, type Browser, type BrowserContext, type Page, type Route } from "playwright-core";
+import { chromium, type Browser, type BrowserContext, type Page, type Request, type Route } from "playwright-core";
 import {
   RENDER_RECIPE,
   PLAYWRIGHT_VERSION,
@@ -43,26 +43,30 @@ function pngDimensions(png: Buffer): { width: number; height: number } {
 
 /**
  * Counts a page's requests from the start, and returns a wait for none to have been in flight
- * for a quiet period, which resolves false at the bound. Playwright's `networkidle` is the
+ * for a quiet period, which at the bound resolves to what's still in flight, and otherwise to null. Playwright's `networkidle` is the
  * same thing with a fixed 500 ms.
  */
-function trackRequests(page: Page): (quietMs: number, boundMs: number) => Promise<boolean> {
-  let inFlight = 0;
+function trackRequests(page: Page): (quietMs: number, boundMs: number) => Promise<readonly string[] | null> {
+  const inFlight = new Set<Request>();
   let lastChange = Date.now();
-  const change = (delta: number) => () => {
-    inFlight += delta;
+  const started = (request: Request) => {
+    inFlight.add(request);
     lastChange = Date.now();
   };
-  page.on("request", change(1));
-  page.on("requestfinished", change(-1));
-  page.on("requestfailed", change(-1));
+  const ended = (request: Request) => {
+    inFlight.delete(request);
+    lastChange = Date.now();
+  };
+  page.on("request", started);
+  page.on("requestfinished", ended);
+  page.on("requestfailed", ended);
   return async (quietMs, boundMs) => {
     const deadline = Date.now() + boundMs;
-    while (inFlight > 0 || Date.now() - lastChange < quietMs) {
-      if (Date.now() >= deadline) return false;
+    while (inFlight.size > 0 || Date.now() - lastChange < quietMs) {
+      if (Date.now() >= deadline) return [...inFlight].map((request) => request.url());
       await new Promise((resolve) => setTimeout(resolve, 5));
     }
-    return true;
+    return null;
   };
 }
 
@@ -84,8 +88,8 @@ async function resolveStorybookFile(root: string, pathname: string): Promise<str
 
 /**
  * Answers a request from the build, and aborts any that leaves the origin. That abort is
- * only needed natively, since the container has no network. A failure here means the context
- * has closed, so there is nothing left to answer.
+ * only needed natively, since the container has no network. A request that can't be answered is
+ * aborted, so it's reported rather than holding the network wait to its bound.
  */
 async function answerFromStorybook(route: Route, root: string): Promise<void> {
   const url = new URL(route.request().url());
@@ -95,7 +99,10 @@ async function answerFromStorybook(route: Route, root: string): Promise<void> {
     await (file
       ? route.fulfill({ path: file, headers: { "cache-control": "no-store" } })
       : route.fulfill({ status: 404 }));
-  } catch {}
+  } catch {
+    // Which only fails if the context has closed, and then there's nothing left to answer.
+    await route.abort().catch(() => {});
+  }
 }
 
 /**
@@ -188,10 +195,11 @@ async function screenshotStory(
   );
   for (const message of playFailures) record({ source: "play", message });
 
-  if (!(await networkQuiet(RENDER_RECIPE.networkQuietMs, RENDER_RECIPE.networkQuietBoundMs))) {
+  const unanswered = await networkQuiet(RENDER_RECIPE.networkQuietMs, RENDER_RECIPE.networkQuietBoundMs);
+  if (unanswered !== null) {
     record({
       source: "timeout",
-      message: `network not quiet after ${RENDER_RECIPE.networkQuietBoundMs}ms; rendered anyway`,
+      message: `network not quiet after ${RENDER_RECIPE.networkQuietBoundMs}ms; rendered anyway${unanswered.length === 0 ? "" : `, with these in flight: ${unanswered.join(", ")}`}`,
     });
   }
   await page.evaluate(() => document.fonts.ready.then(() => undefined));
