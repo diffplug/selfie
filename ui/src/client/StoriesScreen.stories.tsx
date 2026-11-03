@@ -48,7 +48,7 @@ export default screens;
 type Story = StoryObj<typeof screens>;
 
 const capturing = (overrides: Partial<CaptureState> = {}): CaptureState => ({ can: true, capturing: 0, error: null, clearError: () => undefined, capture: async () => true, ...overrides });
-const FAILED = new RequestError("capture-failed", "That didn't capture: Docker is unavailable.");
+const FAILED = new RequestError("capture-failed", "That didn't render: Docker is unavailable.");
 
 export const SomeCaptured: Story = { args: { view: MIXED, search: "", capture: capturing() } };
 export const Filtered: Story = { args: { view: MIXED, search: "?q=button", capture: capturing() } };

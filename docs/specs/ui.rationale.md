@@ -47,7 +47,7 @@ Evidence and reasoning for `docs/specs/ui.md`, keyed by its headings.
 
 **Every story, on the same page.** Separate pages for snapshots and for a live Storybook would be two products to learn, and every feature would need building twice. So the list merges what's been captured, and a story's page is simply its run's. It reads runs newest first and stops once each story has an answer, since each costs a comparison. If a story's never been captured, that's every run at the commit, which is the cost to watch.
 
-**Capturing here.** Most iterating is on one story, and 1.7 s was measured for one story of Dormouse's 568 in the pinned container, 2026-11, so asking from the page is about as quick as looking away. It doesn't build, so an agent or person rebuilds, and what's captured is whatever is hosted. A filtered run can't become goldens, so Capture the rest can't either, once it's a subset: only a whole run from a clean build can. Every story at once is the one case worth treating as a whole run.
+**Rendering here.** Most iterating is on one story, and 1.7 s was measured for one story of Dormouse's 568 in the pinned container, 2026-11, so asking from the page is about as quick as looking away. It doesn't build, so an agent or person rebuilds, and what's captured is whatever is hosted. A filtered run can't become goldens, so Render the rest can't either, once it's a subset: only a whole run from a clean build can. Every story at once is the one case worth treating as a whole run.
 
 ## Keyboard
 

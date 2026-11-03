@@ -232,9 +232,9 @@ export function localReviewSource(
 
     async capture(stories) {
       if (storybook === undefined || storybook.record === undefined || !isBuiltStorybook(storybook.dir)) {
-        throw new SelfieError("capture-failed", "This server has no built Storybook to capture.");
+        throw new SelfieError("capture-failed", "This server has no built Storybook to render a story from.");
       }
-      if (capturing) throw new SelfieError("capture-busy", "A capture is already running here. Try again once it's done.");
+      if (capturing) throw new SelfieError("capture-busy", "A render is already running here. Try again once it's done.");
       capturing = true;
       try {
         const index = new Set((await readStoryIndex(storybook.dir)).map(({ id }) => id));
@@ -244,7 +244,7 @@ export function localReviewSource(
         return { runId: await storybook.record(new Set(stories).size === index.size ? undefined : stories) };
       } catch (error) {
         if (error instanceof SelfieError && error.code === "unknown-story") throw error;
-        throw new SelfieError("capture-failed", `That didn't capture: ${(error as Error).message}`);
+        throw new SelfieError("capture-failed", `That didn't render: ${(error as Error).message}`);
       } finally {
         capturing = false;
       }

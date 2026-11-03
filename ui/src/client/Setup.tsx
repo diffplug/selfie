@@ -1,4 +1,4 @@
-// What stands between someone and a story saved at the commit they're on, on the page they land on.
+// What stands between someone and a render at the commit they're on, on the page they land on.
 import { CheckCircleFillIcon, CircleIcon } from "@primer/octicons-react";
 import { Banner, Button, Heading, Stack, Text } from "@primer/react";
 import { useEffect, type ReactNode } from "react";
@@ -11,7 +11,7 @@ import { shortSha } from "./words.tsx";
 const STAGES = ["commit", "build", "stories", "save"] as const;
 type Stage = (typeof STAGES)[number];
 
-/** How far from a saved story this commit is, or null if it has one, or this server hosts no Storybook to say of. */
+/** How far from a render this commit is, or null if it has one, or this server hosts no Storybook to say of. */
 export function setupStage(view: StoriesView): Stage | null {
   if (view.setup === null || view.stories.some(({ capture }) => capture !== null)) return null;
   if (view.head === null) return "commit";
@@ -32,7 +32,7 @@ function NoBuild({ setup: { storybookDir, buildCommand } }: { setup: StorySetup 
   return (
     <Stack gap="condensed">
       <Text as="p">
-        Selfie shows and saves stories from a built Storybook, and there isn't one at <code>{storybookDir}</code>.
+        Selfie shows and renders stories from a built Storybook, and there isn't one at <code>{storybookDir}</code>.
       </Text>
       {buildCommand !== null ? (
         <>
@@ -80,7 +80,7 @@ function Uncommitted({ head, setup: { uncommitted, storybookDir } }: { head: str
               <code>{file}</code>
             </span>
           ))}
-          {others > 0 && ` and ${others.toLocaleString()} more`}. A story saved now is marked as from uncommitted changes, since it may not show what <code>{shortSha(head)}</code> does, and it can't become a golden.
+          {others > 0 && ` and ${others.toLocaleString()} more`}. A render now is marked as from uncommitted changes, since it may not show what <code>{shortSha(head)}</code> does, and it can't become a golden.
           {uncommitted.some((file) => isInside(file, storybookDir)) && (
             <>
               {" "}
@@ -103,23 +103,23 @@ function SaveAStory({ view, setup, capture }: { view: StoriesView; setup: StoryS
   return (
     <Stack gap="condensed">
       <Text as="p">
-        Saving a story renders it and keeps the image with this commit, so there's something to write a note on, and to compare your next change with. Saving approves nothing.{" "}
-        {setup.usesDocker ? "It renders in a pinned browser in Docker, and the first save downloads that, which can take a few minutes." : "It renders in this machine's browser."}
+        Rendering a story keeps its image with this commit, so there's something to write a note on, and to compare your next change with. It approves nothing.{" "}
+        {setup.usesDocker ? "It renders in a pinned browser in Docker, and the first render downloads that, which can take a few minutes." : "It renders in this machine's browser."}
       </Text>
       <Uncommitted head={view.head!} setup={setup} />
       {capture.can ? (
         <Stack direction="horizontal" align="center" gap="condensed" wrap="wrap">
           <Button variant="primary" disabled={capture.capturing > 0} onClick={() => void saveFirst()}>
-            Save {fullName(first)}
+            Render {fullName(first)}
           </Button>
           <Button disabled={capture.capturing > 0} onClick={() => void capture.capture(view.stories.map(({ story }) => story))}>
-            Save all {view.stories.length.toLocaleString()}
+            Render all {view.stories.length.toLocaleString()}
           </Button>
           <Text className="selfie-muted">Or pick one below, and look at it running first.</Text>
         </Stack>
       ) : (
         <Text as="p">
-          <code>selfie record</code> saves them all.
+          <code>selfie record</code> renders them all.
         </Text>
       )}
     </Stack>
@@ -145,7 +145,7 @@ const TITLES: Readonly<Record<Stage, string>> = {
   commit: "Make a commit",
   build: "Build your Storybook",
   stories: "Write a story",
-  save: "Save a story",
+  save: "Render a story",
 };
 
 export function Setup({ view, stage, capture, recheck }: { view: StoriesView; stage: Stage; capture: CaptureState; recheck: () => void }) {
@@ -158,11 +158,11 @@ export function Setup({ view, stage, capture, recheck }: { view: StoriesView; st
   return (
     <section className="selfie-setup" aria-labelledby="selfie-setup-heading">
       <Heading as="h3" variant="small" id="selfie-setup-heading">
-        Nothing saved {view.head === null ? "yet" : <>at <code>{shortSha(view.head)}</code> yet</>}
+        Nothing rendered {view.head === null ? "yet" : <>at <code>{shortSha(view.head)}</code> yet</>}
       </Heading>
       <ol className="selfie-setup-steps">
         <Step stage="commit" at={stage} done={view.head === null ? null : <>At commit <code>{shortSha(view.head)}</code></>}>
-          <Text as="p">A saved story is kept with the commit it came from, and this repository has no commits yet. Make one, and {MOVES_ON}.</Text>
+          <Text as="p">A render is kept with the commit it came from, and this repository has no commits yet. Make one, and {MOVES_ON}.</Text>
         </Step>
         <Step stage="build" at={stage} done={<>A built Storybook at <code>{setup.storybookDir}</code></>}>
           <NoBuild setup={setup} />

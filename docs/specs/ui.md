@@ -115,7 +115,7 @@ Source of truth: `ui/src/client/`.
 | Path | Screen |
 |---|---|
 | `/` | Every story, in the filter from the query |
-| `/stories/:story` | One story, whichever run its newest capture is from |
+| `/stories/:story` | One story, whichever run its newest render is from |
 | `/runs/:id` | The run |
 | `/runs/:id/stories/:story` | One snapshot, in the filter from the query |
 | `/runs/:id/accept` | Accepting |
@@ -153,18 +153,18 @@ Source of truth: `ui/src/client/`.
 - **Must say what the diff image's colors mean wherever it has more than one.**
 - **Must not offer a decision on what has no image to decide on.**
 
-**Every story** is the hosted Storybook's stories, nested and ordered as its own sidebar does them, and each with its newest capture from the finished runs at HEAD in the project's environment, so several partial runs read as one (rationale). A story's page is that capture's run's, as it would be from that run's own review.
+**Every story** is the hosted Storybook's stories, nested and ordered as its own sidebar does them, and each with its newest render from the finished runs at HEAD in the project's environment, so several partial runs read as one (rationale). A story's page is that render's run's, as it would be from that run's own review.
 
-- **Must say what stands between a person and a story saved at HEAD, while nothing is saved there and this server hosts a Storybook:** a commit, then a build, then a story in it, then saving one (rationale). Each step says what to do, the page moves on by itself as they're done, and it offers to save the first story, or all of them, there. After saving just that first one, it opens that story's page.
-- **Must say, before saving, what's uncommitted, that what's saved is marked so and can't become a golden, and when the build itself is one of those files.**
+- **Must say what stands between a person and a render at HEAD, while there's none and this server hosts a Storybook:** a commit, then a build, then a story in it, then rendering one (rationale). Each step says what to do, the page moves on by itself as they're done, and it offers to render the first story, or all of them, there. After rendering just that first one, it opens that story's page.
+- **Must say, before rendering, what's uncommitted, that what's rendered is marked so and can't become a golden, and when the build itself is one of those files.**
 - **Must nest by a story's title, keep the build's order, and use its names**: a top-level section, then a component, then each story, with Storybook's own icons and colors, so a person finds what they know from it (rationale). Each folder may be closed, and a filter opens them all.
-- **Must list a story nothing has captured, show it running, and offer to capture it**, since it's still a real story to look at. A note is written on an image, so starting one captures the story first, and then opens the note box. With no way to capture here, it says what command does.
-- **Must offer to capture again whatever story is on screen, and every story with no capture or one known to be from another build, as Capture the rest**, which is how a change fans out to the rest of a Storybook. Asking for every story records a whole run, not a filtered one, which can become goldens (rationale).
-- **Must capture only from the hosted Storybook as it stands, and one capture at a time**, refusing a second with `capture-busy`. It never builds, since a page must not be able to run a shell.
-- **Must never read a story a filtered run left out as removed**, through `newestCaptures` in `selfie-store`. It takes that story from an older run, or else lists it as not captured.
-- **Must say when a capture is from uncommitted changes, or known to be from another build than the one hosted**, since a capture is whichever is newest, not whichever is reliable.
-- **Must leave out a story the hosted build no longer has**, and with no build at all, list only what's been captured, and say so.
-- **Must move next and previous through every story**, not through that story's run. Decisions go to the run that captured the image, and accepting stays a thing one run does.
+- **Must list a story nothing has rendered, show it running, and offer to render it**, since it's still a real story to look at. A note is written on an image, so starting one renders the story first, and then opens the note box. With no way to render here, it says what command does.
+- **Must offer to render again whatever story is on screen, and every story with no render or one known to be from another build, as Render the rest**, which is how a change fans out to the rest of a Storybook. Asking for every story records a whole run, not a filtered one, which can become goldens (rationale).
+- **Must render only from the hosted Storybook as it stands, and one at a time**, refusing a second with `capture-busy`. It never builds, since a page must not be able to run a shell.
+- **Must never read a story a filtered run left out as removed**, through `newestCaptures` in `selfie-store`. It takes that story from an older run, or else lists it as not rendered.
+- **Must say when a render is from uncommitted changes, or known to be from another build than the one hosted**, since a render is whichever is newest, not whichever is reliable.
+- **Must leave out a story the hosted build no longer has**, and with no build at all, list only what's been rendered, and say so.
+- **Must move next and previous through every story**, not through that story's run. Decisions go to the run that rendered the image, and accepting stays a thing one run does.
 
 **Accepting** shows, in plain words, every refusal `accept` would give, and what to do about it.
 
@@ -190,7 +190,7 @@ Source of truth: `useHotkeys` in `ui/src/client/hooks.ts`.
 | `z`, `c` | A snapshot | Next zoom, center on the region being looked at or else the change |
 | `l` | A snapshot | Open or close the live stories |
 | `m` | A snapshot | Write a note |
-| `c`, `m` | A story with no capture | Capture it, or capture it to write a note on it |
+| `c`, `m` | A story with no render | Render it, or render it to write a note on it |
 | `w` | A snapshot | Show the image a note was written on, or go back |
 | `n`, `p` | A snapshot | Next and previous region |
 | `x` | A snapshot | Select the region being looked at, or the first |

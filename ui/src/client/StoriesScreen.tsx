@@ -44,7 +44,7 @@ function StoryRow({ entry, depth, search }: { entry: ListedStory; depth: number;
           </a>
         </span>
       </Table.Cell>
-      <Table.Cell>{capture === null ? <span className="selfie-muted">Not captured</span> : <StateLabel state={capture.state} />}</Table.Cell>
+      <Table.Cell>{capture === null ? <span className="selfie-muted">Not rendered</span> : <StateLabel state={capture.state} />}</Table.Cell>
       <Table.Cell>{capture !== null && <DecisionLabel row={capture} />}</Table.Cell>
       <Table.Cell>{capture !== null && <RelativeTime date={new Date(capture.capturedAt)} />}</Table.Cell>
       <Table.Cell>
@@ -70,7 +70,7 @@ function FolderRow({ folder, depth, open, onToggle }: { folder: StoryFolder; dep
             <span className={section ? "selfie-tree-section" : undefined}>{folder.name}</span>
           </button>
           <span className="selfie-muted">
-            {captured.toLocaleString()} of {plural(stories.length, "story", "stories")} captured
+            {captured.toLocaleString()} of {plural(stories.length, "story", "stories")} rendered
           </span>
         </span>
       </Table.Cell>
@@ -97,7 +97,7 @@ function StoryTree({ stories, search, filtering }: { stories: readonly ListedSto
             <Table.Header>Story</Table.Header>
             <Table.Header>State</Table.Header>
             <Table.Header>Decision</Table.Header>
-            <Table.Header>Captured</Table.Header>
+            <Table.Header>Rendered</Table.Header>
             <Table.Header>Caveats</Table.Header>
           </Table.Row>
         </Table.Head>
@@ -121,7 +121,7 @@ export function CaptureStatus({ capture }: { capture: CaptureState }) {
     <>
       {capture.error !== null && <ActionFailedBanner error={capture.error} onDismiss={capture.clearError} />}
       {capture.capturing > 0 && (
-        <Banner variant="info" title={`Capturing ${plural(capture.capturing, "story", "stories")}`} description="It renders in the same browser as any other run, so it can take a moment." />
+        <Banner variant="info" title={`Rendering ${plural(capture.capturing, "story", "stories")}`} description="It renders in the same browser as any other run, so it can take a moment." />
       )}
     </>
   );
@@ -157,7 +157,7 @@ export function StoriesScreen({ view, search, capture, recheck }: { view: Storie
           {view.newestRunId !== null && <AppLink href={runPath(view.newestRunId)}>Review the newest run</AppLink>}
           {capture.can && stage === null && rest.length > 0 && (
             <Button variant="primary" disabled={capture.capturing > 0} onClick={() => void capture.capture(rest.map(({ story }) => story))}>
-              {`Capture the rest (${rest.length.toLocaleString()})`}
+              {`Render the rest (${rest.length.toLocaleString()})`}
             </Button>
           )}
         </Stack>
@@ -167,13 +167,13 @@ export function StoriesScreen({ view, search, capture, recheck }: { view: Storie
         <Banner
           variant="warning"
           title="There's no built Storybook here"
-          description="Only what's been captured is listed. Build one, or point selfie ui at it with --storybook-dir, to see every story running."
+          description="Only what's been rendered is listed. Build one, or point selfie ui at it with --storybook-dir, to see every story running."
         />
       )}
       {listsStories(stage) && (
         <>
           <Text as="p" className="selfie-muted" role="status">
-            {captured.toLocaleString()} of {plural(view.stories.length, "story", "stories")} captured at this commit. <Keys keys="j" /> and <Keys keys="k" /> move through the list, <Keys keys="/" /> searches.
+            {captured.toLocaleString()} of {plural(view.stories.length, "story", "stories")} rendered at this commit. <Keys keys="j" /> and <Keys keys="k" /> move through the list, <Keys keys="/" /> searches.
           </Text>
           <FormControl>
             <FormControl.Label>Filter by story</FormControl.Label>
@@ -253,7 +253,7 @@ function CapturedStory({
       {capture.can && (
         <Stack direction="horizontal" align="center" gap="condensed" wrap="wrap">
           <Button disabled={capture.capturing > 0} onClick={() => void capture.capture([story])}>
-            Capture again
+            Render again
           </Button>
           {outOfDate && <Text className="selfie-muted">This image is from another build than the one being hosted.</Text>}
         </Stack>
@@ -301,17 +301,17 @@ export function UncapturedStory({ view, story, navigation, capture, onWriteNote 
             Write a note on this
           </Button>
           <Button disabled={capture.capturing > 0} onClick={captureNow} trailingVisual={() => <Keys keys="c" />}>
-            Capture it
+            Render it
           </Button>
-          <Text className="selfie-muted">A note is written on an image, so writing one captures this story first.</Text>
+          <Text className="selfie-muted">A note is written on an image, so writing one renders this story first.</Text>
         </Stack>
       ) : (
         <Banner
           variant="info"
-          title="Not captured yet"
+          title="Not rendered yet"
           description={
             <>
-              No run at this commit has an image of this story. <code>selfie record --story {story}</code> captures one.
+              No run at this commit has an image of this story. <code>selfie record --story {story}</code> renders one.
             </>
           }
         />
