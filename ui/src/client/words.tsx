@@ -15,7 +15,7 @@ import {
   UnfoldIcon,
   XIcon,
 } from "@primer/octicons-react";
-import { Label, Stack, type LabelProps } from "@primer/react";
+import { Label, Stack, VisuallyHidden, type LabelProps } from "@primer/react";
 import type { ReactNode } from "react";
 import { isDecidable } from "selfie-store";
 import type { BlockerReason, NoteState, PixelDiff, RegionKind, SnapshotRow, SnapshotState } from "../shared/api.ts";
@@ -56,6 +56,17 @@ const STATE_LABELS: Readonly<Record<SnapshotState, { variant: LabelProps["varian
   failed: { variant: "danger", icon: <StopIcon size={12} />, words: "Failed" },
   unchanged: { variant: "secondary", icon: <DotIcon size={12} />, words: "Unchanged" },
 };
+
+/** A state's icon and words, small enough for a list's row. */
+export function StateMark({ state }: { readonly state: SnapshotState }) {
+  const { icon, words } = STATE_LABELS[state];
+  return (
+    <span className="selfie-state-mark" data-state={state} title={words}>
+      {icon}
+      <VisuallyHidden>{words}</VisuallyHidden>
+    </span>
+  );
+}
 
 const KIND_LABELS: Readonly<Record<RegionKind, { variant: LabelProps["variant"]; icon: ReactNode; words: string }>> = {
   changed: { variant: "danger", icon: <DiffModifiedIcon size={12} />, words: "Changed" },

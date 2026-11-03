@@ -35,7 +35,7 @@ const SHORTCUTS: readonly (readonly [string, string])[] = [
   ["n", "Next region"],
   ["p", "Previous region"],
   ["x", "Select the region being looked at, or the first"],
-  ["u", "Back to the list"],
+  ["u", "Up to the run, or to where this commit stands"],
   ["?", "This list"],
 ];
 
@@ -240,9 +240,11 @@ export function DetailScreen({
     <Stack gap="condensed">
       <Stack direction="horizontal" align="center" justify="space-between" wrap="wrap" gap="condensed">
         <Stack direction="horizontal" align="center" gap="normal">
-          <AppLink href={listHref}>
-            <ArrowLeftIcon /> Back to the list <Keys keys="u" />
-          </AppLink>
+          {navigation === undefined && (
+            <AppLink href={listHref}>
+              <ArrowLeftIcon /> Back to the list <Keys keys="u" />
+            </AppLink>
+          )}
           <AriaStatus className="selfie-muted">{message}</AriaStatus>
         </Stack>
         <Stack direction="horizontal" align="center" gap="condensed">

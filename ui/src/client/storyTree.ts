@@ -62,3 +62,20 @@ export const storiesIn = ({ children }: StoryFolder): readonly ListedStory[] =>
 
 /** Whether a folder only groups other folders, as a sidebar's top-level sections do. */
 export const isSection = ({ children }: StoryFolder, depth: number) => depth === 0 && children.every((child) => child.kind === "folder");
+
+/** What Storybook's sidebar starts with closed: everything but the top-level sections. */
+export function initiallyClosed(nodes: readonly StoryTreeNode[], depth = 0): readonly string[] {
+  return nodes.flatMap((node) => {
+    if (node.kind === "story") return [];
+    return [...(isSection(node, depth) ? [] : [node.path]), ...initiallyClosed(node.children, depth + 1)];
+  });
+}
+
+/** Closed folders, less the ones a story is in, so it can be seen. */
+export function openedAround(closed: ReadonlySet<string>, entry: ListedStory | undefined): ReadonlySet<string> {
+  if (entry === undefined) return closed;
+  const next = new Set(closed);
+  const names = entry.title.split("/").filter(Boolean);
+  names.forEach((_, at) => next.delete(names.slice(0, at + 1).join("/")));
+  return next;
+}

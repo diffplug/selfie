@@ -591,13 +591,6 @@ code {
   transform-origin: top left;
 }
 
-.selfie-tree-label {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--base-size-8);
-  min-width: 0;
-}
-
 /* Storybook's own sidebar colors, so a story looks here as it does there. */
 .selfie-tree-icon {
   flex: none;
@@ -619,19 +612,6 @@ code {
 
 [data-color-mode="dark"] .selfie-tree-icon[data-kind="folder"] {
   color: #ff4785;
-}
-
-.selfie-tree-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--base-size-8);
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--fgColor-default);
-  font: inherit;
-  font-weight: var(--base-text-weight-semibold);
-  cursor: pointer;
 }
 
 .selfie-tree-section {
@@ -675,4 +655,83 @@ code {
   overflow-x: auto;
   background: var(--bgColor-muted);
   border-radius: var(--borderRadius-medium);
+}
+
+/* Flush with the page's edges, as Storybook's sidebar is. */
+.selfie-main:has(> .selfie-stories) {
+  max-width: none;
+  padding: 0;
+}
+
+.selfie-nav {
+  display: grid;
+  gap: var(--base-size-8);
+  padding: var(--base-size-12) var(--base-size-8);
+}
+
+.selfie-nav-tree {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.selfie-nav-row {
+  display: flex;
+  align-items: center;
+  gap: var(--base-size-6);
+  width: 100%;
+  min-height: var(--base-size-28);
+  padding: var(--base-size-2) var(--base-size-8);
+  border: 0;
+  border-radius: var(--borderRadius-small);
+  background: none;
+  color: var(--fgColor-default);
+  font: inherit;
+  font-size: var(--text-body-size-small);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.selfie-nav-row:hover {
+  background: var(--bgColor-neutral-muted);
+}
+
+.selfie-nav-row[aria-current="page"] {
+  background: var(--bgColor-accent-muted);
+  font-weight: var(--base-text-weight-semibold);
+}
+
+.selfie-nav-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selfie-nav-caveat {
+  display: inline-flex;
+  color: var(--fgColor-attention);
+}
+
+.selfie-state-mark {
+  display: inline-flex;
+  color: var(--fgColor-muted);
+}
+
+.selfie-state-mark[data-state="changed"] {
+  color: var(--fgColor-attention);
+}
+
+.selfie-state-mark[data-state="new"] {
+  color: var(--fgColor-accent);
+}
+
+.selfie-state-mark[data-state="removed"] {
+  color: var(--fgColor-severe);
+}
+
+.selfie-state-mark[data-state="failed"] {
+  color: var(--fgColor-danger);
 }

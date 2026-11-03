@@ -114,7 +114,7 @@ Source of truth: `ui/src/client/`.
 
 | Path | Screen |
 |---|---|
-| `/` | Every story, in the filter from the query |
+| `/` | Every story, and where this commit stands |
 | `/stories/:story` | One story, whichever run its newest render is from |
 | `/runs/:id` | The run |
 | `/runs/:id/stories/:story` | One snapshot, in the filter from the query |
@@ -158,7 +158,9 @@ Source of truth: `ui/src/client/`.
 - **Must say where this commit stands, in order:** the commit and branch; the built Storybook, how many stories it has, and whether it's from a clean checkout; and how many stories have a render (rationale). What's missing says what to do, the page moves on by itself as it's done, and with no renders it offers to render the first story, or all of them, opening that story's page after the first.
 - **Must call a build clean only if nothing is uncommitted and it was built since HEAD last moved**, which is the most Selfie can know of a build it may not have made (rationale). Otherwise it says which, and may still render.
 - **Must say, before rendering from uncommitted changes, what they are, that a render is marked so and can't become a golden, and when the build itself is one of those files.**
-- **Must nest by a story's title, keep the build's order, and use its names**: a top-level section, then a component, then each story, with Storybook's own icons and colors, so a person finds what they know from it (rationale). Each folder may be closed, and a filter opens them all.
+- **Must keep the list beside `/` and each `/stories/:story`, on the left, as Storybook's sidebar is** (rationale), with what `/` says, or that story, on the right. A filter stays in the query from page to page. A run's own screens don't have it.
+- **Must nest by a story's title, keep the build's order, and use its names**: a top-level section, then a component, then each story, with Storybook's own icons and colors, so a person finds what they know from it (rationale). Only the sections start open. Moving to a story opens the way to it, and a filter opens everything.
+- **Must mark each story in the list with its state, in words for a screen reader and on hover, and with any caveat**, and give a story's decision and when it was rendered on its page.
 - **Must list a story nothing has rendered, show it running, and offer to render it**, since it's still a real story to look at. A note is written on an image, so starting one renders the story first, and then opens the note box. With no way to render here, it says what command does.
 - **Must offer to render again whatever story is on screen, and every story with no render or one known to be from another build, as Render the rest**, which is how a change fans out to the rest of a Storybook. Asking for every story records a whole run, not a filtered one, which can become goldens (rationale).
 - **Must render only from the hosted Storybook as it stands, and one at a time**, refusing a second with `capture-busy`. It never builds, since a page must not be able to run a shell.

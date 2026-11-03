@@ -1,24 +1,23 @@
 // Every story of the hosted Storybook, each with its newest capture at HEAD, whichever run that was.
 // A story's page is its run's, so looking at one here and in that run's review is the same screen.
-import { ArrowLeftIcon, SearchIcon } from "@primer/octicons-react";
+import { AlertIcon, SearchIcon } from "@primer/octicons-react";
 import { BookmarkHollowIcon, ChevronSmallDownIcon, ChevronSmallRightIcon, ComponentIcon, FolderIcon } from "@storybook/icons";
-import { Banner, Button, FormControl, Heading, RelativeTime, Stack, Text, TextInput } from "@primer/react";
-import { Blankslate, ScrollableRegion, Table } from "@primer/react/experimental";
-import { useMemo, useRef, useState } from "react";
+import { Banner, Button, Heading, PageLayout, RelativeTime, Stack, Text, TextInput, VisuallyHidden } from "@primer/react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { ListedStory, StoriesView } from "../shared/api.ts";
 import { DetailScreen, StoryPager, type StoryNavigation } from "./DetailScreen.tsx";
 import { FeedbackBar } from "./Feedback.tsx";
 import { filterQuery, matchesText, neighbors, NO_FILTER, parseFilter, positionWords } from "./filter.ts";
-import { useCapture, useFeedback, useHotkeys, useRun, useStories, useStoryListKeys, useTitle, type CaptureState, type FeedbackState, type RunState } from "./hooks.ts";
+import { useCapture, useFeedback, useHotkeys, useRun, useStories, useStoryFocusKeys, useTitle, type CaptureState, type FeedbackState, type RunState } from "./hooks.ts";
 import { Keys } from "./Keys.tsx";
 import { OpenInStorybook, StoryFrame, storyFrameUrl } from "./LiveStories.tsx";
 import { plural } from "./plural.ts";
 import { ActionFailedBanner } from "./RunNotes.tsx";
-import { anyStoryPath, AppLink, followLink, navigate, storiesPath } from "./router.tsx";
+import { anyStoryPath, followLink, navigate, storiesPath } from "./router.tsx";
 import { Checklist } from "./Checklist.tsx";
 import { LoadFailure, Loading } from "./Status.tsx";
-import { buildStoryTree, isSection, storiesIn, visibleRows, type StoryFolder } from "./storyTree.ts";
-import { DecisionLabel, shortSha, StateLabel } from "./words.tsx";
+import { buildStoryTree, initiallyClosed, isSection, openedAround, storiesIn, visibleRows, type StoryFolder } from "./storyTree.ts";
+import { StateMark } from "./words.tsx";
 
 const matching = (stories: readonly ListedStory[], text: string) => stories.filter(({ story, title, name }) => matchesText(`${story} ${title} ${name}`, text));
 
@@ -29,58 +28,68 @@ function captureCaveats({ capture }: ListedStory): string {
 }
 
 /** Indents a row by how deep it is, as the Storybook's sidebar does. */
-const indented = (depth: number) => ({ paddingLeft: `calc(${depth} * var(--base-size-20))` });
+const indented = (depth: number) => ({ paddingLeft: `calc(var(--base-size-8) + ${depth} * var(--base-size-16))` });
 
-function StoryRow({ entry, depth, search }: { entry: ListedStory; depth: number; search: string }) {
+function StoryRow({ entry, depth, search, current }: { entry: ListedStory; depth: number; search: string; current: boolean }) {
   const href = anyStoryPath(entry.story, search);
-  const { capture } = entry;
+  const link = useRef<HTMLAnchorElement>(null);
+  const caveats = captureCaveats(entry);
+  useEffect(() => {
+    if (current) link.current?.scrollIntoView({ block: "nearest" });
+  }, [current]);
   return (
-    <Table.Row>
-      <Table.Cell>
-        <span className="selfie-tree-label" style={indented(depth)}>
-          <BookmarkHollowIcon className="selfie-tree-icon" data-kind="story" />
-          <a href={href} data-story={entry.story} title={entry.story} onClick={(event) => followLink(event, href)}>
-            {entry.name}
-          </a>
-        </span>
-      </Table.Cell>
-      <Table.Cell>{capture === null ? <span className="selfie-muted">Not rendered</span> : <StateLabel state={capture.state} />}</Table.Cell>
-      <Table.Cell>{capture !== null && <DecisionLabel row={capture} />}</Table.Cell>
-      <Table.Cell>{capture !== null && <RelativeTime date={new Date(capture.capturedAt)} />}</Table.Cell>
-      <Table.Cell>
-        <span className="selfie-muted">{captureCaveats(entry)}</span>
-      </Table.Cell>
-    </Table.Row>
+    <li>
+      <a ref={link} className="selfie-nav-row" style={indented(depth)} href={href} data-story={entry.story} title={entry.story} aria-current={current ? "page" : undefined} onClick={(event) => followLink(event, href)}>
+        <BookmarkHollowIcon className="selfie-tree-icon" data-kind="story" />
+        <span className="selfie-nav-name">{entry.name}</span>
+        {entry.capture === null ? (
+          <VisuallyHidden>, not rendered</VisuallyHidden>
+        ) : (
+          <>
+            {caveats !== "" && (
+              <span className="selfie-nav-caveat" title={caveats}>
+                <AlertIcon size={12} />
+                <VisuallyHidden>{caveats}</VisuallyHidden>
+              </span>
+            )}
+            <StateMark state={entry.capture.state} />
+          </>
+        )}
+      </a>
+    </li>
   );
 }
 
 function FolderRow({ folder, depth, open, onToggle }: { folder: StoryFolder; depth: number; open: boolean; onToggle: () => void }) {
   const stories = storiesIn(folder);
-  const captured = stories.filter(({ capture }) => capture !== null).length;
+  const rendered = stories.filter(({ capture }) => capture !== null).length;
   const section = isSection(folder, depth);
   const isComponent = folder.children.every((child) => child.kind === "story");
   const Icon = isComponent ? ComponentIcon : FolderIcon;
   return (
-    <Table.Row className="selfie-tree-folder">
-      <Table.Cell style={{ gridColumn: "1 / -1" }}>
-        <span className="selfie-tree-label" style={indented(depth)}>
-          <button type="button" className="selfie-tree-toggle" aria-expanded={open} onClick={onToggle}>
-            {open ? <ChevronSmallDownIcon /> : <ChevronSmallRightIcon />}
-            {!section && <Icon className="selfie-tree-icon" data-kind={isComponent ? "component" : "folder"} />}
-            <span className={section ? "selfie-tree-section" : undefined}>{folder.name}</span>
-          </button>
-          <span className="selfie-muted">
-            {captured.toLocaleString()} of {plural(stories.length, "story", "stories")} rendered
-          </span>
+    <li>
+      <button type="button" className="selfie-nav-row" style={indented(depth)} aria-expanded={open} onClick={onToggle}>
+        {open ? <ChevronSmallDownIcon /> : <ChevronSmallRightIcon />}
+        {!section && <Icon className="selfie-tree-icon" data-kind={isComponent ? "component" : "folder"} />}
+        <span className={section ? "selfie-nav-name selfie-tree-section" : "selfie-nav-name"}>{folder.name}</span>
+        <span className="selfie-muted selfie-small" title={`${rendered.toLocaleString()} of ${plural(stories.length, "story", "stories")} rendered`}>
+          {rendered.toLocaleString()}/{stories.length.toLocaleString()}
         </span>
-      </Table.Cell>
-    </Table.Row>
+      </button>
+    </li>
   );
 }
 
-function StoryTree({ stories, search, filtering }: { stories: readonly ListedStory[]; search: string; filtering: boolean }) {
+function StoryTree({ stories, story, search, filtering }: { stories: readonly ListedStory[]; story: string | null; search: string; filtering: boolean }) {
   const tree = useMemo(() => buildStoryTree(stories), [stories]);
-  const [closed, setClosed] = useState<ReadonlySet<string>>(new Set());
+  const entry = stories.find((candidate) => candidate.story === story);
+  const [closed, setClosed] = useState<ReadonlySet<string>>(() => openedAround(new Set(initiallyClosed(tree)), entry));
+  // Whatever moves to a story opens the way to it, during this render so it's there to scroll to.
+  const [shownFor, setShownFor] = useState(story);
+  if (shownFor !== story) {
+    setShownFor(story);
+    setClosed(openedAround(closed, entry));
+  }
   // A filter means looking for something, so nothing it found stays folded away.
   const rows = useMemo(() => visibleRows(tree, filtering ? new Set() : closed), [tree, filtering, closed]);
   const toggle = (path: string) =>
@@ -90,28 +99,72 @@ function StoryTree({ stories, search, filtering }: { stories: readonly ListedSto
       return next;
     });
   return (
-    <ScrollableRegion aria-label="Stories">
-      <Table aria-label="Stories" cellPadding="condensed" gridTemplateColumns="minmax(240px, 1fr) 130px 130px 130px minmax(120px, 200px)">
-        <Table.Head>
-          <Table.Row>
-            <Table.Header>Story</Table.Header>
-            <Table.Header>State</Table.Header>
-            <Table.Header>Decision</Table.Header>
-            <Table.Header>Rendered</Table.Header>
-            <Table.Header>Caveats</Table.Header>
-          </Table.Row>
-        </Table.Head>
-        <Table.Body>
-          {rows.map((row) =>
-            row.kind === "story" ? (
-              <StoryRow key={row.entry.story} entry={row.entry} depth={row.depth} search={search} />
-            ) : (
-              <FolderRow key={row.path} folder={row} depth={row.depth} open={filtering || !closed.has(row.path)} onToggle={() => toggle(row.path)} />
-            ),
-          )}
-        </Table.Body>
-      </Table>
-    </ScrollableRegion>
+    <ul className="selfie-nav-tree">
+      {rows.map((row) =>
+        row.kind === "story" ? (
+          <StoryRow key={row.entry.story} entry={row.entry} depth={row.depth} search={search} current={row.entry.story === story} />
+        ) : (
+          <FolderRow key={row.path} folder={row} depth={row.depth} open={filtering || !closed.has(row.path)} onToggle={() => toggle(row.path)} />
+        ),
+      )}
+    </ul>
+  );
+}
+
+/** The list every story's page stays beside, as in Storybook. */
+function StorySidebar({ view, story, search }: { view: StoriesView; story: string | null; search: string }) {
+  const filter = useMemo(() => parseFilter(search), [search]);
+  const input = useRef<HTMLInputElement>(null);
+  const shown = useMemo(() => matching(view.stories, filter.text), [view.stories, filter.text]);
+  const filtered = (text: string) => {
+    const query = filterQuery({ ...NO_FILTER, text });
+    return story === null ? storiesPath(query) : anyStoryPath(story, query);
+  };
+  useHotkeys({ "/": () => input.current?.focus() });
+  return (
+    <nav aria-label="Stories" className="selfie-nav">
+      <TextInput
+        ref={input}
+        block
+        aria-label="Filter stories"
+        leadingVisual={SearchIcon}
+        value={filter.text}
+        placeholder="Press / to search"
+        onChange={(event) => navigate(filtered(event.target.value), { replace: true })}
+      />
+      {shown.length > 0 ? (
+        <StoryTree stories={shown} story={story} search={search} filtering={filter.text !== ""} />
+      ) : filter.text === "" ? (
+        <Text as="p" className="selfie-muted">
+          No stories yet.
+        </Text>
+      ) : (
+        <Stack gap="condensed" align="start">
+          <Text as="p" className="selfie-muted">
+            Nothing matches this filter.
+          </Text>
+          <Button size="small" onClick={() => navigate(filtered(""))}>
+            Clear the filter
+          </Button>
+        </Stack>
+      )}
+    </nav>
+  );
+}
+
+/** Every story at the left and whatever's being looked at on the right, as in Storybook. */
+export function StoriesLayout({ view, story, search, children }: { view: StoriesView; story: string | null; search: string; children: ReactNode }) {
+  return (
+    <div className="selfie-stories">
+      <PageLayout containerWidth="full" padding="none" columnGap="none" rowGap="none">
+        <PageLayout.Pane position="start" sticky resizable width="medium" divider="line" widthStorageKey="selfie-story-nav" aria-label="Stories">
+          <StorySidebar view={view} story={story} search={search} />
+        </PageLayout.Pane>
+        <PageLayout.Content padding="normal" width="full">
+          <Stack gap="normal">{children}</Stack>
+        </PageLayout.Content>
+      </PageLayout>
+    </div>
   );
 }
 
@@ -127,43 +180,17 @@ export function CaptureStatus({ capture }: { capture: CaptureState }) {
   );
 }
 
-export function StoriesScreen({ view, search, capture, recheck }: { view: StoriesView; search: string; capture: CaptureState; recheck: () => void }) {
+/** What's on the right with no story picked. */
+export function StoriesOverview({ view, capture, recheck }: { view: StoriesView; capture: CaptureState; recheck: () => void }) {
   useTitle("Every story");
-  const filter = useMemo(() => parseFilter(search), [search]);
-  const input = useRef<HTMLInputElement>(null);
-  const shown = useMemo(() => matching(view.stories, filter.text), [view.stories, filter.text]);
-
-  useStoryListKeys(input);
-
+  useStoryFocusKeys();
   return (
     <Stack gap="normal">
       <Checklist view={view} capture={capture} recheck={recheck} />
       {view.stories.length > 0 && (
-        <>
-          <Text as="p" className="selfie-muted">
-            <Keys keys="j" /> and <Keys keys="k" /> move through the list, <Keys keys="/" /> searches.
-          </Text>
-          <FormControl>
-            <FormControl.Label>Filter by story</FormControl.Label>
-            <TextInput
-              ref={input}
-              leadingVisual={SearchIcon}
-              value={filter.text}
-              placeholder="Press / to search"
-              onChange={(event) => navigate(storiesPath(filterQuery({ ...NO_FILTER, text: event.target.value })), { replace: true })}
-            />
-          </FormControl>
-          {shown.length > 0 ? (
-            <StoryTree stories={shown} search={search} filtering={filter.text !== ""} />
-          ) : (
-            <Blankslate border>
-              <Blankslate.Heading as="h3">Nothing matches this filter</Blankslate.Heading>
-              <Stack direction="horizontal" justify="center">
-                <Button onClick={() => navigate(storiesPath())}>Clear the filter</Button>
-              </Stack>
-            </Blankslate>
-          )}
-        </>
+        <Text as="p" className="selfie-muted">
+          Pick a story from the list to look at it. <Keys keys="j" /> and <Keys keys="k" /> move through the list, <Keys keys="/" /> searches.
+        </Text>
       )}
     </Stack>
   );
@@ -190,7 +217,7 @@ function CapturedStory({
   navigation,
   liveStories,
   capture,
-  outOfDate,
+  entry,
   startNote,
   onDecided,
 }: {
@@ -200,7 +227,7 @@ function CapturedStory({
   navigation: StoryNavigation;
   liveStories: readonly [boolean, (open: boolean) => void];
   capture: CaptureState;
-  outOfDate: boolean;
+  entry: ListedStory;
   startNote: boolean;
   onDecided: () => void;
 }) {
@@ -221,7 +248,12 @@ function CapturedStory({
           <Button disabled={capture.capturing > 0} onClick={() => void capture.capture([story])}>
             Render again
           </Button>
-          {outOfDate && <Text className="selfie-muted">This image is from another build than the one being hosted.</Text>}
+          {entry.capture !== null && (
+            <Text className="selfie-muted">
+              Rendered <RelativeTime date={new Date(entry.capture.capturedAt)} />.{entry.capture.dirty && " It has uncommitted changes in it."}
+              {entry.capture.fromHostedBuild === false && " This image is from another build than the one being hosted."}
+            </Text>
+          )}
         </Stack>
       )}
       <DetailScreen state={deciding} view={state.view} story={story} search="" feedback={feedback} navigation={navigation} liveStories={liveStories} startNote={startNote} />
@@ -247,13 +279,8 @@ export function UncapturedStory({ view, story, navigation, capture, onWriteNote 
   const { storybookUrl } = view;
   return (
     <Stack gap="condensed">
-      <Stack direction="horizontal" align="center" justify="space-between" wrap="wrap" gap="condensed">
-        <AppLink href={navigation.list}>
-          <ArrowLeftIcon /> Back to the list <Keys keys="u" />
-        </AppLink>
-        <Stack direction="horizontal" align="center" gap="condensed">
-          <StoryPager previous={navigation.previous} next={navigation.next} position={navigation.position} />
-        </Stack>
+      <Stack direction="horizontal" align="center" justify="end">
+        <StoryPager previous={navigation.previous} next={navigation.next} position={navigation.position} />
       </Stack>
       <Stack direction="horizontal" align="center" gap="condensed" wrap="wrap">
         <Heading as="h2" variant="small" className="selfie-story-title">
@@ -308,7 +335,7 @@ function OneStory({
   const [noteOn, setNoteOn] = useState<string | null>(null);
   const navigation = navigationIn(view, story, search);
   const entry = view.stories.find((candidate) => candidate.story === story);
-  if (entry === undefined) return <Banner variant="warning" title="This Storybook has no such story" description={<AppLink href={navigation.list}>Back to the list</AppLink>} />;
+  if (entry === undefined) return <Banner variant="warning" title="This Storybook has no such story" description="Pick one from the list." />;
   if (entry.capture === null) return <UncapturedStory view={view} story={story} navigation={navigation} capture={capture} onWriteNote={() => setNoteOn(story)} />;
   return (
     <CapturedStory
@@ -319,7 +346,7 @@ function OneStory({
       navigation={navigation}
       liveStories={liveStories}
       capture={capture}
-      outOfDate={entry.capture.fromHostedBuild === false}
+      entry={entry}
       startNote={noteOn === story}
       onDecided={onDecided}
     />
@@ -334,11 +361,11 @@ export function StoriesRoutes({ story, search }: { story: string | null; search:
   const capture = useCapture(stories.view?.canCapture ?? false, stories.reload);
   if (stories.view === null) return stories.error !== null ? <LoadFailure error={stories.error} /> : <Loading label="Reading every story" />;
   return (
-    <>
+    <StoriesLayout view={stories.view} story={story} search={search}>
       <FeedbackBar feedback={feedback} storyHref={(name) => anyStoryPath(name)} showList={story === null} />
       <CaptureStatus capture={capture} />
       {story === null ? (
-        <StoriesScreen view={stories.view} search={search} capture={capture} recheck={stories.reload} />
+        <StoriesOverview view={stories.view} capture={capture} recheck={stories.reload} />
       ) : (
         <OneStory
           view={stories.view}
@@ -350,6 +377,6 @@ export function StoriesRoutes({ story, search }: { story: string | null; search:
           onDecided={stories.reload}
         />
       )}
-    </>
+    </StoriesLayout>
   );
 }

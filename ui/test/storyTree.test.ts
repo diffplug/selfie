@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import type { ListedStory } from "../src/shared/api.ts";
-import { buildStoryTree, isSection, storiesIn, visibleRows, type StoryFolder } from "../src/client/storyTree.ts";
+import { buildStoryTree, initiallyClosed, isSection, openedAround, storiesIn, visibleRows, type StoryFolder } from "../src/client/storyTree.ts";
 
 const story = (title: string, name: string): ListedStory => ({ story: `${title}--${name}`.toLowerCase(), title, name, capture: null });
 const labels = (nodes: ReturnType<typeof visibleRows>) => nodes.map((row) => `${" ".repeat(row.depth)}${row.kind === "folder" ? row.name : row.entry.name}`);
@@ -36,4 +36,15 @@ test("only a top-level folder of folders is a section", () => {
   expect(isSection(screens!, 0)).toBe(true);
   expect(isSection(alone!, 0)).toBe(false);
   expect(isSection(deep!, 1)).toBe(false);
+});
+
+test("starts with only the top-level sections open, as Storybook does", () => {
+  const tree = buildStoryTree([story("Screens/Accept", "Ready"), story("Screens/Run", "Empty"), story("Alone", "One")]);
+  expect(labels(visibleRows(tree, new Set(initiallyClosed(tree))))).toEqual(["Screens", " Accept", " Run", "Alone"]);
+});
+
+test("opens the way to a story, and leaves the rest as they were", () => {
+  const closed = new Set(["A", "A/B", "A/B/C", "D"]);
+  expect([...openedAround(closed, story("A/B", "One"))]).toEqual(["A/B/C", "D"]);
+  expect(openedAround(closed, undefined)).toBe(closed);
 });

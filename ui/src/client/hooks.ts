@@ -323,19 +323,21 @@ export function useCapture(can: boolean, onCaptured: () => void): CaptureState {
   };
 }
 
-/** A list of stories' keys: next and previous move focus through its links, and / goes to its search. */
-export function useStoryListKeys(search: RefObject<HTMLInputElement | null>): void {
+/** Next and previous move focus through a list of stories' links. */
+export function useStoryFocusKeys(): void {
   const moveFocus = (delta: number) => {
     const links = [...document.querySelectorAll<HTMLElement>("[data-story]")];
     if (links.length === 0) return;
     const at = links.indexOf(document.activeElement as HTMLElement);
     links[at === -1 ? 0 : Math.max(0, Math.min(links.length - 1, at + delta))]?.focus();
   };
-  useHotkeys({
-    j: () => moveFocus(1),
-    k: () => moveFocus(-1),
-    "/": () => search.current?.focus(),
-  });
+  useHotkeys({ j: () => moveFocus(1), k: () => moveFocus(-1) });
+}
+
+/** A list of stories' keys: next and previous move focus through its links, and / goes to its search. */
+export function useStoryListKeys(search: RefObject<HTMLInputElement | null>): void {
+  useStoryFocusKeys();
+  useHotkeys({ "/": () => search.current?.focus() });
 }
 
 /** Device pixels per CSS pixel, which changes with browser zoom or on moving to another display. */

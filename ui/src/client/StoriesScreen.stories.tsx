@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import type { ListedStory, StoriesView } from "../shared/api.ts";
 import { RequestError } from "./api.ts";
 import type { CaptureState } from "./hooks.ts";
-import { CaptureStatus, navigationIn, StoriesScreen, UncapturedStory } from "./StoriesScreen.tsx";
+import { CaptureStatus, navigationIn, StoriesLayout, StoriesOverview, UncapturedStory } from "./StoriesScreen.tsx";
 import { approved, OTHER_RUN_ID, RUN_ID, SHA } from "./stories/fixtures.ts";
 
 // The renderer fixes the clock, so a relative date always reads the same there.
@@ -46,7 +46,16 @@ const MIXED = view([
   uncaptured("pages-settings--account"),
 ]);
 
-const screens = { title: "Screens/Every story", component: StoriesScreen, args: { recheck: () => undefined } } satisfies Meta<typeof StoriesScreen>;
+function StoriesScreen({ view: shown, search, capture }: { view: StoriesView; search: string; capture: CaptureState }) {
+  return (
+    <StoriesLayout view={shown} story={null} search={search}>
+      <CaptureStatus capture={capture} />
+      <StoriesOverview view={shown} capture={capture} recheck={() => undefined} />
+    </StoriesLayout>
+  );
+}
+
+const screens = { title: "Screens/Every story", component: StoriesScreen } satisfies Meta<typeof StoriesScreen>;
 export default screens;
 type Story = StoryObj<typeof screens>;
 
@@ -72,19 +81,21 @@ export const NothingCapturedWithUncommittedChanges: Story = {
   args: { view: view(NOT_RENDERED, { newestRunId: null, setup: setupOf({ builtFrom: "uncommitted", uncommitted: ["src/Button.tsx", "src/Card.tsx", "storybook-static/", "README.md", "package.json"] }) }), search: "", capture: capturing() },
 };
 export const NoBuild: Story = { args: { view: view([captured("components-card--default")], { storybookUrl: null, canCapture: false, setup: null }), search: "", capture: capturing({ can: false }) } };
-const withStatus = ({ view: shown, search, capture }: { view: StoriesView; search: string; capture: CaptureState }) => (
-  <>
-    <CaptureStatus capture={capture} />
-    <StoriesScreen view={shown} search={search} capture={capture} recheck={() => undefined} />
-  </>
-);
-export const CapturingTheRest: Story = { args: { view: MIXED, search: "", capture: capturing({ capturing: 3 }) }, render: withStatus };
-export const CaptureFailed: Story = { args: { view: MIXED, search: "", capture: capturing({ error: FAILED }) }, render: withStatus };
+export const CapturingTheRest: Story = { args: { view: MIXED, search: "", capture: capturing({ capturing: 3 }) } };
+export const CaptureFailed: Story = { args: { view: MIXED, search: "", capture: capturing({ error: FAILED }) } };
 export const NotCaptured: Story = {
   args: { view: MIXED, search: "", capture: capturing() },
-  render: ({ view: shown, capture }) => <UncapturedStory view={shown} story="pages-home--default" navigation={navigationIn(shown, "pages-home--default", "")} capture={capture} onWriteNote={() => undefined} />,
+  render: ({ view: shown, capture }) => (
+    <StoriesLayout view={shown} story="pages-home--default" search="">
+      <UncapturedStory view={shown} story="pages-home--default" navigation={navigationIn(shown, "pages-home--default", "")} capture={capture} onWriteNote={() => undefined} />
+    </StoriesLayout>
+  ),
 };
 export const NotCapturedAndCantBe: Story = {
   args: { view: { ...MIXED, canCapture: false }, search: "", capture: capturing({ can: false }) },
-  render: ({ view: shown, capture }) => <UncapturedStory view={shown} story="pages-home--default" navigation={navigationIn(shown, "pages-home--default", "")} capture={capture} onWriteNote={() => undefined} />,
+  render: ({ view: shown, capture }) => (
+    <StoriesLayout view={shown} story="pages-home--default" search="">
+      <UncapturedStory view={shown} story="pages-home--default" navigation={navigationIn(shown, "pages-home--default", "")} capture={capture} onWriteNote={() => undefined} />
+    </StoriesLayout>
+  ),
 };
