@@ -153,7 +153,6 @@ export function createReviewApi(source: ReviewSource): Hono {
 
   api.use(noStoreByDefault);
 
-  api.get("/current", async (context) => context.json(await source.current()));
   api.get("/stories", async (context) => context.json(await source.storiesView()));
   api.post("/captures", async (context) => {
     const { stories } = await jsonBody(context);

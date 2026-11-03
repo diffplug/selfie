@@ -54,9 +54,9 @@ const USAGE = `Usage: selfie [--port <n>] [--storybook-dir <dir>] [--native] [--
 
   ui [<run>] [--port <n>] [--storybook-dir <dir>] [--native]
       Serves the review UI on loopback until stopped, and prints its URL. Opens at this run, or
-      else the newest at HEAD. It renders only when someone asks it to on the page. Opens no
-      browser by itself. Hosts the built Storybook on a port of its own, so a story's page links
-      to the real thing, and /stories lists every story, each with its newest capture.
+      else every story, each with its newest capture. It renders only when someone asks it to on
+      the page. Opens no browser by itself. Hosts the built Storybook on a port of its own, so a
+      story's page links to the real thing.
 
   notes [--all]
       Prints the open notes a person has sent to an agent from this folder's review UI, each with
@@ -228,7 +228,7 @@ function openEveryStory(args: string[], context: Context): Promise<number> {
       port,
       native: values.native,
       storybookDir: values["storybook-dir"],
-      path: "stories",
+      path: "",
       runId: null,
       forStories: { build: values["no-build"] !== true, open: values["no-open"] !== true },
     }),

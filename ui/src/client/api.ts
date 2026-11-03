@@ -5,7 +5,6 @@ import {
   type AcceptOutcome,
   type ApiError,
   type BaselineNote,
-  type CurrentView,
   type DecisionKind,
   type DecisionTarget,
   type FeedbackView,
@@ -49,7 +48,6 @@ const post = <T>(path: string, body: unknown) => request<T>(path, { method: "POS
 
 const runRoute = (runId: string) => `/runs/${encodeURIComponent(runId)}`;
 
-export const fetchCurrent = (signal: AbortSignal) => request<CurrentView>("/current", { signal });
 export const fetchRun = (runId: string, signal: AbortSignal) => request<RunView>(runRoute(runId), { signal });
 export const fetchBaseline = (runId: string, signal: AbortSignal) => request<BaselineNote>(`${runRoute(runId)}/baseline`, { signal });
 export const fetchUnchanged = async (runId: string) => (await request<{ rows: readonly SnapshotRow[] }>(`${runRoute(runId)}/unchanged`)).rows;

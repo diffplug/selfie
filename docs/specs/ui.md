@@ -58,7 +58,6 @@ Source of truth: `ui/src/server/app.ts`; tests in `cli/test/ui.test.ts`.
 
 | Route | Does |
 |---|---|
-| `GET /api/current` | `current()` |
 | `GET /api/stories` | `storiesView` |
 | `POST /api/captures` | `{ stories }`, which `capture` records as a run |
 | `GET /api/runs/:id` | `runView` |
@@ -106,7 +105,7 @@ Source of truth: `localReviewSource` in `cli/src/ui.ts`, `useRun` in `ui/src/cli
 
 ## Which run
 
-- **Must open `/` at the newest finished run at HEAD in the project's environment.** A run still recording, or crashed, is listed and can't be opened (`docs/specs/snapshots.md` → Crashes and retries).
+- **Must link [every story](#screens) to the newest finished run at HEAD in the project's environment, as the run to review and accept.** A run still recording, or crashed, is listed on its commit's other runs and can't be opened (`docs/specs/snapshots.md` → Crashes and retries).
 - **Must say when a newer run exists at the viewed run's commit, on a run's own screens.** On [every story](#screens), an older run is what's newest for that story.
 
 ## Screens
@@ -115,12 +114,11 @@ Source of truth: `ui/src/client/`.
 
 | Path | Screen |
 |---|---|
-| `/` | Goes to the newest run, or says why there's none |
+| `/` | Every story, in the filter from the query |
+| `/stories/:story` | One story, whichever run its newest capture is from |
 | `/runs/:id` | The run |
 | `/runs/:id/stories/:story` | One snapshot, in the filter from the query |
 | `/runs/:id/accept` | Accepting |
-| `/stories` | Every story |
-| `/stories/:story` | One story, whichever run its newest capture is from |
 
 **The run** shows, in order: its commit, run ID, whether its pixels were rendered earlier and by which run, dirty state, baseline, environment, and decision actor; a warning if it was recorded dirty, has no baseline, is shown against branch goldens (`docs/specs/cli.md` → Review), or its SHA can't be a baseline; the counts; blockers; advisories; and the differences.
 
@@ -155,7 +153,7 @@ Source of truth: `ui/src/client/`.
 - **Must say what the diff image's colors mean wherever it has more than one.**
 - **Must not offer a decision on what has no image to decide on.**
 
-**Every story** is the hosted Storybook's stories, nested and ordered as its own sidebar does them, and each with its newest capture from the runs [`/` would choose from](#which-run), so several partial runs read as one (rationale). A story's page is that capture's run's, as it would be from that run's own review.
+**Every story** is the hosted Storybook's stories, nested and ordered as its own sidebar does them, and each with its newest capture from the finished runs at HEAD in the project's environment, so several partial runs read as one (rationale). A story's page is that capture's run's, as it would be from that run's own review.
 
 - **Must nest by a story's title, keep the build's order, and use its names**: a top-level section, then a component, then each story, with Storybook's own icons and colors, so a person finds what they know from it (rationale). Each folder may be closed, and a filter opens them all.
 - **Must list a story nothing has captured, show it running, and offer to capture it**, since it's still a real story to look at. A note is written on an image, so starting one captures the story first, and then opens the note box. With no way to capture here, it says what command does.
@@ -175,7 +173,7 @@ Source of truth: `ui/src/client/`.
 
 **Notes** are in `docs/specs/feedback.md`, with what they add to these screens.
 
-**Empty and failed:** no commits, no runs at HEAD, an unfinished run, an unknown run, an unknown page, nothing matching a filter, nothing differing, and the server gone each have their own words and a way on.
+**Empty and failed:** an unfinished run, an unknown run, an unknown page, nothing matching a filter, nothing differing, and the server gone each have their own words and a way on.
 
 ## Keyboard
 

@@ -198,16 +198,6 @@ export interface StoriesView {
   readonly canCapture: boolean;
 }
 
-/** Which run the UI opens to: the newest finished one at HEAD, in the project's environment. */
-export interface CurrentView {
-  readonly head: string | null;
-  readonly runId: string | null;
-  /** HEAD has runs, and none finished. */
-  readonly hasUnfinishedRun: boolean;
-  /** Only asked for if there's no run to open. */
-  readonly baseline: BaselineNote | null;
-}
-
 export interface AcceptOutcome {
   readonly accepted: boolean;
   /** Empty if accepted. These include any about the count this request passed. */
@@ -273,7 +263,6 @@ export type SendVia = "agent" | "copy";
  * status with its message.
  */
 export interface ReviewSource {
-  current(): Promise<CurrentView>;
   storiesView(): Promise<StoriesView>;
   /** Records a run of just these stories from the hosted Storybook, one at a time. */
   capture(stories: readonly string[]): Promise<{ readonly runId: string }>;

@@ -262,7 +262,7 @@ Source of truth: `cli/src/ui.ts`, and `selfie ui` in `cli/src/cli.ts`; tests in 
 
 - **Must print `{ url, port, runId, storybookUrl }` once it is listening, then keep serving until a signal**, and exit 0. `runId` is the run it was asked to open, or null.
 - **Must host the build the other commands would capture, or `--storybook-dir`'s, and the kept builds, on a free port of its own** (`docs/specs/ui.md` → Routes), whether or not there's a build yet.
-- **Must take an optional run**, and refuse a bad or unknown one with exit 2 before listening. With none, the page opens at the newest finished run at HEAD in this project's environment, or `--native`'s.
+- **Must take an optional run**, and refuse a bad or unknown one with exit 2 before listening. With none, the page opens at every story (`docs/specs/ui.md` → Screens), in this project's environment, or `--native`'s.
 - **Must ask the system for a free port unless given `--port`**, so two projects can both be served.
 - **Never open a browser.** Whoever ran it decides what to do with the URL. [`selfie` alone](#selfie-alone) is the one that does.
 - **Must load `selfie-ui` and Hono only in the commands that serve**, by a dynamic `import()`, so no other command pays for a web server. `cli/test/ui.test.ts` checks what `cli/src/cli.ts` loads.
@@ -273,7 +273,7 @@ Source of truth: `cli/src/ui.ts`, and `selfie ui` in `cli/src/cli.ts`; tests in 
 
 Source of truth: `openEveryStory` in `cli/src/cli.ts`; tests in `cli/test/ui.test.ts`. `docs/specs/feedback.md` owns what happens to a note.
 
-It's [`selfie ui`](#ui), except as below, with `runId` always null, and its URL at every story.
+It's [`selfie ui`](#ui) with no run, except as below.
 
 - **Must run the config's `buildCommand` first, once, unless `--no-build`** ([Configuration](#configuration)).
 - **Must fail with `no-stories` and exit 2, saying what to do, if there's no built Storybook after that.**

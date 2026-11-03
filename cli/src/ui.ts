@@ -6,7 +6,7 @@ import path from "node:path";
 import { isBuiltStorybook } from "selfie-ui/local";
 import { keptBuildPath } from "selfie-ui/api";
 import { buildHash, readStoriesInOrder, readStoryIndex } from "selfie-render";
-import type { AcceptOutcome, CurrentView, DecisionTarget, FeedbackView, NewNote, ReviewSource, RunView, SnapshotRow, StoriesView, StorybookLink } from "selfie-ui/app";
+import type { AcceptOutcome, DecisionTarget, FeedbackView, NewNote, ReviewSource, RunView, SnapshotRow, StoriesView, StorybookLink } from "selfie-ui/app";
 import { resolveCaptureSettings, resolveRegionMergeDistance } from "./config.ts";
 import { accept, checkAccept, decide } from "./decisions.ts";
 import { diffToPng, type PixelDiff } from "./diff.ts";
@@ -239,18 +239,6 @@ export function localReviewSource(
       } finally {
         capturing = false;
       }
-    },
-
-    async current(): Promise<CurrentView> {
-      const { environmentId: environment } = await resolveCaptureSettings(repo, { native });
-      const { head, runs } = await runsAtHead(project, environment);
-      const runId = runs.find(({ status }) => status !== "recording")?.id ?? null;
-      return {
-        head,
-        runId,
-        hasUnfinishedRun: runs.length > 0,
-        baseline: runId === null ? baselineNote(await findBaseline(project, environment)) : null,
-      };
     },
 
     async baseline(runId) {

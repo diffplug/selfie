@@ -76,15 +76,15 @@ describe("who may ask", () => {
   test("refuses any Host but its own loopback address and port, on every route", async () => {
     const refused = ["evil.example", `evil.example:${PORT}`, "127.0.0.1", "127.0.0.1:1", "0.0.0.0:4173", "[::1]:1"];
     for (const host of refused) {
-      for (const url of ["/api/current", "/", `/api/images/${UNKNOWN_HASH}`, "/assets/a.js"]) {
+      for (const url of ["/api/stories", "/", `/api/images/${UNKNOWN_HASH}`, "/assets/a.js"]) {
         const response = await app.request(url, { headers: { host } });
         expect(response.status, `${host} ${url}`).toBe(403);
         expect(await response.json()).toMatchObject({ error: { code: "bad-host" } });
       }
     }
-    expect((await app.request("/api/current")).status).toBe(403);
-    expect((await get("/api/current", { host: `localhost:${PORT}` })).status).toBe(200);
-    expect((await get("/api/current", { host: HOST })).status).toBe(200);
+    expect((await app.request("/api/stories")).status).toBe(403);
+    expect((await get("/api/stories", { host: `localhost:${PORT}` })).status).toBe(200);
+    expect((await get("/api/stories", { host: HOST })).status).toBe(200);
   });
 
   describe("a change from another site", () => {
@@ -148,9 +148,9 @@ describe("who may ask", () => {
     });
 
     test("can't be read or framed", async () => {
-      expect((await get("/api/current", { origin: "https://evil.example" })).status).toBe(403);
-      const refused = await get("/api/current", { host: "evil.example" });
-      for (const response of [await get("/"), await get("/api/current"), refused]) {
+      expect((await get("/api/stories", { origin: "https://evil.example" })).status).toBe(403);
+      const refused = await get("/api/stories", { host: "evil.example" });
+      for (const response of [await get("/"), await get("/api/stories"), refused]) {
         expect(response.headers.get("content-security-policy")).toBe(
           "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
         );
@@ -198,23 +198,17 @@ describe("pages", () => {
 });
 
 describe("which run", () => {
-  test("says when there are none yet, and why", async () => {
-    const current = (await (await get("/api/current")).json()) as any;
-    expect(current).toEqual({
-      head: git(h.repo, "rev-parse", "HEAD"),
-      runId: null,
-      hasUnfinishedRun: false,
-      baseline: { sha: null, message: expect.any(String) },
-    });
+  const newest = async () => ((await (await get("/api/stories")).json()) as StoriesView);
+
+  test("says the commit, with no run yet", async () => {
+    expect(await newest()).toMatchObject({ head: git(h.repo, "rev-parse", "HEAD"), newestRunId: null });
   });
 
   test("is the newest finished one at HEAD, in this environment", async () => {
     h.stories = [{ id: "a" }];
     const { environment } = (await review()).json;
     const second = (await review()).json.runId;
-    const current = async () => (await (await get("/api/current")).json()) as any;
-    // With a run to open, nothing asks Git about baselines.
-    expect(await current()).toEqual({ head: expect.any(String), runId: second, hasUnfinishedRun: true, baseline: null });
+    expect((await newest()).newestRunId).toBe(second);
 
     // A review still recording, or crashed, can't be compared.
     const recording = await project.snapshots.beginRun({
@@ -224,13 +218,13 @@ describe("which run", () => {
       dirty: false,
       baselineSha: null,
     });
-    expect((await current()).runId).toBe(second);
+    expect((await newest()).newestRunId).toBe(second);
     const unfinished = await get(`/api/runs/${recording.id}`);
     expect(unfinished.status).toBe(409);
     expect(await unfinished.json()).toMatchObject({ error: { code: "run-not-finished" } });
 
     await commit(h.repo, "moved on");
-    expect(await current()).toMatchObject({ runId: null, hasUnfinishedRun: false });
+    expect((await newest()).newestRunId).toBeNull();
     // Though a run of an earlier commit is still there to view.
     expect((await get(`/api/runs/${second}`)).status).toBe(200);
   });
@@ -790,7 +784,7 @@ describe("selfie ui", () => {
       await writeBuild();
       const { stop, exit, json, stderr } = await bare("--storybook-dir", dir());
       const { url, port, storybookUrl, runId } = json();
-      expect(url).toBe(`http://127.0.0.1:${port}/stories`);
+      expect(url).toBe(`http://127.0.0.1:${port}/`);
       expect(runId).toBeNull();
       expect(stderr()).toContain(url);
       expect(opened).toEqual([url]);
@@ -911,7 +905,7 @@ describe("selfie ui", () => {
     expect(stderr()).toContain("Serving");
     const page = await fetch(url);
     expect(await page.text()).toContain("the client");
-    expect((await fetch(`${url}api/current`)).status).toBe(200);
+    expect((await fetch(`${url}api/stories`)).status).toBe(200);
     stop.abort();
     expect(await exit).toBe(0);
     await expect(fetch(url)).rejects.toThrow();
@@ -968,12 +962,12 @@ describe("selfie ui", () => {
     const source = localReviewSource(project);
     const server: LocalServer = await serveLocal({ source, port: 0, clientDir });
     try {
-      expect((await fetch(`${server.url}api/current`)).status).toBe(200);
+      expect((await fetch(`${server.url}api/stories`)).status).toBe(200);
       const external = Object.values(networkInterfaces())
         .flat()
         .filter((address) => address !== undefined && !address.internal && address.family === "IPv4");
       for (const address of external) {
-        await expect(fetch(`http://${address!.address}:${server.port}/api/current`)).rejects.toThrow();
+        await expect(fetch(`http://${address!.address}:${server.port}/api/stories`)).rejects.toThrow();
       }
     } finally {
       await server.close();
@@ -1058,8 +1052,8 @@ describe("the hosted Storybook", () => {
     const server = await serveLocal({ source: localReviewSource(project), port: 0, clientDir });
     try {
       expect(new URL(hosted.url).port).not.toBe(String(server.port));
-      expect((await fetch(`${hosted.url}api/current`)).status).toBe(404);
-      const fromStory = await fetch(`${server.url}api/current`, { headers: { origin: hosted.url.slice(0, -1) } });
+      expect((await fetch(`${hosted.url}api/stories`)).status).toBe(404);
+      const fromStory = await fetch(`${server.url}api/stories`, { headers: { origin: hosted.url.slice(0, -1) } });
       expect(fromStory.status).toBe(403);
     } finally {
       await Promise.all([hosted.close(), server.close()]);

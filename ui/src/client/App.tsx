@@ -1,25 +1,13 @@
 import { Heading } from "@primer/react";
-import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
-import { fetchCurrent } from "./api.ts";
+import { useLayoutEffect, useRef, type ReactNode } from "react";
 import { AcceptScreen } from "./AcceptScreen.tsx";
 import { DetailScreen } from "./DetailScreen.tsx";
 import { FeedbackBar, NewerRunBanner } from "./Feedback.tsx";
-import { useFeedback, useFetched, useRun, useTitle } from "./hooks.ts";
+import { useFeedback, useRun } from "./hooks.ts";
 import { StoriesRoutes } from "./StoriesScreen.tsx";
-import { AppLink, navigate, parseRoute, runPath, storyPath, useLocation, type Route } from "./router.tsx";
+import { AppLink, parseRoute, storyPath, useLocation, type Route } from "./router.tsx";
 import { RunScreen } from "./RunScreen.tsx";
-import { LoadFailure, Loading, NoRuns, NotFound } from "./Status.tsx";
-
-function Home() {
-  useTitle("Newest run");
-  const { data: current, error } = useFetched("current", fetchCurrent);
-  useEffect(() => {
-    if (current?.runId) navigate(runPath(current.runId), { replace: true });
-  }, [current?.runId]);
-  if (error !== null) return <LoadFailure error={error} />;
-  if (current === null || current.runId !== null) return <Loading label="Finding the newest run" />;
-  return <NoRuns current={current} />;
-}
+import { LoadFailure, Loading, NotFound } from "./Status.tsx";
 
 /** Holds the run across its screens, so moving between them doesn't read it again. */
 function RunRoutes({ runId, route, search }: { runId: string; route: Route; search: string }) {
@@ -75,7 +63,6 @@ export function App() {
   }, [pathname]);
   return (
     <Page>
-      {route.kind === "home" && <Home />}
       {route.kind === "missing" && <NotFound />}
       {(route.kind === "stories" || route.kind === "anyStory") && <StoriesRoutes story={route.kind === "anyStory" ? route.story : null} search={search} />}
       {(route.kind === "run" || route.kind === "story" || route.kind === "accept") && (
