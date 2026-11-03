@@ -5,10 +5,12 @@
   "license": "FSL-1.1-MIT",
   "type": "module",
   "exports": {
+    "./api": "./src/shared/api.ts",
     "./app": "./src/server/app.ts",
     "./regions": "./src/shared/regions.ts",
     "./notes": "./src/shared/notes.ts",
     "./local": "./src/server/local.ts",
+    "./storybook": "./src/server/storybook.ts",
     "./sync": "./src/server/sync.ts",
     "./sync-api": "./src/shared/sync-api.ts"
   },

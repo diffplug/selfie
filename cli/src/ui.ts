@@ -1,10 +1,9 @@
 // The review UI's window on a local repository: the library, as the shape its routes want. Nothing
 // here renders, so the UI only reads what `selfie review` recorded and records decisions on it.
 import type { Comparison, DecisionKind } from "selfie-store";
-import { stat } from "node:fs/promises";
 import path from "node:path";
-import { buildHash } from "selfie-render";
 import { isBuiltStorybook } from "selfie-ui/local";
+import { keptBuildPath } from "selfie-ui/api";
 import type { AcceptOutcome, CurrentView, DecisionTarget, FeedbackView, NewNote, ReviewSource, RunView, SnapshotRow, StorybookLink } from "selfie-ui/app";
 import { resolveCaptureSettings, resolveRegionMergeDistance } from "./config.ts";
 import { accept, checkAccept, decide } from "./decisions.ts";
@@ -27,18 +26,12 @@ export function localReviewSource(
 ): ReviewSource {
   const { snapshots, store, repo } = project;
 
-  /** Hashing a whole build is too slow for every view, and a rebuild rewrites these. */
-  let knownBuild: { readonly stamp: string; readonly hash: Promise<string | null> } | null = null;
-  const hostedBuild = async (dir: string): Promise<string | null> => {
-    const stamp = (await Promise.all(["iframe.html", "index.json"].map((file) => stat(path.join(dir, file)).then(({ mtimeMs }) => mtimeMs, () => null)))).join();
-    if (knownBuild?.stamp !== stamp) knownBuild = { stamp, hash: buildHash(dir) };
-    return knownBuild.hash;
-  };
-
+  /** The very build that rendered a run, if that's kept, or else the directory as it stands. */
   const storybookFor = async (runId: string): Promise<StorybookLink | null> => {
-    if (storybook === undefined || !isBuiltStorybook(storybook.dir)) return null;
-    const [hosted, rendered] = await Promise.all([hostedBuild(storybook.dir), project.renders.buildOf(runId)]);
-    return { url: storybook.url, renderedThisRun: hosted === null || rendered === null ? null : hosted === rendered };
+    if (storybook === undefined) return null;
+    const kept = await project.builds.keptBuildOfRun(runId);
+    if (kept !== null) return { url: new URL(keptBuildPath(kept), storybook.url).href, exactBuild: true };
+    return isBuiltStorybook(storybook.dir) ? { url: storybook.url, exactBuild: false } : null;
   };
 
   /** A corrupt cache costs only pixel stats in a list, so it isn't worth failing a page over. */

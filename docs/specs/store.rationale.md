@@ -59,6 +59,12 @@ All 1,623 of those images came back from `sharp` with exactly the same pixels, i
 
 **`sharp`'s license.** `sharp` is Apache-2.0. Its prebuilt `@img/sharp-libvips-*` packages are LGPL-3.0-or-later, installed as separate npm packages and linked dynamically. That was read from their `package.json` files, and isn't legal advice.
 
+## Storybook builds
+
+**Why by file, and why one list.** Storybook names most of its files by their content, so most of a build survives a rebuild. This repository's build is 10 MB in 65 files, and Dormouse's 568 stories are 12 MB in 390 files, both measured 2026-11. Dormouse's first keep added about 3.4 s to a record. A row per file would write that many rows for every build, and take a request for every file a page loads. One list is one blob, read once.
+
+**Why the first list stays.** A build's hash ignores what can't change a pixel (`docs/specs/render.md`), so two builds with one hash can differ in `project.json`. Either answer is fine, and keeping the first means a kept build never changes, which a browser's cache relies on.
+
 ## Adapters
 
 **Statement size limit.** Measured on real D1, 2026-11: a 100,000 byte statement runs, and 100,001 fails with `SQLITE_TOOBIG`. Nothing checked this locally before, so an oversized query would only have failed in the cloud.

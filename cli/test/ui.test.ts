@@ -844,7 +844,7 @@ describe("the hosted Storybook", () => {
     await writeFile(path.join(dir, "assets", "story.js"), "export {};");
   };
 
-  const storybook = () => createStorybookApp({ dir, port: () => STORYBOOK_PORT });
+  const storybook = () => createStorybookApp({ dir, port: () => STORYBOOK_PORT, readBuildFile: (build, file) => project.builds.readFile(build, file) });
   const read = (url: string, host = `127.0.0.1:${STORYBOOK_PORT}`) => storybook().request(url, { headers: { host } });
 
   beforeEach(() => {
@@ -894,7 +894,7 @@ describe("the hosted Storybook", () => {
 
   test("the review API refuses a story's page, since it's another origin", async () => {
     await built();
-    const hosted = await serveStorybook({ dir });
+    const hosted = await serveStorybook({ dir, readBuildFile: async () => null });
     const server = await serveLocal({ source: localReviewSource(project), port: 0, clientDir });
     try {
       expect(new URL(hosted.url).port).not.toBe(String(server.port));
@@ -906,10 +906,48 @@ describe("the hosted Storybook", () => {
     }
   });
 
-  describe("what a run says of it", () => {
+  describe("a kept build", () => {
+    const hash = "a".repeat(64);
+    const kept = async () => {
+      const files = [
+        { path: "index.html", fileHash: await project.builds.putFile(new TextEncoder().encode("<!doctype html><title>kept</title>")) },
+        { path: "assets/a b.js", fileHash: await project.builds.putFile(new TextEncoder().encode("export {};")) },
+      ];
+      await project.builds.putBuild(hash, files);
+    };
+
+    test("serves its files, and a browser may keep them", async () => {
+      await kept();
+      const page = await read(`/storybook-builds/${hash}/`);
+      expect(await page.text()).toContain("kept");
+      expect(page.headers.get("content-type")).toContain("text/html");
+      expect(page.headers.get("cache-control")).toContain("immutable");
+      expect(page.headers.get("x-frame-options")).toBe("SAMEORIGIN");
+      const script = await read(`/storybook-builds/${hash}/assets/a%20b.js`);
+      expect(await script.text()).toBe("export {};");
+      expect(script.headers.get("content-type")).toContain("javascript");
+    });
+
+    test.each(["/storybook-builds/nope/", `/storybook-builds/${"b".repeat(64)}/`, `/storybook-builds/${hash}/missing.js`, `/storybook-builds/${hash}/..%2f..%2fsecret.txt`, `/storybook-builds/${hash}/%ff`])(
+      "has no such thing as %s",
+      async (url) => {
+        await kept();
+        expect((await read(url)).status).toBe(404);
+      },
+    );
+
+    test("answers only to its own loopback address, and is only to read", async () => {
+      await kept();
+      expect((await read(`/storybook-builds/${hash}/`, "evil.example")).status).toBe(403);
+      const post = await storybook().request(`/storybook-builds/${hash}/`, { method: "POST", headers: { host: `127.0.0.1:${STORYBOOK_PORT}` } });
+      expect(post.status).toBe(405);
+    });
+  });
+
+  describe("what a run links to", () => {
     const hosted = () => localReviewSource(project, { storybook: { dir, url: hostedAt } });
     const reviewedBuild = async (...flags: string[]) => (await h.cli("review", "--storybook-dir", dir, ...flags)).json.runId as string;
-    const says = async (runId: string, source = hosted()) => (await source.runView(runId)).storybook?.renderedThisRun;
+    const linkOf = async (runId: string) => (await hosted().runView(runId)).storybook;
 
     beforeEach(() => {
       h.stories = [{ id: "a" }, { id: "b" }];
@@ -917,54 +955,44 @@ describe("the hosted Storybook", () => {
 
     test("nothing, with no build, or nothing hosted", async () => {
       const runId = (await review()).json.runId as string;
-      expect((await hosted().runView(runId)).storybook).toBeNull();
+      expect(await linkOf(runId)).toBeNull();
       await built();
       expect((await localReviewSource(project).runView(runId)).storybook).toBeNull();
     });
 
-    test("that nobody knows, for a run that didn't say which build rendered it", async () => {
+    test("the directory, and that it may not match, for a run whose own build wasn't kept", async () => {
       const runId = (await review()).json.runId as string;
       await built();
-      expect((await hosted().runView(runId)).storybook).toEqual({ url: hostedAt, renderedThisRun: null });
+      expect(await linkOf(runId)).toEqual({ url: hostedAt, exactBuild: false });
     });
 
-    test("that this is the build that rendered it, until it's rebuilt", async () => {
+    test("the very build that rendered it, wherever the directory has gone since", async () => {
       await built();
       const runId = await reviewedBuild();
-      const source = hosted();
-      expect(await says(runId, source)).toBe(true);
-      await writeFile(path.join(dir, "index.json"), '{"rebuilt":true}');
-      expect(await says(runId, source)).toBe(false);
+      const link = await linkOf(runId);
+      expect(link).toMatchObject({ exactBuild: true, url: expect.stringContaining(`${hostedAt}storybook-builds/`) });
+      await writeFile(path.join(dir, "index.html"), "<!doctype html><title>the next build</title>");
+      expect(await linkOf(runId)).toEqual(link);
+      expect(await (await read(new URL(link!.url).pathname)).text()).toContain("the manager");
+      expect(await (await read("/")).text()).toContain("the next build");
     });
 
-    test("the same of a render the same build reused", async () => {
+    test("the same for a run that reused an earlier render, a filtered one, and one where a story failed", async () => {
       await built();
       const first = await reviewedBuild();
       await commit(h.repo, "something that doesn't change the build");
       const reused = await reviewedBuild();
       expect(reused).not.toBe(first);
-      expect(await says(reused)).toBe(true);
-      expect(await says(first)).toBe(true);
-    });
-
-    test("the same of a filtered run, and of one where a story failed", async () => {
-      await built();
-      expect(await says(await reviewedBuild("--story", "a"))).toBe(true);
+      expect((await linkOf(reused))?.exactBuild).toBe(true);
+      expect((await linkOf(await reviewedBuild("--story", "a")))?.exactBuild).toBe(true);
       h.stories = [{ id: "a", failed: "it threw" }, { id: "b" }];
-      expect(await says(await reviewedBuild())).toBe(true);
+      expect((await linkOf(await reviewedBuild()))?.exactBuild).toBe(true);
     });
 
-    test("nothing of a build that changed while it rendered", async () => {
+    test("not a build that changed while it rendered", async () => {
       await built();
       h.onCapture = () => writeFileSync(path.join(dir, "index.json"), '{"changed":true}');
-      expect(await says(await reviewedBuild())).toBeNull();
-    });
-
-    test("survives a build being rewritten as it's asked", async () => {
-      await built();
-      const runId = await reviewedBuild();
-      await rm(path.join(dir, "index.json"));
-      expect(await says(runId)).toBe(false);
+      expect((await linkOf(await reviewedBuild()))?.exactBuild).toBe(false);
     });
   });
 });

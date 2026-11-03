@@ -107,12 +107,15 @@ export interface BaselineNote {
 
 export type RunListing = Pick<Run, "id" | "startedAt" | "status" | "dirty">;
 
-/** The Storybook this server is hosting beside the review, to open a story's real, running page. */
+/** Where a kept build is, on a hosted Storybook's origin, ending in a slash. Crosses into `selfie-cli` from here. */
+export const keptBuildPath = (build: string) => `/storybook-builds/${build}/`;
+
+/** A Storybook to open a run's stories in, on an origin of its own. */
 export interface StorybookLink {
-  /** Its own origin, ending in a slash. */
+  /** Ending in a slash. */
   readonly url: string;
-  /** Whether that build rendered this run, or null if nobody knows. If it isn't so, a story may not look like its image. */
-  readonly renderedThisRun: boolean | null;
+  /** Whether it's the very build that rendered this run. If it isn't, a story may not look like its image. */
+  readonly exactBuild: boolean;
 }
 
 /** Everything a screen shows about a run, recomputed from `summarizeRun` after every action. */

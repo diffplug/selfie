@@ -78,8 +78,7 @@ function StorybookLinkTo({ storybook, story }: { storybook: StorybookLink; story
       <Link href={`${storybook.url}?path=/story/${encodeURIComponent(story)}`} target="_blank" rel="noreferrer noopener">
         Open in Storybook <LinkExternalIcon />
       </Link>
-      {storybook.renderedThisRun === false && <Text className="selfie-muted">A different build from this run&apos;s, so it may not match.</Text>}
-      {storybook.renderedThisRun === null && <Text className="selfie-muted">Selfie doesn&apos;t know if this build rendered this run, so it may not match.</Text>}
+      {!storybook.exactBuild && <Text className="selfie-muted">This run&apos;s own build wasn&apos;t kept, so it&apos;s the latest, which may not match.</Text>}
     </>
   );
 }

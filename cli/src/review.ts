@@ -23,6 +23,7 @@ import {
   type RecordedSnapshot,
   type RawImage,
   type Run,
+  type StorybookBuildFile,
   type StoryFilter,
 } from "selfie-store";
 import { resolveCaptureSettings, resolveRegionMergeDistance, resolveStorybookDir, type CaptureSettings } from "./config.ts";
@@ -373,6 +374,24 @@ async function renderFresh(
   };
 }
 
+/**
+ * Says which build rendered a run, and keeps that build so its stories can still be opened. A build
+ * that changed while it rendered isn't what rendered these images, so nothing is said of it. The run
+ * is sound either way, so failing to keep a build only costs its stories' links.
+ */
+async function keepBuild(project: Project, run: Run, storybookDir: string, before: string | null, log: (line: string) => void): Promise<void> {
+  if (before === null) return;
+  try {
+    const files: StorybookBuildFile[] = [];
+    const after = await buildHash(storybookDir, async (path, bytes) => void files.push({ path, fileHash: await project.builds.putFile(bytes) }));
+    if (after !== before) return;
+    await project.builds.putBuild(before, files);
+    await project.builds.recordRunBuild(run.id, before);
+  } catch (error) {
+    log(`This run's Storybook wasn't kept: ${(error as Error).message}`);
+  }
+}
+
 /** What a run says about where it was recorded. */
 interface RunFacts {
   readonly gitSha: string;
@@ -479,8 +498,7 @@ async function recordBuild(project: Project, options: RecordOptions, { reuse }: 
     if (existing === null) {
       log(`Recorded run ${run.id}: ${recording.storyIds.length} stories.`);
       await recording.finished(run);
-      // A build that changed while it rendered isn't what rendered these images, so nothing is said.
-      if (buildBefore !== null && buildBefore === (await buildHash(storybookDir))) await project.renders.rememberBuild(run.id, buildBefore);
+      await keepBuild(project, run, storybookDir, buildBefore, log);
     } else {
       log(`Run ${run.id} already describes this build at this commit, so nothing new was recorded. selfie record renders again.`);
     }

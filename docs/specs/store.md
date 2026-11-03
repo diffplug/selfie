@@ -1,9 +1,9 @@
 # Store
 
-> Status: built — the store core, image checks and decoding, WebP storage with PNG as its fallback, its local SQLite and filesystem adapters, and the D1 REST and R2 adapters exist. A question stays open; see `## Future`.
+> Status: built — the store core, image checks and decoding, WebP storage with PNG as its fallback, kept Storybook builds, its local SQLite and filesystem adapters, and the D1 REST and R2 adapters exist. Questions stay open; see `## Future`.
 >
 > - See `docs/specs/glossary.md` for image, image hash, image key, and store.
-> - Owns image identity, image decoding, image keys, and hash collisions. The build order belongs to `docs/specs/system.md`. Snapshots, runs, and goldens belong to `docs/specs/snapshots.md`.
+> - Owns image identity, image decoding, image keys, hash collisions, and how Storybook builds are kept. The build order belongs to `docs/specs/system.md`. Snapshots, runs, and goldens belong to `docs/specs/snapshots.md`.
 
 ## Image identity
 
@@ -67,7 +67,17 @@ Source of truth: `store/src/core/store.ts`, `store/src/core/image-file.ts`; test
 - **Must look up each group's hashes in one statement, and do nothing more for a hash with a row**: no blob call and no insert, since bytes are always written first. Everything else inserts as [Image keys](#image-keys) says, so a concurrent insert stays safe.
 - **Must test collisions two ways:** an injected hash function for the logic, and a committed pair of real images whose hashes collide at 53 bits. The test recomputes both hashes from the committed images. `pnpm find-collision` regenerates the pair, separately from the test run.
 
+## Storybook builds
+
+Source of truth: `store/src/core/storybook-builds.ts`; tests in `store/test/storybook-builds.test.ts`. A build is named by `buildHash` (`docs/specs/render.md` → Render identity).
+
+- **Must keep a build's files by the hash of their exact bytes**, at `storybook-files/<sha256>`, so builds that share a file share its bytes, and a rebuilt directory costs only what changed (rationale).
+- **Must write a build's files, then one blob listing them, at `storybook-builds/<hash>`**, so a build with that blob is whole, and nothing serves one that's only partly written (`StorybookBuilds.has`). **The first list stays** (rationale).
+- **Must look up a file only by its whole path within a build**, never reaching a file system, so nothing in a path can climb out of it.
+- **Must say which build rendered a run, in `run_builds(run_id, build)`**, since it's a fact about the run. Reserved: both are in the store rather than the CLI's local tables for **Scope: cloud-deploy** (`docs/specs/ui.md` → Not built).
+
 ## Adapters
+
 
 Source of truth: `store/src/core/sql.ts`, `store/src/core/blob.ts`, `store/src/adapters/`; the contract suite is `store/test/contract/`.
 
@@ -118,7 +128,7 @@ Source of truth: `store/src/adapters/r2.ts`; tests in `store/test/workerd/r2.wor
 - **Must key cloud blobs by project and image hash**, never by image key, and never shared across projects. The object key is `projects/<project>/<blob key>`, so the same image in two projects is two objects.
 - **Must refuse a project identifier that isn't one blob key segment**, as [Adapters](#adapters) defines a segment, so it holds no `/` and no project's prefix can lie inside another's. A blob key can't climb out of its prefix, by the same rule.
 - **Must give a project an identifier that never passes to another project**, since the identifier is all that separates their objects. Reserved: a project's identifier is its GitHub repository ID (`docs/specs/access.md` → GitHub App).
-- **Must treat R2's per-key write limit as a concurrent put, not a failure.** R2 allows [one write per second per key](https://developers.cloudflare.com/r2/platform/limits/) and throws error 10058 for more. If a blob is then at the key, the put is done, since everything put at a key decodes to the same pixels. If not, it resends after a jittered doubling delay, a bounded number of times, then fails with R2's error. Any other error fails at once.
+- **Must treat R2's per-key write limit as a concurrent put, not a failure.** R2 allows [one write per second per key](https://developers.cloudflare.com/r2/platform/limits/) and throws error 10058 for more. If a blob is then at the key, the put is done, since everything put at a key is interchangeable (`BlobStorage.put`). If not, it resends after a jittered doubling delay, a bounded number of times, then fails with R2's error. Any other error fails at once.
 - **Must run the blob contract against the real binding inside workerd, never a mock or a Node-side proxy**, as part of `pnpm test`, since workerd's local R2 needs no network or credentials. Local R2 does not enforce the per-key write limit, so tests raise error 10058 over the binding. No test has run against real R2.
 
 ## Future
@@ -127,4 +137,5 @@ Source of truth: `store/src/adapters/r2.ts`; tests in `store/test/workerd/r2.wor
 
 ### Open questions
 
+- **Removing what's kept.** Nothing removes a kept image or Storybook build, so a local store only grows, by what a build changes. Decide what may go, since a run or a golden can still refer to it.
 - **Schema migrations.** How a schema change reaches every project database, and how the app treats a database still on the older schema. Until then a change may only add tables and indexes, through `initStoreSchema`, with one exception made before any project database existed (`docs/specs/snapshots.md` → Schema).
