@@ -758,7 +758,7 @@ describe("selfie ui", () => {
       expect(runId).toBeNull();
       expect(stderr()).toContain("selfie agent-await-feedback");
       const { stories, canCapture } = (await (await fetch(`http://127.0.0.1:${port}/api/stories`)).json()) as StoriesView;
-      expect(stories).toEqual([{ story: "a", capture: null }]);
+      expect(stories).toEqual([{ story: "a", title: "", name: "", capture: null }]);
       expect(canCapture).toBe(true);
       expect(await (await fetch(`${storybookUrl}iframe.html`)).text()).toContain("the preview");
       stop.abort();
@@ -1038,8 +1038,8 @@ describe("the hosted Storybook", () => {
       await withStories("a", "b");
       const view = await live();
       expect(view.stories).toEqual([
-        { story: "a", capture: null },
-        { story: "b", capture: null },
+        { story: "a", title: "T", name: "a", capture: null },
+        { story: "b", title: "T", name: "b", capture: null },
       ]);
       expect(view.newestRunId).toBeNull();
       expect(view.storybookUrl).toBe(hostedAt);
@@ -1055,6 +1055,13 @@ describe("the hosted Storybook", () => {
       expect(captures.b).toMatchObject({ runId: partial, state: "new", fromHostedBuild: true, dirty: false });
       expect(captures.c).toMatchObject({ runId: whole });
       expect((await live()).newestRunId).toBe(partial);
+    });
+
+    test("keeps the order the build lists them in, and what it calls them", async () => {
+      await withStories("z", "a", "m");
+      const { stories } = await live();
+      expect(stories.map(({ story }) => story)).toEqual(["z", "a", "m"]);
+      expect(stories[0]).toMatchObject({ title: "T", name: "z" });
     });
 
     test("leaves a story out if the build no longer has it, and lists a new one as not captured", async () => {

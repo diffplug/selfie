@@ -175,6 +175,10 @@ export interface StoryCaptureInfo {
 
 export interface ListedStory {
   readonly story: string;
+  /** Its path in the Storybook's sidebar, such as `Screens/Accept`, or nothing if that's not known. */
+  readonly title: string;
+  /** What the sidebar calls it, or its ID if that's not known. */
+  readonly name: string;
   /** Null if no run at HEAD has captured it. */
   readonly capture: StoryCaptureInfo | null;
 }
@@ -186,7 +190,7 @@ export interface StoriesView {
   readonly storybookUrl: string | null;
   /** The size a story renders at here now. */
   readonly viewport: { readonly width: number; readonly height: number };
-  /** In ID order. */
+  /** In the order the Storybook's sidebar shows them. */
   readonly stories: readonly ListedStory[];
   /** The newest finished run at HEAD, to review and accept. */
   readonly newestRunId: string | null;

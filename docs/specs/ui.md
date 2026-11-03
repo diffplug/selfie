@@ -155,8 +155,9 @@ Source of truth: `ui/src/client/`.
 - **Must say what the diff image's colors mean wherever it has more than one.**
 - **Must not offer a decision on what has no image to decide on.**
 
-**Every story** is the hosted Storybook's stories, each with its newest capture from the runs [`/` would choose from](#which-run), so several partial runs read as one (rationale). A story's page is that capture's run's, as it would be from that run's own review.
+**Every story** is the hosted Storybook's stories, nested and ordered as its own sidebar does them, and each with its newest capture from the runs [`/` would choose from](#which-run), so several partial runs read as one (rationale). A story's page is that capture's run's, as it would be from that run's own review.
 
+- **Must nest by a story's title, keep the build's order, and use its names**: a top-level section, then a package for a component, then a bookmark for each story, so a person finds what they know from Storybook. Each folder may be closed, and a filter opens them all.
 - **Must list a story nothing has captured, show it running, and offer to capture it**, since it's still a real story to look at. A note is written on an image, so starting one captures the story first, and then opens the note box. With no way to capture here, it says what command does.
 - **Must offer to capture again whatever story is on screen, and every story with no capture or one known to be from another build, as Capture the rest**, which is how a change fans out to the rest of a Storybook. Asking for every story records a whole run, not a filtered one, which can become goldens (rationale).
 - **Must capture only from the hosted Storybook as it stands, and one capture at a time**, refusing a second with `capture-busy`. It never builds, since a page must not be able to run a shell (`docs/specs/cli.md` → Configuration).

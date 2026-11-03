@@ -8,11 +8,19 @@ import { approved, OTHER_RUN_ID, RUN_ID, SHA } from "./stories/fixtures.ts";
 // The renderer fixes the clock, so a relative date always reads the same there.
 const CAPTURED_AT = Date.UTC(2026, 0, 15, 11);
 
+/** What a sidebar would call a story with this ID, `components-button--primary`. */
+const named = (story: string) => {
+  const [path = "", name = ""] = story.split("--");
+  const words = (text: string) => text.replace(/(^|-)(\w)/g, (_, gap: string, letter: string) => (gap === "" ? "" : " ") + letter.toUpperCase());
+  return { title: path.split("-").map(words).join("/"), name: words(name) };
+};
+
 const captured = (story: string, overrides: Partial<NonNullable<ListedStory["capture"]>> = {}): ListedStory => ({
   story,
+  ...named(story),
   capture: { runId: RUN_ID, state: "unchanged", decision: null, capturedAt: CAPTURED_AT, dirty: false, fromHostedBuild: true, ...overrides },
 });
-const uncaptured = (story: string): ListedStory => ({ story, capture: null });
+const uncaptured = (story: string): ListedStory => ({ story, ...named(story), capture: null });
 
 const view = (stories: readonly ListedStory[], overrides: Partial<StoriesView> = {}): StoriesView => ({
   head: SHA,

@@ -1,6 +1,6 @@
 // Every story of the hosted Storybook, each with its newest capture at HEAD, whichever run that was.
 // A story's page is its run's, so looking at one here and in that run's review is the same screen.
-import { ArrowLeftIcon, SearchIcon } from "@primer/octicons-react";
+import { ArrowLeftIcon, BookmarkIcon, ChevronDownIcon, ChevronRightIcon, FileDirectoryIcon, PackageIcon, SearchIcon } from "@primer/octicons-react";
 import { Banner, Button, FormControl, Heading, RelativeTime, Stack, Text, TextInput } from "@primer/react";
 import { Blankslate, ScrollableRegion, Table } from "@primer/react/experimental";
 import { useMemo, useRef, useState } from "react";
@@ -15,9 +15,10 @@ import { plural } from "./plural.ts";
 import { ActionFailedBanner } from "./RunNotes.tsx";
 import { anyStoryPath, AppLink, followLink, navigate, runPath, storiesPath } from "./router.tsx";
 import { LoadFailure, Loading } from "./Status.tsx";
+import { buildStoryTree, isSection, storiesIn, visibleRows, type StoryFolder } from "./storyTree.ts";
 import { DecisionLabel, shortSha, StateLabel } from "./words.tsx";
 
-const matching = (stories: readonly ListedStory[], text: string) => stories.filter(({ story }) => matchesText(story, text));
+const matching = (stories: readonly ListedStory[], text: string) => stories.filter(({ story, title, name }) => matchesText(`${story} ${title} ${name}`, text));
 
 /** What a capture can't be relied on for, in words, or nothing if it can. */
 function captureCaveats({ capture }: ListedStory): string {
@@ -25,15 +26,21 @@ function captureCaveats({ capture }: ListedStory): string {
   return [capture.dirty && "Uncommitted changes", capture.fromHostedBuild === false && "From another build"].filter(Boolean).join(", ");
 }
 
-function StoryRow({ entry, search }: { entry: ListedStory; search: string }) {
+/** Indents a row by how deep it is, as the Storybook's sidebar does. */
+const indented = (depth: number) => ({ paddingLeft: `calc(${depth} * var(--base-size-20))` });
+
+function StoryRow({ entry, depth, search }: { entry: ListedStory; depth: number; search: string }) {
   const href = anyStoryPath(entry.story, search);
   const { capture } = entry;
   return (
     <Table.Row>
       <Table.Cell>
-        <a href={href} data-story={entry.story} onClick={(event) => followLink(event, href)}>
-          {entry.story}
-        </a>
+        <span className="selfie-tree-label" style={indented(depth)}>
+          <BookmarkIcon className="selfie-tree-story-icon" />
+          <a href={href} data-story={entry.story} title={entry.story} onClick={(event) => followLink(event, href)}>
+            {entry.name}
+          </a>
+        </span>
       </Table.Cell>
       <Table.Cell>{capture === null ? <span className="selfie-muted">Not captured</span> : <StateLabel state={capture.state} />}</Table.Cell>
       <Table.Cell>{capture !== null && <DecisionLabel row={capture} />}</Table.Cell>
@@ -42,6 +49,66 @@ function StoryRow({ entry, search }: { entry: ListedStory; search: string }) {
         <span className="selfie-muted">{captureCaveats(entry)}</span>
       </Table.Cell>
     </Table.Row>
+  );
+}
+
+function FolderRow({ folder, depth, open, onToggle }: { folder: StoryFolder; depth: number; open: boolean; onToggle: () => void }) {
+  const stories = storiesIn(folder);
+  const captured = stories.filter(({ capture }) => capture !== null).length;
+  const section = isSection(folder, depth);
+  const Icon = folder.children.every((child) => child.kind === "story") ? PackageIcon : FileDirectoryIcon;
+  return (
+    <Table.Row className="selfie-tree-folder">
+      <Table.Cell style={{ gridColumn: "1 / -1" }}>
+        <span className="selfie-tree-label" style={indented(depth)}>
+          <button type="button" className="selfie-tree-toggle" aria-expanded={open} onClick={onToggle}>
+            {open ? <ChevronDownIcon /> : <ChevronRightIcon />}
+            {!section && <Icon className="selfie-tree-folder-icon" />}
+            <span className={section ? "selfie-tree-section" : undefined}>{folder.name}</span>
+          </button>
+          <span className="selfie-muted">
+            {captured.toLocaleString()} of {plural(stories.length, "story", "stories")} captured
+          </span>
+        </span>
+      </Table.Cell>
+    </Table.Row>
+  );
+}
+
+function StoryTree({ stories, search, filtering }: { stories: readonly ListedStory[]; search: string; filtering: boolean }) {
+  const tree = useMemo(() => buildStoryTree(stories), [stories]);
+  const [closed, setClosed] = useState<ReadonlySet<string>>(new Set());
+  // A filter means looking for something, so nothing it found stays folded away.
+  const rows = useMemo(() => visibleRows(tree, filtering ? new Set() : closed), [tree, filtering, closed]);
+  const toggle = (path: string) =>
+    setClosed((previous) => {
+      const next = new Set(previous);
+      if (!next.delete(path)) next.add(path);
+      return next;
+    });
+  return (
+    <ScrollableRegion aria-label="Stories">
+      <Table aria-label="Stories" cellPadding="condensed" gridTemplateColumns="minmax(240px, 1fr) 130px 130px 130px minmax(120px, 200px)">
+        <Table.Head>
+          <Table.Row>
+            <Table.Header>Story</Table.Header>
+            <Table.Header>State</Table.Header>
+            <Table.Header>Decision</Table.Header>
+            <Table.Header>Captured</Table.Header>
+            <Table.Header>Caveats</Table.Header>
+          </Table.Row>
+        </Table.Head>
+        <Table.Body>
+          {rows.map((row) =>
+            row.kind === "story" ? (
+              <StoryRow key={row.entry.story} entry={row.entry} depth={row.depth} search={search} />
+            ) : (
+              <FolderRow key={row.path} folder={row} depth={row.depth} open={filtering || !closed.has(row.path)} onToggle={() => toggle(row.path)} />
+            ),
+          )}
+        </Table.Body>
+      </Table>
+    </ScrollableRegion>
   );
 }
 
@@ -112,24 +179,7 @@ export function StoriesScreen({ view, search, capture }: { view: StoriesView; se
         />
       </FormControl>
       {shown.length > 0 ? (
-        <ScrollableRegion aria-label="Stories">
-          <Table aria-label="Stories" cellPadding="condensed" gridTemplateColumns="minmax(240px, 1fr) 130px 130px 130px minmax(120px, 200px)">
-            <Table.Head>
-              <Table.Row>
-                <Table.Header>Story</Table.Header>
-                <Table.Header>State</Table.Header>
-                <Table.Header>Decision</Table.Header>
-                <Table.Header>Captured</Table.Header>
-                <Table.Header>Caveats</Table.Header>
-              </Table.Row>
-            </Table.Head>
-            <Table.Body>
-              {shown.map((entry) => (
-                <StoryRow key={entry.story} entry={entry} search={search} />
-              ))}
-            </Table.Body>
-          </Table>
-        </ScrollableRegion>
+        <StoryTree stories={shown} search={search} filtering={filter.text !== ""} />
       ) : (
         <Blankslate border>
           <Blankslate.Heading as="h3">{filter.text === "" ? "No stories yet" : "Nothing matches this filter"}</Blankslate.Heading>

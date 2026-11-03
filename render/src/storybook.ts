@@ -13,6 +13,11 @@ export interface StoryEntry {
 
 /** The stories in a build's `index.json`, sorted by ID. Docs entries are left out. */
 export async function readStoryIndex(storybookDir: string): Promise<StoryEntry[]> {
+  return (await readStoriesInOrder(storybookDir)).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+}
+
+/** The same, in the order the build lists them, which is the order its sidebar shows. */
+export async function readStoriesInOrder(storybookDir: string): Promise<StoryEntry[]> {
   const file = path.join(storybookDir, "index.json");
   let parsed: unknown;
   try {
@@ -31,7 +36,7 @@ export async function readStoryIndex(storybookDir: string): Promise<StoryEntry[]
       stories.push({ id: entry.id, title: entry.title ?? "", name: entry.name ?? "" });
     }
   }
-  return stories.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  return stories;
 }
 
 export const unmatchedPatternWarning = (pattern: string) => `Story pattern "${pattern}" matched nothing.`;

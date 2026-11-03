@@ -5,7 +5,7 @@ import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
 import { isBuiltStorybook } from "selfie-ui/local";
 import { keptBuildPath } from "selfie-ui/api";
-import { buildHash, readStoryIndex } from "selfie-render";
+import { buildHash, readStoriesInOrder, readStoryIndex } from "selfie-render";
 import type { AcceptOutcome, CurrentView, DecisionTarget, FeedbackView, NewNote, ReviewSource, RunView, SnapshotRow, StoriesView, StorybookLink } from "selfie-ui/app";
 import { resolveCaptureSettings, resolveRegionMergeDistance } from "./config.ts";
 import { accept, checkAccept, decide } from "./decisions.ts";
@@ -174,7 +174,7 @@ export function localReviewSource(
       const { head, runs } = await runsAtHead(project, settings.environmentId);
       const finished = runs.filter(({ status }) => status !== "recording");
       const built = storybook !== undefined && isBuiltStorybook(storybook.dir);
-      const index = built ? await readStoryIndex(storybook.dir) : [];
+      const index = built ? await readStoriesInOrder(storybook.dir) : [];
       const hosted = built ? await hostedBuild(storybook.dir) : null;
 
       // Runs at one commit all find the same goldens on its branch, and finding them takes Git.
@@ -190,19 +190,21 @@ export function localReviewSource(
         if (!builds.has(runId)) builds.set(runId, await project.builds.buildOfRun(runId));
         return builds.get(runId)!;
       };
-      const ids = index.length > 0 ? index.map(({ id }) => id) : [...captures.keys()].sort();
+      const listed = index.length > 0 ? index : [...captures.keys()].sort().map((id) => ({ id, title: "", name: id }));
       return {
         head,
         storybookUrl: built ? storybook.url : null,
         viewport: settings.environment.viewport,
         stories: await Promise.all(
-          ids.map(async (story) => {
+          listed.map(async ({ id: story, title, name }) => {
             const found = captures.get(story);
-            if (found === undefined) return { story, capture: null };
+            if (found === undefined) return { story, title, name, capture: null };
             const { run, row } = found;
             const build = await buildOf(run.id);
             return {
               story,
+              title,
+              name,
               capture: {
                 runId: run.id,
                 state: row.state,

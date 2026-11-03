@@ -590,3 +590,40 @@ code {
   border: 0;
   transform-origin: top left;
 }
+
+.selfie-tree-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--base-size-8);
+  min-width: 0;
+}
+
+.selfie-tree-story-icon {
+  flex: none;
+  color: var(--fgColor-accent);
+}
+
+.selfie-tree-folder-icon {
+  flex: none;
+  color: var(--fgColor-accent);
+}
+
+.selfie-tree-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--base-size-8);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--fgColor-default);
+  font: inherit;
+  font-weight: var(--base-text-weight-semibold);
+  cursor: pointer;
+}
+
+.selfie-tree-section {
+  color: var(--fgColor-muted);
+  font-size: var(--text-caption-size);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
