@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { AcceptRefusal, DecisionKind, DecisionTarget, FeedbackView, NewNote, RunView, SnapshotRow } from "../shared/api.ts";
+import type { AcceptRefusal, DecisionKind, DecisionTarget, FeedbackView, NewNote, RunView, SendVia, SnapshotRow } from "../shared/api.ts";
 import { deleteNote, fetchFeedback, fetchRun, fetchUnchanged, postAccept, postDecision, postNote, postSendNotes, RequestError } from "./api.ts";
 import { reuseRows } from "./filter.ts";
 import { toggled } from "./selection.ts";
@@ -133,7 +133,7 @@ export interface FeedbackState {
   readonly add: (note: NewNote) => Promise<boolean>;
   readonly remove: (id: number) => Promise<void>;
   /** The text to paste into an agent, or null if the request failed. */
-  readonly send: () => Promise<string | null>;
+  readonly send: (via: SendVia) => Promise<string | null>;
 }
 
 /** How often to look for what an agent or another tab did, since nothing tells this page. */
@@ -185,7 +185,7 @@ export function useFeedback(): FeedbackState {
     clearError: useCallback(() => setError(null), []),
     add: async (note) => (await act(() => postNote(note), (next) => next)) !== null,
     remove: async (id) => void (await act(() => deleteNote(id), (next) => next)),
-    send: async () => (await act(postSendNotes, ({ feedback }) => feedback))?.text ?? null,
+    send: async (via) => (await act(() => postSendNotes(via), ({ feedback }) => feedback))?.text ?? null,
   };
 }
 

@@ -23,6 +23,7 @@ const ERROR_STATUS: Readonly<Record<string, ContentfulStatusCode>> = {
   "bad-config": 500,
   "unknown-run": 404,
   "unknown-note": 404,
+  "no-agent-waiting": 409,
   "stale-decision": 409,
   "no-actor": 409,
   "run-not-finished": 409,
@@ -178,7 +179,11 @@ export function createReviewApi(source: ReviewSource): Hono {
 
   api.get("/feedback", async (context) => context.json(await source.feedback()));
   api.post("/notes", async (context) => context.json(await source.addNote(newNote(await jsonBody(context)))));
-  api.post("/notes/send", async (context) => context.json(await source.sendNotes()));
+  api.post("/notes/send", async (context) => {
+    const { via } = await jsonBody(context);
+    if (via !== "agent" && via !== "copy") throw new BadRequest('via must be "agent" or "copy".');
+    return context.json(await source.sendNotes(via));
+  });
   api.delete("/notes/:id", async (context) => context.json(await source.removeNote(noteId(context.req.param("id")))));
 
   api.get("/images/:hash", async (context) => {

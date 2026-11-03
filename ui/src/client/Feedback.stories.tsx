@@ -8,10 +8,11 @@ interface Args {
   readonly notes?: readonly Note[];
   readonly showList?: boolean;
   readonly failed?: boolean;
+  readonly agentWaiting?: boolean;
 }
 
-function Bar({ notes = [], showList = true, failed = false }: Args) {
-  const feedback = feedbackOf(notes, failed ? { error: failure("unreachable", "Can't reach the Selfie server. Is selfie ui still running?") } : {});
+function Bar({ notes = [], showList = true, failed = false, agentWaiting = false }: Args) {
+  const feedback = feedbackOf(notes, failed ? { error: failure("unreachable", "Can't reach the Selfie server. Is selfie ui still running?") } : {}, agentWaiting);
   return <FeedbackBar feedback={feedback} runId={RUN_ID} showList={showList} />;
 }
 
@@ -28,6 +29,9 @@ export const NoNotesShowsNothing: Story = { args: {} };
 export const NotesInTheRunList: Story = { args: { notes: SOME } };
 export const NotesOnAStorysPage: Story = { args: { notes: SOME, showList: false } };
 export const CouldNotReachTheServer: Story = { args: { notes: SOME, failed: true } };
+export const AgentWaitingWithDrafts: Story = { args: { notes: SOME, agentWaiting: true } };
+export const AgentWaitingWithNothingToSend: Story = { args: { notes: [], agentWaiting: true } };
+export const AgentWaitingWithAllSent: Story = { args: { notes: [SOME[0]!], agentWaiting: true } };
 export const CopyDialog: Story = {
   args: { notes: SOME },
   play: async ({ canvasElement }) => {

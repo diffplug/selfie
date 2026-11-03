@@ -38,8 +38,8 @@ export function NotesPanel({ notes, target, onAdd, onRemove, writing }: NotesPan
                 {note.box !== null && <Text className="selfie-muted selfie-small">{describeBox(note.box)}</Text>}
                 {note.state === "draft" && <IconButton icon={TrashIcon} aria-label={`Delete note ${note.id}`} size="small" variant="invisible" onClick={() => onRemove(note.id)} />}
               </Stack>
-              {note.messages.map(({ text: said, at }) => (
-                <Text as="p" key={at} className="selfie-note-text">
+              {note.messages.map(({ id, text: said }) => (
+                <Text as="p" key={id} className="selfie-note-text">
                   {said}
                 </Text>
               ))}

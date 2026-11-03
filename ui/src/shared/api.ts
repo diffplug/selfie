@@ -175,6 +175,7 @@ export type NoteState = "draft" | "sent";
 
 /** One thing said about a note, which is a draft until it's sent. */
 export interface NoteMessage {
+  readonly id: number;
   readonly sender: "person" | "agent";
   readonly author: string;
   readonly text: string;
@@ -203,7 +204,12 @@ export interface FeedbackView {
   /** Only its name, since a response never holds a path. */
   readonly folder: string;
   readonly notes: readonly Note[];
+  /** Whether `selfie agent-await-feedback` is running in this folder now. */
+  readonly agentWaiting: boolean;
 }
+
+/** `agent` to a waiting agent, or `copy` if the person is pasting them somewhere themselves. */
+export type SendVia = "agent" | "copy";
 
 /**
  * The seam between the routes and a platform: how they reach a project's data. `cli/src/ui.ts`
@@ -223,7 +229,7 @@ export interface ReviewSource {
   addNote(note: NewNote): Promise<FeedbackView>;
   removeNote(id: number): Promise<FeedbackView>;
   /** Sends every draft, and answers with all that's been sent, as text to paste into an agent. */
-  sendNotes(): Promise<{ readonly feedback: FeedbackView; readonly text: string }>;
+  sendNotes(via: SendVia): Promise<{ readonly feedback: FeedbackView; readonly text: string }>;
   /** The stored bytes, or null if this store doesn't hold it. */
   image(hash: string): Promise<Uint8Array | null>;
   /** Null if the store doesn't hold both. */

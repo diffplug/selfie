@@ -4,8 +4,10 @@
 //
 // A note is where something is, and its messages are the conversation about it. Being sent belongs to
 // a message and not to a note, since a person's reply to a note that's already been read is a draft too.
+import { randomUUID } from "node:crypto";
 import { access, mkdir, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
 import type { RawImage, Sql, SqlRow } from "selfie-store";
 import type { BoundingBox, NewNote, Note, NoteMessage, NoteState } from "selfie-ui/app";
 import { describeBox } from "selfie-ui/regions";
@@ -36,7 +38,18 @@ export const CREATE_NOTES_TABLES: readonly string[] = [
   delivered_at INTEGER
 )`,
   "CREATE INDEX IF NOT EXISTS note_messages_by_note ON note_messages(note_id, id)",
+  `CREATE TABLE IF NOT EXISTS note_waiters (
+  session TEXT PRIMARY KEY,
+  token TEXT NOT NULL,
+  heartbeat_at INTEGER NOT NULL
+) WITHOUT ROWID`,
 ];
+
+/** How long since its last heartbeat an agent still counts as waiting, which is a couple it could miss. */
+export const WAITER_STALE_MS = 6_000;
+const WAITER_BEAT_MS = 2_000;
+/** How often a waiting agent looks for what's been sent, which is only a read. */
+const WAITER_POLL_MS = 1_000;
 
 /** The notes of one session. */
 export interface Notes {
@@ -47,6 +60,15 @@ export interface Notes {
   removeDraft(id: number): Promise<void>;
   /** Sends every draft. */
   send(): Promise<void>;
+  /** Is an agent waiting in this session now? */
+  isWaiting(): Promise<boolean>;
+  /** True if this token is the one waiting now, whether it just took over or already was. False if another is alive. */
+  beat(token: string): Promise<boolean>;
+  stopWaiting(token: string): Promise<void>;
+  /** What a person has sent that no agent has received. An agent's own replies are never in it. */
+  undelivered(): Promise<ReadonlySet<number>>;
+  /** Everything sent, up to this message if given, has been received. */
+  markDelivered(upTo?: number): Promise<void>;
 }
 
 const stateOf = (messages: readonly NoteMessage[]): NoteState => (messages[0]?.sent === false ? "draft" : "sent");
@@ -57,7 +79,7 @@ export function notesIn(sql: Sql, session: string): Notes {
       const [notes, messages] = await Promise.all([
         sql.run({ sql: "SELECT id, story, run_id, image_hash, box FROM notes WHERE session = ?1 ORDER BY id", params: [session], idempotent: true }),
         sql.run({
-          sql: `SELECT m.note_id, m.sender, m.author, m.text, m.run_id, m.at, m.sent_at FROM note_messages m
+          sql: `SELECT m.id, m.note_id, m.sender, m.author, m.text, m.run_id, m.at, m.sent_at FROM note_messages m
 JOIN notes n ON n.id = m.note_id WHERE n.session = ?1 ORDER BY m.id`,
           params: [session],
           idempotent: true,
@@ -103,17 +125,52 @@ JOIN notes n ON n.id = m.note_id WHERE n.session = ?1 ORDER BY m.id`,
       if (removed!.length === 0) throw new SelfieError("unknown-note", `This folder has no draft on note ${id}.`);
     },
     async send() {
-      const at = Date.now();
       await sql.run({
-        sql: `UPDATE note_messages SET sent_at = ?2, delivered_at = ?2 WHERE sent_at IS NULL
+        sql: `UPDATE note_messages SET sent_at = ?2 WHERE sent_at IS NULL
   AND note_id IN (SELECT id FROM notes WHERE session = ?1)`,
-        params: [session, at],
+        params: [session, Date.now()],
+      });
+    },
+    async isWaiting() {
+      const [row] = await sql.run({ sql: "SELECT heartbeat_at FROM note_waiters WHERE session = ?1", params: [session], idempotent: true });
+      return row !== undefined && Date.now() - (row.heartbeat_at as number) < WAITER_STALE_MS;
+    },
+    async beat(token) {
+      const at = Date.now();
+      // One statement, so two agents can't both find the place free and both take it.
+      const rows = await sql.run({
+        sql: `INSERT INTO note_waiters(session, token, heartbeat_at) VALUES (?1, ?2, ?3)
+ON CONFLICT(session) DO UPDATE SET token = excluded.token, heartbeat_at = excluded.heartbeat_at
+WHERE note_waiters.token = excluded.token OR note_waiters.heartbeat_at <= ?4
+RETURNING token`,
+        params: [session, token, at, at - WAITER_STALE_MS],
+      });
+      return rows.length > 0;
+    },
+    async stopWaiting(token) {
+      await sql.run({ sql: "DELETE FROM note_waiters WHERE session = ?1 AND token = ?2", params: [session, token], idempotent: true });
+    },
+    async undelivered() {
+      const rows = await sql.run({
+        sql: `SELECT id FROM note_messages WHERE sender = 'person' AND sent_at IS NOT NULL AND delivered_at IS NULL
+  AND note_id IN (SELECT id FROM notes WHERE session = ?1)`,
+        params: [session],
+        idempotent: true,
+      });
+      return new Set(rows.map(({ id }) => id as number));
+    },
+    async markDelivered(upTo = Number.MAX_SAFE_INTEGER) {
+      await sql.run({
+        sql: `UPDATE note_messages SET delivered_at = ?2 WHERE sent_at IS NOT NULL AND delivered_at IS NULL AND id <= ?3
+  AND note_id IN (SELECT id FROM notes WHERE session = ?1)`,
+        params: [session, Date.now(), upTo],
       });
     },
   };
 }
 
 const toMessage = (row: SqlRow): NoteMessage => ({
+  id: row.id as number,
   sender: row.sender as NoteMessage["sender"],
   author: row.author as string,
   text: row.text as string,
@@ -186,9 +243,58 @@ async function exportNoteImage(project: Project, { imageHash, box }: Note): Prom
   return file;
 }
 
-/** What `selfie notes` prints. One at a time, since each may decode a whole image. */
-export async function notesForAgent(project: Project): Promise<{ readonly folder: string; readonly notes: readonly (Note & { readonly image: string | null })[] }> {
+/** What an agent reads: all it may see of a session's notes. One at a time, since each may decode a whole image. */
+export async function notesForAgent(project: Project): Promise<AgentNotes> {
   const notes = [];
   for (const note of sentNotes(await project.notes.list())) notes.push({ ...note, image: await exportNoteImage(project, note) });
   return { folder: project.repo.root, notes };
+}
+
+export interface AgentNotes {
+  readonly folder: string;
+  readonly notes: readonly (Note & { readonly image: string | null })[];
+}
+
+/** The notes with something new in them, whole, so an agent has the conversation, with what's new marked. */
+async function newNotesForAgent(project: Project, fresh: ReadonlySet<number>): Promise<AgentNotes> {
+  const notes = [];
+  for (const note of sentNotes(await project.notes.list())) {
+    if (!note.messages.some(({ id }) => fresh.has(id))) continue;
+    notes.push({ ...note, messages: note.messages.map((message) => ({ ...message, new: fresh.has(message.id) })), image: await exportNoteImage(project, note) });
+  }
+  return { folder: project.repo.root, notes };
+}
+
+/**
+ * Blocks until a person sends notes in this session, or something stops it. Nothing counts as
+ * received until it's ready to print, so a failure along the way leaves it for the next one.
+ */
+export async function awaitFeedback(
+  project: Project,
+  { timeoutMs, signal }: { readonly timeoutMs: number; readonly signal?: AbortSignal | undefined },
+): Promise<AgentNotes & { readonly outcome: "notes" | "timed-out" | "stopped" }> {
+  const { notes } = project;
+  const token = randomUUID();
+  const nothing = (outcome: "timed-out" | "stopped") => ({ outcome, folder: project.repo.root, notes: [] });
+  const deadline = Date.now() + timeoutMs;
+  let beaten = Date.now();
+  if (!(await notes.beat(token))) throw new SelfieError("already-waiting", "An agent is already waiting for feedback in this folder.");
+  try {
+    for (;;) {
+      if (signal?.aborted) return nothing("stopped");
+      const fresh = await notes.undelivered();
+      if (fresh.size > 0) {
+        const found = await newNotesForAgent(project, fresh);
+        await notes.markDelivered(Math.max(...fresh));
+        return { outcome: "notes", ...found };
+      }
+      if (Date.now() >= deadline) return nothing("timed-out");
+      await delay(WAITER_POLL_MS, undefined, { signal }).catch(() => undefined);
+      if (Date.now() - beaten < WAITER_BEAT_MS) continue;
+      beaten = Date.now();
+      if (!(await notes.beat(token))) throw new SelfieError("already-waiting", "Another agent took over waiting for feedback in this folder.");
+    }
+  } finally {
+    await notes.stopWaiting(token);
+  }
 }

@@ -68,7 +68,11 @@ export function localReviewSource(project: Project, { native }: { readonly nativ
   /** Diffs by content, so any run that compares these two images shares the work. */
   const diffs = new Map<string, Promise<{ diff: PixelDiff; png: Uint8Array } | null>>();
 
-  const feedback = async (): Promise<FeedbackView> => ({ folder: path.basename(repo.root), notes: await project.notes.list() });
+  const feedback = async (): Promise<FeedbackView> => ({
+    folder: path.basename(repo.root),
+    notes: await project.notes.list(),
+    agentWaiting: await project.notes.isWaiting(),
+  });
 
   const requireActor = async (consequence: string) => {
     const actor = await gitUserEmail(repo);
@@ -90,8 +94,13 @@ export function localReviewSource(project: Project, { native }: { readonly nativ
       return feedback();
     },
 
-    async sendNotes() {
+    async sendNotes(via) {
+      if (via === "agent" && !(await project.notes.isWaiting())) {
+        throw new SelfieError("no-agent-waiting", "The agent stopped waiting, so nothing was sent. Copy these for an agent instead.");
+      }
       await project.notes.send();
+      // The person has what's been sent in hand now, so nobody is waiting for it.
+      if (via === "copy") await project.notes.markDelivered();
       const view = await feedback();
       return { feedback: view, text: textForAgent(sentNotes(view.notes), view.folder) };
     },
