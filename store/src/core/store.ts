@@ -40,6 +40,13 @@ const SELECT_IMAGE_KEY = "SELECT key FROM images WHERE hash = ?1";
 // every project shares. A group this size stays far inside what real D1 was measured
 // to accept in one batch, and its lookup fits the limit of 100 bound parameters.
 const IMAGES_PER_GROUP = 100;
+const QUERIES_PER_REQUEST = 50;
+
+const findKeysStatement = (hashes: readonly string[]): SqlStatement => ({
+  sql: `SELECT key, hash FROM images WHERE hash IN (${hashes.map((_, i) => `?${i + 1}`).join(", ")})`,
+  params: hashes,
+  idempotent: true,
+});
 // Encoding is most of a first review. Each one holds a whole image, so this also bounds memory.
 const BLOBS_AT_ONCE = 4;
 
@@ -164,13 +171,21 @@ export class Store {
 
   /** The key of each of these distinct hashes that has a row. */
   async #findKeys(hashes: readonly string[]): Promise<Map<string, number>> {
-    const params = hashes.map((_, i) => `?${i + 1}`).join(", ");
-    const rows = await this.#sql.run({
-      sql: `SELECT key, hash FROM images WHERE hash IN (${params})`,
-      params: hashes,
-      idempotent: true,
-    });
+    const rows = await this.#sql.run(findKeysStatement(hashes));
     return new Map(rows.map((row) => [row.hash as string, checkedKey(row.key)]));
+  }
+
+  /** Which of these images this store doesn't hold, so another store need only send those. */
+  async missingImages(hashes: readonly string[]): Promise<readonly string[]> {
+    const distinct = [...new Set(hashes)];
+    for (const hash of distinct) assertImageHash(hash);
+    const held = new Set<string>();
+    const statements = chunks(distinct, IMAGES_PER_GROUP).map((group) => findKeysStatement(group));
+    // Most are usually held, so this many statements in a request stay within a request's rows.
+    for (const batch of chunks(statements, QUERIES_PER_REQUEST)) {
+      for (const rows of await this.#sql.batch(batch)) for (const row of rows) held.add(row.hash as string);
+    }
+    return distinct.filter((hash) => !held.has(hash));
   }
 
   /** This store's key for an image hash, or null if the image is not stored. */

@@ -402,6 +402,29 @@ describe("Store", () => {
     });
   });
 
+  describe("missingImages", () => {
+    it("says which it doesn't hold, in the order asked, across query groups", async () => {
+      const store = storeWith({});
+      const { hash } = await store.putImage(file(1));
+      const absent = Array.from({ length: 150 }, (_, i) => i.toString(16).padStart(64, "f"));
+      expect(await store.missingImages([...absent.slice(0, 120), hash, ...absent.slice(120)])).toEqual(absent);
+      expect(await store.missingImages([hash])).toEqual([]);
+      expect(await store.missingImages([])).toEqual([]);
+    });
+
+    it("refuses what isn't a hash", async () => {
+      await expect(storeWith({}).missingImages(["nope"])).rejects.toThrow();
+    });
+
+    it("asks once for each distinct hash, however often it's named", async () => {
+      const store = storeWith({});
+      const { hash } = await store.putImage(file(1));
+      expect(await store.missingImages([hash, hash])).toEqual([]);
+      const absent = "f".repeat(64);
+      expect(await store.missingImages([absent, absent])).toEqual([absent]);
+    });
+  });
+
   describe("lookups by image hash", () => {
     it.each(["", "abc", "AB".repeat(32), "zz".repeat(32), `${"ab".repeat(32)}00`])(
       "refuses %j",

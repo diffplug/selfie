@@ -69,7 +69,7 @@ Selfie is for fully opaque images, and transparency is never allowed: `docs/spec
 
 **Scope: github-access** — The GitHub App, sign-in, and access checks (`docs/specs/access.md`). Ships with `cloud-deploy`, since a deployed service needs them before it holds anyone's images.
 
-**Scope: sync** — Push and pull between stores, and the cloud half of `find-baseline`, whose local half is built (`docs/specs/cli.md` → find-baseline). Local approvals carry through here ([Approvals across stores](#approvals-across-stores)).
+**Scope: sync** — Push and pull between stores, and the cloud half of `find-baseline`, whose local half is built (`docs/specs/cli.md` → find-baseline). Local approvals carry through here ([Approvals across stores](#approvals-across-stores)). Designed in `docs/specs/sync.md`.
 
 **Scope: trust** — The cloud accepts local results without re-rendering.
 

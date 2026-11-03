@@ -54,6 +54,8 @@ export const CREATE_SNAPSHOT_TABLES: readonly string[] = [
 // so a statement holds 49 when none has one, and at least 33.
 const MAX_RECORD_PARAMS = 100;
 const SNAPSHOTS_PER_DECISION_STATEMENT = 48;
+// Beside the environment, a merged decision takes five.
+const DECISIONS_PER_MERGE_STATEMENT = 19;
 // Nearest first, beside the environment.
 const SHAS_PER_GOLDENS_QUERY = 99;
 
@@ -124,6 +126,8 @@ const COUNT_REMOVED = `(SELECT COUNT(*) FROM run_snapshots gs
 
 const SELECT_REMOVED_COUNT = `SELECT ${COUNT_REMOVED} AS total`;
 
+const CAN_BE_GOLDENS = "r.finished_at IS NOT NULL AND r.failed_count = 0 AND r.dirty = 0";
+
 // The checks and the write are one statement, so nothing can change between them, and
 // the goldens of a SHA appear whole. Sent again, it must still succeed, so a run already
 // accepted passes without the checks: accepting a rerun over its own SHA's goldens makes
@@ -131,7 +135,7 @@ const SELECT_REMOVED_COUNT = `SELECT ${COUNT_REMOVED} AS total`;
 const ACCEPT_RUN = `INSERT INTO goldens(git_sha, environment, run_key)
 SELECT r.git_sha, r.environment, r.key
 FROM runs r
-WHERE r.id = ?1 AND r.finished_at IS NOT NULL AND r.failed_count = 0 AND r.dirty = 0
+WHERE r.id = ?1 AND ${CAN_BE_GOLDENS}
   AND (?2 = '' OR ${GOLDENS_RUN_KEY} IS NOT NULL)
   AND (
     EXISTS (SELECT 1 FROM goldens a
@@ -166,6 +170,22 @@ FROM (
 ) AS c
 WHERE runs.id = ?1 AND c.total = CAST(?3 AS INTEGER)
 RETURNING ${RUN_COLUMNS}`;
+
+// Not by the checks that accepting makes, since another store already made them.
+const ADOPT_GOLDENS = `INSERT INTO goldens(git_sha, environment, run_key)
+SELECT r.git_sha, r.environment, r.key FROM runs r
+WHERE r.id = ?1 AND ${CAN_BE_GOLDENS}
+ON CONFLICT(git_sha, environment) DO UPDATE SET run_key = excluded.run_key
+RETURNING run_key`;
+
+const READ_RUN_PAGE = `SELECT rs.story, i.hash AS image_hash, rs.failure, rs.play_error, d.decision, d.actor, d.decided_at
+FROM runs r
+CROSS JOIN run_snapshots rs ON rs.run_key = r.key
+LEFT JOIN images i ON i.key = rs.image_key
+LEFT JOIN decisions d ON d.environment = r.environment AND d.story = rs.story AND d.image_hash = i.hash
+WHERE r.id = ?1 AND rs.story > ?2
+ORDER BY rs.story
+LIMIT CAST(?3 AS INTEGER)`;
 
 const COUNT_SNAPSHOTS = `SELECT COUNT(*) AS total FROM run_snapshots
 WHERE run_key = (SELECT key FROM runs WHERE id = ?1)`;
@@ -287,6 +307,23 @@ export interface DecisionRequest {
   readonly snapshots: readonly { readonly story: string; readonly imageHash: string }[];
 }
 
+/** A run as another store holds it, which keeps its identity and its times here. */
+export type ReceivedRun = Omit<Run, "status" | "finishedAt" | "failedCount">;
+
+/** A decision as another store holds it, which keeps its time here. */
+export interface ReceivedDecision extends Decision {
+  readonly story: string;
+  readonly imageHash: string;
+}
+
+/** What a run holds, as a page of a read by name. */
+export interface RunPage {
+  readonly run: Run;
+  readonly snapshots: readonly (RecordedSnapshot & { readonly decision: Decision | null })[];
+  /** Where the next page starts, or null if this is the last. */
+  readonly next: string | null;
+}
+
 export type SnapshotErrorCode =
   | "unknown-run"
   /** The run takes no more snapshots, since it was finished. */
@@ -303,6 +340,8 @@ export type SnapshotErrorCode =
   | "wrong-removed-count"
   /** A snapshot named an image that isn't stored. */
   | "unknown-image"
+  /** A run with this ID is already here, and it isn't this one. */
+  | "run-conflict"
   /** The baseline SHA has no goldens in the run's environment. */
   | "no-goldens"
   | "no-baseline-run";
@@ -338,15 +377,7 @@ export class Snapshots {
   }
 
   /** Starts a run, which stays `recording` until `finishRun`. */
-  async beginRun({
-    gitSha,
-    environment,
-    scale,
-    dirty,
-    baselineSha,
-    storyFilter = null,
-    reusedFromRun = null,
-  }: {
+  async beginRun(options: {
     gitSha: string;
     environment: string;
     scale: number;
@@ -355,44 +386,25 @@ export class Snapshots {
     storyFilter?: StoryFilter | null;
     reusedFromRun?: string | null;
   }): Promise<Run> {
-    assertGitSha(gitSha);
-    assertNamePart(environment, "environment");
-    if (!Number.isFinite(scale) || scale <= 0) throw new RangeError(`A run's scale must be a positive number, got ${scale}`);
-    if (baselineSha !== null) assertGitSha(baselineSha);
-    const id = crypto.randomUUID();
-    const startedAt = this.#now();
-    // Sql binds no nulls, so an empty string stands for one.
-    await this.#sql.run({
-      sql: `INSERT INTO runs(id, git_sha, environment, started_at, dirty, baseline_sha, story_filter, reused_from_run, scale)
-VALUES (?1, ?2, ?3, CAST(?4 AS INTEGER), CAST(?5 AS INTEGER), NULLIF(?6, ''), NULLIF(?7, ''), NULLIF(?8, ''), ?9)
-ON CONFLICT(id) DO NOTHING`,
-      params: [
-        id,
-        gitSha,
-        environment,
-        startedAt,
-        dirty ? 1 : 0,
-        baselineSha ?? "",
-        storyFilter === null ? "" : JSON.stringify(storyFilter),
-        reusedFromRun ?? "",
-        scale,
-      ],
-      idempotent: true,
-    });
-    return {
-      id,
-      gitSha,
-      environment,
-      status: "recording",
-      startedAt,
-      finishedAt: null,
-      failedCount: null,
-      dirty,
-      baselineSha,
-      storyFilter,
-      reusedFromRun,
-      scale,
-    };
+    const run: ReceivedRun = { storyFilter: null, reusedFromRun: null, ...options, id: crypto.randomUUID(), startedAt: this.#now() };
+    await this.#sql.run(insertRunStatement(run));
+    return { ...run, status: "recording", finishedAt: null, failedCount: null };
+  }
+
+  /**
+   * Starts holding a run that began in another store, under its own ID and times. If it's
+   * already here, this says how far it got, so a resend can carry on: an unfinished one
+   * takes its snapshots again, and a finished one needs nothing. Throws if that ID is here
+   * for different facts, since a run never changes.
+   */
+  async receiveRun(received: ReceivedRun): Promise<Run> {
+    const [, rows] = await this.#sql.batch([insertRunStatement(received), { sql: SELECT_RUN, params: [received.id], idempotent: true }]);
+    const run = toRun(rows![0]!);
+    const { gitSha, environment, startedAt, dirty, baselineSha, scale } = received;
+    if (run.gitSha !== gitSha || run.environment !== environment || run.startedAt !== startedAt || run.dirty !== dirty || run.baselineSha !== baselineSha || run.scale !== scale) {
+      throw new SnapshotError("run-conflict", `Run ${received.id} is already here, and it isn't this one`);
+    }
+    return run;
   }
 
   /**
@@ -425,11 +437,12 @@ ON CONFLICT(id) DO NOTHING`,
   /**
    * Ends a run, if it holds exactly `expectedCount` snapshots, failed ones included.
    * If not it stays `recording` and this throws, so a batch that was lost shows here.
+   * A run from another store gives the time it finished there.
    */
-  async finishRun(runId: string, expectedCount: number): Promise<Run> {
+  async finishRun(runId: string, expectedCount: number, finishedAt: number = this.#now()): Promise<Run> {
     const [row] = await this.#sql.run({
       sql: FINISH_RUN,
-      params: [runId, this.#now(), expectedCount],
+      params: [runId, finishedAt, expectedCount],
       idempotent: true,
     });
     if (row !== undefined) return toRun(row);
@@ -586,18 +599,7 @@ ON CONFLICT(environment, story, image_hash) DO UPDATE SET
     ])) as [SqlRow[], SqlRow[], SqlRow[]];
 
     const run = finishedRun(runRows, runId);
-    if (run.status === "failed") {
-      throw new SnapshotError(
-        "run-has-failures",
-        `Run ${runId} has ${run.failedCount} failed stories, so it can't become goldens`,
-      );
-    }
-    if (run.dirty) {
-      throw new SnapshotError(
-        "run-dirty",
-        `Run ${runId} was recorded on a dirty tree, so it doesn't describe ${run.gitSha}`,
-      );
-    }
+    assertCanBeGoldens(run);
     assertGoldensFound(baselineSha, baselineRows[0]?.run_key !== null, run);
     if (accepted.length > 0) return true;
 
@@ -613,6 +615,69 @@ ON CONFLICT(environment, story, image_hash) DO UPDATE SET
       );
     }
     return false;
+  }
+
+  /** A page of all a run holds, by name, for another store to take. Unlike a comparison, it needs no baseline. */
+  async readRun(runId: string, after = "", limit = ROWS_PER_PAGE): Promise<RunPage> {
+    const [runRows, rows] = (await this.#sql.batch([
+      { sql: SELECT_RUN, params: [runId], idempotent: true },
+      { sql: READ_RUN_PAGE, params: [runId, after, limit + 1], idempotent: true },
+    ])) as [SqlRow[], SqlRow[]];
+    const run = finishedRun(runRows, runId);
+    const page = rows.slice(0, limit);
+    return {
+      run,
+      snapshots: page.map((row) => ({
+        story: row.story as string,
+        ...(row.image_hash === null ? { failure: row.failure as string } : { imageHash: row.image_hash as string }),
+        ...(row.play_error === null ? {} : { playError: row.play_error as string }),
+        decision: row.decision === null ? null : { decision: row.decision as DecisionKind, actor: row.actor as string, at: row.decided_at as number },
+      })),
+      next: rows.length > limit ? (page.at(-1)!.story as string) : null,
+    };
+  }
+
+  /**
+   * Takes decisions from another store. For one name and hash the latest wins, and at the
+   * same moment a rejection does, so two stores reach one verdict whichever order they hear
+   * in. Who made it travels with it, and isn't compared, so sending a decision back to where
+   * it came from can't change whose it is. It may name an image this store doesn't hold yet.
+   */
+  async mergeDecisions(environment: string, decisions: readonly ReceivedDecision[]): Promise<void> {
+    assertNamePart(environment, "environment");
+    const statements = chunks(decisions, DECISIONS_PER_MERGE_STATEMENT).map((group) => {
+      const params: SqlParam[] = [environment];
+      const values = group.map(({ story, imageHash, decision, actor, at }) => {
+        assertNamePart(story, "story");
+        assertImageHash(imageHash);
+        if (actor === "") throw new RangeError("A decision must say who made it");
+        return `(?${params.push(story)}, ?${params.push(imageHash)}, ?${params.push(decision)}, ?${params.push(actor)}, CAST(?${params.push(at)} AS INTEGER))`;
+      });
+      return {
+        sql: `WITH v(story, image_hash, decision, actor, decided_at) AS (VALUES ${values.join(", ")})
+INSERT INTO decisions(environment, story, image_hash, decision, actor, decided_at)
+SELECT ?1, v.story, v.image_hash, v.decision, v.actor, v.decided_at FROM v WHERE true
+ON CONFLICT(environment, story, image_hash) DO UPDATE SET
+  decision = excluded.decision, actor = excluded.actor, decided_at = excluded.decided_at
+WHERE (excluded.decided_at, excluded.decision) > (decisions.decided_at, decisions.decision)`,
+        params,
+        idempotent: true,
+      };
+    });
+    for (const group of chunks(statements, STATEMENTS_PER_REQUEST)) await this.#sql.batch(group);
+  }
+
+  /**
+   * Makes a finished run the goldens of its Git SHA because the store that decides them
+   * says so, replacing any here, without the checks of `acceptRun`, which that store made.
+   * It must still be able to be goldens: complete, and from a clean tree.
+   */
+  async adoptGoldens(runId: string): Promise<void> {
+    const [run, adopted] = (await this.#sql.batch([
+      { sql: SELECT_RUN, params: [runId], idempotent: true },
+      { sql: ADOPT_GOLDENS, params: [runId], idempotent: true },
+    ])) as [SqlRow[], SqlRow[]];
+    if (adopted.length === 0) assertCanBeGoldens(finishedRun(run, runId));
   }
 
   /** Whether this SHA has a complete set of goldens in this environment. */
@@ -801,4 +866,28 @@ function assertNamePart(part: string, what: string): void {
   if (part === "" || part.includes("\0")) {
     throw new RangeError(`A snapshot's ${what} must be non-empty with no NUL: ${JSON.stringify(part)}`);
   }
+}
+
+function assertCanBeGoldens(run: Run): void {
+  if (run.status === "failed") {
+    throw new SnapshotError("run-has-failures", `Run ${run.id} has ${run.failedCount} failed stories, so it can't become goldens`);
+  }
+  if (run.dirty) {
+    throw new SnapshotError("run-dirty", `Run ${run.id} was recorded on a dirty tree, so it doesn't describe ${run.gitSha}`);
+  }
+}
+
+function insertRunStatement({ id, gitSha, environment, startedAt, dirty, baselineSha, storyFilter, reusedFromRun, scale }: ReceivedRun): SqlStatement {
+  assertGitSha(gitSha);
+  assertNamePart(environment, "environment");
+  if (!Number.isFinite(scale) || scale <= 0) throw new RangeError(`A run's scale must be a positive number, got ${scale}`);
+  if (baselineSha !== null) assertGitSha(baselineSha);
+  return {
+    // Sql binds no nulls, so an empty string stands for one.
+    sql: `INSERT INTO runs(id, git_sha, environment, started_at, dirty, baseline_sha, story_filter, reused_from_run, scale)
+VALUES (?1, ?2, ?3, CAST(?4 AS INTEGER), CAST(?5 AS INTEGER), NULLIF(?6, ''), NULLIF(?7, ''), NULLIF(?8, ''), ?9)
+ON CONFLICT(id) DO NOTHING`,
+    params: [id, gitSha, environment, startedAt, dirty ? 1 : 0, baselineSha ?? "", storyFilter === null ? "" : JSON.stringify(storyFilter), reusedFromRun ?? "", scale],
+    idempotent: true,
+  };
 }

@@ -64,7 +64,7 @@ GitHub decides. Selfie keeps no member list of its own.
 
 - **Must authenticate CI uploads with GitHub Actions OIDC, so a repository stores no Selfie secret.**
 - **Must verify every OIDC token before accepting it:** an RS256 signature from GitHub's published keys, the issuer `https://token.actions.githubusercontent.com`, an unexpired token, an audience naming Selfie, and a `repository_id` that is the project being uploaded to (rationale). A token for any other audience was meant for another service.
-- **Must accept an OIDC token only for uploading to its own repository's project**, never to view a private project, approve, or reject, since it identifies a workflow and not a person.
+- **Must accept an OIDC token only for uploading to its own repository's project**, never to view a private project, approve, or reject, since it identifies a workflow and not a person. Uploading includes making goldens that remove nothing, since that approves nothing (`docs/specs/sync.md` → Goldens).
 
 ### Pull requests from forks
 
@@ -75,6 +75,7 @@ GitHub decides. Selfie keeps no member list of its own.
 
 ### Open questions
 
-- **Unpushed work in public repositories.** A run uploaded from an unpushed branch of a public repository would be visible to anyone. Decide whether anonymous viewers see only runs for commits GitHub already has, or whether a run isn't uploaded until its commit is pushed.
+A run isn't uploaded until GitHub has its commit (`docs/specs/sync.md` → What goes), so anonymous viewers see no unpushed work.
+
 - **Running an approved capture pass.** Decide how a maintainer approves it and how it runs, since it executes the fork's code and needs a token to upload. GitHub's docs don't say whether a fork's `pull_request` run can get an OIDC token, and `pull_request_target` runs with write access even from a public fork, so both need testing. The fork's code could forge its screenshots, so its run must stay subject to normal approval.
 - **Reading code for `change-grouping`.** That scope sends code diffs to a Meta model, which needs more app permissions and means private code leaves GitHub. Decide how a repository owner consents.

@@ -11,6 +11,7 @@ A spec is the accurate reference for the current code: it states the invariants 
 - **`docs/specs/access.md`** — The GitHub App, who can see and change a project, and how images are served. Read first for anything touching auth or visibility.
 - **`docs/specs/snapshots.md`** — Runs, snapshot states, decisions, and goldens: the data layer `selfie review` and the review UI use.
 - **`docs/specs/store.md`** — Image storage: image identity, decoding, keys, hash collisions, and the SQL and blob adapters.
+- **`docs/specs/sync.md`** — Moving runs, images, decisions, and goldens between stores.
 - **`docs/specs/feedback.md`** — Notes: how a person tells a coding agent what they see, and how the agent answers.
 - **`docs/specs/render.md`** — The renderer: capturing a built Storybook into PNGs in a pinned environment, the environment ID, and the manifest.
 - **`docs/specs/cli.md`** — The `selfie` CLI: `review`, `approve`, `reject`, `accept`, `find-baseline`, and `ui`, their exit codes and JSON, and local data's layout.

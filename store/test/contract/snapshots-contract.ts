@@ -352,6 +352,118 @@ export function describeSnapshotContract(
       expect(await snapshots.firstWithGoldens([], environment)).toBeNull();
     });
 
+    describe("from another store", () => {
+      const received = (environment: string) => ({
+        id: crypto.randomUUID(),
+        gitSha: SHA_0,
+        environment,
+        startedAt: 1_000,
+        dirty: false,
+        baselineSha: null,
+        storyFilter: null,
+        reusedFromRun: null,
+        scale: 2,
+      });
+      const on = (decision: "approved" | "rejected", actor: string, at: number) => ({ story: "a", imageHash: hashOf(1), decision, actor, at });
+      const decisionsOn = async (runId: string) => (await snapshots.readRun(runId)).snapshots[0]?.decision;
+      const finished = async (environment: string, items: readonly RecordedSnapshot[] = [rendered("a", 1)], finishedAt?: number) => {
+        const run = received(environment);
+        await snapshots.receiveRun(run);
+        await snapshots.recordSnapshots(run.id, items);
+        await snapshots.finishRun(run.id, items.length, finishedAt);
+        return run;
+      };
+
+      it("keeps a run's identity and its times", async () => {
+        const run = received("received-run");
+        expect(await snapshots.receiveRun(run)).toMatchObject({ ...run, status: "recording", finishedAt: null });
+        await snapshots.recordSnapshots(run.id, [rendered("a", 1)]);
+        expect(await snapshots.finishRun(run.id, 1, 2_000)).toMatchObject({ id: run.id, status: "complete", startedAt: 1_000, finishedAt: 2_000 });
+      });
+
+      it("says how far a run got when it's sent again, and refuses a different one under its ID", async () => {
+        const run = await finished("received-again", undefined, 2_000);
+        expect(await snapshots.receiveRun(run)).toMatchObject({ status: "complete", finishedAt: 2_000 });
+        await expect(snapshots.receiveRun({ ...run, gitSha: SHA_1 })).rejects.toMatchObject({ code: "run-conflict" });
+      });
+
+      it("reads back what a run holds, in pages, with what's been decided", async () => {
+        const run = await finished("read-back", [rendered("a", 1), rendered("b", 2), { story: "c", failure: "boom" }, { ...rendered("d", 3), playError: "threw" }]);
+        await snapshots.mergeDecisions("read-back", [on("approved", "ned", 1_000)]);
+        const first = await snapshots.readRun(run.id, "", 3);
+        expect(first.snapshots).toEqual([
+          { story: "a", imageHash: hashOf(1), decision: { decision: "approved", actor: "ned", at: 1_000 } },
+          { story: "b", imageHash: hashOf(2), decision: null },
+          { story: "c", failure: "boom", decision: null },
+        ]);
+        expect(first.next).toBe("c");
+        const second = await snapshots.readRun(run.id, first.next!, 3);
+        expect(second.snapshots).toEqual([{ story: "d", imageHash: hashOf(3), playError: "threw", decision: null }]);
+        expect(second.next).toBeNull();
+      });
+
+      it("won't read a run that hasn't finished", async () => {
+        const run = received("read-unfinished");
+        await snapshots.receiveRun(run);
+        await expect(snapshots.readRun(run.id)).rejects.toMatchObject({ code: "run-not-finished" });
+      });
+
+      it("lets the latest decision win, whichever order they arrive in", async () => {
+        const [older, newer] = [on("rejected", "bob", 1_000), on("approved", "ned", 2_000)];
+        for (const [environment, order] of [["merge-forward", [older, newer]], ["merge-backward", [newer, older]]] as const) {
+          const run = await finished(environment);
+          for (const decision of order) await snapshots.mergeDecisions(environment, [decision]);
+          expect(await decisionsOn(run.id)).toEqual({ decision: "approved", actor: "ned", at: 2_000 });
+        }
+      });
+
+      it("settles the same moment the same way in either order, with a rejection winning", async () => {
+        const [approval, rejection] = [on("approved", "ned", 1_000), on("rejected", "bob", 1_000)];
+        for (const [environment, order] of [["tie-forward", [approval, rejection]], ["tie-backward", [rejection, approval]]] as const) {
+          const run = await finished(environment);
+          for (const decision of order) await snapshots.mergeDecisions(environment, [decision]);
+          expect((await decisionsOn(run.id))?.decision).toBe("rejected");
+        }
+      });
+
+      it("doesn't change whose a decision is when it's sent back", async () => {
+        const run = await finished("sent-back");
+        await snapshots.mergeDecisions("sent-back", [on("approved", "alice", 1_000)]);
+        await snapshots.mergeDecisions("sent-back", [on("approved", "zed", 1_000)]);
+        expect(await decisionsOn(run.id)).toEqual({ decision: "approved", actor: "alice", at: 1_000 });
+      });
+
+      it("merges more decisions than one statement holds, and a resend changes nothing", async () => {
+        const many = Array.from({ length: 45 }, (_, i) => ({ ...on("approved", "ned", 1_000), story: `s${i}` }));
+        await over(replaying).mergeDecisions("merge-many", many);
+        const run = await finished("merge-many", many.map(({ story }) => rendered(story, 1)));
+        const { snapshots: read } = await snapshots.readRun(run.id);
+        expect(read.every(({ decision }) => decision?.decision === "approved")).toBe(true);
+      });
+
+      it("adopts goldens with no decisions, replacing what was there", async () => {
+        const environment = "adopted";
+        const first = await finished(environment, [rendered("a", 1)]);
+        const second = await finished(environment, [rendered("a", 2)]);
+        await over(replaying).adoptGoldens(first.id);
+        expect(await snapshots.acceptedRunAt(SHA_0, environment)).toBe(first.id);
+        await snapshots.adoptGoldens(second.id);
+        expect(await snapshots.acceptedRunAt(SHA_0, environment)).toBe(second.id);
+      });
+
+      it("won't adopt what can't be goldens", async () => {
+        const dirty = received("adopt-refused");
+        await snapshots.receiveRun({ ...dirty, dirty: true });
+        await expect(snapshots.adoptGoldens(dirty.id)).rejects.toMatchObject({ code: "run-not-finished" });
+        await snapshots.recordSnapshots(dirty.id, [rendered("a", 1)]);
+        await snapshots.finishRun(dirty.id, 1);
+        await expect(snapshots.adoptGoldens(dirty.id)).rejects.toMatchObject({ code: "run-dirty" });
+        const failed = await finished("adopt-refused", [{ story: "a", failure: "boom" }]);
+        await expect(snapshots.adoptGoldens(failed.id)).rejects.toMatchObject({ code: "run-has-failures" });
+        expect(await snapshots.acceptedRunAt(SHA_0, "adopt-refused")).toBeNull();
+      });
+    });
+
     it("refuses an acceptance that would drop goldens the reviewer didn't see", async () => {
       // The rerun lacks d, and the reviewer says nothing was removed.
       await expect(snapshots.acceptRun(rerun, SHA_0, 0)).rejects.toMatchObject({

@@ -293,12 +293,7 @@ Story IDs come from a project's build, and a manifest's paths from a directory i
 
 ## Future
 
-**Scope: sync** is defined in `docs/specs/system.md` → Build order. For this CLI it still needs:
-
-- `find-baseline` asking the cloud's goldens as well as local ones.
-- `selfie push` and `selfie pull`, and carrying decisions through them (`docs/specs/snapshots.md` → Future).
-- A way for a branch's reviewer to have a baseline when only other machines accepted the default branch's goldens.
-- A pushed run carrying `reused_from_run`, since the cloud's `trust` must be able to tell a reused run from one rendered at its SHA. That ID may name a run never pushed. Whether to also record the build's identity can wait for `trust`.
+**Scope: sync** is designed in `docs/specs/sync.md`, which owns what it adds to this CLI.
 
 ### Regions
 

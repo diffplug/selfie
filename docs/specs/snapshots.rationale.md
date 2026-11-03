@@ -82,3 +82,7 @@ D1's docs say a database runs one query at a time, so a batch this size holds up
 - **Writes.** D1 lists $1.00 per million rows written, so about $30 a month. It also lists the first 50 million a month as included on the paid plan, so a project this size alone pays nothing until others use up that allowance.
 - **Storage.** About 1.37 GB a month assumes about 46 bytes a row. Local SQLite measured 39 bytes a row by file growth with 30 character story IDs, which would be 1.17 GB a month and about 256 days to the limit. D1's own overhead was not measured.
 - **The limit.** D1's docs list 10 GB per database on the paid plan and 500 MB on the free plan, as checked 2026-11. On the free plan this rate reaches the limit in about 11 days.
+
+## Decisions
+
+**How two stores agree.** A decision is the only thing beside goldens that two stores can hold differently, since images are named by their hash and a finished run never changes. Latest wins, which needs no schema change, since each row already holds its time, actor, and decision. A tie has to come out the same in either order, so a rejection beats an approval, since that's the mistake that's cheaper to make. The author isn't compared: a decision's author can differ between stores, since the cloud names who pushed it, so comparing it could hand a decision to someone who only re-pushed it. Clocks can differ, which only matters if two people decide on one image within that difference.

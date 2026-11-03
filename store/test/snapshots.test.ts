@@ -768,7 +768,7 @@ describe("Snapshots", () => {
       expect(report["compareRun (includeUnchanged)"]!.requests).toBe(3);
     });
 
-    it("never scans a table, for anything a review sends", async () => {
+    it("never scans a table, for anything a review or a sync sends", async () => {
       const { adapter: counted, sent } = counting(adapter);
       const model = new Snapshots({ sql: new Sql(counted) });
       const items = [rendered("a", 1), rendered("b", 2)];
@@ -787,6 +787,10 @@ describe("Snapshots", () => {
       await model.getRun(head.id);
       await model.finishRun(head.id, 2);
       await model.finishRun(head.id, 99).catch(() => {});
+      await model.readRun(head.id);
+      await model.mergeDecisions(ENV, [{ story: "a", imageHash: hashOf(3), decision: "approved", actor: "ned", at: 1 }]);
+      await model.adoptGoldens(clean.id);
+      await model.receiveRun(clean);
 
       const db = new DatabaseSync(temp.path);
       try {
