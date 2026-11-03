@@ -13,21 +13,18 @@ import {
   Stack,
   Text,
   useDetails,
-  VisuallyHidden,
 } from "@primer/react";
-import { Blankslate, ScrollableRegion, Table } from "@primer/react/experimental";
-import { findRenames } from "../shared/renames.ts";
-import { memo, useDeferredValue, useEffect, useMemo, useState, type ComponentProps, type MouseEvent, type RefObject } from "react";
+import { Blankslate, ScrollableRegion } from "@primer/react/experimental";
+import { useDeferredValue, useEffect, useMemo, useState, type ComponentProps, type RefObject } from "react";
 import type { AdvisoryReason, BlockerReason, DecisionKind, RunView, SnapshotRow } from "../shared/api.ts";
-import { imageUrl } from "./api.ts";
 import { applyFilter, decidableIn, filterQuery, hasAdvisory, NO_FILTER, parseFilter, showQuery, SHOW_OPTIONS, targetsOf, type RowFilter, type Show } from "./filter.ts";
 import { useStoryFocusKeys, useTitle, type RunState } from "./hooks.ts";
 import { Keys } from "./Keys.tsx";
-import { acceptPath, AppLink, AppLinkButton, followLink, navigate, runPath, storiesPath, storyPath } from "./router.tsx";
+import { acceptPath, AppLink, AppLinkButton, navigate, runPath, storiesPath, storyPath } from "./router.tsx";
 import { ActionFailure, RunNotes } from "./RunNotes.tsx";
 import { StoryLinks } from "./StoryLinks.tsx";
 import { plural } from "./plural.ts";
-import { AdvisoryLabels, BLOCKER_WORDS, DecisionLabel, describePixels, ReusedPixels, shortSha, StateLabel } from "./words.tsx";
+import { BLOCKER_WORDS, ReusedPixels, shortSha } from "./words.tsx";
 
 const PATTERNS_LISTED = 3;
 
@@ -220,77 +217,6 @@ function Advisories({ view }: { view: RunView }) {
  * Its filter isn't a prop, so a keystroke re-renders only the rows it shows or hides: a click takes
  * the filter from the URL as it is by then.
  */
-const Row = memo(function Row({ row, runId, renamed }: { row: SnapshotRow; runId: string; renamed: string | undefined }) {
-  const thumbnail = row.imageHash ?? row.goldenHash;
-  return (
-    <Table.Row>
-      <Table.Cell>
-        {thumbnail !== null ? (
-          <img className="selfie-thumb" src={imageUrl(thumbnail)} alt="" loading="lazy" decoding="async" width={64} height={48} />
-        ) : (
-          <div className="selfie-thumb" aria-hidden="true" />
-        )}
-      </Table.Cell>
-      <Table.Cell>
-        <Link
-          href={storyPath(runId, row.story)}
-          onClick={(event: MouseEvent) => followLink(event, storyPath(runId, row.story, window.location.search))}
-          className="selfie-story-link"
-        >
-          {row.story}
-        </Link>
-        {renamed !== undefined && <div className="selfie-muted selfie-small">{renamed}</div>}
-      </Table.Cell>
-      <Table.Cell>
-        <StateLabel state={row.state} />
-      </Table.Cell>
-      <Table.Cell>
-        <DecisionLabel row={row} />
-      </Table.Cell>
-      <Table.Cell>
-        <span className="selfie-nowrap">{row.state === "failed" ? "No image" : describePixels(row.pixelDiff)}</span>
-      </Table.Cell>
-      <Table.Cell>
-        <Stack as="span" direction="horizontal" gap="condensed" wrap="wrap">
-          <AdvisoryLabels row={row} />
-        </Stack>
-      </Table.Cell>
-    </Table.Row>
-  );
-});
-
-function StoriesTable({ rows, runId, renames }: { rows: readonly SnapshotRow[]; runId: string; renames: ReadonlyMap<string, string> }) {
-  const renamedTo = useMemo(() => new Map([...renames].map(([to, from]) => [from, to])), [renames]);
-  const renamedWords = (story: string) => {
-    const from = renames.get(story);
-    const to = renamedTo.get(story);
-    return from !== undefined ? `Renamed from ${from}` : to !== undefined ? `Renamed to ${to}` : undefined;
-  };
-  return (
-    <ScrollableRegion aria-labelledby="differences-heading">
-      <Table aria-labelledby="differences-heading" cellPadding="condensed" gridTemplateColumns="80px minmax(200px, 1fr) 120px 170px 190px 130px">
-        <Table.Head>
-          <Table.Row>
-            <Table.Header>
-              <VisuallyHidden>Preview</VisuallyHidden>
-            </Table.Header>
-            <Table.Header>Story</Table.Header>
-            <Table.Header>State</Table.Header>
-            <Table.Header>Decision</Table.Header>
-            <Table.Header>Pixels</Table.Header>
-            <Table.Header>Advisories</Table.Header>
-          </Table.Row>
-        </Table.Head>
-        <Table.Body>
-          {rows.map((row) => (
-            <Row key={row.story} row={row} runId={runId} renamed={renamedWords(row.story)} />
-          ))}
-        </Table.Body>
-      </Table>
-    </ScrollableRegion>
-  );
-}
-
 interface PendingBulk {
   readonly decision: DecisionKind;
   /** Each decidable, as they were when the dialog opened, which is exactly what gets sent. */
@@ -389,7 +315,6 @@ function Differences({
     if (wantsUnchanged && unchanged === null) loadUnchanged();
   }, [wantsUnchanged, unchanged, loadUnchanged]);
 
-  const renames = useMemo(() => findRenames(view.rows), [view.rows]);
   const deferredFilter = useDeferredValue(filter);
   const source = deferredFilter.show === "unchanged" ? (unchanged ?? []) : view.rows;
   const shown = useMemo(() => applyFilter(source, deferredFilter), [source, deferredFilter]);
@@ -443,9 +368,7 @@ function Differences({
         {loadingUnchanged ? "Reading the unchanged stories…" : `Showing ${shown.length.toLocaleString()} of ${source.length.toLocaleString()}.`}{" "}
         <Keys keys="j" /> and <Keys keys="k" /> move through the list, <Keys keys="/" /> searches.
       </Text>
-      {shown.length > 0 ? (
-        <StoriesTable rows={shown} runId={view.run.id} renames={renames} />
-      ) : loadingUnchanged ? null : (
+      {shown.length > 0 || loadingUnchanged ? null : (
         <Blankslate border>
           <Blankslate.Heading as="h4">
             {isFiltered ? "Nothing matches this filter" : "Nothing differs from the baseline"}

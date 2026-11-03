@@ -9,6 +9,8 @@ import { useFeedback, useFetched, useRun } from "./hooks.ts";
 import { StoriesRoutes } from "./StoriesScreen.tsx";
 import { StoryNavLayout } from "./StoryNav.tsx";
 import { differingStories } from "./storyTree.ts";
+import { AdvisoryLabels, describePixels } from "./words.tsx";
+import { applyFilter, NO_FILTER, parseFilter } from "./filter.ts";
 import { AppLink, parseRoute, storyPath, useLocation, type Route } from "./router.tsx";
 import { PageFactsLine, PageFactsProvider, usePageFacts } from "./PageFacts.tsx";
 import { RunScreen } from "./RunScreen.tsx";
@@ -23,7 +25,12 @@ function RunRoutes({ runId, route, search }: { runId: string; route: Route; sear
   usePageFacts(view === null ? null : { kind: "diff", run: view.run, branchGoldens: view.branchGoldens, context });
   const rows = view?.rows;
   const renames = useMemo(() => findRenames(rows ?? []), [rows]);
-  const stories = useMemo(() => (view === null ? [] : differingStories(view, renames)), [view, renames]);
+  // The tree shows what the page's Show says, and its own search does the text.
+  const { show } = parseFilter(search);
+  const { unchanged } = state;
+  const shownRows = useMemo(() => applyFilter(show === "unchanged" ? (unchanged ?? []) : (rows ?? []), { ...NO_FILTER, show }), [show, unchanged, rows]);
+  const stories = useMemo(() => (view === null ? [] : differingStories({ ...view, rows: shownRows }, renames, show === "unchanged")), [view, shownRows, renames, show]);
+  const rowOf = useMemo(() => new Map(shownRows.map((row) => [row.story, row])), [shownRows]);
   // Where to put focus on coming back to the list.
   const lastStory = useRef<string | null>(null);
   if (state.view === null) {
@@ -39,6 +46,20 @@ function RunRoutes({ runId, route, search }: { runId: string; route: Route; sear
       renames={renames}
       startOpen
       emptyWords="Nothing differs."
+      more={({ story }) => {
+        const row = rowOf.get(story);
+        if (row === undefined) return null;
+        return (
+          <>
+            <span className="selfie-nav-col" data-size="wide" title={describePixels(row.pixelDiff)}>
+              {row.state === "failed" ? "No image" : describePixels(row.pixelDiff)}
+            </span>
+            <span className="selfie-nav-col">
+              <AdvisoryLabels row={row} />
+            </span>
+          </>
+        );
+      }}
     >
       {/* The run's screen has its own banner for the newest at its commit, so this one isn't said twice. */}
       {(route.kind !== "run" || feedback.view?.latestRunId !== state.view.siblings.find(({ status }) => status !== "recording")?.id) && (

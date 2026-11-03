@@ -20,7 +20,19 @@ import { LoadFailure, Loading } from "./Status.tsx";
 /** Every story at the left and whatever's being looked at on the right. */
 export function StoriesLayout({ view, story, search, children }: { view: StoriesView; story: string | null; search: string; children: ReactNode }) {
   return (
-    <StoryNavLayout stories={view.stories} story={story} search={search} hrefOf={anyStoryPath}>
+    <StoryNavLayout
+      stories={view.stories}
+      story={story}
+      search={search}
+      hrefOf={anyStoryPath}
+      more={({ render }) =>
+        render !== null && (
+          <span className="selfie-nav-col">
+            <RelativeTime date={new Date(render.renderedAt)} />
+          </span>
+        )
+      }
+    >
       {children}
     </StoryNavLayout>
   );

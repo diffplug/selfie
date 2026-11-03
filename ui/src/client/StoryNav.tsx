@@ -9,7 +9,7 @@ import { useHotkeys } from "./hooks.ts";
 import { plural } from "./plural.ts";
 import { followLink, navigate } from "./router.tsx";
 import { buildStoryTree, initiallyClosed, isSection, openedAround, storiesIn, visibleRows, type StoryFolder } from "./storyTree.ts";
-import { StateMark } from "./words.tsx";
+import { DecisionLabel, StateLabel, StateMark } from "./words.tsx";
 
 export const matchingStories = (stories: readonly ListedStory[], text: string) => stories.filter(({ story, title, name }) => matchesText(`${story} ${title} ${name}`, text));
 
@@ -22,7 +22,7 @@ function renderCaveats({ render }: ListedStory): string {
 /** Indents a row by how deep it is, as the Storybook's sidebar does. */
 const indented = (depth: number) => ({ paddingLeft: `calc(var(--base-size-8) + ${depth} * var(--base-size-16))` });
 
-function StoryRow({ entry, depth, href, current, renamedFrom }: { entry: ListedStory; depth: number; href: string; current: boolean; renamedFrom: string | undefined }) {
+function StoryRow({ entry, depth, href, current, renamedFrom, more }: { entry: ListedStory; depth: number; href: string; current: boolean; renamedFrom: string | undefined; more: ReactNode }) {
   const link = useRef<HTMLAnchorElement>(null);
   const caveats = renderCaveats(entry);
   useEffect(() => {
@@ -43,14 +43,25 @@ function StoryRow({ entry, depth, href, current, renamedFrom }: { entry: ListedS
                 <VisuallyHidden>{caveats}</VisuallyHidden>
               </span>
             )}
-            {renamedFrom !== undefined ? (
-              <span className="selfie-state-mark" data-state="renamed" title={`Renamed from ${renamedFrom}`}>
-                <ArrowSwitchIcon size={12} />
-                <VisuallyHidden>Renamed from {renamedFrom}</VisuallyHidden>
+            <span className="selfie-nav-compact">
+              {renamedFrom !== undefined ? (
+                <span className="selfie-state-mark" data-state="renamed" title={`Renamed from ${renamedFrom}`}>
+                  <ArrowSwitchIcon size={12} />
+                  <VisuallyHidden>Renamed from {renamedFrom}</VisuallyHidden>
+                </span>
+              ) : (
+                <StateMark state={entry.render.state} />
+              )}
+            </span>
+            <span className="selfie-nav-details">
+              <span className="selfie-nav-col" title={renamedFrom === undefined ? undefined : `Renamed from ${renamedFrom}`}>
+                {renamedFrom !== undefined ? "Renamed" : <StateLabel state={entry.render.state} />}
               </span>
-            ) : (
-              <StateMark state={entry.render.state} />
-            )}
+              <span className="selfie-nav-col">
+                <DecisionLabel row={entry.render} />
+              </span>
+            </span>
+            {more !== undefined && <span className="selfie-nav-more">{more}</span>}
           </>
         )}
       </a>
@@ -87,9 +98,11 @@ interface TreeProps {
   readonly renames?: ReadonlyMap<string, string> | undefined;
   /** For a short list that's there to be gone through, rather than Storybook's whole sidebar. */
   readonly startOpen?: boolean | undefined;
+  /** What else to say of a story, once the sidebar is dragged wide enough. */
+  readonly more?: ((entry: ListedStory) => ReactNode) | undefined;
 }
 
-function StoryTree({ stories, story, search, hrefOf, renames, startOpen = false, filtering }: TreeProps & { filtering: boolean }) {
+function StoryTree({ stories, story, search, hrefOf, renames, startOpen = false, more, filtering }: TreeProps & { filtering: boolean }) {
   const tree = useMemo(() => buildStoryTree(stories), [stories]);
   const entry = stories.find((candidate) => candidate.story === story);
   const [closed, setClosed] = useState<ReadonlySet<string>>(() => (startOpen ? new Set() : openedAround(new Set(initiallyClosed(tree)), entry)));
@@ -111,7 +124,7 @@ function StoryTree({ stories, story, search, hrefOf, renames, startOpen = false,
     <ul className="selfie-nav-tree">
       {rows.map((row) =>
         row.kind === "story" ? (
-          <StoryRow key={row.entry.story} entry={row.entry} depth={row.depth} href={hrefOf(row.entry.story, search)} current={row.entry.story === story} renamedFrom={renames?.get(row.entry.story)} />
+          <StoryRow key={row.entry.story} entry={row.entry} depth={row.depth} href={hrefOf(row.entry.story, search)} current={row.entry.story === story} renamedFrom={renames?.get(row.entry.story)} more={more?.(row.entry)} />
         ) : (
           <FolderRow key={row.path} folder={row} depth={row.depth} open={filtering || !closed.has(row.path)} onToggle={() => toggle(row.path)} />
         ),

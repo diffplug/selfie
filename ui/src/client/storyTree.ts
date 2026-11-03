@@ -91,13 +91,15 @@ export function nameFromId(story: string): { readonly title: string; readonly na
 export function differingStories(
   { run, rows, storyNames }: Pick<RunView, "run" | "rows" | "storyNames">,
   renames: ReadonlyMap<string, string>,
+  keepUnchanged = false,
 ): readonly ListedStory[] {
-  const hidden = new Set(renames.values());
+  // Only if the name it went to is here to say so.
+  const hidden = new Set(rows.flatMap(({ story }) => renames.get(story) ?? []));
   const order = new Map(storyNames.map(({ story }, at) => [story, at]));
   const names = new Map(storyNames.map(({ story, title, name }) => [story, { title, name }]));
   const at = (story: string) => order.get(story) ?? order.size;
   return rows
-    .filter(({ state, story }) => state !== "unchanged" && !hidden.has(story))
+    .filter(({ state, story }) => (keepUnchanged || state !== "unchanged") && !hidden.has(story))
     .sort((a, b) => at(a.story) - at(b.story) || a.story.localeCompare(b.story))
     .map(({ story, state, decision }) => ({
       story,

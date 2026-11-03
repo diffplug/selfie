@@ -123,7 +123,9 @@ Source of truth: `ui/src/client/`.
 
 **The top bar** says what a page is looking at: on every story, the built Storybook, its commit and branch, and whether it's clean; on a run's pages, the diff, between the run's commit and what it's compared with, and how that relates to the merge base with the default branch.
 
-**A run's pages** have the same list at their left, of what differs, which is what's changed, new, removed, or failed, and never what's unchanged.
+**A run's pages** have the same list at their left, of what differs, which is what's changed, new, removed, or failed, narrowed by what Show says, and showing what's unchanged only if that's what Show asks for. The list is where a run's stories are: there's no table of them on the right.
+
+- **Must say more of each story as the list is dragged wider:** its state and decision, then its pixels and advisories on a run's pages, or when it was rendered on every story.
 
 - **Must say a story is renamed if it's new and a removed story's golden is its very image**, one to one, and the closest names first where several share an image (rationale). The list has it once, under its new name. This is only to look at: to decisions and accepting they're still one new and one removed.
 

@@ -70,5 +70,6 @@ describe("a run's differences", () => {
 
   test("have a renamed story once, under its new name", () => {
     expect(stories([row("new", "new"), row("old", "removed")], [], new Map([["new", "old"]]))).toEqual(["new"]);
+    expect(stories([row("old", "removed")], [], new Map([["new", "old"]]))).toEqual(["old"]);
   });
 });

@@ -177,20 +177,6 @@ code {
   margin-left: auto;
 }
 
-.selfie-thumb {
-  display: block;
-  /* In a table cell, a tall image would otherwise squeeze it narrower than the others. */
-  flex: none;
-  width: 64px;
-  height: 48px;
-  /* The top of a tall page, rather than all of it as a sliver. */
-  object-fit: cover;
-  object-position: top left;
-  border: var(--borderWidth-thin) solid var(--borderColor-muted);
-  border-radius: var(--borderRadius-small);
-  background: var(--bgColor-muted);
-}
-
 .selfie-story-link {
   overflow-wrap: anywhere;
 }
@@ -673,6 +659,7 @@ code {
 }
 
 .selfie-nav {
+  container: story-nav / inline-size;
   display: grid;
   gap: var(--base-size-8);
   padding: var(--base-size-12) var(--base-size-8);
@@ -747,4 +734,42 @@ code {
 
 .selfie-state-mark[data-state="renamed"] {
   color: var(--fgColor-done);
+}
+
+/* More of a story's facts as the sidebar is dragged wider, in place of its small marks. */
+.selfie-nav-details,
+.selfie-nav-more {
+  display: none;
+}
+
+.selfie-nav-col {
+  flex: none;
+  width: 120px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.selfie-nav-col[data-size="wide"] {
+  width: 200px;
+}
+
+@container story-nav (min-width: 560px) {
+  .selfie-nav-details {
+    display: flex;
+    align-items: center;
+    gap: var(--base-size-8);
+  }
+
+  .selfie-nav-compact {
+    display: none;
+  }
+}
+
+@container story-nav (min-width: 840px) {
+  .selfie-nav-more {
+    display: flex;
+    align-items: center;
+    gap: var(--base-size-8);
+  }
 }
