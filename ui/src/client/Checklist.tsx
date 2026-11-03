@@ -176,6 +176,12 @@ function RendersItem({ view, setup, renders }: { view: StoriesView; setup: Story
             {`Render the rest (${rest.length.toLocaleString()})`}
           </Button>
         )}
+        {/* Only a run of every story can become goldens, which the rest alone isn't. */}
+        {renders.can && (
+          <Button disabled={renders.rendering > 0} onClick={() => void renders.render(view.stories.map(({ story }) => story))}>
+            Render all {view.stories.length.toLocaleString()}
+          </Button>
+        )}
         {view.newestRunId !== null && <AppLink href={runPath(view.newestRunId)}>Review the newest run</AppLink>}
       </Stack>
     </Item>

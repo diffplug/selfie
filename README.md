@@ -12,6 +12,55 @@ Selfie is piloting with StorybookJS, but PRs to support other testing models are
 
 A hosted instance runs at [hackathon.selfie.dev](https://hackathon.selfie.dev).
 
+## Quickstart
+
+You'll need Node 26 or later, pnpm, and Docker running, since stories render in a pinned browser in a container. Your project needs a Storybook (7 or later) in a Git repository.
+
+**1. Install Selfie.** It isn't on npm yet, so run it from a checkout:
+
+```sh
+git clone https://github.com/diffplug/selfie-hackathon
+cd selfie-hackathon
+pnpm install
+alias selfie="node --disable-warning=ExperimentalWarning $PWD/cli/src/main.ts"
+```
+
+The alias lasts for this terminal, so add it to your shell's profile, with the full path, to keep it.
+
+**2. Tell it how to build your Storybook.** Add `selfie.config.json` at the top of your repository, and make sure Git ignores the output directory:
+
+```json
+{
+  "storybookDir": "storybook-static",
+  "buildCommand": "npx storybook build"
+}
+```
+
+**3. Open it.** From your repository:
+
+```sh
+selfie
+```
+
+This builds your Storybook, serves it, and opens your browser. The left side lists every story, as Storybook's sidebar does. The right side is a checklist of where your commit stands, and says what to do if something's missing.
+
+**4. Render a story.** Pick a story to see it running, then press `c`, or click **Render it**. The first render downloads the browser, which can take a few minutes. Rendering keeps an image of that story with your commit. Press `m` to write a note on it for a coding agent. **Render all** on the checklist does every story.
+
+**5. Make your first goldens.** Goldens are the images later changes get compared with. On your default branch, with nothing uncommitted:
+
+1. Click **Render all**, then **Review the newest run**.
+2. Click **Approve all** and confirm, then **Accept this run** and confirm.
+
+**6. See a diff.** On a new branch, change a component and commit it. Stop `selfie` and start it again, so it rebuilds, then click **Render all** and **Review the newest run**. The tree now lists only what changed, was added, or was removed, and each story's page shows the images side by side. `j` and `k` go through them, and `a` and `r` approve and reject.
+
+**7. Check that it's stable.** If a story changes when you didn't touch it, find out why:
+
+```sh
+selfie flakes
+```
+
+It renders everything several times and lists what wasn't the same. `selfie skill fix-flakes` prints a guide for a coding agent to fix what it finds. A project can also change how stories render, such as using dark mode, with `environment.recipe` in `selfie.config.json` (`docs/specs/render.md`).
+
 ## Built for the Meta Global AI Developer Hackathon
 
 We previously launched [Selfie](https://lib.selfie.dev), a snapshot testing library focused on data rather than screenshots with no cloud or agent integrations. We are backgrounding it to focus on this completely new and unrelated service, which shares the same general theme and name but none of its code. Everything in this repo was built from November 1, 2026 onward for the [Meta Global AI Developer Hackathon](https://cerebralvalley.ai/e/meta-ai-developer-hackathon/details).
