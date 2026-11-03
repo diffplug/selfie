@@ -10,6 +10,7 @@ import { Blobs, initStoreSchema, Snapshots, Sql, Store, type CompareOptions, typ
 import type { PixelDiff } from "./diff.ts";
 import { SelfieError } from "./errors.ts";
 import { nearestOnBranch, openRepo, walkToBaseline, type BaselineSearch, type Repo } from "./git.ts";
+import { CREATE_NOTES_TABLES, notesIn, type Notes } from "./notes.ts";
 import { assertRunId, isRunId, projectSlug, selfieHome } from "./paths.ts";
 
 /** How many runs keep their exported images. Older ones are deleted by the next review. */
@@ -61,6 +62,7 @@ export interface Project {
   /** `<home>/<slug>` */
   readonly directory: string;
   readonly renders: Renders;
+  readonly notes: Notes;
   readonly store: Store;
   readonly snapshots: Snapshots;
   readonly close: () => void;
@@ -76,11 +78,13 @@ export async function openProject({ cwd, env }: { cwd: string; env: NodeJS.Proce
   const sql = new Sql(adapter);
   await initStoreSchema(sql);
   await sql.run({ sql: "CREATE TABLE IF NOT EXISTS render_keys (key TEXT PRIMARY KEY, run_id TEXT NOT NULL) WITHOUT ROWID" });
+  for (const statement of CREATE_NOTES_TABLES) await sql.run({ sql: statement });
   return {
     cwd,
     repo,
     directory,
     renders: rendersIn(sql),
+    notes: notesIn(sql, repo.root),
     store: new Store({ sql, blob: new Blobs(new FilesystemBlobStorage(path.join(directory, "blobs"))), webp: sharpWebp }),
     snapshots: new Snapshots({ sql }),
     close: () => adapter.close(),

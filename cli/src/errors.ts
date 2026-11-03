@@ -12,6 +12,7 @@ export type SelfieErrorCode =
   | "missing-image"
   | "no-actor"
   | "stale-decision"
+  | "unknown-note"
   | "usage";
 
 /** The work couldn't be done. `code` says which case this is, for a caller that isn't reading the message. */

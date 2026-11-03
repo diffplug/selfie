@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { AcceptRefusal, DecisionKind, DecisionTarget, RunView, SnapshotRow } from "../shared/api.ts";
-import { fetchRun, fetchUnchanged, postAccept, postDecision, RequestError } from "./api.ts";
+import type { AcceptRefusal, DecisionKind, DecisionTarget, FeedbackView, NewNote, RunView, SnapshotRow } from "../shared/api.ts";
+import { deleteNote, fetchFeedback, fetchRun, fetchUnchanged, postAccept, postDecision, postNote, postSendNotes, RequestError } from "./api.ts";
 import { reuseRows } from "./filter.ts";
 import { toggled } from "./selection.ts";
 
@@ -122,6 +122,71 @@ export function useHotkeys(keys: Readonly<Record<string, () => void>>): void {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
+}
+
+export interface FeedbackState {
+  readonly view: FeedbackView | null;
+  /** Why the last change didn't happen. */
+  readonly error: RequestError | null;
+  readonly clearError: () => void;
+  /** True if the note was saved. */
+  readonly add: (note: NewNote) => Promise<boolean>;
+  readonly remove: (id: number) => Promise<void>;
+  /** The text to paste into an agent, or null if the request failed. */
+  readonly send: () => Promise<string | null>;
+}
+
+/** How often to look for what an agent or another tab did, since nothing tells this page. */
+const FEEDBACK_READ_MS = 2_000;
+
+/** One folder's notes, as the server last described them. */
+export function useFeedback(): FeedbackState {
+  const [view, setView] = useState<FeedbackView | null>(null);
+  const [error, setError] = useState<RequestError | null>(null);
+  // At most one read is on its way, and an action's answer aborts it, so a slow read can't undo it.
+  const reading = useRef<AbortController | null>(null);
+  // Most reads find nothing new, and that shouldn't redraw a page someone is reading.
+  const apply = useCallback((next: FeedbackView) => setView((previous) => (JSON.stringify(previous) === JSON.stringify(next) ? previous : next)), []);
+
+  useEffect(() => {
+    const read = () => {
+      reading.current?.abort();
+      const controller = new AbortController();
+      reading.current = controller;
+      // A missed read is made up by the next, and an action says for itself if the server is gone.
+      fetchFeedback(controller.signal).then(apply, () => undefined);
+    };
+    read();
+    const timer = setInterval(read, FEEDBACK_READ_MS);
+    window.addEventListener("focus", read);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("focus", read);
+      reading.current?.abort();
+    };
+  }, [apply]);
+
+  const act = async <T,>(work: () => Promise<T>, take: (answer: T) => FeedbackView): Promise<T | null> => {
+    setError(null);
+    try {
+      const answer = await work();
+      reading.current?.abort();
+      apply(take(answer));
+      return answer;
+    } catch (failure) {
+      setError(asRequestError(failure));
+      return null;
+    }
+  };
+
+  return {
+    view,
+    error,
+    clearError: useCallback(() => setError(null), []),
+    add: async (note) => (await act(() => postNote(note), (next) => next)) !== null,
+    remove: async (id) => void (await act(() => deleteNote(id), (next) => next)),
+    send: async () => (await act(postSendNotes, ({ feedback }) => feedback))?.text ?? null,
+  };
 }
 
 export interface RegionSelection {

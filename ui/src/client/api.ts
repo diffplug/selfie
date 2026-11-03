@@ -8,6 +8,8 @@ import {
   type CurrentView,
   type DecisionKind,
   type DecisionTarget,
+  type FeedbackView,
+  type NewNote,
   type PixelDiff,
   type RunView,
   type SnapshotRow,
@@ -39,12 +41,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return body as T;
 }
 
-const post = <T>(path: string, body: unknown) =>
-  request<T>(path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", [REQUEST_HEADER]: REQUEST_HEADER_VALUE },
-    body: JSON.stringify(body),
-  });
+const WRITE_HEADERS = { "Content-Type": "application/json", [REQUEST_HEADER]: REQUEST_HEADER_VALUE };
+
+const post = <T>(path: string, body: unknown) => request<T>(path, { method: "POST", headers: WRITE_HEADERS, body: JSON.stringify(body) });
 
 const runRoute = (runId: string) => `/runs/${encodeURIComponent(runId)}`;
 
@@ -58,6 +57,11 @@ export const postDecision = (runId: string, decision: DecisionKind, snapshots: r
   post<RunView>(`${runRoute(runId)}/decisions`, { decision, snapshots });
 export const postAccept = (runId: string, removedSeen: number | undefined) =>
   post<AcceptOutcome>(`${runRoute(runId)}/accept`, removedSeen === undefined ? {} : { removedSeen });
+
+export const fetchFeedback = (signal: AbortSignal) => request<FeedbackView>("/feedback", { signal });
+export const postNote = (note: NewNote) => post<FeedbackView>("/notes", note);
+export const postSendNotes = () => post<{ readonly feedback: FeedbackView; readonly text: string }>("/notes/send", {});
+export const deleteNote = (id: number) => request<FeedbackView>(`/notes/${id}`, { method: "DELETE", headers: WRITE_HEADERS });
 
 export const imageUrl = (hash: string) => `/api/images/${hash}`;
 export const diffImageUrl = (current: string, golden: string) => `/api/diffs/${current}/${golden}/image`;

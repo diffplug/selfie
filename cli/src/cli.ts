@@ -9,6 +9,7 @@ import { gitUserEmail } from "./git.ts";
 import { compareAsReviewed, findBaseline, openProject, type Project } from "./project.ts";
 import { record, review } from "./review.ts";
 import { summarizeRun } from "./summary.ts";
+import { notesForAgent } from "./notes.ts";
 
 const EXIT_OK = 0;
 const EXIT_NEEDS_ATTENTION = 1;
@@ -46,6 +47,10 @@ const USAGE = `Usage: selfie <command>
       Serves the review UI on loopback until stopped, and prints its URL. Opens at this run, or
       else the newest at HEAD. It shows what's recorded, and never renders. Opens no
       browser by itself.
+
+  notes
+      Prints the notes a person has sent to an agent from this folder's review UI, each with a
+      picture of what it's about. Never their drafts. Each worktree's folder has its own notes.
 
 Local data lives under ~/.config/selfie/<git-origin-slugified>/, or $SELFIE_HOME instead of
 ~/.config/selfie. A project configures Selfie in selfie.config.json at its Git top level:
@@ -225,6 +230,14 @@ async function dispatch(command: string | undefined, args: string[], context: Co
       return withProject(context, async (project) => {
         const { environmentId } = await resolveCaptureSettings(project.repo, { native: values.native });
         printJson(context, { ...(await findBaseline(project, environmentId)), environment: environmentId });
+        return EXIT_OK;
+      });
+    }
+    case "notes": {
+      const { positionals } = parse(args, {});
+      noPositionals(command, positionals);
+      return withProject(context, async (project) => {
+        printJson(context, await notesForAgent(project));
         return EXIT_OK;
       });
     }

@@ -13,6 +13,8 @@
 | **Golden** | The snapshot accepted as correct for its name. |
 | **Baseline** | The Git sha whose goldens a run is held to: the nearest merge-base with a complete set of goldens. |
 | **Branch goldens** | With no baseline, the nearest goldens on a run's own branch, which it's shown against. Only to look at: never a baseline (`docs/specs/cli.md` → Review). |
+| **Note** | What a person says about a story, for an agent to act on: on an image, and maybe a box of it (`docs/specs/feedback.md`). |
+| **Session** | Whose notes these are: a local Git worktree's top folder (`docs/specs/feedback.md`). |
 | **Approval** | A person's or agent's acceptance of a snapshot change. May be made before the change is pushed (`docs/specs/system.md`). |
 | **Rejection** | A person's or agent's refusal of a snapshot change. |
 | **Decision** | An approval or a rejection, recorded against a snapshot name and an image hash (`docs/specs/snapshots.md`). |

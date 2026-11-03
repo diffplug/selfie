@@ -8,6 +8,8 @@ import {
   DiffModifiedIcon,
   DiffRemovedIcon,
   DotIcon,
+  PaperAirplaneIcon,
+  PencilIcon,
   StopIcon,
   UnfoldIcon,
   XIcon,
@@ -15,7 +17,7 @@ import {
 import { Label, Stack, type LabelProps } from "@primer/react";
 import type { ReactNode } from "react";
 import { isDecidable } from "selfie-store";
-import type { BlockerReason, PixelDiff, RegionKind, SnapshotRow, SnapshotState } from "../shared/api.ts";
+import type { BlockerReason, NoteState, PixelDiff, RegionKind, SnapshotRow, SnapshotState } from "../shared/api.ts";
 import { isLayoutOnly } from "../shared/regions.ts";
 import { plural } from "./plural.ts";
 import { AppLink, runPath } from "./router.tsx";
@@ -59,6 +61,20 @@ const KIND_LABELS: Readonly<Record<RegionKind, { variant: LabelProps["variant"];
   moved: { variant: "accent", icon: <ArrowSwitchIcon size={12} />, words: "Moved" },
   spacing: { variant: "attention", icon: <UnfoldIcon size={12} />, words: "Spacing" },
 };
+
+const NOTE_LABELS: Readonly<Record<NoteState, { variant: LabelProps["variant"]; icon: ReactNode; words: string }>> = {
+  draft: { variant: "secondary", icon: <PencilIcon size={12} />, words: "Draft" },
+  sent: { variant: "accent", icon: <PaperAirplaneIcon size={12} />, words: "Sent" },
+};
+
+export function NoteLabel({ state }: { readonly state: NoteState }) {
+  const { variant, icon, words } = NOTE_LABELS[state];
+  return (
+    <IconLabel variant={variant} icon={icon}>
+      {words}
+    </IconLabel>
+  );
+}
 
 export function KindLabel({ kind }: { readonly kind: RegionKind }) {
   const { variant, icon, words } = KIND_LABELS[kind];

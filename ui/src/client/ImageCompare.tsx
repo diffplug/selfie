@@ -3,13 +3,16 @@
 // is looking stays the same from story to story, since this stays mounted across them.
 import { Button, SegmentedControl, Stack, Text } from "@primer/react";
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import type { BoundingBox, PixelDiff, SnapshotRow } from "../shared/api.ts";
-import type { RegionGroup } from "../shared/regions.ts";
+import type { BoundingBox, Note, PixelDiff, SnapshotRow } from "../shared/api.ts";
+import { hull, type RegionGroup } from "../shared/regions.ts";
 import { diffImageUrl, imageUrl } from "./api.ts";
-import { useDevicePixelRatio, useHotkeys, type RegionSelection } from "./hooks.ts";
+import { useDevicePixelRatio, useHotkeys, type FeedbackState, type RegionSelection } from "./hooks.ts";
 import { Keys } from "./Keys.tsx";
+import { NotesPanel } from "./NotesPanel.tsx";
+import { plural } from "./plural.ts";
 import { RegionList } from "./RegionList.tsx";
 import { stepped } from "./selection.ts";
+import { useDrawnBox } from "./useDrawnBox.ts";
 
 /** `"size"` is the size the page really was. A number is how many device pixels show one image pixel. */
 const ZOOMS = ["size", 1, 2, 4, 8] as const;
@@ -43,11 +46,9 @@ type Size = { readonly width: number; readonly height: number };
 /** Over one image, as shares of its size, so at any zoom. The list says the same to assistive technology. */
 function RegionOutlines({ groups, layer, size, selection }: { groups: readonly RegionGroup[]; layer: Layer; size: Size; selection: RegionSelection }) {
   const { selected, focused, toggle, setFocused } = selection;
-  const share = (part: number, whole: number) => `${(part / whole) * 100}%`;
   return (
     <div className="selfie-outlines" aria-hidden="true">
       {groups.map((group, index) => {
-        const { x, y, width, height } = boxOn(group, layer);
         return (
           <div
             key={index}
@@ -56,7 +57,7 @@ function RegionOutlines({ groups, layer, size, selection }: { groups: readonly R
             data-kind={group.kind}
             data-selected={selected.has(index) || undefined}
             data-focused={focused === index || undefined}
-            style={{ left: share(x, size.width), top: share(y, size.height), width: share(width, size.width), height: share(height, size.height) }}
+            style={placed(boxOn(group, layer), size)}
             onClick={() => {
               toggle(index);
               setFocused(index);
@@ -68,6 +69,31 @@ function RegionOutlines({ groups, layer, size, selection }: { groups: readonly R
           </div>
         );
       })}
+    </div>
+  );
+}
+
+const share = (part: number, whole: number) => `${(part / whole) * 100}%`;
+const placed = ({ x, y, width, height }: BoundingBox, size: Size) => ({
+  left: share(x, size.width),
+  top: share(y, size.height),
+  width: share(width, size.width),
+  height: share(height, size.height),
+});
+
+/** What's being said about this image. They're never in the way of clicking or drawing on it. */
+function NoteBoxes({ notes, drawn, size }: { notes: readonly Note[]; drawn: BoundingBox | null; size: Size }) {
+  return (
+    <div className="selfie-outlines" aria-hidden="true">
+      {notes.map(
+        ({ id, box }) =>
+          box !== null && (
+            <div key={id} className="selfie-note-box" style={placed(box, size)}>
+              <span className="selfie-note-chip">Note {id}</span>
+            </div>
+          ),
+      )}
+      {drawn !== null && <div className="selfie-note-box" data-drawing style={placed(drawn, size)} />}
     </div>
   );
 }
@@ -92,9 +118,11 @@ interface ImageCompareProps {
   readonly scale: number;
   readonly groups: readonly RegionGroup[];
   readonly selection: RegionSelection;
+  readonly runId: string;
+  readonly feedback: FeedbackState;
 }
 
-export function ImageCompare({ row, diff, scale, groups, selection }: ImageCompareProps) {
+export function ImageCompare({ row, diff, scale, groups, selection, runId, feedback }: ImageCompareProps) {
   const { story, imageHash, goldenHash } = row;
   const sources = sourcesOf(row, diff !== null);
   const canFlip = goldenHash !== null && imageHash !== null;
@@ -112,12 +140,14 @@ export function ImageCompare({ row, diff, scale, groups, selection }: ImageCompa
   // CSS pixels per image pixel, which everything drawn over or scrolled to is measured in.
   const cssPixels = devicePixels / deviceRatio;
   const [outlined, setOutlined] = useState(true);
-  const { focused, toggle, setFocused } = selection;
+  const { selected, focused, toggle, setSelected, setFocused } = selection;
+  const writing = useRef<HTMLTextAreaElement>(null);
   const [sizes, setSizes] = useState<Readonly<Record<string, Size>>>({});
   const viewport = useRef<HTMLDivElement>(null);
   const section = useRef<HTMLDivElement>(null);
 
   const shownSize = shown === undefined ? undefined : sizes[shown.src];
+  const { drawn, clear: clearDrawn, handlers: drawing } = useDrawnBox({ story, cssPixels, size: shownSize, onDrawn: () => writing.current?.focus() });
   const hasSize = shownSize !== undefined;
 
   const focusedGroup = focused === null ? null : (groups[focused] ?? null);
@@ -170,8 +200,30 @@ export function ImageCompare({ row, diff, scale, groups, selection }: ImageCompa
     else section.current?.querySelector(`[data-region="${index}"]`)?.scrollIntoView({ block: "center" });
   };
 
+  const hashOn = (on: Layer) => (on === "golden" ? goldenHash : imageHash);
+  const storyNotes = (feedback.view?.notes ?? []).filter((note) => note.story === story);
+
   const outlinesOn = (on: Layer, size: Size | undefined) =>
-    outlined && size !== undefined && <RegionOutlines groups={groups} layer={on} size={size} selection={selection} />;
+    size !== undefined && (
+      <>
+        {outlined && <RegionOutlines groups={groups} layer={on} size={size} selection={selection} />}
+        <NoteBoxes notes={storyNotes.filter(({ imageHash: noted }) => noted === hashOn(on))} drawn={mode === "flip" ? drawn : null} size={size} />
+      </>
+    );
+
+  const selectedBoxes = [...selected].map((index) => boxOn(groups[index]!, layer));
+  const noteBox = drawn ?? (selectedBoxes.length === 0 ? null : selectedBoxes.reduce(hull));
+  const imageWords = hashOn(layer) === null ? "this story" : layer === "golden" ? "the golden" : "the current image";
+  const noteTarget = drawn !== null ? `on the box you drew on ${imageWords}` : selected.size > 0 ? `on ${plural(selected.size, "selected region")} of ${imageWords}` : `on all of ${imageWords}`;
+
+  const addNote = async (text: string) => {
+    const saved = await feedback.add({ story, runId, imageHash: hashOn(layer), box: noteBox, text });
+    if (saved) {
+      clearDrawn();
+      setSelected(new Set());
+    }
+    return saved;
+  };
 
   const hasDiffLayer = sources.some(({ name }) => name === "diff");
 
@@ -191,6 +243,7 @@ export function ImageCompare({ row, diff, scale, groups, selection }: ImageCompa
       setZoom((value) => ZOOMS[(ZOOMS.indexOf(value) + 1) % ZOOMS.length]!);
     },
     c: center,
+    m: () => writing.current?.focus(),
     n: () => goToRegion(stepped(focused, groups.length, 1)),
     p: () => goToRegion(stepped(focused, groups.length, -1)),
     x: () => {
@@ -211,6 +264,7 @@ export function ImageCompare({ row, diff, scale, groups, selection }: ImageCompa
   return (
     <Stack as="section" aria-label="Images" gap="condensed" ref={section}>
       {groups.length > 0 && <RegionList groups={groups} selection={selection} onGo={goToRegion} outlined={outlined} onOutlined={setOutlined} />}
+      <NotesPanel notes={storyNotes} target={noteTarget} onAdd={addNote} onRemove={(id) => void feedback.remove(id)} writing={writing} />
       <Stack direction="horizontal" wrap="wrap" align="end" gap="normal">
         <SegmentedControl aria-label="How to compare the images" onChange={(index) => setMode(index === 0 ? "side" : "flip")}>
           <SegmentedControl.Button selected={mode === "side"}>Side by side</SegmentedControl.Button>
@@ -286,7 +340,7 @@ export function ImageCompare({ row, diff, scale, groups, selection }: ImageCompa
         </div>
       ) : (
         <div className="selfie-viewport" ref={viewport} tabIndex={0} role="group" aria-label={`${LAYER_WORDS[layer]} image, ${zoomWords(zoom).toLowerCase()}. Scroll to pan.`}>
-          <div className="selfie-stack" style={shownSize === undefined ? undefined : { width: shownSize.width * cssPixels, height: shownSize.height * cssPixels }}>
+          <div className="selfie-stack" {...drawing} style={shownSize === undefined ? undefined : { width: shownSize.width * cssPixels, height: shownSize.height * cssPixels }}>
             {sources.map(({ name, src }) => {
               const size = sizes[src];
               return (
@@ -295,6 +349,7 @@ export function ImageCompare({ row, diff, scale, groups, selection }: ImageCompa
                   src={src}
                   alt={name === layer ? `${LAYER_WORDS[name]} image of ${story}` : ""}
                   className="selfie-layer"
+                  draggable={false}
                   style={{
                     visibility: name === layer ? "visible" : "hidden",
                     // Blocks stay even only at a whole number of device pixels, so anything else is smoothed.

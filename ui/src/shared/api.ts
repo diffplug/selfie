@@ -170,6 +170,41 @@ export interface DecisionTarget {
   readonly imageHash: string;
 }
 
+/** `draft` is still the person's, and `sent` is the agent's to act on. */
+export type NoteState = "draft" | "sent";
+
+/** One thing said about a note, which is a draft until it's sent. */
+export interface NoteMessage {
+  readonly sender: "person" | "agent";
+  readonly author: string;
+  readonly text: string;
+  readonly runId: string | null;
+  readonly at: number;
+  readonly sent: boolean;
+}
+
+/** Where something a person wants to talk about is: on a story, on an image, and maybe a box of it. */
+export interface Note {
+  readonly id: number;
+  readonly story: string;
+  readonly runId: string;
+  /** The image it's about, or null for a story with no image, such as one that failed. */
+  readonly imageHash: string | null;
+  /** Null for all of the image. */
+  readonly box: BoundingBox | null;
+  readonly state: NoteState;
+  readonly messages: readonly NoteMessage[];
+}
+
+export type NewNote = Pick<Note, "story" | "runId" | "imageHash" | "box"> & { readonly text: string };
+
+/** One session's notes, which is one local folder's. */
+export interface FeedbackView {
+  /** Only its name, since a response never holds a path. */
+  readonly folder: string;
+  readonly notes: readonly Note[];
+}
+
 /**
  * The seam between the routes and a platform: how they reach a project's data. `cli/src/ui.ts`
  * implements it for a local repository. An error with a `code` from `ERROR_STATUS` becomes that
@@ -184,6 +219,11 @@ export interface ReviewSource {
   /** Decides on exactly these images, or refuses all of them if one isn't what the run holds. */
   decide(runId: string, decision: DecisionKind, targets: readonly DecisionTarget[]): Promise<RunView>;
   accept(runId: string, removedSeen: number | undefined): Promise<AcceptOutcome>;
+  feedback(): Promise<FeedbackView>;
+  addNote(note: NewNote): Promise<FeedbackView>;
+  removeNote(id: number): Promise<FeedbackView>;
+  /** Sends every draft, and answers with all that's been sent, as text to paste into an agent. */
+  sendNotes(): Promise<{ readonly feedback: FeedbackView; readonly text: string }>;
   /** The stored bytes, or null if this store doesn't hold it. */
   image(hash: string): Promise<Uint8Array | null>;
   /** Null if the store doesn't hold both. */

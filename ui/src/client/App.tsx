@@ -3,7 +3,8 @@ import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
 import { fetchCurrent } from "./api.ts";
 import { AcceptScreen } from "./AcceptScreen.tsx";
 import { DetailScreen } from "./DetailScreen.tsx";
-import { useFetched, useRun, useTitle } from "./hooks.ts";
+import { FeedbackBar } from "./Feedback.tsx";
+import { useFeedback, useFetched, useRun, useTitle } from "./hooks.ts";
 import { AppLink, navigate, parseRoute, runPath, useLocation, type Route } from "./router.tsx";
 import { RunScreen } from "./RunScreen.tsx";
 import { LoadFailure, Loading, NoRuns, NotFound } from "./Status.tsx";
@@ -22,20 +23,25 @@ function Home() {
 /** Holds the run across its screens, so moving between them doesn't read it again. */
 function RunRoutes({ runId, route, search }: { runId: string; route: Route; search: string }) {
   const state = useRun(runId);
+  const feedback = useFeedback();
   // Where to put focus on coming back to the list.
   const lastStory = useRef<string | null>(null);
   if (state.view === null) {
     return state.loadError !== null ? <LoadFailure error={state.loadError} /> : <Loading label="Reading this run" />;
   }
-  switch (route.kind) {
-    case "story":
-      lastStory.current = route.story;
-      return <DetailScreen state={state} view={state.view} story={route.story} search={search} />;
-    case "accept":
-      return <AcceptScreen state={state} view={state.view} />;
-    default:
-      return <RunScreen state={state} view={state.view} search={search} returningFrom={lastStory} />;
-  }
+  if (route.kind === "story") lastStory.current = route.story;
+  return (
+    <>
+      <FeedbackBar feedback={feedback} runId={runId} showList={route.kind === "run"} />
+      {route.kind === "story" ? (
+        <DetailScreen state={state} view={state.view} story={route.story} search={search} feedback={feedback} />
+      ) : route.kind === "accept" ? (
+        <AcceptScreen state={state} view={state.view} />
+      ) : (
+        <RunScreen state={state} view={state.view} search={search} returningFrom={lastStory} />
+      )}
+    </>
+  );
 }
 
 /** Around every screen. */

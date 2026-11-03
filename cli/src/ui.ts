@@ -1,12 +1,14 @@
 // The review UI's window on a local repository: the library, as the shape its routes want. Nothing
 // here renders, so the UI only reads what `selfie review` recorded and records decisions on it.
 import type { Comparison, DecisionKind } from "selfie-store";
-import type { AcceptOutcome, CurrentView, DecisionTarget, ReviewSource, RunView, SnapshotRow } from "selfie-ui/app";
+import type { AcceptOutcome, CurrentView, DecisionTarget, FeedbackView, NewNote, ReviewSource, RunView, SnapshotRow } from "selfie-ui/app";
+import path from "node:path";
 import { resolveCaptureSettings, resolveRegionMergeDistance } from "./config.ts";
 import { accept, checkAccept, decide } from "./decisions.ts";
 import { diffToPng, type PixelDiff } from "./diff.ts";
 import { SelfieError } from "./errors.ts";
 import { gitUserEmail, headSha, type BaselineSearch } from "./git.ts";
+import { sentNotes, textForAgent } from "./notes.ts";
 import { branchGoldens, compareAsReviewed, findBaseline, readReviewCache, requireRun, type Project } from "./project.ts";
 import { summarizeRun } from "./summary.ts";
 
@@ -66,7 +68,34 @@ export function localReviewSource(project: Project, { native }: { readonly nativ
   /** Diffs by content, so any run that compares these two images shares the work. */
   const diffs = new Map<string, Promise<{ diff: PixelDiff; png: Uint8Array } | null>>();
 
+  const feedback = async (): Promise<FeedbackView> => ({ folder: path.basename(repo.root), notes: await project.notes.list() });
+
+  const requireActor = async (consequence: string) => {
+    const actor = await gitUserEmail(repo);
+    if (actor === null) throw new SelfieError("no-actor", `Git doesn't say who you are, so ${consequence}. Set git config user.email.`);
+    return actor;
+  };
+
   return {
+    feedback,
+
+    async addNote(note: NewNote) {
+      await requireRun(project, note.runId);
+      await project.notes.add(note, await requireActor("this note wasn't saved"));
+      return feedback();
+    },
+
+    async removeNote(id: number) {
+      await project.notes.removeDraft(id);
+      return feedback();
+    },
+
+    async sendNotes() {
+      await project.notes.send();
+      const view = await feedback();
+      return { feedback: view, text: textForAgent(sentNotes(view.notes), view.folder) };
+    },
+
     runView: async (runId) => viewOf(await compareAsReviewed(project, runId), await gitUserEmail(repo)),
 
     async current(): Promise<CurrentView> {
@@ -97,10 +126,7 @@ export function localReviewSource(project: Project, { native }: { readonly nativ
     },
 
     async decide(runId: string, decision: DecisionKind, targets: readonly DecisionTarget[]) {
-      const actor = await gitUserEmail(repo);
-      if (actor === null) {
-        throw new SelfieError("no-actor", "Git doesn't say who you are, so no decision was recorded. Set git config user.email.");
-      }
+      const actor = await requireActor("no decision was recorded");
       const { comparison } = await decide(project, { runId, decision, actor, stories: { targets } });
       return viewOf(comparison, actor);
     },

@@ -79,4 +79,4 @@ Selfie is for fully opaque images, and transparency is never allowed: `docs/spec
 
 **Scope: customer-subdomains** — Possible future offer: a subdomain per customer. Independent of `platforms-upgrade`.
 
-**Scope: annotations** — Stretch, if we get to it: agents and humans annotate snapshots and their deltas. Not ordered against the scopes above.
+**Scope: remote-notes** is defined in `docs/specs/feedback.md` → Future.
