@@ -7,7 +7,7 @@ import { buildAcceptDocument, buildRecordDocument, buildReviewDocument } from ".
 import { SelfieError } from "./errors.ts";
 import { gitUserEmail, resolveCommit } from "./git.ts";
 import { compareAsReviewed, findBaseline, openProject, type Project } from "./project.ts";
-import { record, review, replyToNote, runBuildCommand } from "./review.ts";
+import { buildIfAsked, record, review, replyToNote } from "./review.ts";
 import { summarizeRun } from "./summary.ts";
 import { findBaselineWithRemote, pull, push, requireRemote, resolveRemote, type Fetch } from "./sync.ts";
 import { isNoteId, isNoteText, MAX_NOTE_CHARACTERS } from "selfie-ui/notes";
@@ -173,12 +173,19 @@ async function serveReview(
     readonly path: string;
     readonly runId: string | null;
     readonly afterListening?: string;
+    /** Run once on the way up, after the config is known to be good, since a build can take minutes. */
+    readonly buildCommand?: string | undefined;
+    readonly needsBuild?: boolean;
   },
 ): Promise<number> {
-  const { native } = options;
+  const { native, buildCommand } = options;
   // Only here, so that no other command loads a web server.
-  const [{ serveReviewWithStorybook }, { localReviewSource }] = await Promise.all([import("selfie-ui/local"), import("./ui.ts")]);
+  const [{ isBuiltStorybook, serveReviewWithStorybook }, { localReviewSource }] = await Promise.all([import("selfie-ui/local"), import("./ui.ts")]);
   const dir = resolveStorybookDir(project.cwd, options.storybookDir, await resolveCaptureSettings(project.repo, { native }));
+  await buildIfAsked(buildCommand, project.cwd, context.signal, (line) => context.stderr(`${line}\n`));
+  if (options.needsBuild === true && !isBuiltStorybook(dir)) {
+    throw new SelfieError("no-stories", `There's no built Storybook at ${dir}, so there's nothing to give feedback on. Build one, or pass --build-command.`);
+  }
   const servers = await serveReviewWithStorybook({
     source: (url) =>
       localReviewSource(project, {
@@ -398,22 +405,14 @@ async function dispatch(command: string | undefined, args: string[], context: Co
       noPositionals(command, positionals);
       const port = portFrom(values.port);
       return withProject(context, async (project) => {
-        const buildCommand = values["build-command"];
-        if (buildCommand !== undefined) {
-          context.stderr(`Building: ${buildCommand}\n`);
-          await runBuildCommand(buildCommand, project.cwd, context.signal);
-        }
-        const dir = resolveStorybookDir(project.cwd, values["storybook-dir"], await resolveCaptureSettings(project.repo, { native: values.native }));
-        const { isBuiltStorybook } = await import("selfie-ui/local");
-        if (!isBuiltStorybook(dir)) {
-          throw new SelfieError("no-stories", `There's no built Storybook at ${dir}, so there's nothing to give feedback on. Build one, or pass --build-command.`);
-        }
         return serveReview(context, project, {
           port,
           native: values.native,
-          storybookDir: dir,
+          storybookDir: values["storybook-dir"],
           path: "stories",
           runId: null,
+          buildCommand: values["build-command"],
+          needsBuild: true,
           afterListening: "Open that page, and write a note on any story. For an agent to be sent them, have it run: selfie agent-await-feedback\n",
         });
       });

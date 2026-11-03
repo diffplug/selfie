@@ -702,7 +702,7 @@ function modulesLoadedBy(file: string): string[] {
 describe("what each entry point loads", () => {
   const root = path.resolve(import.meta.dirname, "../..");
 
-  test("the CLI loads no web server until selfie ui asks for one", () => {
+  test("the CLI loads no web server until a command that serves asks for one", () => {
     const loaded = modulesLoadedBy(path.join(root, "cli/src/cli.ts"));
     expect(loaded.length).toBeGreaterThan(5);
     expect(loaded.filter((url) => url.includes("hono") || url.includes("/ui/src/server/") || url.includes("/ui/src/client/"))).toEqual([]);
@@ -715,7 +715,7 @@ describe("what each entry point loads", () => {
 });
 
 describe("selfie ui", () => {
-  const start = async (...argv: string[]) => {
+  const serve = async (command: string, ...argv: string[]) => {
     const stop = new AbortController();
     let stdout = "";
     let stderr = "";
@@ -723,7 +723,7 @@ describe("selfie ui", () => {
     const printed = new Promise<void>((resolve) => {
       onPrinted = resolve;
     });
-    const exit = runCli(["ui", ...argv], {
+    const exit = runCli([command, ...argv], {
       cwd: h.repo,
       env: { SELFIE_HOME: h.home },
       stdout: (text) => {
@@ -739,32 +739,10 @@ describe("selfie ui", () => {
     await Promise.race([printed, exit]);
     return { stop, exit, json: () => JSON.parse(stdout), stderr: () => stderr };
   };
+  const start = (...argv: string[]) => serve("ui", ...argv);
 
   describe("selfie feedback", () => {
-    const feedback = async (...argv: string[]) => {
-      const stop = new AbortController();
-      let stdout = "";
-      let stderr = "";
-      let onPrinted: () => void;
-      const printed = new Promise<void>((resolve) => {
-        onPrinted = resolve;
-      });
-      const exit = runCli(["feedback", ...argv], {
-        cwd: h.repo,
-        env: { SELFIE_HOME: h.home },
-        stdout: (text) => {
-          stdout += text;
-          onPrinted();
-        },
-        stderr: (text) => {
-          stderr += text;
-        },
-        signal: stop.signal,
-        uiClientDir: clientDir,
-      });
-      await Promise.race([printed, exit]);
-      return { stop, exit, json: () => JSON.parse(stdout), stderr: () => stderr };
-    };
+    const feedback = (...argv: string[]) => serve("feedback", ...argv);
     const builtAt = async (dir: string) => {
       await mkdir(dir, { recursive: true });
       await writeFile(path.join(dir, "iframe.html"), "<!doctype html><title>the preview</title>");
@@ -805,6 +783,15 @@ describe("selfie ui", () => {
       const failing = await feedback("--build-command", "exit 3");
       expect(await failing.exit).toBe(2);
       expect(failing.json().error.code).toBe("build-failed");
+    });
+
+    test("doesn't spend a build finding out the config is bad", async () => {
+      await writeFile(path.join(h.repo, "selfie.config.json"), JSON.stringify({ notAKey: true }));
+      const marker = path.join(h.scratch, "built-anyway");
+      const refused = await feedback("--build-command", `touch ${marker}`);
+      expect(await refused.exit).toBe(2);
+      expect(refused.json().error.code).toBe("bad-config");
+      await expect(readdir(h.scratch)).resolves.not.toContain("built-anyway");
     });
 
     test("refuses a bad port, and arguments", async () => {

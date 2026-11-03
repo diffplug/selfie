@@ -185,3 +185,7 @@ Without leaving these out, every build hashed differently and the feature would 
 **What a diff cache would save.** A reused run with 80 changes spent 1,086 ms of its 1.36 s on diffs it had already computed, about 13 ms a story, which is why it stays in `docs/specs/cli.md` → Future.
 
 **What copying rows costs.** Each reused run writes 541 rows. A review of this feature estimated about 450 MB a year at 50 hits a day. In the store above, `run_snapshots` held 5,560 rows in 376,832 bytes by `dbstat`, or 68 bytes a row including page overhead and 2 stories' `play` messages, which comes to about 670 MB for the same 18,250 runs. Either is small beside D1's 10 GB, and these rows are local, but it has no bound, as `docs/specs/snapshots.md` → Storing only what changed says of every run.
+
+## feedback
+
+**Building only on the way up.** Later builds are the agent's own, with its own `--build-command`, since a page must not be able to run a shell. The config is read first, since a bad one would otherwise cost a whole build to find out.
