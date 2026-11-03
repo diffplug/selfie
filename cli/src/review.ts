@@ -34,7 +34,7 @@ import { isRunId, regularFileInside, storyDirName } from "./paths.ts";
 import { encodePng } from "./png.ts";
 import {
   branchGoldens,
-  renderedirectory,
+  renderDirectory,
   compareAsReviewed,
   findBaseline,
   pruneOutput,
@@ -188,7 +188,7 @@ async function storeGroup(
 }
 
 /** Puts the render's images in the store, and returns one row per story. */
-async function storeRender(project: Project, renderedir: string, manifest: Manifest): Promise<RecordedSnapshot[]> {
+async function storeRender(project: Project, renderDir: string, manifest: Manifest): Promise<RecordedSnapshot[]> {
   const records: RecordedSnapshot[] = [];
   for (const group of chunks(manifest.stories, IMAGES_PER_GROUP)) {
     const failures = new Map<string, string>();
@@ -198,7 +198,7 @@ async function storeRender(project: Project, renderedir: string, manifest: Manif
         failures.set(story.id, describeErrors(story.errors));
         continue;
       }
-      const checked = await regularFileInside(renderedir, story.file);
+      const checked = await regularFileInside(renderDir, story.file);
       if ("refused" in checked) failures.set(story.id, `The render is unusable: ${checked.refused}`);
       else files.push({ story: story.id, png: await readFile(checked.file) });
     }
@@ -344,7 +344,7 @@ async function replay(
 /** Renders the built Storybook. Only a render of every story can answer a later review, so only it is remembered. */
 async function renderFresh(
   project: Project,
-  renderedir: string,
+  renderDir: string,
   render: typeof realRender,
   { storybookDir, identity, settings, options, log }: {
     readonly storybookDir: string;
@@ -356,7 +356,7 @@ async function renderFresh(
 ): Promise<Recording> {
   const manifest = await render({
     storybookDir,
-    outDir: renderedir,
+    outDir: renderDir,
     environment: settings.environment,
     log,
     ...(options.stories === undefined ? {} : { stories: [...options.stories] }),
@@ -367,7 +367,7 @@ async function renderFresh(
     reusedFromRun: null,
     storyIds: manifest.stories.map(({ id }) => id),
     warnings: manifest.warnings,
-    records: () => storeRender(project, renderedir, manifest),
+    records: () => storeRender(project, renderDir, manifest),
     async finished(run) {
       if (options.stories !== undefined) return;
       if (identity === null) {
@@ -459,7 +459,7 @@ async function recordBuild(project: Project, options: RecordOptions, { reuse }: 
   const log = options.log ?? (() => {});
   const render = options.render ?? realRender;
   const started = Date.now();
-  const renderedir = renderedirectory(project, randomUUID());
+  const renderDir = renderDirectory(project, randomUUID());
   try {
     // 1. Build. Whatever it writes is part of what this describes, so it comes first.
     // Before building, so a bad config doesn't cost a whole built Storybook to find out.
@@ -485,7 +485,7 @@ async function recordBuild(project: Project, options: RecordOptions, { reuse }: 
     const buildBefore = await storybookHash(storybookDir);
     const identity = await renderIdentity({ storybookDir, environment: settings.environment, initScript: settings.initScript });
     const replayed = identity !== null && reuse ? await replay(project, identity, options.stories, log) : null;
-    const recording = replayed ?? (await renderFresh(project, renderedir, render, { storybookDir, identity, settings, options, log }));
+    const recording = replayed ?? (await renderFresh(project, renderDir, render, { storybookDir, identity, settings, options, log }));
     const rendered = Date.now();
     assertStoriesRendered(recording.storyIds.length, storybookDir, options.stories);
 
@@ -524,7 +524,7 @@ async function recordBuild(project: Project, options: RecordOptions, { reuse }: 
       timings: { renderMs: rendered - renderStarted, storeMs: stored - rendered, totalMs: Date.now() - started },
     };
   } finally {
-    await rm(renderedir, { recursive: true, force: true });
+    await rm(renderDir, { recursive: true, force: true });
   }
 }
 

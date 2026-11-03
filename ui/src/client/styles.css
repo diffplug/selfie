@@ -735,3 +735,7 @@ code {
 .selfie-state-mark[data-state="failed"] {
   color: var(--fgColor-danger);
 }
+
+.selfie-state-mark[data-state="renamed"] {
+  color: var(--fgColor-done);
+}

@@ -1,170 +1,27 @@
 // Every story of the hosted Storybook, each with its newest render at HEAD, whichever run that was.
 // A story's page is its run's, so looking at one here and in that run's review is the same screen.
-import { AlertIcon, SearchIcon } from "@primer/octicons-react";
-import { BookmarkHollowIcon, ChevronSmallDownIcon, ChevronSmallRightIcon, ComponentIcon, FolderIcon } from "@storybook/icons";
-import { Banner, Button, Heading, PageLayout, RelativeTime, Stack, Text, TextInput, VisuallyHidden } from "@primer/react";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Banner, Button, Heading, RelativeTime, Stack, Text } from "@primer/react";
+import { useState, type ReactNode } from "react";
 import type { ListedStory, StoriesView } from "../shared/api.ts";
 import { DetailScreen, StoryPager, type StoryNavigation } from "./DetailScreen.tsx";
 import { FeedbackBar } from "./Feedback.tsx";
-import { filterQuery, matchesText, neighbors, NO_FILTER, parseFilter, positionWords } from "./filter.ts";
+import { neighbors, parseFilter, positionWords } from "./filter.ts";
 import { useRender, useFeedback, useHotkeys, useRun, useStories, useStoryFocusKeys, useTitle, type RenderState, type FeedbackState, type RunState } from "./hooks.ts";
 import { Keys } from "./Keys.tsx";
 import { OpenInStorybook, StoryFrame, storyFrameUrl } from "./LiveStories.tsx";
 import { plural } from "./plural.ts";
 import { ActionFailedBanner } from "./RunNotes.tsx";
-import { anyStoryPath, followLink, navigate, storiesPath } from "./router.tsx";
+import { anyStoryPath, navigate, storiesPath } from "./router.tsx";
+import { matchingStories, StoryNavLayout } from "./StoryNav.tsx";
 import { Checklist } from "./Checklist.tsx";
 import { LoadFailure, Loading } from "./Status.tsx";
-import { buildStoryTree, initiallyClosed, isSection, openedAround, storiesIn, visibleRows, type StoryFolder } from "./storyTree.ts";
-import { StateMark } from "./words.tsx";
 
-const matching = (stories: readonly ListedStory[], text: string) => stories.filter(({ story, title, name }) => matchesText(`${story} ${title} ${name}`, text));
-
-/** What a render can't be relied on for, in words, or nothing if it can. */
-function renderCaveats({ render }: ListedStory): string {
-  if (render === null) return "";
-  return [render.dirty && "Uncommitted changes", render.fromHostedStorybook === false && "From another built Storybook"].filter(Boolean).join(", ");
-}
-
-/** Indents a row by how deep it is, as the Storybook's sidebar does. */
-const indented = (depth: number) => ({ paddingLeft: `calc(var(--base-size-8) + ${depth} * var(--base-size-16))` });
-
-function StoryRow({ entry, depth, search, current }: { entry: ListedStory; depth: number; search: string; current: boolean }) {
-  const href = anyStoryPath(entry.story, search);
-  const link = useRef<HTMLAnchorElement>(null);
-  const caveats = renderCaveats(entry);
-  useEffect(() => {
-    if (current) link.current?.scrollIntoView({ block: "nearest" });
-  }, [current]);
-  return (
-    <li>
-      <a ref={link} className="selfie-nav-row" style={indented(depth)} href={href} data-story={entry.story} title={entry.story} aria-current={current ? "page" : undefined} onClick={(event) => followLink(event, href)}>
-        <BookmarkHollowIcon className="selfie-tree-icon" data-kind="story" />
-        <span className="selfie-nav-name">{entry.name}</span>
-        {entry.render === null ? (
-          <VisuallyHidden>, not rendered</VisuallyHidden>
-        ) : (
-          <>
-            {caveats !== "" && (
-              <span className="selfie-nav-caveat" title={caveats}>
-                <AlertIcon size={12} />
-                <VisuallyHidden>{caveats}</VisuallyHidden>
-              </span>
-            )}
-            <StateMark state={entry.render.state} />
-          </>
-        )}
-      </a>
-    </li>
-  );
-}
-
-function FolderRow({ folder, depth, open, onToggle }: { folder: StoryFolder; depth: number; open: boolean; onToggle: () => void }) {
-  const stories = storiesIn(folder);
-  const rendered = stories.filter(({ render }) => render !== null).length;
-  const section = isSection(folder, depth);
-  const isComponent = folder.children.every((child) => child.kind === "story");
-  const Icon = isComponent ? ComponentIcon : FolderIcon;
-  return (
-    <li>
-      <button type="button" className="selfie-nav-row" style={indented(depth)} aria-expanded={open} onClick={onToggle}>
-        {open ? <ChevronSmallDownIcon /> : <ChevronSmallRightIcon />}
-        {!section && <Icon className="selfie-tree-icon" data-kind={isComponent ? "component" : "folder"} />}
-        <span className={section ? "selfie-nav-name selfie-tree-section" : "selfie-nav-name"}>{folder.name}</span>
-        <span className="selfie-muted selfie-small" title={`${rendered.toLocaleString()} of ${plural(stories.length, "story", "stories")} rendered`}>
-          {rendered.toLocaleString()}/{stories.length.toLocaleString()}
-        </span>
-      </button>
-    </li>
-  );
-}
-
-function StoryTree({ stories, story, search, filtering }: { stories: readonly ListedStory[]; story: string | null; search: string; filtering: boolean }) {
-  const tree = useMemo(() => buildStoryTree(stories), [stories]);
-  const entry = stories.find((candidate) => candidate.story === story);
-  const [closed, setClosed] = useState<ReadonlySet<string>>(() => openedAround(new Set(initiallyClosed(tree)), entry));
-  // Whatever moves to a story opens the way to it, during this render so it's there to scroll to.
-  const [shownFor, setShownFor] = useState(story);
-  if (shownFor !== story) {
-    setShownFor(story);
-    setClosed(openedAround(closed, entry));
-  }
-  // A filter means looking for something, so nothing it found stays folded away.
-  const rows = useMemo(() => visibleRows(tree, filtering ? new Set() : closed), [tree, filtering, closed]);
-  const toggle = (path: string) =>
-    setClosed((previous) => {
-      const next = new Set(previous);
-      if (!next.delete(path)) next.add(path);
-      return next;
-    });
-  return (
-    <ul className="selfie-nav-tree">
-      {rows.map((row) =>
-        row.kind === "story" ? (
-          <StoryRow key={row.entry.story} entry={row.entry} depth={row.depth} search={search} current={row.entry.story === story} />
-        ) : (
-          <FolderRow key={row.path} folder={row} depth={row.depth} open={filtering || !closed.has(row.path)} onToggle={() => toggle(row.path)} />
-        ),
-      )}
-    </ul>
-  );
-}
-
-/** The list every story's page stays beside, as in Storybook. */
-function StorySidebar({ view, story, search }: { view: StoriesView; story: string | null; search: string }) {
-  const filter = useMemo(() => parseFilter(search), [search]);
-  const input = useRef<HTMLInputElement>(null);
-  const shown = useMemo(() => matching(view.stories, filter.text), [view.stories, filter.text]);
-  const filtered = (text: string) => {
-    const query = filterQuery({ ...NO_FILTER, text });
-    return story === null ? storiesPath(query) : anyStoryPath(story, query);
-  };
-  useHotkeys({ "/": () => input.current?.focus() });
-  return (
-    <nav aria-label="Stories" className="selfie-nav">
-      <TextInput
-        ref={input}
-        block
-        aria-label="Filter stories"
-        leadingVisual={SearchIcon}
-        value={filter.text}
-        placeholder="Press / to search"
-        onChange={(event) => navigate(filtered(event.target.value), { replace: true })}
-      />
-      {shown.length > 0 ? (
-        <StoryTree stories={shown} story={story} search={search} filtering={filter.text !== ""} />
-      ) : filter.text === "" ? (
-        <Text as="p" className="selfie-muted">
-          No stories yet.
-        </Text>
-      ) : (
-        <Stack gap="condensed" align="start">
-          <Text as="p" className="selfie-muted">
-            Nothing matches this filter.
-          </Text>
-          <Button size="small" onClick={() => navigate(filtered(""))}>
-            Clear the filter
-          </Button>
-        </Stack>
-      )}
-    </nav>
-  );
-}
-
-/** Every story at the left and whatever's being looked at on the right, as in Storybook. */
+/** Every story at the left and whatever's being looked at on the right. */
 export function StoriesLayout({ view, story, search, children }: { view: StoriesView; story: string | null; search: string; children: ReactNode }) {
   return (
-    <div className="selfie-stories">
-      <PageLayout containerWidth="full" padding="none" columnGap="none" rowGap="none">
-        <PageLayout.Pane position="start" sticky resizable width="medium" divider="line" widthStorageKey="selfie-story-nav" aria-label="Stories">
-          <StorySidebar view={view} story={story} search={search} />
-        </PageLayout.Pane>
-        <PageLayout.Content padding="normal" width="full">
-          <Stack gap="normal">{children}</Stack>
-        </PageLayout.Content>
-      </PageLayout>
-    </div>
+    <StoryNavLayout stories={view.stories} story={story} search={search} hrefOf={anyStoryPath}>
+      {children}
+    </StoryNavLayout>
   );
 }
 
@@ -198,7 +55,7 @@ export function StoriesOverview({ view, renders, recheck }: { view: StoriesView;
 
 /** Next and previous through this list, whichever runs they're from. */
 export function navigationIn(view: StoriesView, story: string, search: string): StoryNavigation {
-  const shown = matching(view.stories, parseFilter(search).text);
+  const shown = matchingStories(view.stories, parseFilter(search).text);
   const { previous, next } = neighbors(view.stories, shown, story);
   const hrefOf = (entry: ListedStory | null) => (entry === null ? null : anyStoryPath(entry.story, search));
   return {

@@ -142,7 +142,7 @@ export async function branchGoldens(project: Project, run: Run): Promise<string 
 export const runDirectory = (project: Project, runId: string) => path.join(project.directory, "runs", runId);
 
 /** A new directory for one render, so concurrent reviews never share one. */
-export const renderedirectory = (project: Project, id: string) => path.join(project.directory, "render", id);
+export const renderDirectory = (project: Project, id: string) => path.join(project.directory, "render", id);
 
 /** What a review exported, kept beside the images. Losing it loses no fact: the store has them all. */
 export interface ReviewCache {
