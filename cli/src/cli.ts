@@ -48,8 +48,9 @@ const USAGE = `Usage: selfie [--port <n>] [--storybook-dir <dir>] [--native] [--
       nothing. Exits 0 if every story held still, 1 if any didn't, 2 if it couldn't run.
 
   skill <name>
-      Prints a guide for a coding agent, in the format of an agent skill. selfie skill fix-flakes
-      is how to make every story render the same way every time.
+      Prints a guide for a coding agent, in the format of an agent skill. selfie skill quickstart
+      sets Selfie up in a repository, and selfie skill fix-flakes makes every story render the same
+      way every time.
 
   approve <run> (--all | --story <pattern>...) [--actor <who>]
   reject <run> (--all | --story <pattern>...) [--actor <who>]

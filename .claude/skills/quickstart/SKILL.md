@@ -1,0 +1,1 @@
+../../../cli/skills/quickstart/SKILL.md

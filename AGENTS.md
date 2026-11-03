@@ -29,4 +29,4 @@ A spec is the accurate reference for the current code: it states the invariants 
 
 ## Skills
 
-`cli/skills/` holds guides for a coding agent, linked from `.claude/skills/`, and printed for anyone by `selfie skill`. `fix-flakes` is how to make every story render the same way every time, which `selfie flakes` measures.
+`cli/skills/` holds guides for a coding agent, linked from `.claude/skills/`, and printed for anyone by `selfie skill`. `quickstart` sets Selfie up in a repository, which the README's Quickstart points an agent at. `fix-flakes` is how to make every story render the same way every time, which `selfie flakes` measures.
