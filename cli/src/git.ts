@@ -75,6 +75,16 @@ export async function headSha(repo: Repo): Promise<string | null> {
   return sha !== null && isGitSha(sha) ? sha : null;
 }
 
+/** The branch HEAD is on, even with no commits yet, or null if it's detached. */
+export const currentBranch = (repo: Repo): Promise<string | null> => ask(repo.root, ["symbolic-ref", "--quiet", "--short", "HEAD"]);
+
+/** When HEAD last moved here, by commit, checkout, or reset, in milliseconds. The commit's own time, if the reflog has none. */
+export async function headMovedAt(repo: Repo): Promise<number | null> {
+  const moved = /@\{(\d+)\}/.exec((await ask(repo.root, ["reflog", "-1", "--date=unix", "--format=%gd", "HEAD"])) ?? "")?.[1];
+  const seconds = moved ?? (await ask(repo.root, ["show", "-s", "--format=%ct", "HEAD"]));
+  return seconds === undefined || seconds === null ? null : Number(seconds) * 1000;
+}
+
 /** Modified, staged, and untracked paths across the whole working tree. Ignored files don't count. */
 export async function dirtyPaths(repo: Repo): Promise<string[]> {
   const { code, stdout, stderr } = await git(repo.root, ["--no-optional-locks", "status", "--porcelain"]);

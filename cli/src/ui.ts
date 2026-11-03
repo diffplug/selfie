@@ -6,12 +6,12 @@ import path from "node:path";
 import { isBuiltStorybook } from "selfie-ui/local";
 import { keptBuildPath } from "selfie-ui/api";
 import { buildHash, readStoriesInOrder, readStoryIndex } from "selfie-render";
-import type { AcceptOutcome, DecisionTarget, FeedbackView, NewNote, ReviewSource, RunView, SnapshotRow, StoriesView, StorybookLink } from "selfie-ui/app";
+import type { AcceptOutcome, DecisionTarget, FeedbackView, NewNote, ReviewSource, RunView, SnapshotRow, StoriesView, StorybookLink, StorySetup } from "selfie-ui/app";
 import { resolveCaptureSettings, resolveRegionMergeDistance } from "./config.ts";
 import { accept, checkAccept, decide } from "./decisions.ts";
 import { diffToPng, type PixelDiff } from "./diff.ts";
 import { SelfieError } from "./errors.ts";
-import { dirtyPaths, gitUserEmail, type BaselineSearch } from "./git.ts";
+import { currentBranch, dirtyPaths, gitUserEmail, headMovedAt, type BaselineSearch } from "./git.ts";
 import { isOpenNote } from "selfie-ui/notes";
 import { sentNotes, textForAgent } from "./notes.ts";
 import { branchGoldens, compareAsReviewed, compareAsShown, findBaseline, readReviewCache, requireRun, runsAtHead, type Project } from "./project.ts";
@@ -47,6 +47,13 @@ export function localReviewSource(
     const stamp = stats.sort().join();
     if (knownBuild?.stamp !== stamp) knownBuild = { stamp, hash: buildHash(dir) };
     return knownBuild.hash;
+  };
+
+  // Nothing says what a build was built from, since it may not have been built by Selfie. A build
+  // newer than HEAD's last move can only have come from this commit or from changes made since.
+  const builtBeforeHead = async (dir: string): Promise<boolean> => {
+    const moved = await headMovedAt(repo);
+    return moved !== null && (await stat(path.join(dir, "iframe.html"))).mtimeMs < moved;
   };
 
   const keptStorybookUrl = async (runId: string): Promise<string | null> => {
@@ -170,6 +177,17 @@ export function localReviewSource(
     runView: async (runId) => viewOf(await compareAsReviewed(project, runId), await gitUserEmail(repo)),
 
     async storiesView(): Promise<StoriesView> {
+      const setupOf = async (head: string | null, built: boolean): Promise<StorySetup | null> => {
+        if (storybook === undefined) return null;
+        const uncommitted = await dirtyPaths(repo);
+        return {
+          storybookDir: path.relative(repo.root, storybook.dir) || ".",
+          buildCommand: settings.buildCommand ?? null,
+          uncommitted,
+          builtFrom: !built || head === null ? null : uncommitted.length > 0 ? "uncommitted" : (await builtBeforeHead(storybook.dir)) ? "before-head" : "clean",
+          usesDocker: settings.environment.runner.kind === "container",
+        };
+      };
       const settings = await resolveCaptureSettings(repo, { native });
       const { head, runs } = await runsAtHead(project, settings.environmentId);
       const finished = runs.filter(({ status }) => status !== "recording");
@@ -193,6 +211,7 @@ export function localReviewSource(
       const listed = index.length > 0 ? index : [...captures.keys()].sort().map((id) => ({ id, title: "", name: id }));
       return {
         head,
+        branch: await currentBranch(repo),
         storybookUrl: built ? storybook.url : null,
         viewport: settings.environment.viewport,
         stories: await Promise.all(
@@ -218,15 +237,7 @@ export function localReviewSource(
         ),
         newestRunId: finished[0]?.id ?? null,
         canCapture: built && head !== null && storybook.record !== undefined,
-        setup:
-          storybook === undefined
-            ? null
-            : {
-                storybookDir: path.relative(repo.root, storybook.dir) || ".",
-                buildCommand: settings.buildCommand ?? null,
-                uncommitted: await dirtyPaths(repo),
-                usesDocker: settings.environment.runner.kind === "container",
-              },
+        setup: await setupOf(head, built),
       };
     },
 

@@ -2,7 +2,7 @@
 // browser, plus `selfie ui` itself on a real socket. Only the capture is a stand-in.
 import { execFileSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
-import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, rm, utimes, writeFile } from "node:fs/promises";
 import { networkInterfaces, tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -1213,12 +1213,24 @@ describe("the hosted Storybook", () => {
       expect(view.stories.map(({ story }) => story)).toEqual(["a"]);
     });
 
-    test("says where saving a first story stands", async () => {
-      expect((await live()).setup).toEqual({ storybookDir: expect.any(String), buildCommand: null, uncommitted: [], usesDocker: true });
-      await writeFile(path.join(h.repo, "changed.txt"), "not committed");
-      expect((await live()).setup?.uncommitted).toEqual(["changed.txt"]);
+    test("says where a first render stands", async () => {
+      const setup = async () => (await live()).setup;
+      expect(await setup()).toEqual({ storybookDir: expect.any(String), buildCommand: null, uncommitted: [], builtFrom: null, usesDocker: true });
+      expect((await live()).branch).toBe("main");
       await writeFile(path.join(h.repo, "selfie.config.json"), JSON.stringify({ buildCommand: "make stories" }));
-      expect((await live()).setup?.buildCommand).toBe("make stories");
+      expect(await setup()).toMatchObject({ buildCommand: "make stories", uncommitted: ["selfie.config.json"] });
+    });
+
+    test("says a build is clean only with nothing uncommitted, and built since HEAD moved here", async () => {
+      await withStories("a");
+      const builtFrom = async () => (await live()).setup?.builtFrom;
+      expect(await builtFrom()).toBe("clean");
+      await writeFile(path.join(h.repo, "changed.txt"), "not committed");
+      expect(await builtFrom()).toBe("uncommitted");
+      await rm(path.join(h.repo, "changed.txt"));
+      const longAgo = new Date("2020-01-01");
+      await utimes(path.join(dir, "iframe.html"), longAgo, longAgo);
+      expect(await builtFrom()).toBe("before-head");
     });
 
     test("can't capture with no commit to keep it with, nor say more than a server that hosts nothing knows", async () => {

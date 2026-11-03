@@ -641,35 +641,35 @@ code {
   text-transform: uppercase;
 }
 
-.selfie-setup {
+.selfie-checklist {
+  display: grid;
+  gap: var(--base-size-12);
+  margin: 0;
   padding: var(--base-size-16);
   border: var(--borderWidth-thin) solid var(--borderColor-default);
   border-radius: var(--borderRadius-medium);
-}
-
-.selfie-setup-steps {
-  display: grid;
-  gap: var(--base-size-12);
-  margin: var(--base-size-12) 0 0;
-  padding: 0;
   list-style: none;
 }
 
-.selfie-setup-step {
+.selfie-checklist-item {
   display: grid;
   grid-template-columns: var(--base-size-16) minmax(0, 1fr);
   gap: var(--base-size-8);
 }
 
-.selfie-setup-step > svg {
+.selfie-checklist-item > svg {
   margin-top: var(--base-size-2);
 }
 
-.selfie-setup-done {
+.selfie-checklist-done {
   color: var(--fgColor-success);
 }
 
-.selfie-setup-file {
+.selfie-checklist-warn {
+  color: var(--fgColor-attention);
+}
+
+.selfie-checklist-file {
   margin: 0;
   padding: var(--base-size-8) var(--base-size-12);
   overflow-x: auto;

@@ -14,8 +14,8 @@ import { Keys } from "./Keys.tsx";
 import { OpenInStorybook, StoryFrame, storyFrameUrl } from "./LiveStories.tsx";
 import { plural } from "./plural.ts";
 import { ActionFailedBanner } from "./RunNotes.tsx";
-import { anyStoryPath, AppLink, followLink, navigate, runPath, storiesPath } from "./router.tsx";
-import { listsStories, Setup, setupStage } from "./Setup.tsx";
+import { anyStoryPath, AppLink, followLink, navigate, storiesPath } from "./router.tsx";
+import { Checklist } from "./Checklist.tsx";
 import { LoadFailure, Loading } from "./Status.tsx";
 import { buildStoryTree, isSection, storiesIn, visibleRows, type StoryFolder } from "./storyTree.ts";
 import { DecisionLabel, shortSha, StateLabel } from "./words.tsx";
@@ -127,53 +127,21 @@ export function CaptureStatus({ capture }: { capture: CaptureState }) {
   );
 }
 
-/** Whether a capture is missing or known to be out of date, which is what's left to fan out to. */
-const needsCapture = ({ capture }: ListedStory) => capture === null || capture.fromHostedBuild === false;
-
 export function StoriesScreen({ view, search, capture, recheck }: { view: StoriesView; search: string; capture: CaptureState; recheck: () => void }) {
   useTitle("Every story");
   const filter = useMemo(() => parseFilter(search), [search]);
   const input = useRef<HTMLInputElement>(null);
   const shown = useMemo(() => matching(view.stories, filter.text), [view.stories, filter.text]);
-  const captured = view.stories.filter((entry) => entry.capture !== null).length;
-  const rest = view.stories.filter(needsCapture);
-  const stage = setupStage(view);
 
   useStoryListKeys(input);
 
   return (
     <Stack gap="normal">
-      <Stack direction="horizontal" align="center" justify="space-between" wrap="wrap" gap="condensed">
-        <Heading as="h2" variant="medium">
-          Every story
-          {view.head !== null && (
-            <>
-              {" "}
-              at <code title={view.head}>{shortSha(view.head)}</code>
-            </>
-          )}
-        </Heading>
-        <Stack direction="horizontal" align="center" gap="condensed">
-          {view.newestRunId !== null && <AppLink href={runPath(view.newestRunId)}>Review the newest run</AppLink>}
-          {capture.can && stage === null && rest.length > 0 && (
-            <Button variant="primary" disabled={capture.capturing > 0} onClick={() => void capture.capture(rest.map(({ story }) => story))}>
-              {`Render the rest (${rest.length.toLocaleString()})`}
-            </Button>
-          )}
-        </Stack>
-      </Stack>
-      {stage !== null && <Setup view={view} stage={stage} capture={capture} recheck={recheck} />}
-      {stage === null && view.storybookUrl === null && (
-        <Banner
-          variant="warning"
-          title="There's no built Storybook here"
-          description="Only what's been rendered is listed. Build one, or point selfie ui at it with --storybook-dir, to see every story running."
-        />
-      )}
-      {listsStories(stage) && (
+      <Checklist view={view} capture={capture} recheck={recheck} />
+      {view.stories.length > 0 && (
         <>
-          <Text as="p" className="selfie-muted" role="status">
-            {captured.toLocaleString()} of {plural(view.stories.length, "story", "stories")} rendered at this commit. <Keys keys="j" /> and <Keys keys="k" /> move through the list, <Keys keys="/" /> searches.
+          <Text as="p" className="selfie-muted">
+            <Keys keys="j" /> and <Keys keys="k" /> move through the list, <Keys keys="/" /> searches.
           </Text>
           <FormControl>
             <FormControl.Label>Filter by story</FormControl.Label>
@@ -189,12 +157,10 @@ export function StoriesScreen({ view, search, capture, recheck }: { view: Storie
             <StoryTree stories={shown} search={search} filtering={filter.text !== ""} />
           ) : (
             <Blankslate border>
-              <Blankslate.Heading as="h3">{filter.text === "" ? "No stories yet" : "Nothing matches this filter"}</Blankslate.Heading>
-              {filter.text !== "" && (
-                <Stack direction="horizontal" justify="center">
-                  <Button onClick={() => navigate(storiesPath())}>Clear the filter</Button>
-                </Stack>
-              )}
+              <Blankslate.Heading as="h3">Nothing matches this filter</Blankslate.Heading>
+              <Stack direction="horizontal" justify="center">
+                <Button onClick={() => navigate(storiesPath())}>Clear the filter</Button>
+              </Stack>
             </Blankslate>
           )}
         </>

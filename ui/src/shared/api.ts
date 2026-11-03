@@ -183,14 +183,16 @@ export interface ListedStory {
   readonly capture: StoryCaptureInfo | null;
 }
 
-/** What it takes to save a first story here, from a server that hosts a Storybook. */
+/** What a server that hosts a Storybook can say about it. */
 export interface StorySetup {
   /** Where it looks for a build, from the Git top level. */
   readonly storybookDir: string;
   /** How the config says to build one, if it does. */
   readonly buildCommand: string | null;
-  /** What differs from HEAD now, as Git names it, which a story saved now would be marked with. */
+  /** What differs from HEAD now, as Git names it, which a render now would be marked with. */
   readonly uncommitted: readonly string[];
+  /** What the hosted build reads as: nothing uncommitted and built since HEAD last moved, or which of those it isn't. Null with no build or commit. */
+  readonly builtFrom: "clean" | "uncommitted" | "before-head" | null;
   /** Renders in the pinned container, and not in this machine's browser. */
   readonly usesDocker: boolean;
 }
@@ -198,6 +200,8 @@ export interface StorySetup {
 /** Every story of the hosted Storybook, each with its newest capture, which a single run is a special case of. */
 export interface StoriesView {
   readonly head: string | null;
+  /** The branch HEAD is on, or null if it's detached. */
+  readonly branch: string | null;
   /** The hosted Storybook as it stands, or null if there's no build there. */
   readonly storybookUrl: string | null;
   /** The size a story renders at here now. */
