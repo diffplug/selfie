@@ -10,6 +10,7 @@ import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import type { RawImage, Sql, SqlRow } from "selfie-store";
 import type { BoundingBox, NewNote, Note, NoteMessage, NoteState } from "selfie-ui/app";
+import { isOpenNote } from "selfie-ui/notes";
 import { describeBox } from "selfie-ui/regions";
 import { SelfieError } from "./errors.ts";
 import { encodePng } from "./png.ts";
@@ -38,6 +39,10 @@ export const CREATE_NOTES_TABLES: readonly string[] = [
   delivered_at INTEGER
 )`,
   "CREATE INDEX IF NOT EXISTS note_messages_by_note ON note_messages(note_id, id)",
+  `CREATE TABLE IF NOT EXISTS note_sessions (
+  session TEXT PRIMARY KEY,
+  latest_run TEXT NOT NULL
+) WITHOUT ROWID`,
   `CREATE TABLE IF NOT EXISTS note_waiters (
   session TEXT PRIMARY KEY,
   token TEXT NOT NULL,
@@ -60,6 +65,14 @@ export interface Notes {
   removeDraft(id: number): Promise<void>;
   /** Sends every draft. */
   send(): Promise<void>;
+  /** A person's answer, which is a draft until it's sent, and which reopens a resolved note. */
+  answer(id: number, text: string, author: string, runId: string | null): Promise<void>;
+  /** An agent's answer. It's already been read by whoever wrote it, so it's never new to an agent. */
+  reply(id: number, text: string, runId: string | null): Promise<void>;
+  resolve(id: number): Promise<void>;
+  /** The newest run recorded from this folder, which is the one to show. */
+  latestRun(): Promise<string | null>;
+  rememberRun(runId: string): Promise<void>;
   /** Is an agent waiting in this session now? */
   isWaiting(): Promise<boolean>;
   /** True if this token is the one waiting now, whether it just took over or already was. False if another is alive. */
@@ -71,13 +84,34 @@ export interface Notes {
   markDelivered(upTo?: number): Promise<void>;
 }
 
-const stateOf = (messages: readonly NoteMessage[]): NoteState => (messages[0]?.sent === false ? "draft" : "sent");
+function stateOf(messages: readonly NoteMessage[], resolved: boolean): NoteState {
+  if (resolved) return "resolved";
+  if (messages[0]?.sent === false) return "draft";
+  // A person's draft answer isn't anything yet, so the agent's reply is still what's on the note.
+  return messages.filter(({ sent }) => sent).at(-1)?.sender === "agent" ? "replied" : "sent";
+}
+
+function requireFound(rows: readonly SqlRow[], id: number): void {
+  if (rows.length === 0) throw new SelfieError("unknown-note", `This folder has no note ${id}.`);
+}
 
 export function notesIn(sql: Sql, session: string): Notes {
+  /** Adds a message, or says this session has no such note. */
+  const addMessage = async (id: number, sender: NoteMessage["sender"], author: string, text: string, runId: string | null, sentAt: number) => {
+    const at = Date.now();
+    const added = await sql.run({
+      // A parameter can't be null, so nothing is an empty string or zero on its way in.
+      sql: `INSERT INTO note_messages(note_id, sender, author, text, run_id, at, sent_at, delivered_at)
+SELECT id, ?3, ?4, ?5, NULLIF(?6, ''), ?7, NULLIF(?8, 0), NULLIF(?8, 0) FROM notes WHERE session = ?1 AND id = ?2 RETURNING id`,
+      params: [session, id, sender, author, text, runId ?? "", at, sentAt],
+    });
+    requireFound(added, id);
+  };
+
   return {
     async list() {
       const [notes, messages] = await Promise.all([
-        sql.run({ sql: "SELECT id, story, run_id, image_hash, box FROM notes WHERE session = ?1 ORDER BY id", params: [session], idempotent: true }),
+        sql.run({ sql: "SELECT id, story, run_id, image_hash, box, resolved_at FROM notes WHERE session = ?1 ORDER BY id", params: [session], idempotent: true }),
         sql.run({
           sql: `SELECT m.id, m.note_id, m.sender, m.author, m.text, m.run_id, m.at, m.sent_at FROM note_messages m
 JOIN notes n ON n.id = m.note_id WHERE n.session = ?1 ORDER BY m.id`,
@@ -129,6 +163,27 @@ JOIN notes n ON n.id = m.note_id WHERE n.session = ?1 ORDER BY m.id`,
         sql: `UPDATE note_messages SET sent_at = ?2 WHERE sent_at IS NULL
   AND note_id IN (SELECT id FROM notes WHERE session = ?1)`,
         params: [session, Date.now()],
+      });
+    },
+    async answer(id, text, author, runId) {
+      await addMessage(id, "person", author, text, runId, 0);
+      await sql.run({ sql: "UPDATE notes SET resolved_at = NULL WHERE session = ?1 AND id = ?2", params: [session, id] });
+    },
+    reply: (id, text, runId) => addMessage(id, "agent", "agent", text, runId, Date.now()),
+    async resolve(id) {
+      const resolved = await sql.run({ sql: "UPDATE notes SET resolved_at = ?3 WHERE session = ?1 AND id = ?2 RETURNING id", params: [session, id, Date.now()] });
+      requireFound(resolved, id);
+    },
+    async latestRun() {
+      const [row] = await sql.run({ sql: "SELECT latest_run FROM note_sessions WHERE session = ?1", params: [session], idempotent: true });
+      return (row?.latest_run as string | undefined) ?? null;
+    },
+    async rememberRun(runId) {
+      await sql.run({
+        sql: `INSERT INTO note_sessions(session, latest_run) VALUES (?1, ?2)
+ON CONFLICT(session) DO UPDATE SET latest_run = excluded.latest_run`,
+        params: [session, runId],
+        idempotent: true,
       });
     },
     async isWaiting() {
@@ -185,7 +240,7 @@ const toNote = (row: SqlRow, messages: readonly NoteMessage[]): Note => ({
   runId: row.run_id as string,
   imageHash: row.image_hash as string | null,
   box: row.box === null ? null : (JSON.parse(row.box as string) as BoundingBox),
-  state: stateOf(messages),
+  state: stateOf(messages, row.resolved_at !== null),
   messages,
 });
 
@@ -196,11 +251,12 @@ export const sentNotes = (notes: readonly Note[]): readonly Note[] =>
     return messages.length === 0 ? [] : [{ ...note, messages }];
   });
 
+
 /** The hunk to paste into any coding agent. Never names a file, since it crosses the review server. */
 export function textForAgent(notes: readonly Note[], folder: string): string {
-  const header = `Feedback on the Storybook stories in the folder \`${folder}\`, as ${notes.length === 1 ? "1 note" : `${notes.length} notes`}. Run \`selfie notes\` there for the details of each, with a picture of what it's about.`;
+  const header = `Feedback on the Storybook stories in the folder \`${folder}\`, as ${notes.length === 1 ? "1 note" : `${notes.length} notes`}. Run \`selfie notes\` there for the details of each, with a picture of what it's about. When you've acted on them, run \`selfie record\`, then \`selfie reply <note> "what you did"\` for each.`;
   const bodies = notes.map(({ id, story, box, messages }) => {
-    const said = messages.map(({ text }) => text).join("\n\n");
+    const said = messages.map(({ sender, text }) => (messages.length === 1 ? text : `${sender === "agent" ? "Agent" : "Person"}: ${text}`)).join("\n\n");
     return `Note ${id}, on ${story}${box === null ? "" : `, in the box ${describeBox(box)}`}:\n${said}`;
   });
   return [header, ...bodies].join("\n\n");
@@ -243,10 +299,12 @@ async function exportNoteImage(project: Project, { imageHash, box }: Note): Prom
   return file;
 }
 
-/** What an agent reads: all it may see of a session's notes. One at a time, since each may decode a whole image. */
-export async function notesForAgent(project: Project): Promise<AgentNotes> {
+/** What's still open for an agent to read, or everything. One at a time, since each may decode a whole image. */
+export async function notesForAgent(project: Project, { all = false }: { readonly all?: boolean } = {}): Promise<AgentNotes> {
   const notes = [];
-  for (const note of sentNotes(await project.notes.list())) notes.push({ ...note, image: await exportNoteImage(project, note) });
+  for (const note of sentNotes(await project.notes.list())) {
+    if (all || isOpenNote(note)) notes.push({ ...note, image: await exportNoteImage(project, note) });
+  }
   return { folder: project.repo.root, notes };
 }
 

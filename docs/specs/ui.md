@@ -40,6 +40,7 @@ Source of truth: `ReviewSource` in `ui/src/shared/api.ts`.
 | `decide(runId, decision, targets)` | The new `RunView` |
 | `accept(runId, removedSeen)` | `accepted`, `refusals`, and the new `RunView` |
 | `feedback()`, `addNote(note)`, `removeNote(id)` | This session's notes (`docs/specs/feedback.md`) |
+| `answerNote(id, text, runId)`, `resolveNote(id)` | This session's notes after a person's answer, or closing one |
 | `sendNotes(via)` | The notes after sending every draft, to a waiting agent or to be copied, and the text to paste into an agent |
 | `image(hash)` | Stored bytes, or null |
 | `diff(current, golden)` | Pixel stats and a PNG, or null if the store lacks either image |
@@ -61,6 +62,8 @@ Source of truth: `ui/src/server/app.ts`; tests in `cli/test/ui.test.ts`.
 | `GET /api/feedback` | `feedback` |
 | `POST /api/notes` | `{ story, runId, imageHash, box, text }` |
 | `DELETE /api/notes/:id` | `removeNote` |
+| `POST /api/notes/:id/answers` | `{ text, runId }` |
+| `POST /api/notes/:id/resolve` | `resolveNote` |
 | `POST /api/notes/send` | `{ via }`, where `via` is `agent` or `copy` |
 | `GET /api/images/:hash` | The stored file, with its media type |
 | `GET /api/diffs/:current/:golden` | The `PixelDiff` |
@@ -143,6 +146,8 @@ Source of truth: `ui/src/client/`.
 - **Must say when another run is the commit's goldens, that this one would replace them.**
 - **Must show when a run is accepted**, and never offer it again.
 
+**Notes** are in `docs/specs/feedback.md`, with what they add to these screens.
+
 **Empty and failed:** no commits, no runs at HEAD, an unfinished run, an unknown run, an unknown page, nothing matching a filter, nothing differing, and the server gone each have their own words and a way on.
 
 ## Keyboard
@@ -157,6 +162,7 @@ Source of truth: `useHotkeys` in `ui/src/client/hooks.ts`.
 | `s`, `f`, `d` | A snapshot | Side by side, stacked then flip, diff |
 | `z`, `c` | A snapshot | Next zoom, center on the region being looked at or else the change |
 | `m` | A snapshot | Write a note |
+| `w` | A snapshot | Show the image a note was written on, or go back |
 | `n`, `p` | A snapshot | Next and previous region |
 | `x` | A snapshot | Select the region being looked at, or the first |
 | `u` | A snapshot | Back to the list, with focus on that story |

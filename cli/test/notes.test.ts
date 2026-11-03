@@ -11,7 +11,7 @@ import { runCli } from "../src/cli.ts";
 import { awaitFeedback, textForAgent, WAITER_STALE_MS, withBoxDrawn } from "../src/notes.ts";
 import { openProject, type Project } from "../src/project.ts";
 import { localReviewSource } from "../src/ui.ts";
-import { createHarness, git, type Harness } from "./support.ts";
+import { createHarness, git, GREEN, type Harness } from "./support.ts";
 
 const PORT = 4173;
 const HOST = `127.0.0.1:${PORT}`;
@@ -371,6 +371,157 @@ describe("waiting for feedback", () => {
 
   test("refuses a timeout that isn't a number", async () => {
     expect((await h.cli("agent-await-feedback", "--timeout", "soon")).code).toBe(2);
+  });
+});
+
+describe("answers", () => {
+  const sendAll = () => send(app, "POST", "/api/notes/send", { via: "copy" });
+  const answer = (id: number, text: string) => send(app, "POST", `/api/notes/${id}/answers`, { text, runId });
+  const onlyNote = async () => (await feedback()).notes[0];
+  const noteId = async () => (await onlyNote()).id as number;
+
+  beforeEach(async () => {
+    await writeNote({ text: "Make it bigger" });
+    await sendAll();
+  });
+
+  test("an agent's reply shows on the note, and leaves it open", async () => {
+    const { code, json } = await h.cli("reply", String(await noteId()), "Made it bigger", "--run", runId);
+    expect(code).toBe(0);
+    expect(json).toMatchObject({ note: await noteId(), runId });
+    expect(await onlyNote()).toMatchObject({ state: "replied", messages: [{ sender: "person" }, { sender: "agent", text: "Made it bigger", runId, sent: true }] });
+  });
+
+  test("says whether the image changed in that run, so a fix that moved nothing shows at once", async () => {
+    expect((await h.cli("reply", String(await noteId()), "Nothing yet", "--run", runId)).json.imageChanged).toBe(false);
+    h.stories = [{ id: "a", color: GREEN }];
+    const newer = (await h.cli("record", "--storybook-dir", "ignored")).json.runId;
+    expect((await h.cli("reply", String(await noteId()), "Fixed", "--run", newer)).json.imageChanged).toBe(true);
+  });
+
+  test("uses the newest run from this folder if it isn't told one", async () => {
+    h.stories = [{ id: "a", color: GREEN }];
+    const newer = (await h.cli("record", "--storybook-dir", "ignored")).json.runId;
+    const { json } = await h.cli("reply", String(await noteId()), "Fixed");
+    expect(json).toMatchObject({ runId: newer, imageChanged: true });
+    expect((await feedback()).latestRunId).toBe(newer);
+  });
+
+  test("refuses a note this folder doesn't have, and a bad way of asking", async () => {
+    expect((await h.cli("reply", "99999", "Hello")).code).toBe(2);
+    expect((await h.cli("reply", "99999", "Hello")).json.error.code).toBe("unknown-note");
+    expect((await h.cli("reply", "nope", "Hello")).code).toBe(2);
+    expect((await h.cli("reply", String(await noteId()))).code).toBe(2);
+    expect((await h.cli("reply", String(await noteId()), "   ")).code).toBe(2);
+  });
+
+  test("refuses an answer too long for the routes to take", async () => {
+    expect((await h.cli("reply", String(await noteId()), "x".repeat(10_001))).code).toBe(2);
+    expect((await onlyNote()).messages).toHaveLength(1);
+  });
+
+  test("refuses a run that isn't in the store", async () => {
+    expect((await h.cli("reply", String(await noteId()), "Hello", "--run", "00000000-0000-4000-8000-000000000000")).code).toBe(2);
+    expect((await onlyNote()).messages).toHaveLength(1);
+  });
+
+  test("a person's answer is a draft, which an agent can't see until it's sent", async () => {
+    const id = await noteId();
+    await h.cli("reply", String(id), "How much bigger?", "--run", runId);
+    expect((await answer(id, "About double")).status).toBe(200);
+    expect(await onlyNote()).toMatchObject({ state: "replied", messages: [{}, {}, { sender: "person", sent: false }] });
+    expect((await h.cli("notes")).json.notes[0].messages).toHaveLength(2);
+    await sendAll();
+    expect((await onlyNote()).state).toBe("sent");
+    expect((await h.cli("notes")).json.notes[0].messages).toHaveLength(3);
+  });
+
+  test("a waiting agent gets a person's answer with the whole conversation, and what's new marked", async () => {
+    const id = await noteId();
+    await h.cli("reply", String(id), "How much bigger?", "--run", runId);
+    await answer(id, "About double");
+    await project.notes.send();
+    const { json } = await h.cli("agent-await-feedback");
+    expect(json.notes[0].messages.map(({ text, new: isNew }: any) => [text, isNew])).toEqual([
+      ["Make it bigger", false],
+      ["How much bigger?", false],
+      ["About double", true],
+    ]);
+  });
+
+  test("a draft answer can be taken back, without losing the note", async () => {
+    const id = await noteId();
+    await answer(id, "Never mind");
+    expect((await send(app, "DELETE", `/api/notes/${id}`)).status).toBe(200);
+    expect(await onlyNote()).toMatchObject({ state: "sent", messages: [{ text: "Make it bigger" }] });
+  });
+
+  test("the text to paste says what to do, and has the whole conversation", async () => {
+    const id = await noteId();
+    await h.cli("reply", String(id), "How much bigger?", "--run", runId);
+    const { text } = (await (await sendAll()).json()) as any;
+    expect(text).toContain("Person: Make it bigger");
+    expect(text).toContain("Agent: How much bigger?");
+    expect(text).toContain("selfie reply <note>");
+  });
+
+  describe("resolving", () => {
+    test("is the person's, and closes it for the agent", async () => {
+      const id = await noteId();
+      expect((await send(app, "POST", `/api/notes/${id}/resolve`, {})).status).toBe(200);
+      expect((await onlyNote()).state).toBe("resolved");
+      expect((await h.cli("notes")).json.notes).toEqual([]);
+      expect((await h.cli("notes", "--all")).json.notes).toHaveLength(1);
+      expect(((await (await sendAll()).json()) as any).text).not.toContain("Make it bigger");
+    });
+
+    test("an answer reopens it", async () => {
+      const id = await noteId();
+      await send(app, "POST", `/api/notes/${id}/resolve`, {});
+      await answer(id, "Actually, one more thing");
+      expect((await onlyNote()).state).toBe("sent");
+    });
+
+    test("an agent can't resolve one, only say what it did", async () => {
+      const id = await noteId();
+      await send(app, "POST", `/api/notes/${id}/resolve`, {});
+      await h.cli("reply", String(id), "Sorry, also this", "--run", runId);
+      expect((await onlyNote()).state).toBe("resolved");
+    });
+
+    test("refuses a note this folder doesn't have", async () => {
+      expect((await send(app, "POST", "/api/notes/99999/resolve", {})).status).toBe(404);
+      expect((await answer(99999, "Hello")).status).toBe(404);
+    });
+  });
+});
+
+describe("the newest run from a folder", () => {
+  test("is what was last recorded or reviewed there, and not a run someone named", async () => {
+    expect((await feedback()).latestRunId).toBe(runId);
+    h.stories = [{ id: "a", color: GREEN }];
+    const newer = (await h.cli("record", "--storybook-dir", "ignored")).json.runId;
+    expect((await feedback()).latestRunId).toBe(newer);
+    await h.cli("review", runId);
+    expect((await feedback()).latestRunId).toBe(newer);
+  });
+
+  test("is remembered as soon as it's recorded, even if the review after that fails", async () => {
+    h.stories = [{ id: "a", color: GREEN }];
+    const { code } = await h.cli("review", "--storybook-dir", "ignored", "--baseline", "0".repeat(40));
+    expect(code).toBe(2);
+    expect((await feedback()).latestRunId).not.toBe(runId);
+  });
+
+  test("is each folder's own", async () => {
+    const other = path.join(h.scratch, "elsewhere");
+    execFileSync("git", ["worktree", "add", "-q", "-b", "elsewhere", other], { cwd: h.repo });
+    const otherProject = await openProject({ cwd: other, env: { SELFIE_HOME: h.home } });
+    try {
+      expect((await feedback(appFor(otherProject))).latestRunId).toBeNull();
+    } finally {
+      otherProject.close();
+    }
   });
 });
 
