@@ -16,6 +16,9 @@ export type SelfieErrorCode =
   | "no-remote"
   | "bad-remote"
   | "unknown-note"
+  | "unknown-story"
+  | "capture-busy"
+  | "capture-failed"
   | "already-waiting"
   | "no-agent-waiting"
   | "usage";

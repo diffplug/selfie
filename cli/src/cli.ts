@@ -49,9 +49,9 @@ const USAGE = `Usage: selfie <command>
 
   ui [<run>] [--port <n>] [--storybook-dir <dir>] [--native]
       Serves the review UI on loopback until stopped, and prints its URL. Opens at this run, or
-      else the newest at HEAD. It shows what's recorded, and never renders. Opens no
+      else the newest at HEAD. It renders only when someone asks it to on the page. Opens no
       browser by itself. Hosts the built Storybook on a port of its own, so a story's page links
-      to the real thing, which may be a later build than the one a run rendered.
+      to the real thing, and /stories lists every story, each with its newest capture.
 
   notes [--all]
       Prints the open notes a person has sent to an agent from this folder's review UI, each with
@@ -339,7 +339,24 @@ async function dispatch(command: string | undefined, args: string[], context: Co
         const [{ serveReviewWithStorybook }, { localReviewSource }] = await Promise.all([import("selfie-ui/local"), import("./ui.ts")]);
         const dir = resolveStorybookDir(project.cwd, values["storybook-dir"], await resolveCaptureSettings(project.repo, { native: values.native }));
         const servers = await serveReviewWithStorybook({
-          source: (url) => localReviewSource(project, { native: values.native, storybook: { dir, url } }),
+          source: (url) =>
+            localReviewSource(project, {
+              native: values.native,
+              storybook: {
+                dir,
+                url,
+                record: async (stories) =>
+                  (
+                    await record(project, {
+                      storybookDir: dir,
+                      native: values.native,
+                      stories,
+                      capture: context.capture,
+                      log: (line) => context.stderr(`${line}\n`),
+                    })
+                  ).run.id,
+              },
+            }),
           port,
           clientDir: context.uiClientDir,
           dir,

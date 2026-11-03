@@ -38,6 +38,7 @@ Source of truth: `ReviewSource` in `ui/src/shared/api.ts`.
 |---|---|
 | `current()` | HEAD, the newest finished run there, whether it has only unfinished ones, and the baseline search if there's no run to open |
 | `storiesView()` | Every story of the hosted Storybook, each with its newest capture at HEAD ([Every story](#screens)) |
+| `capture(stories)` | Records a run of those stories from the hosted Storybook, and says which |
 | `runView(runId)` | A `RunView` ([Recomputing](#recomputing)) |
 | `baseline(runId)` | The baseline search of a run's environment, for a screen saying why it has none |
 | `unchanged(runId)` | The run's unchanged rows |
@@ -59,6 +60,7 @@ Source of truth: `ui/src/server/app.ts`; tests in `cli/test/ui.test.ts`.
 |---|---|
 | `GET /api/current` | `current()` |
 | `GET /api/stories` | `storiesView` |
+| `POST /api/captures` | `{ stories }`, which `capture` records as a run |
 | `GET /api/runs/:id` | `runView` |
 | `GET /api/runs/:id/baseline` | `baseline` |
 | `GET /api/runs/:id/unchanged` | `{ rows }` |
@@ -78,8 +80,8 @@ Source of truth: `ui/src/server/app.ts`; tests in `cli/test/ui.test.ts`.
 |---|---|---|
 | 400 | `bad-run-id`, `bad-image-hash`, `bad-request` | The request can't mean anything |
 | 403 | `bad-host`, `bad-origin`, `bad-request-kind` | `docs/specs/access.md` → Local review server |
-| 404 | `unknown-run`, `unknown-image`, `no-diff-image`, `not-found` | |
-| 409 | `no-agent-waiting`, `stale-decision`, `no-actor`, `run-not-finished`, `no-goldens`, `run-dirty`, `run-has-failures`, `wrong-removed-count` | The request can't apply to the data as it stands |
+| 404 | `unknown-run`, `unknown-image`, `no-diff-image`, `unknown-story`, `not-found` | |
+| 409 | `capture-busy`, `capture-failed`, `no-agent-waiting`, `stale-decision`, `no-actor`, `run-not-finished`, `no-goldens`, `run-dirty`, `run-has-failures`, `wrong-removed-count` | The request can't apply to the data as it stands |
 
 On a hosted Storybook's own origin (`docs/specs/access.md` → Local review server), `selfie-ui/storybook` serves each kept build's files at `/storybook-builds/<hash>/`, and locally the directory as it stands is at `/`.
 
@@ -154,7 +156,9 @@ Source of truth: `ui/src/client/`.
 
 **Every story** is the hosted Storybook's stories, each with its newest capture from the runs [`/` would choose from](#which-run), so several partial runs read as one (rationale). A story's page is that capture's run's, as it would be from that run's own review.
 
-- **Must list a story nothing has captured, show it running, and say how to capture it**, since it's still a real story to look at.
+- **Must list a story nothing has captured, show it running, and offer to capture it**, since it's still a real story to look at. A note is written on an image, so starting one captures the story first, and then opens the note box. With no way to capture here, it says what command does.
+- **Must offer to capture again whatever story is on screen, and every story with no capture or one known to be from another build, as Capture the rest**, which is how a change fans out to the rest of a Storybook. Asking for every story records a whole run, not a filtered one, which can become goldens (rationale).
+- **Must capture only from the hosted Storybook as it stands, and one capture at a time**, refusing a second with `capture-busy`. It never builds, since a page must not be able to run a shell (`docs/specs/cli.md` → Configuration).
 - **Must never read a story a filtered run left out as removed**, through `newestCaptures` in `selfie-store`. It takes that story from an older run, or else lists it as not captured.
 - **Must say when a capture is from uncommitted changes, or known to be from another build than the one hosted**, since a capture is whichever is newest, not whichever is reliable.
 - **Must leave out a story the hosted build no longer has**, and with no build at all, list only what's been captured, and say so.
@@ -184,6 +188,7 @@ Source of truth: `useHotkeys` in `ui/src/client/hooks.ts`.
 | `z`, `c` | A snapshot | Next zoom, center on the region being looked at or else the change |
 | `l` | A snapshot | Open or close the live stories |
 | `m` | A snapshot | Write a note |
+| `c`, `m` | A story with no capture | Capture it, or capture it to write a note on it |
 | `w` | A snapshot | Show the image a note was written on, or go back |
 | `n`, `p` | A snapshot | Next and previous region |
 | `x` | A snapshot | Select the region being looked at, or the first |
@@ -219,7 +224,7 @@ Source of truth: `ui/src/client/*.stories.tsx`, `ui/src/client/stories/fixtures.
 
 **Scope: cloud-deploy** is defined in `docs/specs/system.md` → Build order. What it must do first, since the local UI needs none of it:
 
-1. **Move the review rules into platform-free code, and narrow `ReviewSource` to platform facts.** `storiesView` is the newest such rule that needs moving, beyond `newestCaptures` itself. A hosted source needs a branch's commits as one of those facts to offer branch goldens, or it offers none. A Worker can't load `selfie-cli`, which reaches Git, Docker, and the filesystem, and today `summarizeRun`, `checkAccept`, and diffing live there, and `localReviewSource` applies them. `filterStories`, which `summarizeRun` calls, has to move out of `selfie-render` for that. `isDecidable` has moved already.
+1. **Move the review rules into platform-free code, and narrow `ReviewSource` to platform facts.** `storiesView` is the newest such rule that needs moving, beyond `newestCaptures` itself. `capture` is for a source with something to render with, so a hosted one says `canCapture: false`. A hosted source needs a branch's commits as one of those facts to offer branch goldens, or it offers none. A Worker can't load `selfie-cli`, which reaches Git, Docker, and the filesystem, and today `summarizeRun`, `checkAccept`, and diffing live there, and `localReviewSource` applies them. `filterStories`, which `summarizeRun` calls, has to move out of `selfie-render` for that. `isDecidable` has moved already.
 2. **Make the source a per-request factory, `(context) => ReviewSource`, with a client base path.** A hosted service has many projects and viewers, where `createLocalApp` has one project for its whole life, and a client that always asks at `/api`.
 3. **Fit the Worker's budget.** The shared D1 limit is 1,200 requests per 5 minutes. One approve-and-next is 10 requests as measured on the local adapter: 6 for the decision (read the run, compare, write, compare, read whose goldens these are, list the commit's runs), and 4 lookups for the next story's two images and its diff. That's 120 stories per 5 minutes, for every reviewer of every project, down from 15 requests and 80 stories before the comparisons were reduced. What gets it to about 3:
    - no D1 lookup per image, since a content address needs none before reading R2
@@ -233,7 +238,6 @@ Also its own guard in place of `loopbackHosts`, keeping `sameOriginWrites` and `
 
 - Approving or rejecting a selection. Those are still on a whole image, until there are decisions on regions (`docs/specs/snapshots.md` → Future). A note can be on one.
 - Selecting one region out of a group. Lowering `regionMergeDistance` separates them.
-- Rendering from the UI. A reviewer runs `selfie review` and looks at the result.
 - A way to clear a decision. One can be replaced, and a run can be reviewed again, but `Snapshots.decide` has no way to remove one.
 - Finding runs at other commits. `/runs/:id` opens any of them, and `selfie ui <run>` prints that URL, but nothing lists them: `runs` has no index that would serve it without a scan.
 - Keeping how someone's looking at the images when the next story's capture is from another run, since each run's page is its own, and it reads that run again. The live stories do stay as they were.

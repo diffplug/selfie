@@ -1,7 +1,7 @@
-// The review UI's window on a local repository: the library, as the shape its routes want. Nothing
-// here renders, so the UI only reads what `selfie review` recorded and records decisions on it.
+// The review UI's window on a local repository: the library, as the shape its routes want. It reads
+// what's been recorded, records decisions on it, and renders only when a page asks it to capture.
 import { newestCaptures, type Comparison, type DecisionKind, type Run } from "selfie-store";
-import { stat } from "node:fs/promises";
+import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
 import { isBuiltStorybook } from "selfie-ui/local";
 import { keptBuildPath } from "selfie-ui/api";
@@ -22,17 +22,29 @@ const DIFFS_KEPT = 32;
 
 const baselineNote = ({ sha, message }: BaselineSearch) => ({ sha, message });
 
+/** Records a run from a hosted Storybook, of just these stories, or of every one, and says which run. */
+export type StoryRecorder = (stories: readonly string[] | undefined) => Promise<string>;
+
 export function localReviewSource(
   project: Project,
-  { native, storybook }: { readonly native?: boolean | undefined; readonly storybook?: { readonly dir: string; readonly url: string } | undefined } = {},
+  { native, storybook }: { readonly native?: boolean | undefined; readonly storybook?: { readonly dir: string; readonly url: string; readonly record?: StoryRecorder | undefined } | undefined } = {},
 ): ReviewSource {
   const { snapshots, store, repo } = project;
 
-  /** Hashing a whole build is too slow for every read of a page, and a rebuild rewrites these. */
+  // One at a time from a page, since two can't both be what someone is waiting on. An agent's own
+  // `selfie record` isn't held to this: each capture has a directory of its own.
+  let capturing = false;
+
+  /** Hashing a whole build is too slow for every read of a page, and any change to it changes a file's time or size. */
   let knownBuild: { readonly stamp: string; readonly hash: Promise<string | null> } | null = null;
   const hostedBuild = async (dir: string): Promise<string | null> => {
-    const times = await Promise.all(["iframe.html", "index.json"].map((file) => stat(path.join(dir, file)).then(({ mtimeMs }) => mtimeMs, () => null)));
-    const stamp = times.join();
+    const files = (await readdir(dir, { recursive: true, withFileTypes: true }).catch(() => [])).filter((entry) => entry.isFile());
+    const stats = await Promise.all(files.map(async (entry) => {
+      const file = path.join(entry.parentPath, entry.name);
+      const { mtimeMs, size } = await stat(file).catch(() => ({ mtimeMs: 0, size: 0 }));
+      return `${file}:${mtimeMs}:${size}`;
+    }));
+    const stamp = stats.sort().join();
     if (knownBuild?.stamp !== stamp) knownBuild = { stamp, hash: buildHash(dir) };
     return knownBuild.hash;
   };
@@ -203,7 +215,28 @@ export function localReviewSource(
           }),
         ),
         newestRunId: finished[0]?.id ?? null,
+        canCapture: built && storybook.record !== undefined,
       };
+    },
+
+    async capture(stories) {
+      if (storybook === undefined || storybook.record === undefined || !isBuiltStorybook(storybook.dir)) {
+        throw new SelfieError("capture-failed", "This server has no built Storybook to capture.");
+      }
+      if (capturing) throw new SelfieError("capture-busy", "A capture is already running here. Try again once it's done.");
+      capturing = true;
+      try {
+        const index = new Set((await readStoryIndex(storybook.dir)).map(({ id }) => id));
+        const unknown = stories.find((story) => !index.has(story));
+        if (unknown !== undefined) throw new SelfieError("unknown-story", `The hosted Storybook has no story ${unknown}.`);
+        // Every story is a whole run, which can become goldens, and not a filtered one that can't.
+        return { runId: await storybook.record(new Set(stories).size === index.size ? undefined : stories) };
+      } catch (error) {
+        if (error instanceof SelfieError && error.code === "unknown-story") throw error;
+        throw new SelfieError("capture-failed", `That didn't capture: ${(error as Error).message}`);
+      } finally {
+        capturing = false;
+      }
     },
 
     async current(): Promise<CurrentView> {

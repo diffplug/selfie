@@ -87,7 +87,7 @@ export function NoRuns({ current: { head, hasUnfinishedRun, baseline } }: { read
     <Blank icon={GitCommitIcon} title={`No runs yet for ${shortSha(head)}`} action={<Button onClick={reload}>Look again</Button>}>
       {hasUnfinishedRun
         ? "A review started here but hasn't finished. It's still recording, or it crashed. "
-        : "Run selfie review to record one, then come back: this page doesn't render anything itself. "}
+        : "Run selfie review to record one, then come back, or look at every story, where you can capture them from here. "}
       {baseline?.sha != null
         ? `Its baseline will be ${shortSha(baseline.sha)}.`
         : (baseline?.message ?? "There's no baseline yet, so every story will read as new.")}
