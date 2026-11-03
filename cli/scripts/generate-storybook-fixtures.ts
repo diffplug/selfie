@@ -128,6 +128,11 @@ for (const [build, color] of [["current", "#1a7f37"], ["golden", "#0969da"]] as 
   );
 }
 
+// A story that takes the keyboard as it loads, as a terminal does.
+const grabbing = path.join(ui, "storybook-fixtures/live-story/grabbing");
+await mkdir(grabbing, { recursive: true });
+await writeFile(path.join(grabbing, "iframe.html"), `<!doctype html><title>grabbing</title><body style="margin:0"><input id="typing" aria-label="typing" style="margin:64px;font:48px sans-serif"><script>setTimeout(() => document.getElementById("typing").focus(), 50);</script>`);
+
 await writeFile(
   path.join(ui, "src/client/stories/images.generated.ts"),
   `// Written by cli/scripts/generate-storybook-fixtures.ts.
