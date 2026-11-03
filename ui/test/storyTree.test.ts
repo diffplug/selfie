@@ -2,7 +2,7 @@ import { expect, test } from "vitest";
 import type { ListedStory } from "../src/shared/api.ts";
 import { buildStoryTree, initiallyClosed, isSection, openedAround, storiesIn, visibleRows, type StoryFolder } from "../src/client/storyTree.ts";
 
-const story = (title: string, name: string): ListedStory => ({ story: `${title}--${name}`.toLowerCase(), title, name, capture: null });
+const story = (title: string, name: string): ListedStory => ({ story: `${title}--${name}`.toLowerCase(), title, name, render: null });
 const labels = (nodes: ReturnType<typeof visibleRows>) => nodes.map((row) => `${" ".repeat(row.depth)}${row.kind === "folder" ? row.name : row.entry.name}`);
 
 const STORIES = [story("Screens/Accept", "Ready"), story("Screens/Accept", "Dark"), story("Screens/Run", "Empty"), story("Alone", "One"), story("A/B/C", "Deep")];

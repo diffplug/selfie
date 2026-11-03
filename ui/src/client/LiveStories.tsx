@@ -33,7 +33,7 @@ export function StorybookLinkTo({ row, view }: { row: SnapshotRow; view: RunView
 // For a run from before its viewport was recorded, which is laid out at this column's own width.
 const UNKNOWN_SIZE_HEIGHT = 600;
 
-/** Lays a story out at the size it was captured at, and scales it to fit, as an image is. */
+/** Lays a story out at the size it was rendered at, and scales it to fit, as an image is. */
 export function StoryFrame({ title, url, viewport }: { title: string; url: string; viewport: RunView["viewport"] }) {
   const box = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);

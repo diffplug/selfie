@@ -1,5 +1,5 @@
 // What decides a build's pixels, as one string, so a review can recognize a build that already
-// rendered. Beside `capture`, so a new capture option that can change pixels sits next to this.
+// rendered. Beside `render`, so a new render option that can change pixels sits next to this.
 import { createHash } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";

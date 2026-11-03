@@ -59,7 +59,7 @@ export const postAccept = (runId: string, removedSeen: number | undefined) =>
   post<AcceptOutcome>(`${runRoute(runId)}/accept`, removedSeen === undefined ? {} : { removedSeen });
 
 export const fetchStories = (signal: AbortSignal) => request<StoriesView>("/stories", { signal });
-export const postCapture = (stories: readonly string[]) => post<{ readonly runId: string }>("/captures", { stories });
+export const postRender = (stories: readonly string[]) => post<{ readonly runId: string }>("/renders", { stories });
 export const fetchFeedback = (signal: AbortSignal) => request<FeedbackView>("/feedback", { signal });
 export const postNote = (note: NewNote) => post<FeedbackView>("/notes", note);
 export const postSendNotes = (via: SendVia) => post<{ readonly feedback: FeedbackView; readonly text: string }>("/notes/send", { via });

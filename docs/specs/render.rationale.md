@@ -22,7 +22,7 @@ With the flag, 7 full runs of all 541 stories, across the settle times, quiet pe
 
 **Settle time outside the ID.** With a project's timers frozen, settle times from 0 to 500 ms gave identical PNGs on all 541 stories, so tuning it shouldn't restart goldens. A story that does depend on it reports as changed, like any other project input.
 
-## Capture
+## Render
 
 **The whole page.** All 541 of dormouse's stories, in the default container, each story rendered twice, on one Mac, 2026-11. Encoding uses `sharp` lossless WebP at effort 4, outside the container.
 
@@ -36,16 +36,16 @@ With the flag, 7 full runs of all 541 stories, across the settle times, quiet pe
 | WebP total | 8.0 MB | 13.6 MB | 18.7 MB |
 | WebP encode, average per image | 29 ms | 56 ms | 94 ms |
 
-Against the viewport capture at 1×:
+Against the viewport render at 1×:
 
 - **341 were identical.**
 - **184 were taller, and began with the exact viewport image**, so the viewport had hidden everything below.
 - **6 were 5 px wider.** All 6 are app bar or workspace window stories, and the overflow is real: the viewport had cut it off.
-- **10 were taller, with a top that differed.** Of the two inspected, one had scrolled to a focused button in the viewport capture, and the full page starts at the top. The other drew one `→` differently, in a story that's stable in both modes. Why the mode changes that glyph is unknown. The other 8 were not looked at, though 2 of them share that story's exact count of 2,270 changed pixels.
+- **10 were taller, with a top that differed.** Of the two inspected, one had scrolled to a focused button in the viewport render, and the full page starts at the top. The other drew one `→` differently, in a story that's stable in both modes. Why the mode changes that glyph is unknown. The other 8 were not looked at, though 2 of them share that story's exact count of 2,270 changed pixels.
 
 Across machines at 1×, comparing image hashes: 541/541 between two GitHub arm64 runners (Neoverse-N2), and 541/541 between each of them and a local M4 Mac, with each story rendering the same twice on each machine. At 1.5× and 2×, only the Mac was measured, and that's two renders on one machine.
 
-**How tall a page can be.** A page of a vertical gradient, in the default container at 1×, captured correctly at its top, middle, and bottom at every height tried, up to 120,000 px. So Chromium isn't the limit here. `decodeImage` is, at 100 million pixels, which refused 90,000 px and accepted 83,000 px at 1200 wide.
+**How tall a page can be.** A page of a vertical gradient, in the default container at 1×, rendered correctly at its top, middle, and bottom at every height tried, up to 120,000 px. So Chromium isn't the limit here. `decodeImage` is, at 100 million pixels, which refused 90,000 px and accepted 83,000 px at 1200 wide.
 
 **One image check, without `--platform`.** GitHub's arm64 runners have Docker 28.0.4, which rejects `docker image inspect --platform` with `unknown flag: --platform`. On Docker 29.9.2 with the containerd store, that flag also exits 0 for a platform with no content, printing an empty OS and architecture. Plain `inspect` reported the right platform for the default arm64 digest on 28.0.4 and 29.9.2, and for an amd64 digest on an arm64 host on 29.9.2. A multi-platform tag on 29.9.2 answered for the host instead, which is why a multi-platform digest for another platform is refused.
 
@@ -87,7 +87,7 @@ Across machines at 1×, comparing image hashes: 541/541 between two GitHub arm64
 
 The reverse was left out too, for the same complexity: retrying a story that doesn't match, for a bounded time, to spare a slow page a false `changed`. Neither has a real project asking for it yet.
 
-**An unread response.** With the fixture's `basic--serving` story not reading its `fetch` bodies, its requests stayed in flight in the container, under both `networkidle` and the request count. A plain Playwright script against `route.fulfill` or a real server didn't reproduce it, and the cause wasn't found. The wait is soft, so such a story is captured late with a `timeout` error. No dormouse story did this.
+**An unread response.** With the fixture's `basic--serving` story not reading its `fetch` bodies, its requests stayed in flight in the container, under both `networkidle` and the request count. A plain Playwright script against `route.fulfill` or a real server didn't reproduce it, and the cause wasn't found. The wait is soft, so such a story is rendered late with a `timeout` error. No dormouse story did this.
 
 **Play failures.** Storybook 11's bundle sets `throwPlayFunctionExceptions: false`. On a play failure it then runs the `errored` phase, logs the error, and continues to `completed`, so an `errored` check depends on when it polls. 2 of dormouse's 541 stories do this, and both report `play` errors.
 
@@ -95,7 +95,7 @@ The reverse was left out too, for the same complexity: retrying a story that doe
 
 **How to find a story that isn't frozen.** Render it twice and compare. A built-in repeat pass did this until it was removed, since flagging unstable stories in the data, and deciding what that means, was more machinery than asking an agent to fix one. These measurements of it remain.
 
-**Comparing PNG bytes.** Equal bytes always mean equal pixels, so bytes can't hide a difference. The only possible error is a false alarm, if one set of pixels could encode two ways. Across the earlier experiment's 59 runs and 1,016 captures, 233 distinct pixel hashes mapped one to one to 233 distinct PNGs. Chromium's PNGs carry no timestamp or text chunk, and `render/test/capture.container.test.ts` checks this and that the same render matches byte for byte in the real container.
+**Comparing PNG bytes.** Equal bytes always mean equal pixels, so bytes can't hide a difference. The only possible error is a false alarm, if one set of pixels could encode two ways. Across the earlier experiment's 59 runs and 1,016 renders, 233 distinct pixel hashes mapped one to one to 233 distinct PNGs. Chromium's PNGs carry no timestamp or text chunk, and `render/test/render.container.test.ts` checks this and that the same render matches byte for byte in the real container.
 
 **Equal timing can miss a timer.** Two renders with equal timing called all 30 unfrozen sample stories stable in 4 of 4 runs, though two of them hold running timers: load timing is repeatable enough for a blink to land on the same phase each time. At the 100 ms settle, the second render needed about 730 ms more settling to catch both in every run: 530 ms caught both in 0 of 4 runs, and 730 and 930 ms in 4 of 4, while 1130 ms caught both in only 2 of 4.
 

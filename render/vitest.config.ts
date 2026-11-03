@@ -10,7 +10,7 @@ if (process.env.SELFIE_RENDER_CONTAINER === undefined) {
   } catch (error) {
     process.env.SELFIE_RENDER_CONTAINER = "0";
     console.log(
-      `Skipping the container capture tests. ${error instanceof Error ? error.message : String(error)}`,
+      `Skipping the container render tests. ${error instanceof Error ? error.message : String(error)}`,
     );
   }
 }

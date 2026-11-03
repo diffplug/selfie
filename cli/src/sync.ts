@@ -3,7 +3,7 @@
 // finished by running it again. See `docs/specs/sync.md`.
 import { chunks, ImageDecodeError, ImageHashMismatchError, mapConcurrently, type RunPage } from "selfie-store";
 import { SYNC_LIMITS, type GoldensAnswer, type ProjectAccess, type SentDecision, type SentRun, type SentSnapshot, type SyncError } from "selfie-ui/sync-api";
-import { resolveCaptureSettings } from "./config.ts";
+import { resolveRenderSettings } from "./config.ts";
 import { SelfieError } from "./errors.ts";
 import { walkToBaseline, type BaselineSearch } from "./git.ts";
 import { normalizeOrigin } from "./paths.ts";
@@ -156,7 +156,7 @@ async function uploadRun(project: Project, remote: Remote, route: string, runId:
 /** Sends a run, by the order in `docs/specs/sync.md` -> Pushing and pulling. */
 export async function push(project: Project, remote: Remote, { run: given, accept, native }: { readonly run: string | undefined; readonly accept: boolean | undefined; readonly native: boolean | undefined }): Promise<PushResult> {
   const { snapshots } = project;
-  const { environmentId } = await resolveCaptureSettings(project.repo, { native });
+  const { environmentId } = await resolveRenderSettings(project.repo, { native });
   // The newest that can go, since one from a dirty tree would only be refused.
   const newest = (await runsAtHead(project, environmentId)).runs.find(({ status, dirty }) => status !== "recording" && !dirty);
   const runId = given ?? newest?.id;
@@ -204,7 +204,7 @@ export interface PullResult {
 /** Takes a commit's goldens from the remote, which decides them, replacing any here. */
 export async function pull(project: Project, remote: Remote, { commit, native }: { readonly commit: string | undefined; readonly native: boolean | undefined }): Promise<PullResult> {
   const { snapshots, store } = project;
-  const { environmentId: environment } = await resolveCaptureSettings(project.repo, { native });
+  const { environmentId: environment } = await resolveRenderSettings(project.repo, { native });
   const route = await projectRoute(project, remote);
   const sha = commit ?? (await remoteBaseline(project, remote, route, environment)).sha;
   const nothing = { sha, environment, runId: null, images: { received: 0, alreadyHere: 0 }, decisions: 0, replaced: null };

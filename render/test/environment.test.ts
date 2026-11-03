@@ -28,7 +28,7 @@ describe("defaults", () => {
 describe("environmentId", () => {
   test("is pinned for the default environment", () => {
     // Changing this literal restarts every project's goldens. Upgrading Playwright or editing
-    // CAPTURE_RECIPE are the expected reasons, since the ID includes both.
+    // RENDER_RECIPE are the expected reasons, since the ID includes both.
     expect(environmentId(defineEnvironment())).toBe("container-linux-arm64-eb95931ecc85e990");
   });
 

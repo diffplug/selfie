@@ -41,7 +41,7 @@ async function loadConfig(repo: Repo): Promise<ProjectConfig> {
   return parsed as ProjectConfig;
 }
 
-export interface CaptureSettings {
+export interface RenderSettings {
   readonly environment: RenderEnvironment;
   readonly environmentId: string;
   readonly initScript?: string;
@@ -52,14 +52,14 @@ export interface CaptureSettings {
 }
 
 /** The build a command means: the flag, relative to where it ran, then the config's, then the default. */
-export const resolveStorybookDir = (cwd: string, given: string | undefined, { storybookDir }: Pick<CaptureSettings, "storybookDir">): string =>
+export const resolveStorybookDir = (cwd: string, given: string | undefined, { storybookDir }: Pick<RenderSettings, "storybookDir">): string =>
   path.resolve(cwd, given ?? storybookDir ?? "storybook-static");
 
 /** The environment, init script, and Storybook a project uses: the pinned default, then its config. */
-export async function resolveCaptureSettings(
+export async function resolveRenderSettings(
   repo: Repo,
   { native = false }: { readonly native?: boolean | undefined } = {},
-): Promise<CaptureSettings> {
+): Promise<RenderSettings> {
   const config = await loadConfig(repo);
   const environment = defineEnvironment({
     ...config.environment,

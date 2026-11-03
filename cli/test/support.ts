@@ -1,4 +1,4 @@
-// A temp Git repository and Selfie home, and a stand-in for `capture` that writes what a test
+// A temp Git repository and Selfie home, and a stand-in for `render` that writes what a test
 // says, so everything but the browser runs with no Docker. `review.container.test.ts` runs the
 // real one.
 import { execFileSync } from "node:child_process";
@@ -10,8 +10,8 @@ import {
   defineEnvironment,
   environmentId,
   filterStories,
-  type capture,
-  type CaptureOptions,
+  type render,
+  type RenderOptions,
   type Manifest,
   type ManifestStory,
   type StoryError,
@@ -51,7 +51,7 @@ export interface FakeStory {
   readonly patch?: readonly [number, number, number, number, Color];
   readonly failed?: string;
   readonly errors?: readonly StoryError[];
-  /** A warning from the capture itself, in the manifest. */
+  /** A warning from the render itself, in the manifest. */
   readonly warning?: string;
   /** Replaces the manifest's path to the image, to test what an unsafe one does. */
   readonly fileOverride?: string;
@@ -61,13 +61,13 @@ export interface FakeStory {
   readonly symlinkTo?: string;
 }
 
-/** Writes what `capture` writes for these stories. */
-export function fakeCapture(
+/** Writes what `render` writes for these stories. */
+export function fakeRender(
   stories: () => readonly FakeStory[],
-  onCapture?: (options: CaptureOptions) => void,
-): typeof capture {
-  return async (options: CaptureOptions) => {
-    onCapture?.(options);
+  onRender?: (options: RenderOptions) => void,
+): typeof render {
+  return async (options: RenderOptions) => {
+    onRender?.(options);
     const environment = options.environment ?? defineEnvironment();
     const filtered = options.stories ? filterStories(stories(), options.stories) : null;
     const selected = filtered?.stories ?? stories();
@@ -173,14 +173,14 @@ export interface Harness {
   readonly scratch: string;
   readonly repo: string;
   readonly home: string;
-  /** What the next capture renders. */
+  /** What the next render renders. */
   stories: readonly FakeStory[];
   /** Runs a command in-process. `json` is stdout parsed, which fails if it isn't one document. */
   cli: (...argv: string[]) => Promise<{ code: number; json: any; stdout: string; stderr: string }>;
-  /** The capture to hand to the library directly. */
-  capture: typeof capture;
-  /** Called at the start of each capture. */
-  onCapture?: (options: CaptureOptions) => void;
+  /** The render to hand to the library directly. */
+  render: typeof render;
+  /** Called at the start of each render. */
+  onRender?: (options: RenderOptions) => void;
   destroy: () => Promise<void>;
 }
 
@@ -188,16 +188,16 @@ export async function createHarness(): Promise<Harness> {
   const scratch = await mkdtemp(path.join(tmpdir(), "selfie-cli-test-"));
   const repo = await createRepo(scratch);
   const home = path.join(scratch, "home");
-  const fake = fakeCapture(
+  const fake = fakeRender(
     () => harness.stories,
-    (options) => harness.onCapture?.(options),
+    (options) => harness.onRender?.(options),
   );
   const harness: Harness = {
     scratch,
     repo,
     home,
     stories: [],
-    capture: fake,
+    render: fake,
     cli: async (...argv) => {
       let stdout = "";
       let stderr = "";
@@ -210,7 +210,7 @@ export async function createHarness(): Promise<Harness> {
         stderr: (text) => {
           stderr += text;
         },
-        capture: fake,
+        render: fake,
       });
       return { code, stdout, stderr, json: JSON.parse(stdout) };
     },

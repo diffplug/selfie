@@ -7,7 +7,7 @@ import type { Sql } from "./sql.ts";
 
 export const CREATE_STORYBOOK_BUILD_TABLES: readonly string[] = [
   "CREATE TABLE IF NOT EXISTS run_builds (run_id TEXT PRIMARY KEY, build TEXT NOT NULL) WITHOUT ROWID",
-  // By environment, whose ID already covers it, so a run's story can lay out as it was captured.
+  // By environment, whose ID already covers it, so a run's story can lay out as it was rendered.
   "CREATE TABLE IF NOT EXISTS environment_viewports (environment TEXT PRIMARY KEY, width INTEGER NOT NULL, height INTEGER NOT NULL) WITHOUT ROWID",
 ];
 

@@ -1,4 +1,4 @@
-export { capture, type CaptureOptions } from "./capture.ts";
+export { render, type RenderOptions } from "./render.ts";
 export {
   defineEnvironment,
   environmentId,

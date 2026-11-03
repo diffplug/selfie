@@ -162,11 +162,11 @@ export interface RunView {
 }
 
 /** A story's newest image at HEAD, from whichever run took it. */
-export interface StoryCaptureInfo {
+export interface StoryRenderInfo {
   readonly runId: string;
   readonly state: SnapshotRow["state"];
   readonly decision: SnapshotRow["decision"];
-  readonly capturedAt: number;
+  readonly renderedAt: number;
   /** Recorded with uncommitted changes, so it can't become a golden. */
   readonly dirty: boolean;
   /** Whether the hosted build rendered it, or null if that's not known. If not, it may be out of date. */
@@ -179,8 +179,8 @@ export interface ListedStory {
   readonly title: string;
   /** What the sidebar calls it, or its ID if that's not known. */
   readonly name: string;
-  /** Null if no run at HEAD has captured it. */
-  readonly capture: StoryCaptureInfo | null;
+  /** Null if no run at HEAD has rendered it. */
+  readonly render: StoryRenderInfo | null;
 }
 
 /** What a server that hosts a Storybook can say about it. */
@@ -197,7 +197,7 @@ export interface StorySetup {
   readonly usesDocker: boolean;
 }
 
-/** Every story of the hosted Storybook, each with its newest capture, which a single run is a special case of. */
+/** Every story of the hosted Storybook, each with its newest render, which a single run is a special case of. */
 export interface StoriesView {
   readonly head: string | null;
   /** The branch HEAD is on, or null if it's detached. */
@@ -210,8 +210,8 @@ export interface StoriesView {
   readonly stories: readonly ListedStory[];
   /** The newest finished run at HEAD, to review and accept. */
   readonly newestRunId: string | null;
-  /** Whether this server can capture a story when asked, which takes a commit, a build, and a browser to do it with. */
-  readonly canCapture: boolean;
+  /** Whether this server can render a story when asked, which takes a commit, a build, and a browser to do it with. */
+  readonly canRender: boolean;
   /** Null if this server hosts no Storybook. */
   readonly setup: StorySetup | null;
 }
@@ -283,7 +283,7 @@ export type SendVia = "agent" | "copy";
 export interface ReviewSource {
   storiesView(): Promise<StoriesView>;
   /** Records a run of just these stories from the hosted Storybook, one at a time. */
-  capture(stories: readonly string[]): Promise<{ readonly runId: string }>;
+  render(stories: readonly string[]): Promise<{ readonly runId: string }>;
   runView(runId: string): Promise<RunView>;
   /** Why the run has no baseline: only a screen showing that asks. */
   baseline(runId: string): Promise<BaselineNote>;

@@ -35,7 +35,7 @@ Evidence and reasoning for `docs/specs/ui.md`, keyed by its headings.
 - **Why reuse a review's stats.** A later accepted run could change a baseline's goldens under a run, and then `review.json`'s stats would describe the old pair while the images show the new one. That's rare, and it only misstates numbers, against a request for every story.
 - **Why thumbnails, given they cost a read each.** They're lazy, and 30 load on opening a 512 row list. They let someone scan for the one that's different, which pixel counts don't.
 
-**Live stories.** Closed by default since a page per side is a lot to load for what most reviews don't need. They lay out at the captured viewport and scale down, since a story laid out at half the width could look nothing like its image. They aren't frozen, as a capture is, so they can differ from an image without anything being wrong, which the screen says. Each story gets a new frame, since moving one frame along would add to the browser's history, and Back would walk through stories in it.
+**Live stories.** Closed by default since a page per side is a lot to load for what most reviews don't need. They lay out at the rendered viewport and scale down, since a story laid out at half the width could look nothing like its image. They aren't frozen, as a render is, so they can differ from an image without anything being wrong, which the screen says. Each story gets a new frame, since moving one frame along would add to the browser's history, and Back would walk through stories in it.
 
 **A story taking the keyboard.** Measured on Dormouse's terminal story, 2026-11: it focuses itself as it loads, so every key on the page went into the story, and pressing `m` did nothing. The page can't tell a story not to, so it takes focus back, unless the pointer is over the frame, which is what a click there means.
 
@@ -49,9 +49,9 @@ Evidence and reasoning for `docs/specs/ui.md`, keyed by its headings.
 
 **A sidebar, as in Storybook.** With the list as a page of its own, moving between stories meant going back to it, and a person who knows Storybook looks left for them. It takes the table's columns with it, so a row says only a story's state and any caveat, and a story's page says the rest.
 
-**Every story, on the same page.** Separate pages for snapshots and for a live Storybook would be two products to learn, and every feature would need building twice. So the list merges what's been captured, and a story's page is simply its run's. It reads runs newest first and stops once each story has an answer, since each costs a comparison. If a story's never been captured, that's every run at the commit, which is the cost to watch.
+**Every story, on the same page.** Separate pages for snapshots and for a live Storybook would be two products to learn, and every feature would need building twice. So the list merges what's been rendered, and a story's page is simply its run's. It reads runs newest first and stops once each story has an answer, since each costs a comparison. If a story's never been rendered, that's every run at the commit, which is the cost to watch.
 
-**Rendering here.** Most iterating is on one story, and 1.7 s was measured for one story of Dormouse's 568 in the pinned container, 2026-11, so asking from the page is about as quick as looking away. It doesn't build, so an agent or person rebuilds, and what's captured is whatever is hosted. A filtered run can't become goldens, so Render the rest can't either, once it's a subset: only a whole run from a clean build can. Every story at once is the one case worth treating as a whole run.
+**Rendering here.** Most iterating is on one story, and 1.7 s was measured for one story of Dormouse's 568 in the pinned container, 2026-11, so asking from the page is about as quick as looking away. It doesn't build, so an agent or person rebuilds, and what's rendered is whatever is hosted. A filtered run can't become goldens, so Render the rest can't either, once it's a subset: only a whole run from a clean build can. Every story at once is the one case worth treating as a whole run.
 
 ## Keyboard
 

@@ -72,7 +72,7 @@ GitHub decides. Selfie keeps no member list of its own.
 ### Pull requests from forks
 
 - **Must give a fork's pull request only what read access gives**: its author can read the repository's snapshots as anyone with read access can, and can't upload or approve.
-- **Must fail a fork's pull request's snapshot check until a maintainer approves running the capture pass.** Nothing from the fork is stored before that.
+- **Must fail a fork's pull request's snapshot check until a maintainer approves running the render pass.** Nothing from the fork is stored before that.
 
 **Later:** a fork's pull request could keep its changed snapshots somewhere like Actions artifacts until a maintainer accepts them.
 
@@ -80,5 +80,5 @@ GitHub decides. Selfie keeps no member list of its own.
 
 A run isn't uploaded until GitHub has its commit (`docs/specs/sync.md` → What goes), so anonymous viewers see no unpushed work.
 
-- **Running an approved capture pass.** Decide how a maintainer approves it and how it runs, since it executes the fork's code and needs a token to upload. GitHub's docs don't say whether a fork's `pull_request` run can get an OIDC token, and `pull_request_target` runs with write access even from a public fork, so both need testing. The fork's code could forge its screenshots, so its run must stay subject to normal approval. It would also be the one uploader without write access, so it must not reach the project's images through the route that takes a client's hash on trust: it could plant a false picture under the hash of an image that hasn't been rendered yet.
+- **Running an approved render pass.** Decide how a maintainer approves it and how it runs, since it executes the fork's code and needs a token to upload. GitHub's docs don't say whether a fork's `pull_request` run can get an OIDC token, and `pull_request_target` runs with write access even from a public fork, so both need testing. The fork's code could forge its screenshots, so its run must stay subject to normal approval. It would also be the one uploader without write access, so it must not reach the project's images through the route that takes a client's hash on trust: it could plant a false picture under the hash of an image that hasn't been rendered yet.
 - **Reading code for `change-grouping`.** That scope sends code diffs to a Meta model, which needs more app permissions and means private code leaves GitHub. Decide how a repository owner consents.

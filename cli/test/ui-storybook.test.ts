@@ -131,25 +131,25 @@ describe("the hosted Storybook", () => {
     });
   });
 
-  describe("every story, as the newest capture of each", () => {
+  describe("every story, as the newest render of each", () => {
     const live = () => localReviewSource(project, { storybook: { dir, url: hostedAt } }).storiesView();
     const withStories = async (...ids: string[]) => {
       await built();
       await writeFile(path.join(dir, "index.json"), JSON.stringify({ entries: Object.fromEntries(ids.map((id) => [id, { type: "story", id, title: "T", name: id }])) }));
     };
     const recorded = async (...flags: string[]) => (await h.cli("record", "--storybook-dir", dir, ...flags)).json.runId as string;
-    const capturesOf = async () => Object.fromEntries((await live()).stories.map(({ story, capture }) => [story, capture]));
+    const rendersOf = async () => Object.fromEntries((await live()).stories.map(({ story, render }) => [story, render]));
 
     beforeEach(() => {
       h.stories = [{ id: "a" }, { id: "b" }, { id: "c" }];
     });
 
-    test("lists what no run has captured, with nothing to say of it", async () => {
+    test("lists what no run has rendered, with nothing to say of it", async () => {
       await withStories("a", "b");
       const view = await live();
       expect(view.stories).toEqual([
-        { story: "a", title: "T", name: "a", capture: null },
-        { story: "b", title: "T", name: "b", capture: null },
+        { story: "a", title: "T", name: "a", render: null },
+        { story: "b", title: "T", name: "b", render: null },
       ]);
       expect(view.newestRunId).toBeNull();
       expect(view.storybookUrl).toBe(hostedAt);
@@ -160,10 +160,10 @@ describe("the hosted Storybook", () => {
       await withStories("a", "b", "c");
       const whole = await recorded();
       const partial = await recorded("--story", "b");
-      const captures = await capturesOf();
-      expect(captures.a).toMatchObject({ runId: whole, state: "new" });
-      expect(captures.b).toMatchObject({ runId: partial, state: "new", fromHostedBuild: true, dirty: false });
-      expect(captures.c).toMatchObject({ runId: whole });
+      const renders = await rendersOf();
+      expect(renders.a).toMatchObject({ runId: whole, state: "new" });
+      expect(renders.b).toMatchObject({ runId: partial, state: "new", fromHostedBuild: true, dirty: false });
+      expect(renders.c).toMatchObject({ runId: whole });
       expect((await live()).newestRunId).toBe(partial);
     });
 
@@ -174,63 +174,63 @@ describe("the hosted Storybook", () => {
       expect(stories[0]).toMatchObject({ title: "T", name: "z" });
     });
 
-    test("leaves a story out if the build no longer has it, and lists a new one as not captured", async () => {
+    test("leaves a story out if the build no longer has it, and lists a new one as not rendered", async () => {
       await withStories("a", "b");
       await recorded();
       await withStories("a", "d");
-      const captures = await capturesOf();
-      expect(Object.keys(captures)).toEqual(["a", "d"]);
-      expect(captures.d).toBeNull();
+      const renders = await rendersOf();
+      expect(Object.keys(renders)).toEqual(["a", "d"]);
+      expect(renders.d).toBeNull();
     });
 
-    test("keeps looking through older runs for a story, even with one captured that's gone from the build", async () => {
+    test("keeps looking through older runs for a story, even with one rendered that's gone from the build", async () => {
       await withStories("a", "b", "c");
       const whole = await recorded();
       h.stories = [{ id: "gone" }, { id: "a" }];
       const newer = await recorded();
       await withStories("a", "b", "c");
-      const captures = await capturesOf();
-      expect(captures.a).toMatchObject({ runId: newer });
-      expect(captures.b).toMatchObject({ runId: whole });
-      expect(captures.c).toMatchObject({ runId: whole });
+      const renders = await rendersOf();
+      expect(renders.a).toMatchObject({ runId: newer });
+      expect(renders.b).toMatchObject({ runId: whole });
+      expect(renders.c).toMatchObject({ runId: whole });
     });
 
-    test("doesn't say a capture without a recorded build came from another", async () => {
+    test("doesn't say a render without a recorded build came from another", async () => {
       h.stories = [{ id: "a" }];
       await review();
       await withStories("a");
-      expect((await capturesOf()).a).toMatchObject({ fromHostedBuild: null });
+      expect((await rendersOf()).a).toMatchObject({ fromHostedBuild: null });
     });
 
     test("notices any file of the build changing, not only its index", async () => {
       await withStories("a");
       await recorded();
       const source = localReviewSource(project, { storybook: { dir, url: hostedAt } });
-      const fromHosted = async () => (await source.storiesView()).stories[0]!.capture?.fromHostedBuild;
+      const fromHosted = async () => (await source.storiesView()).stories[0]!.render?.fromHostedBuild;
       expect(await fromHosted()).toBe(true);
       await writeFile(path.join(dir, "assets", "story.js"), "export const changed = true;");
       expect(await fromHosted()).toBe(false);
     });
 
-    test("says when a capture came from another build, or uncommitted changes", async () => {
+    test("says when a render came from another build, or uncommitted changes", async () => {
       await withStories("a");
       await recorded();
       await writeFile(path.join(dir, "assets", "story.js"), "export const changed = true;");
-      expect((await capturesOf()).a).toMatchObject({ fromHostedBuild: false, dirty: false });
+      expect((await rendersOf()).a).toMatchObject({ fromHostedBuild: false, dirty: false });
       await writeFile(path.join(h.repo, "file.txt"), "uncommitted\n");
       await recorded();
-      expect((await capturesOf()).a).toMatchObject({ fromHostedBuild: true, dirty: true });
+      expect((await rendersOf()).a).toMatchObject({ fromHostedBuild: true, dirty: true });
     });
 
     test("carries a decision on the image, which can go with it into a clean run", async () => {
       await withStories("a");
       const runId = await recorded();
-      expect((await capturesOf()).a).toMatchObject({ decision: null });
+      expect((await rendersOf()).a).toMatchObject({ decision: null });
       await h.cli("approve", runId, "--all");
-      expect((await capturesOf()).a).toMatchObject({ decision: { decision: "approved" } });
+      expect((await rendersOf()).a).toMatchObject({ decision: { decision: "approved" } });
     });
 
-    test("with no build, lists what's been captured, and says there's no build", async () => {
+    test("with no build, lists what's been rendered, and says there's no build", async () => {
       h.stories = [{ id: "a" }];
       await review();
       const view = await live();
@@ -258,16 +258,16 @@ describe("the hosted Storybook", () => {
       expect(await builtFrom()).toBe("before-head");
     });
 
-    test("can't capture with no commit to keep it with, nor say more than a server that hosts nothing knows", async () => {
+    test("can't render with no commit to keep it with, nor say more than a server that hosts nothing knows", async () => {
       expect((await localReviewSource(project).storiesView()).setup).toBeNull();
       await withStories("a");
       const record = async () => "r";
-      expect((await localReviewSource(project, { storybook: { dir, url: hostedAt, record } }).storiesView()).canCapture).toBe(true);
+      expect((await localReviewSource(project, { storybook: { dir, url: hostedAt, record } }).storiesView()).canRender).toBe(true);
       const empty = path.join(h.scratch, "no-commits");
       git(h.scratch, "init", "--quiet", "--initial-branch=main", empty);
       const uncommitted = await openProject({ cwd: empty, env: { SELFIE_HOME: h.home } });
       const view = await localReviewSource(uncommitted, { storybook: { dir, url: hostedAt, record } }).storiesView();
-      expect(view).toMatchObject({ head: null, canCapture: false });
+      expect(view).toMatchObject({ head: null, canRender: false });
     });
 
     test("answers at /api/stories", async () => {
@@ -277,7 +277,7 @@ describe("the hosted Storybook", () => {
     });
   });
 
-  describe("capturing from the page", () => {
+  describe("rendering from the page", () => {
     const withStories = async (...ids: string[]) => {
       await built();
       await writeFile(path.join(dir, "index.json"), JSON.stringify({ entries: Object.fromEntries(ids.map((id) => [id, { type: "story", id }])) }));
@@ -295,7 +295,7 @@ describe("the hosted Storybook", () => {
         asked.push(stories);
         return "the-run";
       });
-      expect(await source.capture(["a", "b"])).toEqual({ runId: "the-run" });
+      expect(await source.render(["a", "b"])).toEqual({ runId: "the-run" });
       expect(asked).toEqual([["a", "b"]]);
     });
 
@@ -305,11 +305,11 @@ describe("the hosted Storybook", () => {
         asked.push(stories);
         return "the-run";
       });
-      await source.capture(["b", "a"]);
+      await source.render(["b", "a"]);
       expect(asked).toEqual([undefined]);
     });
 
-    test("refuses a story the build doesn't have, or a second capture at once", async () => {
+    test("refuses a story the build doesn't have, or a second render at once", async () => {
       await withStories("a");
       let finish = () => {};
       const blocked = new Promise<void>((resolve) => {
@@ -319,42 +319,42 @@ describe("the hosted Storybook", () => {
         await blocked;
         return "the-run";
       });
-      await expect(source.capture(["nope"])).rejects.toMatchObject({ code: "unknown-story" });
-      const first = source.capture(["a"]);
+      await expect(source.render(["nope"])).rejects.toMatchObject({ code: "unknown-story" });
+      const first = source.render(["a"]);
       await new Promise((resolve) => setTimeout(resolve, 5));
-      await expect(source.capture(["a"])).rejects.toMatchObject({ code: "capture-busy" });
+      await expect(source.render(["a"])).rejects.toMatchObject({ code: "render-busy" });
       finish();
       await expect(first).resolves.toEqual({ runId: "the-run" });
-      await expect(source.capture(["a"])).resolves.toEqual({ runId: "the-run" });
+      await expect(source.render(["a"])).resolves.toEqual({ runId: "the-run" });
     });
 
-    test("says why it failed, and can capture again after", async () => {
+    test("says why it failed, and can render again after", async () => {
       await withStories("a");
       let failing = true;
       const source = sourceRecording(async () => {
         if (failing) throw new Error("Docker is unavailable");
         return "the-run";
       });
-      await expect(source.capture(["a"])).rejects.toMatchObject({ code: "capture-failed", message: expect.stringContaining("Docker is unavailable") });
+      await expect(source.render(["a"])).rejects.toMatchObject({ code: "render-failed", message: expect.stringContaining("Docker is unavailable") });
       failing = false;
-      await expect(source.capture(["a"])).resolves.toEqual({ runId: "the-run" });
+      await expect(source.render(["a"])).resolves.toEqual({ runId: "the-run" });
     });
 
     test("isn't offered with no build, or nothing to record with", async () => {
-      expect((await localReviewSource(project, { storybook: { dir, url: hostedAt, record: async () => "r" } }).storiesView()).canCapture).toBe(false);
+      expect((await localReviewSource(project, { storybook: { dir, url: hostedAt, record: async () => "r" } }).storiesView()).canRender).toBe(false);
       await withStories("a");
-      expect((await localReviewSource(project, { storybook: { dir, url: hostedAt } }).storiesView()).canCapture).toBe(false);
-      expect((await sourceRecording(async () => "r").storiesView()).canCapture).toBe(true);
-      await expect(localReviewSource(project).capture(["a"])).rejects.toMatchObject({ code: "capture-failed" });
+      expect((await localReviewSource(project, { storybook: { dir, url: hostedAt } }).storiesView()).canRender).toBe(false);
+      expect((await sourceRecording(async () => "r").storiesView()).canRender).toBe(true);
+      await expect(localReviewSource(project).render(["a"])).rejects.toMatchObject({ code: "render-failed" });
     });
 
-    test("answers at /api/captures, only to a change from the page", async () => {
-      const refused = await app.request("/api/captures", { method: "POST", headers: { host: HOST, "content-type": "application/json" }, body: JSON.stringify({ stories: ["a"] }) });
+    test("answers at /api/renders, only to a change from the page", async () => {
+      const refused = await app.request("/api/renders", { method: "POST", headers: { host: HOST, "content-type": "application/json" }, body: JSON.stringify({ stories: ["a"] }) });
       expect(refused.status).toBe(403);
       for (const stories of [undefined, [], [1], [""]]) {
-        expect((await change("/api/captures", { stories })).status, JSON.stringify(stories)).toBe(400);
+        expect((await change("/api/renders", { stories })).status, JSON.stringify(stories)).toBe(400);
       }
-      expect((await change("/api/captures", { stories: ["a"] })).status).toBe(409);
+      expect((await change("/api/renders", { stories: ["a"] })).status).toBe(409);
     });
   });
 
@@ -428,7 +428,7 @@ describe("the hosted Storybook", () => {
 
     test("not a build that changed while it rendered", async () => {
       await built();
-      h.onCapture = () => writeFileSync(path.join(dir, "index.json"), '{"changed":true}');
+      h.onRender = () => writeFileSync(path.join(dir, "index.json"), '{"changed":true}');
       expect((await linkOf(await reviewedBuild()))?.exactBuild).toBe(false);
     });
   });

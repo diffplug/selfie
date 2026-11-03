@@ -1,4 +1,4 @@
-// Every story of the hosted Storybook, each with its newest capture at HEAD, whichever run that was.
+// Every story of the hosted Storybook, each with its newest render at HEAD, whichever run that was.
 // A story's page is its run's, so looking at one here and in that run's review is the same screen.
 import { AlertIcon, SearchIcon } from "@primer/octicons-react";
 import { BookmarkHollowIcon, ChevronSmallDownIcon, ChevronSmallRightIcon, ComponentIcon, FolderIcon } from "@storybook/icons";
@@ -8,7 +8,7 @@ import type { ListedStory, StoriesView } from "../shared/api.ts";
 import { DetailScreen, StoryPager, type StoryNavigation } from "./DetailScreen.tsx";
 import { FeedbackBar } from "./Feedback.tsx";
 import { filterQuery, matchesText, neighbors, NO_FILTER, parseFilter, positionWords } from "./filter.ts";
-import { useCapture, useFeedback, useHotkeys, useRun, useStories, useStoryFocusKeys, useTitle, type CaptureState, type FeedbackState, type RunState } from "./hooks.ts";
+import { useRender, useFeedback, useHotkeys, useRun, useStories, useStoryFocusKeys, useTitle, type RenderState, type FeedbackState, type RunState } from "./hooks.ts";
 import { Keys } from "./Keys.tsx";
 import { OpenInStorybook, StoryFrame, storyFrameUrl } from "./LiveStories.tsx";
 import { plural } from "./plural.ts";
@@ -21,10 +21,10 @@ import { StateMark } from "./words.tsx";
 
 const matching = (stories: readonly ListedStory[], text: string) => stories.filter(({ story, title, name }) => matchesText(`${story} ${title} ${name}`, text));
 
-/** What a capture can't be relied on for, in words, or nothing if it can. */
-function captureCaveats({ capture }: ListedStory): string {
-  if (capture === null) return "";
-  return [capture.dirty && "Uncommitted changes", capture.fromHostedBuild === false && "From another build"].filter(Boolean).join(", ");
+/** What a render can't be relied on for, in words, or nothing if it can. */
+function renderCaveats({ render }: ListedStory): string {
+  if (render === null) return "";
+  return [render.dirty && "Uncommitted changes", render.fromHostedBuild === false && "From another build"].filter(Boolean).join(", ");
 }
 
 /** Indents a row by how deep it is, as the Storybook's sidebar does. */
@@ -33,7 +33,7 @@ const indented = (depth: number) => ({ paddingLeft: `calc(var(--base-size-8) + $
 function StoryRow({ entry, depth, search, current }: { entry: ListedStory; depth: number; search: string; current: boolean }) {
   const href = anyStoryPath(entry.story, search);
   const link = useRef<HTMLAnchorElement>(null);
-  const caveats = captureCaveats(entry);
+  const caveats = renderCaveats(entry);
   useEffect(() => {
     if (current) link.current?.scrollIntoView({ block: "nearest" });
   }, [current]);
@@ -42,7 +42,7 @@ function StoryRow({ entry, depth, search, current }: { entry: ListedStory; depth
       <a ref={link} className="selfie-nav-row" style={indented(depth)} href={href} data-story={entry.story} title={entry.story} aria-current={current ? "page" : undefined} onClick={(event) => followLink(event, href)}>
         <BookmarkHollowIcon className="selfie-tree-icon" data-kind="story" />
         <span className="selfie-nav-name">{entry.name}</span>
-        {entry.capture === null ? (
+        {entry.render === null ? (
           <VisuallyHidden>, not rendered</VisuallyHidden>
         ) : (
           <>
@@ -52,7 +52,7 @@ function StoryRow({ entry, depth, search, current }: { entry: ListedStory; depth
                 <VisuallyHidden>{caveats}</VisuallyHidden>
               </span>
             )}
-            <StateMark state={entry.capture.state} />
+            <StateMark state={entry.render.state} />
           </>
         )}
       </a>
@@ -62,7 +62,7 @@ function StoryRow({ entry, depth, search, current }: { entry: ListedStory; depth
 
 function FolderRow({ folder, depth, open, onToggle }: { folder: StoryFolder; depth: number; open: boolean; onToggle: () => void }) {
   const stories = storiesIn(folder);
-  const rendered = stories.filter(({ capture }) => capture !== null).length;
+  const rendered = stories.filter(({ render }) => render !== null).length;
   const section = isSection(folder, depth);
   const isComponent = folder.children.every((child) => child.kind === "story");
   const Icon = isComponent ? ComponentIcon : FolderIcon;
@@ -168,25 +168,25 @@ export function StoriesLayout({ view, story, search, children }: { view: Stories
   );
 }
 
-/** What's said while a capture runs, or why the last one didn't. */
-export function CaptureStatus({ capture }: { capture: CaptureState }) {
+/** What's said while a render runs, or why the last one didn't. */
+export function RenderStatus({ renders }: { renders: RenderState }) {
   return (
     <>
-      {capture.error !== null && <ActionFailedBanner error={capture.error} onDismiss={capture.clearError} />}
-      {capture.capturing > 0 && (
-        <Banner variant="info" title={`Rendering ${plural(capture.capturing, "story", "stories")}`} description="It renders in the same browser as any other run, so it can take a moment." />
+      {renders.error !== null && <ActionFailedBanner error={renders.error} onDismiss={renders.clearError} />}
+      {renders.rendering > 0 && (
+        <Banner variant="info" title={`Rendering ${plural(renders.rendering, "story", "stories")}`} description="It renders in the same browser as any other run, so it can take a moment." />
       )}
     </>
   );
 }
 
 /** What's on the right with no story picked. */
-export function StoriesOverview({ view, capture, recheck }: { view: StoriesView; capture: CaptureState; recheck: () => void }) {
+export function StoriesOverview({ view, renders, recheck }: { view: StoriesView; renders: RenderState; recheck: () => void }) {
   useTitle("Every story");
   useStoryFocusKeys();
   return (
     <Stack gap="normal">
-      <Checklist view={view} capture={capture} recheck={recheck} />
+      <Checklist view={view} renders={renders} recheck={recheck} />
       {view.stories.length > 0 && (
         <Text as="p" className="selfie-muted">
           Pick a story from the list to look at it. <Keys keys="j" /> and <Keys keys="k" /> move through the list, <Keys keys="/" /> searches.
@@ -210,13 +210,13 @@ export function navigationIn(view: StoriesView, story: string, search: string): 
 }
 
 /** A story's page, which is its run's, moving through every story rather than that run's. */
-function CapturedStory({
+function RenderedStory({
   runId,
   story,
   feedback,
   navigation,
   liveStories,
-  capture,
+  renders,
   entry,
   startNote,
   onDecided,
@@ -226,7 +226,7 @@ function CapturedStory({
   feedback: FeedbackState;
   navigation: StoryNavigation;
   liveStories: readonly [boolean, (open: boolean) => void];
-  capture: CaptureState;
+  renders: RenderState;
   entry: ListedStory;
   startNote: boolean;
   onDecided: () => void;
@@ -243,15 +243,15 @@ function CapturedStory({
   };
   return (
     <Stack gap="condensed">
-      {capture.can && (
+      {renders.can && (
         <Stack direction="horizontal" align="center" gap="condensed" wrap="wrap">
-          <Button disabled={capture.capturing > 0} onClick={() => void capture.capture([story])}>
+          <Button disabled={renders.rendering > 0} onClick={() => void renders.render([story])}>
             Render again
           </Button>
-          {entry.capture !== null && (
+          {entry.render !== null && (
             <Text className="selfie-muted">
-              Rendered <RelativeTime date={new Date(entry.capture.capturedAt)} />.{entry.capture.dirty && " It has uncommitted changes in it."}
-              {entry.capture.fromHostedBuild === false && " This image is from another build than the one being hosted."}
+              Rendered <RelativeTime date={new Date(entry.render.renderedAt)} />.{entry.render.dirty && " It has uncommitted changes in it."}
+              {entry.render.fromHostedBuild === false && " This image is from another build than the one being hosted."}
             </Text>
           )}
         </Stack>
@@ -262,20 +262,20 @@ function CapturedStory({
 }
 
 /** A story with no image yet, which is still a real story to look at. */
-export function UncapturedStory({ view, story, navigation, capture, onWriteNote }: { view: StoriesView; story: string; navigation: StoryNavigation; capture: CaptureState; onWriteNote: () => void }) {
+export function UnrenderedStory({ view, story, navigation, renders, onWriteNote }: { view: StoriesView; story: string; navigation: StoryNavigation; renders: RenderState; onWriteNote: () => void }) {
   useTitle(story);
   const go = (href: string | null) => {
     if (href !== null) navigate(href, { replace: true });
   };
-  const captureNow = () => {
-    if (capture.can && capture.capturing === 0) void capture.capture([story]);
+  const renderNow = () => {
+    if (renders.can && renders.rendering === 0) void renders.render([story]);
   };
   const writeNote = () => {
-    if (!capture.can || capture.capturing > 0) return;
+    if (!renders.can || renders.rendering > 0) return;
     onWriteNote();
-    void capture.capture([story]);
+    void renders.render([story]);
   };
-  useHotkeys({ j: () => go(navigation.next), k: () => go(navigation.previous), u: () => navigate(navigation.list), c: captureNow, m: writeNote });
+  useHotkeys({ j: () => go(navigation.next), k: () => go(navigation.previous), u: () => navigate(navigation.list), c: renderNow, m: writeNote });
   const { storybookUrl } = view;
   return (
     <Stack gap="condensed">
@@ -288,12 +288,12 @@ export function UncapturedStory({ view, story, navigation, capture, onWriteNote 
         </Heading>
         {storybookUrl !== null && <OpenInStorybook url={storybookUrl} story={story} />}
       </Stack>
-      {capture.can ? (
+      {renders.can ? (
         <Stack direction="horizontal" align="center" gap="condensed" wrap="wrap">
-          <Button variant="primary" disabled={capture.capturing > 0} onClick={writeNote} trailingVisual={() => <Keys keys="m" />}>
+          <Button variant="primary" disabled={renders.rendering > 0} onClick={writeNote} trailingVisual={() => <Keys keys="m" />}>
             Write a note on this
           </Button>
-          <Button disabled={capture.capturing > 0} onClick={captureNow} trailingVisual={() => <Keys keys="c" />}>
+          <Button disabled={renders.rendering > 0} onClick={renderNow} trailingVisual={() => <Keys keys="c" />}>
             Render it
           </Button>
           <Text className="selfie-muted">A note is written on an image, so writing one renders this story first.</Text>
@@ -320,7 +320,7 @@ function OneStory({
   search,
   feedback,
   liveStories,
-  capture,
+  renders,
   onDecided,
 }: {
   view: StoriesView;
@@ -328,24 +328,24 @@ function OneStory({
   search: string;
   feedback: FeedbackState;
   liveStories: readonly [boolean, (open: boolean) => void];
-  capture: CaptureState;
+  renders: RenderState;
   onDecided: () => void;
 }) {
-  // Which story someone asked to write on, whose note box opens once it's been captured.
+  // Which story someone asked to write on, whose note box opens once it's been rendered.
   const [noteOn, setNoteOn] = useState<string | null>(null);
   const navigation = navigationIn(view, story, search);
   const entry = view.stories.find((candidate) => candidate.story === story);
   if (entry === undefined) return <Banner variant="warning" title="This Storybook has no such story" description="Pick one from the list." />;
-  if (entry.capture === null) return <UncapturedStory view={view} story={story} navigation={navigation} capture={capture} onWriteNote={() => setNoteOn(story)} />;
+  if (entry.render === null) return <UnrenderedStory view={view} story={story} navigation={navigation} renders={renders} onWriteNote={() => setNoteOn(story)} />;
   return (
-    <CapturedStory
-      key={entry.capture.runId}
-      runId={entry.capture.runId}
+    <RenderedStory
+      key={entry.render.runId}
+      runId={entry.render.runId}
       story={story}
       feedback={feedback}
       navigation={navigation}
       liveStories={liveStories}
-      capture={capture}
+      renders={renders}
       entry={entry}
       startNote={noteOn === story}
       onDecided={onDecided}
@@ -358,14 +358,14 @@ export function StoriesRoutes({ story, search }: { story: string | null; search:
   const stories = useStories(feedback.view?.latestRunId);
   // Here, since each run a story is from has a page of its own.
   const liveStories = useState(false);
-  const capture = useCapture(stories.view?.canCapture ?? false, stories.reload);
+  const renders = useRender(stories.view?.canRender ?? false, stories.reload);
   if (stories.view === null) return stories.error !== null ? <LoadFailure error={stories.error} /> : <Loading label="Reading every story" />;
   return (
     <StoriesLayout view={stories.view} story={story} search={search}>
       <FeedbackBar feedback={feedback} storyHref={(name) => anyStoryPath(name)} showList={story === null} />
-      <CaptureStatus capture={capture} />
+      <RenderStatus renders={renders} />
       {story === null ? (
-        <StoriesOverview view={stories.view} capture={capture} recheck={stories.reload} />
+        <StoriesOverview view={stories.view} renders={renders} recheck={stories.reload} />
       ) : (
         <OneStory
           view={stories.view}
@@ -373,7 +373,7 @@ export function StoriesRoutes({ story, search }: { story: string | null; search:
           search={search}
           feedback={feedback}
           liveStories={liveStories}
-          capture={capture}
+          renders={renders}
           onDecided={stories.reload}
         />
       )}

@@ -13,7 +13,7 @@ A spec is the accurate reference for the current code: it states the invariants 
 - **`docs/specs/store.md`** — Image storage: image identity, decoding, keys, hash collisions, kept Storybook builds, and the SQL and blob adapters.
 - **`docs/specs/sync.md`** — Moving runs, images, decisions, and goldens between stores.
 - **`docs/specs/feedback.md`** — Notes: how a person tells a coding agent what they see, and how the agent answers.
-- **`docs/specs/render.md`** — The renderer: capturing a built Storybook into PNGs in a pinned environment, the environment ID, and the manifest.
+- **`docs/specs/render.md`** — The renderer: rendering a built Storybook into PNGs in a pinned environment, the environment ID, and the manifest.
 - **`docs/specs/cli.md`** — The `selfie` CLI: `review`, `approve`, `reject`, `accept`, `find-baseline`, and `ui`, their exit codes and JSON, and local data's layout.
 - **`docs/specs/ui.md`** — The review UI: its routes, the seam a platform implements, and what each screen must show. Read `docs/specs/access.md` → Local review server with it.
 

@@ -14,7 +14,7 @@ export {
   isDecidable,
   isGitSha,
   isRunId,
-  newestCaptures,
+  newestRenders,
   Snapshots,
   SnapshotError,
   type CompareOptions,
@@ -32,7 +32,7 @@ export {
   type SnapshotErrorCode,
   type SnapshotsOptions,
   type SnapshotState,
-  type StoryCapture,
+  type StoryRender,
   type StoryFilter,
 } from "./snapshots.ts";
 export {

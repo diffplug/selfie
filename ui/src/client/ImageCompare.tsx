@@ -347,7 +347,7 @@ export function ImageCompare({ row, diff, scale, groups, selection, runId, feedb
         {mode === "flip" ? (
           <>
             Showing <strong>{LAYER_WORDS[layer].toLowerCase()}</strong>
-            {shownSize === undefined ? "" : `, ${shownSize.width}×${shownSize.height}`} captured at {scale}×,{" "}
+            {shownSize === undefined ? "" : `, ${shownSize.width}×${shownSize.height}`} rendered at {scale}×,{" "}
             {zoom === "size" ? "at its actual size." : `with one image pixel ${zoom} device ${zoom === 1 ? "pixel" : "pixels"} wide.`}{" "}
             {canFlip && (
               <>

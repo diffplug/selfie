@@ -11,13 +11,13 @@ import { BLUE, commit, createHarness, git, type Harness } from "./support.ts";
 
 let h: Harness;
 let build: string;
-let captures: number;
+let renders: number;
 
 /** Runs a command on the build, and says whether it rendered. */
 async function onBuild(command: "record" | "review", flags: string[]) {
-  const before = captures;
+  const before = renders;
   const result = await h.cli(command, "--storybook-dir", build, ...flags);
-  return { ...result, rendered: captures > before };
+  return { ...result, rendered: renders > before };
 }
 const review = (...flags: string[]) => onBuild("review", flags);
 const record = (...flags: string[]) => onBuild("record", flags);
@@ -37,9 +37,9 @@ beforeEach(async () => {
   await writeFile(inBuild("index.json"), '{"entries":{}}');
   await writeFile(inBuild("assets/app.css"), ".a{color:red}");
   h.stories = [{ id: "a--one" }, { id: "a--two", color: BLUE }];
-  captures = 0;
-  h.onCapture = () => {
-    captures += 1;
+  renders = 0;
+  h.onRender = () => {
+    renders += 1;
   };
 });
 afterEach(async () => {
@@ -83,7 +83,7 @@ describe("an unchanged build", () => {
     expect((await review()).json.runId).toBe(second.json.runId);
   });
 
-  test("at a new commit, skips capture, and records the same images in a new run", async () => {
+  test("at a new commit, skips render, and records the same images in a new run", async () => {
     const first = await review();
     expect(first.json.reusedFromRun).toBeNull();
 
@@ -199,10 +199,10 @@ describe("a render that isn't reusable", () => {
     expect((await review()).rendered).toBe(true);
   });
 
-  test("a capture warning, and stderr says what it was", async () => {
+  test("a render warning, and stderr says what it was", async () => {
     h.stories = [{ id: "a--one", warning: "The worker stopped early: it crashed" }];
     const { stderr } = await review();
-    expect(stderr).toContain("won't be reused: the capture warned: The worker stopped early: it crashed.");
+    expect(stderr).toContain("won't be reused: the render warned: The worker stopped early: it crashed.");
     expect((await review()).rendered).toBe(true);
   });
 
@@ -214,15 +214,15 @@ describe("a render that isn't reusable", () => {
   });
 
   test("a build that changed while it rendered isn't remembered", async () => {
-    h.onCapture = () => {
-      captures += 1;
+    h.onRender = () => {
+      renders += 1;
       writeFileSync(inBuild("assets/during.txt"), "written during the render");
     };
     const first = await review();
     expect(first.stderr).toContain("the build changed while it rendered");
     // The build as it now stands has no render that saw all of it from the start.
-    h.onCapture = () => {
-      captures += 1;
+    h.onRender = () => {
+      renders += 1;
     };
     expect((await review()).rendered).toBe(true);
     await rm(inBuild("assets/during.txt"));

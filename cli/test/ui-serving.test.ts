@@ -89,9 +89,9 @@ describe("selfie ui", () => {
       expect(runId).toBeNull();
       expect(stderr()).toContain(url);
       expect(opened).toEqual([url]);
-      const { stories, canCapture } = (await (await fetch(`http://127.0.0.1:${port}/api/stories`)).json()) as StoriesView;
-      expect(stories).toEqual([{ story: "a", title: "", name: "", capture: null }]);
-      expect(canCapture).toBe(true);
+      const { stories, canRender } = (await (await fetch(`http://127.0.0.1:${port}/api/stories`)).json()) as StoriesView;
+      expect(stories).toEqual([{ story: "a", title: "", name: "", render: null }]);
+      expect(canRender).toBe(true);
       expect(await (await fetch(`${storybookUrl}iframe.html`)).text()).toContain("the preview");
       stop.abort();
       expect(await exit).toBe(0);
@@ -130,8 +130,8 @@ describe("selfie ui", () => {
       const { stop, exit, json, stderr } = await bare("--storybook-dir", path.join(h.scratch, "nothing-here"));
       expect(stderr()).toContain("There's no built Storybook");
       expect(opened).toEqual([json().url]);
-      const { canCapture, setup } = (await (await fetch(`${json().url}api/stories`)).json()) as StoriesView;
-      expect(canCapture).toBe(false);
+      const { canRender, setup } = (await (await fetch(`${json().url}api/stories`)).json()) as StoriesView;
+      expect(canRender).toBe(false);
       expect(setup?.buildCommand).toBeNull();
       stop.abort();
       expect(await exit).toBe(0);

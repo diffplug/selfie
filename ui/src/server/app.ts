@@ -26,8 +26,8 @@ const ERROR_STATUS: Readonly<Record<string, ContentfulStatusCode>> = {
   "unknown-run": 404,
   "unknown-note": 404,
   "unknown-story": 404,
-  "capture-busy": 409,
-  "capture-failed": 409,
+  "render-busy": 409,
+  "render-failed": 409,
   "no-agent-waiting": 409,
   "stale-decision": 409,
   "no-actor": 409,
@@ -154,12 +154,12 @@ export function createReviewApi(source: ReviewSource): Hono {
   api.use(noStoreByDefault);
 
   api.get("/stories", async (context) => context.json(await source.storiesView()));
-  api.post("/captures", async (context) => {
+  api.post("/renders", async (context) => {
     const { stories } = await jsonBody(context);
     if (!Array.isArray(stories) || stories.length === 0 || stories.length > MAX_DECISION_TARGETS || !stories.every((story) => typeof story === "string" && story !== "")) {
-      throw new BadRequest("stories must list the stories to capture.");
+      throw new BadRequest("stories must list the stories to render.");
     }
-    return context.json(await source.capture(stories as string[]));
+    return context.json(await source.render(stories as string[]));
   });
   api.get("/runs/:runId", async (context) => context.json(await source.runView(context.req.param("runId"))));
   api.get("/runs/:runId/baseline", async (context) => context.json(await source.baseline(context.req.param("runId"))));

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import type { AcceptRefusal, DecisionKind, DecisionTarget, FeedbackView, StoriesView, NewNote, RunView, SendVia, SnapshotRow } from "../shared/api.ts";
-import { deleteNote, fetchFeedback, fetchStories, fetchRun, fetchUnchanged, postAccept, postAnswer, postCapture, postDecision, postNote, postResolve, postSendNotes, RequestError } from "./api.ts";
+import { deleteNote, fetchFeedback, fetchStories, fetchRun, fetchUnchanged, postAccept, postAnswer, postRender, postDecision, postNote, postResolve, postSendNotes, RequestError } from "./api.ts";
 import { reuseRows } from "./filter.ts";
 import { toggled } from "./selection.ts";
 
@@ -287,37 +287,37 @@ export function useStories(latestRunId: string | null | undefined): { readonly v
   return { view, error, reload };
 }
 
-export interface CaptureState {
+export interface RenderState {
   readonly can: boolean;
-  /** How many stories are being captured right now. */
-  readonly capturing: number;
+  /** How many stories are being rendered right now. */
+  readonly rendering: number;
   readonly error: RequestError | null;
   readonly clearError: () => void;
   /** Says whether it worked. If it didn't, `error` says why. */
-  readonly capture: (stories: readonly string[]) => Promise<boolean>;
+  readonly render: (stories: readonly string[]) => Promise<boolean>;
 }
 
-/** Asks the server to capture stories, and reads every story again once it has. */
-export function useCapture(can: boolean, onCaptured: () => void): CaptureState {
-  const [capturing, setCapturing] = useState(0);
+/** Asks the server to render stories, and reads every story again once it has. */
+export function useRender(can: boolean, onRendered: () => void): RenderState {
+  const [rendering, setRendering] = useState(0);
   const [error, setError] = useState<RequestError | null>(null);
   return {
     can,
-    capturing,
+    rendering,
     error,
     clearError: useCallback(() => setError(null), []),
-    capture: async (stories) => {
-      setCapturing(stories.length);
+    render: async (stories) => {
+      setRendering(stories.length);
       setError(null);
       try {
-        await postCapture(stories);
-        onCaptured();
+        await postRender(stories);
+        onRendered();
         return true;
       } catch (failed) {
         setError(asRequestError(failed));
         return false;
       } finally {
-        setCapturing(0);
+        setRendering(0);
       }
     },
   };

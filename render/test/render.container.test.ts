@@ -7,7 +7,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
-import { capture, type CaptureOptions } from "../src/capture.ts";
+import { render, type RenderOptions } from "../src/render.ts";
 import { type ContainerRunner, defineEnvironment, environmentId } from "../src/environment.ts";
 import type { Manifest, ManifestStory } from "../src/manifest.ts";
 
@@ -18,8 +18,8 @@ let scratch: string;
 let dirCounter = 0;
 const newOutDir = () => path.join(scratch, `out-${(dirCounter += 1)}`);
 
-const run = (options: Partial<CaptureOptions>, outDir = newOutDir()) =>
-  capture({ storybookDir: STORYBOOK, outDir, log: quiet, ...options });
+const run = (options: Partial<RenderOptions>, outDir = newOutDir()) =>
+  render({ storybookDir: STORYBOOK, outDir, log: quiet, ...options });
 const story = (manifest: Manifest, id: string): ManifestStory => {
   const found = manifest.stories.find((entry) => entry.id === id);
   if (!found) throw new Error(`no story ${id}`);
@@ -86,7 +86,7 @@ describe.runIf(process.env.SELFIE_RENDER_CONTAINER === "1")("in the pinned conta
       expect(played.errors).toContainEqual({ source: "play", message: "this play function fails" });
     });
 
-    test("captures every story and leaves out docs", () => {
+    test("renders every story and leaves out docs", () => {
       expect(manifest.stories.map((entry) => entry.id)).not.toContain("guide--docs");
       expect(manifest.totals.stories).toBe(12);
     });
@@ -97,7 +97,7 @@ describe.runIf(process.env.SELFIE_RENDER_CONTAINER === "1")("in the pinned conta
       expect(status).toBe("ok");
     });
 
-    test("captures the whole page, not only the viewport", () => {
+    test("renders the whole page, not only the viewport", () => {
       const { width, height, status } = story(manifest, "basic--tall");
       expect({ status, width, height }).toEqual({ status: "ok", width: 1200, height: 2000 });
     });
@@ -205,7 +205,7 @@ describe.runIf(process.env.SELFIE_RENDER_CONTAINER === "1")("in the pinned conta
     );
     await expect.poll(() => containersFor(outDir), { timeout: 30_000 }).not.toBe("");
     abort.abort();
-    await expect(running).rejects.toThrow("Capture aborted.");
+    await expect(running).rejects.toThrow("Render aborted.");
     await expect.poll(() => containersFor(outDir), { timeout: 30_000 }).toBe("");
   });
 
@@ -219,7 +219,7 @@ describe.runIf(process.env.SELFIE_RENDER_CONTAINER === "1")("in the pinned conta
 
 test("a build directory that isn't a Storybook is refused", async () => {
   await expect(
-    capture({ storybookDir: path.join(STORYBOOK, "missing"), outDir: newOutDir(), log: quiet }),
+    render({ storybookDir: path.join(STORYBOOK, "missing"), outDir: newOutDir(), log: quiet }),
   ).rejects.toThrow(/index/);
 });
 
@@ -228,7 +228,7 @@ test("a native runner warns, and its environment never names the container", asy
   const environment = defineEnvironment({ runner: { kind: "native" } });
   let manifest: Manifest;
   try {
-    manifest = await capture({
+    manifest = await render({
       storybookDir: STORYBOOK,
       outDir: newOutDir(),
       environment,
@@ -253,6 +253,6 @@ test("a native environment from another machine is refused", async () => {
     runner: { kind: "native", os: "plan9", osRelease: "4", arch: "mips" },
   });
   await expect(
-    capture({ storybookDir: STORYBOOK, outDir: newOutDir(), environment, log: quiet }),
+    render({ storybookDir: STORYBOOK, outDir: newOutDir(), environment, log: quiet }),
   ).rejects.toThrow(/this machine/);
 });

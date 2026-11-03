@@ -7,9 +7,9 @@
 
 ## Rendering environments
 
-Source of truth: `render/src/environment.ts`, `render/src/capture.ts`. `docs/specs/render.md` owns how the package does this.
+Source of truth: `render/src/environment.ts`, `render/src/render.ts`. `docs/specs/render.md` owns how the package does this.
 
-- **Must make the rendering environment configurable, and record it with every capture.** An environment is what decides the pixels apart from the project's own input: the container image digest or other runner, its CPU architecture, the browser and its flags, the viewport and scale, and the fixed capture recipe. Project input, such as story code, a settle time, or an init script, is not part of it (`docs/specs/render.md` → Environment).
+- **Must make the rendering environment configurable, and record it with every render.** An environment is what decides the pixels apart from the project's own input: the container image digest or other runner, its CPU architecture, the browser and its flags, the viewport and scale, and the fixed render recipe. Project input, such as story code, a settle time, or an init script, is not part of it (`docs/specs/render.md` → Environment).
 - **Must default to one pinned Linux arm64 container image**, the only setup measured to match across machines (rationale).
 - **Must make the environment part of a snapshot's name**, so images from different environments are never compared, and changing the environment starts new goldens rather than reporting every story as changed. `docs/specs/snapshots.md` → Snapshot names owns how, and a run records its environment.
 - **Must let a project freeze its own timers**, since browser options alone don't stop a blinking cursor (rationale).

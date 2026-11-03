@@ -1,13 +1,13 @@
 // The review UI's window on a local repository: the library, as the shape its routes want. It reads
-// what's been recorded, records decisions on it, and renders only when a page asks it to capture.
-import { newestCaptures, type Comparison, type DecisionKind, type Run } from "selfie-store";
+// what's been recorded, records decisions on it, and renders only when a page asks it to render.
+import { newestRenders, type Comparison, type DecisionKind, type Run } from "selfie-store";
 import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
 import { isBuiltStorybook } from "selfie-ui/local";
 import { keptBuildPath } from "selfie-ui/api";
 import { buildHash, readStoriesInOrder, readStoryIndex } from "selfie-render";
 import type { AcceptOutcome, DecisionTarget, FeedbackView, NewNote, ReviewSource, RunView, SnapshotRow, StoriesView, StorybookLink, StorySetup } from "selfie-ui/app";
-import { resolveCaptureSettings, resolveRegionMergeDistance } from "./config.ts";
+import { resolveRenderSettings, resolveRegionMergeDistance } from "./config.ts";
 import { accept, checkAccept, decide } from "./decisions.ts";
 import { diffToPng, type PixelDiff } from "./diff.ts";
 import { SelfieError } from "./errors.ts";
@@ -32,8 +32,8 @@ export function localReviewSource(
   const { snapshots, store, repo } = project;
 
   // One at a time from a page, since two can't both be what someone is waiting on. An agent's own
-  // `selfie record` isn't held to this: each capture has a directory of its own.
-  let capturing = false;
+  // `selfie record` isn't held to this: each render has a directory of its own.
+  let rendering = false;
 
   /** Hashing a whole build is too slow for every read of a page, and any change to it changes a file's time or size. */
   let knownBuild: { readonly stamp: string; readonly hash: Promise<string | null> } | null = null;
@@ -188,7 +188,7 @@ export function localReviewSource(
           usesDocker: settings.environment.runner.kind === "container",
         };
       };
-      const settings = await resolveCaptureSettings(repo, { native });
+      const settings = await resolveRenderSettings(repo, { native });
       const { head, runs } = await runsAtHead(project, settings.environmentId);
       const finished = runs.filter(({ status }) => status !== "recording");
       const built = storybook !== undefined && isBuiltStorybook(storybook.dir);
@@ -201,14 +201,14 @@ export function localReviewSource(
         const against = run.baselineSha ?? (await (onBranch ??= branchGoldens(project, run)));
         return (await compareAsShown(project, run, against)).snapshots;
       };
-      const captures = await newestCaptures(finished, rowsOf, index.length > 0 ? new Set(index.map(({ id }) => id)) : undefined);
+      const renders = await newestRenders(finished, rowsOf, index.length > 0 ? new Set(index.map(({ id }) => id)) : undefined);
 
       const builds = new Map<string, string | null>();
       const buildOf = async (runId: string) => {
         if (!builds.has(runId)) builds.set(runId, await project.builds.buildOfRun(runId));
         return builds.get(runId)!;
       };
-      const listed = index.length > 0 ? index : [...captures.keys()].sort().map((id) => ({ id, title: "", name: id }));
+      const listed = index.length > 0 ? index : [...renders.keys()].sort().map((id) => ({ id, title: "", name: id }));
       return {
         head,
         branch: await currentBranch(repo),
@@ -216,19 +216,19 @@ export function localReviewSource(
         viewport: settings.environment.viewport,
         stories: await Promise.all(
           listed.map(async ({ id: story, title, name }) => {
-            const found = captures.get(story);
-            if (found === undefined) return { story, title, name, capture: null };
+            const found = renders.get(story);
+            if (found === undefined) return { story, title, name, render: null };
             const { run, row } = found;
             const build = await buildOf(run.id);
             return {
               story,
               title,
               name,
-              capture: {
+              render: {
                 runId: run.id,
                 state: row.state,
                 decision: row.decision,
-                capturedAt: run.startedAt,
+                renderedAt: run.startedAt,
                 dirty: run.dirty,
                 fromHostedBuild: hosted === null || build === null ? null : build === hosted,
               },
@@ -236,17 +236,17 @@ export function localReviewSource(
           }),
         ),
         newestRunId: finished[0]?.id ?? null,
-        canCapture: built && head !== null && storybook.record !== undefined,
+        canRender: built && head !== null && storybook.record !== undefined,
         setup: await setupOf(head, built),
       };
     },
 
-    async capture(stories) {
+    async render(stories) {
       if (storybook === undefined || storybook.record === undefined || !isBuiltStorybook(storybook.dir)) {
-        throw new SelfieError("capture-failed", "This server has no built Storybook to render a story from.");
+        throw new SelfieError("render-failed", "This server has no built Storybook to render a story from.");
       }
-      if (capturing) throw new SelfieError("capture-busy", "A render is already running here. Try again once it's done.");
-      capturing = true;
+      if (rendering) throw new SelfieError("render-busy", "A render is already running here. Try again once it's done.");
+      rendering = true;
       try {
         const index = new Set((await readStoryIndex(storybook.dir)).map(({ id }) => id));
         const unknown = stories.find((story) => !index.has(story));
@@ -255,9 +255,9 @@ export function localReviewSource(
         return { runId: await storybook.record(new Set(stories).size === index.size ? undefined : stories) };
       } catch (error) {
         if (error instanceof SelfieError && error.code === "unknown-story") throw error;
-        throw new SelfieError("capture-failed", `That didn't render: ${(error as Error).message}`);
+        throw new SelfieError("render-failed", `That didn't render: ${(error as Error).message}`);
       } finally {
-        capturing = false;
+        rendering = false;
       }
     },
 

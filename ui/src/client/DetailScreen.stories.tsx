@@ -305,7 +305,7 @@ export const Rejected: Story = { args: { row: rows.changed("components-button--p
 export const PlayError: Story = {
   args: { row: rows.changed("components-tooltip--hover", { playError: "expected the tooltip to be visible" }) },
 };
-export const CapturedAtTwoTimes: Story = {
+export const RenderedAtTwoTimes: Story = {
   args: {
     row: rows.double("components-button--primary"),
     view: viewOf([rows.double("components-button--primary")], { run: { scale: 2 } }),

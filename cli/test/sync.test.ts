@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { runCli } from "../src/cli.ts";
 import { encodePng } from "../src/png.ts";
 import { openProject, type Project } from "../src/project.ts";
-import { commit, createHarness, fakeCapture, git, GREEN, RED, solid, type FakeStory, type Harness } from "./support.ts";
+import { commit, createHarness, fakeRender, git, GREEN, RED, solid, type FakeStory, type Harness } from "./support.ts";
 
 const REMOTE = "http://127.0.0.1:9";
 /** What the cloud would answer, in the shape the client calls it. */
@@ -30,7 +30,7 @@ let app: ReturnType<typeof createSyncApi>;
 
 /** Runs a command on a machine, as a token, against the cloud. */
 function machine(repo: string, home: string, fetchWith: () => typeof fetch = () => toCloud) {
-  const capture = fakeCapture(() => stories, () => undefined);
+  const render = fakeRender(() => stories, () => undefined);
   return async (token: string | null, ...argv: string[]) => {
     let stdout = "";
     const code = await runCli(argv, {
@@ -40,7 +40,7 @@ function machine(repo: string, home: string, fetchWith: () => typeof fetch = () 
         stdout += text;
       },
       stderr: () => undefined,
-      capture,
+      render,
       fetch: fetchWith(),
     });
     return { code, json: JSON.parse(stdout) };

@@ -3,7 +3,7 @@ import { AlertFillIcon, CheckCircleFillIcon, CircleIcon } from "@primer/octicons
 import { Banner, Button, Stack, Text } from "@primer/react";
 import { useEffect, type ReactNode } from "react";
 import type { ListedStory, StoriesView, StorySetup } from "../shared/api.ts";
-import type { CaptureState } from "./hooks.ts";
+import type { RenderState } from "./hooks.ts";
 import { plural } from "./plural.ts";
 import { anyStoryPath, AppLink, navigate, runPath } from "./router.tsx";
 import { shortSha } from "./words.tsx";
@@ -131,18 +131,18 @@ function BuildItem({ view, setup }: { view: StoriesView; setup: StorySetup | nul
 }
 
 /** Whether a render is missing or known to be out of date, which is what's left to fan out to. */
-const needsRender = ({ capture }: ListedStory) => capture === null || capture.fromHostedBuild === false;
+const needsRender = ({ render }: ListedStory) => render === null || render.fromHostedBuild === false;
 
 const fullName = ({ title, name }: ListedStory) => [...(title === "" ? [] : title.split("/")), name].join(" / ");
 
-function RendersItem({ view, setup, capture }: { view: StoriesView; setup: StorySetup | null; capture: CaptureState }) {
-  const rendered = view.stories.filter((entry) => entry.capture !== null).length;
+function RendersItem({ view, setup, renders }: { view: StoriesView; setup: StorySetup | null; renders: RenderState }) {
+  const rendered = view.stories.filter((entry) => entry.render !== null).length;
   const rest = view.stories.filter(needsRender);
   const first = view.stories[0];
   const stale = rest.length - (view.stories.length - rendered);
   if (first === undefined || view.head === null) return <Item mark="later" title="No renders yet" />;
   const renderFirst = async () => {
-    if (await capture.capture([first.story])) navigate(anyStoryPath(first.story));
+    if (await renders.render([first.story])) navigate(anyStoryPath(first.story));
   };
   const toReview = view.newestRunId !== null && <AppLink href={runPath(view.newestRunId)}>Review the newest run</AppLink>;
   if (rendered === 0) {
@@ -152,12 +152,12 @@ function RendersItem({ view, setup, capture }: { view: StoriesView; setup: Story
           Rendering a story keeps its image with this commit, so there's something to write a note on, and to compare your next change with. It approves nothing.{" "}
           {setup?.usesDocker === false ? "It renders in this machine's browser." : "It renders in a pinned browser in Docker, and the first render downloads that, which can take a few minutes."}
         </Text>
-        {capture.can ? (
+        {renders.can ? (
           <Stack direction="horizontal" align="center" gap="condensed" wrap="wrap">
-            <Button variant="primary" disabled={capture.capturing > 0} onClick={() => void renderFirst()}>
+            <Button variant="primary" disabled={renders.rendering > 0} onClick={() => void renderFirst()}>
               Render {fullName(first)}
             </Button>
-            <Button disabled={capture.capturing > 0} onClick={() => void capture.capture(view.stories.map(({ story }) => story))}>
+            <Button disabled={renders.rendering > 0} onClick={() => void renders.render(view.stories.map(({ story }) => story))}>
               Render all {view.stories.length.toLocaleString()}
             </Button>
             <Text className="selfie-muted">Or pick a story, and look at it running first.</Text>
@@ -176,8 +176,8 @@ function RendersItem({ view, setup, capture }: { view: StoriesView; setup: Story
       title={`${rendered.toLocaleString()} of ${plural(view.stories.length, "story", "stories")} rendered${stale > 0 ? `, ${stale.toLocaleString()} from another build` : ""}`}
     >
       <Stack direction="horizontal" align="center" gap="condensed" wrap="wrap">
-        {capture.can && rest.length > 0 && (
-          <Button variant="primary" disabled={capture.capturing > 0} onClick={() => void capture.capture(rest.map(({ story }) => story))}>
+        {renders.can && rest.length > 0 && (
+          <Button variant="primary" disabled={renders.rendering > 0} onClick={() => void renders.render(rest.map(({ story }) => story))}>
             {`Render the rest (${rest.length.toLocaleString()})`}
           </Button>
         )}
@@ -187,7 +187,7 @@ function RendersItem({ view, setup, capture }: { view: StoriesView; setup: Story
   );
 }
 
-export function Checklist({ view, capture, recheck }: { view: StoriesView; capture: CaptureState; recheck: () => void }) {
+export function Checklist({ view, renders, recheck }: { view: StoriesView; renders: RenderState; recheck: () => void }) {
   const { head, branch, setup } = view;
   // What's next, or a fix to what it warns of, happens in a terminal or an editor.
   const waiting = setup !== null && (head === null || view.storybookUrl === null || view.stories.length === 0 || setup.builtFrom !== "clean");
@@ -214,7 +214,7 @@ export function Checklist({ view, capture, recheck }: { view: StoriesView; captu
         />
       )}
       <BuildItem view={view} setup={setup} />
-      <RendersItem view={view} setup={setup} capture={capture} />
+      <RendersItem view={view} setup={setup} renders={renders} />
     </ul>
   );
 }

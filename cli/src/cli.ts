@@ -1,7 +1,7 @@
 // Arguments in, one document and an exit code out. The work is the library's.
 import { parseArgs, type ParseArgsConfig } from "node:util";
-import type { capture } from "selfie-render";
-import { resolveCaptureSettings, resolveStorybookDir } from "./config.ts";
+import type { render } from "selfie-render";
+import { resolveRenderSettings, resolveStorybookDir } from "./config.ts";
 import { accept, decide } from "./decisions.ts";
 import { buildAcceptDocument, buildRecordDocument, buildReviewDocument } from "./document.ts";
 import { SelfieError } from "./errors.ts";
@@ -55,7 +55,7 @@ const USAGE = `Usage: selfie [--port <n>] [--storybook-dir <dir>] [--native] [--
 
   ui [<run>] [--port <n>] [--storybook-dir <dir>] [--native]
       Serves the review UI on loopback until stopped, and prints its URL. Opens at this run, or
-      else every story, each with its newest capture. It renders only when someone asks it to on
+      else every story, each with its newest render. It renders only when someone asks it to on
       the page. Opens no browser by itself. Hosts the built Storybook on a port of its own, so a
       story's page links to the real thing.
 
@@ -100,7 +100,7 @@ interface Context {
   readonly stderr: (text: string) => void;
   /** Opens a page for a person at a terminal. Not set for anything else, such as an agent. */
   readonly openBrowser?: ((url: string) => void) | undefined;
-  readonly capture?: typeof capture;
+  readonly render?: typeof render;
   readonly signal?: AbortSignal;
   /** Defaults to the built client in `selfie-ui`. */
   readonly uiClientDir?: string;
@@ -183,7 +183,7 @@ async function serveReview(
   const { native, forStories } = options;
   // Only here, so that no other command loads a web server.
   const [{ isBuiltStorybook, serveReviewWithStorybook }, { localReviewSource }] = await Promise.all([import("selfie-ui/local"), import("./ui.ts")]);
-  const settings = await resolveCaptureSettings(project.repo, { native });
+  const settings = await resolveRenderSettings(project.repo, { native });
   const dir = resolveStorybookDir(project.cwd, options.storybookDir, settings);
   if (forStories !== undefined) {
     if (forStories.build) await buildIfAsked(settings.buildCommand, project.repo.root, context.signal, (line) => context.stderr(`${line}\n`));
@@ -197,7 +197,7 @@ async function serveReview(
           dir,
           url,
           record: async (stories) =>
-            (await record(project, { storybookDir: dir, native, stories, capture: context.capture, log: (line) => context.stderr(`${line}\n`) })).run.id,
+            (await record(project, { storybookDir: dir, native, stories, render: context.render, log: (line) => context.stderr(`${line}\n`) })).run.id,
         },
       }),
     port: options.port,
@@ -241,7 +241,7 @@ function recordOptions(values: ReturnType<typeof parse<typeof BUILD_OPTIONS>>["v
     buildFromConfig: values.build,
     native: values.native,
     stories: values.story,
-    capture: context.capture,
+    render: context.render,
     signal: context.signal,
     log: (line: string) => context.stderr(`${line}\n`),
   };
@@ -372,7 +372,7 @@ async function dispatch(command: string | undefined, args: string[], context: Co
       noPositionals(command, positionals);
       const remote = resolveRemote(values.remote, context.env, context.fetch);
       return withProject(context, async (project) => {
-        const { environmentId } = await resolveCaptureSettings(project.repo, { native: values.native });
+        const { environmentId } = await resolveRenderSettings(project.repo, { native: values.native });
         const found = remote === null ? await findBaseline(project, environmentId) : await findBaselineWithRemote(project, remote, environmentId);
         printJson(context, { ...found, environment: environmentId });
         return EXIT_OK;

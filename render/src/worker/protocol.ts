@@ -12,7 +12,7 @@ export const PLAYWRIGHT_VERSION = (
  * a value starts new goldens by itself. Bump `waitSequence` when the order of waits in
  * `worker.ts` changes.
  */
-export const CAPTURE_RECIPE = {
+export const RENDER_RECIPE = {
   waitSequence: 2,
   /** No server listens here: the worker answers every request itself. */
   origin: "http://127.0.0.1:6199",

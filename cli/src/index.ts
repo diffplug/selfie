@@ -1,6 +1,6 @@
 // The library behind the `selfie` CLI, for any caller that wants results rather than a process:
 // plain data, with no printing and no exit codes. See `docs/specs/cli.md` -> Library.
-export { resolveCaptureSettings, type CaptureSettings } from "./config.ts";
+export { resolveRenderSettings, type RenderSettings } from "./config.ts";
 export {
   accept,
   checkAccept,

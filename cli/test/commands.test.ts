@@ -59,7 +59,7 @@ describe("a first review, with no baseline", () => {
       expect((await decodeImage(await readFile(difference.current))).width).toBe(8);
     }
     expect(stderr).toContain("Recorded run");
-    expect(stderr).toMatch(/Timings: capture \d+ ms, store \d+ ms, compare \d+ ms, diff \d+ ms, total \d+ ms/);
+    expect(stderr).toMatch(/Timings: render \d+ ms, store \d+ ms, compare \d+ ms, diff \d+ ms, total \d+ ms/);
   });
 
   test("leaves out what the document no longer carries", async () => {
@@ -281,7 +281,7 @@ describe("selfie.config.json", () => {
     await writeFile(path.join(h.repo, "freeze.js"), "frozen();");
     await writeConfig({ environment: { scale: 2 }, initScript: "freeze.js" });
     let seen: any;
-    h.onCapture = (options) => {
+    h.onRender = (options) => {
       seen = options;
     };
     await review();
@@ -291,7 +291,7 @@ describe("selfie.config.json", () => {
 
   test("uses the pinned default with no file", async () => {
     let seen: any;
-    h.onCapture = (options) => {
+    h.onRender = (options) => {
       seen = options;
     };
     await review();
@@ -462,8 +462,8 @@ describe("dirty trees", () => {
   });
 
   test("a HEAD that moves during the render fails the review", async () => {
-    h.onCapture = () => {
-      h.onCapture = undefined;
+    h.onRender = () => {
+      h.onRender = undefined;
       git(h.repo, "commit", "--quiet", "--allow-empty", "-m", "moved");
     };
     const { code, json } = await review();
@@ -605,11 +605,11 @@ describe("untrusted names", () => {
     expect(new Set(directories).size).toBe(2);
   });
 
-  test("a manifest path outside the capture fails that story, and nothing outside is read", async () => {
+  test("a manifest path outside the render fails that story, and nothing outside is read", async () => {
     const secret = path.join(h.scratch, "secret.png");
     await writeFile(secret, await encodePng(solid(2, 2, GREEN)));
     h.stories = [
-      { id: "a--escape", fileOverride: path.relative(path.join(h.home, "x", "capture", "y"), secret) },
+      { id: "a--escape", fileOverride: path.relative(path.join(h.home, "x", "render", "y"), secret) },
       { id: "a--absolute", fileOverride: secret },
       { id: "a--fine" },
     ];
@@ -617,7 +617,7 @@ describe("untrusted names", () => {
     expect(code).toBe(1);
     const failed = json.blockers.filter(({ reason }: any) => reason === "failed");
     expect(failed.map(({ story }: any) => story)).toEqual(["a--absolute", "a--escape"]);
-    for (const { detail } of failed) expect(detail).toContain("The capture is unusable");
+    for (const { detail } of failed) expect(detail).toContain("The render is unusable");
     expect(json.counts.new).toBe(1);
   });
 
@@ -643,7 +643,7 @@ describe("local data", () => {
     expect(entries.sort()).toEqual(["d1.env", expect.stringMatching(/^local-[0-9a-f]{16}$/)]);
   });
 
-  test("keeps the newest 20 run directories, and leaves no capture directory behind", async () => {
+  test("keeps the newest 20 run directories, and leaves no render directory behind", async () => {
     h.stories = [{ id: "a--one" }];
     const first = await review();
     let last = first;
@@ -653,26 +653,26 @@ describe("local data", () => {
     expect(runs).toHaveLength(20);
     expect(runs).toContain(last.json.runId);
     expect(runs).not.toContain(first.json.runId);
-    expect(await readdir(path.join(projectDir, "capture"))).toEqual([]);
+    expect(await readdir(path.join(projectDir, "render"))).toEqual([]);
 
     // The oldest was pruned, and can still be acted on.
     expect((await h.cli("approve", first.json.runId, "--all")).code).toBe(0);
     expect((await h.cli("accept", first.json.runId)).code).toBe(0);
   });
 
-  test("leaves no capture directory behind when the capture fails", async () => {
+  test("leaves no render directory behind when the render fails", async () => {
     const context = {
       cwd: h.repo,
       env: { SELFIE_HOME: h.home },
       stdout: () => {},
       stderr: () => {},
-      capture: async () => {
+      render: async () => {
         throw new Error("Docker is unavailable");
       },
     };
     const { runCli } = await import("../src/cli.ts");
     expect(await runCli(["review"], context)).toBe(2);
-    expect(await readdir(path.join(await projectDirectory(), "capture")).catch(() => [])).toEqual([]);
+    expect(await readdir(path.join(await projectDirectory(), "render")).catch(() => [])).toEqual([]);
   });
 });
 

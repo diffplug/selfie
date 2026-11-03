@@ -144,7 +144,7 @@ export function DetailScreen({
   navigation?: StoryNavigation;
   /** Whether the live stories are open, if it's kept above this screen, which a new run starts afresh. */
   liveStories?: readonly [boolean, (open: boolean) => void];
-  /** Someone asked to write a note on this story, and it's just been captured so they can. */
+  /** Someone asked to write a note on this story, and it's just been rendered so they can. */
   startNote?: boolean;
 }) {
   const { unchanged, loadUnchanged } = state;
