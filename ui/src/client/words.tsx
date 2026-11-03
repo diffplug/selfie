@@ -25,6 +25,9 @@ import { AppLink, runPath } from "./router.tsx";
 
 export const shortSha = (sha: string) => sha.slice(0, 10);
 
+/** A commit, short, with the whole of it on hover. */
+export const Sha = ({ sha }: { readonly sha: string }) => <code title={sha}>{shortSha(sha)}</code>;
+
 /** A run that didn't render: where its pixels came from, which every place that offers a decision on them must say. */
 export function ReusedPixels({ from }: { readonly from: string }) {
   return (
@@ -57,11 +60,13 @@ const STATE_LABELS: Readonly<Record<SnapshotState, { variant: LabelProps["varian
   unchanged: { variant: "secondary", icon: <DotIcon size={12} />, words: "Unchanged" },
 };
 
+export const renamedWords = (from: string) => `Renamed from ${from}`;
+
 /** A state's icon and words, small enough for a list's row. */
-export function StateMark({ state }: { readonly state: SnapshotState }) {
-  const { icon, words } = STATE_LABELS[state];
+export function StateMark({ state, renamedFrom }: { readonly state: SnapshotState; readonly renamedFrom?: string | undefined }) {
+  const { icon, words } = renamedFrom === undefined ? STATE_LABELS[state] : { icon: <ArrowSwitchIcon size={12} />, words: renamedWords(renamedFrom) };
   return (
-    <span className="selfie-state-mark" data-state={state} title={words}>
+    <span className="selfie-state-mark" data-state={renamedFrom === undefined ? state : "renamed"} title={words}>
       {icon}
       <VisuallyHidden>{words}</VisuallyHidden>
     </span>

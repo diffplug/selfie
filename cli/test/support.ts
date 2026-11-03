@@ -139,7 +139,7 @@ export const git = (cwd: string, ...args: string[]): string =>
 
 let repoTemplate: Promise<string> | undefined;
 
-/** Made once, since nearly every test wants one, and copying it costs no Git processes. */
+/** Made once per test file, since nearly every test wants one, and copying it costs no Git processes. */
 const templateRepo = () =>
   (repoTemplate ??= (async () => {
     const parent = await mkdtemp(path.join(tmpdir(), "selfie-cli-template-"));

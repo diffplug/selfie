@@ -17,7 +17,7 @@ function RunRoutes({ runId, route, search }: { runId: string; route: Route; sear
   const state = useRun(runId);
   const feedback = useFeedback();
   const { data: context } = useFetched(runId, (signal) => fetchRunContext(runId, signal));
-  const tree = useRunTree(state.view, state.unchanged, search);
+  const tree = useRunTree(state.view, state.unchanged, search, route.kind === "story" ? route.story : null);
   // Where to put focus on coming back to the list.
   const lastStory = useRef<string | null>(null);
   if (state.view === null) {
@@ -31,8 +31,8 @@ function RunRoutes({ runId, route, search }: { runId: string; route: Route; sear
         <NewerRunBanner latestRunId={feedback.view?.latestRunId} runId={runId} story={route.kind === "story" ? route.story : null} />
       )}
       <FeedbackBar feedback={feedback} storyHref={(story) => storyPath(runId, story, "")} showList={route.kind === "run"} />
-      {route.kind === "story" ? (
-        <DetailScreen state={state} view={state.view} story={route.story} search={search} feedback={feedback} treeOrder={tree.treeOrder} />
+      {route.kind === "story" && tree.navigation !== null ? (
+        <DetailScreen state={state} view={state.view} story={route.story} search={search} feedback={feedback} navigation={tree.navigation} />
       ) : route.kind === "accept" ? (
         <AcceptScreen state={state} view={state.view} />
       ) : (

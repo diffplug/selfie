@@ -20,6 +20,9 @@ import { summarizeRun } from "./summary.ts";
 /** Each is about 20 KB of PNG. This is a reviewer going back and forth, not a cache of a run. */
 const DIFFS_KEPT = 32;
 
+/** A person looks at a few runs at a time. */
+const KEPT_INDEXES_HELD = 8;
+
 const baselineNote = ({ sha, message }: BaselineSearch) => ({ sha, message });
 
 /** Records a run from a hosted Storybook, of just these stories, or of every one, and says which run. */
@@ -81,9 +84,12 @@ export function localReviewSource(
     if (index === undefined) {
       index = project.storybooks.readFile(hash, "index.json").then(
         (bytes) => (bytes === null ? [] : storiesInIndex(JSON.parse(new TextDecoder().decode(bytes)), "a kept index.json")),
-        () => [],
       ).catch(() => []);
       keptIndexes.set(hash, index);
+      for (const oldest of keptIndexes.keys()) {
+        if (keptIndexes.size <= KEPT_INDEXES_HELD) break;
+        keptIndexes.delete(oldest);
+      }
     }
     return index;
   };
@@ -203,23 +209,11 @@ export function localReviewSource(
     runView: async (runId) => viewOf(await compareAsReviewed(project, runId), await gitUserEmail(repo)),
 
     async storiesView(): Promise<StoriesView> {
-      const setupOf = async (head: string | null, built: boolean): Promise<StorySetup | null> => {
-        if (storybook === undefined) return null;
-        const uncommitted = await dirtyPaths(repo);
-        return {
-          storybookDir: path.relative(repo.root, storybook.dir) || ".",
-          buildCommand: settings.buildCommand ?? null,
-          uncommitted,
-          builtFrom: !built || head === null ? null : uncommitted.length > 0 ? "uncommitted" : (await builtBeforeHead(storybook.dir)) ? "before-head" : "clean",
-          usesDocker: settings.environment.runner.kind === "container",
-        };
-      };
       const settings = await resolveRenderSettings(repo, { native });
       const { head, runs } = await runsAtHead(project, settings.environmentId);
       const finished = runs.filter(({ status }) => status !== "recording");
       const built = storybook !== undefined && isBuiltStorybook(storybook.dir);
       const index = built ? await readStoriesInOrder(storybook.dir) : [];
-      const hosted = built ? await hostedStorybook(storybook.dir) : null;
 
       // Runs at one commit all find the same goldens on its branch, and finding them takes Git.
       let onBranch: Promise<string | null> | undefined;
@@ -229,6 +223,8 @@ export function localReviewSource(
       };
       const renders = await newestRenders(finished, rowsOf, index.length > 0 ? new Set(index.map(({ id }) => id)) : undefined);
 
+      // Hashing a whole build isn't worth it until there's a render to compare it with.
+      const hosted = built && renders.size > 0 ? await hostedStorybook(storybook.dir) : null;
       const builds = new Map<string, string | null>();
       const buildOf = async (runId: string) => {
         if (!builds.has(runId)) builds.set(runId, await project.storybooks.storybookOfRun(runId));
@@ -263,7 +259,16 @@ export function localReviewSource(
         ),
         newestRunId: finished[0]?.id ?? null,
         canRender: built && head !== null && storybook.record !== undefined,
-        setup: await setupOf(head, built),
+        setup:
+          storybook === undefined
+            ? null
+            : {
+                storybookDir: path.relative(repo.root, storybook.dir) || ".",
+                buildCommand: settings.buildCommand ?? null,
+                uncommitted: await dirtyPaths(repo),
+                builtBeforeHead: built && head !== null && (await builtBeforeHead(storybook.dir)),
+                usesDocker: settings.environment.runner.kind === "container",
+              },
       };
     },
 

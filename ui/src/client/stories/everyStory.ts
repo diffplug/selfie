@@ -1,16 +1,16 @@
 // What the stories of the list of every story share.
 import type { ListedStory, StoriesView } from "../../shared/api.ts";
 import type { RenderState } from "../hooks.ts";
+import { nameFromId } from "../storyTree.ts";
 import { approved, OTHER_RUN_ID, RUN_ID, SHA } from "./fixtures.ts";
 
 // The renderer fixes the clock, so a relative date always reads the same there.
 const RENDERED_AT = Date.UTC(2026, 0, 15, 11);
 
-/** What a sidebar would call a story with this ID, `components-button--primary`. */
+/** Nested, as a real Storybook's titles are. */
 const named = (story: string) => {
-  const [path = "", name = ""] = story.split("--");
-  const words = (text: string) => text.replace(/(^|-)(\w)/g, (_, gap: string, letter: string) => (gap === "" ? "" : " ") + letter.toUpperCase());
-  return { title: path.split("-").map(words).join("/"), name: words(name) };
+  const { title, name } = nameFromId(story);
+  return { title: title.replaceAll(" ", "/"), name };
 };
 
 export const rendered = (story: string, overrides: Partial<NonNullable<ListedStory["render"]>> = {}): ListedStory => ({
@@ -20,7 +20,7 @@ export const rendered = (story: string, overrides: Partial<NonNullable<ListedSto
 });
 export const unrendered = (story: string): ListedStory => ({ story, ...named(story), render: null });
 
-export const setupOf = (setup: Partial<NonNullable<StoriesView["setup"]>>): NonNullable<StoriesView["setup"]> => ({ storybookDir: "storybook-static", buildCommand: null, uncommitted: [], builtFrom: "clean", usesDocker: true, ...setup });
+export const setupOf = (setup: Partial<NonNullable<StoriesView["setup"]>>): NonNullable<StoriesView["setup"]> => ({ storybookDir: "storybook-static", buildCommand: null, uncommitted: [], builtBeforeHead: false, usesDocker: true, ...setup });
 
 export const view = (stories: readonly ListedStory[], overrides: Partial<StoriesView> = {}): StoriesView => ({
   head: SHA,

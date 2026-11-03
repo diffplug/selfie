@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { AcceptRefusal, DecisionKind, DecisionTarget, FeedbackView, StoriesView, NewNote, RunView, SendVia, SnapshotRow } from "../shared/api.ts";
 import { deleteNote, fetchFeedback, fetchStories, fetchRun, fetchUnchanged, postAccept, postAnswer, postRender, postDecision, postNote, postResolve, postSendNotes, RequestError } from "./api.ts";
 import { reuseRows } from "./filter.ts";
@@ -250,7 +250,7 @@ export function useFetched<T>(key: string | null, load: (signal: AbortSignal) =>
  * Every story of the hosted Storybook, as the server last described them. Read again whenever the
  * page regains focus, or something new is recorded, since an agent records from outside this page.
  */
-export function useStories(latestRunId: string | null | undefined): { readonly view: StoriesView | null; readonly error: RequestError | null; readonly reload: () => void } {
+export function useStories(latestRunId: string | null | undefined): { readonly view: StoriesView | null; readonly error: RequestError | null; readonly reload: () => void; readonly recheck: () => void } {
   const [view, setView] = useState<StoriesView | null>(null);
   const [error, setError] = useState<RequestError | null>(null);
   const reading = useRef<AbortController | null>(null);
@@ -267,8 +267,14 @@ export function useStories(latestRunId: string | null | undefined): { readonly v
       (failed: unknown) => {
         if (!controller.signal.aborted) setError(asRequestError(failed));
       },
-    );
+    ).finally(() => {
+      if (reading.current === controller) reading.current = null;
+    });
   }, []);
+  /** For a timer: nothing's waiting on it, so it lets a read finish, and rests while nobody's looking. */
+  const recheck = useCallback(() => {
+    if (!document.hidden && reading.current === null) reload();
+  }, [reload]);
   useEffect(() => {
     reload();
     window.addEventListener("focus", reload);
@@ -284,7 +290,7 @@ export function useStories(latestRunId: string | null | undefined): { readonly v
     lastRun.current = latestRunId;
     if (known !== undefined && known !== latestRunId) reload();
   }, [latestRunId, reload]);
-  return { view, error, reload };
+  return { view, error, reload, recheck };
 }
 
 export interface RenderState {
@@ -332,12 +338,6 @@ export function useStoryFocusKeys(): void {
     links[at === -1 ? 0 : Math.max(0, Math.min(links.length - 1, at + delta))]?.focus();
   };
   useHotkeys({ j: () => moveFocus(1), k: () => moveFocus(-1) });
-}
-
-/** A list of stories' keys: next and previous move focus through its links, and / goes to its search. */
-export function useStoryListKeys(search: RefObject<HTMLInputElement | null>): void {
-  useStoryFocusKeys();
-  useHotkeys({ "/": () => search.current?.focus() });
 }
 
 /** Device pixels per CSS pixel, which changes with browser zoom or on moving to another display. */

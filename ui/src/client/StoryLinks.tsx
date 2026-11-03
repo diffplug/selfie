@@ -1,7 +1,7 @@
 import { showQuery, type Show } from "./filter.ts";
 import { AppLink, runPath, storyPath } from "./router.tsx";
 
-/** A longer list is one click away, in the run's table with its filter set. */
+/** A longer list is one click away, in the run's list with its filter set. */
 const STORIES_LISTED = 10;
 
 /** Stories as links, in a filter so next and previous stay among them, with any detail below each. */

@@ -1,5 +1,5 @@
 // One snapshot: its images, its numbers, and its decision, with the keyboard doing most of the work.
-import { ArrowLeftIcon, CheckIcon, XIcon } from "@primer/octicons-react";
+import { CheckIcon, XIcon } from "@primer/octicons-react";
 import { Banner, Button, Dialog, Heading, RelativeTime, Stack, Text } from "@primer/react";
 import { AriaStatus } from "@primer/react/experimental";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -7,17 +7,16 @@ import { findRenames } from "../shared/renames.ts";
 import { isDecidable } from "selfie-store";
 import type { DecisionKind, PixelDiff, RunView, SnapshotRow } from "../shared/api.ts";
 import { diffImageUrl, fetchDiff, imageUrl } from "./api.ts";
-import { applyFilter, neighbors, parseFilter, positionWords, targetsOf } from "./filter.ts";
+import { parseFilter, targetsOf, type StoryNavigation } from "./filter.ts";
 import { useFetched, useHotkeys, useRegionSelection, useTitle, type FeedbackState, type RunState } from "./hooks.ts";
 import { ImageCompare } from "./ImageCompare.tsx";
 import { Keys } from "./Keys.tsx";
-import { acceptPath, AppLink, navigate, runPath, storyPath } from "./router.tsx";
+import { acceptPath, AppLink, navigate } from "./router.tsx";
 import { ActionFailure } from "./RunNotes.tsx";
 import { LiveStories, StorybookLinkTo } from "./LiveStories.tsx";
 import { LoadFailure, Loading } from "./Status.tsx";
 import { describeBox, groupRegions, isLayoutOnly } from "../shared/regions.ts";
 import { comparedImage, newestNotedImage } from "../shared/notes.ts";
-import { plural } from "./plural.ts";
 import { AdvisoryLabels, DecisionLabel, describePixels, sizeChanged, StateLabel } from "./words.tsx";
 
 const SHORTCUTS: readonly (readonly [string, string])[] = [
@@ -115,14 +114,6 @@ function Notes({ row, diff, renamedFrom, renamedTo }: { row: SnapshotRow; diff: 
   );
 }
 
-/** Where the keys go on a story that's part of something larger than its run. By default, its run's list. */
-export interface StoryNavigation {
-  readonly previous: string | null;
-  readonly next: string | null;
-  readonly list: string;
-  readonly position: string;
-}
-
 /** Where this story is, and the way to the ones either side of it. */
 export function StoryPager({ previous, next, position }: Pick<StoryNavigation, "previous" | "next" | "position">) {
   const go = (href: string | null) => {
@@ -150,20 +141,17 @@ export function DetailScreen({
   navigation,
   liveStories,
   startNote = false,
-  treeOrder,
 }: {
   state: RunState;
   view: RunView;
   story: string;
   search: string;
   feedback: FeedbackState;
-  navigation?: StoryNavigation;
+  navigation: StoryNavigation;
   /** Whether the live stories are open, if it's kept above this screen, which a new run starts afresh. */
   liveStories?: readonly [boolean, (open: boolean) => void];
   /** Someone asked to write a note on this story, and it's just been rendered so they can. */
   startNote?: boolean;
-  /** The stories of the list beside this page, from the top. */
-  treeOrder?: readonly string[];
 }) {
   const { unchanged, loadUnchanged } = state;
   const filter = useMemo(() => parseFilter(search), [search]);
@@ -174,23 +162,8 @@ export function DetailScreen({
     if (needsUnchanged) loadUnchanged();
   }, [needsUnchanged, loadUnchanged]);
 
-  const source = filter.show === "unchanged" ? (unchanged ?? []) : view.rows;
-  // Next and previous go as the list beside this reads, and through only what's in it.
-  const all = useMemo(() => {
-    if (treeOrder === undefined) return source;
-    const bySource = new Map(source.map((candidate) => [candidate.story, candidate]));
-    return treeOrder.flatMap((name) => bySource.get(name) ?? []);
-  }, [source, treeOrder]);
-  const shown = useMemo(() => applyFilter(all, filter), [all, filter]);
   const row = inRows ?? unchanged?.find((candidate) => candidate.story === story) ?? null;
-  const { previous: previousRow, next: nextRow } = useMemo(() => neighbors(all, shown, story), [all, shown, story]);
-  const hrefOf = (target: SnapshotRow | null) => (target === null ? null : storyPath(view.run.id, target.story, search));
-  const { previous, next, list: listHref, position } = navigation ?? {
-    previous: hrefOf(previousRow),
-    next: hrefOf(nextRow),
-    list: runPath(view.run.id, search),
-    position: positionWords(shown.findIndex((candidate) => candidate.story === story), shown.length),
-  };
+  const { previous, next, nextStory, list: listHref, position } = navigation;
 
   const [helpOpen, setHelpOpen] = useState(false);
   const [message, setMessage] = useState("");
@@ -215,8 +188,8 @@ export function DetailScreen({
   const selection = useRegionSelection(story);
 
   // The next story's images are likely wanted within seconds, so have them ready. Across many runs,
-  // what comes next isn't in this one, so it just loads when it's asked for.
-  const preloading = navigation === undefined ? nextRow : null;
+  // what comes next may not be in this one, and then it just loads when it's asked for.
+  const preloading = useMemo(() => view.rows.find((candidate) => candidate.story === nextStory) ?? null, [view.rows, nextStory]);
   useEffect(() => {
     if (preloading === null) return;
     const urls = [
@@ -265,11 +238,6 @@ export function DetailScreen({
     <Stack gap="condensed">
       <Stack direction="horizontal" align="center" justify="space-between" wrap="wrap" gap="condensed">
         <Stack direction="horizontal" align="center" gap="normal">
-          {navigation === undefined && (
-            <AppLink href={listHref}>
-              <ArrowLeftIcon /> Back to the list <Keys keys="u" />
-            </AppLink>
-          )}
           <AriaStatus className="selfie-muted">{message}</AriaStatus>
         </Stack>
         <Stack direction="horizontal" align="center" gap="condensed">

@@ -1,5 +1,5 @@
 // The tree of stories at the left, nested as Storybook's sidebar does them, beside whatever's on the right.
-import { AlertIcon, ArrowSwitchIcon, SearchIcon, XCircleFillIcon } from "@primer/octicons-react";
+import { AlertIcon, SearchIcon, XCircleFillIcon } from "@primer/octicons-react";
 import { BookmarkHollowIcon, ChevronSmallDownIcon, ChevronSmallRightIcon, ComponentIcon, FolderIcon } from "@storybook/icons";
 import { Button, PageLayout, Stack, Text, TextInput, VisuallyHidden } from "@primer/react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -9,7 +9,8 @@ import { useHotkeys } from "./hooks.ts";
 import { plural } from "./plural.ts";
 import { followLink, navigate } from "./router.tsx";
 import { buildStoryTree, initiallyClosed, isSection, openedAround, storiesIn, visibleRows, type StoryFolder } from "./storyTree.ts";
-import { DecisionLabel, StateLabel, StateMark } from "./words.tsx";
+import { toggled } from "./selection.ts";
+import { DecisionLabel, renamedWords, StateLabel, StateMark } from "./words.tsx";
 
 export const matchingStories = (stories: readonly ListedStory[], text: string) => stories.filter(({ story, title, name }) => matchesText(`${story} ${title} ${name}`, text));
 
@@ -44,17 +45,10 @@ function StoryRow({ entry, depth, href, current, renamedFrom, more }: { entry: L
               </span>
             )}
             <span className="selfie-nav-compact">
-              {renamedFrom !== undefined ? (
-                <span className="selfie-state-mark" data-state="renamed" title={`Renamed from ${renamedFrom}`}>
-                  <ArrowSwitchIcon size={12} />
-                  <VisuallyHidden>Renamed from {renamedFrom}</VisuallyHidden>
-                </span>
-              ) : (
-                <StateMark state={entry.render.state} />
-              )}
+              <StateMark state={entry.render.state} renamedFrom={renamedFrom} />
             </span>
             <span className="selfie-nav-details">
-              <span className="selfie-nav-col" title={renamedFrom === undefined ? undefined : `Renamed from ${renamedFrom}`}>
+              <span className="selfie-nav-col" title={renamedFrom === undefined ? undefined : renamedWords(renamedFrom)}>
                 {renamedFrom !== undefined ? "Renamed" : <StateLabel state={entry.render.state} />}
               </span>
               <span className="selfie-nav-col">
@@ -114,12 +108,7 @@ function StoryTree({ stories, story, search, hrefOf, renames, startOpen = false,
   }
   // A filter means looking for something, so nothing it found stays folded away.
   const rows = useMemo(() => visibleRows(tree, filtering ? new Set() : closed), [tree, filtering, closed]);
-  const toggle = (path: string) =>
-    setClosed((previous) => {
-      const next = new Set(previous);
-      if (!next.delete(path)) next.add(path);
-      return next;
-    });
+  const toggle = (path: string) => setClosed((previous) => toggled(previous, path));
   return (
     <ul className="selfie-nav-tree">
       {rows.map((row) =>

@@ -1,16 +1,13 @@
 // What the top bar says this page is looking at. Screens below it know, so they tell it.
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import type { Run, RunContext, StoriesView } from "../shared/api.ts";
-import { shortSha } from "./words.tsx";
+import { Sha } from "./words.tsx";
 
 export type PageFacts =
   | { readonly kind: "view"; readonly view: Pick<StoriesView, "head" | "branch" | "storybookUrl" | "setup"> }
   | { readonly kind: "diff"; readonly run: Pick<Run, "gitSha" | "dirty" | "baselineSha">; readonly branchGoldens: string | null; readonly context: RunContext | null };
 
-const Sha = ({ sha }: { sha: string }) => <code title={sha}>{shortSha(sha)}</code>;
-
-function ofHead(sha: string, head: string | null, branch: string | null): ReactNode {
-  if (sha !== head) return null;
+function ofHead(branch: string | null): ReactNode {
   return branch === null ? ", HEAD" : <>, HEAD of <code>{branch}</code></>;
 }
 
@@ -19,22 +16,19 @@ function ViewFacts({ view: { head, branch, storybookUrl, setup } }: { view: Extr
   const at = (
     <>
       <Sha sha={head} />
-      {ofHead(head, head, branch)}
+      {ofHead(branch)}
     </>
   );
   if (storybookUrl === null) return <>No built Storybook for {at}</>;
-  if (setup?.builtFrom === "before-head") return <>Built Storybook from before {at}</>;
   return (
     <>
-      Built Storybook for {at}
-      {setup?.builtFrom === "uncommitted" && ", with uncommitted changes"}
+      Built Storybook {setup?.builtBeforeHead === true ? "from before" : "for"} {at}
+      {(setup?.uncommitted.length ?? 0) > 0 && ", with uncommitted changes"}
     </>
   );
 }
 
-function Against({ run, branchGoldens, context }: Omit<Extract<PageFacts, { kind: "diff" }>, "kind">) {
-  const sha = branchGoldens ?? run.baselineSha;
-  if (sha === null) return <>, with no goldens to compare with</>;
+function Against({ sha, branchGoldens, context }: { sha: string; branchGoldens: string | null; context: RunContext | null }) {
   const relation =
     branchGoldens !== null ? (
       "the nearest goldens on its branch"
@@ -56,13 +50,13 @@ function Against({ run, branchGoldens, context }: Omit<Extract<PageFacts, { kind
 export function PageFactsLine({ facts }: { facts: PageFacts }) {
   if (facts.kind === "view") return <ViewFacts view={facts.view} />;
   const { run, branchGoldens, context } = facts;
-  const hasGoldens = (branchGoldens ?? run.baselineSha) !== null;
+  const against = branchGoldens ?? run.baselineSha;
   return (
     <>
-      {hasGoldens ? "Built Storybook diff between" : "Built Storybook for"} <Sha sha={run.gitSha} />
-      {context !== null && ofHead(run.gitSha, context.head, context.branch)}
+      {against === null ? "Built Storybook for" : "Built Storybook diff between"} <Sha sha={run.gitSha} />
+      {context?.head === run.gitSha && ofHead(context.branch)}
       {run.dirty && ", with uncommitted changes"}
-      <Against {...facts} />
+      {against === null ? ", with no goldens to compare with" : <Against sha={against} branchGoldens={branchGoldens} context={context} />}
     </>
   );
 }

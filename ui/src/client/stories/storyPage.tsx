@@ -17,7 +17,7 @@ export function StoryPage({ row, others = [], view, notes = [] }: StoryPageArgs)
   const state = stateOf(shown);
   return (
     <RunFrame view={shown} state={state} story={row.story}>
-      {(treeOrder) => <DetailScreen state={state} view={shown} story={row.story} search="" feedback={feedbackOf(notes)} treeOrder={treeOrder} />}
+      {(navigation) => navigation !== null && <DetailScreen state={state} view={shown} story={row.story} search="" feedback={feedbackOf(notes)} navigation={navigation} />}
     </RunFrame>
   );
 }

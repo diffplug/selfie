@@ -1,4 +1,4 @@
-// The run: its facts, what blocks it, what to look at, and every difference, with bulk decisions.
+// The run: its facts, what blocks it, what to look at, and bulk decisions on what differs.
 import {
   Banner,
   Button,
@@ -15,7 +15,7 @@ import {
   useDetails,
 } from "@primer/react";
 import { Blankslate, ScrollableRegion } from "@primer/react/experimental";
-import { useDeferredValue, useEffect, useMemo, useState, type ComponentProps, type RefObject } from "react";
+import { useEffect, useMemo, useState, type ComponentProps, type RefObject } from "react";
 import type { AdvisoryReason, BlockerReason, DecisionKind, RunView, SnapshotRow } from "../shared/api.ts";
 import { applyFilter, decidableIn, filterQuery, hasAdvisory, NO_FILTER, parseFilter, showQuery, SHOW_OPTIONS, targetsOf, type RowFilter, type Show } from "./filter.ts";
 import { useStoryFocusKeys, useTitle, type RunState } from "./hooks.ts";
@@ -24,7 +24,7 @@ import { acceptPath, AppLink, AppLinkButton, navigate, runPath, storiesPath, sto
 import { ActionFailure, RunNotes } from "./RunNotes.tsx";
 import { StoryLinks } from "./StoryLinks.tsx";
 import { plural } from "./plural.ts";
-import { BLOCKER_WORDS, ReusedPixels, shortSha } from "./words.tsx";
+import { BLOCKER_WORDS, ReusedPixels, Sha, shortSha } from "./words.tsx";
 
 const PATTERNS_LISTED = 3;
 
@@ -42,7 +42,7 @@ function Facts({ view }: { view: RunView }) {
   return (
     <dl className="selfie-facts">
       <Fact term="Commit">
-        <code title={run.gitSha}>{shortSha(run.gitSha)}</code>
+        <Sha sha={run.gitSha} />
       </Fact>
       <Fact term="Run">
         <code>{run.id}</code>
@@ -54,11 +54,11 @@ function Facts({ view }: { view: RunView }) {
       )}
       <Fact term="Working tree">{run.dirty ? "Dirty when recorded" : "Clean when recorded"}</Fact>
       <Fact term="Baseline">
-        {run.baselineSha === null ? "None" : <code title={run.baselineSha}>{shortSha(run.baselineSha)}</code>}
+        {run.baselineSha === null ? "None" : <Sha sha={run.baselineSha} />}
       </Fact>
       {branchGoldens !== null && (
         <Fact term="Compared with">
-          <code title={branchGoldens}>{shortSha(branchGoldens)}</code>, on this branch
+          <Sha sha={branchGoldens} />, on this branch
         </Fact>
       )}
       <Fact term="Environment">
@@ -213,10 +213,6 @@ function Advisories({ view }: { view: RunView }) {
   );
 }
 
-/**
- * Its filter isn't a prop, so a keystroke re-renders only the rows it shows or hides: a click takes
- * the filter from the URL as it is by then.
- */
 interface PendingBulk {
   readonly decision: DecisionKind;
   /** Each decidable, as they were when the dialog opened, which is exactly what gets sent. */
@@ -315,9 +311,8 @@ function Differences({
     if (wantsUnchanged && unchanged === null) loadUnchanged();
   }, [wantsUnchanged, unchanged, loadUnchanged]);
 
-  const deferredFilter = useDeferredValue(filter);
-  const source = deferredFilter.show === "unchanged" ? (unchanged ?? []) : view.rows;
-  const shown = useMemo(() => applyFilter(source, deferredFilter), [source, deferredFilter]);
+  const source = filter.show === "unchanged" ? (unchanged ?? []) : view.rows;
+  const shown = useMemo(() => applyFilter(source, filter), [source, filter]);
   const allDecidable = useMemo(() => decidableIn(view.rows), [view.rows]);
   const shownDecidable = useMemo(() => decidableIn(shown), [shown]);
   const undecided = useMemo(() => applyFilter(view.rows, { ...NO_FILTER, show: "undecided" }), [view.rows]);
@@ -404,7 +399,6 @@ export function RunScreen({
   const setFilter = (next: RowFilter, replace = false) => navigate(runPath(run.id, filterQuery(next)), { replace });
   const showInList = (show: Show) => {
     setFilter({ ...NO_FILTER, show });
-    document.getElementById("differences-heading")?.scrollIntoView();
   };
 
   // Coming back from a story, the list picks up where the reviewer left it.
@@ -427,7 +421,7 @@ export function RunScreen({
     <Stack gap="normal">
       <Stack direction="horizontal" align="center" justify="space-between" wrap="wrap" gap="condensed">
         <Heading as="h2" variant="medium">
-          Run at <code title={run.gitSha}>{shortSha(run.gitSha)}</code>
+          Run at <Sha sha={run.gitSha} />
         </Heading>
         <AppLink href={storiesPath()}>Every story</AppLink>
         <AppLinkButton variant={ready ? "primary" : "default"} href={acceptPath(run.id)}>

@@ -1,8 +1,8 @@
 import { expect, test } from "vitest";
 import { findRenames } from "../src/shared/renames.ts";
 
-const added = (story: string, imageHash: string) => ({ story, state: "new", imageHash, goldenHash: null });
-const gone = (story: string, goldenHash: string) => ({ story, state: "removed", imageHash: null, goldenHash });
+const added = (story: string, imageHash: string) => ({ story, state: "new" as const, imageHash, goldenHash: null });
+const gone = (story: string, goldenHash: string) => ({ story, state: "removed" as const, imageHash: null, goldenHash });
 const renamesOf = (...rows: Parameters<typeof findRenames>[0]) => Object.fromEntries(findRenames(rows));
 
 test("a removed story and a new one with the same image are a rename", () => {
@@ -16,7 +16,7 @@ test("a different image isn't, nor is either side alone", () => {
 });
 
 test("a changed story with that image isn't", () => {
-  expect(renamesOf(gone("old--a", "x"), { story: "b", state: "changed", imageHash: "x", goldenHash: "z" })).toEqual({});
+  expect(renamesOf(gone("old--a", "x"), { story: "b", state: "changed" as const, imageHash: "x", goldenHash: "z" })).toEqual({});
 });
 
 test("is one to one, so a second copy of an image reads as new", () => {

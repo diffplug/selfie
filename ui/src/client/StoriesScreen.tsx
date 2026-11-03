@@ -1,11 +1,11 @@
 // Every story of the hosted Storybook, each with its newest render at HEAD, whichever run that was.
 // A story's page is its run's, so looking at one here and in that run's review is the same screen.
 import { Banner, Button, Heading, RelativeTime, Stack, Text } from "@primer/react";
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import type { ListedStory, StoriesView } from "../shared/api.ts";
-import { DetailScreen, StoryPager, type StoryNavigation } from "./DetailScreen.tsx";
+import { DetailScreen, StoryPager } from "./DetailScreen.tsx";
 import { FeedbackBar } from "./Feedback.tsx";
-import { neighbors, parseFilter, positionWords } from "./filter.ts";
+import { navigationThrough, parseFilter, type StoryNavigation } from "./filter.ts";
 import { useRender, useFeedback, useHotkeys, useRun, useStories, useStoryFocusKeys, useTitle, type RenderState, type FeedbackState, type RunState } from "./hooks.ts";
 import { Keys } from "./Keys.tsx";
 import { usePageFacts } from "./PageFacts.tsx";
@@ -20,7 +20,8 @@ import { LoadFailure, Loading } from "./Status.tsx";
 
 /** Every story at the left and whatever's being looked at on the right. */
 export function StoriesLayout({ view, story, search, children }: { view: StoriesView; story: string | null; search: string; children: ReactNode }) {
-  usePageFacts({ kind: "view", view });
+  const { head, branch, storybookUrl, setup } = view;
+  usePageFacts({ kind: "view", view: { head, branch, storybookUrl, setup } });
   return (
     <StoryNavLayout
       stories={view.stories}
@@ -71,15 +72,7 @@ export function StoriesOverview({ view, renders, recheck }: { view: StoriesView;
 /** Next and previous through this list, whichever runs they're from. */
 export function navigationIn(view: StoriesView, story: string, search: string): StoryNavigation {
   const ordered = inTreeOrder(view.stories);
-  const shown = matchingStories(ordered, parseFilter(search).text);
-  const { previous, next } = neighbors(ordered, shown, story);
-  const hrefOf = (entry: ListedStory | null) => (entry === null ? null : anyStoryPath(entry.story, search));
-  return {
-    previous: hrefOf(previous),
-    next: hrefOf(next),
-    list: storiesPath(search),
-    position: positionWords(shown.findIndex((entry) => entry.story === story), shown.length),
-  };
+  return navigationThrough(ordered, matchingStories(ordered, parseFilter(search).text), story, (name) => anyStoryPath(name, search), storiesPath(search));
 }
 
 /** A story's page, which is its run's, moving through every story rather than that run's. */
@@ -206,7 +199,7 @@ function OneStory({
 }) {
   // Which story someone asked to write on, whose note box opens once it's been rendered.
   const [noteOn, setNoteOn] = useState<string | null>(null);
-  const navigation = navigationIn(view, story, search);
+  const navigation = useMemo(() => navigationIn(view, story, search), [view, story, search]);
   const entry = view.stories.find((candidate) => candidate.story === story);
   if (entry === undefined) return <Banner variant="warning" title="This Storybook has no such story" description="Pick one from the list." />;
   if (entry.render === null) return <UnrenderedStory view={view} story={story} navigation={navigation} renders={renders} onWriteNote={() => setNoteOn(story)} />;
@@ -238,7 +231,7 @@ export function StoriesRoutes({ story, search }: { story: string | null; search:
       <FeedbackBar feedback={feedback} storyHref={(name) => anyStoryPath(name)} showList={story === null} />
       <RenderStatus renders={renders} />
       {story === null ? (
-        <StoriesOverview view={stories.view} renders={renders} recheck={stories.reload} />
+        <StoriesOverview view={stories.view} renders={renders} recheck={stories.recheck} />
       ) : (
         <OneStory
           view={stories.view}

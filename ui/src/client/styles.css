@@ -69,10 +69,6 @@ body {
   font-size: var(--text-body-size-small);
 }
 
-.selfie-nowrap {
-  white-space: nowrap;
-}
-
 code {
   font-family: var(--fontStack-monospace);
   font-size: 0.9em;
@@ -175,10 +171,6 @@ code {
 /* The list */
 .selfie-bulk {
   margin-left: auto;
-}
-
-.selfie-story-link {
-  overflow-wrap: anywhere;
 }
 
 .selfie-bulk-facts {

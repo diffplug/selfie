@@ -123,7 +123,7 @@ Source of truth: `ui/src/client/`.
 
 **The top bar** says what a page is looking at: on every story, the built Storybook, its commit and branch, and whether it's clean; on a run's pages, the diff, between the run's commit and what it's compared with, and how that relates to the merge base with the default branch.
 
-**A run's pages** have the same list at their left, of what differs, which is what's changed, new, removed, or failed, narrowed by what Show says, and showing what's unchanged only if that's what Show asks for. The list is where a run's stories are: there's no table of them on the right.
+**A run's pages** have the same list at their left, of what differs, which is what's changed, new, removed, or failed, narrowed by what Show says, and showing what's unchanged only if that's what Show asks for, or if it has an advisory. Next and previous go down that list, as far as it's narrowed. The list is where a run's stories are: there's no table of them on the right.
 
 - **Must say more of each story as the list is dragged wider:** its state and decision, then its pixels and advisories on a run's pages, or when it was rendered on every story.
 
@@ -132,7 +132,7 @@ Source of truth: `ui/src/client/`.
 **The run** shows, in order: its commit, run ID, whether its pixels were rendered earlier and by which run, dirty state, baseline, environment, and decision actor; a warning if it was recorded dirty, has no baseline, is shown against branch goldens (`docs/specs/cli.md` → Review), or its SHA can't be a baseline; the counts; blockers; advisories; and the differences.
 
 - **Must group blockers by reason, in words, and offer each as a filter of the list.**
-- **Must keep the filter, text and state, in the URL, and nowhere else**, so back, reload, and next and previous all follow it. A row's link takes the filter from the URL on a click, so a keystroke re-renders only the rows it shows or hides, and a link opened in a new tab has no filter.
+- **Must keep the filter, text and state, in the URL, and nowhere else**, so back, reload, and next and previous all follow it.
 - **Must list unchanged stories only when asked**, by the `unchanged` filter, which is when they're fetched.
 
 **Bulk decisions:** approve or reject all, or all the current filter shows.
@@ -165,7 +165,7 @@ Source of truth: `ui/src/client/`.
 **Every story** is the hosted Storybook's stories, nested and ordered as its own sidebar does them, and each with its newest render from the finished runs at HEAD in the project's environment, so several partial runs read as one (rationale). A story's page is that render's run's, as it would be from that run's own review.
 
 - **Must say where this commit stands, in order:** the commit and branch; the built Storybook, how many stories it has, and whether it's from a clean checkout; and how many stories have a render (rationale). What's missing says what to do, the page moves on by itself as it's done, and with no renders it offers to render the first story, or all of them, opening that story's page after the first.
-- **Must call a built Storybook clean only if nothing is uncommitted and it was built since HEAD last moved**, which is the most Selfie can know of a built Storybook it may not have made (rationale). Otherwise it says which, and may still render.
+- **Must call a built Storybook clean only if nothing is uncommitted and it was built since HEAD last moved**, which is the most Selfie can know of a built Storybook it may not have made (rationale). Otherwise it says which, or both, and may still render.
 - **Must say, before rendering from uncommitted changes, what they are, that a render is marked so and can't become a golden, and when the built Storybook itself is one of those files.**
 - **Must keep the list beside `/` and each `/stories/:story`, on the left, as Storybook's sidebar is** (rationale), with what `/` says, or that story, on the right. A filter stays in the query from page to page, and may be cleared in one click.
 - **Must nest by a story's title, keep the built Storybook's order, and use its names**: a top-level section, then a component, then each story, with Storybook's own icons and colors, so a person finds what they know from it (rationale). Only the sections start open. Moving to a story opens the way to it, and a filter opens everything.
@@ -232,7 +232,7 @@ Source of truth: `ui/src/client/*.stories.tsx`, `ui/src/client/stories/`.
 
 ## Scale
 
-- **Must not read a blob to show a list.** Row data comes from `compareRun` and `review.json`, and thumbnails use `loading="lazy"` (rationale).
+- **Must not read a blob to show a list.** Row data comes from `compareRun` and `review.json` (rationale).
 - **Must not read the unchanged stories until asked**, or ask Git why a run has no baseline until a screen shows it.
 - **Must not virtualize the list, or put `content-visibility` on its rows** (rationale).
 
@@ -246,7 +246,7 @@ Source of truth: `ui/src/client/*.stories.tsx`, `ui/src/client/stories/`.
    - no D1 lookup per image, since a content address needs none before reading R2
    - diff stats and diff PNGs stored at review time, not computed in a request, which also moves image decoding and diffing out of a Worker's request
    - answering a decision from the comparison and what the page already knows, and a version check or ETag on focus reads
-4. **Serve less to a browser.** Thumbnails of about 2 KB stored at render, rather than a full PNG for a list row, and each theme's CSS loaded only when used, since the CSS is 370 KB here.
+4. **Serve less to a browser.** Each theme's CSS loaded only when used, since the CSS is 370 KB here.
 
 Also its own guard in place of `loopbackHosts`, keeping `sameOriginWrites` and `pageHeaders` (`docs/specs/access.md` → Who can do what), and a way to serve `ui/dist/` from a Worker.
 

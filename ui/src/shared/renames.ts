@@ -1,12 +1,9 @@
+import type { ComparedSnapshot } from "./api.ts";
+
 // A story that's gone and a new one with the very same image read as one story renamed. Only for
 // saying so: to the store they're still one removed and one new, which accepting treats as ever.
 
-interface ComparedRow {
-  readonly story: string;
-  readonly state: string;
-  readonly imageHash: string | null;
-  readonly goldenHash: string | null;
-}
+type ComparedRow = Pick<ComparedSnapshot, "story" | "state" | "imageHash" | "goldenHash">;
 
 const wordsOf = (story: string) => new Set(story.split(/-+/));
 

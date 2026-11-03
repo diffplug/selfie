@@ -2,23 +2,28 @@
 import { useMemo, type ReactNode } from "react";
 import type { RunContext, RunView, SnapshotRow } from "../shared/api.ts";
 import { findRenames } from "../shared/renames.ts";
-import { applyFilter, NO_FILTER, parseFilter } from "./filter.ts";
+import { applyFilter, navigationThrough, NO_FILTER, parseFilter } from "./filter.ts";
 import { usePageFacts } from "./PageFacts.tsx";
-import { storyPath } from "./router.tsx";
-import { StoryNavLayout } from "./StoryNav.tsx";
+import { runPath, storyPath } from "./router.tsx";
+import { matchingStories, StoryNavLayout } from "./StoryNav.tsx";
 import { differingStories, inTreeOrder } from "./storyTree.ts";
 import { AdvisoryLabels, describePixels } from "./words.tsx";
 
-/** The tree shows what the page's Show says, and its own search does the text. */
-export function useRunTree(view: RunView | null, unchanged: readonly SnapshotRow[] | null, search: string) {
+/** The tree shows what the page's Show says, and its own search does the text. Next and previous go through just that. */
+export function useRunTree(view: RunView | null, unchanged: readonly SnapshotRow[] | null, search: string, story: string | null) {
   const rows = view?.rows;
   const renames = useMemo(() => findRenames(rows ?? []), [rows]);
-  const { show } = parseFilter(search);
-  const shownRows = useMemo(() => applyFilter(show === "unchanged" ? (unchanged ?? []) : (rows ?? []), { ...NO_FILTER, show }), [show, unchanged, rows]);
-  const stories = useMemo(() => (view === null ? [] : differingStories({ ...view, rows: shownRows }, renames, show === "unchanged")), [view, shownRows, renames, show]);
-  const treeOrder = useMemo(() => inTreeOrder(stories).map(({ story }) => story), [stories]);
-  const rowOf = useMemo(() => new Map(shownRows.map((row) => [row.story, row])), [shownRows]);
-  return { renames, stories, treeOrder, rowOf };
+  const { show, text } = parseFilter(search);
+  const source = show === "unchanged" ? (unchanged ?? []) : (rows ?? []);
+  const shownRows = useMemo(() => applyFilter(source, { ...NO_FILTER, show }), [source, show]);
+  const stories = useMemo(() => (view === null ? [] : differingStories({ ...view, rows: shownRows }, renames)), [view, shownRows, renames]);
+  const rowOf = useMemo(() => new Map(source.map((row) => [row.story, row])), [source]);
+  const navigation = useMemo(() => {
+    if (view === null || story === null) return null;
+    const all = inTreeOrder(differingStories({ ...view, rows: source }, renames));
+    return navigationThrough(all, matchingStories(inTreeOrder(stories), text), story, (name) => storyPath(view.run.id, name, search), runPath(view.run.id, search));
+  }, [view, source, renames, stories, text, story, search]);
+  return { renames, stories, rowOf, navigation };
 }
 
 export function RunLayout({

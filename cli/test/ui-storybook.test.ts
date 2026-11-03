@@ -240,7 +240,7 @@ describe("the hosted Storybook", () => {
 
     test("says where a first render stands", async () => {
       const setup = async () => (await live()).setup;
-      expect(await setup()).toEqual({ storybookDir: expect.any(String), buildCommand: null, uncommitted: [], builtFrom: null, usesDocker: true });
+      expect(await setup()).toEqual({ storybookDir: expect.any(String), buildCommand: null, uncommitted: [], builtBeforeHead: false, usesDocker: true });
       expect((await live()).branch).toBe("main");
       await writeFile(path.join(h.repo, "selfie.config.json"), JSON.stringify({ buildCommand: "make stories" }));
       expect(await setup()).toMatchObject({ buildCommand: "make stories", uncommitted: ["selfie.config.json"] });
@@ -248,14 +248,14 @@ describe("the hosted Storybook", () => {
 
     test("says a build is clean only with nothing uncommitted, and built since HEAD moved here", async () => {
       await withStories("a");
-      const builtFrom = async () => (await live()).setup?.builtFrom;
-      expect(await builtFrom()).toBe("clean");
+      const setup = async () => (await live()).setup;
+      expect(await setup()).toMatchObject({ builtBeforeHead: false, uncommitted: [] });
       await writeFile(path.join(h.repo, "changed.txt"), "not committed");
-      expect(await builtFrom()).toBe("uncommitted");
+      expect((await setup())?.uncommitted).toEqual(["changed.txt"]);
       await rm(path.join(h.repo, "changed.txt"));
       const longAgo = new Date("2020-01-01");
       await utimes(path.join(dir, "iframe.html"), longAgo, longAgo);
-      expect(await builtFrom()).toBe("before-head");
+      expect(await setup()).toMatchObject({ builtBeforeHead: true });
     });
 
     test("can't render with no commit to keep it with, nor say more than a server that hosts nothing knows", async () => {

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import type { ListedStory } from "../src/shared/api.ts";
+import { navigationThrough } from "../src/client/filter.ts";
 import { buildStoryTree, differingStories, inTreeOrder, initiallyClosed, nameFromId, isSection, openedAround, storiesIn, visibleRows, type StoryFolder } from "../src/client/storyTree.ts";
 
 const story = (title: string, name: string): ListedStory => ({ story: `${title}--${name}`.toLowerCase(), title, name, render: null });
@@ -59,10 +60,6 @@ describe("a run's differences", () => {
   const run = { id: "r", startedAt: 1 } as never;
   const stories = (rows: never[], storyNames: never[] = [], renames: ReadonlyMap<string, string> = new Map()) => differingStories({ run, rows, storyNames }, renames).map(({ story }) => story);
 
-  test("leave out what's unchanged, as one with only a play error is", () => {
-    expect(stories([row("a", "changed"), row("b", "unchanged"), row("c", "new"), row("d", "removed"), row("e", "failed")])).toEqual(["a", "c", "d", "e"]);
-  });
-
   test("are in the Storybook's order, then by ID where it doesn't say", () => {
     const named = [{ story: "z", title: "Z", name: "Z" }, { story: "m", title: "M", name: "M" }] as never[];
     expect(stories([row("a", "changed"), row("m", "changed"), row("z", "changed")], named)).toEqual(["z", "m", "a"]);
@@ -77,4 +74,17 @@ describe("a run's differences", () => {
 test("reads from the top of the tree, where a later story joins the folder an earlier one made", () => {
   const stories = [story("B", "One"), story("A", "Two"), story("B", "Three")];
   expect(inTreeOrder(stories).map(({ name }) => name)).toEqual(["One", "Three", "Two"]);
+});
+
+describe("next and previous", () => {
+  const rows = ["a", "b", "c", "d"].map((story) => ({ story }));
+  const through = (shown: typeof rows, story: string) => navigationThrough(rows, shown, story, (name) => `/${name}`, "/");
+
+  test("go through what's shown", () => {
+    expect(through(rows, "b")).toMatchObject({ previous: "/a", next: "/c", nextStory: "c", position: "2 of 4" });
+  });
+
+  test("still have neighbors for a story a decision just took out of the filter", () => {
+    expect(through([rows[0]!, rows[2]!], "b")).toMatchObject({ previous: "/a", next: "/c" });
+  });
 });

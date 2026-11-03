@@ -202,8 +202,8 @@ export interface StorySetup {
   readonly buildCommand: string | null;
   /** What differs from HEAD now, as Git names it, which a render now would be marked with. */
   readonly uncommitted: readonly string[];
-  /** What the hosted built Storybook reads as: nothing uncommitted and built since HEAD last moved, or which of those it isn't. Null with no built Storybook or commit. */
-  readonly builtFrom: "clean" | "uncommitted" | "before-head" | null;
+  /** The hosted built Storybook is older than HEAD's last move, so it can't be of this commit. */
+  readonly builtBeforeHead: boolean;
   /** Renders in the pinned container, and not in this machine's browser. */
   readonly usesDocker: boolean;
 }

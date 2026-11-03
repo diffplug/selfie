@@ -11,9 +11,9 @@ export function stepped(focused: number | null, count: number, by: 1 | -1): numb
   return (focused + by + count) % count;
 }
 
-export function toggled(selected: ReadonlySet<number>, index: number): ReadonlySet<number> {
+export function toggled<T>(selected: ReadonlySet<T>, item: T): ReadonlySet<T> {
   const next = new Set(selected);
-  if (!next.delete(index)) next.add(index);
+  if (!next.delete(item)) next.add(item);
   return next;
 }
 

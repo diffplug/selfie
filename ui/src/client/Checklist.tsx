@@ -6,7 +6,7 @@ import type { ListedStory, StoriesView, StorySetup } from "../shared/api.ts";
 import type { RenderState } from "./hooks.ts";
 import { plural } from "./plural.ts";
 import { anyStoryPath, AppLink, navigate, runPath } from "./router.tsx";
-import { shortSha } from "./words.tsx";
+import { Sha, shortSha } from "./words.tsx";
 
 const RECHECK_MS = 2000;
 const UNCOMMITTED_NAMED = 3;
@@ -110,24 +110,20 @@ function StorybookItem({ view, setup }: { view: StoriesView; setup: StorySetup |
       </Item>
     );
   }
-  if (setup?.builtFrom === "clean") return <Item mark="done" title={`Built Storybook on a clean checkout with ${count}`} />;
-  if (setup?.builtFrom === "uncommitted" && view.head !== null) {
-    return (
-      <Item mark="warn" title={`Built Storybook on a checkout with uncommitted changes, with ${count}`}>
-        <Uncommitted head={view.head} setup={setup} />
-      </Item>
-    );
-  }
-  if (setup?.builtFrom === "before-head") {
-    return (
-      <Item mark="warn" title={`Built Storybook from before this commit, with ${count}`}>
+  if (setup === null || view.head === null) return <Item mark="done" title={`Built Storybook with ${count}`} />;
+  const { builtBeforeHead, uncommitted } = setup;
+  if (!builtBeforeHead && uncommitted.length === 0) return <Item mark="done" title={`Built Storybook on a clean checkout with ${count}`} />;
+  const whatsOff = [builtBeforeHead && "from before this commit", uncommitted.length > 0 && "on a checkout with uncommitted changes"].filter(Boolean).join(", ");
+  return (
+    <Item mark="warn" title={`Built Storybook ${whatsOff}, with ${count}`}>
+      {builtBeforeHead && (
         <Text as="p">
-          Build it again with <code>{setup.buildCommand ?? DEFAULT_BUILD}</code>, and {MOVES_ON}. A render now would show the older built Storybook.
+          Build it again with <code>{setup.buildCommand ?? DEFAULT_BUILD}</code>, and {MOVES_ON}. A render now would show the older build.
         </Text>
-      </Item>
-    );
-  }
-  return <Item mark="done" title={`Built Storybook with ${count}`} />;
+      )}
+      {uncommitted.length > 0 && <Uncommitted head={view.head} setup={setup} />}
+    </Item>
+  );
 }
 
 /** Whether a render is missing or known to be out of date, which is what's left to fan out to. */
@@ -139,12 +135,11 @@ function RendersItem({ view, setup, renders }: { view: StoriesView; setup: Story
   const rendered = view.stories.filter((entry) => entry.render !== null).length;
   const rest = view.stories.filter(needsRender);
   const first = view.stories[0];
-  const stale = rest.length - (view.stories.length - rendered);
+  const stale = view.stories.filter(({ render }) => render?.fromHostedStorybook === false).length;
   if (first === undefined || view.head === null) return <Item mark="later" title="No renders yet" />;
   const renderFirst = async () => {
     if (await renders.render([first.story])) navigate(anyStoryPath(first.story));
   };
-  const toReview = view.newestRunId !== null && <AppLink href={runPath(view.newestRunId)}>Review the newest run</AppLink>;
   if (rendered === 0) {
     return (
       <Item mark="todo" title="No renders yet">
@@ -157,7 +152,7 @@ function RendersItem({ view, setup, renders }: { view: StoriesView; setup: Story
             <Button variant="primary" disabled={renders.rendering > 0} onClick={() => void renderFirst()}>
               Render {fullName(first)}
             </Button>
-            <Button disabled={renders.rendering > 0} onClick={() => void renders.render(view.stories.map(({ story }) => story))}>
+            <Button disabled={renders.rendering > 0} onClick={() => void renders.render(rest.map(({ story }) => story))}>
               Render all {view.stories.length.toLocaleString()}
             </Button>
             <Text className="selfie-muted">Or pick a story, and look at it running first.</Text>
@@ -181,7 +176,7 @@ function RendersItem({ view, setup, renders }: { view: StoriesView; setup: Story
             {`Render the rest (${rest.length.toLocaleString()})`}
           </Button>
         )}
-        {toReview}
+        {view.newestRunId !== null && <AppLink href={runPath(view.newestRunId)}>Review the newest run</AppLink>}
       </Stack>
     </Item>
   );
@@ -190,7 +185,7 @@ function RendersItem({ view, setup, renders }: { view: StoriesView; setup: Story
 export function Checklist({ view, renders, recheck }: { view: StoriesView; renders: RenderState; recheck: () => void }) {
   const { head, branch, setup } = view;
   // What's next, or a fix to what it warns of, happens in a terminal or an editor.
-  const waiting = setup !== null && (head === null || view.storybookUrl === null || view.stories.length === 0 || setup.builtFrom !== "clean");
+  const waiting = setup !== null && (head === null || view.storybookUrl === null || view.stories.length === 0 || setup.builtBeforeHead || setup.uncommitted.length > 0);
   useEffect(() => {
     if (!waiting) return;
     const timer = setInterval(recheck, RECHECK_MS);
@@ -207,7 +202,7 @@ export function Checklist({ view, renders, recheck }: { view: StoriesView; rende
           mark="done"
           title={
             <>
-              At commit <code title={head}>{shortSha(head)}</code>
+              At commit <Sha sha={head} />
               {branch !== null && <> on branch <code>{branch}</code></>}
             </>
           }

@@ -55,7 +55,7 @@ function BetweenStories() {
         Go to the other story
       </button>
       <RunFrame view={view} state={stateOf(view)} story={story}>
-        {(treeOrder) => <DetailScreen state={stateOf(view)} view={view} story={story} search="" feedback={feedbackOf()} treeOrder={treeOrder} />}
+        {(navigation) => navigation !== null && <DetailScreen state={stateOf(view)} view={view} story={story} search="" feedback={feedbackOf()} navigation={navigation} />}
       </RunFrame>
     </>
   );

@@ -17,7 +17,7 @@ export interface StoryLeaf {
 
 export type StoryTreeNode = StoryFolder | StoryLeaf;
 
-/** A row to draw: how deep it is, and whether something's holding it closed. */
+/** A row to draw, and how deep it is. */
 export type StoryTreeRow = StoryTreeNode & { readonly depth: number };
 
 /** Keeps the Storybook's order, where a folder comes where its first story does. */
@@ -57,7 +57,7 @@ export function visibleRows(nodes: readonly StoryTreeNode[], closed: ReadonlySet
 }
 
 /** Every story inside a folder, however deep. */
-export const storiesIn = ({ children }: StoryFolder): readonly ListedStory[] =>
+export const storiesIn = ({ children }: Pick<StoryFolder, "children">): readonly ListedStory[] =>
   children.flatMap((child) => (child.kind === "story" ? [child.entry] : storiesIn(child)));
 
 /** Whether a folder only groups other folders, as a sidebar's top-level sections do. */
@@ -87,11 +87,10 @@ export function nameFromId(story: string): { readonly title: string; readonly na
   return name === "" ? { title: "", name: words(path) } : { title: words(path), name: words(name) };
 }
 
-/** A run's differences as a tree's list, in its Storybook's order, with a renamed story there once, under its new name. */
+/** A run's rows as a tree's list, in its Storybook's order, with a renamed story there once, under its new name. */
 export function differingStories(
   { run, rows, storyNames }: Pick<RunView, "run" | "rows" | "storyNames">,
   renames: ReadonlyMap<string, string>,
-  keepUnchanged = false,
 ): readonly ListedStory[] {
   // Only if the name it went to is here to say so.
   const hidden = new Set(rows.flatMap(({ story }) => renames.get(story) ?? []));
@@ -99,7 +98,7 @@ export function differingStories(
   const names = new Map(storyNames.map(({ story, title, name }) => [story, { title, name }]));
   const at = (story: string) => order.get(story) ?? order.size;
   return rows
-    .filter(({ state, story }) => (keepUnchanged || state !== "unchanged") && !hidden.has(story))
+    .filter(({ story }) => !hidden.has(story))
     .sort((a, b) => at(a.story) - at(b.story) || a.story.localeCompare(b.story))
     .map(({ story, state, decision }) => ({
       story,
@@ -110,6 +109,5 @@ export function differingStories(
 
 /** Stories in the order a tree of them reads from the top, which is the order next and previous must go in. */
 export function inTreeOrder(stories: readonly ListedStory[]): readonly ListedStory[] {
-  const walk = (nodes: readonly StoryTreeNode[]): ListedStory[] => nodes.flatMap((node) => (node.kind === "story" ? [node.entry] : walk(node.children)));
-  return walk(buildStoryTree(stories));
+  return storiesIn({ children: buildStoryTree(stories) });
 }
