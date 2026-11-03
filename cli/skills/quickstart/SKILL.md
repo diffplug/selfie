@@ -67,7 +67,7 @@ Check each of these, and warn about what applies:
 - **The build isn't ignored:** `git check-ignore <storybookDir>`. If it isn't, the build itself makes every render uncommitted. Say to add it to `.gitignore`.
 - **Not on the default branch:** only goldens on the default branch's history become a baseline for others. `selfie find-baseline` says what this branch would compare with. Say so if a person making their first goldens here should switch branch.
 - **A shallow clone:** `git rev-parse --is-shallow-repository`. Finding a baseline may stop early.
-- **A big Storybook:** give a rough time for rendering every story, from how long `selfie flakes` took per render of the one story and how many stories there are. Stories render several at once, and the first render's download doesn't count, so call it an estimate.
+- **A big Storybook:** say how many stories there are, and that rendering them all takes a while. Don't guess how long from one story.
 
 ## 5. Hand it over
 
