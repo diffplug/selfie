@@ -105,6 +105,12 @@ export function findBaseline(project: Project, environment: string): Promise<Bas
   return walkToBaseline(project.repo, (shas) => project.snapshots.firstWithGoldens(shas, environment));
 }
 
+/** A run's comparison with every story in it, against what its screens show it against. */
+export async function compareAsShown(project: Project, run: Run, against?: string | null): Promise<Comparison> {
+  const sha = against !== undefined ? against : ((await branchGoldens(project, run)) ?? run.baselineSha);
+  return project.snapshots.compareRun(run.id, sha, { includeUnchanged: true });
+}
+
 /** A run compared with the baseline its reviewer saw. */
 export async function compareAsReviewed(
   project: Project,

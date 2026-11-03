@@ -161,6 +161,37 @@ export interface RunView {
   readonly siblings: readonly RunListing[];
 }
 
+/** A story's newest image at HEAD, from whichever run took it. */
+export interface StoryCaptureInfo {
+  readonly runId: string;
+  readonly state: SnapshotRow["state"];
+  readonly decision: SnapshotRow["decision"];
+  readonly capturedAt: number;
+  /** Recorded with uncommitted changes, so it can't become a golden. */
+  readonly dirty: boolean;
+  /** Whether the hosted build rendered it, or null if that's not known. If not, it may be out of date. */
+  readonly fromHostedBuild: boolean | null;
+}
+
+export interface ListedStory {
+  readonly story: string;
+  /** Null if no run at HEAD has captured it. */
+  readonly capture: StoryCaptureInfo | null;
+}
+
+/** Every story of the hosted Storybook, each with its newest capture, which a single run is a special case of. */
+export interface StoriesView {
+  readonly head: string | null;
+  /** The hosted Storybook as it stands, or null if there's no build there. */
+  readonly storybookUrl: string | null;
+  /** The size a story renders at here now. */
+  readonly viewport: { readonly width: number; readonly height: number };
+  /** In ID order. */
+  readonly stories: readonly ListedStory[];
+  /** The newest finished run at HEAD, to review and accept. */
+  readonly newestRunId: string | null;
+}
+
 /** Which run the UI opens to: the newest finished one at HEAD, in the project's environment. */
 export interface CurrentView {
   readonly head: string | null;
@@ -237,6 +268,7 @@ export type SendVia = "agent" | "copy";
  */
 export interface ReviewSource {
   current(): Promise<CurrentView>;
+  storiesView(): Promise<StoriesView>;
   runView(runId: string): Promise<RunView>;
   /** Why the run has no baseline: only a screen showing that asks. */
   baseline(runId: string): Promise<BaselineNote>;

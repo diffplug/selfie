@@ -958,6 +958,103 @@ describe("the hosted Storybook", () => {
     });
   });
 
+  describe("every story, as the newest capture of each", () => {
+    const live = () => localReviewSource(project, { storybook: { dir, url: hostedAt } }).storiesView();
+    const withStories = async (...ids: string[]) => {
+      await built();
+      await writeFile(path.join(dir, "index.json"), JSON.stringify({ entries: Object.fromEntries(ids.map((id) => [id, { type: "story", id, title: "T", name: id }])) }));
+    };
+    const recorded = async (...flags: string[]) => (await h.cli("record", "--storybook-dir", dir, ...flags)).json.runId as string;
+    const capturesOf = async () => Object.fromEntries((await live()).stories.map(({ story, capture }) => [story, capture]));
+
+    beforeEach(() => {
+      h.stories = [{ id: "a" }, { id: "b" }, { id: "c" }];
+    });
+
+    test("lists what no run has captured, with nothing to say of it", async () => {
+      await withStories("a", "b");
+      const view = await live();
+      expect(view.stories).toEqual([
+        { story: "a", capture: null },
+        { story: "b", capture: null },
+      ]);
+      expect(view.newestRunId).toBeNull();
+      expect(view.storybookUrl).toBe(hostedAt);
+      expect(view.viewport).toEqual({ width: 1200, height: 900 });
+    });
+
+    test("merges partial runs, each story from the newest that has it, and never reads a left-out story as removed", async () => {
+      await withStories("a", "b", "c");
+      const whole = await recorded();
+      const partial = await recorded("--story", "b");
+      const captures = await capturesOf();
+      expect(captures.a).toMatchObject({ runId: whole, state: "new" });
+      expect(captures.b).toMatchObject({ runId: partial, state: "new", fromHostedBuild: true, dirty: false });
+      expect(captures.c).toMatchObject({ runId: whole });
+      expect((await live()).newestRunId).toBe(partial);
+    });
+
+    test("leaves a story out if the build no longer has it, and lists a new one as not captured", async () => {
+      await withStories("a", "b");
+      await recorded();
+      await withStories("a", "d");
+      const captures = await capturesOf();
+      expect(Object.keys(captures)).toEqual(["a", "d"]);
+      expect(captures.d).toBeNull();
+    });
+
+    test("keeps looking through older runs for a story, even with one captured that's gone from the build", async () => {
+      await withStories("a", "b", "c");
+      const whole = await recorded();
+      h.stories = [{ id: "gone" }, { id: "a" }];
+      const newer = await recorded();
+      await withStories("a", "b", "c");
+      const captures = await capturesOf();
+      expect(captures.a).toMatchObject({ runId: newer });
+      expect(captures.b).toMatchObject({ runId: whole });
+      expect(captures.c).toMatchObject({ runId: whole });
+    });
+
+    test("doesn't say a capture without a recorded build came from another", async () => {
+      h.stories = [{ id: "a" }];
+      await review();
+      await withStories("a");
+      expect((await capturesOf()).a).toMatchObject({ fromHostedBuild: null });
+    });
+
+    test("says when a capture came from another build, or uncommitted changes", async () => {
+      await withStories("a");
+      await recorded();
+      await writeFile(path.join(dir, "assets", "story.js"), "export const changed = true;");
+      expect((await capturesOf()).a).toMatchObject({ fromHostedBuild: false, dirty: false });
+      await writeFile(path.join(h.repo, "file.txt"), "uncommitted\n");
+      await recorded();
+      expect((await capturesOf()).a).toMatchObject({ fromHostedBuild: true, dirty: true });
+    });
+
+    test("carries a decision on the image, which can go with it into a clean run", async () => {
+      await withStories("a");
+      const runId = await recorded();
+      expect((await capturesOf()).a).toMatchObject({ decision: null });
+      await h.cli("approve", runId, "--all");
+      expect((await capturesOf()).a).toMatchObject({ decision: { decision: "approved" } });
+    });
+
+    test("with no build, lists what's been captured, and says there's no build", async () => {
+      h.stories = [{ id: "a" }];
+      await review();
+      const view = await live();
+      expect(view.storybookUrl).toBeNull();
+      expect(view.stories.map(({ story }) => story)).toEqual(["a"]);
+    });
+
+    test("answers at /api/stories", async () => {
+      const response = await get("/api/stories");
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({ stories: [] });
+    });
+  });
+
   describe("what a run links to", () => {
     const hosted = () => localReviewSource(project, { storybook: { dir, url: hostedAt } });
     const reviewedBuild = async (...flags: string[]) => (await h.cli("review", "--storybook-dir", dir, ...flags)).json.runId as string;

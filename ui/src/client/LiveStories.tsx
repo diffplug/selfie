@@ -8,7 +8,15 @@ import { LAYER_WORDS } from "./ImageCompare.tsx";
 import { Keys } from "./Keys.tsx";
 
 const storyPageUrl = (build: string, story: string) => `${build}?path=/story/${encodeURIComponent(story)}`;
-const storyFrameUrl = (build: string, story: string) => `${build}iframe.html?id=${encodeURIComponent(story)}&viewMode=story`;
+export const storyFrameUrl = (build: string, story: string) => `${build}iframe.html?id=${encodeURIComponent(story)}&viewMode=story`;
+
+export function OpenInStorybook({ url, story }: { url: string; story: string }) {
+  return (
+    <Link href={storyPageUrl(url, story)} target="_blank" rel="noreferrer noopener">
+      Open in Storybook <LinkExternalIcon />
+    </Link>
+  );
+}
 
 /** The page, on the Storybook's own origin, saying if it may not be what rendered this image. */
 export function StorybookLinkTo({ row, view }: { row: SnapshotRow; view: RunView }) {
@@ -16,9 +24,7 @@ export function StorybookLinkTo({ row, view }: { row: SnapshotRow; view: RunView
   if (storybook === null || row.state === "removed") return null;
   return (
     <>
-      <Link href={storyPageUrl(storybook.url, row.story)} target="_blank" rel="noreferrer noopener">
-        Open in Storybook <LinkExternalIcon />
-      </Link>
+      <OpenInStorybook url={storybook.url} story={row.story} />
       {!storybook.exactBuild && <Text className="selfie-muted">This run&apos;s own build wasn&apos;t kept, so it&apos;s the latest, which may not match.</Text>}
     </>
   );
@@ -28,7 +34,7 @@ export function StorybookLinkTo({ row, view }: { row: SnapshotRow; view: RunView
 const UNKNOWN_SIZE_HEIGHT = 600;
 
 /** Lays a story out at the size it was captured at, and scales it to fit, as an image is. */
-function StoryFrame({ title, url, viewport }: { title: string; url: string; viewport: RunView["viewport"] }) {
+export function StoryFrame({ title, url, viewport }: { title: string; url: string; viewport: RunView["viewport"] }) {
   const box = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
   useLayoutEffect(() => {

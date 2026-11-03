@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { AcceptRefusal, DecisionKind, DecisionTarget, FeedbackView, NewNote, RunView, SendVia, SnapshotRow } from "../shared/api.ts";
-import { deleteNote, fetchFeedback, fetchRun, fetchUnchanged, postAccept, postAnswer, postDecision, postNote, postResolve, postSendNotes, RequestError } from "./api.ts";
+import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
+import type { AcceptRefusal, DecisionKind, DecisionTarget, FeedbackView, StoriesView, NewNote, RunView, SendVia, SnapshotRow } from "../shared/api.ts";
+import { deleteNote, fetchFeedback, fetchStories, fetchRun, fetchUnchanged, postAccept, postAnswer, postDecision, postNote, postResolve, postSendNotes, RequestError } from "./api.ts";
 import { reuseRows } from "./filter.ts";
 import { toggled } from "./selection.ts";
 
@@ -244,6 +244,62 @@ export function useFetched<T>(key: string | null, load: (signal: AbortSignal) =>
     // `load` is a function of `key`.
   }, [key]);
   return state.key === key ? state : { data: null, error: null };
+}
+
+/**
+ * Every story of the hosted Storybook, as the server last described them. Read again whenever the
+ * page regains focus, or something new is recorded, since an agent records from outside this page.
+ */
+export function useStories(latestRunId: string | null | undefined): { readonly view: StoriesView | null; readonly error: RequestError | null; readonly reload: () => void } {
+  const [view, setView] = useState<StoriesView | null>(null);
+  const [error, setError] = useState<RequestError | null>(null);
+  const reading = useRef<AbortController | null>(null);
+  const reload = useCallback(() => {
+    reading.current?.abort();
+    const controller = new AbortController();
+    reading.current = controller;
+    fetchStories(controller.signal).then(
+      (next) => {
+        // Most reads find nothing new, and that shouldn't redraw a list someone is reading.
+        setView((previous) => (JSON.stringify(previous) === JSON.stringify(next) ? previous : next));
+        setError(null);
+      },
+      (failed: unknown) => {
+        if (!controller.signal.aborted) setError(asRequestError(failed));
+      },
+    );
+  }, []);
+  useEffect(() => {
+    reload();
+    window.addEventListener("focus", reload);
+    return () => {
+      window.removeEventListener("focus", reload);
+      reading.current?.abort();
+    };
+  }, [reload]);
+  // Not on first learning it, which says nothing has been recorded since this page read.
+  const lastRun = useRef(latestRunId);
+  useEffect(() => {
+    const known = lastRun.current;
+    lastRun.current = latestRunId;
+    if (known !== undefined && known !== latestRunId) reload();
+  }, [latestRunId, reload]);
+  return { view, error, reload };
+}
+
+/** A list of stories' keys: next and previous move focus through its links, and / goes to its search. */
+export function useStoryListKeys(search: RefObject<HTMLInputElement | null>): void {
+  const moveFocus = (delta: number) => {
+    const links = [...document.querySelectorAll<HTMLElement>("[data-story]")];
+    if (links.length === 0) return;
+    const at = links.indexOf(document.activeElement as HTMLElement);
+    links[at === -1 ? 0 : Math.max(0, Math.min(links.length - 1, at + delta))]?.focus();
+  };
+  useHotkeys({
+    j: () => moveFocus(1),
+    k: () => moveFocus(-1),
+    "/": () => search.current?.focus(),
+  });
 }
 
 /** Device pixels per CSS pixel, which changes with browser zoom or on moving to another display. */

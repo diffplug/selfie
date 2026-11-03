@@ -5,7 +5,8 @@ import { AcceptScreen } from "./AcceptScreen.tsx";
 import { DetailScreen } from "./DetailScreen.tsx";
 import { FeedbackBar, NewerRunBanner } from "./Feedback.tsx";
 import { useFeedback, useFetched, useRun, useTitle } from "./hooks.ts";
-import { AppLink, navigate, parseRoute, runPath, useLocation, type Route } from "./router.tsx";
+import { StoriesRoutes } from "./StoriesScreen.tsx";
+import { AppLink, navigate, parseRoute, runPath, storyPath, useLocation, type Route } from "./router.tsx";
 import { RunScreen } from "./RunScreen.tsx";
 import { LoadFailure, Loading, NoRuns, NotFound } from "./Status.tsx";
 
@@ -36,7 +37,7 @@ function RunRoutes({ runId, route, search }: { runId: string; route: Route; sear
       {(route.kind !== "run" || feedback.view?.latestRunId !== state.view.siblings.find(({ status }) => status !== "recording")?.id) && (
         <NewerRunBanner latestRunId={feedback.view?.latestRunId} runId={runId} story={route.kind === "story" ? route.story : null} />
       )}
-      <FeedbackBar feedback={feedback} runId={runId} showList={route.kind === "run"} />
+      <FeedbackBar feedback={feedback} storyHref={(story) => storyPath(runId, story, "")} showList={route.kind === "run"} />
       {route.kind === "story" ? (
         <DetailScreen state={state} view={state.view} story={route.story} search={search} feedback={feedback} />
       ) : route.kind === "accept" ? (
@@ -76,6 +77,7 @@ export function App() {
     <Page>
       {route.kind === "home" && <Home />}
       {route.kind === "missing" && <NotFound />}
+      {(route.kind === "stories" || route.kind === "anyStory") && <StoriesRoutes story={route.kind === "anyStory" ? route.story : null} search={search} />}
       {(route.kind === "run" || route.kind === "story" || route.kind === "accept") && (
         <RunRoutes key={route.runId} runId={route.runId} route={route} search={search} />
       )}

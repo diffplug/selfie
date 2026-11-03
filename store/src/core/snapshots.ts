@@ -908,3 +908,34 @@ ON CONFLICT(id) DO NOTHING`,
     idempotent: true,
   };
 }
+
+/** A story's newest capture across some runs, and the run it's from. */
+export interface StoryCapture<RunLike> {
+  readonly run: RunLike;
+  readonly row: ComparedSnapshot;
+}
+
+/**
+ * Each story's newest capture, across runs given newest first, reading only until each of `stories`
+ * has one, since a comparison isn't free, and most runs at a commit are partial. With no `stories`,
+ * it reads them all. A run that left a story out reads as having removed it, which says nothing about
+ * that story, so it's taken from an older run.
+ */
+export async function newestCaptures<RunLike>(
+  runs: readonly RunLike[],
+  rowsOf: (run: RunLike) => Promise<readonly ComparedSnapshot[]>,
+  stories?: ReadonlySet<string>,
+): Promise<Map<string, StoryCapture<RunLike>>> {
+  const captures = new Map<string, StoryCapture<RunLike>>();
+  const wanted = stories?.size ?? Number.POSITIVE_INFINITY;
+  let found = 0;
+  for (const run of runs) {
+    if (found >= wanted) break;
+    for (const row of await rowsOf(run)) {
+      if (row.state === "removed" || captures.has(row.story) || (stories !== undefined && !stories.has(row.story))) continue;
+      captures.set(row.story, { run, row });
+      found += 1;
+    }
+  }
+  return captures;
+}

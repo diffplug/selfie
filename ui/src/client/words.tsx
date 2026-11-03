@@ -97,7 +97,7 @@ export function StateLabel({ state }: { readonly state: SnapshotState }) {
   );
 }
 
-export function DecisionLabel({ row }: { readonly row: SnapshotRow }) {
+export function DecisionLabel({ row }: { readonly row: Pick<SnapshotRow, "state" | "decision"> }) {
   if (!isDecidable(row.state)) return <span className="selfie-muted">No decision needed</span>;
   if (row.decision?.decision === "approved") {
     return (

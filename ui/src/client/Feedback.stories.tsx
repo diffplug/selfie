@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, userEvent, within } from "storybook/test";
 import type { Note } from "../shared/api.ts";
 import { FeedbackBar, NewerRunBanner } from "./Feedback.tsx";
+import { storyPath } from "./router.tsx";
 import { failure, feedbackOf, note, OTHER_RUN_ID, RUN_ID } from "./stories/fixtures.ts";
 
 interface Args {
@@ -13,7 +14,7 @@ interface Args {
 
 function Bar({ notes = [], showList = true, failed = false, agentWaiting = false }: Args) {
   const feedback = feedbackOf(notes, failed ? { error: failure("unreachable", "Can't reach the Selfie server. Is selfie ui still running?") } : {}, agentWaiting);
-  return <FeedbackBar feedback={feedback} runId={RUN_ID} showList={showList} />;
+  return <FeedbackBar feedback={feedback} storyHref={(story) => storyPath(RUN_ID, story, "")} showList={showList} />;
 }
 
 const meta = { title: "Screens/Feedback", component: Bar } satisfies Meta<typeof Bar>;

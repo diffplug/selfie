@@ -3,9 +3,11 @@ import { DatabaseSync } from "node:sqlite";
 import {
   imageInsertStatement,
   initStoreSchema,
+  newestCaptures,
   Snapshots,
   Sql,
   Store,
+  type ComparedSnapshot,
   type RecordedSnapshot,
   type SqlAdapter,
   type SqlStatement,
@@ -812,5 +814,33 @@ describe("Snapshots", () => {
         db.close();
       }
     });
+  });
+});
+
+describe("newestCaptures", () => {
+  const row = (story: string, state: ComparedSnapshot["state"] = "unchanged"): ComparedSnapshot => ({ story, state, imageHash: null, goldenHash: null, failure: null, playError: null, decision: null });
+
+  it("takes each story from the first run that has it, and stops once each wanted one has an answer", async () => {
+    const read: string[] = [];
+    const rows: Record<string, ComparedSnapshot[]> = { newest: [row("a")], middle: [row("a"), row("b")], oldest: [row("c")] };
+    const rowsOf = async (run: string) => {
+      read.push(run);
+      return rows[run]!;
+    };
+    const found = await newestCaptures(["newest", "middle", "oldest"], rowsOf, new Set(["a", "b"]));
+    expect(Object.fromEntries([...found].map(([story, { run }]) => [story, run]))).toEqual({ a: "newest", b: "middle" });
+    expect(read).toEqual(["newest", "middle"]);
+  });
+
+  it("doesn't count what isn't wanted towards stopping, and reads a removed story as nothing", async () => {
+    const rows: Record<string, ComparedSnapshot[]> = { newest: [row("gone"), row("a"), row("b", "removed")], older: [row("b")] };
+    const found = await newestCaptures(["newest", "older"], async (run) => rows[run]!, new Set(["a", "b"]));
+    expect(found.get("b")?.run).toBe("older");
+    expect(found.has("gone")).toBe(false);
+  });
+
+  it("reads every run if it isn't told which stories", async () => {
+    const found = await newestCaptures(["one", "two"], async (run) => [row(run)]);
+    expect([...found.keys()]).toEqual(["one", "two"]);
   });
 });

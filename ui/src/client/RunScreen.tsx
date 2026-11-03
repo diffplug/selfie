@@ -22,9 +22,9 @@ import { memo, useDeferredValue, useEffect, useMemo, useRef, useState, type Comp
 import type { AdvisoryReason, BlockerReason, DecisionKind, RunView, SnapshotRow } from "../shared/api.ts";
 import { imageUrl } from "./api.ts";
 import { applyFilter, decidableIn, filterQuery, hasAdvisory, NO_FILTER, parseFilter, showQuery, SHOW_OPTIONS, targetsOf, type RowFilter, type Show } from "./filter.ts";
-import { useHotkeys, useTitle, type RunState } from "./hooks.ts";
+import { useStoryListKeys, useTitle, type RunState } from "./hooks.ts";
 import { Keys } from "./Keys.tsx";
-import { acceptPath, AppLink, AppLinkButton, followLink, navigate, runPath, storyPath } from "./router.tsx";
+import { acceptPath, AppLink, AppLinkButton, followLink, navigate, runPath, storiesPath, storyPath } from "./router.tsx";
 import { ActionFailure, RunNotes } from "./RunNotes.tsx";
 import { StoryLinks } from "./StoryLinks.tsx";
 import { plural } from "./plural.ts";
@@ -499,17 +499,7 @@ export function RunScreen({
     document.querySelector<HTMLElement>(`[data-story="${CSS.escape(story)}"]`)?.focus();
   }, [returningFrom]);
 
-  const moveFocus = (delta: number) => {
-    const links = [...document.querySelectorAll<HTMLElement>("[data-story]")];
-    if (links.length === 0) return;
-    const at = links.indexOf(document.activeElement as HTMLElement);
-    links[at === -1 ? 0 : Math.max(0, Math.min(links.length - 1, at + delta))]?.focus();
-  };
-  useHotkeys({
-    j: () => moveFocus(1),
-    k: () => moveFocus(-1),
-    "/": () => filterInput.current?.focus(),
-  });
+  useStoryListKeys(filterInput);
 
   useTitle(`Run at ${shortSha(run.gitSha)}`);
   const newest = view.siblings.find(({ status }) => status !== "recording");
@@ -523,6 +513,7 @@ export function RunScreen({
         <Heading as="h2" variant="medium">
           Run at <code title={run.gitSha}>{shortSha(run.gitSha)}</code>
         </Heading>
+        <AppLink href={storiesPath()}>Every story</AppLink>
         <AppLinkButton variant={ready ? "primary" : "default"} href={acceptPath(run.id)}>
           {acceptedRunId === run.id ? "Accepted" : ready ? "Accept this run" : "Why can't this be accepted?"}
         </AppLinkButton>

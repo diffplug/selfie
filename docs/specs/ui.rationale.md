@@ -37,6 +37,8 @@ Evidence and reasoning for `docs/specs/ui.md`, keyed by its headings.
 
 **Live stories.** Closed by default since a page per side is a lot to load for what most reviews don't need. They lay out at the captured viewport and scale down, since a story laid out at half the width could look nothing like its image. They aren't frozen, as a capture is, so they can differ from an image without anything being wrong, which the screen says. Each story gets a new frame, since moving one frame along would add to the browser's history, and Back would walk through stories in it.
 
+**Every story, on the same page.** Separate pages for snapshots and for a live Storybook would be two products to learn, and every feature would need building twice. So the list merges what's been captured, and a story's page is simply its run's. It reads runs newest first and stops once each story has an answer, since each costs a comparison. If a story's never been captured, that's every run at the commit, which is the cost to watch.
+
 ## Keyboard
 
 - **Why ignore repeats.** With `a` moving on to the next story, a held key would approve one image every few milliseconds. `j` and `k` lose little by it.
