@@ -123,6 +123,10 @@ export interface RunView {
   readonly run: Run;
   /** Null if there's no built Storybook to host. */
   readonly storybook: StorybookLink | null;
+  /** The kept build of the goldens this run is compared with, or null if there's none. */
+  readonly goldenStorybookUrl: string | null;
+  /** The size this run's stories rendered at, so a live one lays out as its image did. Null if that wasn't recorded. */
+  readonly viewport: { readonly width: number; readonly height: number } | null;
   /** With no baseline, the nearest goldens on the run's branch, which `rows` compares with. Only to look at. */
   readonly branchGoldens: string | null;
   /** How close a diff's regions group here, in CSS pixels. */

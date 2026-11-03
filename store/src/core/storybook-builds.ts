@@ -7,6 +7,8 @@ import type { Sql } from "./sql.ts";
 
 export const CREATE_STORYBOOK_BUILD_TABLES: readonly string[] = [
   "CREATE TABLE IF NOT EXISTS run_builds (run_id TEXT PRIMARY KEY, build TEXT NOT NULL) WITHOUT ROWID",
+  // By environment, whose ID already covers it, so a run's story can lay out as it was captured.
+  "CREATE TABLE IF NOT EXISTS environment_viewports (environment TEXT PRIMARY KEY, width INTEGER NOT NULL, height INTEGER NOT NULL) WITHOUT ROWID",
 ];
 
 /** A build's files by their path in it. Written last and whole, so that having one means having them all. */
@@ -22,6 +24,12 @@ const manifestBlobKey = (build: string) => `storybook-builds/${build}`;
 export interface StorybookBuildFile {
   readonly path: string;
   readonly fileHash: string;
+}
+
+/** The size a story renders at, in CSS pixels. */
+export interface StoryViewport {
+  readonly width: number;
+  readonly height: number;
 }
 
 export class StorybookBuilds {
@@ -85,6 +93,21 @@ export class StorybookBuilds {
       params: [runId, build],
       idempotent: true,
     });
+  }
+
+  /** Says what size an environment renders at, which can't change, since its ID covers it. */
+  async recordViewport(environment: string, { width, height }: StoryViewport): Promise<void> {
+    await this.#sql.run({
+      sql: "INSERT OR IGNORE INTO environment_viewports(environment, width, height) VALUES (?1, ?2, ?3)",
+      params: [environment, width, height],
+      idempotent: true,
+    });
+  }
+
+  /** What size an environment renders at, or null for one no run has recorded this. */
+  async viewportOf(environment: string): Promise<StoryViewport | null> {
+    const [row] = await this.#sql.run({ sql: "SELECT width, height FROM environment_viewports WHERE environment = ?1", params: [environment], idempotent: true });
+    return row === undefined ? null : { width: row.width as number, height: row.height as number };
   }
 
   /** The build that rendered a run, if it's known and kept here. */

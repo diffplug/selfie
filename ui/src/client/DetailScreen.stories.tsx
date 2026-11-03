@@ -43,6 +43,22 @@ export const WithStorybook: Story = {
 export const WithStorybookOfAnotherBuild: Story = {
   args: { row: BUTTON, view: { ...viewOf([BUTTON]), storybook: { url: "http://127.0.0.1:51234/", exactBuild: false } } },
 };
+const FRESH = rows.fresh("components-badge--new");
+const liveView = (row: SnapshotRow, overrides: Partial<RunView> = {}): RunView => ({
+  ...viewOf([row]),
+  storybook: { url: "./live-story/current/", exactBuild: true },
+  goldenStorybookUrl: "./live-story/golden/",
+  ...overrides,
+});
+const liveLoaded = async ({ canvasElement }: { canvasElement: HTMLElement }) => {
+  await press("l")();
+  await waitFor(() => expect(within(canvasElement).getAllByTitle(/running/).length).toBeGreaterThan(0));
+  await new Promise((resolve) => setTimeout(resolve, 300));
+};
+export const LiveStoriesOpen: Story = { args: { row: BUTTON, view: liveView(BUTTON) }, play: liveLoaded };
+export const LiveStoriesNewStory: Story = { args: { row: FRESH, view: liveView(FRESH) }, play: liveLoaded };
+export const LiveStoriesGoldenNotKept: Story = { args: { row: BUTTON, view: liveView(BUTTON, { goldenStorybookUrl: null }) }, play: liveLoaded };
+export const LiveStoriesSizeUnknown: Story = { args: { row: BUTTON, view: liveView(BUTTON, { viewport: null }) }, play: liveLoaded };
 export const Stacked: Story = { args: { row: BUTTON }, play: press("f") };
 export const StackedGolden: Story = { args: { row: BUTTON }, play: press("f", "f") };
 export const StackedDiff: Story = { args: { row: BUTTON }, play: press("d") };

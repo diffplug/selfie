@@ -118,6 +118,16 @@ for (const [current, golden] of DIFFS) {
   await writeFile(path.join(directory, "image"), png);
 }
 
+// What a live story's frame shows in a story of the screen itself, which has no other Storybook to frame.
+for (const [build, color] of [["current", "#1a7f37"], ["golden", "#0969da"]] as const) {
+  const directory = path.join(ui, "storybook-fixtures/live-story", build);
+  await mkdir(directory, { recursive: true });
+  await writeFile(
+    path.join(directory, "iframe.html"),
+    `<!doctype html><title>${build}</title><body style="margin:0;font:48px sans-serif"><button style="margin:64px;padding:24px 48px;font:inherit;color:#fff;background:${color};border:0;border-radius:12px">The ${build} button</button>`,
+  );
+}
+
 await writeFile(
   path.join(ui, "src/client/stories/images.generated.ts"),
   `// Written by cli/scripts/generate-storybook-fixtures.ts.

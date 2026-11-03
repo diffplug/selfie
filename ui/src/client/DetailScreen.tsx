@@ -1,10 +1,10 @@
 // One snapshot: its images, its numbers, and its decision, with the keyboard doing most of the work.
-import { ArrowLeftIcon, CheckIcon, LinkExternalIcon, XIcon } from "@primer/octicons-react";
-import { Banner, Button, Dialog, Heading, Link, RelativeTime, Stack, Text } from "@primer/react";
+import { ArrowLeftIcon, CheckIcon, XIcon } from "@primer/octicons-react";
+import { Banner, Button, Dialog, Heading, RelativeTime, Stack, Text } from "@primer/react";
 import { AriaStatus } from "@primer/react/experimental";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { isDecidable } from "selfie-store";
-import type { DecisionKind, PixelDiff, RunView, SnapshotRow, StorybookLink } from "../shared/api.ts";
+import type { DecisionKind, PixelDiff, RunView, SnapshotRow } from "../shared/api.ts";
 import { diffImageUrl, fetchDiff, imageUrl } from "./api.ts";
 import { applyFilter, neighbors, parseFilter, targetsOf } from "./filter.ts";
 import { useFetched, useHotkeys, useRegionSelection, useTitle, type FeedbackState, type RunState } from "./hooks.ts";
@@ -12,6 +12,7 @@ import { ImageCompare } from "./ImageCompare.tsx";
 import { Keys } from "./Keys.tsx";
 import { acceptPath, AppLink, navigate, runPath, storyPath } from "./router.tsx";
 import { ActionFailure } from "./RunNotes.tsx";
+import { LiveStories, StorybookLinkTo } from "./LiveStories.tsx";
 import { LoadFailure, Loading } from "./Status.tsx";
 import { describeBox, groupRegions, isLayoutOnly } from "../shared/regions.ts";
 import { plural } from "./plural.ts";
@@ -27,6 +28,7 @@ const SHORTCUTS: readonly (readonly [string, string])[] = [
   ["d", "Show the diff"],
   ["z", "Next zoom: actual size, 1×, 2×, 4×, 8×"],
   ["c", "Center on the region being looked at, or else the change"],
+  ["l", "Open or close the live stories"],
   ["m", "Write a note for your agent"],
   ["w", "Show the image a note was written on"],
   ["n", "Next region"],
@@ -68,18 +70,6 @@ function PixelStats({ stats }: { stats: PixelDiff }) {
       {stats.maxChannelDelta > 0 && ` The largest difference in a channel is ${stats.maxChannelDelta} of 255.`}
       {account.length > 0 && " In the diff, pink changed, blue moved, and yellow is spacing that grew or shrank."}
     </Text>
-  );
-}
-
-/** The real page, on the Storybook's own origin, saying if it may not be what rendered this image. */
-function StorybookLinkTo({ storybook, story }: { storybook: StorybookLink; story: string }) {
-  return (
-    <>
-      <Link href={`${storybook.url}?path=/story/${encodeURIComponent(story)}`} target="_blank" rel="noreferrer noopener">
-        Open in Storybook <LinkExternalIcon />
-      </Link>
-      {!storybook.exactBuild && <Text className="selfie-muted">This run&apos;s own build wasn&apos;t kept, so it&apos;s the latest, which may not match.</Text>}
-    </>
   );
 }
 
@@ -126,6 +116,8 @@ export function DetailScreen({ state, view, story, search, feedback }: { state: 
 
   const [helpOpen, setHelpOpen] = useState(false);
   const [message, setMessage] = useState("");
+  // Here, so that it stays as it is from story to story, like how someone's looking at the images.
+  const [liveOpen, setLiveOpen] = useState(false);
 
   const go = useCallback(
     (target: SnapshotRow | null) => {
@@ -178,6 +170,7 @@ export function DetailScreen({ state, view, story, search, feedback }: { state: 
     a: () => void decide("approved"),
     r: () => void decide("rejected"),
     u: () => navigate(listHref),
+    l: () => setLiveOpen((open) => !open),
     "?": () => setHelpOpen(true),
   });
 
@@ -217,7 +210,7 @@ export function DetailScreen({ state, view, story, search, feedback }: { state: 
           <Heading as="h2" variant="small" className="selfie-story-title">
             {row.story}
           </Heading>
-          {view.storybook !== null && row.state !== "removed" && <StorybookLinkTo storybook={view.storybook} story={row.story} />}
+          <StorybookLinkTo row={row} view={view} />
         </Stack>
         {decidable && (
           <Stack direction="horizontal" gap="condensed">
@@ -265,6 +258,7 @@ export function DetailScreen({ state, view, story, search, feedback }: { state: 
         />
       )}
       <Notes row={row} diff={diff} />
+      <LiveStories row={row} view={view} open={liveOpen} onToggle={() => setLiveOpen((open) => !open)} />
       <ImageCompare row={row} diff={diff} scale={view.run.scale} groups={groups} selection={selection} runId={view.run.id} feedback={feedback} />
       {helpOpen && <ShortcutsDialog onClose={() => setHelpOpen(false)} />}
     </Stack>

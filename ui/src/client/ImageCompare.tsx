@@ -21,7 +21,7 @@ type Zoom = (typeof ZOOMS)[number];
 const zoomWords = (zoom: Zoom) => (zoom === "size" ? "Actual size" : `${zoom}×`);
 type Layer = "current" | "golden" | "diff" | "noted";
 
-const LAYER_WORDS: Readonly<Record<Layer, string>> = { current: "Current", golden: "Golden", diff: "Diff", noted: "When noted" };
+export const LAYER_WORDS: Readonly<Record<Layer, string>> = { current: "Current", golden: "Golden", diff: "Diff", noted: "When noted" };
 
 /** How each image is spoken of when a note is on it. */
 const LAYER_IMAGE_WORDS: Readonly<Record<Layer, string>> = { current: "the current image", golden: "the golden", diff: "the current image", noted: "the image when noted" };

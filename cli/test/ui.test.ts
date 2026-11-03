@@ -745,9 +745,13 @@ describe("selfie ui", () => {
     await mkdir(dir, { recursive: true });
     await writeFile(path.join(dir, "iframe.html"), "<!doctype html><title>the preview</title>");
     const { stop, exit, json } = await start("--storybook-dir", dir);
-    const { port, storybookUrl } = json();
+    const { port, storybookUrl, url } = json();
     expect(new URL(storybookUrl).port).not.toBe(String(port));
-    expect(await (await fetch(`${storybookUrl}iframe.html`)).text()).toContain("the preview");
+    const frame = await fetch(`${storybookUrl}iframe.html`);
+    expect(await frame.text()).toContain("the preview");
+    // They're each told about the other, whichever name the review page is open under.
+    expect(frame.headers.get("content-security-policy")).toBe(`frame-ancestors 'self' http://127.0.0.1:${port} http://localhost:${port}`);
+    expect((await fetch(url)).headers.get("content-security-policy")).toContain(`frame-src ${new URL(storybookUrl).origin};`);
     stop.abort();
     expect(await exit).toBe(0);
     await expect(fetch(storybookUrl)).rejects.toThrow();
@@ -844,7 +848,7 @@ describe("the hosted Storybook", () => {
     await writeFile(path.join(dir, "assets", "story.js"), "export {};");
   };
 
-  const storybook = () => createStorybookApp({ dir, port: () => STORYBOOK_PORT, readBuildFile: (build, file) => project.builds.readFile(build, file) });
+  const storybook = () => createStorybookApp({ dir, port: () => STORYBOOK_PORT, readBuildFile: (build, file) => project.builds.readFile(build, file), reviewOrigins: () => [ORIGIN] });
   const read = (url: string, host = `127.0.0.1:${STORYBOOK_PORT}`) => storybook().request(url, { headers: { host } });
 
   beforeEach(() => {
@@ -869,10 +873,11 @@ describe("the hosted Storybook", () => {
       expect(await (await read("/assets/story.js")).text()).toBe("export {};");
     });
 
-    test("lets Storybook frame its own preview, and nobody else", async () => {
+    test("lets Storybook and the review page frame it, and nobody else", async () => {
       const { headers } = await read("/iframe.html");
-      expect(headers.get("content-security-policy")).toBe("frame-ancestors 'self'");
-      expect(headers.get("x-frame-options")).toBe("SAMEORIGIN");
+      expect(headers.get("content-security-policy")).toBe(`frame-ancestors 'self' ${ORIGIN}`);
+      // It can't name another origin, and would refuse the review page.
+      expect(headers.get("x-frame-options")).toBeNull();
     });
 
     test("stays inside the build", async () => {
@@ -892,9 +897,18 @@ describe("the hosted Storybook", () => {
     });
   });
 
+  test("the review page may frame only the hosted Storybook", async () => {
+    const framing = createLocalApp({ source: localReviewSource(project), port: () => PORT, clientDir, storybookOrigin: "http://127.0.0.1:51234" });
+    const { headers } = await framing.request("/", { headers: { host: HOST } });
+    const policy = headers.get("content-security-policy");
+    expect(policy).toContain("frame-src http://127.0.0.1:51234;");
+    expect(policy).toContain("frame-ancestors 'none'");
+    expect(headers.get("x-frame-options")).toBe("DENY");
+  });
+
   test("the review API refuses a story's page, since it's another origin", async () => {
     await built();
-    const hosted = await serveStorybook({ dir, readBuildFile: async () => null });
+    const hosted = await serveStorybook({ dir, readBuildFile: async () => null, reviewOrigins: () => [] });
     const server = await serveLocal({ source: localReviewSource(project), port: 0, clientDir });
     try {
       expect(new URL(hosted.url).port).not.toBe(String(server.port));
@@ -922,7 +936,7 @@ describe("the hosted Storybook", () => {
       expect(await page.text()).toContain("kept");
       expect(page.headers.get("content-type")).toContain("text/html");
       expect(page.headers.get("cache-control")).toContain("immutable");
-      expect(page.headers.get("x-frame-options")).toBe("SAMEORIGIN");
+      expect(page.headers.get("content-security-policy")).toBe(`frame-ancestors 'self' ${ORIGIN}`);
       const script = await read(`/storybook-builds/${hash}/assets/a%20b.js`);
       expect(await script.text()).toBe("export {};");
       expect(script.headers.get("content-type")).toContain("javascript");
@@ -987,6 +1001,29 @@ describe("the hosted Storybook", () => {
       expect((await linkOf(await reviewedBuild("--story", "a")))?.exactBuild).toBe(true);
       h.stories = [{ id: "a", failed: "it threw" }, { id: "b" }];
       expect((await linkOf(await reviewedBuild()))?.exactBuild).toBe(true);
+    });
+
+    test("the goldens' own build too, if it's kept, once a later run is compared with them", async () => {
+      await built();
+      const first = await reviewedBuild();
+      expect((await hosted().runView(first)).goldenStorybookUrl).toBeNull();
+      expect((await h.cli("approve", first, "--all")).code).toBe(0);
+      expect((await h.cli("accept", first)).code).toBe(0);
+      const goldens = (await linkOf(first))!.url;
+
+      await commit(h.repo, "the next change");
+      await writeFile(path.join(dir, "index.html"), "<!doctype html><title>the next build</title>");
+      const view = await hosted().runView(await reviewedBuild());
+      expect(view.goldenStorybookUrl).toBe(goldens);
+      expect(view.storybook?.url).not.toBe(goldens);
+    });
+
+    test("the size its environment rendered at, whatever the config says now", async () => {
+      await built();
+      const before = await reviewedBuild();
+      expect((await hosted().runView(before)).viewport).toEqual({ width: 1200, height: 900 });
+      await writeFile(path.join(h.repo, "selfie.config.json"), JSON.stringify({ environment: { viewport: { width: 640, height: 480 } } }));
+      expect((await hosted().runView(before)).viewport).toEqual({ width: 1200, height: 900 });
     });
 
     test("not a build that changed while it rendered", async () => {

@@ -139,6 +139,8 @@ Source of truth: `ui/src/client/`.
 - **Must let someone select any set of regions, from the list, from an outline, or with a key, and keep that only while they stay on the story.** Clicking a stacked region's outline selects it, and side by side only its number does, since clicking an image there stacks it.
 - **Must keep the region being looked at still when flipping between images**, since it can be somewhere else in the other one (rationale).
 - **Must link a snapshot to its story in the very build that rendered its run, if that's kept, or else the directory `selfie ui` hosts, and then say it may not match** (`RunView.storybook`). A removed story has no link.
+- **Must offer the live stories, closed and loading nothing until opened, and stay open or closed from story to story**: the golden's kept build beside the run's, in frames (`docs/specs/access.md` → Local review server), at the size its environment renders at and scaled to fit, or else saying that size wasn't recorded, each saying why if it has none (rationale).
+- **Must leave the browser's history alone when moving a live story along**, so Back leaves the screen as it does anywhere else (rationale).
 - **Must keep how someone is looking when moving between stories**, and must never show one story's image under another's name while it loads.
 - **Must compute diff images, and pixel stats a run's `review.json` no longer holds, on demand, from the store, by hash pair**, so a pruned run reads like any other. A list shows stats only from `review.json`, and one snapshot uses them rather than ask (rationale).
 - **Must explain each kind of snapshot:** new has no golden, removed has no current and takes no decision, failed shows its message, and a changed size says so, and shows the images from their top left corners.
@@ -168,6 +170,7 @@ Source of truth: `useHotkeys` in `ui/src/client/hooks.ts`.
 | `a`, `r` | A snapshot | Approve or reject, then go to the next |
 | `s`, `f`, `d` | A snapshot | Side by side, stacked then flip, diff |
 | `z`, `c` | A snapshot | Next zoom, center on the region being looked at or else the change |
+| `l` | A snapshot | Open or close the live stories |
 | `m` | A snapshot | Write a note |
 | `w` | A snapshot | Show the image a note was written on, or go back |
 | `n`, `p` | A snapshot | Next and previous region |
@@ -222,5 +225,4 @@ Also its own guard in place of `loopbackHosts`, keeping `sameOriginWrites` and `
 - A way to clear a decision. One can be replaced, and a run can be reviewed again, but `Snapshots.decide` has no way to remove one.
 - Finding runs at other commits. `/runs/:id` opens any of them, and `selfie ui <run>` prints that URL, but nothing lists them: `runs` has no index that would serve it without a scan.
 - Sorting the list by size of change.
-- A story running in the page, next to its image. It needs the review page's CSP to allow framing that one origin.
 - A hosted Storybook in the cloud (**Scope: cloud-deploy**), where its origin needs the same separation, and a build needs uploading.
