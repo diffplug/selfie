@@ -80,7 +80,7 @@ function Notes({ row, diff, renamedFrom, renamedTo }: { row: SnapshotRow; diff: 
       {row.state === "failed" && (
         <Banner variant="critical" title="This story failed to render" description={<code className="selfie-pre">{row.failure ?? "No message was recorded."}</code>} />
       )}
-      {row.state === "new" &&
+      {row.state === "added" &&
         (renamedFrom !== undefined ? (
           <Banner
             variant="info"
@@ -92,7 +92,7 @@ function Notes({ row, diff, renamedFrom, renamedTo }: { row: SnapshotRow; diff: 
             }
           />
         ) : (
-          <Banner variant="info" title="New story" description="The baseline has no golden for it, so there's nothing to compare. Approving lets this image become its first golden." />
+          <Banner variant="info" title="Added story" description="The baseline has no golden for it, so there's nothing to compare. Approving lets this image become its first golden." />
         ))}
       {row.state === "removed" && renamedTo !== undefined && (
         <Banner variant="info" title="Renamed story" description={<>The new story <code>{renamedTo}</code> has this very image, so it looks to have been renamed.</>} />

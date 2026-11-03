@@ -8,8 +8,8 @@ const meta = { title: "Pages/Story/Notes", component: StoryPage } satisfies Meta
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** The agent's change to a new story, which has no golden: what's compared is the image the note is on. */
-const SINCE_NOTED = { ...BUTTON, state: "new" as const, goldenHash: null, pixelDiff: null };
+/** The agent's change to an added story, which has no golden: what's compared is the image the note is on. */
+const SINCE_NOTED = { ...BUTTON, state: "added" as const, goldenHash: null, pixelDiff: null };
 export const NewStoryComparedWithItsNote: Story = {
   args: { row: SINCE_NOTED, notes: [note(1, { story: BUTTON.story, imageHash: BUTTON.goldenHash })] },
 };

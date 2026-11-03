@@ -54,7 +54,7 @@ function IconLabel({ variant, icon, children }: { variant: LabelProps["variant"]
 
 const STATE_LABELS: Readonly<Record<SnapshotState, { variant: LabelProps["variant"]; icon: ReactNode; words: string }>> = {
   changed: { variant: "attention", icon: <DiffModifiedIcon size={12} />, words: "Changed" },
-  new: { variant: "accent", icon: <DiffAddedIcon size={12} />, words: "New" },
+  added: { variant: "accent", icon: <DiffAddedIcon size={12} />, words: "Added" },
   removed: { variant: "severe", icon: <DiffRemovedIcon size={12} />, words: "Removed" },
   failed: { variant: "danger", icon: <StopIcon size={12} />, words: "Failed" },
   unchanged: { variant: "secondary", icon: <DotIcon size={12} />, words: "Unchanged" },
@@ -161,7 +161,7 @@ export function describePixels(diff: PixelDiff | null): string {
 export const BLOCKER_WORDS: Readonly<Record<BlockerReason, (count: number) => string>> = {
   failed: (count) => `${plural(count, "story", "stories")} failed to render`,
   "changed-unapproved": (count) => `${plural(count, "changed image")} with no decision`,
-  "new-unapproved": (count) => `${plural(count, "new image")} with no decision`,
+  "added-unapproved": (count) => `${plural(count, "added image")} with no decision`,
   rejected: (count) => `${plural(count, "image")} rejected`,
   removed: (count) => `${plural(count, "golden")} this run doesn't have, which must be acknowledged to accept`,
   "pattern-unmatched": (count) => `${plural(count, "--story pattern")} that matched nothing`,

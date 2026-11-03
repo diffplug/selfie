@@ -318,7 +318,7 @@ async function newNotesForAgent(project: Project, fresh: ReadonlySet<number>): P
   const notes = [];
   for (const note of sentNotes(await project.notes.list())) {
     if (!note.messages.some(({ id }) => fresh.has(id))) continue;
-    notes.push({ ...note, messages: note.messages.map((message) => ({ ...message, new: fresh.has(message.id) })), image: await exportNoteImage(project, note) });
+    notes.push({ ...note, messages: note.messages.map((message) => ({ ...message, added: fresh.has(message.id) })), image: await exportNoteImage(project, note) });
   }
   return { folder: project.repo.root, notes };
 }

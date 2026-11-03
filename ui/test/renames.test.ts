@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import { findRenames } from "../src/shared/renames.ts";
 
-const added = (story: string, imageHash: string) => ({ story, state: "new" as const, imageHash, goldenHash: null });
+const added = (story: string, imageHash: string) => ({ story, state: "added" as const, imageHash, goldenHash: null });
 const gone = (story: string, goldenHash: string) => ({ story, state: "removed" as const, imageHash: null, goldenHash });
 const renamesOf = (...rows: Parameters<typeof findRenames>[0]) => Object.fromEntries(findRenames(rows));
 

@@ -20,7 +20,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 const when = ({ render }: (typeof STORIES)[number]) => render !== null && <RelativeTime date={new Date(render.renderedAt)} />;
-const MOVED = rendered("widgets-button--primary", { state: "new" });
+const MOVED = rendered("widgets-button--primary", { state: "added" });
 
 export const AsItStarts: Story = {};
 export const OnAStory: Story = { args: { story: "components-button--primary" } };

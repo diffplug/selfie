@@ -20,7 +20,7 @@ const stories = (rows: readonly SnapshotRow[]) => rows.map(({ story }) => story)
 const rows = [
   row("button--large"),
   row("button--small", { decision: approved }),
-  row("card--new", { state: "new", goldenHash: null }),
+  row("card--new", { state: "added", goldenHash: null }),
   row("gone", { state: "removed", imageHash: null }),
   row("broken", { state: "failed", imageHash: null, goldenHash: null, failure: "boom" }),
   row("calm", { state: "unchanged", playError: "threw" }),
@@ -78,7 +78,7 @@ test("moved and spacing only is a changed row with nothing changed in it", () =>
     row("only-moved", { pixelDiff: stats(0) }),
     row("really-changed", { pixelDiff: stats(1) }),
     row("not-compared-yet"),
-    row("new-story", { state: "new", goldenHash: null, pixelDiff: stats(0) }),
+    row("new-story", { state: "added", goldenHash: null, pixelDiff: stats(0) }),
   ];
   expect(stories(applyFilter(candidates, { text: "", show: "layout" }))).toEqual(["only-moved"]);
   expect(parseFilter("?show=layout").show).toBe("layout");

@@ -47,11 +47,11 @@ describe("a first review, with no baseline", () => {
     expect(json.gitSha).toBe(git(h.repo, "rev-parse", "HEAD"));
     expect(json.dirtyPaths).toEqual([]);
     expect(json.environment).toMatch(/^container-linux-arm64-/);
-    expect(json.counts).toEqual({ stories: 2, unchanged: 0, changed: 0, new: 2, removed: 0, undecided: 2, advisories: 0 });
-    expect(reasons(json.blockers)).toEqual(["new-unapproved", "new-unapproved"]);
+    expect(json.counts).toEqual({ stories: 2, unchanged: 0, changed: 0, added: 2, removed: 0, undecided: 2, advisories: 0 });
+    expect(reasons(json.blockers)).toEqual(["added-unapproved", "added-unapproved"]);
     expect(json.advisories).toEqual([]);
     for (const difference of json.differences) {
-      expect(difference.state).toBe("new");
+      expect(difference.state).toBe("added");
       expect(await exists(difference.current)).toBe(true);
       expect(difference.golden).toBeNull();
       expect(difference.diff).toBeNull();
@@ -265,7 +265,7 @@ describe("comparing with a baseline", () => {
     expect(json.sha).toBeNull();
     const reviewed = await review();
     expect(reviewed.json.baseline.sha).toBeNull();
-    expect(reviewed.json.counts.new).toBe(3);
+    expect(reviewed.json.counts.added).toBe(3);
 
     await rm(path.join(h.repo, "selfie.config.json"));
     expect((await h.cli("find-baseline")).json.sha).not.toBeNull();
@@ -493,7 +493,7 @@ describe("blockers and advisories", () => {
     ];
     const first = await review();
     expect(first.code).toBe(1); // Everything is new, which does block.
-    expect(reasons(first.json.blockers)).toEqual(["new-unapproved", "new-unapproved"]);
+    expect(reasons(first.json.blockers)).toEqual(["added-unapproved", "added-unapproved"]);
     expect(first.json.advisories).toEqual([
       { story: "a--play", reason: "play-error", detail: "the play failed" },
     ]);
@@ -523,7 +523,7 @@ describe("blockers and advisories", () => {
     expect(code).toBe(1);
     expect(json.blockers[0]).toMatchObject({ story: "a--bad", reason: "failed" });
     expect(json.blockers[0].detail).toContain("The store refused its image");
-    expect(json.counts).toMatchObject({ stories: 2, new: 1 });
+    expect(json.counts).toMatchObject({ stories: 2, added: 1 });
   });
 });
 
@@ -618,7 +618,7 @@ describe("untrusted names", () => {
     const failed = json.blockers.filter(({ reason }: any) => reason === "failed");
     expect(failed.map(({ story }: any) => story)).toEqual(["a--absolute", "a--escape"]);
     for (const { detail } of failed) expect(detail).toContain("The render is unusable");
-    expect(json.counts.new).toBe(1);
+    expect(json.counts.added).toBe(1);
   });
 
   test("a symlink in place of an image fails that story", async () => {

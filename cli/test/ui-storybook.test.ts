@@ -161,8 +161,8 @@ describe("the hosted Storybook", () => {
       const whole = await recorded();
       const partial = await recorded("--story", "b");
       const renders = await rendersOf();
-      expect(renders.a).toMatchObject({ runId: whole, state: "new" });
-      expect(renders.b).toMatchObject({ runId: partial, state: "new", fromHostedStorybook: true, dirty: false });
+      expect(renders.a).toMatchObject({ runId: whole, state: "added" });
+      expect(renders.b).toMatchObject({ runId: partial, state: "added", fromHostedStorybook: true, dirty: false });
       expect(renders.c).toMatchObject({ runId: whole });
       expect((await live()).newestRunId).toBe(partial);
     });

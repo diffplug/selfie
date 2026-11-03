@@ -35,7 +35,7 @@ export const view = (stories: readonly ListedStory[], overrides: Partial<Stories
 });
 
 export const MIXED = view([
-  rendered("components-badge--new", { state: "new", runId: OTHER_RUN_ID, dirty: true }),
+  rendered("components-badge--new", { state: "added", runId: OTHER_RUN_ID, dirty: true }),
   rendered("components-button--primary", { state: "changed", decision: approved().decision }),
   rendered("components-card--default"),
   rendered("components-list--broken", { state: "failed" }),

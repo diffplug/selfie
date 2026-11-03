@@ -160,7 +160,7 @@ describe("accept", () => {
     expect(outcome).toMatchObject({ accepted: true, refusals: [] });
     expect(outcome.view.acceptedRunId).toBe(runId);
     const later = (await review()).json;
-    expect(later.counts).toMatchObject({ unchanged: 1, new: 0 });
+    expect(later.counts).toMatchObject({ unchanged: 1, added: 0 });
   });
 
   test("a removal must be acknowledged, with the count there is", async () => {
@@ -218,7 +218,7 @@ describe("accept", () => {
     expect(view.branchGoldens).toBe(first.gitSha);
     expect(view.rows.map(({ story, state }: any) => [story, state])).toEqual([["a", "changed"]]);
     expect(view.counts).toMatchObject({ unchanged: 1, changed: 1 });
-    expect(view.refusals).toEqual([{ reason: "unapproved", stories: [{ story: "a", state: "new", decision: null }] }]);
+    expect(view.refusals).toEqual([{ reason: "unapproved", stories: [{ story: "a", state: "added", decision: null }] }]);
     const unchanged = (await (await get(`/api/runs/${runId}/unchanged`)).json()) as any;
     expect(unchanged.rows.map(({ story }: any) => story)).toEqual(["b"]);
 

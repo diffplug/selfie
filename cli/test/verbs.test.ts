@@ -138,7 +138,7 @@ describe("a branch when the default branch has no goldens", () => {
     expect(code).toBe(1);
     expect(json.comparedWith).toEqual({ source: "branch", sha: first.gitSha, run: null });
     expect(json.baseline).toMatchObject({ sha: null, reason: "no-goldens" });
-    expect(json.counts).toMatchObject({ unchanged: 1, changed: 1, new: 0, undecided: 1 });
+    expect(json.counts).toMatchObject({ unchanged: 1, changed: 1, added: 0, undecided: 1 });
     expect(json.differences.map(({ story, state }: any) => [story, state])).toEqual([["a--one", "changed"]]);
     expect(json.differences[0].pixelDiff.changedPixels).toBeGreaterThan(0);
     expect(json.next.join()).toContain("only to look at");
@@ -170,7 +170,7 @@ describe("a branch when the default branch has no goldens", () => {
 
     const refused = await h.cli("accept", json.runId);
     expect(refused.code).toBe(1);
-    expect(refused.json.refusals[0].stories).toEqual([{ story: "a--one", state: "new", decision: "rejected" }]);
+    expect(refused.json.refusals[0].stories).toEqual([{ story: "a--one", state: "added", decision: "rejected" }]);
     expect((await h.cli("approve", json.runId, "--story", "a--one")).code).toBe(0);
     expect((await h.cli("accept", json.runId)).code).toBe(0);
   });

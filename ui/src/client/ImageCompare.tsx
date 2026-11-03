@@ -376,7 +376,7 @@ export function ImageCompare({ row, diff, scale, groups, selection, runId, feedb
       </Text>
       {mode === "side" ? (
         <div className="selfie-panes" data-count={sources.length}>
-          {/* Keyed by image, so a new story never shows the last one's image while its own loads. */}
+          {/* Keyed by image, so an added story never shows the last one's image while its own loads. */}
           {sources.map(({ name, src }) => (
             <Pane
               key={src}

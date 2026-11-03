@@ -59,7 +59,7 @@ export const rows = {
   several: changedBetween("several-golden"),
   pushed: changedBetween("pushed-long"),
   double: changedBetween("doubleChanged-doubleGolden"),
-  fresh: (story: string, extras: Extras = {}) => snapshot({ story, state: "new", imageHash: HASHES.fresh, ...extras }),
+  fresh: (story: string, extras: Extras = {}) => snapshot({ story, state: "added", imageHash: HASHES.fresh, ...extras }),
   removed: (story: string) => snapshot({ story, state: "removed", goldenHash: HASHES.gone }),
   failed: (story: string) =>
     snapshot({ story, state: "failed", goldenHash: HASHES.golden, failure: "Render threw: Cannot read properties of undefined (reading 'name')" }),
@@ -104,7 +104,7 @@ export function viewOf(
     ...unapproved.map(({ story, state, decision: made }) =>
       made?.decision === "rejected"
         ? { story, reason: "rejected" as const, detail: made.actor }
-        : { story, reason: `${state}-unapproved` as "changed-unapproved" | "new-unapproved", detail: null },
+        : { story, reason: `${state}-unapproved` as "changed-unapproved" | "added-unapproved", detail: null },
     ),
     ...removed.map(({ story }) => ({ story, reason: "removed" as const, detail: null })),
     ...(run.storyFilter?.unmatched ?? []).map((pattern) => ({ story: null, reason: "pattern-unmatched" as const, detail: pattern })),
@@ -142,7 +142,7 @@ export function viewOf(
       stories: unchanged + list.filter(({ state }) => state !== "removed" && state !== "unchanged").length,
       unchanged,
       changed: inState("changed").length,
-      new: inState("new").length,
+      added: inState("added").length,
       removed: removed.length,
       failed: failed.length,
       undecided: undecided.length,

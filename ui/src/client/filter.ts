@@ -9,7 +9,7 @@ export const SHOW_OPTIONS = [
   ["undecided", "Needs a decision"],
   ["changed", "Changed"],
   ["layout", "Moved and spacing only"],
-  ["new", "New"],
+  ["added", "Added"],
   ["removed", "Removed"],
   ["failed", "Failed"],
   ["approved", "Approved"],

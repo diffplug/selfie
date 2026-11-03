@@ -20,7 +20,7 @@ export function findRenames(rows: readonly ComparedRow[]): ReadonlyMap<string, s
     if (state === "removed" && goldenHash !== null) removedByImage.set(goldenHash, [...(removedByImage.get(goldenHash) ?? []), story]);
   }
   const candidates = rows.flatMap(({ state, story, imageHash }) =>
-    state !== "new" || imageHash === null ? [] : (removedByImage.get(imageHash) ?? []).map((from) => ({ to: story, from, closeness: closeness(story, from) })),
+    state !== "added" || imageHash === null ? [] : (removedByImage.get(imageHash) ?? []).map((from) => ({ to: story, from, closeness: closeness(story, from) })),
   );
   // Closest first, then by name, so the same rows always pair the same way.
   candidates.sort((a, b) => b.closeness - a.closeness || a.to.localeCompare(b.to) || a.from.localeCompare(b.from));

@@ -83,15 +83,15 @@ describe("the run view", () => {
     const response = await get(`/api/runs/${json.runId}`);
     expect(response.headers.get("cache-control")).toBe("no-store");
     const view = (await response.json()) as any;
-    expect(view.counts).toEqual({ stories: 4, unchanged: 1, changed: 1, new: 1, removed: 1, failed: 1, undecided: 2, advisories: 1 });
+    expect(view.counts).toEqual({ stories: 4, unchanged: 1, changed: 1, added: 1, removed: 1, failed: 1, undecided: 2, advisories: 1 });
     expect(view.rows.map(({ story, state }: any) => [story, state])).toEqual([
       ["breaks", "failed"],
       ["differs", "changed"],
-      ["fresh", "new"],
+      ["fresh", "added"],
       ["same", "unchanged"],
       ["gone", "removed"],
     ]);
-    expect(view.blockers.map(({ reason }: any) => reason).sort()).toEqual(["changed-unapproved", "failed", "new-unapproved", "removed"]);
+    expect(view.blockers.map(({ reason }: any) => reason).sort()).toEqual(["added-unapproved", "changed-unapproved", "failed", "removed"]);
     expect(view.advisories).toEqual([{ story: "same", reason: "play-error", detail: "It threw" }]);
     expect(view.rows.find(({ story }: any) => story === "breaks")).toMatchObject({ failure: "render: It broke", imageHash: null });
     expect(view.rows.find(({ story }: any) => story === "differs").pixelDiff).toMatchObject({ changedPixels: 64 });

@@ -351,7 +351,7 @@ describe("a reused run is a real run", () => {
     await newCommit();
     const reused = await review();
     expect(reused.code).toBe(1);
-    expect(reasons(reused.json.blockers)).toEqual(["new-unapproved", "new-unapproved"]);
+    expect(reasons(reused.json.blockers)).toEqual(["added-unapproved", "added-unapproved"]);
     expect((await h.cli("accept", reused.json.runId)).code).toBe(1);
 
     expect((await h.cli("approve", reused.json.runId, "--all")).code).toBe(0);

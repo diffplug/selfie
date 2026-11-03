@@ -126,7 +126,7 @@ export function describeSnapshotContract(
       expect(compared).toEqual([
         { story: "b", state: "changed", imageHash: hashOf(5), goldenHash: hashOf(2), failure: null, playError: null, decision: null },
         { story: "c", state: "failed", imageHash: null, goldenHash: hashOf(3), failure: "Render threw", playError: null, decision: null },
-        { story: "e", state: "new", imageHash: hashOf(6), goldenHash: null, failure: null, playError: null, decision: null },
+        { story: "e", state: "added", imageHash: hashOf(6), goldenHash: null, failure: null, playError: null, decision: null },
         { story: "d", state: "removed", imageHash: null, goldenHash: hashOf(4), failure: null, playError: null, decision: null },
       ]);
     });
@@ -150,7 +150,7 @@ export function describeSnapshotContract(
         a: "unchanged",
         b: "changed",
         c: "unchanged",
-        e: "new",
+        e: "added",
         d: "removed",
       });
       expect(again.unchangedCount).toBe(2);
@@ -166,7 +166,7 @@ export function describeSnapshotContract(
       await expect(snapshots.compareRun(other.id, SHA_0)).rejects.toMatchObject({ code: "no-goldens" });
       const { snapshots: compared } = await snapshots.compareRun(other.id, null);
       // Approved in "shared" and not here, so a decision doesn't cross either.
-      expect(compared).toMatchObject([{ story: "a", state: "new", decision: null }]);
+      expect(compared).toMatchObject([{ story: "a", state: "added", decision: null }]);
     });
 
     it("leaves a crashed run recording, beside the new run that replaces it", async () => {
@@ -258,7 +258,7 @@ export function describeSnapshotContract(
       expect(unchangedCount).toBe(1);
       expect(compared.map(({ story, state, goldenHash }) => [story, state, goldenHash])).toEqual([
         ["b", "changed", hashOf(2)],
-        ["fresh", "new", null],
+        ["fresh", "added", null],
         ["gone", "removed", hashOf(4)],
       ]);
 

@@ -54,7 +54,7 @@ const USAGE = `Usage: selfie [--port <n>] [--storybook-dir <dir>] [--native] [--
 
   approve <run> (--all | --story <pattern>...) [--actor <who>]
   reject <run> (--all | --story <pattern>...) [--actor <who>]
-      Decides on a run's changed and new images. Works on a dirty tree.
+      Decides on a run's changed and added images. Works on a dirty tree.
 
   accept <run> [--removed <n>]
       Makes a run the goldens of its Git SHA. Needs a run recorded on a clean tree, every

@@ -55,7 +55,7 @@ All 1,623 of those images came back from `sharp` with exactly the same pixels, i
 
 **The fallback.** 16,384 on either side was refused by `sharp`, with 16,383 accepted. The tallest of those stories is 9,898, so it stays rare, but it's only a few lines since PNG decoding has to exist anyway for what Chromium writes.
 
-**Encoding in the store.** The rule was once that the store never encodes. Encoding before `Store.putImages` would encode every image of every run, when nearly all of them are already stored, since only the store knows which are new. So it asks an injected codec, for new images only.
+**Encoding in the store.** The rule was once that the store never encodes. Encoding before `Store.putImages` would encode every image of every run, when nearly all of them are already stored, since only the store knows which are new. So it asks an injected codec, for added images only.
 
 **`sharp`'s license.** `sharp` is Apache-2.0. Its prebuilt `@img/sharp-libvips-*` packages are LGPL-3.0-or-later, installed as separate npm packages and linked dynamically. That was read from their `package.json` files, and isn't legal advice.
 

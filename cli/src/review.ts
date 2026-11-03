@@ -78,7 +78,7 @@ export type GivenBaseline = { readonly sha: string; readonly run?: undefined } |
 
 export interface Difference {
   readonly story: string;
-  readonly state: "changed" | "new" | "removed";
+  readonly state: "changed" | "added" | "removed";
   readonly decision: Decision | null;
   readonly imageHash: string | null;
   readonly goldenHash: string | null;

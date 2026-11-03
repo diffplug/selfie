@@ -15,7 +15,7 @@ export interface RunSummary {
     readonly stories: number;
     readonly unchanged: number;
     readonly changed: number;
-    readonly new: number;
+    readonly added: number;
     /** Those within the run's filter. */
     readonly removed: number;
     readonly undecided: number;
@@ -58,7 +58,7 @@ export function summarizeRun({ run, snapshots, unchangedCount }: Comparison): Ru
     ...unapproved.map(({ story, state, decision }) =>
       decision?.decision === "rejected"
         ? { story, reason: "rejected" as const, detail: decision.actor }
-        : { story, reason: `${state}-unapproved` as "changed-unapproved" | "new-unapproved", detail: null },
+        : { story, reason: `${state}-unapproved` as "changed-unapproved" | "added-unapproved", detail: null },
     ),
     ...removed.map(({ story }) => ({ story, reason: "removed" as const, detail: null })),
     ...(run.storyFilter?.unmatched ?? []).map((pattern) => ({
@@ -74,7 +74,7 @@ export function summarizeRun({ run, snapshots, unchangedCount }: Comparison): Ru
   ];
 
   const changed = inState("changed").length;
-  const added = inState("new").length;
+  const added = inState("added").length;
   return {
     blockers,
     advisories,
@@ -82,7 +82,7 @@ export function summarizeRun({ run, snapshots, unchangedCount }: Comparison): Ru
       stories: unchangedCount + changed + added + failed.length,
       unchanged: unchangedCount,
       changed,
-      new: added,
+      added: added,
       removed: removed.length,
       undecided: undecided.length,
       advisories: advisories.length,

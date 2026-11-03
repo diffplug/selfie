@@ -49,7 +49,7 @@ describe.runIf(process.env.SELFIE_CLI_CONTAINER === "1")("in the pinned containe
   test("the whole loop: new, approved, accepted, unchanged, then changed with a diff", async () => {
     const first = await review(...STORIES);
     expect(first.status).toBe(1);
-    expect(first.json.counts).toMatchObject({ stories: 2, new: 2, undecided: 2 });
+    expect(first.json.counts).toMatchObject({ stories: 2, added: 2, undecided: 2 });
     expect(first.json.blockers).toHaveLength(2);
     expect(first.json.environment).toMatch(/^container-linux-arm64-/);
     expect(first.stderr).toContain("render 2/2");

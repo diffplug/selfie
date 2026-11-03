@@ -85,7 +85,7 @@ export function StoryFrame({ title, url, viewport }: { title: string; url: strin
 
 export function LiveStories({ row, view, open, onToggle }: { row: SnapshotRow; view: RunView; open: boolean; onToggle: () => void }) {
   const current = row.state === "removed" ? null : (view.storybook?.url ?? null);
-  const golden = row.state === "new" ? null : view.goldenStorybookUrl;
+  const golden = row.state === "added" ? null : view.goldenStorybookUrl;
   if (current === null && golden === null) return null;
   const side = (layer: "golden" | "current", url: string | null, missing: string) => (
     <div className="selfie-live-side">
@@ -111,7 +111,7 @@ export function LiveStories({ row, view, open, onToggle }: { row: SnapshotRow; v
             {view.viewport === null && " This run didn't record the size it rendered at, so these may lay out differently."}
           </Text>
           <div className="selfie-live-sides">
-            {side("golden", golden, row.state === "new" ? "A new story has no golden." : "The golden's built Storybook wasn't kept.")}
+            {side("golden", golden, row.state === "added" ? "An added story has no golden." : "The golden's built Storybook wasn't kept.")}
             {side("current", current, "A removed story isn't in this run.")}
           </div>
         </>

@@ -712,7 +712,7 @@ code {
   color: var(--fgColor-attention);
 }
 
-.selfie-state-mark[data-state="new"] {
+.selfie-state-mark[data-state="added"] {
   color: var(--fgColor-accent);
 }
 

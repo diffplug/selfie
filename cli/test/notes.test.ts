@@ -339,7 +339,7 @@ describe("waiting for feedback", () => {
     const wait = h.cli("agent-await-feedback");
     await untilWaiting();
     await sendTo("agent");
-    expect((await wait).json.notes[0].messages).toMatchObject([{ text: "Ready", new: true }]);
+    expect((await wait).json.notes[0].messages).toMatchObject([{ text: "Ready", added: true }]);
   });
 
   test("what's been copied isn't received again, even if it was sent to an agent that died", async () => {
@@ -441,7 +441,7 @@ describe("answers", () => {
     await answer(id, "About double");
     await project.notes.send();
     const { json } = await h.cli("agent-await-feedback");
-    expect(json.notes[0].messages.map(({ text, new: isNew }: any) => [text, isNew])).toEqual([
+    expect(json.notes[0].messages.map(({ text, added: isNew }: any) => [text, isNew])).toEqual([
       ["Make it bigger", false],
       ["How much bigger?", false],
       ["About double", true],

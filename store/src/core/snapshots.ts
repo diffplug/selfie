@@ -269,17 +269,17 @@ export interface Decision {
   readonly at: number;
 }
 
-export type SnapshotState = "unchanged" | "changed" | "new" | "removed" | "failed";
+export type SnapshotState = "unchanged" | "changed" | "added" | "removed" | "failed";
 
 /** Whether a snapshot in this state has an image that can take a decision. */
-export const isDecidable = (state: SnapshotState): boolean => state === "changed" || state === "new";
+export const isDecidable = (state: SnapshotState): boolean => state === "changed" || state === "added";
 
 export interface ComparedSnapshot {
   readonly story: string;
   readonly state: SnapshotState;
   /** The run's image. Null if `removed` or `failed`. */
   readonly imageHash: string | null;
-  /** The baseline's image. Null if `new`, and if `failed` with no golden for this name. */
+  /** The baseline's image. Null if `added`, and if `failed` with no golden for this name. */
   readonly goldenHash: string | null;
   /** Null unless `failed`. */
   readonly failure: string | null;
@@ -485,7 +485,7 @@ ORDER BY started_at DESC, key DESC`,
   /**
    * Gives a finished run's snapshots their states, from image hashes alone, against the
    * goldens of `baselineSha` in the run's own environment. A null baseline means there
-   * are none yet, so every rendered snapshot is `new`. Lists only what a reviewer needs
+   * are none yet, so every rendered snapshot is `added`. Lists only what a reviewer needs
    * unless told otherwise: see `Comparison`.
    */
   async compareRun(runId: string, baselineSha: string | null, options?: CompareOptions): Promise<Comparison> {
@@ -838,7 +838,7 @@ function toComparedSnapshot(row: SqlRow): ComparedSnapshot {
     imageHash === null
       ? "failed"
       : goldenHash === null
-        ? "new"
+        ? "added"
         : imageHash === goldenHash
           ? "unchanged"
           : "changed";

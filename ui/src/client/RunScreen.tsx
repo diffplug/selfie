@@ -126,7 +126,7 @@ const BLOCKERS: readonly { readonly reason: BlockerReason; readonly show?: Show 
   { reason: "failed", show: "failed" },
   { reason: "rejected", show: "rejected" },
   { reason: "changed-unapproved", show: "undecided" },
-  { reason: "new-unapproved", show: "undecided" },
+  { reason: "added-unapproved", show: "undecided" },
   { reason: "removed", show: "removed" },
   { reason: "pattern-unmatched" },
 ];
@@ -227,7 +227,7 @@ function BulkDialog({ pending, onClose }: { pending: PendingBulk; onClose: (conf
   const count = (test: (row: SnapshotRow) => boolean) => rows.filter(test).length;
   const facts = [
     [count(({ state }) => state === "changed"), "changed"],
-    [count(({ state }) => state === "new"), "new"],
+    [count(({ state }) => state === "added"), "added"],
     [count(({ decision: made }) => made?.decision === "approved"), "already approved"],
     [count(({ decision: made }) => made?.decision === "rejected"), "already rejected"],
     [count(hasAdvisory), "with an advisory"],
@@ -449,7 +449,7 @@ export function RunScreen({
         <Count label="Stories" count={counts.stories} onShow={showInList} />
         <Count label="Unchanged" count={counts.unchanged} show="unchanged" onShow={showInList} />
         <Count label="Changed" count={counts.changed} show="changed" onShow={showInList} />
-        <Count label="New" count={counts.new} show="new" onShow={showInList} />
+        <Count label="Added" count={counts.added} show="added" onShow={showInList} />
         <Count label="Removed" count={counts.removed} show="removed" onShow={showInList} />
         <Count label="Failed" count={counts.failed} show="failed" onShow={showInList} />
         <Count label="Undecided" count={counts.undecided} show="undecided" onShow={showInList} />

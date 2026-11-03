@@ -54,7 +54,7 @@ export interface PixelDiff {
 export type BlockerReason =
   | "failed"
   | "changed-unapproved"
-  | "new-unapproved"
+  | "added-unapproved"
   | "rejected"
   | "removed"
   | "pattern-unmatched";
@@ -152,7 +152,7 @@ export interface RunView {
     readonly stories: number;
     readonly unchanged: number;
     readonly changed: number;
-    readonly new: number;
+    readonly added: number;
     readonly removed: number;
     readonly failed: number;
     readonly undecided: number;

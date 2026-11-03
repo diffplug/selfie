@@ -16,7 +16,7 @@ Source of truth: `cli/src/cli.ts`, `cli/src/document.ts`; the real binary's test
 | `selfie flakes` | Renders a built Storybook several times, and prints what wasn't the same each time ([Flakes](#flakes)) |
 | `selfie skill <name>` | Prints a guide for a coding agent ([Flakes](#flakes)) |
 | `selfie review [<run>]` | Prints the diff of a run against its baseline. With no run, uses the one for this built Storybook, and records one [only if necessary](#recording-only-if-necessary) |
-| `selfie approve <run>`, `selfie reject <run>` | Records a decision on a run's changed and new images, with `--all` or `--story <pattern>` |
+| `selfie approve <run>`, `selfie reject <run>` | Records a decision on a run's changed and added images, with `--all` or `--story <pattern>` |
 | `selfie accept <run>` | Makes a run the goldens of its Git SHA |
 | `selfie find-baseline` | Prints the baseline this repository and environment would use |
 | `selfie push`, `selfie pull` | Moves a run and its goldens to and from a remote (`docs/specs/sync.md`) |
@@ -54,7 +54,7 @@ Source of truth: `cli/src/index.ts`; tests in `cli/test/library.test.ts`.
 | `accept(project, { runId, removedSeen })` | Returns `accepted`, `refusals`, `usableAsBaseline`, and the `comparison` |
 | `checkAccept(project, comparison, removedSeen)` | What `accept` would refuse of a comparison a caller holds, changing nothing: `refusals`, `usableAsBaseline`, and `removals` |
 | `summarizeRun(comparison)` | Returns `blockers`, `advisories`, `counts`, `undecided`, `unapproved`, `failed`, `removed`, and `notRendered` |
-| `isDecidable(state)` | Whether a snapshot in this state can take a decision: `changed` or `new`. Defined in `selfie-store` |
+| `isDecidable(state)` | Whether a snapshot in this state can take a decision: `changed` or `added`. Defined in `selfie-store` |
 | `compareAsReviewed(project, runId, options)` | A run compared with the baseline its reviewer saw |
 | `findBaseline(project, environment)`, `resolveRenderSettings(repo, { native })`, `gitUserEmail(repo)` | What the commands use for these |
 | `readReviewCache(project, runId)` | The paths and pixel diffs a review exported, or null once pruned |
@@ -107,7 +107,7 @@ A review of a named run starts at step 6. `selfie record` is steps 1 to 5, alway
 - **Must refuse a named run with any flag for making a run**, since it's already recorded.
 - **Must take `--baseline` as a run ID, or else anything Git resolves to a commit, whose goldens it means**, and fail with exit 2 if there's no such finished run in this environment or the commit has no goldens.
 - **Must keep `--baseline` to this one review.** It changes nothing about the run: `selfie approve` and `selfie accept` still compare with the baseline the run recorded, its exports go under `runs/<run id>/against/<baseline>/`, and `review.json` isn't written. It exits 1 if anything differs, even when every image is approved, since the question was what differs (rationale).
-- **Must do diff work only on a `changed` snapshot.** A `new` or `removed` one exports its one image, and an unchanged one nothing, unless it has an advisory.
+- **Must do diff work only on a `changed` snapshot.** A `added` or `removed` one exports its one image, and an unchanged one nothing, unless it has an advisory.
 - **Must write every exported image as a PNG, whatever the store keeps**, so a document's paths stay what they say and any agent can open them.
 - **Must report what changed as regions:** rectangles of each image that correspond and differ, with everything outside them matching once what's between them is lined up, found by a recursive 9-slice in `cli/src/regions.ts` (rationale).
 - **Must make regions depend on the two images alone**, so the same pair always gives the same regions, and a decision or a cache can rely on it.
@@ -135,7 +135,7 @@ Source of truth: `summarizeRun` in `cli/src/summary.ts`.
 | List | `reason` | When | `detail` |
 |---|---|---|---|
 | `blockers` | `failed` | The story failed to render, or its image was unusable | The failure |
-| | `changed-unapproved`, `new-unapproved` | Its image has no decision | |
+| | `changed-unapproved`, `added-unapproved` | Its image has no decision | |
 | | `rejected` | Its image is rejected | The actor |
 | | `removed` | The baseline has its golden, and this run doesn't have the story | |
 | | `pattern-unmatched` | A `--story` pattern matched nothing, while another did. `story` is null | The pattern |
@@ -181,7 +181,7 @@ Every path is absolute, and names a file that exists until it is pruned.
 | `comparedWith` | What this review compared with: `source`, one of `baseline`, `given`, or `branch`, and its `sha`, or its `run` if it's a run |
 | `environment` | Its ID |
 | `filter` | `patterns` and `notRendered`, or null with no `--story` |
-| `counts` | `stories`, `unchanged`, `changed`, `new`, `removed`, `undecided`, and `advisories` |
+| `counts` | `stories`, `unchanged`, `changed`, `added`, `removed`, `undecided`, and `advisories` |
 | `blockers[]`, `advisories[]` | `story`, `reason`, `detail` |
 | `differences[]` | `story`, `state`, `decision`, `imageHash`, `goldenHash`, `current`, `golden`, `diff`, `pixelDiff`, `regionGroups` |
 | `playErrors[]` | `story`, `playError`, `current` |
@@ -207,7 +207,7 @@ Source of truth: `cli/src/project.ts`.
 
 Source of truth: `decide` in `cli/src/decisions.ts`.
 
-- **Must decide on exactly the run's `changed` and `new` images selected by `--all` or `--story`, and require exactly one of those.** Unchanged images get no decision. Failed and removed ones have no image, and are listed under `skipped`.
+- **Must decide on exactly the run's `changed` and `added` images selected by `--all` or `--story`, and require exactly one of those.** Unchanged images get no decision. Failed and removed ones have no image, and are listed under `skipped`.
 - **Must work on a dirty tree**, so a user can approve work before committing it (`docs/specs/system.md` → Approvals).
 - **Must take the actor from `--actor`, or else `git config user.email`**, and fail if there's neither.
 - **Must compare against the baseline recorded on the run**, the one its reviewer saw.

@@ -82,7 +82,7 @@ It takes 4 to 10 ms an image on average, 17 ms at worst, and a story's stats com
 
 **Twenty.** It is meant to outlast an agent's review, fix, review cycle within one task, and be small. Run directories only hold what differs: the 541-story review with nothing changed left 48 KB, holding the images of the 2 stories with `play` errors, and one with 130 changed stories left 14 MB, or about 110 KB per changed story. Twenty runs each changing all 541 would hold about 1.2 GB. A render directory holds every story's PNG, so it can't outlive its review.
 
-**The store still grows.** Blobs grow only with new images, but nothing deletes either them or a run's rows: `docs/specs/snapshots.md` → Open questions owns retention. After the 12 runs below and in the sample loop, holding 2,914 run rows and 650 images, `store.db` was 512 KB and `blobs/` 25 MB.
+**The store still grows.** Blobs grow only with added images, but nothing deletes either them or a run's rows: `docs/specs/snapshots.md` → Open questions owns retention. After the 12 runs below and in the sample loop, holding 2,914 run rows and 650 images, `store.db` was 512 KB and `blobs/` 25 MB.
 
 ## Accept
 
@@ -119,7 +119,7 @@ It takes 4 to 10 ms an image on average, 17 ms at worst, and a story's stats com
 
 | 541-story review | Exit | Wall | Render | Store | Compare | Diff |
 |---|---|---|---|---|---|---|
-| First, 512 new images, 29 unchanged | 1 | 72.3 s | 63.1 s | 8.9 s | 2 ms | 56 ms |
+| First, 512 added images, 29 unchanged | 1 | 72.3 s | 63.1 s | 8.9 s | 2 ms | 56 ms |
 | Nothing changed, twice | 0 | 68.6 s, 70.1 s | 64.2 s, 65.7 s | 4.2 s, 4.1 s | 1 ms, 1 ms | 3 ms, 3 ms |
 | 130 changed by a CSS color | 1 | 73.9 s | 66.6 s | 5.3 s | 1 ms | 1,656 ms |
 

@@ -317,7 +317,7 @@ describe("another machine", () => {
     // The same images here are unchanged against what was pulled.
     await commit(desktopRepo, "more");
     const { json: reviewed } = await desktop(null, "review", "--storybook-dir", "ignored");
-    expect(reviewed.counts).toMatchObject({ unchanged: 2, changed: 0, new: 0 });
+    expect(reviewed.counts).toMatchObject({ unchanged: 2, changed: 0, added: 0 });
   });
 
   test("finds the nearest baseline in the cloud, if it isn't told a commit", async () => {

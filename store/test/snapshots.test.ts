@@ -196,7 +196,7 @@ describe("Snapshots", () => {
       await snapshots.recordSnapshots(run.id, [rendered("a", 2), { story: "b", failure: "Crash" }]);
       expect(await snapshots.finishRun(run.id, 2)).toMatchObject({ status: "failed", failedCount: 1 });
       expect(await heldBy(run.id)).toMatchObject([
-        { story: "a", state: "new", imageHash: hashOf(2), failure: null },
+        { story: "a", state: "added", imageHash: hashOf(2), failure: null },
         { story: "b", state: "failed", imageHash: null, failure: "Crash" },
       ]);
 
@@ -227,10 +227,10 @@ describe("Snapshots", () => {
       expect(sent.flat()).toHaveLength(1);
       await model.finishRun(run.id, 5);
       expect(await heldBy(run.id)).toMatchObject([
-        { story: "a", state: "new" },
+        { story: "a", state: "added" },
         { story: "b", state: "failed" },
-        { story: "c", state: "new" },
-        { story: "d", state: "new" },
+        { story: "c", state: "added" },
+        { story: "d", state: "added" },
         { story: "e", state: "failed" },
       ]);
     });
@@ -377,7 +377,7 @@ describe("Snapshots", () => {
         model,
       );
       const states = await statesOf(head.id, SHA_A, model);
-      expect(states).toEqual({ a: "unchanged", b: "changed", c: "new", d: "failed", gone: "removed" });
+      expect(states).toEqual({ a: "unchanged", b: "changed", c: "added", d: "failed", gone: "removed" });
       expect(await model.runsAt(SHA_B, ENV)).toHaveLength(1);
       expect(await model.hasCompleteGoldens(SHA_A, ENV)).toBe(true);
       expect(await model.getRun(head.id)).toMatchObject({ failedCount: 1 });
@@ -756,7 +756,7 @@ describe("Snapshots", () => {
       );
       const counts: Record<string, number> = {};
       for (const { state } of compared) counts[state] = (counts[state] ?? 0) + 1;
-      expect(counts).toEqual({ unchanged: N - 200, changed: 100, failed: 50, new: 50, removed: 50 });
+      expect(counts).toEqual({ unchanged: N - 200, changed: 100, failed: 50, added: 50, removed: 50 });
 
       await measure("hasCompleteGoldens", () => model.hasCompleteGoldens(SHA_A, ENV));
 

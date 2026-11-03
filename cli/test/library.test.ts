@@ -31,10 +31,10 @@ afterEach(async () => {
   await h.destroy();
 });
 
-test("isDecidable is true only of what has a new image", () => {
-  expect(["changed", "new", "unchanged", "removed", "failed"].filter((state) => isDecidable(state as any))).toEqual([
+test("isDecidable is true only of what has an added image", () => {
+  expect(["changed", "added", "unchanged", "removed", "failed"].filter((state) => isDecidable(state as any))).toEqual([
     "changed",
-    "new",
+    "added",
   ]);
 });
 
@@ -76,8 +76,8 @@ describe("review", () => {
     expect(reviewed.dirtyPaths).toEqual([]);
     expect(reviewed.timings.totalMs).toBeGreaterThanOrEqual(0);
     expect(summarizeRun(reviewed.comparison).blockers.map(({ reason }) => reason)).toEqual([
-      "new-unapproved",
-      "new-unapproved",
+      "added-unapproved",
+      "added-unapproved",
     ]);
     // No wording about commands anywhere in a result.
     expect(JSON.stringify(reviewed)).not.toContain("selfie approve");
@@ -95,8 +95,8 @@ describe("review", () => {
       {
         reason: "unapproved",
         stories: [
-          { story: "a", state: "new", decision: "rejected" },
-          { story: "b", state: "new", decision: "rejected" },
+          { story: "a", state: "added", decision: "rejected" },
+          { story: "b", state: "added", decision: "rejected" },
         ],
       },
     ]);
