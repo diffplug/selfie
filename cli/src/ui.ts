@@ -7,10 +7,10 @@ import { resolveCaptureSettings, resolveRegionMergeDistance } from "./config.ts"
 import { accept, checkAccept, decide } from "./decisions.ts";
 import { diffToPng, type PixelDiff } from "./diff.ts";
 import { SelfieError } from "./errors.ts";
-import { gitUserEmail, headSha, type BaselineSearch } from "./git.ts";
+import { gitUserEmail, type BaselineSearch } from "./git.ts";
 import { isOpenNote } from "selfie-ui/notes";
 import { sentNotes, textForAgent } from "./notes.ts";
-import { branchGoldens, compareAsReviewed, findBaseline, readReviewCache, requireRun, type Project } from "./project.ts";
+import { branchGoldens, compareAsReviewed, findBaseline, readReviewCache, requireRun, runsAtHead, type Project } from "./project.ts";
 import { summarizeRun } from "./summary.ts";
 
 /** Each is about 20 KB of PNG. This is a reviewer going back and forth, not a cache of a run. */
@@ -122,8 +122,7 @@ export function localReviewSource(project: Project, { native }: { readonly nativ
 
     async current(): Promise<CurrentView> {
       const { environmentId: environment } = await resolveCaptureSettings(repo, { native });
-      const head = await headSha(repo);
-      const runs = head === null ? [] : await snapshots.runsAt(head, environment);
+      const { head, runs } = await runsAtHead(project, environment);
       const runId = runs.find(({ status }) => status !== "recording")?.id ?? null;
       return {
         head,

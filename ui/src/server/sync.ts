@@ -130,7 +130,7 @@ const sameStories = (p: readonly string[], q: readonly string[]) => p.length ===
 const refused = (code: string, message: string): GoldensAnswer => ({ outcome: "refused", acceptedRunId: null, refusal: { code, message } });
 
 /** The cloud decides a SHA's goldens: `docs/specs/sync.md` -> Goldens. */
-async function makeGoldens({ snapshots }: SyncProject, id: string, removed: readonly string[]): Promise<GoldensAnswer> {
+async function makeGoldens({ snapshots }: SyncProject, id: string, baselineSha: string | null, removed: readonly string[]): Promise<GoldensAnswer> {
   const run = await snapshots.getRun(id);
   if (run === null) throw new Refusal(404, "unknown-run", `No run ${id} in this project.`);
   const accepted = await snapshots.acceptedRunAt(run.gitSha, run.environment);
@@ -139,11 +139,11 @@ async function makeGoldens({ snapshots }: SyncProject, id: string, removed: read
     return { outcome: "conflict", acceptedRunId: accepted, refusal: { code: "goldens-conflict", message: `Run ${accepted} is already the goldens of ${run.gitSha}, and a push never replaces them.` } };
   }
   try {
-    const found = await snapshots.removedFrom(id, run.baselineSha);
+    const found = await snapshots.removedFrom(id, baselineSha);
     if (!sameStories(found, removed)) {
       return refused("wrong-removed", `This would remove ${found.length} goldens here, and not the ${removed.length} you named: ${found.join(", ") || "none"}.`);
     }
-    if (!(await snapshots.acceptRun(id, run.baselineSha, found.length))) {
+    if (!(await snapshots.acceptRun(id, baselineSha, found.length))) {
       return refused("not-approved", "Some of this run's images are neither the same as the baseline's, nor approved.");
     }
     return { outcome: "accepted", acceptedRunId: id, refusal: null };
@@ -289,11 +289,11 @@ export function createSyncApi(host: SyncHost): Hono {
 
   api.post("/projects/:project/goldens", async (context) => {
     const project = await projectOf(context);
-    const { runId, removed } = await bodyOf(context);
+    const { runId, baselineSha, removed } = await bodyOf(context);
     const named = listOf(removed ?? [], SYNC_LIMITS.snapshots, "removed").map((story) => readText(story, "A removed story"));
     // With nothing removed, this makes no judgment: docs/specs/sync.md -> Goldens.
     refuseUnless(project.access.decider !== null || (project.access.upload && named.length === 0));
-    return context.json(await makeGoldens(project, readRunId(runId), named));
+    return context.json(await makeGoldens(project, readRunId(runId), orNull(baselineSha, (sha) => readSha(sha, "baselineSha")), named));
   });
 
   api.get("/projects/:project/goldens", async (context) => {

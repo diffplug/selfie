@@ -9,7 +9,7 @@ import { SqliteAdapter } from "selfie-store/adapters/sqlite";
 import { Blobs, initStoreSchema, Snapshots, Sql, Store, type CompareOptions, type Comparison, type Run } from "selfie-store";
 import type { PixelDiff } from "./diff.ts";
 import { SelfieError } from "./errors.ts";
-import { nearestOnBranch, openRepo, walkToBaseline, type BaselineSearch, type Repo } from "./git.ts";
+import { headSha, nearestOnBranch, openRepo, walkToBaseline, type BaselineSearch, type Repo } from "./git.ts";
 import { CREATE_NOTES_TABLES, notesIn, type Notes } from "./notes.ts";
 import { assertRunId, isRunId, projectSlug, selfieHome } from "./paths.ts";
 
@@ -89,6 +89,12 @@ export async function openProject({ cwd, env }: { cwd: string; env: NodeJS.Proce
     snapshots: new Snapshots({ sql }),
     close: () => adapter.close(),
   };
+}
+
+/** HEAD, and the runs there in an environment, newest first. */
+export async function runsAtHead(project: Project, environment: string): Promise<{ readonly head: string | null; readonly runs: readonly Run[] }> {
+  const head = await headSha(project.repo);
+  return { head, runs: head === null ? [] : await project.snapshots.runsAt(head, environment) };
 }
 
 /** The baseline this project would use now, in an environment. */

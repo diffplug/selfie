@@ -5,7 +5,10 @@ export function chunks<T>(items: readonly T[], size: number): T[][] {
   return groups;
 }
 
-/** Runs `work` on each item, at most `limit` at a time, and returns the results in order. */
+/**
+ * Runs `work` on each item, at most `limit` at a time, and returns the results in order. After one
+ * fails, nothing new starts, though what's already running finishes.
+ */
 export async function mapConcurrently<Item, Result>(
   items: readonly Item[],
   limit: number,
@@ -13,12 +16,18 @@ export async function mapConcurrently<Item, Result>(
 ): Promise<Result[]> {
   const results: Result[] = new Array(items.length);
   let next = 0;
+  let failed = false;
   await Promise.all(
     Array.from({ length: Math.min(limit, items.length) }, async () => {
-      while (next < items.length) {
+      while (next < items.length && !failed) {
         const at = next;
         next += 1;
-        results[at] = await work(items[at]!);
+        try {
+          results[at] = await work(items[at]!);
+        } catch (error) {
+          failed = true;
+          throw error;
+        }
       }
     }),
   );

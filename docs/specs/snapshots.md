@@ -125,8 +125,6 @@ Source of truth: `store/src/core/snapshots.ts`; `store/test/snapshots.test.ts` m
 
 ## Future
 
-**Scope: sync** is designed in `docs/specs/sync.md`. What's here is ready for it.
-
 ### Decisions on regions
 
 A decision is on a name and a whole image today ([Decisions](#decisions)). **Scope: regions** (`docs/specs/cli.md` → Future) makes a whole-image decision the case of one region, and needs a key that survives what regions are for:

@@ -1,6 +1,6 @@
 # CLI
 
-> Status: built — the `selfie-cli` library and the `selfie` binary: `review`, `approve`, `reject`, `accept`, `find-baseline`, and `ui`, on the local store. Nothing here reaches the cloud; see `## Future`.
+> Status: built — the `selfie-cli` library and the `selfie` binary: `review`, `approve`, `reject`, `accept`, `find-baseline`, and `ui`, on the local store. `docs/specs/sync.md` owns `push`, `pull`, and what a remote adds to `find-baseline`; see `## Future`.
 >
 > - See `docs/specs/glossary.md` for run, snapshot, golden, baseline, decision, and environment.
 > - Owns local data's layout, each command's checks and exit code, and the shape of what they print and return. `docs/specs/snapshots.md` owns what a run, a decision, and a golden are. `docs/specs/render.md` owns capture. `docs/specs/store.md` owns images.
@@ -16,6 +16,7 @@ Source of truth: `cli/src/cli.ts`, `cli/src/document.ts`; the real binary's test
 | `selfie approve <run>`, `selfie reject <run>` | Records a decision on a run's changed and new images, with `--all` or `--story <pattern>` |
 | `selfie accept <run>` | Makes a run the goldens of its Git SHA |
 | `selfie find-baseline` | Prints the baseline this repository and environment would use |
+| `selfie push`, `selfie pull` | Moves a run and its goldens to and from a remote (`docs/specs/sync.md`) |
 | `selfie notes` | Prints the open notes a person has sent to an agent from this folder (`docs/specs/feedback.md`) |
 | `selfie reply <note> <text>` | Answers a note (`docs/specs/feedback.md`) |
 | `selfie agent-await-feedback` | Blocks until a person sends notes from this folder (`docs/specs/feedback.md`) |
@@ -250,7 +251,7 @@ Source of truth: `cli/src/git.ts`; tests in `cli/test/git.test.ts`, on real Git 
 
 It prints `sha`, `reason`, `message`, `defaultBranch`, `mergeBase`, and `environment`.
 
-- **Must use local data only.** `sync` adds the cloud's goldens ([Future](#future)).
+- **Must use local data only, unless a remote is set** (`docs/specs/sync.md` → Commands).
 
 ## ui
 
@@ -292,8 +293,6 @@ Story IDs come from a project's build, and a manifest's paths from a directory i
 - **Must refuse a run ID that isn't a lowercase UUID before it reaches a path.**
 
 ## Future
-
-**Scope: sync** is designed in `docs/specs/sync.md`, which owns what it adds to this CLI.
 
 ### Regions
 
