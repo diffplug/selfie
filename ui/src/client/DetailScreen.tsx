@@ -1,10 +1,10 @@
 // One snapshot: its images, its numbers, and its decision, with the keyboard doing most of the work.
-import { ArrowLeftIcon, CheckIcon, XIcon } from "@primer/octicons-react";
-import { Banner, Button, Dialog, Heading, RelativeTime, Stack, Text } from "@primer/react";
+import { ArrowLeftIcon, CheckIcon, LinkExternalIcon, XIcon } from "@primer/octicons-react";
+import { Banner, Button, Dialog, Heading, Link, RelativeTime, Stack, Text } from "@primer/react";
 import { AriaStatus } from "@primer/react/experimental";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { isDecidable } from "selfie-store";
-import type { DecisionKind, PixelDiff, RunView, SnapshotRow } from "../shared/api.ts";
+import type { DecisionKind, PixelDiff, RunView, SnapshotRow, StorybookLink } from "../shared/api.ts";
 import { diffImageUrl, fetchDiff, imageUrl } from "./api.ts";
 import { applyFilter, neighbors, parseFilter, targetsOf } from "./filter.ts";
 import { useFetched, useHotkeys, useRegionSelection, useTitle, type FeedbackState, type RunState } from "./hooks.ts";
@@ -68,6 +68,19 @@ function PixelStats({ stats }: { stats: PixelDiff }) {
       {stats.maxChannelDelta > 0 && ` The largest difference in a channel is ${stats.maxChannelDelta} of 255.`}
       {account.length > 0 && " In the diff, pink changed, blue moved, and yellow is spacing that grew or shrank."}
     </Text>
+  );
+}
+
+/** The real page, on the Storybook's own origin, saying if it may not be what rendered this image. */
+function StorybookLinkTo({ storybook, story }: { storybook: StorybookLink; story: string }) {
+  return (
+    <>
+      <Link href={`${storybook.url}?path=/story/${encodeURIComponent(story)}`} target="_blank" rel="noreferrer noopener">
+        Open in Storybook <LinkExternalIcon />
+      </Link>
+      {storybook.renderedThisRun === false && <Text className="selfie-muted">A different build from this run&apos;s, so it may not match.</Text>}
+      {storybook.renderedThisRun === null && <Text className="selfie-muted">Selfie doesn&apos;t know if this build rendered this run, so it may not match.</Text>}
+    </>
   );
 }
 
@@ -201,9 +214,12 @@ export function DetailScreen({ state, view, story, search, feedback }: { state: 
       </Stack>
 
       <Stack direction="horizontal" align="center" justify="space-between" wrap="wrap" gap="condensed">
-        <Heading as="h2" variant="small" className="selfie-story-title">
-          {row.story}
-        </Heading>
+        <Stack direction="horizontal" align="center" gap="condensed" wrap="wrap">
+          <Heading as="h2" variant="small" className="selfie-story-title">
+            {row.story}
+          </Heading>
+          {view.storybook !== null && row.state !== "removed" && <StorybookLinkTo storybook={view.storybook} story={row.story} />}
+        </Stack>
         {decidable && (
           <Stack direction="horizontal" gap="condensed">
             <Button variant="primary" leadingVisual={CheckIcon} disabled={state.busy} onClick={() => void decide("approved")} trailingVisual={() => <Keys keys="a" onPrimary />}>

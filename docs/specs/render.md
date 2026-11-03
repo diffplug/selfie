@@ -83,7 +83,7 @@ Source of truth: `render/src/manifest.ts`; tests in `render/test/manifest.test.t
 
 Source of truth: `render/src/identity.ts`; tests in `render/test/identity.test.ts`.
 
-`renderIdentity({ storybookDir, environment, initScript })` returns one string that changes whenever a render of that build could change, for `docs/specs/cli.md` → Recording only if necessary to recognize it by. It lives beside `capture`, so a new capture option that can change pixels sits next to what it has to update.
+`buildHash(storybookDir)` returns a SHA256 of a build alone, or null if it's missing or holds a symlink, for telling which build rendered a run. `renderIdentity({ storybookDir, environment, initScript })` returns one string that changes whenever a render of that build could change, for `docs/specs/cli.md` → Recording only if necessary to recognize it by. It lives beside `capture`, so a new capture option that can change pixels sits next to what it has to update.
 
 - **Must depend on all of these, so that any one changing changes the identity:**
 

@@ -6,6 +6,7 @@ import path from "node:path";
 import {
   capture as realCapture,
   filterStories,
+  buildHash,
   renderIdentity,
   type Manifest,
   type ManifestStory,
@@ -24,7 +25,7 @@ import {
   type Run,
   type StoryFilter,
 } from "selfie-store";
-import { resolveCaptureSettings, resolveRegionMergeDistance, type CaptureSettings } from "./config.ts";
+import { resolveCaptureSettings, resolveRegionMergeDistance, resolveStorybookDir, type CaptureSettings } from "./config.ts";
 import { diffToPng, type PixelDiff } from "./diff.ts";
 import { SelfieError } from "./errors.ts";
 import { dirtyPaths, headSha, resolveCommit, type BaselineSearch } from "./git.ts";
@@ -444,12 +445,13 @@ async function recordBuild(project: Project, options: RecordOptions, { reuse }: 
       throw new SelfieError("no-commits", "This repository has no commits yet, and a run is recorded against a Git SHA.");
     }
     const settings = await resolveCaptureSettings(repo, { native: options.native });
-    const storybookDir = path.resolve(project.cwd, options.storybookDir ?? settings.storybookDir ?? "storybook-static");
+    const storybookDir = resolveStorybookDir(project.cwd, options.storybookDir, settings);
     const baseline = await findBaseline(project, settings.environmentId);
     const dirtyBefore = await dirtyPaths(repo);
 
     // 3. Capture, unless asked to reuse and this exact build already rendered.
     const captureStarted = Date.now();
+    const buildBefore = await buildHash(storybookDir);
     const identity = await renderIdentity({ storybookDir, environment: settings.environment, initScript: settings.initScript });
     const replayed = identity !== null && reuse ? await replay(project, identity, options.stories, log) : null;
     const recording = replayed ?? (await renderFresh(project, captureDir, capture, { storybookDir, identity, settings, options, log }));
@@ -477,6 +479,8 @@ async function recordBuild(project: Project, options: RecordOptions, { reuse }: 
     if (existing === null) {
       log(`Recorded run ${run.id}: ${recording.storyIds.length} stories.`);
       await recording.finished(run);
+      // A build that changed while it rendered isn't what rendered these images, so nothing is said.
+      if (buildBefore !== null && buildBefore === (await buildHash(storybookDir))) await project.renders.rememberBuild(run.id, buildBefore);
     } else {
       log(`Run ${run.id} already describes this build at this commit, so nothing new was recorded. selfie record renders again.`);
     }

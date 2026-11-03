@@ -107,9 +107,19 @@ export interface BaselineNote {
 
 export type RunListing = Pick<Run, "id" | "startedAt" | "status" | "dirty">;
 
+/** The Storybook this server is hosting beside the review, to open a story's real, running page. */
+export interface StorybookLink {
+  /** Its own origin, ending in a slash. */
+  readonly url: string;
+  /** Whether that build rendered this run, or null if nobody knows. If it isn't so, a story may not look like its image. */
+  readonly renderedThisRun: boolean | null;
+}
+
 /** Everything a screen shows about a run, recomputed from `summarizeRun` after every action. */
 export interface RunView {
   readonly run: Run;
+  /** Null if there's no built Storybook to host. */
+  readonly storybook: StorybookLink | null;
   /** With no baseline, the nearest goldens on the run's branch, which `rows` compares with. Only to look at. */
   readonly branchGoldens: string | null;
   /** How close a diff's regions group here, in CSS pixels. */

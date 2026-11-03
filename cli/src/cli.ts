@@ -1,7 +1,7 @@
 // Arguments in, one document and an exit code out. The work is the library's.
 import { parseArgs, type ParseArgsConfig } from "node:util";
 import type { capture } from "selfie-render";
-import { resolveCaptureSettings } from "./config.ts";
+import { resolveCaptureSettings, resolveStorybookDir } from "./config.ts";
 import { accept, decide } from "./decisions.ts";
 import { buildAcceptDocument, buildRecordDocument, buildReviewDocument } from "./document.ts";
 import { SelfieError } from "./errors.ts";
@@ -47,10 +47,11 @@ const USAGE = `Usage: selfie <command>
   find-baseline [--native]
       Prints the nearest SHA at or before the merge-base with complete goldens, or null.
 
-  ui [<run>] [--port <n>] [--native]
+  ui [<run>] [--port <n>] [--storybook-dir <dir>] [--native]
       Serves the review UI on loopback until stopped, and prints its URL. Opens at this run, or
       else the newest at HEAD. It shows what's recorded, and never renders. Opens no
-      browser by itself.
+      browser by itself. Hosts the built Storybook on a port of its own, so a story's page links
+      to the real thing, which may be a later build than the one a run rendered.
 
   notes [--all]
       Prints the open notes a person has sent to an agent from this folder's review UI, each with
@@ -324,6 +325,7 @@ async function dispatch(command: string | undefined, args: string[], context: Co
       const { values, positionals } = parse(args, {
         port: { type: "string", default: "0" },
         native: { type: "boolean" },
+        "storybook-dir": { type: "string" },
       });
       const [runId, ...extra] = positionals;
       if (extra.length > 0) throw new SelfieError("usage", "Expected at most one run ID.");
@@ -334,22 +336,29 @@ async function dispatch(command: string | undefined, args: string[], context: Co
       return withProject(context, async (project) => {
         if (runId !== undefined) await compareAsReviewed(project, runId);
         // Only here, so that no other command loads a web server.
-        const [{ serveLocal }, { localReviewSource }] = await Promise.all([import("selfie-ui/local"), import("./ui.ts")]);
-        const server = await serveLocal({
-          source: localReviewSource(project, { native: values.native }),
-          port,
-          ...(context.uiClientDir === undefined ? {} : { clientDir: context.uiClientDir }),
-        });
+        const [{ serveLocal, serveStorybook }, { localReviewSource }] = await Promise.all([import("selfie-ui/local"), import("./ui.ts")]);
+        const dir = resolveStorybookDir(project.cwd, values["storybook-dir"], await resolveCaptureSettings(project.repo, { native: values.native }));
+        const hosted = await serveStorybook({ dir });
         try {
-          printJson(context, {
-            url: runId === undefined ? server.url : `${server.url}runs/${runId}`,
-            port: server.port,
-            runId: runId ?? null,
+          const server = await serveLocal({
+            source: localReviewSource(project, { native: values.native, storybook: { dir, url: hosted.url } }),
+            port,
+            ...(context.uiClientDir === undefined ? {} : { clientDir: context.uiClientDir }),
           });
-          context.stderr("Serving the review UI until this is stopped.\n");
-          await stopped(context.signal);
+          try {
+            printJson(context, {
+              url: runId === undefined ? server.url : `${server.url}runs/${runId}`,
+              port: server.port,
+              runId: runId ?? null,
+              storybookUrl: hosted.url,
+            });
+            context.stderr("Serving the review UI until this is stopped.\n");
+            await stopped(context.signal);
+          } finally {
+            await server.close();
+          }
         } finally {
-          await server.close();
+          await hosted.close();
         }
         return EXIT_OK;
       });

@@ -48,6 +48,10 @@ export interface CaptureSettings {
   readonly storybookDir?: string;
 }
 
+/** The build a command means: the flag, relative to where it ran, then the config's, then the default. */
+export const resolveStorybookDir = (cwd: string, given: string | undefined, { storybookDir }: Pick<CaptureSettings, "storybookDir">): string =>
+  path.resolve(cwd, given ?? storybookDir ?? "storybook-static");
+
 /** The environment, init script, and Storybook a project uses: the pinned default, then its config. */
 export async function resolveCaptureSettings(
   repo: Repo,

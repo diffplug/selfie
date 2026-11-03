@@ -1,13 +1,14 @@
 // The review UI's routes over the real library, a real store, and real Git, with no socket and no
 // browser, plus `selfie ui` itself on a real socket. Only the capture is a stand-in.
 import { execFileSync } from "node:child_process";
+import { writeFileSync } from "node:fs";
 import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { networkInterfaces, tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { decodeImage } from "./support.ts";
 import { REQUEST_HEADER_VALUE } from "selfie-ui/app";
-import { createLocalApp, serveLocal, type LocalServer } from "selfie-ui/local";
+import { createLocalApp, createStorybookApp, serveLocal, serveStorybook, type LocalServer } from "selfie-ui/local";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { runCli } from "../src/cli.ts";
 import { openProject, type Project } from "../src/project.ts";
@@ -739,6 +740,19 @@ describe("selfie ui", () => {
     return { stop, exit, json: () => JSON.parse(stdout), stderr: () => stderr };
   };
 
+  test("hosts a Storybook on a port of its own, saying where, and --storybook-dir picks which", async () => {
+    const dir = path.join(h.scratch, "a-storybook");
+    await mkdir(dir, { recursive: true });
+    await writeFile(path.join(dir, "iframe.html"), "<!doctype html><title>the preview</title>");
+    const { stop, exit, json } = await start("--storybook-dir", dir);
+    const { port, storybookUrl } = json();
+    expect(new URL(storybookUrl).port).not.toBe(String(port));
+    expect(await (await fetch(`${storybookUrl}iframe.html`)).text()).toContain("the preview");
+    stop.abort();
+    expect(await exit).toBe(0);
+    await expect(fetch(storybookUrl)).rejects.toThrow();
+  });
+
   test("prints one document with its URL, serves on it, and stops when told", async () => {
     const { stop, exit, json, stderr } = await start();
     const { url, port, runId } = json();
@@ -814,5 +828,143 @@ describe("selfie ui", () => {
     } finally {
       await server.close();
     }
+  });
+});
+
+describe("the hosted Storybook", () => {
+  const STORYBOOK_PORT = 51234;
+  let dir: string;
+  const hostedAt = `http://127.0.0.1:${STORYBOOK_PORT}/`;
+
+  const built = async () => {
+    await mkdir(path.join(dir, "assets"), { recursive: true });
+    await writeFile(path.join(dir, "index.html"), "<!doctype html><title>the manager</title>");
+    await writeFile(path.join(dir, "iframe.html"), "<!doctype html><title>the preview</title>");
+    await writeFile(path.join(dir, "index.json"), "{}");
+    await writeFile(path.join(dir, "assets", "story.js"), "export {};");
+  };
+
+  const storybook = () => createStorybookApp({ dir, port: () => STORYBOOK_PORT });
+  const read = (url: string, host = `127.0.0.1:${STORYBOOK_PORT}`) => storybook().request(url, { headers: { host } });
+
+  beforeEach(() => {
+    dir = path.join(h.scratch, "storybook-static");
+  });
+
+  test("is nothing, until it's a built Storybook", async () => {
+    await mkdir(dir, { recursive: true });
+    await writeFile(path.join(dir, "secret.txt"), "not a build");
+    expect((await read("/secret.txt")).status).toBe(404);
+  });
+
+  describe("what it serves", () => {
+    beforeEach(built);
+
+    test("is a build's own files, and nothing is kept", async () => {
+      const page = await read("/");
+      expect(page.status).toBe(200);
+      expect(await page.text()).toContain("the manager");
+      expect(page.headers.get("cache-control")).toBe("no-store");
+      expect(page.headers.get("x-content-type-options")).toBe("nosniff");
+      expect(await (await read("/assets/story.js")).text()).toBe("export {};");
+    });
+
+    test("lets Storybook frame its own preview, and nobody else", async () => {
+      const { headers } = await read("/iframe.html");
+      expect(headers.get("content-security-policy")).toBe("frame-ancestors 'self'");
+      expect(headers.get("x-frame-options")).toBe("SAMEORIGIN");
+    });
+
+    test("stays inside the build", async () => {
+      for (const url of ["/..%2fsecret.txt", "/%2e%2e%2fsecret.txt", "/assets/..%2f..%2fsecret.txt"]) {
+        expect((await read(url)).status, url).toBe(404);
+      }
+    });
+
+    test("is only to read", async () => {
+      const response = await storybook().request("/index.json", { method: "POST", headers: { host: `127.0.0.1:${STORYBOOK_PORT}` } });
+      expect(response.status).toBe(405);
+    });
+
+    test("answers only to its own loopback address", async () => {
+      expect((await read("/", "evil.example")).status).toBe(403);
+      expect((await read("/", HOST)).status).toBe(403);
+    });
+  });
+
+  test("the review API refuses a story's page, since it's another origin", async () => {
+    await built();
+    const hosted = await serveStorybook({ dir });
+    const server = await serveLocal({ source: localReviewSource(project), port: 0, clientDir });
+    try {
+      expect(new URL(hosted.url).port).not.toBe(String(server.port));
+      expect((await fetch(`${hosted.url}api/current`)).status).toBe(404);
+      const fromStory = await fetch(`${server.url}api/current`, { headers: { origin: hosted.url.slice(0, -1) } });
+      expect(fromStory.status).toBe(403);
+    } finally {
+      await Promise.all([hosted.close(), server.close()]);
+    }
+  });
+
+  describe("what a run says of it", () => {
+    const hosted = () => localReviewSource(project, { storybook: { dir, url: hostedAt } });
+    const reviewedBuild = async (...flags: string[]) => (await h.cli("review", "--storybook-dir", dir, ...flags)).json.runId as string;
+    const says = async (runId: string, source = hosted()) => (await source.runView(runId)).storybook?.renderedThisRun;
+
+    beforeEach(() => {
+      h.stories = [{ id: "a" }, { id: "b" }];
+    });
+
+    test("nothing, with no build, or nothing hosted", async () => {
+      const runId = (await review()).json.runId as string;
+      expect((await hosted().runView(runId)).storybook).toBeNull();
+      await built();
+      expect((await localReviewSource(project).runView(runId)).storybook).toBeNull();
+    });
+
+    test("that nobody knows, for a run that didn't say which build rendered it", async () => {
+      const runId = (await review()).json.runId as string;
+      await built();
+      expect((await hosted().runView(runId)).storybook).toEqual({ url: hostedAt, renderedThisRun: null });
+    });
+
+    test("that this is the build that rendered it, until it's rebuilt", async () => {
+      await built();
+      const runId = await reviewedBuild();
+      const source = hosted();
+      expect(await says(runId, source)).toBe(true);
+      await writeFile(path.join(dir, "index.json"), '{"rebuilt":true}');
+      expect(await says(runId, source)).toBe(false);
+    });
+
+    test("the same of a render the same build reused", async () => {
+      await built();
+      const first = await reviewedBuild();
+      await commit(h.repo, "something that doesn't change the build");
+      const reused = await reviewedBuild();
+      expect(reused).not.toBe(first);
+      expect(await says(reused)).toBe(true);
+      expect(await says(first)).toBe(true);
+    });
+
+    test("the same of a filtered run, and of one where a story failed", async () => {
+      await built();
+      expect(await says(await reviewedBuild("--story", "a"))).toBe(true);
+      h.stories = [{ id: "a", failed: "it threw" }, { id: "b" }];
+      expect(await says(await reviewedBuild())).toBe(true);
+    });
+
+    test("nothing of a build that changed while it rendered", async () => {
+      await built();
+      h.onCapture = () => writeFileSync(path.join(dir, "index.json"), '{"changed":true}');
+      expect(await says(await reviewedBuild())).toBeNull();
+    });
+
+    test("survives a build being rewritten as it's asked", async () => {
+      await built();
+      const runId = await reviewedBuild();
+      await rm(path.join(dir, "index.json"));
+      expect(await says(runId)).toBe(false);
+    });
   });
 });
