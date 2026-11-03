@@ -336,29 +336,26 @@ async function dispatch(command: string | undefined, args: string[], context: Co
       return withProject(context, async (project) => {
         if (runId !== undefined) await compareAsReviewed(project, runId);
         // Only here, so that no other command loads a web server.
-        const [{ serveLocal, serveStorybook }, { localReviewSource }] = await Promise.all([import("selfie-ui/local"), import("./ui.ts")]);
+        const [{ serveReviewWithStorybook }, { localReviewSource }] = await Promise.all([import("selfie-ui/local"), import("./ui.ts")]);
         const dir = resolveStorybookDir(project.cwd, values["storybook-dir"], await resolveCaptureSettings(project.repo, { native: values.native }));
-        const hosted = await serveStorybook({ dir, readBuildFile: (build, file) => project.builds.readFile(build, file) });
+        const servers = await serveReviewWithStorybook({
+          source: (url) => localReviewSource(project, { native: values.native, storybook: { dir, url } }),
+          port,
+          clientDir: context.uiClientDir,
+          dir,
+          readBuildFile: (build, file) => project.builds.readFile(build, file),
+        });
         try {
-          const server = await serveLocal({
-            source: localReviewSource(project, { native: values.native, storybook: { dir, url: hosted.url } }),
-            port,
-            ...(context.uiClientDir === undefined ? {} : { clientDir: context.uiClientDir }),
+          printJson(context, {
+            url: runId === undefined ? servers.review.url : `${servers.review.url}runs/${runId}`,
+            port: servers.review.port,
+            runId: runId ?? null,
+            storybookUrl: servers.storybook.url,
           });
-          try {
-            printJson(context, {
-              url: runId === undefined ? server.url : `${server.url}runs/${runId}`,
-              port: server.port,
-              runId: runId ?? null,
-              storybookUrl: hosted.url,
-            });
-            context.stderr("Serving the review UI until this is stopped.\n");
-            await stopped(context.signal);
-          } finally {
-            await server.close();
-          }
+          context.stderr("Serving the review UI until this is stopped.\n");
+          await stopped(context.signal);
         } finally {
-          await hosted.close();
+          await servers.close();
         }
         return EXIT_OK;
       });

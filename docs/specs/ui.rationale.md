@@ -35,6 +35,8 @@ Evidence and reasoning for `docs/specs/ui.md`, keyed by its headings.
 - **Why reuse a review's stats.** A later accepted run could change a baseline's goldens under a run, and then `review.json`'s stats would describe the old pair while the images show the new one. That's rare, and it only misstates numbers, against a request for every story.
 - **Why thumbnails, given they cost a read each.** They're lazy, and 30 load on opening a 512 row list. They let someone scan for the one that's different, which pixel counts don't.
 
+**Live stories.** Closed by default since a page per side is a lot to load for what most reviews don't need. They lay out at the captured viewport and scale down, since a story laid out at half the width could look nothing like its image. They aren't frozen, as a capture is, so they can differ from an image without anything being wrong, which the screen says. Each story gets a new frame, since moving one frame along would add to the browser's history, and Back would walk through stories in it.
+
 ## Keyboard
 
 - **Why ignore repeats.** With `a` moving on to the next story, a held key would approve one image every few milliseconds. `j` and `k` lose little by it.

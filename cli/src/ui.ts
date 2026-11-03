@@ -1,6 +1,6 @@
 // The review UI's window on a local repository: the library, as the shape its routes want. Nothing
 // here renders, so the UI only reads what `selfie review` recorded and records decisions on it.
-import type { Comparison, DecisionKind } from "selfie-store";
+import type { Comparison, DecisionKind, Run } from "selfie-store";
 import path from "node:path";
 import { isBuiltStorybook } from "selfie-ui/local";
 import { keptBuildPath } from "selfie-ui/api";
@@ -26,12 +26,22 @@ export function localReviewSource(
 ): ReviewSource {
   const { snapshots, store, repo } = project;
 
+  const keptStorybookUrl = async (runId: string): Promise<string | null> => {
+    const kept = storybook === undefined ? null : await project.builds.keptBuildOfRun(runId);
+    return kept === null ? null : new URL(keptBuildPath(kept), storybook!.url).href;
+  };
+
   /** The very build that rendered a run, if that's kept, or else the directory as it stands. */
   const storybookFor = async (runId: string): Promise<StorybookLink | null> => {
-    if (storybook === undefined) return null;
-    const kept = await project.builds.keptBuildOfRun(runId);
-    if (kept !== null) return { url: new URL(keptBuildPath(kept), storybook.url).href, exactBuild: true };
-    return isBuiltStorybook(storybook.dir) ? { url: storybook.url, exactBuild: false } : null;
+    const kept = await keptStorybookUrl(runId);
+    if (kept !== null) return { url: kept, exactBuild: true };
+    return storybook !== undefined && isBuiltStorybook(storybook.dir) ? { url: storybook.url, exactBuild: false } : null;
+  };
+
+  /** The kept build of the goldens a run is compared with. Never the directory, which wouldn't be them. */
+  const goldenStorybookFor = async ({ environment }: Run, sha: string | null): Promise<string | null> => {
+    const goldens = sha === null ? null : await snapshots.acceptedRunAt(sha, environment);
+    return goldens === null ? null : keptStorybookUrl(goldens);
   };
 
   /** A corrupt cache costs only pixel stats in a list, so it isn't worth failing a page over. */
@@ -62,6 +72,8 @@ export function localReviewSource(
     return {
       run,
       storybook: await storybookFor(run.id),
+      goldenStorybookUrl: await goldenStorybookFor(run, onBranch ?? run.baselineSha),
+      viewport: await project.builds.viewportOf(run.environment),
       branchGoldens: onBranch,
       regionMergeDistance: await resolveRegionMergeDistance(repo),
       acceptedRunId: await snapshots.acceptedRunAt(run.gitSha, run.environment),

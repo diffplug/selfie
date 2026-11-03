@@ -87,6 +87,13 @@ describe("StorybookBuilds", () => {
     expect(() => builds.has("nope")).toThrow(RangeError);
   });
 
+  it("knows the size an environment renders at, once a run says", async () => {
+    expect(await builds.viewportOf("env")).toBeNull();
+    await builds.recordViewport("env", { width: 1200, height: 900 });
+    await builds.recordViewport("env", { width: 640, height: 480 });
+    expect(await builds.viewportOf("env")).toEqual({ width: 1200, height: 900 });
+  });
+
   it("is safe to create twice", async () => {
     await initStoreSchema(temp.sql);
     await keep(BUILD, { "index.html": "page" });

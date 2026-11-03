@@ -74,7 +74,7 @@ Source of truth: `store/src/core/storybook-builds.ts`; tests in `store/test/stor
 - **Must keep a build's files by the hash of their exact bytes**, at `storybook-files/<sha256>`, so builds that share a file share its bytes, and a rebuilt directory costs only what changed (rationale).
 - **Must write a build's files, then one blob listing them, at `storybook-builds/<hash>`**, so a build with that blob is whole, and nothing serves one that's only partly written (`StorybookBuilds.has`). **The first list stays** (rationale).
 - **Must look up a file only by its whole path within a build**, never reaching a file system, so nothing in a path can climb out of it.
-- **Must say which build rendered a run, in `run_builds(run_id, build)`**, since it's a fact about the run. Reserved: both are in the store rather than the CLI's local tables for **Scope: cloud-deploy** (`docs/specs/ui.md` → Not built).
+- **Must say which build rendered a run, in `run_builds(run_id, build)`, and what size each environment renders at, in `environment_viewports`**, since these are facts about what was captured, and nothing about a run may depend on a file outside the store. Reserved: both are in the store rather than the CLI's local tables for **Scope: cloud-deploy** (`docs/specs/ui.md` → Not built).
 
 ## Adapters
 

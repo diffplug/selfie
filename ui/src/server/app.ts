@@ -42,23 +42,25 @@ class BadRequest extends Error {
 
 /**
  * Another site can't frame the page to steer a click, or embed an image to learn it exists, and
- * nothing else on the page may load from anywhere else.
+ * nothing else on the page may load from anywhere else, but for frames of a hosted Storybook.
  */
-export const pageHeaders: MiddlewareHandler = secureHeaders({
-  contentSecurityPolicy: {
-    defaultSrc: ["'self'"],
-    styleSrc: ["'self'", "'unsafe-inline'"],
-    imgSrc: ["'self'", "data:"],
-    frameAncestors: ["'none'"],
-    baseUri: ["'none'"],
-    formAction: ["'none'"],
-  },
-  crossOriginResourcePolicy: "same-origin",
-  referrerPolicy: "no-referrer",
-  xFrameOptions: "DENY",
-  // Says nothing over plain HTTP. A hosted deployment's edge decides this one.
-  strictTransportSecurity: false,
-});
+export const pageHeaders = (storybookOrigin?: string): MiddlewareHandler =>
+  secureHeaders({
+    contentSecurityPolicy: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:"],
+      ...(storybookOrigin === undefined ? {} : { frameSrc: [storybookOrigin] }),
+      frameAncestors: ["'none'"],
+      baseUri: ["'none'"],
+      formAction: ["'none'"],
+    },
+    crossOriginResourcePolicy: "same-origin",
+    referrerPolicy: "no-referrer",
+    xFrameOptions: "DENY",
+    // Says nothing over plain HTTP. A hosted deployment's edge decides this one.
+    strictTransportSecurity: false,
+  });
 
 /**
  * Refuses a request from any origin but the one given, and any change a form or another site's page

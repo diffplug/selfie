@@ -498,6 +498,7 @@ async function recordBuild(project: Project, options: RecordOptions, { reuse }: 
     if (existing === null) {
       log(`Recorded run ${run.id}: ${recording.storyIds.length} stories.`);
       await recording.finished(run);
+      await project.builds.recordViewport(run.environment, settings.environment.viewport);
       await keepBuild(project, run, storybookDir, buildBefore, log);
     } else {
       log(`Run ${run.id} already describes this build at this commit, so nothing new was recorded. selfie record renders again.`);
