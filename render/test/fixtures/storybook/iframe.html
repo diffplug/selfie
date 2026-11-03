@@ -58,7 +58,7 @@
             loopback: "127.0.0.1",
           };
           const actual = {
-            selfieGlobal: window.__SELFIE_SNAPSHOT__,
+            selfieGlobal: window.__SELFIE_RENDER__,
             now: Date.now(),
             timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
             locale: navigator.language,
@@ -85,7 +85,7 @@
           root.textContent = "rendered after a blocked request";
         },
         "timers--frozen-by-selfie"() {
-          document.body.style.background = window.__SELFIE_SNAPSHOT__ ? "white" : randomColor();
+          document.body.style.background = window.__SELFIE_RENDER__ ? "white" : randomColor();
         },
         "timers--frozen-by-project"() {
           document.body.style.background = window.__PROJECT_FREEZE__ ? "white" : randomColor();
@@ -108,7 +108,7 @@
               timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
               dark: matchMedia("(prefers-color-scheme: dark)").matches,
               year: new Date().getFullYear(),
-              flag: window.__MY_SNAPSHOT__ === true,
+              flag: window.__MY_RENDER__ === true,
             }),
           );
         },

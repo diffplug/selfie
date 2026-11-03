@@ -31,7 +31,7 @@ describe("which run", () => {
     expect((await newest()).newestRunId).toBe(second);
 
     // A review still recording, or crashed, can't be compared.
-    const recording = await project.snapshots.beginRun({
+    const recording = await project.batches.beginRun({
       gitSha: git(h.repo, "rev-parse", "HEAD"),
       environment,
       scale: 1,

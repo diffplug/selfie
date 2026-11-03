@@ -6,7 +6,7 @@ import path from "node:path";
 import { FilesystemBlobStorage } from "selfie-store/adapters/filesystem-blob";
 import { sharpCodec } from "selfie-store/adapters/sharp-codec";
 import { SqliteAdapter } from "selfie-store/adapters/sqlite";
-import { Blobs, initStoreSchema, Snapshots, Sql, Store, BuiltStorybooks, type CompareOptions, type Comparison, type Run } from "selfie-store";
+import { Blobs, initStoreSchema, RenderBatches, Sql, Store, BuiltStorybooks, type CompareOptions, type Comparison, type Run } from "selfie-store";
 import type { PixelDiff } from "./diff.ts";
 import { SelfieError } from "./errors.ts";
 import { headSha, nearestOnBranch, openRepo, walkToBaseline, type BaselineSearch, type Repo } from "./git.ts";
@@ -23,14 +23,14 @@ const CACHE_FILE = "review.json";
  * The newest real render of each build this machine can reuse. Local only: it's in the project's
  * `store.db`, and not in the store's schema, which D1 also has.
  */
-export interface Renders {
+export interface RenderKeys {
   /** The run remembered for a render identity, or null. */
   readonly find: (identity: string) => Promise<string | null>;
   /** Remembers a run for it, or with null forgets what was. */
   readonly remember: (identity: string, runId: string | null) => Promise<void>;
 }
 
-function rendersIn(sql: Sql): Renders {
+function renderKeysIn(sql: Sql): RenderKeys {
   return {
     async find(identity) {
       const [row] = await sql.run({
@@ -61,11 +61,11 @@ export interface Project {
   readonly repo: Repo;
   /** `<home>/<slug>` */
   readonly directory: string;
-  readonly renders: Renders;
+  readonly renderKeys: RenderKeys;
   readonly notes: Notes;
   readonly store: Store;
   readonly storybooks: BuiltStorybooks;
-  readonly snapshots: Snapshots;
+  readonly batches: RenderBatches;
   readonly close: () => void;
 }
 
@@ -85,11 +85,11 @@ export async function openProject({ cwd, env }: { cwd: string; env: NodeJS.Proce
     cwd,
     repo,
     directory,
-    renders: rendersIn(sql),
+    renderKeys: renderKeysIn(sql),
     notes: notesIn(sql, repo.root),
     store: new Store({ sql, blob, codec: sharpCodec }),
     storybooks: new BuiltStorybooks({ sql, blob }),
-    snapshots: new Snapshots({ sql }),
+    batches: new RenderBatches({ sql }),
     close: () => adapter.close(),
   };
 }
@@ -97,18 +97,18 @@ export async function openProject({ cwd, env }: { cwd: string; env: NodeJS.Proce
 /** HEAD, and the runs there in an environment, newest first. */
 export async function runsAtHead(project: Project, environment: string): Promise<{ readonly head: string | null; readonly runs: readonly Run[] }> {
   const head = await headSha(project.repo);
-  return { head, runs: head === null ? [] : await project.snapshots.runsAt(head, environment) };
+  return { head, runs: head === null ? [] : await project.batches.runsAt(head, environment) };
 }
 
 /** The baseline this project would use now, in an environment. */
 export function findBaseline(project: Project, environment: string): Promise<BaselineSearch> {
-  return walkToBaseline(project.repo, (shas) => project.snapshots.firstWithGoldens(shas, environment));
+  return walkToBaseline(project.repo, (shas) => project.batches.firstWithGoldens(shas, environment));
 }
 
 /** A run's comparison with every story in it, against what its screens show it against. */
 export async function compareAsShown(project: Project, run: Run, against?: string | null): Promise<Comparison> {
   const sha = against !== undefined ? against : ((await branchGoldens(project, run)) ?? run.baselineSha);
-  return project.snapshots.compareRun(run.id, sha, { includeUnchanged: true });
+  return project.batches.compareRun(run.id, sha, { includeUnchanged: true });
 }
 
 /** A run compared with the baseline its reviewer saw. */
@@ -118,13 +118,13 @@ export async function compareAsReviewed(
   options?: CompareOptions,
 ): Promise<Comparison> {
   const run = await requireRun(project, runId);
-  return project.snapshots.compareRun(runId, run.baselineSha, options);
+  return project.batches.compareRun(runId, run.baselineSha, options);
 }
 
 /** A run someone named, which must be well formed and in this project's store. */
 export async function requireRun(project: Project, runId: string): Promise<Run> {
   assertRunId(runId);
-  const run = await project.snapshots.getRun(runId);
+  const run = await project.batches.getRun(runId);
   if (run === null) throw new SelfieError("unknown-run", `No run ${runId} in this project's local store.`);
   return run;
 }
@@ -136,7 +136,7 @@ export async function requireRun(project: Project, runId: string): Promise<Run> 
  */
 export async function branchGoldens(project: Project, run: Run): Promise<string | null> {
   if (run.baselineSha !== null) return null;
-  return nearestOnBranch(project.repo, run.gitSha, (shas) => project.snapshots.firstWithGoldens(shas, run.environment));
+  return nearestOnBranch(project.repo, run.gitSha, (shas) => project.batches.firstWithGoldens(shas, run.environment));
 }
 
 export const runDirectory = (project: Project, runId: string) => path.join(project.directory, "runs", runId);

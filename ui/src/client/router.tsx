@@ -52,10 +52,10 @@ const subscribe = (listener: () => void) => {
   };
 };
 
-const snapshot = () => `${window.location.pathname}${window.location.search}`;
+const render = () => `${window.location.pathname}${window.location.search}`;
 
 export function useLocation(): { readonly pathname: string; readonly search: string } {
-  const href = useSyncExternalStore(subscribe, snapshot);
+  const href = useSyncExternalStore(subscribe, render);
   const at = href.indexOf("?");
   return at === -1 ? { pathname: href, search: "" } : { pathname: href.slice(0, at), search: href.slice(at) };
 }

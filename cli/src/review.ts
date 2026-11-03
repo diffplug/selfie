@@ -18,10 +18,10 @@ import {
   chunks,
   ImageDecodeError,
   mapConcurrently,
-  type ComparedSnapshot,
+  type ComparedRender,
   type Comparison,
   type Decision,
-  type RecordedSnapshot,
+  type RecordedRender,
   type RawImage,
   type Run,
   type BuiltStorybookFile,
@@ -189,8 +189,8 @@ async function storeGroup(
 }
 
 /** Puts the render's images in the store, and returns one row per story. */
-async function storeRender(project: Project, renderDir: string, manifest: Manifest): Promise<RecordedSnapshot[]> {
-  const records: RecordedSnapshot[] = [];
+async function storeRender(project: Project, renderDir: string, manifest: Manifest): Promise<RecordedRender[]> {
+  const records: RecordedRender[] = [];
   for (const group of chunks(manifest.stories, IMAGES_PER_GROUP)) {
     const failures = new Map<string, string>();
     const files: { story: string; png: Uint8Array }[] = [];
@@ -239,15 +239,15 @@ async function storyDirectory(runDir: string, story: string): Promise<string> {
 }
 
 /** Writes one difference's files, and computes a pixel diff if it is `changed`. */
-async function exportDifference(project: Project, runDir: string, snapshot: ComparedSnapshot): Promise<Difference> {
-  const { story, imageHash, goldenHash, decision } = snapshot;
+async function exportDifference(project: Project, runDir: string, render: ComparedRender): Promise<Difference> {
+  const { story, imageHash, goldenHash, decision } = render;
   const directory = await storyDirectory(runDir, story);
   const current = imageHash === null ? null : await exportImage(project, directory, "current.png", imageHash);
   const golden = goldenHash === null ? null : await exportImage(project, directory, "golden.png", goldenHash);
 
   let pixelDiff: PixelDiff | null = null;
   let diff: string | null = null;
-  if (snapshot.state === "changed" && current !== null && golden !== null) {
+  if (render.state === "changed" && current !== null && golden !== null) {
     const compared = await diffToPng(current.image, golden.image);
     pixelDiff = compared.diff;
     diff = path.join(directory, "diff.png");
@@ -255,7 +255,7 @@ async function exportDifference(project: Project, runDir: string, snapshot: Comp
   }
   return {
     story,
-    state: snapshot.state as Difference["state"],
+    state: render.state as Difference["state"],
     decision,
     imageHash,
     goldenHash,
@@ -266,17 +266,17 @@ async function exportDifference(project: Project, runDir: string, snapshot: Comp
   };
 }
 
-/** Exports what's needed to act on the comparison: only `changed` snapshots get diff work. */
+/** Exports what's needed to act on the comparison: only `changed` renders get diff work. */
 async function exportImages(project: Project, runDir: string, comparison: Comparison) {
   const { removed } = summarizeRun(comparison);
-  const shown = [...comparison.snapshots.filter(({ state }) => isDecidable(state)), ...removed];
+  const shown = [...comparison.renders.filter(({ state }) => isDecidable(state)), ...removed];
   // Each of these holds whole images in memory.
   const limit = Math.min(MAX_CONCURRENT_DIFFS, availableParallelism());
-  const differences = await mapConcurrently(shown, limit, (snapshot) => exportDifference(project, runDir, snapshot));
+  const differences = await mapConcurrently(shown, limit, (render) => exportDifference(project, runDir, render));
 
   // An unchanged story with a play error needs a look too, so these get their images here.
   const playErrors = await mapConcurrently(
-    comparison.snapshots.filter(({ playError }) => playError !== null),
+    comparison.renders.filter(({ playError }) => playError !== null),
     limit,
     async ({ story, playError, imageHash }) => ({
       story,
@@ -299,7 +299,7 @@ interface Recording {
   readonly reusedFromRun: string | null;
   readonly storyIds: readonly string[];
   readonly warnings: readonly string[];
-  readonly records: () => Promise<readonly RecordedSnapshot[]>;
+  readonly records: () => Promise<readonly RecordedRender[]>;
   /** Called with the finished run, if a new one was recorded. */
   readonly finished: (run: Run) => Promise<void>;
 }
@@ -324,10 +324,10 @@ async function replay(
   patterns: readonly string[] | undefined,
   log: (line: string) => void,
 ): Promise<Recording | null> {
-  const runId = await project.renders.find(identity);
-  if (runId === null || (await project.snapshots.getRun(runId))?.status !== "complete") return null;
-  const { snapshots } = await project.snapshots.compareRun(runId, null, { includeUnchanged: true });
-  const stories = snapshots.map((snapshot) => ({ id: snapshot.story, snapshot }));
+  const runId = await project.renderKeys.find(identity);
+  if (runId === null || (await project.batches.getRun(runId))?.status !== "complete") return null;
+  const { renders } = await project.batches.compareRun(runId, null, { includeUnchanged: true });
+  const stories = renders.map((render) => ({ id: render.story, render }));
   const chosen = patterns === undefined ? stories : filterStories(stories, patterns).stories;
   const storyIds = chosen.map(({ id }) => id);
   return {
@@ -336,7 +336,7 @@ async function replay(
     warnings: (storyFilterOf(patterns, storyIds)?.unmatched ?? []).map(unmatchedPatternWarning),
     // A remembered run is `complete`, so every row has an image.
     records: async () =>
-      chosen.map(({ snapshot: { story, imageHash, playError } }) => ({ story, imageHash: imageHash!, playError })),
+      chosen.map(({ render: { story, imageHash, playError } }) => ({ story, imageHash: imageHash!, playError })),
     finished: async () =>
       log(`Reused the images of run ${runId}, since this exact built Storybook already rendered. selfie record renders again.`),
   };
@@ -399,7 +399,7 @@ async function renderFresh(
       // A built Storybook that changed while it rendered has no identity that describes these images.
       const after = await renderIdentity({ storybookDir, environment: settings.environment, initScript: settings.initScript, settleMs: settings.settleMs });
       const whyNot = after === identity ? whyNotReusable(manifest, run) : "the built Storybook changed while it rendered";
-      await project.renders.remember(identity, whyNot === null ? run.id : null);
+      await project.renderKeys.remember(identity, whyNot === null ? run.id : null);
       if (whyNot !== null) log(`This render won't be reused: ${whyNot}.`);
     },
   };
@@ -437,8 +437,8 @@ async function recordRun(
   recording: Recording,
   fields: RunFacts,
 ): Promise<Run> {
-  const { snapshots } = project;
-  const run = await snapshots.beginRun({
+  const { batches } = project;
+  const run = await batches.beginRun({
     gitSha: fields.gitSha,
     environment: fields.settings.environmentId,
     scale: fields.settings.environment.scale,
@@ -448,8 +448,8 @@ async function recordRun(
     reusedFromRun: recording.reusedFromRun,
   });
   const records = await recording.records();
-  await snapshots.recordSnapshots(run.id, records);
-  return snapshots.finishRun(run.id, records.length);
+  await batches.recordRenders(run.id, records);
+  return batches.finishRun(run.id, records.length);
 }
 
 /** What recording left, for `record` to report and `review` to go on from. */
@@ -464,7 +464,7 @@ export interface RecordResult {
 
 /** The run that already says all this about this built Storybook at this commit, so a review needs no new one. */
 async function sameRun(project: Project, renderedBy: string, fields: RunFacts): Promise<Run | null> {
-  const runs = await project.snapshots.runsAt(fields.gitSha, fields.settings.environmentId);
+  const runs = await project.batches.runsAt(fields.gitSha, fields.settings.environmentId);
   const same = runs.find(
     ({ id, reusedFromRun, status, dirty, baselineSha, storyFilter }) =>
       (id === renderedBy || reusedFromRun === renderedBy) &&
@@ -590,9 +590,9 @@ export async function review(project: Project, options: ReviewOptions): Promise<
   const onBranch = given === null ? await branchGoldens(project, run) : null;
   const comparison =
     given?.run !== undefined
-      ? await project.snapshots.compareWithRun(run.id, given.run)
-      : await project.snapshots.compareRun(run.id, given?.sha ?? onBranch ?? run.baselineSha);
-  const reviewed = onBranch === null ? comparison : await project.snapshots.compareRun(run.id, run.baselineSha);
+      ? await project.batches.compareWithRun(run.id, given.run)
+      : await project.batches.compareRun(run.id, given?.sha ?? onBranch ?? run.baselineSha);
+  const reviewed = onBranch === null ? comparison : await project.batches.compareRun(run.id, run.baselineSha);
   const compared = Date.now();
 
   // 7. Export, keep a cache of what was exported, and prune older runs. A given baseline answers
@@ -645,7 +645,7 @@ export async function replyToNote(project: Project, id: number, text: string, gi
   await notes.reply(id, text, runId);
   const note = (await notes.list()).find((candidate) => candidate.id === id)!;
   if (runId === null || note.imageHash === null) return { note: id, runId, imageChanged: null };
-  const { snapshots: compared } = await compareAsReviewed(project, runId, { includeUnchanged: true });
+  const { renders: compared } = await compareAsReviewed(project, runId, { includeUnchanged: true });
   const now = compared.find(({ story }) => story === note.story)?.imageHash ?? null;
   return { note: id, runId, imageChanged: now !== note.imageHash };
 }

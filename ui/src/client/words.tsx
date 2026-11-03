@@ -18,7 +18,7 @@ import {
 import { Label, Stack, VisuallyHidden, type LabelProps } from "@primer/react";
 import type { ReactNode } from "react";
 import { isDecidable } from "selfie-store";
-import type { BlockerReason, NoteState, PixelDiff, HunkKind, SnapshotRow, SnapshotState } from "../shared/api.ts";
+import type { BlockerReason, NoteState, PixelDiff, HunkKind, RenderRow, RenderState } from "../shared/api.ts";
 import { isLayoutOnly } from "../shared/hunks.ts";
 import { plural } from "./plural.ts";
 import { AppLink, runPath } from "./router.tsx";
@@ -52,7 +52,7 @@ function IconLabel({ variant, icon, children }: { variant: LabelProps["variant"]
   );
 }
 
-const STATE_LABELS: Readonly<Record<SnapshotState, { variant: LabelProps["variant"]; icon: ReactNode; words: string }>> = {
+const STATE_LABELS: Readonly<Record<RenderState, { variant: LabelProps["variant"]; icon: ReactNode; words: string }>> = {
   changed: { variant: "attention", icon: <DiffModifiedIcon size={12} />, words: "Changed" },
   added: { variant: "accent", icon: <DiffAddedIcon size={12} />, words: "Added" },
   removed: { variant: "severe", icon: <DiffRemovedIcon size={12} />, words: "Removed" },
@@ -63,7 +63,7 @@ const STATE_LABELS: Readonly<Record<SnapshotState, { variant: LabelProps["varian
 export const renamedWords = (from: string) => `Renamed from ${from}`;
 
 /** A state's icon and words, small enough for a list's row. */
-export function StateMark({ state, renamedFrom }: { readonly state: SnapshotState; readonly renamedFrom?: string | undefined }) {
+export function StateMark({ state, renamedFrom }: { readonly state: RenderState; readonly renamedFrom?: string | undefined }) {
   const { icon, words } = renamedFrom === undefined ? STATE_LABELS[state] : { icon: <ArrowSwitchIcon size={12} />, words: renamedWords(renamedFrom) };
   return (
     <span className="selfie-state-mark" data-state={renamedFrom === undefined ? state : "renamed"} title={words}>
@@ -104,7 +104,7 @@ export function KindLabel({ kind }: { readonly kind: HunkKind }) {
   );
 }
 
-export function StateLabel({ state }: { readonly state: SnapshotState }) {
+export function StateLabel({ state }: { readonly state: RenderState }) {
   const { variant, icon, words } = STATE_LABELS[state];
   return (
     <IconLabel variant={variant} icon={icon}>
@@ -113,7 +113,7 @@ export function StateLabel({ state }: { readonly state: SnapshotState }) {
   );
 }
 
-export function DecisionLabel({ row }: { readonly row: Pick<SnapshotRow, "state" | "decision"> }) {
+export function DecisionLabel({ row }: { readonly row: Pick<RenderRow, "state" | "decision"> }) {
   if (!isDecidable(row.state)) return <span className="selfie-muted">No decision needed</span>;
   if (row.decision?.decision === "approved") {
     return (
@@ -136,7 +136,7 @@ export function DecisionLabel({ row }: { readonly row: Pick<SnapshotRow, "state"
   );
 }
 
-export function AdvisoryLabels({ row }: { readonly row: SnapshotRow }) {
+export function AdvisoryLabels({ row }: { readonly row: RenderRow }) {
   return (
     <>
       {row.playError !== null && (

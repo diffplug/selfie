@@ -86,7 +86,7 @@ const RECIPE_RULES: Readonly<Record<string, { check: (value: unknown) => boolean
     },
     expected: "an http or https origin, like http://localhost:6006",
   },
-  snapshotGlobal: { check: (value) => typeof value === "string" && /^[A-Za-z_$][\w$]*$/.test(value), expected: "a JavaScript identifier" },
+  renderGlobal: { check: (value) => typeof value === "string" && /^[A-Za-z_$][\w$]*$/.test(value), expected: "a JavaScript identifier" },
   locale: { check: NON_EMPTY, expected: "a locale, like de-DE" },
   timezoneId: { check: NON_EMPTY, expected: "a time zone, like Europe/Berlin" },
   colorScheme: { check: ONE_OF("light", "dark", "no-preference"), expected: 'one of "light", "dark", "no-preference"' },
@@ -187,7 +187,7 @@ export function launchArgs(environment: RenderEnvironment): string[] {
 }
 
 /**
- * A stable ID for what decides the pixels independently of the project, safe in a snapshot's
+ * A stable ID for what decides the pixels independently of the project, safe in a render's
  * name. The readable prefix keeps a native run visibly apart from the container. The hash
  * takes only an image's digest, so a mirror of the same image is the same environment. Flag
  * order and property order don't matter. Upgrading Playwright changes the ID.

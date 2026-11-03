@@ -1,7 +1,7 @@
 // Deciding on and accepting a run, from what the store knows about it, whether or not its
 // exported images are still on disk.
 import { filterStories } from "selfie-render";
-import { SnapshotError, type ComparedSnapshot, type Comparison, type DecisionKind } from "selfie-store";
+import { BatchError, type ComparedRender, type Comparison, type DecisionKind } from "selfie-store";
 import type { AcceptRefusal, DecisionTarget } from "selfie-ui/app";
 import { SelfieError } from "./errors.ts";
 import { isOnBaselineHistory } from "./git.ts";
@@ -21,9 +21,9 @@ export interface DecideRequest {
 
 export interface DecideResult {
   /** The images that took the decision. */
-  readonly decided: readonly ComparedSnapshot[];
+  readonly decided: readonly ComparedRender[];
   /** What was selected, but has no image to decide on. */
-  readonly skipped: readonly ComparedSnapshot[];
+  readonly skipped: readonly ComparedRender[];
   /** Patterns that matched nothing, which a caller shouldn't read as a decision made. */
   readonly unmatchedPatterns: readonly string[];
   /** The run as it stands after this decision. */
@@ -31,8 +31,8 @@ export interface DecideResult {
 }
 
 /** Exactly these rows, each still holding the image named, or nothing is decided. */
-function exactly(snapshots: readonly ComparedSnapshot[], targets: readonly DecisionTarget[]): readonly ComparedSnapshot[] {
-  const rows = new Map(snapshots.filter(({ state }) => isDecidable(state)).map((row) => [row.story, row]));
+function exactly(renders: readonly ComparedRender[], targets: readonly DecisionTarget[]): readonly ComparedRender[] {
+  const rows = new Map(renders.filter(({ state }) => isDecidable(state)).map((row) => [row.story, row]));
   const stale = targets.filter(({ story, imageHash }) => rows.get(story)?.imageHash !== imageHash);
   if (stale.length > 0) {
     throw new SelfieError(
@@ -51,23 +51,23 @@ export async function decide(project: Project, { runId, decision, actor, stories
     patterns === null
       ? null
       : filterStories(
-          before.snapshots.map((snapshot) => ({ ...snapshot, id: snapshot.story })),
+          before.renders.map((render) => ({ ...render, id: render.story })),
           patterns,
         );
-  const chosen: readonly ComparedSnapshot[] =
-    stories !== "all" && "targets" in stories ? exactly(before.snapshots, stories.targets) : (matching?.stories ?? before.snapshots);
+  const chosen: readonly ComparedRender[] =
+    stories !== "all" && "targets" in stories ? exactly(before.renders, stories.targets) : (matching?.stories ?? before.renders);
   const decided = chosen.filter(({ state }) => isDecidable(state));
-  await project.snapshots.decide({
+  await project.batches.decide({
     environment: before.run.environment,
     decision,
     actor,
-    snapshots: decided.map(({ story, imageHash }) => ({ story, imageHash: imageHash! })),
+    renders: decided.map(({ story, imageHash }) => ({ story, imageHash: imageHash! })),
   });
   return {
     decided,
     skipped: chosen.filter(({ state }) => state === "failed" || state === "removed"),
     unmatchedPatterns: matching?.unmatched ?? [],
-    comparison: await project.snapshots.compareRun(runId, before.run.baselineSha),
+    comparison: await project.batches.compareRun(runId, before.run.baselineSha),
   };
 }
 
@@ -75,7 +75,7 @@ export type { AcceptRefusal };
 
 export interface AcceptRequest {
   readonly runId: string;
-  /** How many removed snapshots the reviewer saw. Needed if there are any. */
+  /** How many removed renders the reviewer saw. Needed if there are any. */
   readonly removedSeen?: number | undefined;
 }
 
@@ -135,11 +135,11 @@ export async function accept(project: Project, { runId, removedSeen }: AcceptReq
 
   // Nothing above stands in for this: the store's one statement is what makes it so.
   try {
-    const accepted = await project.snapshots.acceptRun(runId, run.baselineSha, removedSeen ?? 0);
+    const accepted = await project.batches.acceptRun(runId, run.baselineSha, removedSeen ?? 0);
     return result(accepted ? [] : [{ reason: "unapproved", stories: [] }], accepted);
   } catch (error) {
     // Another writer can move a baseline's goldens between the check above and this.
-    if (error instanceof SnapshotError && error.code === "wrong-removed-count") {
+    if (error instanceof BatchError && error.code === "wrong-removed-count") {
       return result([{ reason: "wrong-removed-count", ...removals, seen: removedSeen ?? 0 }], false);
     }
     throw error;

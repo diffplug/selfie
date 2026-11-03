@@ -32,4 +32,4 @@ All four runs reported the same environment ID and no failed stories. One run on
 
 **x86-64 emulating arm64 doesn't work yet.** On a GitHub x86-64 runner with QEMU, the same container started Chromium, then the browser closed on all 541 stories. The error kept only the start of the browser's log, so the cause is unknown. It was one attempt, under the renderer's locked-down container settings, and nothing else was tried.
 
-**Timers.** Playwright's `animations: 'disabled'` and `caret: 'hide'` didn't stop a terminal cursor's JavaScript blink, which changed 2 of 30 stories between runs. Dormouse's snapshot flag did. A blinking cursor can also match by luck, so one repeat that matches is weak evidence.
+**Timers.** Playwright's `animations: 'disabled'` and `caret: 'hide'` didn't stop a terminal cursor's JavaScript blink, which changed 2 of 30 stories between runs. Dormouse's render flag did. A blinking cursor can also match by luck, so one repeat that matches is weak evidence.

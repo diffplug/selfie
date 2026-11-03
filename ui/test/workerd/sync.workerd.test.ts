@@ -3,7 +3,7 @@
 // order, each on what the last left. See docs/specs/sync.md.
 import { env } from "cloudflare:workers";
 import { beforeAll, describe, expect, it } from "vitest";
-import { Blobs, initStoreSchema, ReceivingStore, Snapshots, Sql, type SqlAdapter, type SqlRow } from "selfie-store";
+import { Blobs, initStoreSchema, ReceivingStore, RenderBatches, Sql, type SqlAdapter, type SqlRow } from "selfie-store";
 import { R2BlobStorage, type R2BucketLike } from "selfie-store/adapters/r2";
 import { createSyncApi, type SyncAccess } from "../../src/server/sync.ts";
 
@@ -50,11 +50,11 @@ beforeAll(async () => {
   const sql = new Sql(d1Binding(env.DB));
   await initStoreSchema(sql);
   const store = new ReceivingStore({ sql, blob: new Blobs(new R2BlobStorage({ bucket: env.BLOBS as R2BucketLike, project: "42" })) });
-  const snapshots = new Snapshots({ sql });
+  const batches = new RenderBatches({ sql });
   app = createSyncApi({
     open: async (_project, token) => {
       const access = token === null ? undefined : ACCESS[token];
-      return access === undefined ? null : { access, snapshots, store, hasCommit: async () => true };
+      return access === undefined ? null : { access, batches, store, hasCommit: async () => true };
     },
     findProject: async () => "42",
   });
@@ -72,7 +72,7 @@ describe("the sync routes, in a Worker", () => {
     expect(await sendJson("POST", "/images/missing", "writer", { hashes: [hash, UNKNOWN_HASH] })).toEqual({ missing: [hash, UNKNOWN_HASH] });
     expect((await send("PUT", `/images/${hash}`, "writer", png)).status).toBe(200);
     expect(await sendJson("POST", "/images/missing", "writer", { hashes: [hash] })).toEqual({ missing: [] });
-    expect((await send("POST", `/runs/${FIRST}/snapshots`, "writer", { snapshots: [{ story: "a", imageHash: hash }] })).status).toBe(200);
+    expect((await send("POST", `/runs/${FIRST}/renders`, "writer", { renders: [{ story: "a", imageHash: hash }] })).status).toBe(200);
     expect(await sendJson("POST", `/runs/${FIRST}/finish`, "writer", { count: 1, finishedAt: 600 })).toEqual({ status: "complete" });
   });
 
@@ -81,15 +81,15 @@ describe("the sync routes, in a Worker", () => {
     expect((await send("POST", "/decisions", "writer", decisions("rejected", 700))).status).toBe(200);
     expect((await send("POST", "/decisions", "writer", decisions("approved", 800))).status).toBe(200);
     expect((await send("POST", "/decisions", "writer", decisions("rejected", 750))).status).toBe(200);
-    const page = (await sendJson("GET", `/runs/${FIRST}`, "writer")) as { snapshots: { decision: unknown }[]; run: unknown };
-    expect(page.snapshots[0]!.decision).toEqual({ decision: "approved", actor: "writer-login", at: 800 });
+    const page = (await sendJson("GET", `/runs/${FIRST}`, "writer")) as { renders: { decision: unknown }[]; run: unknown };
+    expect(page.renders[0]!.decision).toEqual({ decision: "approved", actor: "writer-login", at: 800 });
     expect(page.run).toMatchObject({ startedAt: 500, finishedAt: 600 });
   });
 
   it("makes goldens, and then CI can make the next ones from a person's approval", async () => {
     expect(await sendJson("POST", "/goldens", "writer", { runId: FIRST, baselineSha: null, removed: [] })).toEqual({ outcome: "accepted", acceptedRunId: FIRST, refusal: null });
     await send("PUT", `/runs/${SECOND}`, "ci", runFacts(NEXT_SHA));
-    await send("POST", `/runs/${SECOND}/snapshots`, "ci", { snapshots: [{ story: "a", imageHash: hash }] });
+    await send("POST", `/runs/${SECOND}/renders`, "ci", { renders: [{ story: "a", imageHash: hash }] });
     await send("POST", `/runs/${SECOND}/finish`, "ci", { count: 1, finishedAt: 900 });
     expect(await sendJson("POST", "/goldens/first", "ci", { shas: [NEXT_SHA, SHA], environment: ENV })).toEqual({ sha: SHA });
     expect(await sendJson("POST", "/goldens", "ci", { runId: SECOND, baselineSha: SHA, removed: [] })).toMatchObject({ outcome: "accepted" });

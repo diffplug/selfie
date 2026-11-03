@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { AcceptRefusal, DecisionKind, DecisionTarget, FeedbackView, StoriesView, NewNote, RunView, SendVia, SnapshotRow } from "../shared/api.ts";
+import type { AcceptRefusal, DecisionKind, DecisionTarget, FeedbackView, StoriesView, NewNote, RunView, SendVia, RenderRow } from "../shared/api.ts";
 import { deleteNote, fetchFeedback, fetchStories, fetchRun, fetchUnchanged, postAccept, postAnswer, postRender, postDecision, postNote, postResolve, postSendNotes, RequestError } from "./api.ts";
 import { reuseRows } from "./filter.ts";
 import { toggled } from "./selection.ts";
@@ -11,7 +11,7 @@ export interface RunState {
   /** Why the last action didn't happen. */
   readonly actionError: RequestError | null;
   readonly busy: boolean;
-  readonly unchanged: readonly SnapshotRow[] | null;
+  readonly unchanged: readonly RenderRow[] | null;
   readonly loadUnchanged: () => void;
   readonly clearActionError: () => void;
   /** True if the decision was recorded. */
@@ -32,7 +32,7 @@ export function useRun(runId: string): RunState {
   const [loadError, setLoadError] = useState<RequestError | null>(null);
   const [actionError, setActionError] = useState<RequestError | null>(null);
   const [busy, setBusy] = useState(false);
-  const [unchanged, setUnchanged] = useState<readonly SnapshotRow[] | null>(null);
+  const [unchanged, setUnchanged] = useState<readonly RenderRow[] | null>(null);
   // At most one read is on its way, and a newer read or an action's answer aborts it, so a slow read
   // can't undo either.
   const reading = useRef<AbortController | null>(null);
@@ -293,7 +293,7 @@ export function useStories(latestRunId: string | null | undefined): { readonly v
   return { view, error, reload, recheck };
 }
 
-export interface RenderState {
+export interface RenderingState {
   readonly can: boolean;
   /** How many stories are being rendered right now. */
   readonly rendering: number;
@@ -304,7 +304,7 @@ export interface RenderState {
 }
 
 /** Asks the server to render stories, and reads every story again once it has. */
-export function useRender(can: boolean, onRendered: () => void): RenderState {
+export function useRender(can: boolean, onRendered: () => void): RenderingState {
   const [rendering, setRendering] = useState(0);
   const [error, setError] = useState<RequestError | null>(null);
   return {

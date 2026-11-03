@@ -98,12 +98,12 @@ async function jsonBody(context: Context): Promise<Record<string, unknown>> {
 
 function decisionTargets(value: unknown): DecisionTarget[] {
   if (!Array.isArray(value) || value.length === 0 || value.length > MAX_DECISION_TARGETS) {
-    throw new BadRequest("snapshots must list the images to decide on.");
+    throw new BadRequest("renders must list the images to decide on.");
   }
   return value.map((target: unknown) => {
     const { story, imageHash } = (target ?? {}) as Record<string, unknown>;
     if (typeof story !== "string" || story === "" || typeof imageHash !== "string" || !isImageHash(imageHash)) {
-      throw new BadRequest("Each snapshot needs a story and an image hash.");
+      throw new BadRequest("Each render needs a story and an image hash.");
     }
     return { story, imageHash };
   });
@@ -169,11 +169,11 @@ export function createReviewApi(source: ReviewSource): Hono {
   );
 
   api.post("/runs/:runId/decisions", async (context) => {
-    const { decision, snapshots } = await jsonBody(context);
+    const { decision, renders } = await jsonBody(context);
     if (decision !== "approved" && decision !== "rejected") {
       throw new BadRequest('decision must be "approved" or "rejected".');
     }
-    return context.json(await source.decide(context.req.param("runId"), decision, decisionTargets(snapshots)));
+    return context.json(await source.decide(context.req.param("runId"), decision, decisionTargets(renders)));
   });
 
   api.post("/runs/:runId/accept", async (context) => {

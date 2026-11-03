@@ -121,7 +121,7 @@ describe.runIf(process.env.SELFIE_CLI_CONTAINER === "1")("in the pinned containe
     // From the store, since `differences` is empty for images that match the goldens.
     const project = await openProject({ cwd: repo, env: { SELFIE_HOME: home } });
     const images = async ({ json }: { json: any }) =>
-      (await project.snapshots.compareRun(json.runId, null, { includeUnchanged: true })).snapshots.map(({ story, imageHash }) => [story, imageHash]);
+      (await project.batches.compareRun(json.runId, null, { includeUnchanged: true })).renders.map(({ story, imageHash }) => [story, imageHash]);
     try {
       const firstImages = await images(first);
       expect(firstImages).toHaveLength(2);

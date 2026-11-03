@@ -10,7 +10,7 @@ What's given up: wrong bytes under a hash stay, a browser won't notice, and a pu
 
 **Why not a run from a dirty tree.** Its images may show work that's in no commit, which on a public repository would publish it. It also can't become goldens, so there's little to gain.
 
-**Why the run goes before its images.** Images went first in the first design, since a run refers to them. But a run is refused for its commit, and an image isn't, so a forgotten `git push` would have uploaded everything to be told no, and left those images where anyone holding a hash could read them. Sending the run first costs nothing, since it refers to no image until its snapshots.
+**Why the run goes before its images.** Images went first in the first design, since a run refers to them. But a run is refused for its commit, and an image isn't, so a forgotten `git push` would have uploaded everything to be told no, and left those images where anyone holding a hash could read them. Sending the run first costs nothing, since it refers to no image until its renders.
 
 **Why the server checks the commit.** The client could check, but a check on the client doesn't hold for every client, and this one exists to stop something leaking. It's also the simplest answer to what anonymous viewers may see of unpushed work: anyone can already see what GitHub has.
 

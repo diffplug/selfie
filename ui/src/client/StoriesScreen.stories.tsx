@@ -1,14 +1,14 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import type { StoriesView } from "../shared/api.ts";
 import { RequestError } from "./api.ts";
-import type { RenderState } from "./hooks.ts";
-import { RenderStatus, StoriesLayout, StoriesOverview } from "./StoriesScreen.tsx";
+import type { RenderingState } from "./hooks.ts";
+import { RenderingStatus, StoriesLayout, StoriesOverview } from "./StoriesScreen.tsx";
 import { MIXED, rendered, rendering, setupOf, unrendered, view } from "./stories/everyStory.ts";
 
-function StoriesScreen({ view: shown, search, renders }: { view: StoriesView; search: string; renders: RenderState }) {
+function StoriesScreen({ view: shown, search, renders }: { view: StoriesView; search: string; renders: RenderingState }) {
   return (
     <StoriesLayout view={shown} story={null} search={search}>
-      <RenderStatus renders={renders} />
+      <RenderingStatus renders={renders} />
       <StoriesOverview view={shown} renders={renders} recheck={() => undefined} />
     </StoriesLayout>
   );

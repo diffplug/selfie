@@ -76,13 +76,13 @@ It takes 4 to 10 ms an image on average, 17 ms at worst, and a story's stats com
 
 ## Output directories
 
-**Pruning loses no facts.** Run directories were first where a run's dirty flag and baseline lived, so pruning one stopped it being acted on, and made the rule against accepting dirty runs depend on a file. Those moved to the store (`docs/specs/snapshots.rationale.md` → Runs), and `review.json` can be deleted at any time.
+**Pruning loses no facts.** Run directories were first where a run's dirty flag and baseline lived, so pruning one stopped it being acted on, and made the rule against accepting dirty runs depend on a file. Those moved to the store (`docs/specs/renders.rationale.md` → Runs), and `review.json` can be deleted at any time.
 
 **Per-run directories rather than one reused one.** A reused directory would be smaller to describe, but a concurrent review, or an agent still reading the last review's images, would see files change underneath it. A run ID in the path also means a run's JSON keeps pointing at its own images.
 
 **Twenty.** It is meant to outlast an agent's review, fix, review cycle within one task, and be small. Run directories only hold what differs: the 541-story review with nothing changed left 48 KB, holding the images of the 2 stories with `play` errors, and one with 130 changed stories left 14 MB, or about 110 KB per changed story. Twenty runs each changing all 541 would hold about 1.2 GB. A render directory holds every story's PNG, so it can't outlive its review.
 
-**The store still grows.** Blobs grow only with added images, but nothing deletes either them or a run's rows: `docs/specs/snapshots.md` → Open questions owns retention. After the 12 runs below and in the sample loop, holding 2,914 run rows and 650 images, `store.db` was 512 KB and `blobs/` 25 MB.
+**The store still grows.** Blobs grow only with added images, but nothing deletes either them or a run's rows: `docs/specs/renders.md` → Open questions owns retention. After the 12 runs below and in the sample loop, holding 2,914 run rows and 650 images, `store.db` was 512 KB and `blobs/` 25 MB.
 
 ## Accept
 
@@ -185,7 +185,7 @@ Without leaving these out, every built Storybook hashed differently and the feat
 
 **What a diff cache would save.** A reused run with 80 changes spent 1,086 ms of its 1.36 s on diffs it had already computed, about 13 ms a story, which is why it stays in `docs/specs/cli.md` → Future.
 
-**What copying rows costs.** Each reused run writes 541 rows. A review of this feature estimated about 450 MB a year at 50 hits a day. In the store above, `run_snapshots` held 5,560 rows in 376,832 bytes by `dbstat`, or 68 bytes a row including page overhead and 2 stories' `play` messages, which comes to about 670 MB for the same 18,250 runs. Either is small beside D1's 10 GB, and these rows are local, but it has no bound, as `docs/specs/snapshots.md` → Storing only what changed says of every run.
+**What copying rows costs.** Each reused run writes 541 rows. A review of this feature estimated about 450 MB a year at 50 hits a day. In the store above, `renders` held 5,560 rows in 376,832 bytes by `dbstat`, or 68 bytes a row including page overhead and 2 stories' `play` messages, which comes to about 670 MB for the same 18,250 runs. Either is small beside D1's 10 GB, and these rows are local, but it has no bound, as `docs/specs/renders.md` → Storing only what changed says of every run.
 
 ## selfie alone
 

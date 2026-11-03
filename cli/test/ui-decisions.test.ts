@@ -58,9 +58,9 @@ describe("approve and reject", () => {
   });
 
   test("compares at most twice, and never reads the unchanged rows", async () => {
-    const compareRun = project.snapshots.compareRun.bind(project.snapshots);
+    const compareRun = project.batches.compareRun.bind(project.batches);
     const options: unknown[] = [];
-    project.snapshots.compareRun = (id, baseline, compareOptions) => {
+    project.batches.compareRun = (id, baseline, compareOptions) => {
       options.push(compareOptions);
       return compareRun(id, baseline, compareOptions);
     };
@@ -89,14 +89,14 @@ describe("approve and reject", () => {
       "not json",
       "[]",
       {},
-      { decision: "maybe", snapshots: [target("a")] },
+      { decision: "maybe", renders: [target("a")] },
       { decision: "approved" },
-      { decision: "approved", snapshots: [] },
-      { decision: "approved", snapshots: "all" },
-      { decision: "approved", snapshots: [{ story: "a" }] },
-      { decision: "approved", snapshots: [{ story: "", imageHash: target("a").imageHash }] },
-      { decision: "approved", snapshots: [{ story: "a", imageHash: "nope" }] },
-      { decision: "approved", snapshots: [null] },
+      { decision: "approved", renders: [] },
+      { decision: "approved", renders: "all" },
+      { decision: "approved", renders: [{ story: "a" }] },
+      { decision: "approved", renders: [{ story: "", imageHash: target("a").imageHash }] },
+      { decision: "approved", renders: [{ story: "a", imageHash: "nope" }] },
+      { decision: "approved", renders: [null] },
     ]) {
       const response = await change(`/api/runs/${runId}/decisions`, body);
       expect(response.status, JSON.stringify(body)).toBe(400);
@@ -222,7 +222,7 @@ describe("accept", () => {
     const unchanged = (await (await get(`/api/runs/${runId}/unchanged`)).json()) as any;
     expect(unchanged.rows.map(({ story }: any) => story)).toEqual(["b"]);
 
-    const after = (await (await change(`/api/runs/${runId}/decisions`, { decision: "approved", snapshots: view.rows.map(({ story, imageHash }: any) => ({ story, imageHash })) })).json()) as any;
+    const after = (await (await change(`/api/runs/${runId}/decisions`, { decision: "approved", renders: view.rows.map(({ story, imageHash }: any) => ({ story, imageHash })) })).json()) as any;
     expect(after.branchGoldens).toBe(first.gitSha);
     expect(after.refusals).toEqual([]);
   });

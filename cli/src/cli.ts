@@ -334,7 +334,7 @@ async function dispatch(command: string | undefined, args: string[], context: Co
       });
       const runId = onePositional(positionals, "run ID");
       if (Boolean(values.all) === Boolean(values.story?.length)) {
-        throw new SelfieError("usage", "Say which snapshots: either --all, or one or more --story patterns.");
+        throw new SelfieError("usage", "Say which renders: either --all, or one or more --story patterns.");
       }
       return withProject(context, async (project) => {
         const actor = values.actor ?? (await gitUserEmail(project.repo));

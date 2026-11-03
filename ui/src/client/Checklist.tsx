@@ -3,7 +3,7 @@ import { AlertFillIcon, CheckCircleFillIcon, CircleIcon } from "@primer/octicons
 import { Banner, Button, Stack, Text } from "@primer/react";
 import { useEffect, type ReactNode } from "react";
 import type { ListedStory, StoriesView, StorySetup } from "../shared/api.ts";
-import type { RenderState } from "./hooks.ts";
+import type { RenderingState } from "./hooks.ts";
 import { plural } from "./plural.ts";
 import { anyStoryPath, AppLink, navigate, runPath } from "./router.tsx";
 import { Sha, shortSha } from "./words.tsx";
@@ -131,7 +131,7 @@ const needsRender = ({ render }: ListedStory) => render === null || render.fromH
 
 const fullName = ({ title, name }: ListedStory) => [...(title === "" ? [] : title.split("/")), name].join(" / ");
 
-function RendersItem({ view, setup, renders }: { view: StoriesView; setup: StorySetup | null; renders: RenderState }) {
+function RendersItem({ view, setup, renders }: { view: StoriesView; setup: StorySetup | null; renders: RenderingState }) {
   const rendered = view.stories.filter((entry) => entry.render !== null).length;
   const rest = view.stories.filter(needsRender);
   const first = view.stories[0];
@@ -187,7 +187,7 @@ function RendersItem({ view, setup, renders }: { view: StoriesView; setup: Story
   );
 }
 
-export function Checklist({ view, renders, recheck }: { view: StoriesView; renders: RenderState; recheck: () => void }) {
+export function Checklist({ view, renders, recheck }: { view: StoriesView; renders: RenderingState; recheck: () => void }) {
   const { head, branch, setup } = view;
   // What's next, or a fix to what it warns of, happens in a terminal or an editor.
   const waiting = setup !== null && (head === null || view.storybookUrl === null || view.stories.length === 0 || setup.builtBeforeHead || setup.uncommitted.length > 0);

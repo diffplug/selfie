@@ -3,7 +3,7 @@
 import { ChevronDownIcon, ChevronRightIcon, LinkExternalIcon } from "@primer/octicons-react";
 import { Button, Heading, Link, Text } from "@primer/react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { RunView, SnapshotRow } from "../shared/api.ts";
+import type { RunView, RenderRow } from "../shared/api.ts";
 import { LAYER_WORDS } from "./ImageCompare.tsx";
 import { Keys } from "./Keys.tsx";
 
@@ -19,7 +19,7 @@ export function OpenInStorybook({ url, story }: { url: string; story: string }) 
 }
 
 /** The page, on the Storybook's own origin, saying if it may not be what rendered this image. */
-export function StorybookLinkTo({ row, view }: { row: SnapshotRow; view: RunView }) {
+export function StorybookLinkTo({ row, view }: { row: RenderRow; view: RunView }) {
   const { storybook } = view;
   if (storybook === null || row.state === "removed") return null;
   return (
@@ -83,7 +83,7 @@ export function StoryFrame({ title, url, viewport }: { title: string; url: strin
   );
 }
 
-export function LiveStories({ row, view, open, onToggle }: { row: SnapshotRow; view: RunView; open: boolean; onToggle: () => void }) {
+export function LiveStories({ row, view, open, onToggle }: { row: RenderRow; view: RunView; open: boolean; onToggle: () => void }) {
   const current = row.state === "removed" ? null : (view.storybook?.url ?? null);
   const golden = row.state === "added" ? null : view.goldenStorybookUrl;
   if (current === null && golden === null) return null;

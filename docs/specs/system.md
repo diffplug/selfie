@@ -1,6 +1,6 @@
 # System
 
-> Status: partly built — rendering environments are built in `docs/specs/render.md`, local approvals in `docs/specs/snapshots.md`, the local CLI in `docs/specs/cli.md`, and the local review UI in `docs/specs/ui.md`; everything under `## Future` is design.
+> Status: partly built — rendering environments are built in `docs/specs/render.md`, local approvals in `docs/specs/renders.md`, the local CLI in `docs/specs/cli.md`, and the local review UI in `docs/specs/ui.md`; everything under `## Future` is design.
 >
 > - See `docs/specs/glossary.md` for vocabulary.
 > - Owns the staged build order and the behavior spanning the local app and the cloud. Image storage belongs to `docs/specs/store.md`.
@@ -11,14 +11,14 @@ Source of truth: `render/src/environment.ts`, `render/src/render.ts`. `docs/spec
 
 - **Must make the rendering environment configurable, and record it with every render.** An environment is what decides the pixels apart from the project's own input: the container image digest or other runner, its CPU architecture, the browser and its flags, the viewport and scale, and the fixed render recipe. Project input, such as story code, a settle time, or an init script, is not part of it (`docs/specs/render.md` → Environment).
 - **Must default to one pinned Linux arm64 container image**, the only setup measured to match across machines (rationale).
-- **Must make the environment part of a snapshot's name**, so images from different environments are never compared, and changing the environment starts new goldens rather than reporting every story as changed. `docs/specs/snapshots.md` → Snapshot names owns how, and a run records its environment.
+- **Must make the environment part of a render's name**, so images from different environments are never compared, and changing the environment starts new goldens rather than reporting every story as changed. `docs/specs/renders.md` → Render names owns how, and a run records its environment.
 - **Must let a project freeze its own timers**, since browser options alone don't stop a blinking cursor (rationale).
 
 ## Approvals
 
-Source of truth: `store/src/core/snapshots.ts`. `docs/specs/snapshots.md` → Decisions owns how they are recorded.
+Source of truth: `store/src/core/render-batches.ts`. `docs/specs/renders.md` → Decisions owns how they are recorded.
 
-- **Must not make a user re-approve a snapshot change at a new Git SHA in the same store.** An approval holds for a snapshot's name and image hash, so a run after a commit, rebase, or amend finds it if the pixels are the same.
+- **Must not make a user re-approve a render change at a new Git SHA in the same store.** An approval holds for a render's name and image hash, so a run after a commit, rebase, or amend finds it if the pixels are the same.
 
 Reserved: this is the local half of [carrying approvals through a push](#approvals-across-stores).
 
@@ -26,7 +26,7 @@ Reserved: this is the local half of [carrying approvals through a push](#approva
 
 Source of truth: `cli/src/`. `docs/specs/cli.md` owns how it works.
 
-- **Must let an agent use the loop without a UI:** `selfie review` records snapshots locally and outputs JSON with image paths, and `selfie approve`, `reject`, and `accept` act on the run it names. Its exit codes tell an agent whether anything blocks. The same logic is a library, for the review UI.
+- **Must let an agent use the loop without a UI:** `selfie review` records renders locally and outputs JSON with image paths, and `selfie approve`, `reject`, and `accept` act on the run it names. Its exit codes tell an agent whether anything blocks. The same logic is a library, for the review UI.
 - **Must keep local data under `~/.config/selfie/<git-origin-slugified>/`.**
 
 ## Local review
@@ -49,17 +49,17 @@ Selfie is for fully opaque images, and transparency is never allowed: `docs/spec
 
 ### Approvals across stores
 
-- **Must not make a user re-approve at push a snapshot change they already approved locally.** A user can approve changes on an unpushed PR, and those approvals carry through the push. The record is built ([Approvals](#approvals)), and `docs/specs/sync.md` moves it, which isn't deployed yet.
+- **Must not make a user re-approve at push a render change they already approved locally.** A user can approve changes on an unpushed PR, and those approvals carry through the push. The record is built ([Approvals](#approvals)), and `docs/specs/sync.md` moves it, which isn't deployed yet.
 
 ### Cloud data
 
 | Data | Lives in |
 |---|---|
 | User accounts and their GitHub tokens, app installations, and which D1 database belongs to each project | Neon Postgres |
-| A project's snapshot metadata | That project's own D1 database |
+| A project's render metadata | That project's own D1 database |
 | Image bytes, and built Storybooks' files | R2 |
 
-- **Never put snapshot metadata in Neon or account data in a project's D1.**
+- **Never put render metadata in Neon or account data in a project's D1.**
 
 ### Build order
 
@@ -71,7 +71,7 @@ Selfie is for fully opaque images, and transparency is never allowed: `docs/spec
 
 **Scope: trust** — The cloud accepts local results without re-rendering.
 
-**Scope: change-grouping** — Muse Spark reads before/after snapshots with the code diff and the stated intent, groups changed snapshots by the code change that caused them, and flags changes nobody asked for, for batch approval or rejection. Needs `cloud-deploy`, and is not ordered against `sync` or `trust`.
+**Scope: change-grouping** — Muse Spark reads before/after renders with the code diff and the stated intent, groups changed renders by the code change that caused them, and flags changes nobody asked for, for batch approval or rejection. Needs `cloud-deploy`, and is not ordered against `sync` or `trust`.
 
 **Scope: platforms-upgrade** — Possible future: reach each project's existing D1 through Workers for Platforms bindings instead of the REST API, when the shared API rate limit constrains the service. Requires no data migration.
 

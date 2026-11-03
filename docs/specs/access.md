@@ -11,7 +11,7 @@ Source of truth: `loopbackHosts` in `ui/src/server/local.ts`, and `sameOriginWri
 
 There's no login on this server, since anyone who can reach loopback on the machine already has the store's files.
 
-- **Must listen only on loopback and check the `Host` header**, so a website the user visits can't read their snapshots through it, by pointing its own DNS name at `127.0.0.1` for one (rationale). The header must be `127.0.0.1:<port>` or `localhost:<port>`, with the port it is listening on, and anything else gets 403.
+- **Must listen only on loopback and check the `Host` header**, so a website the user visits can't read their renders through it, by pointing its own DNS name at `127.0.0.1` for one (rationale). The header must be `127.0.0.1:<port>` or `localhost:<port>`, with the port it is listening on, and anything else gets 403.
 - **Must refuse a request whose `Origin` isn't this server's**, whatever its method.
 - **Must require `Content-Type: application/json` and the header `X-Selfie-Request: review-ui` on anything but GET and HEAD**, so a form or a page on another site can't approve anything, and must send no CORS headers, so a page's own attempt fails its preflight (rationale).
 - **Must refuse to be framed and to be embedded**, with `frame-ancestors 'none'`, `X-Frame-Options: DENY`, and `Cross-Origin-Resource-Policy: same-origin`, so another site can't steer a click on Approve (rationale), on every response, refusals included. `Content-Security-Policy` is exactly `default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'none'`, with `frame-src` naming the hosted Storybook's origin if there is one, through `hono/secure-headers`.
@@ -27,7 +27,7 @@ There's no login on this server, since anyone who can reach loopback on the mach
 
 - **Must integrate with GitHub through one GitHub App, never an OAuth app or personal access tokens.**
 - **Must create a project only for a repository the app is installed on.** A project exists because a repository owner chose to install the app.
-- **Must identify a project by its repository's numeric ID, never its owner or name**, so a rename or transfer keeps the project, and recreating a name can't inherit another repository's snapshots (rationale). The ID is the project identifier in `docs/specs/store.md` → R2 adapter.
+- **Must identify a project by its repository's numeric ID, never its owner or name**, so a rename or transfer keeps the project, and recreating a name can't inherit another repository's renders (rationale). The ID is the project identifier in `docs/specs/store.md` → R2 adapter.
 - **Must request only the permissions a built scope uses**, starting from what repository access checks need, since a repository owner approves every permission at install.
 - **Must keep the app's private key, client secret, and webhook secret only in Worker secrets**, and users' GitHub tokens only on the server, never in the browser.
 - **Must verify every webhook's signature before acting on it.**
@@ -44,7 +44,7 @@ GitHub decides. Selfie keeps no member list of its own.
 
 - **Must decide from the repository's `permissions` and `private` fields as GitHub reports them**, using the user's token for a signed-in user and an installation token for an anonymous viewer (rationale).
 - **Never let an anonymous viewer change anything.**
-- **Must apply a repository's current visibility to all its snapshots, past ones included**, so a repository going public makes its earlier snapshots public, as it does its Git history, and going private hides them all again.
+- **Must apply a repository's current visibility to all its renders, past ones included**, so a repository going public makes its earlier renders public, as it does its Git history, and going private hides them all again.
 - **Must fail closed.** If GitHub can't answer, a private repository's data is refused, and a repository not known to be public counts as private.
 - **Must answer 404 to someone without access, identical to a project that doesn't exist**, so a response never reveals that a private repository uses Selfie.
 - **May cache an access answer for at most 5 minutes**, and must drop it on any webhook about that repository, so a review page's many images don't each ask GitHub. Webhooks only shorten the window, since they don't cover every change (rationale).
@@ -71,10 +71,10 @@ GitHub decides. Selfie keeps no member list of its own.
 
 ### Pull requests from forks
 
-- **Must give a fork's pull request only what read access gives**: its author can read the repository's snapshots as anyone with read access can, and can't upload or approve.
-- **Must fail a fork's pull request's snapshot check until a maintainer approves running the render pass.** Nothing from the fork is stored before that.
+- **Must give a fork's pull request only what read access gives**: its author can read the repository's renders as anyone with read access can, and can't upload or approve.
+- **Must fail a fork's pull request's render check until a maintainer approves running the render pass.** Nothing from the fork is stored before that.
 
-**Later:** a fork's pull request could keep its changed snapshots somewhere like Actions artifacts until a maintainer accepts them.
+**Later:** a fork's pull request could keep its changed renders somewhere like Actions artifacts until a maintainer accepts them.
 
 ### Open questions
 

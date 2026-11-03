@@ -1,6 +1,6 @@
 // Verdicts, computed from a comparison's facts, so a caller can recompute them after any decision.
 import { filterStories } from "selfie-render";
-import { isDecidable, type ComparedSnapshot, type Comparison, type SnapshotState } from "selfie-store";
+import { isDecidable, type ComparedRender, type Comparison, type RenderState } from "selfie-store";
 import type { AdvisoryReason, Attention, BlockerReason } from "selfie-ui/app";
 
 export { isDecidable };
@@ -22,20 +22,20 @@ export interface RunSummary {
     readonly advisories: number;
   };
   /** Changed or new, with no decision. */
-  readonly undecided: readonly ComparedSnapshot[];
+  readonly undecided: readonly ComparedRender[];
   /** Changed or new, and not approved, which includes rejected. */
-  readonly unapproved: readonly ComparedSnapshot[];
-  readonly failed: readonly ComparedSnapshot[];
+  readonly unapproved: readonly ComparedRender[];
+  readonly failed: readonly ComparedRender[];
   /** Goldens this run lacks, which a filter asked for. */
-  readonly removed: readonly ComparedSnapshot[];
+  readonly removed: readonly ComparedRender[];
   /** Goldens this run lacks only because its filter left them out. */
-  readonly notRendered: readonly ComparedSnapshot[];
+  readonly notRendered: readonly ComparedRender[];
 }
 
-export function summarizeRun({ run, snapshots, unchangedCount }: Comparison): RunSummary {
-  const inState = (state: SnapshotState) => snapshots.filter((snapshot) => snapshot.state === state);
+export function summarizeRun({ run, renders, unchangedCount }: Comparison): RunSummary {
+  const inState = (state: RenderState) => renders.filter((render) => render.state === state);
   const failed = inState("failed");
-  const unapproved = snapshots.filter(
+  const unapproved = renders.filter(
     ({ state, decision }) => isDecidable(state) && decision?.decision !== "approved",
   );
   const undecided = unapproved.filter(({ decision }) => decision === null);
@@ -68,7 +68,7 @@ export function summarizeRun({ run, snapshots, unchangedCount }: Comparison): Ru
     })),
   ];
   const advisories: Attention<AdvisoryReason>[] = [
-    ...snapshots.flatMap(({ story, playError }) =>
+    ...renders.flatMap(({ story, playError }) =>
       playError === null ? [] : [{ story, reason: "play-error" as const, detail: playError }],
     ),
   ];

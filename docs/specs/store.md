@@ -3,7 +3,7 @@
 > Status: built — the store core, image checks and decoding, WebP storage with PNG as its fallback, kept built Storybooks, its local SQLite and filesystem adapters, and the D1 REST and R2 adapters exist. Questions stay open; see `## Future`.
 >
 > - See `docs/specs/glossary.md` for image, image hash, image key, and store.
-> - Owns image identity, image decoding, image keys, hash collisions, and how built Storybooks are kept. The built Storybook order belongs to `docs/specs/system.md`. Snapshots, runs, and goldens belong to `docs/specs/snapshots.md`.
+> - Owns image identity, image decoding, image keys, hash collisions, and how built Storybooks are kept. The built Storybook order belongs to `docs/specs/system.md`. RenderBatches, runs, and goldens belong to `docs/specs/renders.md`.
 
 ## Image identity
 
@@ -118,7 +118,7 @@ Source of truth: `store/src/adapters/d1-rest.ts`; tests in `store/test/d1-rest.t
 - **Must fail at once on any other failure**, such as a SQL error or a bad token, with D1's message.
 - **Must bound every retry and every attempt**: a limit on attempts, a limit on any one wait, and a timeout on each request.
 - **Never put the token in an error or in anything a log could print.**
-- **Must keep tests against real D1 opt-in**, so `pnpm test` runs offline with no credentials. `pnpm test:d1` runs the contract in Node, and `docs/specs/snapshots.md`'s after it, and sends about 495 requests against the shared limit, so never loop it. `pnpm test:d1:snapshots`, in `store/`, runs only the second, at about 90. `pnpm test:d1:workerd` runs inside workerd, with the whole store over this adapter and the [R2 adapter](#r2-adapter), and stops at a budget of 30. Run one at a time, of either, since all runs share one database.
+- **Must keep tests against real D1 opt-in**, so `pnpm test` runs offline with no credentials. `pnpm test:d1` runs the contract in Node, and `docs/specs/renders.md`'s after it, and sends about 495 requests against the shared limit, so never loop it. `pnpm test:d1:renders`, in `store/`, runs only the second, at about 90. `pnpm test:d1:workerd` runs inside workerd, with the whole store over this adapter and the [R2 adapter](#r2-adapter), and stops at a budget of 30. Run one at a time, of either, since all runs share one database.
 
 ## R2 adapter
 
@@ -138,4 +138,4 @@ Source of truth: `store/src/adapters/r2.ts`; tests in `store/test/workerd/r2.wor
 ### Open questions
 
 - **Removing what's kept.** Nothing removes a kept image or built Storybook, so a local store only grows, by what a built Storybook changes. Decide what may go, since a run or a golden can still refer to it.
-- **Schema migrations.** How a schema change reaches every project database, and how the app treats a database still on the older schema. Until then a change may only add tables and indexes, through `initStoreSchema`, with one exception made before any project database existed (`docs/specs/snapshots.md` → Schema).
+- **Schema migrations.** How a schema change reaches every project database, and how the app treats a database still on the older schema. Until then a change may only add tables and indexes, through `initStoreSchema`, with one exception made before any project database existed (`docs/specs/renders.md` → Schema).

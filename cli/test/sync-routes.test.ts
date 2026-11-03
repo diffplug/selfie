@@ -60,7 +60,7 @@ const runFacts = (overrides: Record<string, unknown> = {}) => ({
 async function sendRun(id = RUN, color: Color = RED, overrides: Record<string, unknown> = {}) {
   const { hash } = await putImage(color);
   expect((await send("PUT", `/runs/${id}`, "writer", runFacts(overrides))).status).toBe(200);
-  expect((await send("POST", `/runs/${id}/snapshots`, "writer", { snapshots: [{ story: "a", imageHash: hash }] })).status).toBe(200);
+  expect((await send("POST", `/runs/${id}/renders`, "writer", { renders: [{ story: "a", imageHash: hash }] })).status).toBe(200);
   expect((await send("POST", `/runs/${id}/finish`, "writer", { count: 1, finishedAt: 600 })).status).toBe(200);
   return hash;
 }
@@ -78,7 +78,7 @@ beforeEach(async () => {
     // With no token, it's a public repository's anonymous viewer.
     open: async (project, token) => {
       const access = project === "42" ? ACCESS[token ?? "reader"] : undefined;
-      return access === undefined ? null : { access, snapshots: cloud.snapshots, store: cloud.store, hasCommit: async (sha) => PUSHED.has(sha) };
+      return access === undefined ? null : { access, batches: cloud.batches, store: cloud.store, hasCommit: async (sha) => PUSHED.has(sha) };
     },
     findProject: async (owner, name) => (owner === "diffplug" && name === "selfie" ? "42" : null),
   });
@@ -178,7 +178,7 @@ describe("runs", () => {
     const hash = await sendRun();
     const page = (await (await send("GET", `/runs/${RUN}`, "reader")).json()) as any;
     expect(page.run).toMatchObject({ id: RUN, gitSha: SHA, startedAt: 500, finishedAt: 600, status: "complete" });
-    expect(page.snapshots).toEqual([{ story: "a", imageHash: hash, decision: null }]);
+    expect(page.renders).toEqual([{ story: "a", imageHash: hash, decision: null }]);
     expect(page.next).toBeNull();
   });
 
@@ -188,7 +188,7 @@ describe("runs", () => {
     expect(response.status).toBe(409);
     expect(await response.json()).toMatchObject({ error: { code: "commit-not-pushed" } });
     expect(await (await send("PUT", `/runs/${RUN}`, "writer", runFacts({ dirty: true }))).json()).toMatchObject({ error: { code: "run-dirty" } });
-    expect(await cloud.snapshots.getRun(RUN)).toBeNull();
+    expect(await cloud.batches.getRun(RUN)).toBeNull();
   });
 
   test("sending one again carries on, and a finished one says so", async () => {
@@ -207,8 +207,8 @@ describe("runs", () => {
     await send("PUT", `/runs/${RUN}`, "writer", runFacts());
     expect(await (await send("GET", `/runs/${RUN}`, "reader")).json()).toMatchObject({ error: { code: "run-not-finished" } });
     expect((await send("POST", `/runs/${RUN}/finish`, "writer", { count: 1, finishedAt: 600 })).status).toBe(409);
-    await send("POST", `/runs/${RUN}/snapshots`, "writer", { snapshots: [{ story: "a", imageHash: hash }] });
-    await send("POST", `/runs/${RUN}/snapshots`, "writer", { snapshots: [{ story: "a", imageHash: hash }] });
+    await send("POST", `/runs/${RUN}/renders`, "writer", { renders: [{ story: "a", imageHash: hash }] });
+    await send("POST", `/runs/${RUN}/renders`, "writer", { renders: [{ story: "a", imageHash: hash }] });
     expect(await (await send("POST", `/runs/${RUN}/finish`, "writer", { count: 1, finishedAt: 600 })).json()).toEqual({ status: "complete" });
   });
 
@@ -216,24 +216,24 @@ describe("runs", () => {
     const { hash } = await putImage(RED);
     await send("PUT", `/runs/${RUN}`, "writer", runFacts({ startedAt: NOW + 5 }));
     expect((await send("PUT", `/runs/${RUN}`, "writer", runFacts({ startedAt: NOW + 5 }))).status).toBe(200);
-    await send("POST", `/runs/${RUN}/snapshots`, "writer", { snapshots: [{ story: "a", imageHash: hash }] });
+    await send("POST", `/runs/${RUN}/renders`, "writer", { renders: [{ story: "a", imageHash: hash }] });
     await send("POST", `/runs/${RUN}/finish`, "writer", { count: 1, finishedAt: NOW + 5 });
-    expect(await cloud.snapshots.getRun(RUN)).toMatchObject({ startedAt: NOW, finishedAt: NOW });
+    expect(await cloud.batches.getRun(RUN)).toMatchObject({ startedAt: NOW, finishedAt: NOW });
   });
 
   test("won't take an image it doesn't hold", async () => {
     await send("PUT", `/runs/${RUN}`, "writer", runFacts());
-    const response = await send("POST", `/runs/${RUN}/snapshots`, "writer", { snapshots: [{ story: "a", imageHash: UNKNOWN_HASH }] });
+    const response = await send("POST", `/runs/${RUN}/renders`, "writer", { renders: [{ story: "a", imageHash: UNKNOWN_HASH }] });
     expect(await response.json()).toMatchObject({ error: { code: "unknown-image" } });
   });
 
   test("keeps failures and play errors", async () => {
     const { hash } = await putImage(RED);
     await send("PUT", `/runs/${RUN}`, "writer", runFacts());
-    await send("POST", `/runs/${RUN}/snapshots`, "writer", { snapshots: [{ story: "a", failure: "boom" }, { story: "b", imageHash: hash, playError: "threw" }] });
+    await send("POST", `/runs/${RUN}/renders`, "writer", { renders: [{ story: "a", failure: "boom" }, { story: "b", imageHash: hash, playError: "threw" }] });
     await send("POST", `/runs/${RUN}/finish`, "writer", { count: 2, finishedAt: 600 });
     const page = (await (await send("GET", `/runs/${RUN}`, "reader")).json()) as any;
-    expect(page.snapshots).toEqual([{ story: "a", failure: "boom", decision: null }, { story: "b", imageHash: hash, playError: "threw", decision: null }]);
+    expect(page.renders).toEqual([{ story: "a", failure: "boom", decision: null }, { story: "b", imageHash: hash, playError: "threw", decision: null }]);
   });
 
   test("refuses what isn't a run", async () => {
@@ -245,7 +245,7 @@ describe("runs", () => {
 });
 
 describe("decisions", () => {
-  const decisionOn = async () => ((await (await send("GET", `/runs/${RUN}`, "reader")).json()) as any).snapshots[0].decision;
+  const decisionOn = async () => ((await (await send("GET", `/runs/${RUN}`, "reader")).json()) as any).renders[0].decision;
 
   test("are by whoever is pushing, whatever the client says", async () => {
     const hash = await sendRun();
@@ -272,14 +272,14 @@ describe("goldens", () => {
     const hash = await sendRun();
     await approve(hash);
     expect(await (await goldens({ runId: RUN, baselineSha: null, removed: [] }, "ci")).json()).toEqual({ outcome: "accepted", acceptedRunId: RUN, refusal: null });
-    expect(await cloud.snapshots.acceptedRunAt(SHA, ENV)).toBe(RUN);
+    expect(await cloud.batches.acceptedRunAt(SHA, ENV)).toBe(RUN);
   });
 
   test("are refused for what nobody approved, and leave the run", async () => {
     await sendRun();
     expect(await (await goldens({ runId: RUN, baselineSha: null, removed: [] }, "ci")).json()).toMatchObject({ outcome: "refused", refusal: { code: "not-approved" } });
-    expect(await cloud.snapshots.acceptedRunAt(SHA, ENV)).toBeNull();
-    expect(await cloud.snapshots.getRun(RUN)).not.toBeNull();
+    expect(await cloud.batches.acceptedRunAt(SHA, ENV)).toBeNull();
+    expect(await cloud.batches.getRun(RUN)).not.toBeNull();
   });
 
   test("the same run again is fine", async () => {
@@ -293,7 +293,7 @@ describe("goldens", () => {
     await goldens({ runId: RUN, baselineSha: null, removed: [] });
     await approve(await sendRun(OTHER_RUN, GREEN));
     expect(await (await goldens({ runId: OTHER_RUN, baselineSha: null, removed: [] })).json()).toMatchObject({ outcome: "conflict", acceptedRunId: RUN });
-    expect(await cloud.snapshots.acceptedRunAt(SHA, ENV)).toBe(RUN);
+    expect(await cloud.batches.acceptedRunAt(SHA, ENV)).toBe(RUN);
   });
 
   describe("that remove something", () => {
@@ -301,12 +301,12 @@ describe("goldens", () => {
       const { hash: a } = await putImage(RED);
       const { hash: b } = await putImage(BLUE);
       await send("PUT", `/runs/${RUN}`, "writer", runFacts());
-      await send("POST", `/runs/${RUN}/snapshots`, "writer", { snapshots: [{ story: "a", imageHash: a }, { story: "b", imageHash: b }] });
+      await send("POST", `/runs/${RUN}/renders`, "writer", { renders: [{ story: "a", imageHash: a }, { story: "b", imageHash: b }] });
       await send("POST", `/runs/${RUN}/finish`, "writer", { count: 2, finishedAt: 600 });
       await send("POST", "/decisions", "writer", { environment: ENV, decisions: [{ story: "a", imageHash: a, decision: "approved", at: 700 }, { story: "b", imageHash: b, decision: "approved", at: 700 }] });
       await goldens({ runId: RUN, baselineSha: null, removed: [] });
       await send("PUT", `/runs/${OTHER_RUN}`, "writer", runFacts({ gitSha: OTHER_SHA, baselineSha: SHA }));
-      await send("POST", `/runs/${OTHER_RUN}/snapshots`, "writer", { snapshots: [{ story: "a", imageHash: a }] });
+      await send("POST", `/runs/${OTHER_RUN}/renders`, "writer", { renders: [{ story: "a", imageHash: a }] });
       await send("POST", `/runs/${OTHER_RUN}/finish`, "writer", { count: 1, finishedAt: 800 });
     });
 
@@ -338,7 +338,7 @@ describe("goldens", () => {
     await goldens({ runId: RUN, baselineSha: null, removed: [] });
     // The same image, at another commit, with no approval or recorded baseline of its own.
     await sendRun(OTHER_RUN, RED, { gitSha: OTHER_SHA });
-    await cloud.snapshots.mergeDecisions(ENV, []);
+    await cloud.batches.mergeDecisions(ENV, []);
     expect(await (await goldens({ runId: OTHER_RUN, baselineSha: SHA, removed: [] }, "ci")).json()).toMatchObject({ outcome: "accepted" });
   });
 

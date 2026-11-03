@@ -52,7 +52,7 @@ export const change = (url: string, body: unknown, headers: Record<string, strin
     },
   });
 
-export const decideOn = (runId: string, decision: string, snapshots: unknown) => change(`/api/runs/${runId}/decisions`, { decision, snapshots });
+export const decideOn = (runId: string, decision: string, renders: unknown) => change(`/api/runs/${runId}/decisions`, { decision, renders });
 export const acceptRun = (runId: string, body: unknown = {}) => change(`/api/runs/${runId}/accept`, body);
 export const viewOf = async (runId: string) => (await (await get(`/api/runs/${runId}`)).json()) as any;
 

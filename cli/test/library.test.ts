@@ -42,7 +42,7 @@ test("a decision on exact images takes each as itself, and checkAccept changes n
   h.stories = [{ id: "a*" }, { id: "ab" }];
   const { comparison } = await review(project, options());
   const { id: runId } = comparison.run;
-  const star = comparison.snapshots.find(({ story }) => story === "a*")!;
+  const star = comparison.renders.find(({ story }) => story === "a*")!;
   const target = { story: "a*", imageHash: star.imageHash! };
   const decided = await decide(project, { runId, decision: "approved", actor: "ui", stories: { targets: [target] } });
   expect(decided.decided.map(({ story }) => story)).toEqual(["a*"]);
@@ -56,9 +56,9 @@ test("a decision on exact images takes each as itself, and checkAccept changes n
   const check = await checkAccept(project, all.comparison);
   expect(check.refusals).toEqual([]);
   const { gitSha, environment } = all.comparison.run;
-  expect(await project.snapshots.acceptedRunAt(gitSha, environment)).toBeNull();
+  expect(await project.batches.acceptedRunAt(gitSha, environment)).toBeNull();
   expect((await accept(project, { runId })).accepted).toBe(true);
-  expect(await project.snapshots.acceptedRunAt(gitSha, environment)).toBe(runId);
+  expect(await project.batches.acceptedRunAt(gitSha, environment)).toBe(runId);
 });
 
 test("openProject needs only a directory and an environment, and fails with a code", async () => {
@@ -112,7 +112,7 @@ describe("review", () => {
     h.stories = [{ id: "a" }, { id: "b" }];
     const { comparison } = await review(project, { ...options(), stories: ["a", "nope"] });
     expect(comparison.run.storyFilter).toEqual({ patterns: ["a", "nope"], unmatched: ["nope"] });
-    expect(await project.snapshots.getRun(comparison.run.id)).toMatchObject({
+    expect(await project.batches.getRun(comparison.run.id)).toMatchObject({
       storyFilter: { patterns: ["a", "nope"], unmatched: ["nope"] },
     });
   });

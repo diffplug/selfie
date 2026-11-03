@@ -194,7 +194,7 @@ describe.runIf(process.env.SELFIE_RENDER_CONTAINER === "1")("in the pinned conta
   });
 
   test("a project's recipe reaches the browser", async () => {
-    const recipe = { origin: "http://localhost:6006", locale: "de-DE", timezoneId: "Asia/Tokyo", colorScheme: "dark", fixedTime: "2031-03-04T00:00:00.000Z", snapshotGlobal: "__MY_SNAPSHOT__" } as const;
+    const recipe = { origin: "http://localhost:6006", locale: "de-DE", timezoneId: "Asia/Tokyo", colorScheme: "dark", fixedTime: "2031-03-04T00:00:00.000Z", renderGlobal: "__MY_RENDER__" } as const;
     const environment = defineEnvironment({ recipe });
     const manifest = await run({ environment, stories: ["recipe--says"] });
     const [said] = story(manifest, "recipe--says").errors;

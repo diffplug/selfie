@@ -28,7 +28,7 @@ describe("who may ask", () => {
       const [{ story, imageHash }] = (await viewOf(runId)).rows;
       target = { story, imageHash };
     });
-    const body = () => ({ decision: "approved", snapshots: [target] });
+    const body = () => ({ decision: "approved", renders: [target] });
     const nothingDecided = async () => expect((await viewOf(runId)).counts.undecided).toBe(1);
 
     test("is refused for a foreign Origin, even with the header and the type", async () => {

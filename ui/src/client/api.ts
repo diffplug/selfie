@@ -13,7 +13,7 @@ import {
   type PixelDiff,
   type RunView,
   type SendVia,
-  type SnapshotRow,
+  type RenderRow,
   type StoriesView,
 } from "../shared/api.ts";
 
@@ -52,11 +52,11 @@ const runRoute = (runId: string) => `/runs/${encodeURIComponent(runId)}`;
 export const fetchRun = (runId: string, signal: AbortSignal) => request<RunView>(runRoute(runId), { signal });
 export const fetchRunContext = (runId: string, signal: AbortSignal) => request<RunContext>(`/runs/${encodeURIComponent(runId)}/context`, { signal });
 export const fetchBaseline = (runId: string, signal: AbortSignal) => request<BaselineNote>(`${runRoute(runId)}/baseline`, { signal });
-export const fetchUnchanged = async (runId: string) => (await request<{ rows: readonly SnapshotRow[] }>(`${runRoute(runId)}/unchanged`)).rows;
+export const fetchUnchanged = async (runId: string) => (await request<{ rows: readonly RenderRow[] }>(`${runRoute(runId)}/unchanged`)).rows;
 export const fetchDiff = (current: string, golden: string, signal: AbortSignal) => request<PixelDiff>(`/diffs/${current}/${golden}`, { signal });
 
-export const postDecision = (runId: string, decision: DecisionKind, snapshots: readonly DecisionTarget[]) =>
-  post<RunView>(`${runRoute(runId)}/decisions`, { decision, snapshots });
+export const postDecision = (runId: string, decision: DecisionKind, renders: readonly DecisionTarget[]) =>
+  post<RunView>(`${runRoute(runId)}/decisions`, { decision, renders });
 export const postAccept = (runId: string, removedSeen: number | undefined) =>
   post<AcceptOutcome>(`${runRoute(runId)}/accept`, removedSeen === undefined ? {} : { removedSeen });
 

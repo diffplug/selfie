@@ -6,7 +6,7 @@ import type { ListedStory, StoriesView } from "../shared/api.ts";
 import { DetailScreen, StoryPager } from "./DetailScreen.tsx";
 import { FeedbackBar } from "./Feedback.tsx";
 import { navigationThrough, parseFilter, type StoryNavigation } from "./filter.ts";
-import { useRender, useFeedback, useHotkeys, useRun, useStories, useStoryFocusKeys, useTitle, type RenderState, type FeedbackState, type RunState } from "./hooks.ts";
+import { useRender, useFeedback, useHotkeys, useRun, useStories, useStoryFocusKeys, useTitle, type RenderingState, type FeedbackState, type RunState } from "./hooks.ts";
 import { Keys } from "./Keys.tsx";
 import { usePageFacts } from "./PageFacts.tsx";
 import { OpenInStorybook, StoryFrame, storyFrameUrl } from "./LiveStories.tsx";
@@ -42,7 +42,7 @@ export function StoriesLayout({ view, story, search, children }: { view: Stories
 }
 
 /** What's said while a render runs, or why the last one didn't. */
-export function RenderStatus({ renders }: { renders: RenderState }) {
+export function RenderingStatus({ renders }: { renders: RenderingState }) {
   return (
     <>
       {renders.error !== null && <ActionFailedBanner error={renders.error} onDismiss={renders.clearError} />}
@@ -54,7 +54,7 @@ export function RenderStatus({ renders }: { renders: RenderState }) {
 }
 
 /** What's on the right with no story picked. */
-export function StoriesOverview({ view, renders, recheck }: { view: StoriesView; renders: RenderState; recheck: () => void }) {
+export function StoriesOverview({ view, renders, recheck }: { view: StoriesView; renders: RenderingState; recheck: () => void }) {
   useTitle("Every story");
   useStoryFocusKeys();
   return (
@@ -92,7 +92,7 @@ function RenderedStory({
   feedback: FeedbackState;
   navigation: StoryNavigation;
   liveStories: readonly [boolean, (open: boolean) => void];
-  renders: RenderState;
+  renders: RenderingState;
   entry: ListedStory;
   startNote: boolean;
   onDecided: () => void;
@@ -128,7 +128,7 @@ function RenderedStory({
 }
 
 /** A story with no image yet, which is still a real story to look at. */
-export function UnrenderedStory({ view, story, navigation, renders, onWriteNote }: { view: StoriesView; story: string; navigation: StoryNavigation; renders: RenderState; onWriteNote: () => void }) {
+export function UnrenderedStory({ view, story, navigation, renders, onWriteNote }: { view: StoriesView; story: string; navigation: StoryNavigation; renders: RenderingState; onWriteNote: () => void }) {
   useTitle(story);
   const go = (href: string | null) => {
     if (href !== null) navigate(href, { replace: true });
@@ -194,7 +194,7 @@ function OneStory({
   search: string;
   feedback: FeedbackState;
   liveStories: readonly [boolean, (open: boolean) => void];
-  renders: RenderState;
+  renders: RenderingState;
   onDecided: () => void;
 }) {
   // Which story someone asked to write on, whose note box opens once it's been rendered.
@@ -229,7 +229,7 @@ export function StoriesRoutes({ story, search }: { story: string | null; search:
   return (
     <StoriesLayout view={stories.view} story={story} search={search}>
       <FeedbackBar feedback={feedback} storyHref={(name) => anyStoryPath(name)} showList={story === null} />
-      <RenderStatus renders={renders} />
+      <RenderingStatus renders={renders} />
       {story === null ? (
         <StoriesOverview view={stories.view} renders={renders} recheck={stories.recheck} />
       ) : (

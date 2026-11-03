@@ -3,11 +3,11 @@ import { assertImageHash } from "./image-hash.ts";
 import type { Sql, SqlParam, SqlRow, SqlStatement } from "./sql.ts";
 
 /**
- * The tables behind `Snapshots`, which `initStoreSchema` creates. Rows hold the image
+ * The tables behind `RenderBatches`, which `initStoreSchema` creates. Rows hold the image
  * key and the run key for compactness, and both stay private to this store: everything
  * this module takes or returns names an image by its hash and a run by its `id`.
  */
-export const CREATE_SNAPSHOT_TABLES: readonly string[] = [
+export const CREATE_BATCH_TABLES: readonly string[] = [
   `CREATE TABLE IF NOT EXISTS runs (
   key INTEGER PRIMARY KEY,
   id TEXT NOT NULL UNIQUE,
@@ -23,7 +23,7 @@ export const CREATE_SNAPSHOT_TABLES: readonly string[] = [
   scale REAL NOT NULL
 )`,
   "CREATE INDEX IF NOT EXISTS runs_by_sha ON runs(git_sha, environment, started_at)",
-  `CREATE TABLE IF NOT EXISTS run_snapshots (
+  `CREATE TABLE IF NOT EXISTS renders (
   run_key INTEGER NOT NULL,
   story TEXT NOT NULL,
   image_key INTEGER,
@@ -50,17 +50,17 @@ export const CREATE_SNAPSHOT_TABLES: readonly string[] = [
 ];
 
 // These fit the limit of 100 bound parameters per statement, beside what all of a
-// statement's rows share. A recorded snapshot takes two, or three with a play error,
+// statement's rows share. A recorded render takes two, or three with a play error,
 // so a statement holds 49 when none has one, and at least 33.
 const MAX_RECORD_PARAMS = 100;
-const SNAPSHOTS_PER_DECISION_STATEMENT = 48;
+const RENDERS_PER_DECISION_STATEMENT = 48;
 // Beside the environment, a merged decision takes five.
 const DECISIONS_PER_MERGE_STATEMENT = 19;
 // Nearest first, beside the environment.
 const SHAS_PER_GOLDENS_QUERY = 99;
 
-// Sizes measured on real D1: `docs/specs/snapshots.rationale.md`. A request of 400
-// statements holds 19,600 snapshots, so a run of up to that many costs one.
+// Sizes measured on real D1: `docs/specs/renders.rationale.md`. A request of 400
+// statements holds 19,600 renders, so a run of up to that many costs one.
 const STATEMENTS_PER_REQUEST = 400;
 const ROWS_PER_PAGE = 5_000;
 
@@ -97,8 +97,8 @@ const comparisonStatements = (baselineKey: string) => ({
   comparedPage: `SELECT rs.story, i.hash AS image_hash, rs.failure, rs.play_error,
   gi.hash AS golden_hash, d.decision, d.actor, d.decided_at
 FROM runs r
-CROSS JOIN run_snapshots rs ON rs.run_key = r.key
-LEFT JOIN run_snapshots gs ON gs.run_key = ${baselineKey} AND gs.story = rs.story
+CROSS JOIN renders rs ON rs.run_key = r.key
+LEFT JOIN renders gs ON gs.run_key = ${baselineKey} AND gs.story = rs.story
 LEFT JOIN images i ON i.key = rs.image_key
 LEFT JOIN images gi ON gi.key = gs.image_key
 LEFT JOIN decisions d ON d.environment = r.environment AND d.story = rs.story
@@ -109,25 +109,25 @@ WHERE r.id = ?1 AND rs.story > ?3
 ORDER BY rs.story
 LIMIT CAST(?4 AS INTEGER)`,
   removedPage: `SELECT gs.story, gi.hash AS golden_hash
-FROM run_snapshots gs
+FROM renders gs
 JOIN images gi ON gi.key = gs.image_key
 WHERE gs.run_key = ${baselineKey} AND gs.story > ?3
-  AND NOT EXISTS (SELECT 1 FROM run_snapshots rs
+  AND NOT EXISTS (SELECT 1 FROM renders rs
     WHERE rs.run_key = (SELECT key FROM runs WHERE id = ?1) AND rs.story = gs.story)
 ORDER BY gs.story
 LIMIT CAST(?4 AS INTEGER)`,
   unchangedCount: `SELECT COUNT(*) AS total
-FROM run_snapshots rs
-JOIN run_snapshots gs ON gs.run_key = ${baselineKey} AND gs.story = rs.story
+FROM renders rs
+JOIN renders gs ON gs.run_key = ${baselineKey} AND gs.story = rs.story
 WHERE rs.run_key = (SELECT key FROM runs WHERE id = ?1) AND rs.image_key = gs.image_key`,
 });
 
 const AGAINST_GOLDENS = comparisonStatements(GOLDENS_RUN_KEY);
 const AGAINST_RUN = comparisonStatements(NAMED_RUN_KEY);
 
-const COUNT_REMOVED = `(SELECT COUNT(*) FROM run_snapshots gs
+const COUNT_REMOVED = `(SELECT COUNT(*) FROM renders gs
   WHERE gs.run_key = ${GOLDENS_RUN_KEY}
-    AND NOT EXISTS (SELECT 1 FROM run_snapshots rs
+    AND NOT EXISTS (SELECT 1 FROM renders rs
       WHERE rs.run_key = (SELECT key FROM runs WHERE id = ?1) AND rs.story = gs.story))`;
 
 const SELECT_REMOVED_COUNT = `SELECT ${COUNT_REMOVED} AS total`;
@@ -149,8 +149,8 @@ WHERE r.id = ?1 AND ${CAN_BE_GOLDENS}
     OR (
       ${COUNT_REMOVED} = CAST(?3 AS INTEGER)
       AND NOT EXISTS (
-        SELECT 1 FROM run_snapshots rs
-        LEFT JOIN run_snapshots gs ON gs.run_key = ${GOLDENS_RUN_KEY} AND gs.story = rs.story
+        SELECT 1 FROM renders rs
+        LEFT JOIN renders gs ON gs.run_key = ${GOLDENS_RUN_KEY} AND gs.story = rs.story
         WHERE rs.run_key = r.key AND gs.image_key IS NOT rs.image_key
           AND NOT EXISTS (
             SELECT 1 FROM decisions d
@@ -171,7 +171,7 @@ const FINISH_RUN = `UPDATE runs SET
   failed_count = c.failed
 FROM (
   SELECT COUNT(*) AS total, COALESCE(SUM(image_key IS NULL), 0) AS failed
-  FROM run_snapshots
+  FROM renders
   WHERE run_key = (SELECT key FROM runs WHERE id = ?1)
 ) AS c
 WHERE runs.id = ?1 AND c.total = CAST(?3 AS INTEGER)
@@ -186,21 +186,21 @@ RETURNING run_key`;
 
 const READ_RUN_PAGE = `SELECT rs.story, i.hash AS image_hash, rs.failure, rs.play_error, d.decision, d.actor, d.decided_at
 FROM runs r
-CROSS JOIN run_snapshots rs ON rs.run_key = r.key
+CROSS JOIN renders rs ON rs.run_key = r.key
 LEFT JOIN images i ON i.key = rs.image_key
 LEFT JOIN decisions d ON d.environment = r.environment AND d.story = rs.story AND d.image_hash = i.hash
 WHERE r.id = ?1 AND rs.story > ?2
 ORDER BY rs.story
 LIMIT CAST(?3 AS INTEGER)`;
 
-const COUNT_SNAPSHOTS = `SELECT COUNT(*) AS total FROM run_snapshots
+const COUNT_RENDERS = `SELECT COUNT(*) AS total FROM renders
 WHERE run_key = (SELECT key FROM runs WHERE id = ?1)`;
 
 // A row with a hash the images table lacks, or a finished run, matches nothing, so the
-// statement returns too few rows, which is how `recordSnapshots` knows.
+// statement returns too few rows, which is how `recordRenders` knows.
 const recordSql = (values: string) =>
   `WITH v(story, image_hash, failure, play_error) AS (VALUES ${values})
-INSERT INTO run_snapshots(run_key, story, image_key, failure, play_error)
+INSERT INTO renders(run_key, story, image_key, failure, play_error)
 SELECT r.key, v.story, i.key, v.failure, v.play_error
 FROM runs r CROSS JOIN v LEFT JOIN images i ON i.hash = v.image_hash
 WHERE r.id = ?1 AND r.finished_at IS NULL AND (v.image_hash IS NULL OR i.key IS NOT NULL)
@@ -213,7 +213,7 @@ RETURNING 1 AS written`;
  * What a run recorded for one story: the stored image's hash, or why it failed.
  * `playError` says why its play function failed, on a story that may still have rendered.
  */
-export type RecordedSnapshot = {
+export type RecordedRender = {
   /** The story ID, with any render variant in it. Opaque here. */
   readonly story: string;
   readonly playError?: string | null;
@@ -224,7 +224,7 @@ export type RecordedSnapshot = {
 
 /**
  * - `recording`: not finished. It is still being written, or its writer crashed, so it
- *   may lack snapshots. After a crash, start a new run.
+ *   may lack renders. After a crash, start a new run.
  * - `complete`: finished, and every story rendered.
  * - `failed`: finished, and at least one story failed to render.
  */
@@ -269,14 +269,14 @@ export interface Decision {
   readonly at: number;
 }
 
-export type SnapshotState = "unchanged" | "changed" | "added" | "removed" | "failed";
+export type RenderState = "unchanged" | "changed" | "added" | "removed" | "failed";
 
-/** Whether a snapshot in this state has an image that can take a decision. */
-export const isDecidable = (state: SnapshotState): boolean => state === "changed" || state === "added";
+/** Whether a render in this state has an image that can take a decision. */
+export const isDecidable = (state: RenderState): boolean => state === "changed" || state === "added";
 
-export interface ComparedSnapshot {
+export interface ComparedRender {
   readonly story: string;
-  readonly state: SnapshotState;
+  readonly state: RenderState;
   /** The run's image. Null if `removed` or `failed`. */
   readonly imageHash: string | null;
   /** The baseline's image. Null if `added`, and if `failed` with no golden for this name. */
@@ -293,24 +293,24 @@ export interface Comparison {
   readonly run: Run;
   /**
    * In name order, the run's differences from the baseline and anything with a play
-   * error, then the removed snapshots. Other unchanged ones only if asked for.
+   * error, then the removed renders. Other unchanged ones only if asked for.
    */
-  readonly snapshots: readonly ComparedSnapshot[];
-  /** How many of the run's snapshots are `unchanged`, whether listed or not. */
+  readonly renders: readonly ComparedRender[];
+  /** How many of the run's renders are `unchanged`, whether listed or not. */
   readonly unchangedCount: number;
 }
 
 export interface CompareOptions {
-  /** List every unchanged snapshot too. Reads and returns far more. */
+  /** List every unchanged render too. Reads and returns far more. */
   readonly includeUnchanged?: boolean;
 }
 
 export interface DecisionRequest {
-  /** With each snapshot's story, this is its name. */
+  /** With each render's story, this is its name. */
   readonly environment: string;
   readonly decision: DecisionKind;
   readonly actor: string;
-  readonly snapshots: readonly { readonly story: string; readonly imageHash: string }[];
+  readonly renders: readonly { readonly story: string; readonly imageHash: string }[];
 }
 
 /** A run as another store holds it, which keeps its identity and its times here. */
@@ -325,14 +325,14 @@ export interface ReceivedDecision extends Decision {
 /** What a run holds, as a page of a read by name. */
 export interface RunPage {
   readonly run: Run;
-  readonly snapshots: readonly (RecordedSnapshot & { readonly decision: Decision | null })[];
+  readonly renders: readonly (RecordedRender & { readonly decision: Decision | null })[];
   /** Where the next page starts, or null if this is the last. */
   readonly next: string | null;
 }
 
-export type SnapshotErrorCode =
+export type BatchErrorCode =
   | "unknown-run"
-  /** The run takes no more snapshots, since it was finished. */
+  /** The run takes no more renders, since it was finished. */
   | "run-finished"
   /** The run is still `recording`, so it can't be compared or accepted. */
   | "run-not-finished"
@@ -341,10 +341,10 @@ export type SnapshotErrorCode =
   /** The run was recorded on a dirty tree, so it can't become goldens. */
   | "run-dirty"
   /** Finishing was asked for with a different count than the run holds. */
-  | "wrong-snapshot-count"
-  /** Accepting was asked for with a different count of removed snapshots than there are. */
+  | "wrong-render-count"
+  /** Accepting was asked for with a different count of removed renders than there are. */
   | "wrong-removed-count"
-  /** A snapshot named an image that isn't stored. */
+  /** A render named an image that isn't stored. */
   | "unknown-image"
   /** A run with this ID is already here, and it isn't this one. */
   | "run-conflict"
@@ -353,17 +353,17 @@ export type SnapshotErrorCode =
   | "no-baseline-run";
 
 /** The request can't apply to the data as it stands. */
-export class SnapshotError extends Error {
-  override readonly name = "SnapshotError";
-  readonly code: SnapshotErrorCode;
+export class BatchError extends Error {
+  override readonly name = "BatchError";
+  readonly code: BatchErrorCode;
 
-  constructor(code: SnapshotErrorCode, message: string) {
+  constructor(code: BatchErrorCode, message: string) {
     super(message);
     this.code = code;
   }
 }
 
-export interface SnapshotsOptions {
+export interface RenderBatchesOptions {
   readonly sql: Sql;
   /** Defaults to `Date.now`. Tests inject one to control time. */
   readonly now?: () => number;
@@ -371,13 +371,13 @@ export interface SnapshotsOptions {
 
 /**
  * Runs, comparisons, decisions, and goldens, over `Sql` alone. Every statement is safe
- * to resend, and nothing relies on a batch being atomic. See `docs/specs/snapshots.md`.
+ * to resend, and nothing relies on a batch being atomic. See `docs/specs/renders.md`.
  */
-export class Snapshots {
+export class RenderBatches {
   readonly #sql: Sql;
   readonly #now: () => number;
 
-  constructor({ sql, now = Date.now }: SnapshotsOptions) {
+  constructor({ sql, now = Date.now }: RenderBatchesOptions) {
     this.#sql = sql;
     this.#now = now;
   }
@@ -400,7 +400,7 @@ export class Snapshots {
   /**
    * Starts holding a run that began in another store, under its own ID and times. If it's
    * already here, this says how far it got, so a resend can carry on: an unfinished one
-   * takes its snapshots again, and a finished one needs nothing. Throws if that ID is here
+   * takes its renders again, and a finished one needs nothing. Throws if that ID is here
    * for different facts, since a run never changes.
    */
   async receiveRun(received: ReceivedRun): Promise<Run> {
@@ -408,18 +408,18 @@ export class Snapshots {
     const run = toRun(rows![0]!);
     const { gitSha, environment, startedAt, dirty, baselineSha, scale } = received;
     if (run.gitSha !== gitSha || run.environment !== environment || run.startedAt !== startedAt || run.dirty !== dirty || run.baselineSha !== baselineSha || run.scale !== scale) {
-      throw new SnapshotError("run-conflict", `Run ${received.id} is already here, and it isn't this one`);
+      throw new BatchError("run-conflict", `Run ${received.id} is already here, and it isn't this one`);
     }
     return run;
   }
 
   /**
-   * Adds snapshots to a `recording` run. A failure can leave any of them written, so
+   * Adds renders to a `recording` run. A failure can leave any of them written, so
    * after one, send them again: a name the run already holds takes the newer result.
    * Each image must already be stored, by `Store.putImages`.
    */
-  async recordSnapshots(runId: string, snapshots: readonly RecordedSnapshot[]): Promise<void> {
-    const statements = recordStatements(runId, snapshots);
+  async recordRenders(runId: string, renders: readonly RecordedRender[]): Promise<void> {
+    const statements = recordStatements(runId, renders);
     for (const group of chunks(statements, STATEMENTS_PER_REQUEST)) {
       const results = await this.#sql.batch(group.map(({ statement }) => statement));
       const written = results.reduce((sum, rows) => sum + rows.length, 0);
@@ -430,18 +430,18 @@ export class Snapshots {
 
   async #explainUnrecorded(runId: string, missing: number): Promise<never> {
     const run = await this.getRun(runId);
-    if (run === null) throw new SnapshotError("unknown-run", `No run ${runId}`);
+    if (run === null) throw new BatchError("unknown-run", `No run ${runId}`);
     if (run.status !== "recording") {
-      throw new SnapshotError("run-finished", `Run ${runId} is finished and takes no more snapshots`);
+      throw new BatchError("run-finished", `Run ${runId} is finished and takes no more renders`);
     }
-    throw new SnapshotError(
+    throw new BatchError(
       "unknown-image",
-      `${missing} snapshots were not recorded, since their images are not stored`,
+      `${missing} renders were not recorded, since their images are not stored`,
     );
   }
 
   /**
-   * Ends a run, if it holds exactly `expectedCount` snapshots, failed ones included.
+   * Ends a run, if it holds exactly `expectedCount` renders, failed ones included.
    * If not it stays `recording` and this throws, so a batch that was lost shows here.
    * A run from another store gives the time it finished there.
    */
@@ -455,12 +455,12 @@ export class Snapshots {
 
     const [runRows, countRows] = await this.#sql.batch([
       { sql: SELECT_RUN, params: [runId], idempotent: true },
-      { sql: COUNT_SNAPSHOTS, params: [runId], idempotent: true },
+      { sql: COUNT_RENDERS, params: [runId], idempotent: true },
     ]);
-    if (runRows?.[0] === undefined) throw new SnapshotError("unknown-run", `No run ${runId}`);
-    throw new SnapshotError(
-      "wrong-snapshot-count",
-      `Run ${runId} holds ${String(countRows?.[0]?.total)} snapshots, not the ${expectedCount} expected`,
+    if (runRows?.[0] === undefined) throw new BatchError("unknown-run", `No run ${runId}`);
+    throw new BatchError(
+      "wrong-render-count",
+      `Run ${runId} holds ${String(countRows?.[0]?.total)} renders, not the ${expectedCount} expected`,
     );
   }
 
@@ -483,9 +483,9 @@ ORDER BY started_at DESC, key DESC`,
   }
 
   /**
-   * Gives a finished run's snapshots their states, from image hashes alone, against the
+   * Gives a finished run's renders their states, from image hashes alone, against the
    * goldens of `baselineSha` in the run's own environment. A null baseline means there
-   * are none yet, so every rendered snapshot is `added`. Lists only what a reviewer needs
+   * are none yet, so every rendered render is `added`. Lists only what a reviewer needs
    * unless told otherwise: see `Comparison`.
    */
   async compareRun(runId: string, baselineSha: string | null, options?: CompareOptions): Promise<Comparison> {
@@ -499,7 +499,7 @@ ORDER BY started_at DESC, key DESC`,
   async compareWithRun(runId: string, baselineRunId: string, options?: CompareOptions): Promise<Comparison> {
     return this.#compare(runId, baselineRunId, AGAINST_RUN, options, (found, run) => {
       if (!found) {
-        throw new SnapshotError("no-baseline-run", `${baselineRunId} isn't a finished run in environment ${run.environment}`);
+        throw new BatchError("no-baseline-run", `${baselineRunId} isn't a finished run in environment ${run.environment}`);
       }
     });
   }
@@ -538,7 +538,7 @@ ORDER BY started_at DESC, key DESC`,
     const removed = await this.#remainingPages(firstRemoved, removedPage);
     return {
       run,
-      snapshots: [...compared.map(toComparedSnapshot), ...removed.map(toRemovedSnapshot)],
+      renders: [...compared.map(toComparedRender), ...removed.map(toRemovedRender)],
       unchangedCount: unchangedRows[0]?.total as number,
     };
   }
@@ -557,15 +557,15 @@ ORDER BY started_at DESC, key DESC`,
   }
 
   /**
-   * Records a person's or agent's decision on these snapshots, now. It holds for this
+   * Records a person's or agent's decision on these renders, now. It holds for this
    * name and this image hash, in any run and at any Git SHA, and for no other image.
    * Each name and hash keeps only its most recent decision.
    */
-  async decide({ environment, decision, actor, snapshots }: DecisionRequest): Promise<void> {
+  async decide({ environment, decision, actor, renders }: DecisionRequest): Promise<void> {
     assertNamePart(environment, "environment");
     if (actor === "") throw new RangeError("A decision must say who made it");
     const at = this.#now();
-    const statements = chunks(snapshots, SNAPSHOTS_PER_DECISION_STATEMENT).map((group) => {
+    const statements = chunks(renders, RENDERS_PER_DECISION_STATEMENT).map((group) => {
       const params: SqlParam[] = [environment, decision, actor, at];
       const values = group.map(({ story, imageHash }) => {
         assertNamePart(story, "story");
@@ -588,7 +588,7 @@ ON CONFLICT(environment, story, image_hash) DO UPDATE SET
   /**
    * Makes a finished run's images the goldens of its Git SHA in its environment,
    * replacing any there, if each is the same as the baseline's or approved at exactly
-   * that hash, and `removedSeen` is how many snapshots the baseline has and the run
+   * that hash, and `removedSeen` is how many renders the baseline has and the run
    * lacks. If an image isn't accepted, returns false and changes nothing: `compareRun`
    * shows which. Throws if the count is wrong, so goldens are never silently dropped by
    * a filtered render or a discovery bug, and if the run was recorded on a dirty tree,
@@ -615,7 +615,7 @@ ON CONFLICT(environment, story, image_hash) DO UPDATE SET
       idempotent: true,
     });
     if (removed?.total !== removedSeen) {
-      throw new SnapshotError(
+      throw new BatchError(
         "wrong-removed-count",
         `Accepting run ${runId} would remove ${String(removed?.total)} goldens, not the ${removedSeen} the reviewer saw`,
       );
@@ -644,7 +644,7 @@ ON CONFLICT(environment, story, image_hash) DO UPDATE SET
     const page = rows.slice(0, limit);
     return {
       run,
-      snapshots: page.map((row) => ({
+      renders: page.map((row) => ({
         story: row.story as string,
         ...(row.image_hash === null ? { failure: row.failure as string } : { imageHash: row.image_hash as string }),
         ...(row.play_error === null ? {} : { playError: row.play_error as string }),
@@ -747,13 +747,13 @@ const START = "";
 
 interface RecordStatement {
   readonly statement: SqlStatement;
-  /** How many rows it must return, one for each snapshot it wrote. */
+  /** How many rows it must return, one for each render it wrote. */
   readonly rows: number;
 }
 
-function recordStatements(runId: string, snapshots: readonly RecordedSnapshot[]): RecordStatement[] {
+function recordStatements(runId: string, renders: readonly RecordedRender[]): RecordStatement[] {
   const names = new Set<string>();
-  for (const { story, imageHash } of snapshots) {
+  for (const { story, imageHash } of renders) {
     assertNamePart(story, "story");
     if (imageHash !== undefined) assertImageHash(imageHash);
     if (names.has(story)) throw new RangeError(`Story recorded twice in one call: ${story}`);
@@ -772,7 +772,7 @@ function recordStatements(runId: string, snapshots: readonly RecordedSnapshot[])
     params = [runId];
     values = [];
   };
-  for (const { story, imageHash, failure, playError } of snapshots) {
+  for (const { story, imageHash, failure, playError } of renders) {
     const needed = playError == null ? 2 : 3;
     if (params.length + needed > MAX_RECORD_PARAMS) flush();
     const name = `?${params.push(story)}`;
@@ -795,10 +795,10 @@ function cleanMessage(message: string): string {
 
 function finishedRun(rows: readonly SqlRow[], runId: string): Run {
   const [row] = rows;
-  if (row === undefined) throw new SnapshotError("unknown-run", `No run ${runId}`);
+  if (row === undefined) throw new BatchError("unknown-run", `No run ${runId}`);
   const run = toRun(row);
   if (run.status === "recording") {
-    throw new SnapshotError(
+    throw new BatchError(
       "run-not-finished",
       `Run ${runId} is still recording, so what it lacks can't be told from what was removed`,
     );
@@ -808,7 +808,7 @@ function finishedRun(rows: readonly SqlRow[], runId: string): Run {
 
 function assertGoldensFound(baselineSha: string | null, found: boolean, run: Run): void {
   if (baselineSha !== null && !found) {
-    throw new SnapshotError("no-goldens", `${baselineSha} has no goldens in environment ${run.environment}`);
+    throw new BatchError("no-goldens", `${baselineSha} has no goldens in environment ${run.environment}`);
   }
 }
 
@@ -831,10 +831,10 @@ function toRun(row: SqlRow): Run {
   };
 }
 
-function toComparedSnapshot(row: SqlRow): ComparedSnapshot {
+function toComparedRender(row: SqlRow): ComparedRender {
   const imageHash = row.image_hash as string | null;
   const goldenHash = row.golden_hash as string | null;
-  const state: SnapshotState =
+  const state: RenderState =
     imageHash === null
       ? "failed"
       : goldenHash === null
@@ -860,7 +860,7 @@ function toComparedSnapshot(row: SqlRow): ComparedSnapshot {
   };
 }
 
-function toRemovedSnapshot(row: SqlRow): ComparedSnapshot {
+function toRemovedRender(row: SqlRow): ComparedRender {
   return {
     story: row.story as string,
     state: "removed",
@@ -881,16 +881,16 @@ function assertGitSha(gitSha: string): void {
 // NUL is refused because stores needn't agree on where such a string ends.
 function assertNamePart(part: string, what: string): void {
   if (part === "" || part.includes("\0")) {
-    throw new RangeError(`A snapshot's ${what} must be non-empty with no NUL: ${JSON.stringify(part)}`);
+    throw new RangeError(`A render's ${what} must be non-empty with no NUL: ${JSON.stringify(part)}`);
   }
 }
 
 function assertCanBeGoldens(run: Run): void {
   if (run.status === "failed") {
-    throw new SnapshotError("run-has-failures", `Run ${run.id} has ${run.failedCount} failed stories, so it can't become goldens`);
+    throw new BatchError("run-has-failures", `Run ${run.id} has ${run.failedCount} failed stories, so it can't become goldens`);
   }
   if (run.dirty) {
-    throw new SnapshotError("run-dirty", `Run ${run.id} was recorded on a dirty tree, so it doesn't describe ${run.gitSha}`);
+    throw new BatchError("run-dirty", `Run ${run.id} was recorded on a dirty tree, so it doesn't describe ${run.gitSha}`);
   }
 }
 
@@ -912,7 +912,7 @@ ON CONFLICT(id) DO NOTHING`,
 /** A story's newest render across some runs, and the run it's from. */
 export interface StoryRender<RunLike> {
   readonly run: RunLike;
-  readonly row: ComparedSnapshot;
+  readonly row: ComparedRender;
 }
 
 /**
@@ -923,7 +923,7 @@ export interface StoryRender<RunLike> {
  */
 export async function newestRenders<RunLike>(
   runs: readonly RunLike[],
-  rowsOf: (run: RunLike) => Promise<readonly ComparedSnapshot[]>,
+  rowsOf: (run: RunLike) => Promise<readonly ComparedRender[]>,
   stories?: ReadonlySet<string>,
 ): Promise<Map<string, StoryRender<RunLike>>> {
   const renders = new Map<string, StoryRender<RunLike>>();

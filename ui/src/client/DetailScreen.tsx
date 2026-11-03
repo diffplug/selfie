@@ -1,11 +1,11 @@
-// One snapshot: its images, its numbers, and its decision, with the keyboard doing most of the work.
+// One render: its images, its numbers, and its decision, with the keyboard doing most of the work.
 import { CheckIcon, XIcon } from "@primer/octicons-react";
 import { Banner, Button, Dialog, Heading, RelativeTime, Stack, Text } from "@primer/react";
 import { AriaStatus } from "@primer/react/experimental";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { findRenames } from "../shared/renames.ts";
 import { isDecidable } from "selfie-store";
-import type { DecisionKind, PixelDiff, RunView, SnapshotRow } from "../shared/api.ts";
+import type { DecisionKind, PixelDiff, RunView, RenderRow } from "../shared/api.ts";
 import { diffImageUrl, fetchDiff, imageUrl } from "./api.ts";
 import { parseFilter, targetsOf, type StoryNavigation } from "./filter.ts";
 import { useFetched, useHotkeys, useHunkSelection, useTitle, type FeedbackState, type RunState } from "./hooks.ts";
@@ -74,7 +74,7 @@ function PixelStats({ stats }: { stats: PixelDiff }) {
   );
 }
 
-function Notes({ row, diff, renamedFrom, renamedTo }: { row: SnapshotRow; diff: PixelDiff | null; renamedFrom?: string | undefined; renamedTo?: string | undefined }) {
+function Notes({ row, diff, renamedFrom, renamedTo }: { row: RenderRow; diff: PixelDiff | null; renamedFrom?: string | undefined; renamedTo?: string | undefined }) {
   return (
     <>
       {row.state === "failed" && (

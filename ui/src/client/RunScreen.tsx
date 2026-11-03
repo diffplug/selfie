@@ -16,7 +16,7 @@ import {
 } from "@primer/react";
 import { Blankslate, ScrollableRegion } from "@primer/react/experimental";
 import { useEffect, useMemo, useState, type ComponentProps, type RefObject } from "react";
-import type { AdvisoryReason, BlockerReason, DecisionKind, RunView, SnapshotRow } from "../shared/api.ts";
+import type { AdvisoryReason, BlockerReason, DecisionKind, RunView, RenderRow } from "../shared/api.ts";
 import { applyFilter, decidableIn, filterQuery, hasAdvisory, NO_FILTER, parseFilter, showQuery, SHOW_OPTIONS, targetsOf, type RowFilter, type Show } from "./filter.ts";
 import { useStoryFocusKeys, useTitle, type RunState } from "./hooks.ts";
 import { Keys } from "./Keys.tsx";
@@ -216,7 +216,7 @@ function Advisories({ view }: { view: RunView }) {
 interface PendingBulk {
   readonly decision: DecisionKind;
   /** Each decidable, as they were when the dialog opened, which is exactly what gets sent. */
-  readonly rows: readonly SnapshotRow[];
+  readonly rows: readonly RenderRow[];
   /** All of the run, as opposed to what a filter is showing. */
   readonly scope: "all" | "shown";
 }
@@ -224,7 +224,7 @@ interface PendingBulk {
 function BulkDialog({ pending, onClose }: { pending: PendingBulk; onClose: (confirmed: boolean) => void }) {
   const { decision, rows, scope } = pending;
   const verb = decision === "approved" ? "Approve" : "Reject";
-  const count = (test: (row: SnapshotRow) => boolean) => rows.filter(test).length;
+  const count = (test: (row: RenderRow) => boolean) => rows.filter(test).length;
   const facts = [
     [count(({ state }) => state === "changed"), "changed"],
     [count(({ state }) => state === "added"), "added"],
@@ -275,7 +275,7 @@ function BulkButton({
 }: {
   decision: DecisionKind;
   scope: PendingBulk["scope"];
-  rows: readonly SnapshotRow[];
+  rows: readonly RenderRow[];
   busy: boolean;
   onPick: (pending: PendingBulk) => void;
 }) {

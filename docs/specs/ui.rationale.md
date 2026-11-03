@@ -51,7 +51,7 @@ Evidence and reasoning for `docs/specs/ui.md`, keyed by its headings.
 
 **A sidebar, as in Storybook.** With the list as a page of its own, moving between stories meant going back to it, and a person who knows Storybook looks left for them. It takes the table's columns with it, so a row says only a story's state and any caveat, and a story's page says the rest.
 
-**Every story, on the same page.** Separate pages for snapshots and for a live Storybook would be two products to learn, and every feature would need building twice. So the list merges what's been rendered, and a story's page is simply its run's. It reads runs newest first and stops once each story has an answer, since each costs a comparison. If a story's never been rendered, that's every run at the commit, which is the cost to watch.
+**Every story, on the same page.** Separate pages for renders and for a live Storybook would be two products to learn, and every feature would need building twice. So the list merges what's been rendered, and a story's page is simply its run's. It reads runs newest first and stops once each story has an answer, since each costs a comparison. If a story's never been rendered, that's every run at the commit, which is the cost to watch.
 
 **Rendering here.** Most iterating is on one story, and 1.7 s was measured for one story of Dormouse's 568 in the pinned container, 2026-11, so asking from the page is about as quick as looking away. It doesn't build, so an agent or person rebuilds, and what's rendered is whatever is hosted. A filtered run can't become goldens, so Render the rest can't either, once it's a subset: only a whole run from a clean build can. Every story at once is the one case worth treating as a whole run.
 

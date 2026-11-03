@@ -1,9 +1,9 @@
 // What crosses between the browser and the server, and what the server needs from its platform.
 // Types only, so the client's bundle holds none of the server, and the server none of the client.
 // `selfie-cli` takes its own result types from here, so each has one definition.
-import type { ComparedSnapshot, DecisionKind, Run } from "selfie-store";
+import type { ComparedRender, DecisionKind, Run } from "selfie-store";
 
-export type { ComparedSnapshot, DecisionKind, Run, SnapshotState } from "selfie-store";
+export type { ComparedRender, DecisionKind, Run, RenderState } from "selfie-store";
 
 export interface BoundingBox {
   readonly x: number;
@@ -43,7 +43,7 @@ export interface PixelDiff {
   readonly spacingPixels: number;
   /** The larger image's. */
   readonly totalPixels: number;
-  /** In the current image, around what changed, or else what moved or grew. If something was only removed, the row marking where. Null only if the images are identical, which a `changed` snapshot never is. */
+  /** In the current image, around what changed, or else what moved or grew. If something was only removed, the row marking where. Null only if the images are identical, which a `changed` render never is. */
   readonly boundingBox: BoundingBox | null;
   /** Where to look first, in reading order, which `boundingBox`'s center need not be. */
   readonly firstChanged: { readonly x: number; readonly y: number } | null;
@@ -94,8 +94,8 @@ export type AcceptRefusal =
       readonly seen: number;
     };
 
-/** A compared snapshot, with the pixel stats its review exported, if they're still on disk. */
-export interface SnapshotRow extends ComparedSnapshot {
+/** A compared render, with the pixel stats its review exported, if they're still on disk. */
+export interface RenderRow extends ComparedRender {
   readonly pixelDiff: PixelDiff | null;
 }
 
@@ -159,7 +159,7 @@ export interface RunView {
     readonly advisories: number;
   };
   /** Everything that isn't unchanged, and anything with an advisory, in name order. */
-  readonly rows: readonly SnapshotRow[];
+  readonly rows: readonly RenderRow[];
   /** What `accept` would refuse now, were no removals acknowledged. */
   readonly refusals: readonly AcceptRefusal[];
   /**
@@ -175,8 +175,8 @@ export interface RunView {
 /** A story's newest image at HEAD, from whichever run took it. */
 export interface StoryRenderInfo {
   readonly runId: string;
-  readonly state: SnapshotRow["state"];
-  readonly decision: SnapshotRow["decision"];
+  readonly state: RenderRow["state"];
+  readonly decision: RenderRow["decision"];
   readonly renderedAt: number;
   /** Recorded with uncommitted changes, so it can't become a golden. */
   readonly dirty: boolean;
@@ -299,7 +299,7 @@ export interface ReviewSource {
   /** Why the run has no baseline: only a screen showing that asks. */
   baseline(runId: string): Promise<BaselineNote>;
   runContext(runId: string): Promise<RunContext>;
-  unchanged(runId: string): Promise<readonly SnapshotRow[]>;
+  unchanged(runId: string): Promise<readonly RenderRow[]>;
   /** Decides on exactly these images, or refuses all of them if one isn't what the run holds. */
   decide(runId: string, decision: DecisionKind, targets: readonly DecisionTarget[]): Promise<RunView>;
   accept(runId: string, removedSeen: number | undefined): Promise<AcceptOutcome>;

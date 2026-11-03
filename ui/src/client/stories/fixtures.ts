@@ -8,11 +8,11 @@ import type {
   AdvisoryReason,
   Attention,
   BlockerReason,
-  ComparedSnapshot,
+  ComparedRender,
   Note,
   Run,
   RunView,
-  SnapshotRow,
+  RenderRow,
 } from "../../shared/api.ts";
 import type { FeedbackState, RunState } from "../hooks.ts";
 import { RequestError } from "../api.ts";
@@ -29,9 +29,9 @@ const STARTED = NOW - 2 * 60 * 60 * 1000;
 
 const decision = (kind: "approved" | "rejected", actor = "ned@example.com") => ({ decision: kind, actor, at: NOW - 60 * 60 * 1000 });
 
-type Extras = Partial<Pick<SnapshotRow, "decision" | "playError">>;
+type Extras = Partial<Pick<RenderRow, "decision" | "playError">>;
 
-const snapshot = (fields: Pick<ComparedSnapshot, "story" | "state"> & Partial<SnapshotRow>): SnapshotRow => ({
+const render = (fields: Pick<ComparedRender, "story" | "state"> & Partial<RenderRow>): RenderRow => ({
   imageHash: null,
   goldenHash: null,
   failure: null,
@@ -45,7 +45,7 @@ const snapshot = (fields: Pick<ComparedSnapshot, "story" | "state"> & Partial<Sn
 const changedBetween = (pair: keyof typeof PIXEL_DIFFS) => {
   const [current, golden] = pair.split("-") as [keyof typeof HASHES, keyof typeof HASHES];
   return (story: string, extras: Extras = {}) =>
-    snapshot({ story, state: "changed", imageHash: HASHES[current], goldenHash: HASHES[golden], pixelDiff: PIXEL_DIFFS[pair], ...extras });
+    render({ story, state: "changed", imageHash: HASHES[current], goldenHash: HASHES[golden], pixelDiff: PIXEL_DIFFS[pair], ...extras });
 };
 
 export const rows = {
@@ -59,12 +59,12 @@ export const rows = {
   several: changedBetween("several-golden"),
   pushed: changedBetween("pushed-long"),
   double: changedBetween("doubleChanged-doubleGolden"),
-  fresh: (story: string, extras: Extras = {}) => snapshot({ story, state: "added", imageHash: HASHES.fresh, ...extras }),
-  removed: (story: string) => snapshot({ story, state: "removed", goldenHash: HASHES.gone }),
+  fresh: (story: string, extras: Extras = {}) => render({ story, state: "added", imageHash: HASHES.fresh, ...extras }),
+  removed: (story: string) => render({ story, state: "removed", goldenHash: HASHES.gone }),
   failed: (story: string) =>
-    snapshot({ story, state: "failed", goldenHash: HASHES.golden, failure: "Render threw: Cannot read properties of undefined (reading 'name')" }),
+    render({ story, state: "failed", goldenHash: HASHES.golden, failure: "Render threw: Cannot read properties of undefined (reading 'name')" }),
   unchangedWithPlayError: (story: string) =>
-    snapshot({ story, state: "unchanged", imageHash: HASHES.golden, goldenHash: HASHES.golden, playError: "expected a dialog to open" }),
+    render({ story, state: "unchanged", imageHash: HASHES.golden, goldenHash: HASHES.golden, playError: "expected a dialog to open" }),
 };
 
 export const approved = (actor?: string) => ({ decision: decision("approved", actor) });
@@ -89,10 +89,10 @@ export function runOf(overrides: Partial<Run> = {}): Run {
 }
 
 export function viewOf(
-  list: readonly SnapshotRow[],
+  list: readonly RenderRow[],
   { run: runOverrides, unchanged = 512, ...overrides }: Partial<Omit<RunView, "run">> & { readonly run?: Partial<Run>; readonly unchanged?: number } = {},
 ): RunView {
-  const inState = (state: SnapshotRow["state"]) => list.filter((row) => row.state === state);
+  const inState = (state: RenderRow["state"]) => list.filter((row) => row.state === state);
   const undecided = list.filter((row) => isDecidable(row.state) && row.decision === null);
   const unapproved = list.filter((row) => isDecidable(row.state) && row.decision?.decision !== "approved");
   const failed = inState("failed");

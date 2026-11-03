@@ -2,8 +2,8 @@
 
 > Status: built — the `selfie-cli` library and the `selfie` binary: `review`, `approve`, `reject`, `accept`, `find-baseline`, and `ui`, on the local store. `docs/specs/sync.md` owns `push`, `pull`, and what a remote adds to `find-baseline`; see `## Future`.
 >
-> - See `docs/specs/glossary.md` for run, snapshot, golden, baseline, decision, and environment.
-> - Owns local data's layout, each command's checks and exit code, and the shape of what they print and return. `docs/specs/snapshots.md` owns what a run, a decision, and a golden are. `docs/specs/render.md` owns render. `docs/specs/store.md` owns images.
+> - See `docs/specs/glossary.md` for run, render, golden, baseline, decision, and environment.
+> - Owns local data's layout, each command's checks and exit code, and the shape of what they print and return. `docs/specs/renders.md` owns what a run, a decision, and a golden are. `docs/specs/render.md` owns render. `docs/specs/store.md` owns images.
 
 ## Commands
 
@@ -47,14 +47,14 @@ Source of truth: `cli/src/index.ts`; tests in `cli/test/library.test.ts`.
 
 | Export | Does |
 |---|---|
-| `openProject({ cwd, env })` | The repository's `Project`: its `repo`, `directory`, `renders`, `notes`, `store`, `snapshots`, and `close()` |
+| `openProject({ cwd, env })` | The repository's `Project`: its `repo`, `directory`, `renders`, `notes`, `store`, `renders`, and `close()` |
 | `record(project, options)` | Returns a `RecordResult`: the `run`, `dirtyPaths`, `baseline`, `warnings`, and `timings` |
 | `review(project, options)` | `options` is a `run`, or what `record` takes. Returns a `ReviewResult`: the `comparison`, `dirtyPaths`, `baseline`, `differences`, `playErrors`, `warnings`, and `timings` |
 | `decide(project, { runId, decision, actor, stories })` | `stories` is `"all"`, patterns, or `{ targets }`: exact stories and image hashes, for a caller that showed them, refused whole with `stale-decision` if any isn't a changed or new image the run holds. Returns `decided`, `skipped`, `unmatchedPatterns`, and the `comparison` after it. It compares twice, and reads unchanged rows only for patterns |
 | `accept(project, { runId, removedSeen })` | Returns `accepted`, `refusals`, `usableAsBaseline`, and the `comparison` |
 | `checkAccept(project, comparison, removedSeen)` | What `accept` would refuse of a comparison a caller holds, changing nothing: `refusals`, `usableAsBaseline`, and `removals` |
 | `summarizeRun(comparison)` | Returns `blockers`, `advisories`, `counts`, `undecided`, `unapproved`, `failed`, `removed`, and `notRendered` |
-| `isDecidable(state)` | Whether a snapshot in this state can take a decision: `changed` or `added`. Defined in `selfie-store` |
+| `isDecidable(state)` | Whether a render in this state can take a decision: `changed` or `added`. Defined in `selfie-store` |
 | `compareAsReviewed(project, runId, options)` | A run compared with the baseline its reviewer saw |
 | `findBaseline(project, environment)`, `resolveRenderSettings(repo, { native })`, `gitUserEmail(repo)` | What the commands use for these |
 | `readReviewCache(project, runId)` | The paths and pixel diffs a review exported, or null once pruned |
@@ -98,7 +98,7 @@ A review of a named run starts at step 6. `selfie record` is steps 1 to 5, alway
 2. Reads HEAD and the working tree, and finds the baseline ([`find-baseline`](#find-baseline)).
 3. Unless that exact built Storybook [already rendered](#recording-only-if-necessary), renders `--storybook-dir`, or else the config's `storybookDir`, or else `storybook-static`, in a new render directory, with `--story` patterns, and the project's [init script](#configuration).
 4. Checks HEAD didn't move.
-5. Unless a run [already says all this](#recording-only-if-necessary), begins a run recording whether the tree was dirty, the baseline, and any filter. Stores each PNG with `Store.putImages`, which keeps new ones as WebP, or takes an earlier render's rows, and records and finishes the run with `Snapshots`. Rows carry the failure message and the `play` error.
+5. Unless a run [already says all this](#recording-only-if-necessary), begins a run recording whether the tree was dirty, the baseline, and any filter. Stores each PNG with `Store.putImages`, which keeps new ones as WebP, or takes an earlier render's rows, and records and finishes the run with `RenderBatches`. Rows carry the failure message and the `play` error.
 6. Compares the run with `--baseline`, or else the baseline it recorded, or else its branch goldens.
 7. Exports images and pixel diffs for what isn't unchanged, writes `review.json`, and prunes [output](#output-directories).
 
@@ -107,7 +107,7 @@ A review of a named run starts at step 6. `selfie record` is steps 1 to 5, alway
 - **Must refuse a named run with any flag for making a run**, since it's already recorded.
 - **Must take `--baseline` as a run ID, or else anything Git resolves to a commit, whose goldens it means**, and fail with exit 2 if there's no such finished run in this environment or the commit has no goldens.
 - **Must keep `--baseline` to this one review.** It changes nothing about the run: `selfie approve` and `selfie accept` still compare with the baseline the run recorded, its exports go under `runs/<run id>/against/<baseline>/`, and `review.json` isn't written. It exits 1 if anything differs, even when every image is approved, since the question was what differs (rationale).
-- **Must do diff work only on a `changed` snapshot.** A `added` or `removed` one exports its one image, and an unchanged one nothing, unless it has an advisory.
+- **Must do diff work only on a `changed` render.** A `added` or `removed` one exports its one image, and an unchanged one nothing, unless it has an advisory.
 - **Must write every exported image as a PNG, whatever the store keeps**, so a document's paths stay what they say and any agent can open them.
 - **Must report what changed as hunks:** rectangles of each image that correspond and differ, with everything outside them matching once what's between them is lined up, found by a recursive 9-slice in `cli/src/hunks.ts` (rationale).
 - **Must make hunks depend on the two images alone**, so the same pair always gives the same hunks, and a decision or a cache can rely on it.
@@ -117,7 +117,7 @@ A review of a named run starts at step 6. `selfie record` is steps 1 to 5, alway
 - **Must call rows spacing only if they're one color all the way across, that color is the image's background or the row just outside the hunk, and there are no more of them than the hunk's two sides differ in height by**, so a new solid banner is `changed` (rationale).
 - **Must count as changed whatever moves and spacing don't account for: any pixel that comes out different when the current side is rebuilt from what was matched, and all of what the golden had that matched nothing**, so that nothing can vanish by being called moved.
 - **Must claim a hunk's moves only if that leaves fewer pixels unexplained than comparing it in place, and must then not let any other hunk use its blocks** (rationale).
-- **Must never let `kind` change what blocks, what a decision is on, or what `accept` checks.** A snapshot with only moves and spacing needs a decision like any other (rationale).
+- **Must never let `kind` change what blocks, what a decision is on, or what `accept` checks.** A render with only moves and spacing needs a decision like any other (rationale).
 - **Must compare a hunk in place from its top left, past spacing, and count what only one image has as changed**, whether rows or columns, so images of any two sizes have stats and a diff image.
 - **Must mark a seam for a hunk with nothing different in the current image, because something was only taken away**, one row where it was, in the color of what happened to it, so every hunk has a place in the current image.
 - **Must make the diff image from the current image, faded to light gray, with changed pixels solid `#ff0050`, what moved tinted `#0969da` both where it landed and where it left, and spacing solid `#ffd666`.**
@@ -143,7 +143,7 @@ Source of truth: `summarizeRun` in `cli/src/summary.ts`.
 
 - **Must not list an approved image**: it is still in `differences`, with its `decision`. That is how an approval made earlier, at any Git SHA, needs no repeating (`docs/specs/system.md` → Approvals).
 - **Must list an advisory whatever its story's state**, including unchanged, and count them in `counts.advisories`.
-- **Never make an advisory a gate.** `accept` reports them, but `acceptRun`'s checks are the only ones on an image (`docs/specs/snapshots.md` → Open questions).
+- **Never make an advisory a gate.** `accept` reports them, but `acceptRun`'s checks are the only ones on an image (`docs/specs/renders.md` → Open questions).
 
 ### Recording only if necessary
 
@@ -160,7 +160,7 @@ A review recognizes a built Storybook that already rendered, and skips rendering
 - **Must always name a run that really rendered:** a reused run is never itself remembered, so reuse doesn't chain.
 - **Must answer a filtered review only from the built Storybook's whole run, by the filter, and never remember a filtered render or forget one because of it.** `filter`, `warnings`, and `blockers` come out as a render's would, and a filter matching nothing still exits 2.
 - **Must always render in `selfie record`.** That render still updates what's remembered, so it is also how to replace one, and a later review shows the run it recorded.
-- **Must make it visible:** `run.reusedFromRun` (`docs/specs/snapshots.md` → Runs), which is `reusedFromRun` in `review`'s and `accept`'s documents; one line on stderr from each; and the run and accept screens (`docs/specs/ui.md` → Screens).
+- **Must make it visible:** `run.reusedFromRun` (`docs/specs/renders.md` → Runs), which is `reusedFromRun` in `review`'s and `accept`'s documents; one line on stderr from each; and the run and accept screens (`docs/specs/ui.md` → Screens).
 - **Must say why on stderr when a plain render of every story can't be reused**, naming the story and the error, since that's how a project finds out why it never hits.
 - **Must keep the built Storybook that rendered each new run, reused or filtered or failed or not, named by `storybookHash` (`docs/specs/render.md` → Render identity), unless it changed while it rendered**, so `selfie ui` can open the very build that rendered a run (`docs/specs/store.md` → Built Storybooks, rationale).
 - **Must keep the bytes it read for that hash**, so a built Storybook rewritten meanwhile can't be kept under another's name, **and must not fail a run for failing to keep its built Storybook**, since the run is sound, and only its stories' links are lost.
@@ -200,7 +200,7 @@ Source of truth: `cli/src/project.ts`.
 - **Must keep every fact about a run in the store**, so that deleting a run directory loses nothing but the exported files: a pruned run can be decided on and accepted, and its images come from `Store.getImage`.
 - **Must give each review its own render directory and run directory, named by UUID**, so concurrent reviews can't touch each other's files.
 - **Must delete a render directory when its review ends, however it ends.** A later review deletes one over 24 hours old, left by a crash.
-- **Must keep the newest 20 run directories, and delete older ones at the end of each review** (rationale). A run is never deleted from the store, per `docs/specs/snapshots.md` → Open questions, and an image's blob stays with it.
+- **Must keep the newest 20 run directories, and delete older ones at the end of each review** (rationale). A run is never deleted from the store, per `docs/specs/renders.md` → Open questions, and an image's blob stays with it.
 - **Must write `review.json` atomically.** It holds exported paths and pixel diffs, which are all it can lose.
 
 ## Approve and reject
@@ -231,7 +231,7 @@ Source of truth: `accept` in `cli/src/decisions.ts`.
 | `wrong-removed-count` | `--removed` isn't the count there is | `stories`, `outsideFilter`, `seen` |
 
 - **Must not check the tree as it is now**: only how the run was recorded decides whether its images describe its SHA (rationale). So a run recorded clean may be accepted while HEAD is elsewhere or the tree has moved on.
-- **Must pass `acceptRun` the count the caller gave in `--removed`, and 0 if there are no removals.** `docs/specs/snapshots.md` → Goldens owns what it does with it. A filtered run may be accepted, once acknowledged, and then drops the goldens it left out.
+- **Must pass `acceptRun` the count the caller gave in `--removed`, and 0 if there are no removals.** `docs/specs/renders.md` → Goldens owns what it does with it. A filtered run may be accepted, once acknowledged, and then drops the goldens it left out.
 - **Must report `usableAsBaseline`: whether the SHA is on the default branch's first-parent history, or HEAD's if there is none.** Accepting off it succeeds, and those goldens are only ever [branch goldens](#review).
 - **Must report the run's advisories in its output, accepted or not.**
 
@@ -243,7 +243,7 @@ Source of truth: `cli/src/git.ts`; tests in `cli/test/git.test.ts`, on real Git 
 
 - **Must run Git only by argument arrays, never through a shell.**
 - **Must choose the default branch as the first of these that exists:** `origin/HEAD`'s target, `origin/main`, `origin/master`, local `main`, local `master`. With none, it walks from HEAD and says so in `message`.
-- **Must start at the merge-base of HEAD and the default branch, and walk first-parent history, nearest first, for at most 1,000 commits, to the first SHA with complete goldens in the environment.** A branch's own goldens are never its baseline (rationale), which `selfie accept` and decisions rely on. It asks through `Snapshots.firstWithGoldens`, about 10 queries for 1,000 commits at worst.
+- **Must start at the merge-base of HEAD and the default branch, and walk first-parent history, nearest first, for at most 1,000 commits, to the first SHA with complete goldens in the environment.** A branch's own goldens are never its baseline (rationale), which `selfie accept` and decisions rely on. It asks through `RenderBatches.firstWithGoldens`, about 10 queries for 1,000 commits at worst.
 - **Must exit 0 whatever it finds, and explain null** with `reason` and `message`:
 
 | `reason` | When |
@@ -333,7 +333,7 @@ Story IDs come from a project's built Storybook, and a manifest's paths from a d
 
 ### Hunks
 
-- Decisions on them (`docs/specs/snapshots.md` → Future).
+- Decisions on them (`docs/specs/renders.md` → Future).
 - Content that moved inside something with a fill of its own, such as text in an input in a modal, still ghosts: the input's borders keep its rows from being flat, and its fill isn't the image's background, so no block of the text comes out identical. A scrolled pane does too, since what's cut off at its edge differs.
 - With no row unique to anchor on and two different heights, the 9-slice stops, so a page of identical rows whose height changed is one hunk, however far apart its changes are. Its moves and spacing are still told apart inside it, but they can't be selected or decided on separately.
 - Pixels alone can't tell that a button's four rounded corners are one thing. The renderer could record each element's box, so hunks snap to them, at the cost of tying the differ to the browser.
@@ -348,7 +348,7 @@ Story IDs come from a project's built Storybook, and a manifest's paths from a d
 
 ### Rows copied by a reused run
 
-A reused run at a new commit writes every row again, about 450 to 670 MB of `store.db` a year at 50 hits a day on 541 stories (rationale). Two ways to fix it, neither built: a reused run could hold no rows and read through `reused_from_run`, which every query on a run's rows would have to learn (`docs/specs/snapshots.md` → Storing only what changed is the same idea); or a review could delete the rows of an earlier reused run at the same SHA and environment that nothing accepted or decided from, which needs `docs/specs/snapshots.md` → Open questions' retention rule first.
+A reused run at a new commit writes every row again, about 450 to 670 MB of `store.db` a year at 50 hits a day on 541 stories (rationale). Two ways to fix it, neither built: a reused run could hold no rows and read through `reused_from_run`, which every query on a run's rows would have to learn (`docs/specs/renders.md` → Storing only what changed is the same idea); or a review could delete the rows of an earlier reused run at the same SHA and environment that nothing accepted or decided from, which needs `docs/specs/renders.md` → Open questions' retention rule first.
 
 ### Open questions
 

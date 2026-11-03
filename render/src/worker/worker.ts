@@ -138,7 +138,7 @@ async function prepareContext(browser: Browser, job: WorkerJob): Promise<Browser
   });
   // Date only: timers still run, which is why a project may need its own freeze.
   if (recipe.fixedTime !== null) await context.clock.setFixedTime(new Date(recipe.fixedTime));
-  await context.addInitScript(`window.${recipe.snapshotGlobal} = true;`);
+  await context.addInitScript(`window.${recipe.renderGlobal} = true;`);
   await context.addInitScript(watchPlayFailures);
   if (job.initScript !== null) await context.addInitScript({ content: job.initScript });
   await context.route("**/*", (route) => answerFromStorybook(route, path.resolve(job.buildDir), recipe.origin));

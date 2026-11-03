@@ -6,10 +6,10 @@ Distributed Storybook snapshot testing and agent control surface. See `README.md
 
 A spec is the accurate reference for the current code: it states the invariants and edge cases the code alone does not show. To modify a feature, read its spec first, and when code covered by a spec changes, change the spec.
 
-- **`docs/specs/glossary.md`** — Canonical vocabulary: image, snapshot, run, golden, baseline. Read first; every spec defers to it for names.
+- **`docs/specs/glossary.md`** — Canonical vocabulary: image, render, run, golden, baseline. Read first; every spec defers to it for names.
 - **`docs/specs/system.md`** — The whole system's staged build order, and the behavior that spans the local app and the cloud.
 - **`docs/specs/access.md`** — The GitHub App, who can see and change a project, and how images are served. Read first for anything touching auth or visibility.
-- **`docs/specs/snapshots.md`** — Runs, snapshot states, decisions, and goldens: the data layer `selfie review` and the review UI use.
+- **`docs/specs/renders.md`** — Runs, render states, decisions, and goldens: the data layer `selfie review` and the review UI use.
 - **`docs/specs/store.md`** — Image storage: image identity, decoding, keys, hash collisions, kept built Storybooks, and the SQL and blob adapters.
 - **`docs/specs/sync.md`** — Moving runs, images, decisions, and goldens between stores.
 - **`docs/specs/feedback.md`** — Notes: how a person tells a coding agent what they see, and how the agent answers.

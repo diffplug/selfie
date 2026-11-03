@@ -1,6 +1,6 @@
 // What the stories of the list of every story share.
 import type { ListedStory, StoriesView } from "../../shared/api.ts";
-import type { RenderState } from "../hooks.ts";
+import type { RenderingState } from "../hooks.ts";
 import { nameFromId } from "../storyTree.ts";
 import { approved, OTHER_RUN_ID, RUN_ID, SHA } from "./fixtures.ts";
 
@@ -44,4 +44,4 @@ export const MIXED = view([
   unrendered("pages-settings--account"),
 ]);
 
-export const rendering = (overrides: Partial<RenderState> = {}): RenderState => ({ can: true, rendering: 0, error: null, clearError: () => undefined, render: async () => true, ...overrides });
+export const rendering = (overrides: Partial<RenderingState> = {}): RenderingState => ({ can: true, rendering: 0, error: null, clearError: () => undefined, render: async () => true, ...overrides });

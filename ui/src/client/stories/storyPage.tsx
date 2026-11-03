@@ -1,13 +1,13 @@
 // What the stories of a story's page share.
 import { expect, userEvent, waitFor } from "storybook/test";
-import type { Note, RunView, SnapshotRow } from "../../shared/api.ts";
+import type { Note, RunView, RenderRow } from "../../shared/api.ts";
 import { DetailScreen } from "../DetailScreen.tsx";
 import { feedbackOf, rows, stateOf, viewOf } from "./fixtures.ts";
 import { RunFrame } from "./RunFrame.tsx";
 
 export interface StoryPageArgs {
-  readonly row: SnapshotRow;
-  readonly others?: readonly SnapshotRow[];
+  readonly row: RenderRow;
+  readonly others?: readonly RenderRow[];
   readonly view?: RunView;
   readonly notes?: readonly Note[];
 }

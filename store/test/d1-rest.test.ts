@@ -4,7 +4,7 @@ import { D1RestAdapter, D1RestError, type D1RestConfig } from "../src/adapters/d
 import {
   imageInsertStatement,
   initStoreSchema,
-  Snapshots,
+  RenderBatches,
   Sql,
   Store,
   type SqlRow,
@@ -388,26 +388,26 @@ describe("D1RestAdapter replay against a real SQL engine", () => {
     expect(sent).toHaveLength(22);
   });
 
-  it("resends everything the snapshot model sends, so a lost response never fails it", async () => {
+  it("resends everything the render model sends, so a lost response never fails it", async () => {
     const { sql } = await losingResponses((request) => request % 2 === 0);
     await initStoreSchema(sql);
     await sql.run(imageInsertStatement(hashOf(1), 500));
-    const snapshots = new Snapshots({ sql });
+    const batches = new RenderBatches({ sql });
     const environment = "env";
     const gitSha = "a".repeat(40);
-    const run = await snapshots.beginRun({ gitSha, environment, scale: 1, dirty: false, baselineSha: null });
-    await snapshots.recordSnapshots(run.id, [{ story: "a", imageHash: hashOf(1) }]);
-    expect(await snapshots.finishRun(run.id, 1)).toMatchObject({ status: "complete" });
-    await snapshots.decide({
+    const run = await batches.beginRun({ gitSha, environment, scale: 1, dirty: false, baselineSha: null });
+    await batches.recordRenders(run.id, [{ story: "a", imageHash: hashOf(1) }]);
+    expect(await batches.finishRun(run.id, 1)).toMatchObject({ status: "complete" });
+    await batches.decide({
       environment,
       decision: "approved",
       actor: "ned",
-      snapshots: [{ story: "a", imageHash: hashOf(1) }],
+      renders: [{ story: "a", imageHash: hashOf(1) }],
     });
-    expect(await snapshots.acceptRun(run.id, null, 0)).toBe(true);
-    expect(await snapshots.compareRun(run.id, gitSha, { includeUnchanged: true })).toMatchObject({
-      snapshots: [{ story: "a", state: "unchanged" }],
+    expect(await batches.acceptRun(run.id, null, 0)).toBe(true);
+    expect(await batches.compareRun(run.id, gitSha, { includeUnchanged: true })).toMatchObject({
+      renders: [{ story: "a", state: "unchanged" }],
     });
-    expect(await snapshots.hasCompleteGoldens(gitSha, environment)).toBe(true);
+    expect(await batches.hasCompleteGoldens(gitSha, environment)).toBe(true);
   });
 });

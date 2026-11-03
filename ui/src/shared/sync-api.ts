@@ -1,6 +1,6 @@
 // What crosses between a store's client and the sync routes. Types only, so the CLI can use them
 // without loading the server. See docs/specs/sync.md.
-import type { Decision, RecordedSnapshot, Run, RunPage } from "selfie-store";
+import type { Decision, RecordedRender, Run, RunPage } from "selfie-store";
 
 export type { RunPage };
 
@@ -13,7 +13,7 @@ export interface ProjectAccess {
 /** A run's facts, as a sender states them. */
 export type SentRun = Omit<Run, "id" | "status" | "finishedAt" | "failedCount">;
 
-export type SentSnapshot = RecordedSnapshot;
+export type SentRender = RecordedRender;
 
 /** A decision as a sender states it, which the server says who it's by. */
 export interface SentDecision extends Omit<Decision, "actor"> {
@@ -35,4 +35,4 @@ export interface SyncError {
 }
 
 /** The most of each a request may hold. */
-export const SYNC_LIMITS = { hashes: 500, snapshots: 1_000, decisions: 1_000, shas: 1_000 } as const;
+export const SYNC_LIMITS = { hashes: 500, renders: 1_000, decisions: 1_000, shas: 1_000 } as const;

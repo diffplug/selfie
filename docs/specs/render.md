@@ -2,7 +2,7 @@
 
 > Status: partly built — the `selfie-render` library renders a built Storybook and reports PNGs. `selfie review` calls it (`docs/specs/cli.md`); see `## Future`.
 >
-> - See `docs/specs/glossary.md` for image, snapshot, environment, and run.
+> - See `docs/specs/glossary.md` for image, render, environment, and run.
 > - Owns how a story becomes a PNG: the environment's shape and ID, rendering, and the manifest. `docs/specs/system.md` → Rendering environments owns the rules this implements. `docs/specs/store.md` owns image identity and decoding.
 
 ## Environment
@@ -19,7 +19,7 @@ A `RenderEnvironment` is a typed object:
 | `scale` | 1 |
 
 - **Must refuse a container image that isn't exactly `name@sha256:<digest>`**, including one that also has a tag.
-- **Must keep one ID format:** `container-<os>-<arch>-<hash>` or `native-<os>-<arch>-<hash>`, where the hash is 16 hex digits and the prefix is only for reading. `environmentId()` is what a snapshot's name carries (`docs/specs/snapshots.md` → Snapshot names).
+- **Must keep one ID format:** `container-<os>-<arch>-<hash>` or `native-<os>-<arch>-<hash>`, where the hash is 16 hex digits and the prefix is only for reading. `environmentId()` is what a render's name carries (`docs/specs/renders.md` → Render names).
 - **Must hash the image digest and platform, or the native OS, OS release, and architecture; the browser flags; viewport; scale; `recipe`; and the Playwright version.**
 - **Never hash an image's registry, the order of flags, or the order of properties**, since they can't change pixels.
 - **Never hash `settleMs` or `initScript`.** They are project input like story code, so changing them reports changed stories rather than starting new goldens. The manifest records both (rationale).
@@ -29,7 +29,7 @@ A `RenderEnvironment` is a typed object:
 | Setting | Default |
 |---|---|
 | `origin` | `http://127.0.0.1:6199` |
-| `snapshotGlobal` | `__SELFIE_SNAPSHOT__` |
+| `renderGlobal` | `__SELFIE_RENDER__` |
 | `locale`, `timezoneId` | `en-US`, `UTC` |
 | `colorScheme`, `reducedMotion`, `forcedColors` | `light`, `reduce`, `none` |
 | `fixedTime` | `2026-01-15T12:00:00.000Z`, or null for the real time |
@@ -70,7 +70,7 @@ Source of truth: `render/src/worker/worker.ts`.
 
 Browser options don't stop a project's own JavaScript timers. A project freezes them itself:
 
-- **Must set `window.__SELFIE_SNAPSHOT__ = true` before any story code loads.** A project's code may test it to stop blinks and other timers (rationale).
+- **Must set `window.__SELFIE_RENDER__ = true` before any story code loads.** A project's code may test it to stop blinks and other timers (rationale).
 - **May take an `initScript`**, applied before story code runs, in every frame. This reaches a freeze the project already gates on its own name, such as `window.__ARGOS_SNAPSHOT__ = true;`, and can add a style.
 
 ## Manifest
@@ -130,5 +130,5 @@ Source of truth: `render/src/index.ts`.
 
 ### Possible later work
 
-- **Named environments.** A project holds one environment, so one review can't render both `desktop` at 1200×900 1× and `phone` at 390×844 2×, which a phone layout would want. Each story would then be rendered and approved once per environment. Runs and snapshot names already carry the environment, so this adds to the config and to `selfie review`, and leaves the store alone.
+- **Named environments.** A project holds one environment, so one review can't render both `desktop` at 1200×900 1× and `phone` at 390×844 2×, which a phone layout would want. Each story would then be rendered and approved once per environment. Runs and render names already carry the environment, so this adds to the config and to `selfie review`, and leaves the store alone.
 - **Other images.** Only arm64 has a default. An x86-64 project today names its own digest and platform, and gets a different ID.

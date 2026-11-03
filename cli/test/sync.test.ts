@@ -65,7 +65,7 @@ async function accepted() {
 async function imagesOf(runId: string) {
   const local = await openProject({ cwd: h.repo, env: { SELFIE_HOME: h.home } });
   try {
-    return (await local.snapshots.readRun(runId)).snapshots.map(({ imageHash }) => imageHash);
+    return (await local.batches.readRun(runId)).renders.map(({ imageHash }) => imageHash);
   } finally {
     local.close();
   }
@@ -82,7 +82,7 @@ beforeEach(async () => {
   app = createSyncApi({
     open: async (project, token) => {
       const access = project === "42" && token !== null ? ACCESS[token] : undefined;
-      return access === undefined ? null : { access, snapshots: cloud.snapshots, store: cloud.store, hasCommit: async (sha) => pushedCommits === null || pushedCommits.has(sha) };
+      return access === undefined ? null : { access, batches: cloud.batches, store: cloud.store, hasCommit: async (sha) => pushedCommits === null || pushedCommits.has(sha) };
     },
     findProject: async (owner, name) => (owner === "diffplug" && name === "selfie" ? "42" : null),
   });
@@ -100,16 +100,16 @@ describe("pushing", () => {
     expect(code).toBe(0);
     expect(json).toMatchObject({ runId, images: { sent: 2, alreadyThere: 0 }, decisions: 2, goldens: { outcome: "accepted", acceptedRunId: runId } });
     const head = headOf();
-    const held = await cloud.snapshots.getRun(runId);
+    const held = await cloud.batches.getRun(runId);
     expect(held).toMatchObject({ id: runId, gitSha: head, status: "complete" });
-    expect(await cloud.snapshots.acceptedRunAt(head, held!.environment)).toBe(runId);
+    expect(await cloud.batches.acceptedRunAt(head, held!.environment)).toBe(runId);
   });
 
   test("names who pushed as a decision's author, not what the laptop says", async () => {
     const runId = await accepted();
     await laptop("writer", "push");
-    const { snapshots } = await cloud.snapshots.readRun(runId);
-    expect(snapshots.map(({ decision }) => decision?.actor)).toEqual(["writer-login", "writer-login"]);
+    const { renders } = await cloud.batches.readRun(runId);
+    expect(renders.map(({ decision }) => decision?.actor)).toEqual(["writer-login", "writer-login"]);
   });
 
   test("is safe to run again, and sends nothing twice", async () => {
@@ -140,7 +140,7 @@ describe("pushing", () => {
     const { code, json } = await laptop("writer", "push");
     expect(code).toBe(2);
     expect(json.error.code).toBe("commit-not-pushed");
-    expect(await cloud.snapshots.getRun(runId)).toBeNull();
+    expect(await cloud.batches.getRun(runId)).toBeNull();
     const [{ imageHash }] = (await laptop(null, "review", runId)).json.differences;
     expect(await cloud.store.missingImages([imageHash])).toEqual([imageHash]);
   });
@@ -163,8 +163,8 @@ describe("pushing", () => {
     const { code, json } = await laptop("ci", "push", onMerge, "--accept");
     expect(code).toBe(0);
     expect(json.goldens).toMatchObject({ outcome: "accepted", acceptedRunId: onMerge });
-    const { environment } = (await cloud.snapshots.getRun(onMerge))!;
-    expect(await cloud.snapshots.acceptedRunAt(merge, environment)).toBe(onMerge);
+    const { environment } = (await cloud.batches.getRun(onMerge))!;
+    expect(await cloud.batches.acceptedRunAt(merge, environment)).toBe(onMerge);
   });
 
   test("CI on a fresh machine, which has never pulled and can't, holds an unchanged run to the cloud's goldens", async () => {
@@ -177,7 +177,7 @@ describe("pushing", () => {
     const { code, json } = await fresh("ci", "push", "--accept");
     expect(code).toBe(0);
     expect(json).toMatchObject({ runId, decisions: null, images: { sent: 0 }, goldens: { outcome: "accepted", acceptedRunId: runId } });
-    expect(await cloud.snapshots.acceptedRunAt(merge, (await cloud.snapshots.getRun(runId))!.environment)).toBe(runId);
+    expect(await cloud.batches.acceptedRunAt(merge, (await cloud.batches.getRun(runId))!.environment)).toBe(runId);
   });
 
   test("the default is the newest from a clean tree, and skips a dirty one", async () => {
@@ -211,7 +211,7 @@ describe("pushing", () => {
     const { code, json } = await laptop("writer", "push", dirty);
     expect(code).toBe(2);
     expect(json.error.code).toBe("run-dirty");
-    expect(await cloud.snapshots.getRun(dirty)).toBeNull();
+    expect(await cloud.batches.getRun(dirty)).toBeNull();
   });
 
   test("a push that dies partway is finished by pushing again", async () => {
@@ -222,7 +222,7 @@ describe("pushing", () => {
       return toCloud(url, init);
     }) as typeof fetch);
     expect((await flaky("writer", "push")).code).toBe(2);
-    expect((await cloud.snapshots.getRun(runId))?.status).toBe("recording");
+    expect((await cloud.batches.getRun(runId))?.status).toBe("recording");
     const { code, json } = await laptop("writer", "push");
     expect(code).toBe(0);
     expect(json).toMatchObject({ images: { sent: 1, alreadyThere: 1 }, goldens: { outcome: "accepted" } });
@@ -308,9 +308,9 @@ describe("another machine", () => {
 
     const local = await openProject({ cwd: desktopRepo, env: { SELFIE_HOME: desktopHome } });
     try {
-      expect((await local.snapshots.getRun(runId))?.status).toBe("complete");
-      expect(await local.snapshots.acceptedRunAt(head, json.environment)).toBe(runId);
-      expect(await local.store.getPixels((await local.snapshots.readRun(runId)).snapshots[0]!.imageHash!)).not.toBeNull();
+      expect((await local.batches.getRun(runId))?.status).toBe("complete");
+      expect(await local.batches.acceptedRunAt(head, json.environment)).toBe(runId);
+      expect(await local.store.getPixels((await local.batches.readRun(runId)).renders[0]!.imageHash!)).not.toBeNull();
     } finally {
       local.close();
     }
@@ -405,8 +405,8 @@ describe("another machine", () => {
     await desktop("reader", "pull", head);
     const local = await openProject({ cwd: desktopRepo, env: { SELFIE_HOME: desktopHome } });
     try {
-      const { snapshots } = await local.snapshots.readRun(runId);
-      expect(snapshots.map(({ decision }) => decision?.decision)).toEqual(["rejected", "rejected"]);
+      const { renders } = await local.batches.readRun(runId);
+      expect(renders.map(({ decision }) => decision?.decision)).toEqual(["rejected", "rejected"]);
     } finally {
       local.close();
     }

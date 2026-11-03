@@ -1,11 +1,11 @@
-// The snapshot contract against real D1, over the network. Opt-in through `pnpm test:d1`
-// or, on its own, `pnpm test:d1:snapshots` in `store/`, since it needs credentials and
+// The render contract against real D1, over the network. Opt-in through `pnpm test:d1`
+// or, on its own, `pnpm test:d1:renders` in `store/`, since it needs credentials and
 // spends the account's shared API rate limit. Only one run of any real-D1 suite at a time: all of
 // them use the same database.
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { Snapshots, Sql, type RecordedSnapshot, type SqlStatement } from "../src/core/index.ts";
-import { describeSnapshotContract } from "./contract/snapshots-contract.ts";
+import { RenderBatches, Sql, type RecordedRender, type SqlStatement } from "../src/core/index.ts";
+import { describeBatchContract } from "./contract/renders-contract.ts";
 import type { D1Harness } from "./support/d1-harness.ts";
 import { d1Harness } from "./support/real-d1.ts";
 import { hashOf } from "./support/sql-params.ts";
@@ -16,7 +16,7 @@ const ENABLED = process.env.SELFIE_D1_CONTRACT === "1";
 const REQUEST_BUDGET = 120;
 
 // The size a run must stay efficient at.
-const SNAPSHOTS = 10_000;
+const RENDERS = 10_000;
 
 // How a mostly unchanged run differs from its baseline.
 const CHANGED = 100;
@@ -24,7 +24,7 @@ const NEW = 50;
 const FAILED = 50;
 const REMOVED = 50;
 
-describe.skipIf(!ENABLED)("real D1 snapshots (opt-in: pnpm test:d1:snapshots)", () => {
+describe.skipIf(!ENABLED)("real D1 renders (opt-in: pnpm test:d1:renders)", () => {
   let harness: D1Harness;
 
   beforeAll(async () => {
@@ -35,17 +35,17 @@ describe.skipIf(!ENABLED)("real D1 snapshots (opt-in: pnpm test:d1:snapshots)", 
 
   afterAll(async () => {
     await harness?.sweep();
-    console.log(`Real-D1 snapshot run: ${harness?.requests} API requests.`);
+    console.log(`Real-D1 render run: ${harness?.requests} API requests.`);
   });
 
   // Numbers only, as the code sends them. Local SQLite covers both forms.
-  describeSnapshotContract("D1 REST", "number", async () => ({
+  describeBatchContract("D1 REST", "number", async () => ({
     connect: () => harness.connect(),
     // The tables stay for the test below, and `afterAll` sweeps them.
     destroy: async () => {},
   }));
 
-  it(`records and compares ${SNAPSHOTS} snapshots, and reports what D1 billed`, async () => {
+  it(`records and compares ${RENDERS} renders, and reports what D1 billed`, async () => {
     let rowsRead = 0;
     let rowsWritten = 0;
     let responseBytes = 0;
@@ -64,9 +64,9 @@ describe.skipIf(!ENABLED)("real D1 snapshots (opt-in: pnpm test:d1:snapshots)", 
         return response;
       }),
     );
-    const snapshots = new Snapshots({ sql });
+    const batches = new RenderBatches({ sql });
 
-    const total = SNAPSHOTS + CHANGED + NEW;
+    const total = RENDERS + CHANGED + NEW;
     const hashes = Array.from({ length: total }, (_, i) => hashOf(5_000_000 + i));
     const imageStatements: SqlStatement[] = [];
     for (let i = 0; i < total; i += 49) {
@@ -95,40 +95,40 @@ describe.skipIf(!ENABLED)("real D1 snapshots (opt-in: pnpm test:d1:snapshots)", 
       return result;
     };
 
-    const items = hashes.slice(0, SNAPSHOTS).map((imageHash, i) => ({
+    const items = hashes.slice(0, RENDERS).map((imageHash, i) => ({
       story: `component-${String(i).padStart(5, "0")}--story`,
       imageHash,
     }));
     const environment = "size";
     const gitSha = "3".repeat(40);
-    const run = await measure("beginRun", () => snapshots.beginRun({ gitSha, environment, scale: 1, dirty: false, baselineSha: null }));
-    await measure("recordSnapshots", () => snapshots.recordSnapshots(run.id, items));
-    await measure("finishRun", () => snapshots.finishRun(run.id, SNAPSHOTS));
+    const run = await measure("beginRun", () => batches.beginRun({ gitSha, environment, scale: 1, dirty: false, baselineSha: null }));
+    await measure("recordRenders", () => batches.recordRenders(run.id, items));
+    await measure("finishRun", () => batches.finishRun(run.id, RENDERS));
     await measure("decide", () =>
-      snapshots.decide({ environment, decision: "approved", actor: "real-d1-test", snapshots: items }),
+      batches.decide({ environment, decision: "approved", actor: "real-d1-test", renders: items }),
     );
-    expect(await measure("acceptRun", () => snapshots.acceptRun(run.id, null, 0))).toBe(true);
+    expect(await measure("acceptRun", () => batches.acceptRun(run.id, null, 0))).toBe(true);
 
-    const head: RecordedSnapshot[] = items.slice(0, SNAPSHOTS - REMOVED).map((item, i) =>
+    const head: RecordedRender[] = items.slice(0, RENDERS - REMOVED).map((item, i) =>
       i < CHANGED
-        ? { story: item.story, imageHash: hashes[SNAPSHOTS + i]! }
+        ? { story: item.story, imageHash: hashes[RENDERS + i]! }
         : i < CHANGED + FAILED
           ? { story: item.story, failure: "Render threw" }
           : item,
     );
     for (let i = 0; i < NEW; i++) {
-      head.push({ story: `zz-new-${i}`, imageHash: hashes[SNAPSHOTS + CHANGED + i]! });
+      head.push({ story: `zz-new-${i}`, imageHash: hashes[RENDERS + CHANGED + i]! });
     }
-    const headRun = await snapshots.beginRun({ gitSha: "4".repeat(40), environment, scale: 1, dirty: false, baselineSha: null });
-    await snapshots.recordSnapshots(headRun.id, head);
-    await snapshots.finishRun(headRun.id, head.length);
-    const { snapshots: compared, unchangedCount } = await measure("compareRun (differences)", () =>
-      snapshots.compareRun(headRun.id, gitSha),
+    const headRun = await batches.beginRun({ gitSha: "4".repeat(40), environment, scale: 1, dirty: false, baselineSha: null });
+    await batches.recordRenders(headRun.id, head);
+    await batches.finishRun(headRun.id, head.length);
+    const { renders: compared, unchangedCount } = await measure("compareRun (differences)", () =>
+      batches.compareRun(headRun.id, gitSha),
     );
 
-    console.log(`Real D1 at ${SNAPSHOTS} snapshots:`);
+    console.log(`Real D1 at ${RENDERS} renders:`);
     console.table(report);
     expect(compared).toHaveLength(CHANGED + NEW + FAILED + REMOVED);
-    expect(unchangedCount).toBe(SNAPSHOTS - CHANGED - FAILED - REMOVED);
+    expect(unchangedCount).toBe(RENDERS - CHANGED - FAILED - REMOVED);
   });
 });

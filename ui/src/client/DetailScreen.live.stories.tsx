@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, waitFor, within } from "storybook/test";
-import type { RunView, SnapshotRow } from "../shared/api.ts";
+import type { RunView, RenderRow } from "../shared/api.ts";
 import { rows, viewOf } from "./stories/fixtures.ts";
 import { BUTTON, StoryPage, press } from "./stories/storyPage.tsx";
 
@@ -15,7 +15,7 @@ export const WithStorybookOfAnotherBuild: Story = {
   args: { row: BUTTON, view: { ...viewOf([BUTTON]), storybook: { url: "http://127.0.0.1:51234/", exactStorybook: false } } },
 };
 const FRESH = rows.fresh("components-badge--new");
-const liveView = (row: SnapshotRow, overrides: Partial<RunView> = {}): RunView => ({
+const liveView = (row: RenderRow, overrides: Partial<RunView> = {}): RunView => ({
   ...viewOf([row]),
   storybook: { url: "./live-story/current/", exactStorybook: true },
   goldenStorybookUrl: "./live-story/golden/",

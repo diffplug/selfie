@@ -2,7 +2,7 @@
 
 > Status: built, between a client and any server that mounts the routes. Nothing deployed mounts them yet. They've run on local stores, and inside workerd on its local D1 and R2, always with a stand-in for GitHub. See `## Future`.
 >
-> - Owns moving runs, images, decisions, and goldens between stores, and the routes and commands that do it. `docs/specs/snapshots.md` owns what each store does with them, `docs/specs/access.md` who may ask, and `docs/specs/system.md` where cloud data lives.
+> - Owns moving runs, images, decisions, and goldens between stores, and the routes and commands that do it. `docs/specs/renders.md` owns what each store does with them, `docs/specs/access.md` who may ask, and `docs/specs/system.md` where cloud data lives.
 
 ## What can disagree
 
@@ -10,7 +10,7 @@
 |---|---|---|
 | Images | Named by hash, so never, unless a client [lied or broke](#what-a-store-takes) | Send what's missing |
 | Finished runs | Keep their ID, and never change, so never | Send what's missing |
-| Decisions | One per name and hash, so yes | Latest wins (`docs/specs/snapshots.md` → Decisions) |
+| Decisions | One per name and hash, so yes | Latest wins (`docs/specs/renders.md` → Decisions) |
 | Goldens | One run per SHA and environment, so yes | [The cloud decides](#goldens) |
 
 ## Routes
@@ -26,9 +26,9 @@ To mount under `/api`. `GET /repositories/:owner/:name` finds a repository's pro
 | `POST /images/missing` | `{ hashes }`, at most 500, answers `{ missing }` | Upload |
 | `PUT /images/:hash` | Stores the image's bytes as the sender's store holds them | Upload |
 | `GET /images/:hash` | The stored bytes | View |
-| `POST /runs/:id/snapshots` | `{ snapshots }`, at most 1,000 | Upload |
+| `POST /runs/:id/renders` | `{ renders }`, at most 1,000 | Upload |
 | `POST /runs/:id/finish` | `{ count, finishedAt }` | Upload |
-| `GET /runs/:id` | `?after`, a page of the run, each snapshot, and the decision on each image, with `next` | View |
+| `GET /runs/:id` | `?after`, a page of the run, each render, and the decision on each image, with `next` | View |
 | `POST /decisions` | `{ environment, decisions }`, at most 1,000 | Decide |
 | `POST /goldens` | `{ runId, baselineSha, removed }`, answers `{ outcome, acceptedRunId, refusal }`, where `outcome` is `accepted`, `already`, `conflict`, or `refused` | Upload, or Decide if `removed` isn't empty |
 | `GET /goldens` | `?sha&environment`, answers `{ runId }` | View or Upload |
@@ -39,10 +39,10 @@ To mount under `/api`. `GET /repositories/:owner/:name` finds a repository's pro
 | 400 | `bad-request`, `bad-image` | It can't be understood, or isn't in a form a store keeps |
 | 403 | `not-allowed` | The token can do something here, but not this |
 | 404 | `not-found`, `unknown-run`, `unknown-image` | The project can't be seen, or doesn't hold that |
-| 409 | `run-dirty`, `commit-not-pushed`, and `SnapshotError`'s other codes | The request can't apply to the data as it stands |
+| 409 | `run-dirty`, `commit-not-pushed`, and `BatchError`'s other codes | The request can't apply to the data as it stands |
 | 413 | `image-too-large` | It's more than the server takes |
 
-Inside `POST /goldens`, a refusal is an answer, with a code of `not-approved`, `wrong-removed`, `goldens-conflict`, or one of `SnapshotError`'s, and status 200.
+Inside `POST /goldens`, a refusal is an answer, with a code of `not-approved`, `wrong-removed`, `goldens-conflict`, or one of `BatchError`'s, and status 200.
 
 - **Must answer 404, identical to a project that doesn't exist, to anyone who can do nothing there, before reading anything else about the request, and 403 to anyone who can do something, but not this** (`docs/specs/access.md` → Who can do what).
 - **Must take who's asking only from a bearer token**, never a cookie, so another site's page can't make these requests on someone's behalf.
@@ -54,7 +54,7 @@ Inside `POST /goldens`, a refusal is an answer, with a code of `not-approved`, `
 - **Must refuse a run from a dirty tree, and a run whose commit GitHub doesn't have, with `commit-not-pushed`, when the run is first sent, and before any of its images**, so a forgotten `git push` costs nothing, and nothing from an unpushed commit is ever stored, since anyone can view a public repository's images (rationale). That a run is clean is only what its client says, so this holds for honest clients.
 - **Must take an image through `ReceivingStore.receiveImage`, and never decode it**, since anyone who can upload can already approve (rationale). It answers `bad-image` for a file that isn't in a form a store keeps. A corrupt body, or one holding another picture, gets through (`docs/specs/store.md` → Image identity), and stays until [something can replace it](#not-yet).
 - **Must refuse an image larger than the server takes, before reading it**, with `image-too-large`.
-- **Must take a decision only from someone who may decide, so a CI upload carries none**, and record a new one's author as whoever is pushing, as the server knows them, not what the client says (rationale). A decision the server already holds keeps its author. `docs/specs/snapshots.md` → Decisions says stores agree on the verdict, which the author need not match.
+- **Must take a decision only from someone who may decide, so a CI upload carries none**, and record a new one's author as whoever is pushing, as the server knows them, not what the client says (rationale). A decision the server already holds keeps its author. `docs/specs/renders.md` → Decisions says stores agree on the verdict, which the author need not match.
 - **Must not let a received decision's time, or a run's, be later than the server's clock**, so a wrong clock can't win every later disagreement, or post-date a run. Sending a run again keeps the time it was first given.
 
 Reserved: a fork's render pass must not upload through this (`docs/specs/access.md` → Open questions).
@@ -74,7 +74,7 @@ Reserved: a fork's render pass must not upload through this (`docs/specs/access.
 
 Source of truth: `cli/src/sync.ts`; tests in `cli/test/sync.test.ts`, between two machines on real Git and a store standing in for the cloud's.
 
-- **Must push one run at a time, in this order: the run, its images, its snapshots, finishing it, its decisions, and its goldens**, so that a refused run costs nothing, and nothing refers to what hasn't arrived.
+- **Must push one run at a time, in this order: the run, its images, its renders, finishing it, its decisions, and its goldens**, so that a refused run costs nothing, and nothing refers to what hasn't arrived.
 - **Must make every step safe to send again**, so a push or pull that dies is finished by running it again, with nothing to clean up. A partly received run stays `recording`, which nothing can compare or accept.
 - **Must send only the images the receiver lacks, and pull only those this store lacks, decoding each to check it's the image its hash names**, and stop with `corrupt-image` naming it if it isn't, leaving what's stored here as it was. A sender's check is the last that image gets, and a puller's is the only one that finds what another client sent wrongly.
 - **Must carry `reusedFromRun`**, for `trust`. It may name a run never pushed.
@@ -108,7 +108,7 @@ A project's first push is the expensive one. Each new image takes one upload and
 ### Not yet
 
 - Replacing an image the cloud holds wrongly. Today a pull of it fails, naming it, every time, and a browser shows it as it is. A repair needs someone with write access, and a client that decodes.
-- Decisions on hunks (`docs/specs/snapshots.md` → Future), which add their own table, and travel the same way.
+- Decisions on hunks (`docs/specs/renders.md` → Future), which add their own table, and travel the same way.
 - Notes (**Scope: remote-notes**, `docs/specs/feedback.md`).
 - A review using the cloud's baseline. A review's own search is still local, so for now a person runs `selfie pull` first. It also needs telling when this store's goldens at a SHA aren't the cloud's, which `source` doesn't say.
 - Pulling a run other than a commit's goldens.

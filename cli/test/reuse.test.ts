@@ -60,7 +60,7 @@ describe("an unchanged build", () => {
     expect(second.code).toBe(first.code);
 
     const project = await openProject({ cwd: h.repo, env: { SELFIE_HOME: h.home } });
-    expect(await project.snapshots.runsAt(first.json.gitSha, first.json.environment)).toHaveLength(1);
+    expect(await project.batches.runsAt(first.json.gitSha, first.json.environment)).toHaveLength(1);
     project.close();
   });
 
@@ -177,7 +177,7 @@ describe("a render that isn't reusable", () => {
     const { json } = await review();
     const project = await openProject({ cwd: h.repo, env: { SELFIE_HOME: h.home } });
     const identity = await renderIdentity({ storybookDir: build, environment: defineEnvironment() });
-    await project.renders.remember(identity!, json.runId);
+    await project.renderKeys.remember(identity!, json.runId);
     project.close();
 
     h.stories = [{ id: "a--one" }];

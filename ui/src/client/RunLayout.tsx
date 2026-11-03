@@ -1,6 +1,6 @@
 // What every page of a run sits in: the tree of what differs at the left, and the top bar saying what's compared.
 import { useMemo, type ReactNode } from "react";
-import type { RunContext, RunView, SnapshotRow } from "../shared/api.ts";
+import type { RunContext, RunView, RenderRow } from "../shared/api.ts";
 import { findRenames } from "../shared/renames.ts";
 import { applyFilter, navigationThrough, NO_FILTER, parseFilter } from "./filter.ts";
 import { usePageFacts } from "./PageFacts.tsx";
@@ -10,7 +10,7 @@ import { differingStories, inTreeOrder } from "./storyTree.ts";
 import { AdvisoryLabels, describePixels } from "./words.tsx";
 
 /** The tree shows what the page's Show says, and its own search does the text. Next and previous go through just that. */
-export function useRunTree(view: RunView | null, unchanged: readonly SnapshotRow[] | null, search: string, story: string | null) {
+export function useRunTree(view: RunView | null, unchanged: readonly RenderRow[] | null, search: string, story: string | null) {
   const rows = view?.rows;
   const renames = useMemo(() => findRenames(rows ?? []), [rows]);
   const { show, text } = parseFilter(search);

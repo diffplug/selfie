@@ -3,7 +3,7 @@
 // is looking stays the same from story to story, since this stays mounted across them.
 import { Button, SegmentedControl, Stack, Text } from "@primer/react";
 import { useEffect, useLayoutEffect, useRef, useState, type ReactEventHandler, type ReactNode } from "react";
-import type { BoundingBox, Note, PixelDiff, SnapshotRow } from "../shared/api.ts";
+import type { BoundingBox, Note, PixelDiff, RenderRow } from "../shared/api.ts";
 import { comparedImage, isOpenNote, newestNotedImage } from "../shared/notes.ts";
 import { hull, type HunkGroup } from "../shared/hunks.ts";
 import { diffImageUrl, imageUrl } from "./api.ts";
@@ -33,7 +33,7 @@ interface Source {
   readonly hash: string | null;
 }
 
-function sourcesOf({ imageHash, goldenHash }: SnapshotRow, hasDiffImage: boolean, noted: string | null, compared: string | null): readonly Source[] {
+function sourcesOf({ imageHash, goldenHash }: RenderRow, hasDiffImage: boolean, noted: string | null, compared: string | null): readonly Source[] {
   const sources: Source[] = [];
   if (noted !== null && noted !== imageHash && noted !== goldenHash) sources.push({ name: "noted", src: imageUrl(noted), hash: noted });
   if (goldenHash !== null) sources.push({ name: "golden", src: imageUrl(goldenHash), hash: goldenHash });
@@ -124,7 +124,7 @@ function Pane({ layer, src, story, onOpen, onLoad, children }: { layer: Layer; s
 }
 
 interface ImageCompareProps {
-  readonly row: SnapshotRow;
+  readonly row: RenderRow;
   readonly diff: PixelDiff | null;
   readonly scale: number;
   readonly groups: readonly HunkGroup[];

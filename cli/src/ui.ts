@@ -6,7 +6,7 @@ import path from "node:path";
 import { isBuiltStorybook } from "selfie-ui/local";
 import { keptStorybookPath } from "selfie-ui/api";
 import { storybookHash, readStoriesInOrder, readStoryIndex, storiesInIndex, type StoryEntry } from "selfie-render";
-import type { AcceptOutcome, DecisionTarget, FeedbackView, NewNote, ReviewSource, RunView, SnapshotRow, StoriesView, StorybookLink, StorySetup } from "selfie-ui/app";
+import type { AcceptOutcome, DecisionTarget, FeedbackView, NewNote, ReviewSource, RunView, RenderRow, StoriesView, StorybookLink, StorySetup } from "selfie-ui/app";
 import { resolveRenderSettings, resolveHunkMergeDistance } from "./config.ts";
 import { accept, checkAccept, decide } from "./decisions.ts";
 import { diffToPng, type PixelDiff } from "./diff.ts";
@@ -32,7 +32,7 @@ export function localReviewSource(
   project: Project,
   { native, storybook }: { readonly native?: boolean | undefined; readonly storybook?: { readonly dir: string; readonly url: string; readonly record?: StoryRecorder | undefined } | undefined } = {},
 ): ReviewSource {
-  const { snapshots, store, repo } = project;
+  const { batches, store, repo } = project;
 
   // One at a time from a page, since two can't both be what someone is waiting on. An agent's own
   // `selfie record` isn't held to this: each render has a directory of its own.
@@ -73,7 +73,7 @@ export function localReviewSource(
 
   /** The kept built Storybook of the goldens a run is compared with. Never the directory, which wouldn't be them. */
   const goldenStorybookFor = async ({ environment }: Run, sha: string | null): Promise<string | null> => {
-    const goldens = sha === null ? null : await snapshots.acceptedRunAt(sha, environment);
+    const goldens = sha === null ? null : await batches.acceptedRunAt(sha, environment);
     return goldens === null ? null : keptStorybookUrl(goldens);
   };
 
@@ -96,7 +96,7 @@ export function localReviewSource(
 
   /** What the run's own Storybook calls its stories, then what its goldens' called those it no longer has. */
   const storyNamesFor = async (run: Run, goldensSha: string | null, stories: ReadonlySet<string>) => {
-    const goldens = goldensSha === null ? null : await snapshots.acceptedRunAt(goldensSha, run.environment);
+    const goldens = goldensSha === null ? null : await batches.acceptedRunAt(goldensSha, run.environment);
     const kept = await Promise.all([run.id, goldens].map((id) => (id === null ? null : project.storybooks.keptStorybookOfRun(id))));
     const entries = (await Promise.all(kept.map((hash) => (hash === null ? [] : storiesOfKept(hash))))).flat();
     const named = new Map<string, StoryEntry>();
@@ -112,9 +112,9 @@ export function localReviewSource(
     );
   };
 
-  const toRows = async (runId: string, compared: Comparison["snapshots"]): Promise<SnapshotRow[]> => {
+  const toRows = async (runId: string, compared: Comparison["renders"]): Promise<RenderRow[]> => {
     const pixelDiffs = await cachedDiffs(runId);
-    return compared.map((snapshot) => ({ ...snapshot, pixelDiff: pixelDiffs.get(snapshot.story) ?? null }));
+    return compared.map((render) => ({ ...render, pixelDiff: pixelDiffs.get(render.story) ?? null }));
   };
 
   /**
@@ -124,14 +124,14 @@ export function localReviewSource(
   const viewOf = async (reviewed: Comparison, actor: string | null): Promise<RunView> => {
     const { run } = reviewed;
     const onBranch = await branchGoldens(project, run);
-    const comparison = onBranch === null ? reviewed : await snapshots.compareRun(run.id, onBranch);
+    const comparison = onBranch === null ? reviewed : await batches.compareRun(run.id, onBranch);
     const summary = summarizeRun(comparison);
     const checked = onBranch === null ? summary : summarizeRun(reviewed);
     const notRendered = new Set(summary.notRendered.map(({ story }) => story));
     const { refusals, usableAsBaseline, removals } = await checkAccept(project, reviewed);
     const rows = await toRows(
       run.id,
-      comparison.snapshots.filter(({ story }) => !notRendered.has(story)),
+      comparison.renders.filter(({ story }) => !notRendered.has(story)),
     );
     return {
       run,
@@ -140,7 +140,7 @@ export function localReviewSource(
       viewport: await project.storybooks.viewportOf(run.environment),
       branchGoldens: onBranch,
       hunkMergeDistance: await resolveHunkMergeDistance(repo),
-      acceptedRunId: await snapshots.acceptedRunAt(run.gitSha, run.environment),
+      acceptedRunId: await batches.acceptedRunAt(run.gitSha, run.environment),
       actor,
       blockers: checked.blockers,
       advisories: summary.advisories,
@@ -150,7 +150,7 @@ export function localReviewSource(
       refusals,
       removals,
       usableAsBaseline,
-      siblings: (await snapshots.runsAt(run.gitSha, run.environment)).map(({ id, startedAt, status, dirty }) => ({ id, startedAt, status, dirty })),
+      siblings: (await batches.runsAt(run.gitSha, run.environment)).map(({ id, startedAt, status, dirty }) => ({ id, startedAt, status, dirty })),
     };
   };
 
@@ -219,7 +219,7 @@ export function localReviewSource(
       let onBranch: Promise<string | null> | undefined;
       const rowsOf = async (run: Run) => {
         const against = run.baselineSha ?? (await (onBranch ??= branchGoldens(project, run)));
-        return (await compareAsShown(project, run, against)).snapshots;
+        return (await compareAsShown(project, run, against)).renders;
       };
       const renders = await newestRenders(finished, rowsOf, index.length > 0 ? new Set(index.map(({ id }) => id)) : undefined);
 
@@ -305,7 +305,7 @@ export function localReviewSource(
 
     async unchanged(runId) {
       const run = await requireRun(project, runId);
-      const { snapshots: compared } = await compareAsShown(project, run);
+      const { renders: compared } = await compareAsShown(project, run);
       return toRows(
         runId,
         compared.filter(({ state }) => state === "unchanged"),

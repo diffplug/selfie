@@ -2,8 +2,8 @@
 
 > Status: built — the local review UI, served by `selfie ui`. It runs on one person's machine with no login. Deploying it is `cloud-deploy`; see `## Future`.
 >
-> - See `docs/specs/glossary.md` for run, snapshot, golden, baseline, decision, and environment.
-> - Owns the routes, the seam a platform implements, and what each screen must show. `docs/specs/access.md` → Local review server owns who may reach it. `docs/specs/cli.md` → ui owns the command, and → Library the facts it shows. `docs/specs/snapshots.md` owns what the facts mean.
+> - See `docs/specs/glossary.md` for run, render, golden, baseline, decision, and environment.
+> - Owns the routes, the seam a platform implements, and what each screen must show. `docs/specs/access.md` → Local review server owns who may reach it. `docs/specs/cli.md` → ui owns the command, and → Library the facts it shows. `docs/specs/renders.md` owns what the facts mean.
 
 ## Package
 
@@ -64,7 +64,7 @@ Source of truth: `ui/src/server/app.ts`; tests in `cli/test/ui-*.test.ts`.
 | `GET /api/runs/:id` | `runView` |
 | `GET /api/runs/:id/baseline` | `baseline` |
 | `GET /api/runs/:id/unchanged` | `{ rows }` |
-| `POST /api/runs/:id/decisions` | `{ decision, snapshots: [{ story, imageHash }] }` |
+| `POST /api/runs/:id/decisions` | `{ decision, renders: [{ story, imageHash }] }` |
 | `POST /api/runs/:id/accept` | `{ removedSeen? }` |
 | `GET /api/feedback` | `feedback` |
 | `POST /api/notes` | `{ story, runId, imageHash, box, text }` |
@@ -106,7 +106,7 @@ Source of truth: `localReviewSource` in `cli/src/ui.ts`, `useRun` in `ui/src/cli
 
 ## Which run
 
-- **Must link [every story](#screens) to the newest finished run at HEAD in the project's environment, as the run to review and accept.** A run still recording, or crashed, is listed on its commit's other runs and can't be opened (`docs/specs/snapshots.md` → Crashes and retries).
+- **Must link [every story](#screens) to the newest finished run at HEAD in the project's environment, as the run to review and accept.** A run still recording, or crashed, is listed on its commit's other runs and can't be opened (`docs/specs/renders.md` → Crashes and retries).
 - **Must say when a newer run exists at the viewed run's commit, on a run's own screens.** On [every story](#screens), an older run is what's newest for that story.
 
 ## Screens
@@ -118,7 +118,7 @@ Source of truth: `ui/src/client/`.
 | `/` | Every story, and where this commit stands |
 | `/stories/:story` | One story, whichever run its newest render is from |
 | `/runs/:id` | The run |
-| `/runs/:id/stories/:story` | One snapshot, in the filter from the query |
+| `/runs/:id/stories/:story` | One render, in the filter from the query |
 | `/runs/:id/accept` | Accepting |
 
 **The top bar** says what a page is looking at: on every story, the built Storybook, its commit and branch, and whether it's clean; on a run's pages, the diff, between the run's commit and what it's compared with, and how that relates to the merge base with the default branch.
@@ -140,25 +140,25 @@ Source of truth: `ui/src/client/`.
 - **Must confirm every bulk decision in a dialog, with the count, how many are changed and new, how many are already decided, how many have an advisory, and which stories.** Focus starts on Cancel.
 - **Must hold the rows in the dialog from when it opens, and send those**, so what it listed is what's sent, whatever a filter or a read does meanwhile.
 
-**One snapshot** shows its state and decision, pixel stats, and images.
+**One render** shows its state and decision, pixel stats, and images.
 
 - **Must always offer the images side by side and stacked.** Stacked, switching layers costs no scroll, and the zoom starts at actual size: the image's width divided by `run.scale`, in CSS pixels, so it's the size the page really was on every display.
 - **Must fit an image's width side by side, and scroll all of them as one**, so a tall page's images stay level.
 - **Must also offer zoom at 1×, 2×, 4×, and 8×, where 1× is one image pixel to one device pixel** (rationale), following the display's `devicePixelRatio`.
 - **Must draw nearest-neighbor only at a whole number of device pixels per image pixel, and smooth anything else**, as with a 2× image on a 1× display or a 1.5× image on a 2× display at actual size, since uneven blocks would look like changes.
 - **Must center a change on stacking the images and on every zoom:** the hunk being looked at if there is one, or else the bounding box if it fits, or else the first changed pixel, since a large box's center may hold no change at all (rationale).
-- **Must list a changed snapshot's hunks, however few, grouped by `hunkMergeDistance`, in reading order, each with its number, kind, how much it holds, and where it is on each side.** One hunk gets no special case (rationale).
+- **Must list a changed render's hunks, however few, grouped by `hunkMergeDistance`, in reading order, each with its number, kind, how much it holds, and where it is on each side.** One hunk gets no special case (rationale).
 - **Must outline each hunk on every image, in that image's own coordinates, numbered as in the list, in its kind's color from the diff image**, side by side and stacked, and let the outlines be turned off.
 - **Must let someone select any set of hunks, from the list, from an outline, or with a key, and keep that only while they stay on the story.** Clicking a stacked hunk's outline selects it, and side by side only its number does, since clicking an image there stacks it.
 - **Must keep the hunk being looked at still when flipping between images**, since it can be somewhere else in the other one (rationale).
-- **Must link a snapshot to its story in the very built Storybook that rendered its run, if that's kept, or else the directory `selfie ui` hosts, and then say it may not match** (`RunView.storybook`). A removed story has no link.
+- **Must link a render to its story in the very built Storybook that rendered its run, if that's kept, or else the directory `selfie ui` hosts, and then say it may not match** (`RunView.storybook`). A removed story has no link.
 - **Must offer the live stories, closed and loading nothing until opened, and stay open or closed from story to story**: the golden's kept built Storybook beside the run's, in frames (`docs/specs/access.md` → Local review server), at the size its environment renders at and scaled to fit, or else saying that size wasn't recorded, each saying why if it has none (rationale).
 - **Must give a live story the keyboard only when it's clicked in**, taking focus back from one that focuses itself as it loads, so this page's keys keep working (rationale).
 - **Must leave the browser's history alone when moving a live story along**, so Back leaves the screen as it does anywhere else (rationale).
 - **Must keep how someone is looking when moving between stories**, and must never show one story's image under another's name while it loads.
-- **Must compute diff images, and pixel stats a run's `review.json` no longer holds, on demand, from the store, by hash pair**, so a pruned run reads like any other. A list shows stats only from `review.json`, and one snapshot uses them rather than ask (rationale).
-- **Must explain each kind of snapshot:** new has no golden, removed has no current and takes no decision, failed shows its message, and a changed size says so, and shows the images from their top left corners.
-- **Must say when a changed snapshot is only moves and spacing, in the list, the pixel stats, and a banner, and that it still needs a decision**, and offer those as a filter of the list, so they can be approved together (rationale).
+- **Must compute diff images, and pixel stats a run's `review.json` no longer holds, on demand, from the store, by hash pair**, so a pruned run reads like any other. A list shows stats only from `review.json`, and one render uses them rather than ask (rationale).
+- **Must explain each kind of render:** new has no golden, removed has no current and takes no decision, failed shows its message, and a changed size says so, and shows the images from their top left corners.
+- **Must say when a changed render is only moves and spacing, in the list, the pixel stats, and a banner, and that it still needs a decision**, and offer those as a filter of the list, so they can be approved together (rationale).
 - **Must say what the diff image's colors mean wherever it has more than one.**
 - **Must not offer a decision on what has no image to decide on.**
 
@@ -195,19 +195,19 @@ Source of truth: `useHotkeys` in `ui/src/client/hooks.ts`.
 
 | Key | Where | Does |
 |---|---|---|
-| `j`, `k` | The run, a snapshot | Next and previous, in the current filter |
+| `j`, `k` | The run, a render | Next and previous, in the current filter |
 | `/` | The run | Search |
-| `a`, `r` | A snapshot | Approve or reject, then go to the next |
-| `s`, `f`, `d` | A snapshot | Side by side, stacked then flip, diff |
-| `z`, `c` | A snapshot | Next zoom, center on the hunk being looked at or else the change |
-| `l` | A snapshot | Open or close the live stories |
-| `m` | A snapshot | Write a note |
+| `a`, `r` | A render | Approve or reject, then go to the next |
+| `s`, `f`, `d` | A render | Side by side, stacked then flip, diff |
+| `z`, `c` | A render | Next zoom, center on the hunk being looked at or else the change |
+| `l` | A render | Open or close the live stories |
+| `m` | A render | Write a note |
 | `c`, `m` | A story with no render | Render it, or render it to write a note on it |
-| `w` | A snapshot | Show the image a note was written on, or go back |
-| `n`, `p` | A snapshot | Next and previous hunk |
-| `x` | A snapshot | Select the hunk being looked at, or the first |
-| `u` | A snapshot | Back to the list, with focus on that story |
-| `?` | A snapshot | Lists these |
+| `w` | A render | Show the image a note was written on, or go back |
+| `n`, `p` | A render | Next and previous hunk |
+| `x` | A render | Select the hunk being looked at, or the first |
+| `u` | A render | Back to the list, with focus on that story |
+| `?` | A render | Lists these |
 
 - **Must show each key on screen beside what it does.**
 - **Must ignore a key while someone is typing, a dialog is open, or a modifier is held, and ignore a held key's repeats**, so holding `a` can't approve one image after another unseen (rationale). A focused checkbox isn't typing.
@@ -252,9 +252,9 @@ Also its own guard in place of `loopbackHosts`, keeping `sameOriginWrites` and `
 
 ### Not built
 
-- Approving or rejecting a selection. Those are still on a whole image, until there are decisions on hunks (`docs/specs/snapshots.md` → Future). A note can be on one.
+- Approving or rejecting a selection. Those are still on a whole image, until there are decisions on hunks (`docs/specs/renders.md` → Future). A note can be on one.
 - Selecting one hunk out of a group. Lowering `hunkMergeDistance` separates them.
-- A way to clear a decision. One can be replaced, and a run can be reviewed again, but `Snapshots.decide` has no way to remove one.
+- A way to clear a decision. One can be replaced, and a run can be reviewed again, but `RenderBatches.decide` has no way to remove one.
 - Finding runs at other commits. `/runs/:id` opens any of them, and `selfie ui <run>` prints that URL, but nothing lists them: `runs` has no index that would serve it without a scan.
 - Keeping how someone's looking at the images when the next story's render is from another run, since each run's page is its own, and it reads that run again. The live stories do stay as they were.
 - Sorting the list by size of change.
