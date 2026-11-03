@@ -53,6 +53,7 @@ Source of truth: `store/src/core/store.ts`, `store/src/core/image-file.ts`; test
 - **Must key blobs by image hash, never by image key.** The key is `images/<image hash>`; the [R2 adapter](#r2-adapter) adds the project.
 - **Must write image bytes before the metadata row that refers to them**, since blob storage and SQL share no transaction: a failure can orphan bytes but never leave a row without bytes.
 - **Must treat bytes with no row as not stored**, so an orphan is never served as an image.
+- **Must say which of a set of images it lacks, with `Store.missingImages`, at most 100 per SQL request**, so another store need only send those (`docs/specs/sync.md`).
 - **Must offer a bulk put that groups image inserts, at most 100 per SQL request**, so storing many images doesn't spend one API request each. `Store.putImages` writes each group's bytes before its rows.
 - **Must look up each group's hashes in one statement, and do nothing more for a hash with a row**: no blob call and no insert, since bytes are always written first. Everything else inserts as [Image keys](#image-keys) says, so a concurrent insert stays safe.
 - **Must test collisions two ways:** an injected hash function for the logic, and a committed pair of real images whose hashes collide at 53 bits. The test recomputes both hashes from the committed images. `pnpm find-collision` regenerates the pair, separately from the test run.
