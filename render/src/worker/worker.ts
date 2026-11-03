@@ -1,4 +1,4 @@
-// Screenshots one Storybook build's stories, answering the browser's requests from the build
+// Screenshots one built Storybook's stories, answering the browser's requests from the build
 // directory. Runs the same way inside the container and natively. See protocol.ts for what
 // it may depend on.
 import { createHash } from "node:crypto";
@@ -67,7 +67,7 @@ function trackRequests(page: Page): (quietMs: number, boundMs: number) => Promis
 }
 
 /** The file a build-relative URL path names, or null if it is outside the build or absent. */
-async function resolveBuildFile(root: string, pathname: string): Promise<string | null> {
+async function resolveStorybookFile(root: string, pathname: string): Promise<string | null> {
   let file: string;
   try {
     file = path.join(root, decodeURIComponent(pathname));
@@ -85,11 +85,11 @@ async function resolveBuildFile(root: string, pathname: string): Promise<string 
  * only needed natively, since the container has no network. A failure here means the context
  * has closed, so there is nothing left to answer.
  */
-async function answerFromBuild(route: Route, root: string): Promise<void> {
+async function answerFromStorybook(route: Route, root: string): Promise<void> {
   const url = new URL(route.request().url());
   try {
     if (url.origin !== ORIGIN) return await route.abort();
-    const file = await resolveBuildFile(root, url.pathname);
+    const file = await resolveStorybookFile(root, url.pathname);
     await (file
       ? route.fulfill({ path: file, headers: { "cache-control": "no-store" } })
       : route.fulfill({ status: 404 }));
@@ -134,7 +134,7 @@ async function prepareContext(browser: Browser, job: WorkerJob): Promise<Browser
   await context.addInitScript(`window.${RENDER_RECIPE.snapshotGlobal} = true;`);
   await context.addInitScript(watchPlayFailures);
   if (job.initScript !== null) await context.addInitScript({ content: job.initScript });
-  await context.route("**/*", (route) => answerFromBuild(route, path.resolve(job.buildDir)));
+  await context.route("**/*", (route) => answerFromStorybook(route, path.resolve(job.buildDir)));
   return context;
 }
 

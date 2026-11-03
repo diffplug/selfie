@@ -42,7 +42,7 @@ Selfie has the following commands:
 
 - find-baseline - returns the Git sha of the nearest merge-base with a complete set of goldens
 - record - always renders the Storybook, and records a run
-- review - shows a run's diff against its baseline, or until one exists, against the nearest goldens on its branch, as one JSON document whose exit code says whether anything blocks. With no run, it uses the one for this exact Storybook build, which takes about 0.3 s rather than 70 s on 541 stories, and records one only if there's none yet. `--baseline` compares with a commit's goldens or another run, so recording twice and comparing is how to look for flakiness
+- review - shows a run's diff against its baseline, or until one exists, against the nearest goldens on its branch, as one JSON document whose exit code says whether anything blocks. With no run, it uses the one for this exact built Storybook, which takes about 0.3 s rather than 70 s on 541 stories, and records one only if there's none yet. `--baseline` compares with a commit's goldens or another run, so recording twice and comparing is how to look for flakiness
 - approve, reject - decides on a run's changed snapshots, on a dirty tree if you like, so committing doesn't ask again
 - accept - makes a run's snapshots the goldens for its Git sha, on a clean tree
 - push, pull - move a run, its decisions, and its goldens to and from the cloud, whose goldens win

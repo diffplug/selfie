@@ -16,12 +16,12 @@ Source of truth: `ui/`.
 | `ui/src/shared/notes.ts`, exported as `selfie-ui/notes` | Shared note validation and open-note state (`docs/specs/feedback.md`) |
 | `selfie-ui/sync`, `selfie-ui/sync-api` | `docs/specs/sync.md` → Routes |
 | `ui/src/server/app.ts`, exported as `selfie-ui/app` | The routes under `/api`, over a `ReviewSource`, on Hono, and `sameOriginWrites` and `pageHeaders`. It re-exports the wire types |
-| `ui/src/server/storybook.ts`, exported as `selfie-ui/storybook` | A hosted Storybook's headers and kept builds, for any platform |
+| `ui/src/server/storybook.ts`, exported as `selfie-ui/storybook` | A hosted Storybook's headers and kept built Storybooks, for any platform |
 | `ui/src/server/local.ts`, exported as `selfie-ui/local` | Node's serving, the allowed hosts, and hosting a Storybook's directory |
 | `ui/src/client/` | The React client, on Primer, built by Vite into `ui/dist/` |
 | `cli/src/ui.ts` | `localReviewSource`: a `ReviewSource` over a repository, through the CLI's library |
 | `ui/.storybook/`, `ui/src/client/*.stories.tsx`, `ui/src/client/stories/` | Every screen as a story, which Selfie reviews itself by ([Stories](#stories)) |
-| `ui/storybook-fixtures/` | Images generated before each Storybook build, at the paths the server answers. Not in Git |
+| `ui/storybook-fixtures/` | Images generated before each build of the Storybook, at the paths the server answers. Not in Git |
 
 - **Must keep `ui/src/server/app.ts` free of anything specific to a platform**: no Node, no file, no Git. It knows Hono, `selfie-store`'s core, and `ReviewSource`. `cli/test/ui-*.test.ts` checks what it loads.
 - **Must have `selfie-cli` depend on `selfie-ui`, never the reverse** (rationale). `docs/specs/cli.md` → ui owns how it loads it.
@@ -82,9 +82,9 @@ Source of truth: `ui/src/server/app.ts`; tests in `cli/test/ui-*.test.ts`.
 | 404 | `unknown-run`, `unknown-image`, `no-diff-image`, `unknown-story`, `not-found` | |
 | 409 | `render-busy`, `render-failed`, `no-agent-waiting`, `stale-decision`, `no-actor`, `run-not-finished`, `no-goldens`, `run-dirty`, `run-has-failures`, `wrong-removed-count` | The request can't apply to the data as it stands |
 
-On a hosted Storybook's own origin (`docs/specs/access.md` → Local review server), `selfie-ui/storybook` serves each kept build's files at `/storybook-builds/<hash>/`, and locally the directory as it stands is at `/`.
+On a hosted Storybook's own origin (`docs/specs/access.md` → Local review server), `selfie-ui/storybook` serves each kept built Storybook's files at `/built-storybooks/<hash>/`, and locally the directory as it stands is at `/`.
 
-- **Must give a kept build's files `Cache-Control: private, max-age=31536000, immutable`**, since a kept build never changes, and the directory as it stands `no-store`, since a rebuild does.
+- **Must give a kept built Storybook's files `Cache-Control: private, max-age=31536000, immutable`**, since a kept built Storybook never changes, and the directory as it stands `no-store`, since a rebuild does.
 - **Must refuse an image hash that isn't 64 lowercase hex digits before it reaches the store.**
 - **Must give images, diff images, and diff stats `Cache-Control: private, max-age=31536000, immutable`**, since all are addressed by content (`docs/specs/access.md` → Local review server), and every other API answer `no-store`.
 - **Must decide on exactly the images a request names, or none:** the library's `decide` refuses with `stale-decision` if any named story and hash isn't a changed or new image of that run, and takes the names exactly, never as patterns (rationale).
@@ -142,8 +142,8 @@ Source of truth: `ui/src/client/`.
 - **Must outline each region on every image, in that image's own coordinates, numbered as in the list, in its kind's color from the diff image**, side by side and stacked, and let the outlines be turned off.
 - **Must let someone select any set of regions, from the list, from an outline, or with a key, and keep that only while they stay on the story.** Clicking a stacked region's outline selects it, and side by side only its number does, since clicking an image there stacks it.
 - **Must keep the region being looked at still when flipping between images**, since it can be somewhere else in the other one (rationale).
-- **Must link a snapshot to its story in the very build that rendered its run, if that's kept, or else the directory `selfie ui` hosts, and then say it may not match** (`RunView.storybook`). A removed story has no link.
-- **Must offer the live stories, closed and loading nothing until opened, and stay open or closed from story to story**: the golden's kept build beside the run's, in frames (`docs/specs/access.md` → Local review server), at the size its environment renders at and scaled to fit, or else saying that size wasn't recorded, each saying why if it has none (rationale).
+- **Must link a snapshot to its story in the very built Storybook that rendered its run, if that's kept, or else the directory `selfie ui` hosts, and then say it may not match** (`RunView.storybook`). A removed story has no link.
+- **Must offer the live stories, closed and loading nothing until opened, and stay open or closed from story to story**: the golden's kept built Storybook beside the run's, in frames (`docs/specs/access.md` → Local review server), at the size its environment renders at and scaled to fit, or else saying that size wasn't recorded, each saying why if it has none (rationale).
 - **Must give a live story the keyboard only when it's clicked in**, taking focus back from one that focuses itself as it loads, so this page's keys keep working (rationale).
 - **Must leave the browser's history alone when moving a live story along**, so Back leaves the screen as it does anywhere else (rationale).
 - **Must keep how someone is looking when moving between stories**, and must never show one story's image under another's name while it loads.
@@ -156,17 +156,17 @@ Source of truth: `ui/src/client/`.
 **Every story** is the hosted Storybook's stories, nested and ordered as its own sidebar does them, and each with its newest render from the finished runs at HEAD in the project's environment, so several partial runs read as one (rationale). A story's page is that render's run's, as it would be from that run's own review.
 
 - **Must say where this commit stands, in order:** the commit and branch; the built Storybook, how many stories it has, and whether it's from a clean checkout; and how many stories have a render (rationale). What's missing says what to do, the page moves on by itself as it's done, and with no renders it offers to render the first story, or all of them, opening that story's page after the first.
-- **Must call a build clean only if nothing is uncommitted and it was built since HEAD last moved**, which is the most Selfie can know of a build it may not have made (rationale). Otherwise it says which, and may still render.
-- **Must say, before rendering from uncommitted changes, what they are, that a render is marked so and can't become a golden, and when the build itself is one of those files.**
+- **Must call a built Storybook clean only if nothing is uncommitted and it was built since HEAD last moved**, which is the most Selfie can know of a built Storybook it may not have made (rationale). Otherwise it says which, and may still render.
+- **Must say, before rendering from uncommitted changes, what they are, that a render is marked so and can't become a golden, and when the built Storybook itself is one of those files.**
 - **Must keep the list beside `/` and each `/stories/:story`, on the left, as Storybook's sidebar is** (rationale), with what `/` says, or that story, on the right. A filter stays in the query from page to page. A run's own screens don't have it.
-- **Must nest by a story's title, keep the build's order, and use its names**: a top-level section, then a component, then each story, with Storybook's own icons and colors, so a person finds what they know from it (rationale). Only the sections start open. Moving to a story opens the way to it, and a filter opens everything.
+- **Must nest by a story's title, keep the built Storybook's order, and use its names**: a top-level section, then a component, then each story, with Storybook's own icons and colors, so a person finds what they know from it (rationale). Only the sections start open. Moving to a story opens the way to it, and a filter opens everything.
 - **Must mark each story in the list with its state, in words for a screen reader and on hover, and with any caveat**, and give a story's decision and when it was rendered on its page.
 - **Must list a story nothing has rendered, show it running, and offer to render it**, since it's still a real story to look at. A note is written on an image, so starting one renders the story first, and then opens the note box. With no way to render here, it says what command does.
-- **Must offer to render again whatever story is on screen, and every story with no render or one known to be from another build, as Render the rest**, which is how a change fans out to the rest of a Storybook. Asking for every story records a whole run, not a filtered one, which can become goldens (rationale).
+- **Must offer to render again whatever story is on screen, and every story with no render or one known to be from another built Storybook, as Render the rest**, which is how a change fans out to the rest of a Storybook. Asking for every story records a whole run, not a filtered one, which can become goldens (rationale).
 - **Must render only from the hosted Storybook as it stands, and one at a time**, refusing a second with `render-busy`. It never builds, since a page must not be able to run a shell.
 - **Must never read a story a filtered run left out as removed**, through `newestRenders` in `selfie-store`. It takes that story from an older run, or else lists it as not rendered.
-- **Must say when a render is from uncommitted changes, or known to be from another build than the one hosted**, since a render is whichever is newest, not whichever is reliable.
-- **Must leave out a story the hosted build no longer has**, and with no build at all, list only what's been rendered, and say so.
+- **Must say when a render is from uncommitted changes, or known to be from another built Storybook than the one hosted**, since a render is whichever is newest, not whichever is reliable.
+- **Must leave out a story the hosted built Storybook no longer has**, and with no built Storybook at all, list only what's been rendered, and say so.
 - **Must move next and previous through every story**, not through that story's run. Decisions go to the run that rendered the image, and accepting stays a thing one run does.
 
 **Accepting** shows, in plain words, every refusal `accept` would give, and what to do about it.
@@ -247,4 +247,4 @@ Also its own guard in place of `loopbackHosts`, keeping `sameOriginWrites` and `
 - Finding runs at other commits. `/runs/:id` opens any of them, and `selfie ui <run>` prints that URL, but nothing lists them: `runs` has no index that would serve it without a scan.
 - Keeping how someone's looking at the images when the next story's render is from another run, since each run's page is its own, and it reads that run again. The live stories do stay as they were.
 - Sorting the list by size of change.
-- A hosted Storybook in the cloud (**Scope: cloud-deploy**), where its origin needs the same separation, and a build needs uploading.
+- A hosted Storybook in the cloud (**Scope: cloud-deploy**), where its origin needs the same separation, and a built Storybook needs uploading.

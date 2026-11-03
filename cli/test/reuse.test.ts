@@ -55,7 +55,7 @@ describe("an unchanged build", () => {
     expect(second.rendered).toBe(false);
     expect(second.json.runId).toBe(first.json.runId);
     expect(second.json.reusedFromRun).toBeNull();
-    expect(second.stderr).toContain(`Run ${first.json.runId} already describes this build`);
+    expect(second.stderr).toContain(`Run ${first.json.runId} already describes this built Storybook`);
     expect(second.json.counts).toEqual(first.json.counts);
     expect(second.code).toBe(first.code);
 
@@ -219,7 +219,7 @@ describe("a render that isn't reusable", () => {
       writeFileSync(inBuild("assets/during.txt"), "written during the render");
     };
     const first = await review();
-    expect(first.stderr).toContain("the build changed while it rendered");
+    expect(first.stderr).toContain("the built Storybook changed while it rendered");
     // The build as it now stands has no render that saw all of it from the start.
     h.onRender = () => {
       renders += 1;
@@ -231,7 +231,7 @@ describe("a render that isn't reusable", () => {
 
   test("a build holding a symlink always renders, and stderr says why", async () => {
     await symlink(path.join(h.scratch, "elsewhere.css"), inBuild("assets/link.css"));
-    expect((await review()).stderr).toContain("won't be reused: a native environment, or a build holding a symlink");
+    expect((await review()).stderr).toContain("won't be reused: a native environment, or a built Storybook holding a symlink");
     expect((await review()).rendered).toBe(true);
   });
 

@@ -6,7 +6,7 @@ import path from "node:path";
 import {
   render as realRender,
   filterStories,
-  buildHash,
+  storybookHash,
   renderIdentity,
   type Manifest,
   type ManifestStory,
@@ -23,7 +23,7 @@ import {
   type RecordedSnapshot,
   type RawImage,
   type Run,
-  type StorybookBuildFile,
+  type BuiltStorybookFile,
   type StoryFilter,
 } from "selfie-store";
 import { resolveRenderSettings, resolveRegionMergeDistance, resolveStorybookDir, type RenderSettings } from "./config.ts";
@@ -66,7 +66,7 @@ export interface RecordOptions {
   readonly log?: ((line: string) => void) | undefined;
 }
 
-/** A run to review, or else what to record one from if this build has none. */
+/** A run to review, or else what to record one from if this built Storybook has none. */
 export type ReviewOptions = ({ readonly run: string } | (RecordOptions & { readonly run?: undefined })) & {
   /** A commit with goldens, or a finished run. It changes this review alone: `accept` still checks the run's own. */
   readonly baseline?: string | undefined;
@@ -303,7 +303,7 @@ interface Recording {
   readonly finished: (run: Run) => Promise<void>;
 }
 
-/** The project's own code, which the same build repeats. Anything else might not recur. */
+/** The project's own code, which the same built Storybook repeats. Anything else might not recur. */
 const REPEATABLE_ERRORS: ReadonlySet<StoryError["source"]> = new Set(["play", "console", "page"]);
 
 /** Why this render mustn't answer a later review, or null if it may. */
@@ -316,7 +316,7 @@ function whyNotReusable({ stories, warnings }: Manifest, { status }: Run): strin
   return warnings[0] === undefined ? null : `the render warned: ${warnings[0]}`;
 }
 
-/** The earlier render of this exact build, if there's one, narrowed to the patterns. */
+/** The earlier render of this exact built Storybook, if there's one, narrowed to the patterns. */
 async function replay(
   project: Project,
   identity: string,
@@ -337,11 +337,11 @@ async function replay(
     records: async () =>
       chosen.map(({ snapshot: { story, imageHash, playError } }) => ({ story, imageHash: imageHash!, playError })),
     finished: async () =>
-      log(`Reused the images of run ${runId}, since this exact build already rendered. selfie record renders again.`),
+      log(`Reused the images of run ${runId}, since this exact built Storybook already rendered. selfie record renders again.`),
   };
 }
 
-/** Renders the build. Only a render of every story can answer a later review, so only it is remembered. */
+/** Renders the built Storybook. Only a render of every story can answer a later review, so only it is remembered. */
 async function renderFresh(
   project: Project,
   renderedir: string,
@@ -371,12 +371,12 @@ async function renderFresh(
     async finished(run) {
       if (options.stories !== undefined) return;
       if (identity === null) {
-        log("This render won't be reused: a native environment, or a build holding a symlink, can't be recognized.");
+        log("This render won't be reused: a native environment, or a built Storybook holding a symlink, can't be recognized.");
         return;
       }
-      // A build that changed while it rendered has no identity that describes these images.
+      // A built Storybook that changed while it rendered has no identity that describes these images.
       const after = await renderIdentity({ storybookDir, environment: settings.environment, initScript: settings.initScript });
-      const whyNot = after === identity ? whyNotReusable(manifest, run) : "the build changed while it rendered";
+      const whyNot = after === identity ? whyNotReusable(manifest, run) : "the built Storybook changed while it rendered";
       await project.renders.remember(identity, whyNot === null ? run.id : null);
       if (whyNot !== null) log(`This render won't be reused: ${whyNot}.`);
     },
@@ -384,18 +384,18 @@ async function renderFresh(
 }
 
 /**
- * Says which build rendered a run, and keeps that build so its stories can still be opened. A build
+ * Says which build rendered a run, and keeps that built Storybook so its stories can still be opened. A built Storybook
  * that changed while it rendered isn't what rendered these images, so nothing is said of it. The run
- * is sound either way, so failing to keep a build only costs its stories' links.
+ * is sound either way, so failing to keep a built Storybook only costs its stories' links.
  */
-async function keepBuild(project: Project, run: Run, storybookDir: string, before: string | null, log: (line: string) => void): Promise<void> {
+async function keepStorybook(project: Project, run: Run, storybookDir: string, before: string | null, log: (line: string) => void): Promise<void> {
   if (before === null) return;
   try {
-    const files: StorybookBuildFile[] = [];
-    const after = await buildHash(storybookDir, async (path, bytes) => void files.push({ path, fileHash: await project.builds.putFile(bytes) }));
+    const files: BuiltStorybookFile[] = [];
+    const after = await storybookHash(storybookDir, async (path, bytes) => void files.push({ path, fileHash: await project.storybooks.putFile(bytes) }));
     if (after !== before) return;
-    await project.builds.putBuild(before, files);
-    await project.builds.recordRunBuild(run.id, before);
+    await project.storybooks.putStorybook(before, files);
+    await project.storybooks.recordRunStorybook(run.id, before);
   } catch (error) {
     log(`This run's Storybook wasn't kept: ${(error as Error).message}`);
   }
@@ -440,7 +440,7 @@ export interface RecordResult {
   readonly timings: { readonly renderMs: number; readonly storeMs: number; readonly totalMs: number };
 }
 
-/** The run that already says all this about this build at this commit, so a review needs no new one. */
+/** The run that already says all this about this built Storybook at this commit, so a review needs no new one. */
 async function sameRun(project: Project, renderedBy: string, fields: RunFacts): Promise<Run | null> {
   const runs = await project.snapshots.runsAt(fields.gitSha, fields.settings.environmentId);
   const same = runs.find(
@@ -462,7 +462,7 @@ async function recordBuild(project: Project, options: RecordOptions, { reuse }: 
   const renderedir = renderedirectory(project, randomUUID());
   try {
     // 1. Build. Whatever it writes is part of what this describes, so it comes first.
-    // Before building, so a bad config doesn't cost a whole build to find out.
+    // Before building, so a bad config doesn't cost a whole built Storybook to find out.
     const settings = await resolveRenderSettings(repo, { native: options.native });
     if (options.buildFromConfig === true) {
       if (settings.buildCommand === undefined) throw new SelfieError("usage", "--build runs the config's buildCommand, and selfie.config.json doesn't have one.");
@@ -480,9 +480,9 @@ async function recordBuild(project: Project, options: RecordOptions, { reuse }: 
     const baseline = await findBaseline(project, settings.environmentId);
     const dirtyBefore = await dirtyPaths(repo);
 
-    // 3. Render, unless asked to reuse and this exact build already rendered.
+    // 3. Render, unless asked to reuse and this exact built Storybook already rendered.
     const renderStarted = Date.now();
-    const buildBefore = await buildHash(storybookDir);
+    const buildBefore = await storybookHash(storybookDir);
     const identity = await renderIdentity({ storybookDir, environment: settings.environment, initScript: settings.initScript });
     const replayed = identity !== null && reuse ? await replay(project, identity, options.stories, log) : null;
     const recording = replayed ?? (await renderFresh(project, renderedir, render, { storybookDir, identity, settings, options, log }));
@@ -510,10 +510,10 @@ async function recordBuild(project: Project, options: RecordOptions, { reuse }: 
     if (existing === null) {
       log(`Recorded run ${run.id}: ${recording.storyIds.length} stories.`);
       await recording.finished(run);
-      await project.builds.recordViewport(run.environment, settings.environment.viewport);
-      await keepBuild(project, run, storybookDir, buildBefore, log);
+      await project.storybooks.recordViewport(run.environment, settings.environment.viewport);
+      await keepStorybook(project, run, storybookDir, buildBefore, log);
     } else {
-      log(`Run ${run.id} already describes this build at this commit, so nothing new was recorded. selfie record renders again.`);
+      log(`Run ${run.id} already describes this built Storybook at this commit, so nothing new was recorded. selfie record renders again.`);
     }
     await project.notes.rememberRun(run.id);
     return {
@@ -558,7 +558,7 @@ async function resolveGiven(project: Project, given: string): Promise<GivenBasel
 
 /**
  * Exports what differs from the baseline in a run: one it's told to look at, or else the one
- * for this build, recording it only if there's none. A story's failure is a fact in the result.
+ * for this built Storybook, recording it only if there's none. A story's failure is a fact in the result.
  * Throws if the review couldn't run.
  */
 export async function review(project: Project, options: ReviewOptions): Promise<ReviewResult> {

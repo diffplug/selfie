@@ -23,7 +23,7 @@ const USAGE = `Usage: selfie [--port <n>] [--storybook-dir <dir>] [--native] [--
        selfie <command>
 
   With no command, opens every story of a built Storybook, running, to look at and write notes
-  on, and serves it until stopped. With no build yet, the page says what to do. It first runs the
+  on, and serves it until stopped. With no built Storybook yet, the page says what to do. It first runs the
   config's buildCommand, unless --no-build, and opens a browser if it's at a terminal, unless
   --no-open.
 
@@ -34,7 +34,7 @@ const USAGE = `Usage: selfie [--port <n>] [--storybook-dir <dir>] [--native] [--
   review [<run>] [--baseline <commit-or-run>] [--storybook-dir <dir>] [--build | --build-command <cmd>]
          [--story <pattern>]... [--native]
       Prints a JSON diff of a run against its baseline. With no <run>, uses the run for this
-      exact build, and records one only if there's none yet, so call record first to render
+      exact built Storybook, and records one only if there's none yet, so call record first to render
       again. --baseline compares with those goldens or that run for this review alone, and is
       how to look for flakiness: record twice, then review the second --baseline the first.
       If the default branch has no goldens yet, it compares with the nearest on this branch and
@@ -144,7 +144,7 @@ async function withProject(context: Context, work: (project: Project) => Promise
   }
 }
 
-/** What says how to get a run from a build, for `record` and for a `review` that may need one. */
+/** What says how to get a run from a built Storybook, for `record` and for a `review` that may need one. */
 const BUILD_OPTIONS = {
   "storybook-dir": { type: "string" },
   "build-command": { type: "string" },
@@ -203,7 +203,7 @@ async function serveReview(
     port: options.port,
     clientDir: context.uiClientDir,
     dir,
-    readBuildFile: (build, file) => project.builds.readFile(build, file),
+    readStorybookFile: (build, file) => project.storybooks.readFile(build, file),
   });
   try {
     const url = `${servers.review.url}${options.path}`;

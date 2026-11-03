@@ -1,6 +1,6 @@
 // Writes the images the review UI's stories show, at the paths the server would answer, and their
 // real hashes and pixel diffs. Here, since `selfie-cli` may depend on `selfie-ui` and never the
-// reverse. Every Storybook build runs it. The images are build output, and the hashes and diffs are
+// reverse. Every built Storybook runs it. The images are build output, and the hashes and diffs are
 // committed, since stories import them and typechecking needs them on a fresh clone.
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";

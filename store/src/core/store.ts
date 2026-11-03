@@ -12,7 +12,7 @@ import {
 import { checkImageFile, decodeImage, webpToKeep, type ImageCodec } from "./image-file.ts";
 import { encodePam, type RawImage } from "./pam.ts";
 import { CREATE_SNAPSHOT_TABLES } from "./snapshots.ts";
-import { CREATE_STORYBOOK_BUILD_TABLES } from "./storybook-builds.ts";
+import { CREATE_BUILT_STORYBOOK_TABLES } from "./built-storybooks.ts";
 import type { Sql, SqlStatement } from "./sql.ts";
 
 const CREATE_IMAGES_TABLE = `CREATE TABLE IF NOT EXISTS images (
@@ -64,7 +64,7 @@ export function imageInsertStatement(hash: string, truncated: number): SqlStatem
  */
 export async function initStoreSchema(sql: Sql): Promise<void> {
   await sql.batch(
-    [CREATE_IMAGES_TABLE, ...CREATE_SNAPSHOT_TABLES, ...CREATE_STORYBOOK_BUILD_TABLES].map((statement) => ({
+    [CREATE_IMAGES_TABLE, ...CREATE_SNAPSHOT_TABLES, ...CREATE_BUILT_STORYBOOK_TABLES].map((statement) => ({
       sql: statement,
       idempotent: true,
     })),

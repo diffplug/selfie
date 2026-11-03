@@ -57,7 +57,7 @@ async function hashTree(
  * if it's missing, or holds a symlink. `onFile` sees each file's bytes as read for the hash, before its
  * volatile text is ignored, so keeping them can't disagree with it, however the directory changes.
  */
-export function buildHash(
+export function storybookHash(
   storybookDir: string,
   onFile?: (file: string, bytes: Uint8Array) => Promise<void>,
 ): Promise<string | null> {
@@ -80,7 +80,7 @@ export async function renderIdentity({
   readonly initScript?: string | undefined;
 }): Promise<string | null> {
   if (environment.runner.kind !== "container") return null;
-  const build = await buildHash(storybookDir);
+  const build = await storybookHash(storybookDir);
   if (build === null) return null;
   const renderer = await hashTree(fileURLToPath(new URL(".", import.meta.url)));
   return sha256(JSON.stringify([build, environmentId(environment), initScriptHash(initScript), renderer]));

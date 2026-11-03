@@ -44,7 +44,7 @@ export {
   type SqlStatement,
   type SqlValue,
 } from "./sql.ts";
-export { StorybookBuilds, type StoryViewport, type StorybookBuildFile } from "./storybook-builds.ts";
+export { BuiltStorybooks, type StoryViewport, type BuiltStorybookFile } from "./built-storybooks.ts";
 export {
   ImageHashMismatchError,
   imageInsertStatement,

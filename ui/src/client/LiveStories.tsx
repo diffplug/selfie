@@ -1,4 +1,4 @@
-// The real stories behind the images: each build's, running, opened only when someone asks, since
+// The real stories behind the images: each built Storybook's, running, opened only when someone asks, since
 // most reviews don't need them and each one is a whole page to load.
 import { ChevronDownIcon, ChevronRightIcon, LinkExternalIcon } from "@primer/octicons-react";
 import { Button, Heading, Link, Text } from "@primer/react";
@@ -25,7 +25,7 @@ export function StorybookLinkTo({ row, view }: { row: SnapshotRow; view: RunView
   return (
     <>
       <OpenInStorybook url={storybook.url} story={row.story} />
-      {!storybook.exactBuild && <Text className="selfie-muted">This run&apos;s own build wasn&apos;t kept, so it&apos;s the latest, which may not match.</Text>}
+      {!storybook.exactStorybook && <Text className="selfie-muted">This run&apos;s own build wasn&apos;t kept, so it&apos;s the latest, which may not match.</Text>}
     </>
   );
 }
@@ -111,7 +111,7 @@ export function LiveStories({ row, view, open, onToggle }: { row: SnapshotRow; v
             {view.viewport === null && " This run didn't record the size it rendered at, so these may lay out differently."}
           </Text>
           <div className="selfie-live-sides">
-            {side("golden", golden, row.state === "new" ? "A new story has no golden." : "The golden's build wasn't kept.")}
+            {side("golden", golden, row.state === "new" ? "A new story has no golden." : "The golden's built Storybook wasn't kept.")}
             {side("current", current, "A removed story isn't in this run.")}
           </div>
         </>

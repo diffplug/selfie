@@ -38,15 +38,15 @@ const NEIGHBORS = [rows.fresh("components-badge--new"), rows.tall("pages-setting
 
 export const Changed: Story = { args: { row: BUTTON, others: NEIGHBORS } };
 export const WithStorybook: Story = {
-  args: { row: BUTTON, view: { ...viewOf([BUTTON]), storybook: { url: "http://127.0.0.1:51234/storybook-builds/abc/", exactBuild: true } } },
+  args: { row: BUTTON, view: { ...viewOf([BUTTON]), storybook: { url: "http://127.0.0.1:51234/built-storybooks/abc/", exactStorybook: true } } },
 };
 export const WithStorybookOfAnotherBuild: Story = {
-  args: { row: BUTTON, view: { ...viewOf([BUTTON]), storybook: { url: "http://127.0.0.1:51234/", exactBuild: false } } },
+  args: { row: BUTTON, view: { ...viewOf([BUTTON]), storybook: { url: "http://127.0.0.1:51234/", exactStorybook: false } } },
 };
 const FRESH = rows.fresh("components-badge--new");
 const liveView = (row: SnapshotRow, overrides: Partial<RunView> = {}): RunView => ({
   ...viewOf([row]),
-  storybook: { url: "./live-story/current/", exactBuild: true },
+  storybook: { url: "./live-story/current/", exactStorybook: true },
   goldenStorybookUrl: "./live-story/golden/",
   ...overrides,
 });
@@ -60,7 +60,7 @@ export const LiveStoriesNewStory: Story = { args: { row: FRESH, view: liveView(F
 export const LiveStoriesGoldenNotKept: Story = { args: { row: BUTTON, view: liveView(BUTTON, { goldenStorybookUrl: null }) }, play: liveLoaded };
 /** Its story focuses itself as it loads, and the page's keys must still reach the page. */
 export const LiveStoriesKeepTheKeyboard: Story = {
-  args: { row: BUTTON, view: liveView(BUTTON, { storybook: { url: "./live-story/grabbing/", exactBuild: true }, goldenStorybookUrl: null }) },
+  args: { row: BUTTON, view: liveView(BUTTON, { storybook: { url: "./live-story/grabbing/", exactStorybook: true }, goldenStorybookUrl: null }) },
   play: async (context) => {
     await liveLoaded(context);
     await new Promise((resolve) => setTimeout(resolve, 200));

@@ -14,7 +14,7 @@ Evidence and reasoning for `docs/specs/ui.md`, keyed by its headings.
 
 ## Routes
 
-- **Why targets are taken exactly.** `decide` also takes patterns, where `*` matches anything, and a story's ID comes from a project's build. An ID `a*` passed as a pattern also approves `ab`, which the reviewer never saw. `cli/test/ui-*.test.ts` checks this with those two IDs.
+- **Why targets are taken exactly.** `decide` also takes patterns, where `*` matches anything, and a story's ID comes from a project's built Storybook. An ID `a*` passed as a pattern also approves `ab`, which the reviewer never saw. `cli/test/ui-*.test.ts` checks this with those two IDs.
 - **Why a request names hashes.** A decision belongs to a name and a hash, so naming them says what the reviewer saw. A later accepted run can change a baseline's goldens, and so a run's differences, while a page is open. `stale-decision` is the difference between a confused screen and a wrong approval.
 - **Why bulk has no route of its own.** A server-side "all" would approve whatever is there at that moment, and the dialog would describe something else.
 
@@ -43,9 +43,9 @@ Evidence and reasoning for `docs/specs/ui.md`, keyed by its headings.
 
 **`/` is every story.** It used to go to the newest run at HEAD, or stop at "No runs yet", which is where a first run landed, with nothing to do there. A story is there to look at before any run exists, so that's the place to start, and a run is a step reached from it.
 
-**A checklist, not an error from `selfie`.** A person's first `selfie` in a repository usually has no build, and maybe no config. Stopping with an error leaves them with a sentence to act on and no page, and then they have to start it again. Each line is only ever a fact the server can read, so the same list explains a new commit with nothing rendered at it, and there's no "first run" to remember. A build that isn't ignored by Git is worth naming: it marks every render as uncommitted, and was found by trying this on a new repository.
+**A checklist, not an error from `selfie`.** A person's first `selfie` in a repository usually has no built Storybook, and maybe no config. Stopping with an error leaves them with a sentence to act on and no page, and then they have to start it again. Each line is only ever a fact the server can read, so the same list explains a new commit with nothing rendered at it, and there's no "first run" to remember. A built Storybook that isn't ignored by Git is worth naming: it marks every render as uncommitted, and was found by trying this on a new repository.
 
-**What "clean" can mean.** A build may not have been made by Selfie, so nothing records what it came from. Comparing its time with when HEAD last moved, from the reflog, catches a commit or checkout since it was built, which the commit's own time wouldn't for moving to an older commit. It can't catch changes that were there during a build and then reverted, which is why it's a time and not a guarantee.
+**What "clean" can mean.** A built Storybook may not have been made by Selfie, so nothing records what it came from. Comparing its time with when HEAD last moved, from the reflog, catches a commit or checkout since it was built, which the commit's own time wouldn't for moving to an older commit. It can't catch changes that were there during a build and then reverted, which is why it's a time and not a guarantee.
 
 **A sidebar, as in Storybook.** With the list as a page of its own, moving between stories meant going back to it, and a person who knows Storybook looks left for them. It takes the table's columns with it, so a row says only a story's state and any caveat, and a story's page says the rest.
 

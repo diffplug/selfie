@@ -24,7 +24,7 @@ const matching = (stories: readonly ListedStory[], text: string) => stories.filt
 /** What a render can't be relied on for, in words, or nothing if it can. */
 function renderCaveats({ render }: ListedStory): string {
   if (render === null) return "";
-  return [render.dirty && "Uncommitted changes", render.fromHostedBuild === false && "From another build"].filter(Boolean).join(", ");
+  return [render.dirty && "Uncommitted changes", render.fromHostedStorybook === false && "From another built Storybook"].filter(Boolean).join(", ");
 }
 
 /** Indents a row by how deep it is, as the Storybook's sidebar does. */
@@ -251,7 +251,7 @@ function RenderedStory({
           {entry.render !== null && (
             <Text className="selfie-muted">
               Rendered <RelativeTime date={new Date(entry.render.renderedAt)} />.{entry.render.dirty && " It has uncommitted changes in it."}
-              {entry.render.fromHostedBuild === false && " This image is from another build than the one being hosted."}
+              {entry.render.fromHostedStorybook === false && " This image is from another built Storybook than the one being hosted."}
             </Text>
           )}
         </Stack>

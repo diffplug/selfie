@@ -57,7 +57,7 @@ Selfie is for fully opaque images, and transparency is never allowed: `docs/spec
 |---|---|
 | User accounts and their GitHub tokens, app installations, and which D1 database belongs to each project | Neon Postgres |
 | A project's snapshot metadata | That project's own D1 database |
-| Image bytes, and Storybook builds' files | R2 |
+| Image bytes, and built Storybooks' files | R2 |
 
 - **Never put snapshot metadata in Neon or account data in a project's D1.**
 

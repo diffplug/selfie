@@ -107,15 +107,15 @@ export interface BaselineNote {
 
 export type RunListing = Pick<Run, "id" | "startedAt" | "status" | "dirty">;
 
-/** Where a kept build is, on a hosted Storybook's origin, ending in a slash. Crosses into `selfie-cli` from here. */
-export const keptBuildPath = (build: string) => `/storybook-builds/${build}/`;
+/** Where a kept built Storybook is, on a hosted Storybook's origin, ending in a slash. Crosses into `selfie-cli` from here. */
+export const keptStorybookPath = (build: string) => `/built-storybooks/${build}/`;
 
 /** A Storybook to open a run's stories in, on an origin of its own. */
 export interface StorybookLink {
   /** Ending in a slash. */
   readonly url: string;
   /** Whether it's the very build that rendered this run. If it isn't, a story may not look like its image. */
-  readonly exactBuild: boolean;
+  readonly exactStorybook: boolean;
 }
 
 /** Everything a screen shows about a run, recomputed from `summarizeRun` after every action. */
@@ -123,7 +123,7 @@ export interface RunView {
   readonly run: Run;
   /** Null if there's no built Storybook to host. */
   readonly storybook: StorybookLink | null;
-  /** The kept build of the goldens this run is compared with, or null if there's none. */
+  /** The kept built Storybook of the goldens this run is compared with, or null if there's none. */
   readonly goldenStorybookUrl: string | null;
   /** The size this run's stories rendered at, so a live one lays out as its image did. Null if that wasn't recorded. */
   readonly viewport: { readonly width: number; readonly height: number } | null;
@@ -169,8 +169,8 @@ export interface StoryRenderInfo {
   readonly renderedAt: number;
   /** Recorded with uncommitted changes, so it can't become a golden. */
   readonly dirty: boolean;
-  /** Whether the hosted build rendered it, or null if that's not known. If not, it may be out of date. */
-  readonly fromHostedBuild: boolean | null;
+  /** Whether the hosted built Storybook rendered it, or null if that's not known. If not, it may be out of date. */
+  readonly fromHostedStorybook: boolean | null;
 }
 
 export interface ListedStory {
@@ -185,13 +185,13 @@ export interface ListedStory {
 
 /** What a server that hosts a Storybook can say about it. */
 export interface StorySetup {
-  /** Where it looks for a build, from the Git top level. */
+  /** Where it looks for a built Storybook, from the Git top level. */
   readonly storybookDir: string;
   /** How the config says to build one, if it does. */
   readonly buildCommand: string | null;
   /** What differs from HEAD now, as Git names it, which a render now would be marked with. */
   readonly uncommitted: readonly string[];
-  /** What the hosted build reads as: nothing uncommitted and built since HEAD last moved, or which of those it isn't. Null with no build or commit. */
+  /** What the hosted built Storybook reads as: nothing uncommitted and built since HEAD last moved, or which of those it isn't. Null with no built Storybook or commit. */
   readonly builtFrom: "clean" | "uncommitted" | "before-head" | null;
   /** Renders in the pinned container, and not in this machine's browser. */
   readonly usesDocker: boolean;
@@ -202,7 +202,7 @@ export interface StoriesView {
   readonly head: string | null;
   /** The branch HEAD is on, or null if it's detached. */
   readonly branch: string | null;
-  /** The hosted Storybook as it stands, or null if there's no build there. */
+  /** The hosted Storybook as it stands, or null if there's no built Storybook there. */
   readonly storybookUrl: string | null;
   /** The size a story renders at here now. */
   readonly viewport: { readonly width: number; readonly height: number };
@@ -210,7 +210,7 @@ export interface StoriesView {
   readonly stories: readonly ListedStory[];
   /** The newest finished run at HEAD, to review and accept. */
   readonly newestRunId: string | null;
-  /** Whether this server can render a story when asked, which takes a commit, a build, and a browser to do it with. */
+  /** Whether this server can render a story when asked, which takes a commit, a built Storybook, and a browser to do it with. */
   readonly canRender: boolean;
   /** Null if this server hosts no Storybook. */
   readonly setup: StorySetup | null;

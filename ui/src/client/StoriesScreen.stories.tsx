@@ -18,7 +18,7 @@ const named = (story: string) => {
 const rendered = (story: string, overrides: Partial<NonNullable<ListedStory["render"]>> = {}): ListedStory => ({
   story,
   ...named(story),
-  render: { runId: RUN_ID, state: "unchanged", decision: null, renderedAt: RENDERED_AT, dirty: false, fromHostedBuild: true, ...overrides },
+  render: { runId: RUN_ID, state: "unchanged", decision: null, renderedAt: RENDERED_AT, dirty: false, fromHostedStorybook: true, ...overrides },
 });
 const unrendered = (story: string): ListedStory => ({ story, ...named(story), render: null });
 
@@ -41,7 +41,7 @@ const MIXED = view([
   rendered("components-button--primary", { state: "changed", decision: approved().decision }),
   rendered("components-card--default"),
   rendered("components-list--broken", { state: "failed" }),
-  rendered("components-nav--open", { state: "changed", fromHostedBuild: false }),
+  rendered("components-nav--open", { state: "changed", fromHostedStorybook: false }),
   unrendered("pages-home--default"),
   unrendered("pages-settings--account"),
 ]);
@@ -68,8 +68,8 @@ export const NothingMatches: Story = { args: { view: MIXED, search: "?q=nothing-
 const NOT_RENDERED = [unrendered("components-button--primary"), unrendered("components-button--secondary")];
 const NOT_BUILT = { storybookUrl: null, canRender: false, newestRunId: null, setup: setupOf({ builtFrom: null }) };
 export const SetupNoCommits: Story = { args: { view: view([], { ...NOT_BUILT, head: null }), search: "", renders: rendering({ can: false }) } };
-export const SetupNoBuild: Story = { args: { view: view([], NOT_BUILT), search: "", renders: rendering({ can: false }) } };
-export const SetupNoBuildWithItsCommand: Story = {
+export const SetupNoBuiltStorybook: Story = { args: { view: view([], NOT_BUILT), search: "", renders: rendering({ can: false }) } };
+export const SetupNoBuiltStorybookWithItsCommand: Story = {
   args: { view: view([], { ...NOT_BUILT, setup: setupOf({ builtFrom: null, storybookDir: "ui/storybook-static", buildCommand: "pnpm --filter ui build-storybook" }) }), search: "", renders: rendering({ can: false }) },
 };
 export const SetupNoStories: Story = { args: { view: view([], { newestRunId: null, canRender: false }), search: "", renders: rendering({ can: false }) } };
@@ -80,7 +80,7 @@ export const NothingRenderedNatively: Story = { args: { view: view(NOT_RENDERED,
 export const NothingRenderedWithUncommittedChanges: Story = {
   args: { view: view(NOT_RENDERED, { newestRunId: null, setup: setupOf({ builtFrom: "uncommitted", uncommitted: ["src/Button.tsx", "src/Card.tsx", "storybook-static/", "README.md", "package.json"] }) }), search: "", renders: rendering() },
 };
-export const NoBuild: Story = { args: { view: view([rendered("components-card--default")], { storybookUrl: null, canRender: false, setup: null }), search: "", renders: rendering({ can: false }) } };
+export const NoBuiltStorybook: Story = { args: { view: view([rendered("components-card--default")], { storybookUrl: null, canRender: false, setup: null }), search: "", renders: rendering({ can: false }) } };
 export const RenderingTheRest: Story = { args: { view: MIXED, search: "", renders: rendering({ rendering: 3 }) } };
 export const RenderFailed: Story = { args: { view: MIXED, search: "", renders: rendering({ error: FAILED }) } };
 export const NotRendered: Story = {

@@ -4,8 +4,8 @@ import { newestRenders, type Comparison, type DecisionKind, type Run } from "sel
 import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
 import { isBuiltStorybook } from "selfie-ui/local";
-import { keptBuildPath } from "selfie-ui/api";
-import { buildHash, readStoriesInOrder, readStoryIndex } from "selfie-render";
+import { keptStorybookPath } from "selfie-ui/api";
+import { storybookHash, readStoriesInOrder, readStoryIndex } from "selfie-render";
 import type { AcceptOutcome, DecisionTarget, FeedbackView, NewNote, ReviewSource, RunView, SnapshotRow, StoriesView, StorybookLink, StorySetup } from "selfie-ui/app";
 import { resolveRenderSettings, resolveRegionMergeDistance } from "./config.ts";
 import { accept, checkAccept, decide } from "./decisions.ts";
@@ -35,9 +35,9 @@ export function localReviewSource(
   // `selfie record` isn't held to this: each render has a directory of its own.
   let rendering = false;
 
-  /** Hashing a whole build is too slow for every read of a page, and any change to it changes a file's time or size. */
-  let knownBuild: { readonly stamp: string; readonly hash: Promise<string | null> } | null = null;
-  const hostedBuild = async (dir: string): Promise<string | null> => {
+  /** Hashing a whole built Storybook is too slow for every read of a page, and any change to it changes a file's time or size. */
+  let knownStorybook: { readonly stamp: string; readonly hash: Promise<string | null> } | null = null;
+  const hostedStorybook = async (dir: string): Promise<string | null> => {
     const files = (await readdir(dir, { recursive: true, withFileTypes: true }).catch(() => [])).filter((entry) => entry.isFile());
     const stats = await Promise.all(files.map(async (entry) => {
       const file = path.join(entry.parentPath, entry.name);
@@ -45,11 +45,11 @@ export function localReviewSource(
       return `${file}:${mtimeMs}:${size}`;
     }));
     const stamp = stats.sort().join();
-    if (knownBuild?.stamp !== stamp) knownBuild = { stamp, hash: buildHash(dir) };
-    return knownBuild.hash;
+    if (knownStorybook?.stamp !== stamp) knownStorybook = { stamp, hash: storybookHash(dir) };
+    return knownStorybook.hash;
   };
 
-  // Nothing says what a build was built from, since it may not have been built by Selfie. A build
+  // Nothing says what a built Storybook was built from, since it may not have been built by Selfie. A built Storybook
   // newer than HEAD's last move can only have come from this commit or from changes made since.
   const builtBeforeHead = async (dir: string): Promise<boolean> => {
     const moved = await headMovedAt(repo);
@@ -57,18 +57,18 @@ export function localReviewSource(
   };
 
   const keptStorybookUrl = async (runId: string): Promise<string | null> => {
-    const kept = storybook === undefined ? null : await project.builds.keptBuildOfRun(runId);
-    return kept === null ? null : new URL(keptBuildPath(kept), storybook!.url).href;
+    const kept = storybook === undefined ? null : await project.storybooks.keptStorybookOfRun(runId);
+    return kept === null ? null : new URL(keptStorybookPath(kept), storybook!.url).href;
   };
 
   /** The very build that rendered a run, if that's kept, or else the directory as it stands. */
   const storybookFor = async (runId: string): Promise<StorybookLink | null> => {
     const kept = await keptStorybookUrl(runId);
-    if (kept !== null) return { url: kept, exactBuild: true };
-    return storybook !== undefined && isBuiltStorybook(storybook.dir) ? { url: storybook.url, exactBuild: false } : null;
+    if (kept !== null) return { url: kept, exactStorybook: true };
+    return storybook !== undefined && isBuiltStorybook(storybook.dir) ? { url: storybook.url, exactStorybook: false } : null;
   };
 
-  /** The kept build of the goldens a run is compared with. Never the directory, which wouldn't be them. */
+  /** The kept built Storybook of the goldens a run is compared with. Never the directory, which wouldn't be them. */
   const goldenStorybookFor = async ({ environment }: Run, sha: string | null): Promise<string | null> => {
     const goldens = sha === null ? null : await snapshots.acceptedRunAt(sha, environment);
     return goldens === null ? null : keptStorybookUrl(goldens);
@@ -103,7 +103,7 @@ export function localReviewSource(
       run,
       storybook: await storybookFor(run.id),
       goldenStorybookUrl: await goldenStorybookFor(run, onBranch ?? run.baselineSha),
-      viewport: await project.builds.viewportOf(run.environment),
+      viewport: await project.storybooks.viewportOf(run.environment),
       branchGoldens: onBranch,
       regionMergeDistance: await resolveRegionMergeDistance(repo),
       acceptedRunId: await snapshots.acceptedRunAt(run.gitSha, run.environment),
@@ -193,7 +193,7 @@ export function localReviewSource(
       const finished = runs.filter(({ status }) => status !== "recording");
       const built = storybook !== undefined && isBuiltStorybook(storybook.dir);
       const index = built ? await readStoriesInOrder(storybook.dir) : [];
-      const hosted = built ? await hostedBuild(storybook.dir) : null;
+      const hosted = built ? await hostedStorybook(storybook.dir) : null;
 
       // Runs at one commit all find the same goldens on its branch, and finding them takes Git.
       let onBranch: Promise<string | null> | undefined;
@@ -205,7 +205,7 @@ export function localReviewSource(
 
       const builds = new Map<string, string | null>();
       const buildOf = async (runId: string) => {
-        if (!builds.has(runId)) builds.set(runId, await project.builds.buildOfRun(runId));
+        if (!builds.has(runId)) builds.set(runId, await project.storybooks.storybookOfRun(runId));
         return builds.get(runId)!;
       };
       const listed = index.length > 0 ? index : [...renders.keys()].sort().map((id) => ({ id, title: "", name: id }));
@@ -230,7 +230,7 @@ export function localReviewSource(
                 decision: row.decision,
                 renderedAt: run.startedAt,
                 dirty: run.dirty,
-                fromHostedBuild: hosted === null || build === null ? null : build === hosted,
+                fromHostedStorybook: hosted === null || build === null ? null : build === hosted,
               },
             };
           }),

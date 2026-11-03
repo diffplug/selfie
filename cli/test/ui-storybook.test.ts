@@ -21,7 +21,7 @@ describe("the hosted Storybook", () => {
     await writeFile(path.join(dir, "assets", "story.js"), "export {};");
   };
 
-  const storybook = () => createStorybookApp({ dir, port: () => STORYBOOK_PORT, readBuildFile: (build, file) => project.builds.readFile(build, file), reviewOrigins: () => [ORIGIN] });
+  const storybook = () => createStorybookApp({ dir, port: () => STORYBOOK_PORT, readStorybookFile: (build, file) => project.storybooks.readFile(build, file), reviewOrigins: () => [ORIGIN] });
   const read = (url: string, host = `127.0.0.1:${STORYBOOK_PORT}`) => storybook().request(url, { headers: { host } });
 
   beforeEach(() => {
@@ -81,7 +81,7 @@ describe("the hosted Storybook", () => {
 
   test("the review API refuses a story's page, since it's another origin", async () => {
     await built();
-    const hosted = await serveStorybook({ dir, readBuildFile: async () => null, reviewOrigins: () => [] });
+    const hosted = await serveStorybook({ dir, readStorybookFile: async () => null, reviewOrigins: () => [] });
     const server = await serveLocal({ source: localReviewSource(project), port: 0, clientDir });
     try {
       expect(new URL(hosted.url).port).not.toBe(String(server.port));
@@ -93,29 +93,29 @@ describe("the hosted Storybook", () => {
     }
   });
 
-  describe("a kept build", () => {
+  describe("a kept built Storybook", () => {
     const hash = "a".repeat(64);
     const kept = async () => {
       const files = [
-        { path: "index.html", fileHash: await project.builds.putFile(new TextEncoder().encode("<!doctype html><title>kept</title>")) },
-        { path: "assets/a b.js", fileHash: await project.builds.putFile(new TextEncoder().encode("export {};")) },
+        { path: "index.html", fileHash: await project.storybooks.putFile(new TextEncoder().encode("<!doctype html><title>kept</title>")) },
+        { path: "assets/a b.js", fileHash: await project.storybooks.putFile(new TextEncoder().encode("export {};")) },
       ];
-      await project.builds.putBuild(hash, files);
+      await project.storybooks.putStorybook(hash, files);
     };
 
     test("serves its files, and a browser may keep them", async () => {
       await kept();
-      const page = await read(`/storybook-builds/${hash}/`);
+      const page = await read(`/built-storybooks/${hash}/`);
       expect(await page.text()).toContain("kept");
       expect(page.headers.get("content-type")).toContain("text/html");
       expect(page.headers.get("cache-control")).toContain("immutable");
       expect(page.headers.get("content-security-policy")).toBe(`frame-ancestors 'self' ${ORIGIN}`);
-      const script = await read(`/storybook-builds/${hash}/assets/a%20b.js`);
+      const script = await read(`/built-storybooks/${hash}/assets/a%20b.js`);
       expect(await script.text()).toBe("export {};");
       expect(script.headers.get("content-type")).toContain("javascript");
     });
 
-    test.each(["/storybook-builds/nope/", `/storybook-builds/${"b".repeat(64)}/`, `/storybook-builds/${hash}/missing.js`, `/storybook-builds/${hash}/..%2f..%2fsecret.txt`, `/storybook-builds/${hash}/%ff`])(
+    test.each(["/built-storybooks/nope/", `/built-storybooks/${"b".repeat(64)}/`, `/built-storybooks/${hash}/missing.js`, `/built-storybooks/${hash}/..%2f..%2fsecret.txt`, `/built-storybooks/${hash}/%ff`])(
       "has no such thing as %s",
       async (url) => {
         await kept();
@@ -125,8 +125,8 @@ describe("the hosted Storybook", () => {
 
     test("answers only to its own loopback address, and is only to read", async () => {
       await kept();
-      expect((await read(`/storybook-builds/${hash}/`, "evil.example")).status).toBe(403);
-      const post = await storybook().request(`/storybook-builds/${hash}/`, { method: "POST", headers: { host: `127.0.0.1:${STORYBOOK_PORT}` } });
+      expect((await read(`/built-storybooks/${hash}/`, "evil.example")).status).toBe(403);
+      const post = await storybook().request(`/built-storybooks/${hash}/`, { method: "POST", headers: { host: `127.0.0.1:${STORYBOOK_PORT}` } });
       expect(post.status).toBe(405);
     });
   });
@@ -162,7 +162,7 @@ describe("the hosted Storybook", () => {
       const partial = await recorded("--story", "b");
       const renders = await rendersOf();
       expect(renders.a).toMatchObject({ runId: whole, state: "new" });
-      expect(renders.b).toMatchObject({ runId: partial, state: "new", fromHostedBuild: true, dirty: false });
+      expect(renders.b).toMatchObject({ runId: partial, state: "new", fromHostedStorybook: true, dirty: false });
       expect(renders.c).toMatchObject({ runId: whole });
       expect((await live()).newestRunId).toBe(partial);
     });
@@ -199,14 +199,14 @@ describe("the hosted Storybook", () => {
       h.stories = [{ id: "a" }];
       await review();
       await withStories("a");
-      expect((await rendersOf()).a).toMatchObject({ fromHostedBuild: null });
+      expect((await rendersOf()).a).toMatchObject({ fromHostedStorybook: null });
     });
 
     test("notices any file of the build changing, not only its index", async () => {
       await withStories("a");
       await recorded();
       const source = localReviewSource(project, { storybook: { dir, url: hostedAt } });
-      const fromHosted = async () => (await source.storiesView()).stories[0]!.render?.fromHostedBuild;
+      const fromHosted = async () => (await source.storiesView()).stories[0]!.render?.fromHostedStorybook;
       expect(await fromHosted()).toBe(true);
       await writeFile(path.join(dir, "assets", "story.js"), "export const changed = true;");
       expect(await fromHosted()).toBe(false);
@@ -216,10 +216,10 @@ describe("the hosted Storybook", () => {
       await withStories("a");
       await recorded();
       await writeFile(path.join(dir, "assets", "story.js"), "export const changed = true;");
-      expect((await rendersOf()).a).toMatchObject({ fromHostedBuild: false, dirty: false });
+      expect((await rendersOf()).a).toMatchObject({ fromHostedStorybook: false, dirty: false });
       await writeFile(path.join(h.repo, "file.txt"), "uncommitted\n");
       await recorded();
-      expect((await rendersOf()).a).toMatchObject({ fromHostedBuild: true, dirty: true });
+      expect((await rendersOf()).a).toMatchObject({ fromHostedStorybook: true, dirty: true });
     });
 
     test("carries a decision on the image, which can go with it into a clean run", async () => {
@@ -377,14 +377,14 @@ describe("the hosted Storybook", () => {
     test("the directory, and that it may not match, for a run whose own build wasn't kept", async () => {
       const runId = (await review()).json.runId as string;
       await built();
-      expect(await linkOf(runId)).toEqual({ url: hostedAt, exactBuild: false });
+      expect(await linkOf(runId)).toEqual({ url: hostedAt, exactStorybook: false });
     });
 
     test("the very build that rendered it, wherever the directory has gone since", async () => {
       await built();
       const runId = await reviewedBuild();
       const link = await linkOf(runId);
-      expect(link).toMatchObject({ exactBuild: true, url: expect.stringContaining(`${hostedAt}storybook-builds/`) });
+      expect(link).toMatchObject({ exactStorybook: true, url: expect.stringContaining(`${hostedAt}built-storybooks/`) });
       await writeFile(path.join(dir, "index.html"), "<!doctype html><title>the next build</title>");
       expect(await linkOf(runId)).toEqual(link);
       expect(await (await read(new URL(link!.url).pathname)).text()).toContain("the manager");
@@ -397,10 +397,10 @@ describe("the hosted Storybook", () => {
       await commit(h.repo, "something that doesn't change the build");
       const reused = await reviewedBuild();
       expect(reused).not.toBe(first);
-      expect((await linkOf(reused))?.exactBuild).toBe(true);
-      expect((await linkOf(await reviewedBuild("--story", "a")))?.exactBuild).toBe(true);
+      expect((await linkOf(reused))?.exactStorybook).toBe(true);
+      expect((await linkOf(await reviewedBuild("--story", "a")))?.exactStorybook).toBe(true);
       h.stories = [{ id: "a", failed: "it threw" }, { id: "b" }];
-      expect((await linkOf(await reviewedBuild()))?.exactBuild).toBe(true);
+      expect((await linkOf(await reviewedBuild()))?.exactStorybook).toBe(true);
     });
 
     test("the goldens' own build too, if it's kept, once a later run is compared with them", async () => {
@@ -429,7 +429,7 @@ describe("the hosted Storybook", () => {
     test("not a build that changed while it rendered", async () => {
       await built();
       h.onRender = () => writeFileSync(path.join(dir, "index.json"), '{"changed":true}');
-      expect((await linkOf(await reviewedBuild()))?.exactBuild).toBe(false);
+      expect((await linkOf(await reviewedBuild()))?.exactStorybook).toBe(false);
     });
   });
 });

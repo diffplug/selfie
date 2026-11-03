@@ -31,7 +31,7 @@ function Item({ mark, title, children }: { mark: Mark; title: ReactNode; childre
   );
 }
 
-function NoBuild({ setup: { storybookDir, buildCommand } }: { setup: StorySetup }) {
+function NoBuiltStorybook({ setup: { storybookDir, buildCommand } }: { setup: StorySetup }) {
   const config = JSON.stringify({ storybookDir, buildCommand: DEFAULT_BUILD }, null, 2);
   return (
     <Stack gap="condensed">
@@ -87,7 +87,7 @@ function Uncommitted({ head, setup: { uncommitted, storybookDir } }: { head: str
           {uncommitted.some((file) => isInside(file, storybookDir)) && (
             <>
               {" "}
-              Your build is one of them: add <code>{storybookDir}</code> to <code>.gitignore</code>.
+              Your built Storybook is one of them: add <code>{storybookDir}</code> to <code>.gitignore</code>.
             </>
           )}
         </>
@@ -96,9 +96,9 @@ function Uncommitted({ head, setup: { uncommitted, storybookDir } }: { head: str
   );
 }
 
-function BuildItem({ view, setup }: { view: StoriesView; setup: StorySetup | null }) {
+function StorybookItem({ view, setup }: { view: StoriesView; setup: StorySetup | null }) {
   const count = plural(view.stories.length, "story", "stories");
-  if (view.storybookUrl === null) return <Item mark="todo" title="No built Storybook">{setup !== null && <NoBuild setup={setup} />}</Item>;
+  if (view.storybookUrl === null) return <Item mark="todo" title="No built Storybook">{setup !== null && <NoBuiltStorybook setup={setup} />}</Item>;
   if (view.stories.length === 0) {
     return (
       <Item mark="todo" title="Built Storybook with no stories">
@@ -122,7 +122,7 @@ function BuildItem({ view, setup }: { view: StoriesView; setup: StorySetup | nul
     return (
       <Item mark="warn" title={`Built Storybook from before this commit, with ${count}`}>
         <Text as="p">
-          Build it again with <code>{setup.buildCommand ?? DEFAULT_BUILD}</code>, and {MOVES_ON}. A render now would show the older build.
+          Build it again with <code>{setup.buildCommand ?? DEFAULT_BUILD}</code>, and {MOVES_ON}. A render now would show the older built Storybook.
         </Text>
       </Item>
     );
@@ -131,7 +131,7 @@ function BuildItem({ view, setup }: { view: StoriesView; setup: StorySetup | nul
 }
 
 /** Whether a render is missing or known to be out of date, which is what's left to fan out to. */
-const needsRender = ({ render }: ListedStory) => render === null || render.fromHostedBuild === false;
+const needsRender = ({ render }: ListedStory) => render === null || render.fromHostedStorybook === false;
 
 const fullName = ({ title, name }: ListedStory) => [...(title === "" ? [] : title.split("/")), name].join(" / ");
 
@@ -173,7 +173,7 @@ function RendersItem({ view, setup, renders }: { view: StoriesView; setup: Story
   return (
     <Item
       mark={rest.length === 0 ? "done" : "todo"}
-      title={`${rendered.toLocaleString()} of ${plural(view.stories.length, "story", "stories")} rendered${stale > 0 ? `, ${stale.toLocaleString()} from another build` : ""}`}
+      title={`${rendered.toLocaleString()} of ${plural(view.stories.length, "story", "stories")} rendered${stale > 0 ? `, ${stale.toLocaleString()} from another built Storybook` : ""}`}
     >
       <Stack direction="horizontal" align="center" gap="condensed" wrap="wrap">
         {renders.can && rest.length > 0 && (
@@ -213,7 +213,7 @@ export function Checklist({ view, renders, recheck }: { view: StoriesView; rende
           }
         />
       )}
-      <BuildItem view={view} setup={setup} />
+      <StorybookItem view={view} setup={setup} />
       <RendersItem view={view} setup={setup} renders={renders} />
     </ul>
   );

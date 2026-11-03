@@ -28,7 +28,7 @@
 
 **A dirty run is recorded, not refused.** Rendering uncommitted work is the point of the loop. It can be compared and approved, and [`accept`](#accept) is where it stops.
 
-**A gitignored build isn't dirty.** It usually is ignored, so counting it would make every review dirty. The cost is the [open question](cli.md#open-questions) about stale builds.
+**A gitignored built Storybook isn't dirty.** It usually is ignored, so counting it would make every review dirty. The cost is the [open question](cli.md#open-questions) about stale builds.
 
 **`--baseline` exits 1 on any difference.** Blockers answer "what stops accepting this run", and two runs that differ can have every image approved. Someone looking for flakiness is asking what differs.
 
@@ -129,7 +129,7 @@ The exit 0 row lists dormouse's 2 `play` errors as advisories. Render is most of
 
 ## Recording only if necessary
 
-**Measured 2026-11**, as in [End to end](#end-to-end), in the real container, on a scratch repository and a new store. On a reused run, "render" is hashing the build and reading the earlier run's rows, about 20 ms for 333 files and 12 MB, so a build many times this size still costs little beside a render.
+**Measured 2026-11**, as in [End to end](#end-to-end), in the real container, on a scratch repository and a new store. On a reused run, "render" is hashing the built Storybook and reading the earlier run's rows, about 20 ms for 333 files and 12 MB, so a built Storybook many times this size still costs little beside a render.
 
 | 541-story review | Exit | Wall | Render | Store | Diff |
 |---|---|---|---|---|---|
@@ -138,7 +138,7 @@ The exit 0 row lists dormouse's 2 `play` errors as advisories. Render is most of
 | Same SHA, all still new, reused, twice | 1 | 0.38 s, 0.35 s | 20 ms, 20 ms | 37 ms, 37 ms | 57 ms, 54 ms |
 | New commit, nothing changed, reused, twice | 0 | 0.25 s, 0.25 s | 21 ms, 20 ms | 16 ms, 16 ms | 1 ms, 1 ms |
 | One byte of CSS, 80 stories changed | 1 | 70.2 s | 64.0 s | 4.8 s | 1,130 ms |
-| That build again, reused | 1 | 1.36 s | 22 ms | 15 ms | 1,086 ms |
+| That built Storybook again, reused | 1 | 1.36 s | 22 ms | 15 ms | 1,086 ms |
 | Filtered to 30, answered from the whole run, twice | 0 | 0.25 s, 0.26 s | 23 ms, 22 ms | 12 ms, 13 ms | 1 ms, 1 ms |
 | Filtered to 30, `--no-reuse`, to compare | 0 | 5.3 s | 4.8 s | 280 ms | 1 ms |
 
@@ -155,21 +155,21 @@ The estimate here was about 0.5 s, and the feature came in at about 0.25 s of wa
 | A minimal project, Storybook 10.6.5 and Vite 7.3.7: same directory, with `node_modules/.cache` cleared, and in a second directory with its own install | 4 | `project.json`'s `generatedAt`, every time |
 | A copy of dormouse, Storybook 11.0.0-alpha.6 and Vite 8, 326 files and 546 stories, four of them with caches cleared | 6 | `project.json`'s `generatedAt`, every time. `manifests/components.html`'s `Generation took <strong>0.0s</strong>`, which read `0.1s` in some of them |
 
-Without leaving these out, every build hashed differently and the feature would never have hit on rebuilt output. With them left out, all 4 and all 6 hash the same. In the real loop, `selfie review --build-command` running a real Storybook build of that copy reused the first render on every rebuild, including with its caches cleared, in about 3 s, of which about 2.8 s is the build. A one-line change to the copy's `.storybook/preview.css` rendered again, and putting it back reused the first render. That loop was measured before `docs/specs/render.md` → Render identity took over this hash, which kept the same exclusions.
+Without leaving these out, every built Storybook hashed differently and the feature would never have hit on rebuilt output. With them left out, all 4 and all 6 hash the same. In the real loop, `selfie review --build-command` running a real build of that copy reused the first render on every rebuild, including with its caches cleared, in about 3 s, of which about 2.8 s is the built Storybook. A one-line change to the copy's `.storybook/preview.css` rendered again, and putting it back reused the first render. That loop was measured before `docs/specs/render.md` → Render identity took over this hash, which kept the same exclusions.
 
-**Why those two can't change pixels.** The worker only answers what the browser asks for, and no other file in either build names `project.json` or `manifests/components.html`, so no story loads them unless its own code fetches that path. So only those two exact pieces of text are left out, and the rest of both files still counts: a different `storybookVersion` in `project.json` misses, and so does the same text in any other file. If Storybook changes either format, the text stops matching and every build misses, which costs a render and nothing else.
+**Why those two can't change pixels.** The worker only answers what the browser asks for, and no other file in either build names `project.json` or `manifests/components.html`, so no story loads them unless its own code fetches that path. So only those two exact pieces of text are left out, and the rest of both files still counts: a different `storybookVersion` in `project.json` misses, and so does the same text in any other file. If Storybook changes either format, the text stops matching and every built Storybook misses, which costs a render and nothing else.
 
 **What this doesn't cover.** These are one machine's builds. A different machine doesn't share a local store anyway. `project.json`'s `userSince` didn't vary here, and would if Storybook's user cache were cleared, which would miss once. Webpack builds and builds with telemetry on weren't measured. A project whose build embeds its own timestamp or a Git SHA will miss every time it rebuilds: reuse then still helps when a build isn't rerun, and is otherwise no worse than rendering.
 
-**All or nothing per build.** Knowing which stories a file can reach would take the build's module graph, and a wrong answer replays pixels a real render wouldn't produce.
+**All or nothing per build.** Knowing which stories a file can reach would take the built Storybook's module graph, and a wrong answer replays pixels a real render wouldn't produce.
 
-**A failure is never replayed.** A story that timed out under load would otherwise fail forever on a build nobody changed, and the only way out would be a flag the agent has no reason to try. Only one more render is at stake.
+**A failure is never replayed.** A story that timed out under load would otherwise fail forever on a built Storybook nobody changed, and the only way out would be a flag the agent has no reason to try. Only one more render is at stake.
 
-**Which errors may be reused.** On dormouse's 541 stories, a real render's only errors were 2 `play` and the 2 `console` lines those same failures log. `play`, `console`, and `page` come from the project's own code, the same build repeats them, and none of them fails a story. `request` and the soft network `timeout` aren't reused: both can come from load, and neither is visible afterward, since a row doesn't record them. An allowed list means a new source starts out unreusable. The cost is that a project whose page always makes a failing off-origin request never reuses, and stderr names the story and the error. A `play` failure that depends on load is replayed too, which is a real gap: it stays listed as an advisory, and `--no-reuse` measures it again.
+**Which errors may be reused.** On dormouse's 541 stories, a real render's only errors were 2 `play` and the 2 `console` lines those same failures log. `play`, `console`, and `page` come from the project's own code, the same built Storybook repeats them, and none of them fails a story. `request` and the soft network `timeout` aren't reused: both can come from load, and neither is visible afterward, since a row doesn't record them. An allowed list means a new source starts out unreusable. The cost is that a project whose page always makes a failing off-origin request never reuses, and stderr names the story and the error. A `play` failure that depends on load is replayed too, which is a real gap: it stays listed as an advisory, and `--no-reuse` measures it again.
 
-**A filter is answered only from a whole run.** A whole run holds every answer, and a filtered render is at most a few seconds, so it isn't worth a second key to remember one. On the 30-story sample a hit takes 0.25 s against 5.3 s, once a whole run of that build exists.
+**A filter is answered only from a whole run.** A whole run holds every answer, and a filtered render is at most a few seconds, so it isn't worth a second key to remember one. On the 30-story sample a hit takes 0.25 s against 5.3 s, once a whole run of that built Storybook exists.
 
-**A run's build isn't `render_keys`.** Those keys say what a later review may skip rendering, so they hold only a build's newest reusable render, and forget reused, filtered, and failed runs. `selfie ui` asked them first, and called all of those a different build. So a run says for itself, by a hash of the build's own files, since the environment and the renderer's code don't change whether a story's page is the one in the image.
+**A run's built Storybook isn't `render_keys`.** Those keys say what a later review may skip rendering, so they hold only a built Storybook's newest reusable render, and forget reused, filtered, and failed runs. `selfie ui` asked them first, and called all of those a different build. So a run says for itself, by a hash of the built Storybook's own files, since the environment and the renderer's code don't change whether a story's page is the one in the image.
 
 **Provenance is on the run, and the key is local.** `reused_from_run` is a fact about the run, which `accept`, the UI, and later `trust` all want, so it's read with the run, with no second lookup. `render_keys` is only what this machine rendered, which nothing in the cloud needs. It must outlive a pruned `review.json`, and in `store.db` it lives and dies with the runs it names. After 15 runs here it held 2 rows.
 
@@ -181,7 +181,7 @@ Without leaving these out, every build hashed differently and the feature would 
 
 **The newest real render wins.** Pointing a key at the newest reused run would let `reusedFromRun` name a run that rendered nothing, so reuse never chains. Forgetting a key after a bad render means `--no-reuse` can't uncover a deterministic failure only to have the next review hide it behind an older pass.
 
-**What a reused run can't change.** It's still only as good as its build. A clean tree with a stale gitignored build records stale pixels against the new SHA whether or not it renders, so reuse neither fixes nor worsens [that open question](cli.md#open-questions).
+**What a reused run can't change.** It's still only as good as its built Storybook. A clean tree with a stale gitignored build records stale pixels against the new SHA whether or not it renders, so reuse neither fixes nor worsens [that open question](cli.md#open-questions).
 
 **What a diff cache would save.** A reused run with 80 changes spent 1,086 ms of its 1.36 s on diffs it had already computed, about 13 ms a story, which is why it stays in `docs/specs/cli.md` → Future.
 
@@ -189,6 +189,6 @@ Without leaving these out, every build hashed differently and the feature would 
 
 ## selfie alone
 
-**Building only on the way up.** Later builds are the agent's own, with `--build`, since a page must not be able to run a shell. The config is read first, since a bad one would otherwise cost a whole build to find out.
+**Building only on the way up.** Later builds are the agent's own, with `--build`, since a page must not be able to run a shell. The config is read first, since a bad one would otherwise cost a whole built Storybook to find out.
 
 **Opening a browser here, and not from `selfie ui`.** `selfie` alone is what a person types to look at something. `selfie ui` is also what an agent runs, and a browser opening on it would be a surprise. A terminal is what tells a person from the rest.

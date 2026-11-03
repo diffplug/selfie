@@ -33,8 +33,8 @@ A `RenderEnvironment` is a typed object:
 
 Source of truth: `render/src/render.ts`, `render/src/runners.ts`, `render/src/worker/worker.ts`; tests in `render/test/render.container.test.ts`, `render/test/container-args.test.ts`, with the fixture in `render/test/fixtures/storybook/`.
 
-- **Must render the `type: "story"` entries of the build's `index.json`, sorted by ID.** Docs entries are never rendered. A filter is a list of ID patterns where `*` matches any run of characters. A pattern that matches nothing is a manifest warning.
-- **Must answer every browser request in the worker, from the build directory, on the recipe's fixed origin.** No server listens. A path outside the build or missing from it gets a 404. The same worker runs in both runners, so the only difference between them is where it runs.
+- **Must render the `type: "story"` entries of the built Storybook's `index.json`, sorted by ID.** Docs entries are never rendered. A filter is a list of ID patterns where `*` matches any run of characters. A pattern that matches nothing is a manifest warning.
+- **Must answer every browser request in the worker, from the built Storybook directory, on the recipe's fixed origin.** No server listens. A path outside the built Storybook or missing from it gets a 404. The same worker runs in both runners, so the only difference between them is where it runs.
 - **Must abort any request that leaves the origin, in both runners.** It is reported on the story and doesn't fail it.
 - **Must check the runner before clearing any output:** a native environment against this machine, and for a container, Docker and the image on the declared platform, pulling it once if absent. That check compares the OS and architecture `docker image inspect` reports with the declared platform (rationale), so a digest for another platform is refused, and so is a multi-platform digest unless the declared platform is the host's. **Must use a single-platform digest for any other platform.**
 - **Must run a container with no network, no capabilities, a read-only root, read-only mounts except the output directory, a non-root user, and only `HOME` in its environment.** Never pass credentials or the host's environment into it. It runs by digest with `--pull=never`, so it works offline once pulled and can't use a different image.
@@ -74,7 +74,7 @@ Source of truth: `render/src/manifest.ts`; tests in `render/test/manifest.test.t
 | `stories[]` | `id`, `title`, `name`, `status`, `file`, `width`, `height`, `pngSha256`, `errors`, `durationMs` |
 
 - **Must write file paths relative to the manifest.** `file` is null on a failed story.
-- **Must name a story's file `encodeURIComponent(id) + ".png"`**, since an ID comes from the build and may hold `/`.
+- **Must name a story's file `encodeURIComponent(id) + ".png"`**, since an ID comes from the built Storybook and may hold `/`.
 - **`pngSha256` is not the image hash**, which `docs/specs/store.md` → Image identity defines over decoded pixels.
 - **Must report a play function failure under the source `play`, from Storybook's `playFunctionThrewException` channel event, and keep `status: "ok"`**, since the story still rendered and has an image. The console error it also logs stays under `console`. `selfie review` lists the story as needing attention (`docs/specs/cli.md` → What blocks).
 - **May report other `errors` on an `ok` story:** console errors, page errors, and failed requests that didn't stop the render. Each has a `source`: `render`, `timeout`, `play`, `page`, `console`, `request`, or `worker`. A story keeps at most 20, each cut to 400 characters.
@@ -83,26 +83,26 @@ Source of truth: `render/src/manifest.ts`; tests in `render/test/manifest.test.t
 
 Source of truth: `render/src/identity.ts`; tests in `render/test/identity.test.ts`.
 
-`buildHash(storybookDir, onFile?)` returns a SHA256 of a build alone, or null if it's missing or holds a symlink, for naming the build that rendered a run. `onFile` sees the bytes it hashes. `renderIdentity({ storybookDir, environment, initScript })` returns one string that changes whenever a render of that build could change, for `docs/specs/cli.md` → Recording only if necessary to recognize it by. It lives beside `render`, so a new render option that can change pixels sits next to what it has to update.
+`storybookHash(storybookDir, onFile?)` returns a SHA256 of a built Storybook alone, or null if it's missing or holds a symlink, for naming the built Storybook that rendered a run. `onFile` sees the bytes it hashes. `renderIdentity({ storybookDir, environment, initScript })` returns one string that changes whenever a render of that built Storybook could change, for `docs/specs/cli.md` → Recording only if necessary to recognize it by. It lives beside `render`, so a new render option that can change pixels sits next to what it has to update.
 
 - **Must depend on all of these, so that any one changing changes the identity:**
 
 | Input | From |
 |---|---|
-| The build | A SHA256 of every file's relative path and bytes, sorted by path. **Never use a file's size or time** |
+| The built Storybook | A SHA256 of every file's relative path and bytes, sorted by path. **Never use a file's size or time** |
 | The environment | Its ID |
 | The init script | Its SHA256, or nothing if there's none. An empty script isn't no script |
 | The renderer | A SHA256 of the package's own source, so a change to render code or a default such as `settleMs` changes it in a checkout, where the package's version never changes |
 
-- **Must leave out of the build's hash exactly this text, of exactly these files, and nothing by a pattern over paths**, since it differs between builds of one source, and nothing in a build loads these files (`docs/specs/cli.rationale.md` → Recording only if necessary):
+- **Must leave out of the built Storybook's hash exactly this text, of exactly these files, and nothing by a pattern over paths**, since it differs between builds of one source, and nothing in a built Storybook loads these files (`docs/specs/cli.rationale.md` → Recording only if necessary):
 
-| File, from the build's root | Text |
+| File, from the built Storybook's root | Text |
 |---|---|
 | `project.json` | A leading `{"generatedAt":<digits>,` |
 | `manifests/components.html` | The first `Generation took <strong><number>s</strong>` |
 
 - **Must return null for a native environment**, since its ID doesn't describe everything about its machine.
-- **Must return null for a build holding anything but files and directories**, since what a symlink reaches isn't in its hash, and for one that's missing.
+- **Must return null for a built Storybook holding anything but files and directories**, since what a symlink reaches isn't in its hash, and for one that's missing.
 
 ## API
 

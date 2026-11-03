@@ -131,7 +131,7 @@ export function AcceptScreen({ state, view }: { state: RunState; view: RunView }
           title="This run didn't render"
           description={
             <>
-              <ReusedPixels from={run.reusedFromRun} /> The build hadn't changed, so nothing rendered at <code>{shortSha(run.gitSha)}</code>.
+              <ReusedPixels from={run.reusedFromRun} /> The built Storybook hadn't changed, so nothing rendered at <code>{shortSha(run.gitSha)}</code>.
             </>
           }
         />

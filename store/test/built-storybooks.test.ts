@@ -1,29 +1,29 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { Blobs, initStoreSchema, StorybookBuilds, type BlobStorage } from "../src/core/index.ts";
+import { Blobs, initStoreSchema, BuiltStorybooks, type BlobStorage } from "../src/core/index.ts";
 import { createTempStore } from "./support/temp-store.ts";
 
 const BUILD = "a".repeat(64);
 const OTHER = "b".repeat(64);
 const text = (value: string) => new TextEncoder().encode(value);
 
-describe("StorybookBuilds", () => {
+describe("BuiltStorybooks", () => {
   let temp: Awaited<ReturnType<typeof createTempStore>>;
-  let builds: StorybookBuilds;
+  let builds: BuiltStorybooks;
 
   beforeEach(async () => {
     temp = await createTempStore();
-    builds = new StorybookBuilds({ sql: temp.sql, blob: temp.blob });
+    builds = new BuiltStorybooks({ sql: temp.sql, blob: temp.blob });
   });
   afterEach(() => temp.destroy());
 
   const keep = async (build: string, files: Record<string, string>) => {
-    await builds.putBuild(
+    await builds.putStorybook(
       build,
       await Promise.all(Object.entries(files).map(async ([path, body]) => ({ path, fileHash: await builds.putFile(text(body)) }))),
     );
   };
 
-  it("gives back each file of a kept build", async () => {
+  it("gives back each file of a kept built Storybook", async () => {
     await keep(BUILD, { "index.html": "page", "assets/a.js": "script" });
     expect(await builds.has(BUILD)).toBe(true);
     expect(await builds.readFile(BUILD, "assets/a.js")).toEqual(text("script"));
@@ -41,7 +41,7 @@ describe("StorybookBuilds", () => {
       get: (key) => temp.blob.get(key),
       has: (key) => temp.blob.has(key),
     };
-    builds = new StorybookBuilds({ sql: temp.sql, blob: new Blobs(counted) });
+    builds = new BuiltStorybooks({ sql: temp.sql, blob: new Blobs(counted) });
     await keep(BUILD, { "shared.js": "same", "index.html": "first" });
     await keep(OTHER, { "renamed.js": "same", "index.html": "second" });
     // Three distinct files, and each build's list.
@@ -55,7 +55,7 @@ describe("StorybookBuilds", () => {
     const fileHash = await builds.putFile(text("page"));
     expect(await builds.has(BUILD)).toBe(false);
     expect(await builds.readFile(BUILD, "index.html")).toBeNull();
-    await builds.putBuild(BUILD, [{ path: "index.html", fileHash }]);
+    await builds.putStorybook(BUILD, [{ path: "index.html", fileHash }]);
     expect(await builds.readFile(BUILD, "index.html")).toEqual(text("page"));
   });
 
@@ -66,11 +66,11 @@ describe("StorybookBuilds", () => {
   });
 
   it("knows a run's build only once it's kept", async () => {
-    expect(await builds.keptBuildOfRun("run")).toBeNull();
-    await builds.recordRunBuild("run", BUILD);
-    expect(await builds.keptBuildOfRun("run")).toBeNull();
+    expect(await builds.keptStorybookOfRun("run")).toBeNull();
+    await builds.recordRunStorybook("run", BUILD);
+    expect(await builds.keptStorybookOfRun("run")).toBeNull();
     await keep(BUILD, { "index.html": "page" });
-    expect(await builds.keptBuildOfRun("run")).toBe(BUILD);
+    expect(await builds.keptStorybookOfRun("run")).toBe(BUILD);
   });
 
   it("reads files of more builds than it holds file lists for", async () => {
