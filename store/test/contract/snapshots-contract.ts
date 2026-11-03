@@ -402,6 +402,14 @@ export function describeSnapshotContract(
         expect(second.next).toBeNull();
       });
 
+      it("says what accepting would remove, against goldens or against nothing", async () => {
+        const run = await finished("removes", [rendered("a", 1), rendered("b", 2)]);
+        await snapshots.adoptGoldens(run.id);
+        const next = await finished("removes", [rendered("a", 1)]);
+        expect(await snapshots.removedFrom(next.id, SHA_0)).toEqual(["b"]);
+        expect(await snapshots.removedFrom(next.id, null)).toEqual([]);
+      });
+
       it("won't read a run that hasn't finished", async () => {
         const run = received("read-unfinished");
         await snapshots.receiveRun(run);

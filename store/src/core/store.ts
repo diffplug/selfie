@@ -85,6 +85,15 @@ export interface StoredImage {
   readonly key: number;
 }
 
+/** These bytes are a different image from the one they were sent as. */
+export class ImageHashMismatchError extends Error {
+  override readonly name = "ImageHashMismatchError";
+
+  constructor(actual: string, expected: string) {
+    super(`These bytes are image ${actual}, and not ${expected}.`);
+  }
+}
+
 export class Store {
   readonly #sql: Sql;
   readonly #blob: Blobs;
@@ -104,10 +113,11 @@ export class Store {
    * same hash, unless it is too large for one. Anything else is kept as these exact bytes,
    * so what's stored always decodes to the pixels that were hashed. The first bytes stored
    * stay: a later encoding of the same pixels changes nothing. Throws `ImageDecodeError`
-   * for a file the store doesn't accept.
+   * for a file the store doesn't accept. Given the hash another store knows it by, it throws
+   * `ImageHashMismatchError` before storing anything if these bytes aren't that image.
    */
-  async putImage(file: Uint8Array): Promise<StoredImage> {
-    const [stored] = await this.putImages([file]);
+  async putImage(file: Uint8Array, expectedHash?: string): Promise<StoredImage> {
+    const [stored] = await this.#putGroup([file], expectedHash);
     return stored!;
   }
 
@@ -124,12 +134,13 @@ export class Store {
     return stored;
   }
 
-  async #putGroup(files: readonly Uint8Array[]): Promise<StoredImage[]> {
+  async #putGroup(files: readonly Uint8Array[], expectedHash?: string): Promise<StoredImage[]> {
     const hashes: string[] = [];
     const firstByHash = new Map<string, { file: Uint8Array; digest: Uint8Array }>();
     for (const file of files) {
       const digest = await this.#digestOf(file);
       const hash = toHex(digest);
+      if (expectedHash !== undefined && hash !== expectedHash) throw new ImageHashMismatchError(hash, expectedHash);
       hashes.push(hash);
       if (!firstByHash.has(hash)) firstByHash.set(hash, { file, digest });
     }

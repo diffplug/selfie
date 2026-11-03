@@ -4,9 +4,10 @@
 import { Hono, type Context, type MiddlewareHandler } from "hono";
 import { secureHeaders } from "hono/secure-headers";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { imageMediaType, isImageHash } from "selfie-store";
+import { isImageHash } from "selfie-store";
+import { CONTENT_ADDRESSED, failure, imageResponse, INTERNAL_ERROR, noStoreByDefault } from "./http.ts";
 import { isNoteId, isNoteText, MAX_NOTE_CHARACTERS } from "../shared/notes.ts";
-import { REQUEST_HEADER, REQUEST_HEADER_VALUE, type ApiError, type BoundingBox, type DecisionTarget, type NewNote, type ReviewSource } from "../shared/api.ts";
+import { REQUEST_HEADER, REQUEST_HEADER_VALUE, type BoundingBox, type DecisionTarget, type NewNote, type ReviewSource } from "../shared/api.ts";
 
 export type * from "../shared/api.ts";
 export { REQUEST_HEADER_VALUE };
@@ -38,7 +39,6 @@ class BadRequest extends Error {
   readonly code = "bad-request";
 }
 
-export const failure = (code: string, message: string): ApiError => ({ error: { code, message } });
 
 /**
  * Another site can't frame the page to steer a click, or embed an image to learn it exists, and
@@ -82,14 +82,6 @@ export function sameOriginWrites(allowedOrigin: (context: Context) => string): M
 }
 
 /** Content-addressed, so a browser may keep it for good, and only that browser may. */
-const CONTENT_ADDRESSED = "private, max-age=31536000, immutable";
-
-function png(context: Context, bytes: Uint8Array) {
-  return context.body(bytes as Uint8Array<ArrayBuffer>, 200, {
-    "Content-Type": imageMediaType(bytes),
-    "Cache-Control": CONTENT_ADDRESSED,
-  });
-}
 
 async function jsonBody(context: Context): Promise<Record<string, unknown>> {
   const body: unknown = await context.req.json().catch(() => null);
@@ -141,6 +133,8 @@ function noteId(value: string): number {
 }
 
 /** The routes under `/api`, which never answer with anything but JSON or an image. */
+export { failure };
+
 export function createReviewApi(source: ReviewSource): Hono {
   const api = new Hono();
 
@@ -149,13 +143,10 @@ export function createReviewApi(source: ReviewSource): Hono {
     const status = typeof code === "string" ? ERROR_STATUS[code] : undefined;
     if (status !== undefined) return context.json(failure(code as string, error.message), status);
     console.error(error);
-    return context.json(failure("internal", "Something went wrong in the Selfie server. Its log says what."), 500);
+    return context.json(INTERNAL_ERROR, 500);
   });
 
-  api.use(async (context, next) => {
-    await next();
-    if (!context.res.headers.has("Cache-Control")) context.res.headers.set("Cache-Control", "no-store");
-  });
+  api.use(noStoreByDefault);
 
   api.get("/current", async (context) => context.json(await source.current()));
   api.get("/runs/:runId", async (context) => context.json(await source.runView(context.req.param("runId"))));
@@ -199,7 +190,7 @@ export function createReviewApi(source: ReviewSource): Hono {
     const hash = context.req.param("hash");
     if (!isImageHash(hash)) return context.json(failure("bad-image-hash", "That isn't an image hash."), 400);
     const bytes = await source.image(hash);
-    return bytes === null ? context.json(failure("unknown-image", "This store doesn't hold that image."), 404) : png(context, bytes);
+    return bytes === null ? context.json(failure("unknown-image", "This store doesn't hold that image."), 404) : imageResponse(context, bytes);
   });
 
   api.use("/diffs/:current/:golden/*", async (context, next) => {
@@ -222,7 +213,7 @@ export function createReviewApi(source: ReviewSource): Hono {
     const { current, golden } = context.req.param();
     const result = await source.diff(current, golden);
     if (result === null) return context.json(failure("unknown-image", "This store doesn't hold those images."), 404);
-    return png(context, result.png);
+    return imageResponse(context, result.png);
   });
 
   // Here rather than `notFound`, which a parent app's own routes would come before.

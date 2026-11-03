@@ -68,6 +68,12 @@ const ROWS_PER_PAGE = 5_000;
 const MAX_MESSAGE_CHARACTERS = 2_000;
 
 const GIT_SHA = /^[0-9a-f]{40}(?:[0-9a-f]{24})?$/;
+const RUN_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+/** A full SHA-1 or SHA-256 commit ID. */
+export const isGitSha = (value: string) => GIT_SHA.test(value);
+/** What leaves a store to name a run. */
+export const isRunId = (value: string) => RUN_ID.test(value);
 
 const RUN_COLUMNS =
   "id, git_sha, environment, started_at, finished_at, failed_count, dirty, baseline_sha, story_filter, reused_from_run, scale";
@@ -615,6 +621,17 @@ ON CONFLICT(environment, story, image_hash) DO UPDATE SET
       );
     }
     return false;
+  }
+
+  /** The stories a baseline's goldens have, and this run doesn't, which accepting it would remove. */
+  async removedFrom(runId: string, baselineSha: string | null): Promise<readonly string[]> {
+    const removed: string[] = [];
+    for (let after = ""; ; ) {
+      const rows = await this.#sql.run({ sql: AGAINST_GOLDENS.removedPage, params: [runId, baselineSha ?? "", after, ROWS_PER_PAGE], idempotent: true });
+      removed.push(...rows.map(({ story }) => story as string));
+      if (rows.length < ROWS_PER_PAGE) return removed;
+      after = removed.at(-1)!;
+    }
   }
 
   /** A page of all a run holds, by name, for another store to take. Unlike a comparison, it needs no baseline. */

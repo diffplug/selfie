@@ -13,6 +13,8 @@ Source of truth: `ui/`.
 |---|---|
 | `ui/src/shared/api.ts` | The JSON on the wire, and `ReviewSource` |
 | `ui/src/shared/regions.ts`, exported as `selfie-ui/regions` | Grouping a diff's regions for showing, for the client and the CLI's document |
+| `ui/src/shared/notes.ts`, exported as `selfie-ui/notes` | Shared note validation and open-note state (`docs/specs/feedback.md`) |
+| `selfie-ui/sync`, `selfie-ui/sync-api` | `docs/specs/sync.md` → Routes |
 | `ui/src/server/app.ts`, exported as `selfie-ui/app` | The routes under `/api`, over a `ReviewSource`, on Hono, and `sameOriginWrites` and `pageHeaders`. It re-exports the wire types |
 | `ui/src/server/local.ts`, exported as `selfie-ui/local` | Node's serving, and the allowed hosts |
 | `ui/src/client/` | The React client, on Primer, built by Vite into `ui/dist/` |

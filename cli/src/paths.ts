@@ -3,12 +3,12 @@ import { createHash } from "node:crypto";
 import { lstat } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
+import { isRunId } from "selfie-store";
 import { SelfieError } from "./errors.ts";
 import type { Repo } from "./git.ts";
 
 const READABLE_SLUG_CHARACTERS = 80;
 const READABLE_NAME_CHARACTERS = 80;
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 const shortHash = (value: string, characters: number) =>
   createHash("sha256").update(value).digest("hex").slice(0, characters);
@@ -70,7 +70,7 @@ export function storyDirName(story: string): string {
   return `${readable === "" ? "story" : readable}-${shortHash(story, 10)}`;
 }
 
-export const isRunId = (name: string) => UUID.test(name);
+export { isRunId };
 
 /** Refuses anything but a run ID before it reaches a path. */
 export function assertRunId(run: string): void {
