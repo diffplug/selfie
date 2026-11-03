@@ -19,6 +19,7 @@ import {
 import { pngOf } from "./support/png-builder.ts";
 import { hashOf } from "./support/sql-params.ts";
 import { createTempStore } from "./support/temp-store.ts";
+import { sharpCodec } from "../src/adapters/sharp-codec.ts";
 
 for (const mode of ["number", "string"] as const) {
   describeSnapshotContract("local SQLite", mode, async () => {
@@ -620,7 +621,7 @@ describe("Snapshots", () => {
     });
 
     it("uses images a real Store put", async () => {
-      const store = new Store({ sql, blob: temp.blob });
+      const store = new Store({ codec: sharpCodec, sql, blob: temp.blob });
       const files = [1, 2].map((v) =>
         pngOf({ width: 1, height: 1, pixels: new Uint8Array([v, 0, 0]) }),
       );

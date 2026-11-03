@@ -10,6 +10,7 @@ export type SelfieErrorCode =
   | "unknown-run"
   | "unknown-baseline"
   | "missing-image"
+  | "corrupt-image"
   | "no-actor"
   | "stale-decision"
   | "no-remote"

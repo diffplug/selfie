@@ -5,8 +5,7 @@ import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { networkInterfaces, tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { decodeImage } from "selfie-store";
-import { sharpWebp } from "selfie-store/adapters/sharp-webp";
+import { decodeImage } from "./support.ts";
 import { REQUEST_HEADER_VALUE } from "selfie-ui/app";
 import { createLocalApp, serveLocal, type LocalServer } from "selfie-ui/local";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
@@ -364,7 +363,7 @@ describe("images", () => {
     expect(response.headers.get("cache-control")).toMatch(/^private\b/);
     expect(response.headers.get("cross-origin-resource-policy")).toBe("same-origin");
     expect(response.headers.get("x-content-type-options")).toBe("nosniff");
-    const image = await decodeImage(new Uint8Array(await response.arrayBuffer()), sharpWebp);
+    const image = await decodeImage(new Uint8Array(await response.arrayBuffer()));
     expect(image).toMatchObject({ width: 8, height: 8 });
   });
 

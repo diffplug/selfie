@@ -1,7 +1,7 @@
 import { mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import path from "node:path";
-import { decodeImage } from "selfie-store";
+import { decodeImage } from "./support.ts";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { diffImages } from "../src/diff.ts";
 import { assertRunId, normalizeOrigin, projectSlug, regularFileInside, resolveInside, selfieHome, storyDirName } from "../src/paths.ts";

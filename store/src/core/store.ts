@@ -2,13 +2,14 @@ import type { Blobs } from "./blob.ts";
 import { chunks, mapConcurrently } from "./chunks.ts";
 import {
   assertImageHash,
+  fromHex,
   SHA256_BYTES,
   sha256,
   toHex,
   truncateHash,
   type HashFunction,
 } from "./image-hash.ts";
-import { decodeImage, webpToKeep, type WebpCodec } from "./image-file.ts";
+import { checkImageFile, decodeImage, webpToKeep, type ImageCodec } from "./image-file.ts";
 import { encodePam, type RawImage } from "./pam.ts";
 import { CREATE_SNAPSHOT_TABLES } from "./snapshots.ts";
 import type { Sql, SqlStatement } from "./sql.ts";
@@ -69,13 +70,15 @@ export async function initStoreSchema(sql: Sql): Promise<void> {
   );
 }
 
-export interface StoreOptions {
+export interface ReceivingStoreOptions {
   readonly sql: Sql;
   readonly blob: Blobs;
+}
+
+export interface StoreOptions extends ReceivingStoreOptions {
+  readonly codec: ImageCodec;
   /** Defaults to SHA-256. Tests inject one to force collisions. */
   readonly hash?: HashFunction;
-  /** Reads a stored WebP, and stores a new PNG as one. Without it, files stay as they arrive. */
-  readonly webp?: WebpCodec;
 }
 
 export interface StoredImage {
@@ -94,26 +97,94 @@ export class ImageHashMismatchError extends Error {
   }
 }
 
-export class Store {
-  readonly #sql: Sql;
-  readonly #blob: Blobs;
-  readonly #hash: HashFunction;
-  readonly #webp: WebpCodec | undefined;
+/**
+ * What a store can do without reading pixels, which is all a Worker can do: it takes files under
+ * the hash they're sent with, and serves them. `Store` adds everything that needs a codec.
+ */
+export class ReceivingStore {
+  protected readonly sql: Sql;
+  protected readonly blob: Blobs;
 
-  constructor({ sql, blob, hash = sha256, webp }: StoreOptions) {
-    this.#sql = sql;
-    this.#blob = blob;
+  constructor({ sql, blob }: ReceivingStoreOptions) {
+    this.sql = sql;
+    this.blob = blob;
+  }
+
+  /**
+   * Stores a file another store sent, under the hash it was sent with, without decoding it, or
+   * finds that hash if it's already stored, keeping the first bytes. Throws `ImageDecodeError`
+   * only if the file's form is one no store keeps. So what's stored here may not be the image
+   * its hash names: see `docs/specs/store.md` -> Image identity. One SQL request, with no lookup
+   * first, since a sender has just asked what's missing, and the insert finds a row anyway.
+   */
+  async receiveImage(file: Uint8Array, hash: string): Promise<StoredImage> {
+    assertImageHash(hash);
+    checkImageFile(file);
+    // Bytes first, as ever, so a row always means the bytes exist.
+    const blobKey = imageBlobKey(hash);
+    if (!(await this.blob.has(blobKey))) await this.blob.put(blobKey, file);
+    const [row] = await this.sql.run(imageInsertStatement(hash, truncateHash(fromHex(hash))));
+    return { hash, key: checkedKey(row?.key) };
+  }
+
+  /** Which of these images this store doesn't hold, so another store need only send those. */
+  async missingImages(hashes: readonly string[]): Promise<readonly string[]> {
+    const distinct = [...new Set(hashes)];
+    for (const hash of distinct) assertImageHash(hash);
+    const held = new Set<string>();
+    const statements = chunks(distinct, IMAGES_PER_GROUP).map((group) => findKeysStatement(group));
+    // Most are usually held, so this many statements in a request stay within a request's rows.
+    for (const batch of chunks(statements, QUERIES_PER_REQUEST)) {
+      for (const rows of await this.sql.batch(batch)) for (const row of rows) held.add(row.hash as string);
+    }
+    return distinct.filter((hash) => !held.has(hash));
+  }
+
+  /** This store's key for an image hash, or null if the image is not stored. */
+  async lookupKey(hash: string): Promise<number | null> {
+    assertImageHash(hash);
+    // By the full hash, never by truncated value: a colliding image must not
+    // resolve to the key of the image that claimed that value first.
+    const [row] = await this.sql.run({
+      sql: SELECT_IMAGE_KEY,
+      params: [hash],
+      idempotent: true,
+    });
+    return row === undefined ? null : (row.key as number);
+  }
+
+  /**
+   * The stored file for an image hash, or null if the image is not stored. It can
+   * be served as it is, as `imageMediaType` says. Bytes with no row are orphans from a
+   * failed insert, so they count as not stored.
+   */
+  async getImage(hash: string): Promise<Uint8Array | null> {
+    if ((await this.lookupKey(hash)) === null) return null;
+    const bytes = await this.blob.get(imageBlobKey(hash));
+    if (bytes === null) {
+      throw new Error(`Image ${hash} has a row but no bytes`);
+    }
+    return bytes;
+  }
+}
+
+export class Store extends ReceivingStore {
+  readonly #hash: HashFunction;
+  readonly #codec: ImageCodec;
+
+  constructor({ sql, blob, hash = sha256, codec }: StoreOptions) {
+    super({ sql, blob });
     this.#hash = hash;
-    this.#webp = webp;
+    this.#codec = codec;
   }
 
   /**
    * Stores an image file, or finds it if it is already stored. The hash comes from
-   * decoding it. With a WebP codec a new PNG is kept as a WebP, checked to decode to the
-   * same hash, unless it is too large for one. Anything else is kept as these exact bytes,
-   * so what's stored always decodes to the pixels that were hashed. The first bytes stored
-   * stay: a later encoding of the same pixels changes nothing. Throws `ImageDecodeError`
-   * for a file the store doesn't accept. Given the hash another store knows it by, it throws
+   * decoding it. A new PNG is kept as a WebP, checked to decode to the same hash, unless it
+   * is too large for one. Anything else is kept as these exact bytes, so what's stored here
+   * always decodes to the pixels that were hashed. The first bytes stored stay: a later
+   * encoding of the same pixels changes nothing. Throws `ImageDecodeError` for a file the
+   * store doesn't accept. Given the hash another store knows it by, it throws
    * `ImageHashMismatchError` before storing anything if these bytes aren't that image.
    */
   async putImage(file: Uint8Array, expectedHash?: string): Promise<StoredImage> {
@@ -152,20 +223,20 @@ export class Store {
     // Bytes first: a failure here or later can orphan bytes, but can never leave a row without them.
     await mapConcurrently(missing, BLOBS_AT_ONCE, async ([hash, { file }]) => {
       const blobKey = imageBlobKey(hash);
-      if (!(await this.#blob.has(blobKey))) await this.#blob.put(blobKey, await this.#fileToKeep(file, hash));
+      if (!(await this.blob.has(blobKey))) await this.blob.put(blobKey, await this.#fileToKeep(file, hash));
     });
     if (missing.length > 0) {
       const statements = missing.map(([hash, { digest }]) =>
         imageInsertStatement(hash, truncateHash(digest)),
       );
-      const results = await this.#sql.batch(statements);
+      const results = await this.sql.batch(statements);
       results.forEach((rows, i) => keys.set(missing[i]![0], checkedKey(rows[0]?.key)));
     }
     return hashes.map((hash) => ({ hash, key: keys.get(hash)! }));
   }
 
   async #digestOf(file: Uint8Array): Promise<Uint8Array> {
-    const digest = await this.#hash(encodePam(await decodeImage(file, this.#webp)));
+    const digest = await this.#hash(encodePam(await decodeImage(file, this.#codec)));
     if (digest.length !== SHA256_BYTES) {
       throw new RangeError(`Image hash must be ${SHA256_BYTES} bytes, got ${digest.length}`);
     }
@@ -174,7 +245,7 @@ export class Store {
 
   /** Only for an image not yet stored, so an unchanged image costs no encoding. */
   async #fileToKeep(file: Uint8Array, hash: string): Promise<Uint8Array> {
-    const encoded = this.#webp === undefined ? null : await webpToKeep(file, this.#webp);
+    const encoded = await webpToKeep(file, this.#codec);
     if (encoded === null) return file;
     if (toHex(await this.#digestOf(encoded)) !== hash) throw new Error("The WebP encoder changed an image's pixels");
     return encoded;
@@ -182,54 +253,27 @@ export class Store {
 
   /** The key of each of these distinct hashes that has a row. */
   async #findKeys(hashes: readonly string[]): Promise<Map<string, number>> {
-    const rows = await this.#sql.run(findKeysStatement(hashes));
+    const rows = await this.sql.run(findKeysStatement(hashes));
     return new Map(rows.map((row) => [row.hash as string, checkedKey(row.key)]));
   }
 
-  /** Which of these images this store doesn't hold, so another store need only send those. */
-  async missingImages(hashes: readonly string[]): Promise<readonly string[]> {
-    const distinct = [...new Set(hashes)];
-    for (const hash of distinct) assertImageHash(hash);
-    const held = new Set<string>();
-    const statements = chunks(distinct, IMAGES_PER_GROUP).map((group) => findKeysStatement(group));
-    // Most are usually held, so this many statements in a request stay within a request's rows.
-    for (const batch of chunks(statements, QUERIES_PER_REQUEST)) {
-      for (const rows of await this.#sql.batch(batch)) for (const row of rows) held.add(row.hash as string);
-    }
-    return distinct.filter((hash) => !held.has(hash));
-  }
-
-  /** This store's key for an image hash, or null if the image is not stored. */
-  async lookupKey(hash: string): Promise<number | null> {
-    assertImageHash(hash);
-    // By the full hash, never by truncated value: a colliding image must not
-    // resolve to the key of the image that claimed that value first.
-    const [row] = await this.#sql.run({
-      sql: SELECT_IMAGE_KEY,
-      params: [hash],
-      idempotent: true,
-    });
-    return row === undefined ? null : (row.key as number);
-  }
-
   /**
-   * The stored file for an image hash, or null if the image is not stored. It can
-   * be served as it is, as `imageMediaType` says. Bytes with no row are orphans from a
-   * failed insert, so they count as not stored.
+   * The stored file, after decoding it to check it's the image its hash names, or null if the
+   * image is not stored. What a store sends another, since the receiver may not check. Throws
+   * `ImageDecodeError` or `ImageHashMismatchError` if it isn't.
    */
-  async getImage(hash: string): Promise<Uint8Array | null> {
-    if ((await this.lookupKey(hash)) === null) return null;
-    const bytes = await this.#blob.get(imageBlobKey(hash));
-    if (bytes === null) {
-      throw new Error(`Image ${hash} has a row but no bytes`);
-    }
-    return bytes;
+  async getCheckedImage(hash: string): Promise<Uint8Array | null> {
+    const file = await this.getImage(hash);
+    if (file === null) return null;
+    const actual = toHex(await this.#digestOf(file));
+    if (actual !== hash) throw new ImageHashMismatchError(actual, hash);
+    return file;
   }
 
   /** The exact pixels of a stored image, or null if the image is not stored. */
   async getPixels(hash: string): Promise<RawImage | null> {
     const file = await this.getImage(hash);
-    return file === null ? null : decodeImage(file, this.#webp);
+    return file === null ? null : decodeImage(file, this.#codec);
   }
 }
 

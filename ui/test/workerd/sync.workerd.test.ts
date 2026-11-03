@@ -3,7 +3,7 @@
 // order, each on what the last left. See docs/specs/sync.md.
 import { env } from "cloudflare:workers";
 import { beforeAll, describe, expect, it } from "vitest";
-import { Blobs, initStoreSchema, Snapshots, Sql, Store, type SqlAdapter, type SqlRow } from "selfie-store";
+import { Blobs, initStoreSchema, ReceivingStore, Snapshots, Sql, type SqlAdapter, type SqlRow } from "selfie-store";
 import { R2BlobStorage, type R2BucketLike } from "selfie-store/adapters/r2";
 import { createSyncApi, type SyncAccess } from "../../src/server/sync.ts";
 
@@ -49,7 +49,7 @@ const runFacts = (gitSha: string) => ({ gitSha, environment: ENV, startedAt: 500
 beforeAll(async () => {
   const sql = new Sql(d1Binding(env.DB));
   await initStoreSchema(sql);
-  const store = new Store({ sql, blob: new Blobs(new R2BlobStorage({ bucket: env.BLOBS as R2BucketLike, project: "42" })) });
+  const store = new ReceivingStore({ sql, blob: new Blobs(new R2BlobStorage({ bucket: env.BLOBS as R2BucketLike, project: "42" })) });
   const snapshots = new Snapshots({ sql });
   app = createSyncApi({
     open: async (_project, token) => {
@@ -101,18 +101,25 @@ describe("the sync routes, in a Worker", () => {
     expect(new Uint8Array(await response.arrayBuffer())).toEqual(png);
   });
 
-  it("refuses bytes that aren't the image they're sent as", async () => {
-    expect(await sendJson("PUT", `/images/${UNKNOWN_HASH}`, "writer", png)).toMatchObject({ error: { code: "hash-mismatch" } });
+  it("says only what an image's type is, so nothing runs what it holds", async () => {
+    const { headers } = await send("GET", `/images/${hash}`, "writer");
+    expect(headers.get("content-type")).toBe("image/png");
+    expect(headers.get("x-content-type-options")).toBe("nosniff");
   });
 
-  // What a real client sends, since a local store keeps WebP. So until a Worker has a codec (docs/specs/store.md
-  // -> A Worker reading a WebP), a real push of anything under 16,384 pixels a side stops here.
-  it("refuses a real WebP, since a Worker has no codec yet", async () => {
-    const webp = fromBase64("UklGRhoAAABXRUJQVlA4TA0AAAAvAAAAEAcQERGIiP4HAA==");
-    const response = await send("PUT", `/images/${"e".repeat(64)}`, "writer", webp);
-    expect(response.status).toBe(400);
-    const { error } = (await response.json()) as { error: { code: string; message: string } };
-    expect(error.code).toBe("bad-image");
-    expect(error.message.toLowerCase()).toContain("webp");
+  // What a real client sends, since a local store keeps WebP. A Worker has no codec, and needs none.
+  it("takes a real WebP under the hash it's sent with, as those bytes", async () => {
+    const webp = fromBase64("UklGRh4AAABXRUJQVlA4TBEAAAAvAAAAAAdQiirUo/+BiOh/AAA=");
+    const webpHash = "e".repeat(64);
+    expect((await send("PUT", `/images/${webpHash}`, "writer", webp)).status).toBe(200);
+    const served = await send("GET", `/images/${webpHash}`, "writer");
+    expect(served.headers.get("content-type")).toBe("image/webp");
+    expect(new Uint8Array(await served.arrayBuffer())).toEqual(webp);
+  });
+
+  it("refuses what no store keeps, by its form alone", async () => {
+    const lossy = new TextEncoder().encode("RIFF\x12\0\0\0WEBPVP8 \x06\0\0\0abcdefghijklm");
+    expect(await sendJson("PUT", `/images/${"d".repeat(64)}`, "writer", lossy)).toMatchObject({ error: { code: "bad-image" } });
+    expect(await sendJson("PUT", `/images/${"d".repeat(64)}`, "writer", new Uint8Array([1, 2, 3]))).toMatchObject({ error: { code: "bad-image" } });
   });
 });

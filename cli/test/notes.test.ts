@@ -2,7 +2,7 @@
 import { execFileSync } from "node:child_process";
 import { mkdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
-import { decodeImage } from "selfie-store";
+import { decodeImage } from "./support.ts";
 import { REQUEST_HEADER_VALUE } from "selfie-ui/app";
 import { createLocalApp } from "selfie-ui/local";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";

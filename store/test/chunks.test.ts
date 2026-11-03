@@ -2,6 +2,28 @@ import { describe, expect, it } from "vitest";
 import { mapConcurrently } from "../src/core/index.ts";
 
 describe("mapConcurrently", () => {
+  it("doesn't fail until what's already running has finished", async () => {
+    let finished = false;
+    let release = () => {};
+    const slow = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const failing = mapConcurrently(["fails", "slow"], 2, async (item) => {
+      if (item === "fails") throw new Error("first");
+      await slow;
+      finished = true;
+    });
+    let settled = false;
+    void failing.catch(() => {
+      settled = true;
+    });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(settled).toBe(false);
+    release();
+    await expect(failing).rejects.toThrow("first");
+    expect(finished).toBe(true);
+  });
+
   it("returns results in order, at most so many at a time", async () => {
     let running = 0;
     let most = 0;

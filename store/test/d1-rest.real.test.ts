@@ -11,6 +11,7 @@ import { d1Harness } from "./support/real-d1.ts";
 import { pngOf } from "./support/png-builder.ts";
 import { hashOf, insertedKey, withParamMode, type ImageRow } from "./support/sql-params.ts";
 import { createTempStore } from "./support/temp-store.ts";
+import { sharpCodec } from "../src/adapters/sharp-codec.ts";
 
 const ENABLED = process.env.SELFIE_D1_CONTRACT === "1";
 
@@ -125,7 +126,7 @@ describe.skipIf(!ENABLED)("real D1 (opt-in: pnpm test:d1)", () => {
     it("stores many images in a few requests through Store.putImages", async () => {
       const temp = await createTempStore();
       try {
-        const store = new Store({ sql: new Sql(harness.connect()), blob: temp.blob });
+        const store = new Store({ codec: sharpCodec, sql: new Sql(harness.connect()), blob: temp.blob });
         const files = Array.from({ length: 205 }, (_, i) =>
           pngOf({ width: 1, height: 1, pixels: new Uint8Array([i & 255, i >> 8, 0]) }),
         );

@@ -5,7 +5,7 @@
 | Term | Meaning |
 |---|---|
 | **Image** | One rendered, fully opaque picture, identified by its image hash. Knows nothing about which story produced it. Transparency is never allowed (`docs/specs/store.md`). |
-| **Image hash** | The full SHA256 that identifies an image in every store (`docs/specs/store.md`). |
+| **Image hash** | The full SHA256 that identifies an image in every store, as far as the clients sending it are honest and working (`docs/specs/store.md` → Image identity). |
 | **Image key** | A store's private integer for an image. Meaningless to any other store. |
 | **Snapshot** | A named test case bound to an image: which story was rendered, under which conditions, and what image resulted. |
 | **Environment** | What decides the pixels apart from the project's own input: the runner, its architecture, the browser and its flags, the viewport and scale, and the capture recipe (`docs/specs/system.md`). Its ID is part of a snapshot's name. |

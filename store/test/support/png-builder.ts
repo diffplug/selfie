@@ -1,4 +1,4 @@
-// Builds PNG files byte by byte: the store has no PNG encoder for tests to use. It shares no code with the decoder, and writes zlib by
+// Builds PNG files byte by byte: the store has no PNG encoder for tests to use. It writes zlib by
 // hand as stored blocks so a test controls every byte. Nothing here imports a platform
 // API, so the same tests run in Node and in workerd.
 

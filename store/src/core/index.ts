@@ -1,7 +1,14 @@
 export { Blobs, isBlobKeySegment, type BlobStorage } from "./blob.ts";
 export { chunks, mapConcurrently } from "./chunks.ts";
 export { isImageHash, sha256, toHex, truncateHash, type HashFunction } from "./image-hash.ts";
-export { decodeImage, ImageDecodeError, imageMediaType, WEBP_MAX_SIDE, type WebpCodec } from "./image-file.ts";
+export {
+  checkImageFile,
+  decodeImage,
+  ImageDecodeError,
+  imageMediaType,
+  WEBP_MAX_SIDE,
+  type ImageCodec,
+} from "./image-file.ts";
 export { encodePam, type RawImage } from "./pam.ts";
 export {
   isDecidable,
@@ -39,7 +46,9 @@ export {
   ImageHashMismatchError,
   imageInsertStatement,
   initStoreSchema,
+  ReceivingStore,
   Store,
   type StoredImage,
+  type ReceivingStoreOptions,
   type StoreOptions,
 } from "./store.ts";

@@ -8,7 +8,7 @@
 
 | Data | Across stores | Rule |
 |---|---|---|
-| Images | Named by hash, so never | Send what's missing |
+| Images | Named by hash, so never, unless a client [lied or broke](#what-a-store-takes) | Send what's missing |
 | Finished runs | Keep their ID, and never change, so never | Send what's missing |
 | Decisions | One per name and hash, so yes | Latest wins (`docs/specs/snapshots.md` → Decisions) |
 | Goldens | One run per SHA and environment, so yes | [The cloud decides](#goldens) |
@@ -36,11 +36,11 @@ To mount under `/api`. `GET /repositories/:owner/:name` finds a repository's pro
 
 | Status | Code | When |
 |---|---|---|
-| 400 | `bad-request`, `hash-mismatch`, `bad-image` | It can't be understood, or isn't the image it's sent as |
+| 400 | `bad-request`, `bad-image` | It can't be understood, or isn't in a form a store keeps |
 | 403 | `not-allowed` | The token can do something here, but not this |
 | 404 | `not-found`, `unknown-run`, `unknown-image` | The project can't be seen, or doesn't hold that |
 | 409 | `run-dirty`, `commit-not-pushed`, and `SnapshotError`'s other codes | The request can't apply to the data as it stands |
-| 413 | `image-too-large` | It's more than the platform can afford to verify |
+| 413 | `image-too-large` | It's more than the server takes |
 
 Inside `POST /goldens`, a refusal is an answer, with a code of `not-approved`, `wrong-removed`, `goldens-conflict`, or one of `SnapshotError`'s, and status 200.
 
@@ -52,10 +52,12 @@ Inside `POST /goldens`, a refusal is an answer, with a code of `not-approved`, `
 ### What a store takes
 
 - **Must refuse a run from a dirty tree, and a run whose commit GitHub doesn't have, with `commit-not-pushed`, when the run is first sent, and before any of its images**, so a forgotten `git push` costs nothing, and nothing from an unpushed commit is ever stored, since anyone can view a public repository's images (rationale). That a run is clean is only what its client says, so this holds for honest clients.
-- **Must verify every image against the hash it's sent under, before storing anything**, and refuse a mismatch with `hash-mismatch`, since an image hash names exactly one image in every store.
-- **Must refuse an image larger than the platform says it can afford, before reading it**, with `image-too-large`, and never store one unverified. How many pixels a Worker can verify is still to settle (`docs/specs/store.md` → Future).
+- **Must take an image through `ReceivingStore.receiveImage`, and never decode it**, since anyone who can upload can already approve (rationale). It answers `bad-image` for a file that isn't in a form a store keeps. A corrupt body, or one holding another picture, gets through (`docs/specs/store.md` → Image identity), and stays until [something can replace it](#not-yet).
+- **Must refuse an image larger than the server takes, before reading it**, with `image-too-large`.
 - **Must take a decision only from someone who may decide, so a CI upload carries none**, and record a new one's author as whoever is pushing, as the server knows them, not what the client says (rationale). A decision the server already holds keeps its author. `docs/specs/snapshots.md` → Decisions says stores agree on the verdict, which the author need not match.
 - **Must not let a received decision's time, or a run's, be later than the server's clock**, so a wrong clock can't win every later disagreement, or post-date a run. Sending a run again keeps the time it was first given.
+
+Reserved: a fork's capture pass must not upload through this (`docs/specs/access.md` → Open questions).
 
 ### Goldens
 
@@ -74,7 +76,7 @@ Source of truth: `cli/src/sync.ts`; tests in `cli/test/sync.test.ts`, between tw
 
 - **Must push one run at a time, in this order: the run, its images, its snapshots, finishing it, its decisions, and its goldens**, so that a refused run costs nothing, and nothing refers to what hasn't arrived.
 - **Must make every step safe to send again**, so a push or pull that dies is finished by running it again, with nothing to clean up. A partly received run stays `recording`, which nothing can compare or accept.
-- **Must send only the images the receiver lacks**, and pull only those this store lacks, verifying each against its hash.
+- **Must send only the images the receiver lacks, and pull only those this store lacks, decoding each to check it's the image its hash names**, and stop with `corrupt-image` naming it if it isn't, leaving what's stored here as it was. A sender's check is the last that image gets, and a puller's is the only one that finds what another client sent wrongly.
 - **Must carry `reusedFromRun`**, for `trust`. It may name a run never pushed.
 - **Must send only the decisions on the run's own images**, which are the ones that carry through a push (`docs/specs/system.md` → Approvals across stores).
 - **Must ask first what the token may do, and skip what it can't, saying so**, so that CI isn't refused after uploading everything.
@@ -97,14 +99,15 @@ A push sends a run's goldens if it's accepted locally, or `--accept` asks for th
 
 ## Future
 
-**Scope: cloud-deploy** mounts the routes, and **Scope: github-access** answers the seam, both defined in `docs/specs/system.md` → Build order. **A real client's push can't reach a Worker until cloud-deploy gives it a WebP codec** (`docs/specs/store.md` → A Worker reading a WebP), since a client sends what its store keeps, and a Worker refuses WebP with `bad-image`.
+**Scope: cloud-deploy** mounts the routes, and **Scope: github-access** answers the seam, both defined in `docs/specs/system.md` → Build order.
 
 ### At scale
 
-A project's first push is the expensive one. Each new image takes one upload and 2 D1 requests, so 10,000 new images are about 20,000 requests, or about 83 minutes of the shared limit of 1,200 per 5 minutes (`docs/specs/store.md` → D1 REST adapter), by calculation and not measurement. Before a real project pushes, **Scope: cloud-deploy** needs to pace uploads, or add them another way than through that limit. Finding and inserting in one statement would halve it.
+A project's first push is the expensive one. Each new image takes one upload and one D1 request, so 10,000 new images are about 10,000 requests, or about 42 minutes of the shared limit of 1,200 per 5 minutes (`docs/specs/store.md` → D1 REST adapter), by calculation and not measurement. Before a real project pushes, **Scope: cloud-deploy** needs to pace uploads, or add them another way than through that limit.
 
 ### Not yet
 
+- Replacing an image the cloud holds wrongly. Today a pull of it fails, naming it, every time, and a browser shows it as it is. A repair needs someone with write access, and a client that decodes.
 - Decisions on regions (`docs/specs/snapshots.md` → Future), which add their own table, and travel the same way.
 - Notes (**Scope: remote-notes**, `docs/specs/feedback.md`).
 - A review using the cloud's baseline. A review's own search is still local, so for now a person runs `selfie pull` first. It also needs telling when this store's goldens at a SHA aren't the cloud's, which `source` doesn't say.

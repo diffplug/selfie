@@ -1,5 +1,5 @@
 // The one PNG encoder Selfie's own code uses, for what the CLI writes: exported images and diff
-// images. Neither enters a store, which encodes only through its `WebpCodec`.
+// images. Neither enters a store, which encodes only through its `ImageCodec`.
 import { promisify } from "node:util";
 import { crc32, deflate } from "node:zlib";
 import type { RawImage } from "selfie-store";

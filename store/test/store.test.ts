@@ -1,10 +1,9 @@
+import sharp from "sharp";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   Blobs,
-  decodeImage,
   encodePam,
   ImageDecodeError,
-  imageMediaType,
   Sql,
   sha256,
   ImageHashMismatchError,
@@ -17,6 +16,8 @@ import { imageHashOf } from "./support/image-hash-of.ts";
 import { pngOf } from "./support/png-builder.ts";
 import { readPngFixture } from "./support/png-fixtures.ts";
 import { createTempStore } from "./support/temp-store.ts";
+import { sharpCodec } from "../src/adapters/sharp-codec.ts";
+import { decodeImage } from "./support/decode.ts";
 
 describe("Store", () => {
   let temp: Awaited<ReturnType<typeof createTempStore>>;
@@ -29,8 +30,10 @@ describe("Store", () => {
     await temp.destroy();
   });
 
+  const newStore = () => new Store({ codec: sharpCodec, sql: temp.sql, blob: temp.blob });
+
   const storeWith = (truncatedById: Record<number, number>) =>
-    new Store({ sql: temp.sql, blob: temp.blob, hash: collidingHash(truncatedById) });
+    new Store({ codec: sharpCodec, sql: temp.sql, blob: temp.blob, hash: collidingHash(truncatedById) });
 
   const file = (id: number) => pngOf(image(id));
 
@@ -49,29 +52,27 @@ describe("Store", () => {
 
   describe("with the real hash", () => {
     it("reports the image hash of the PAM file", async () => {
-      const store = new Store({ sql: temp.sql, blob: temp.blob });
+      const store = newStore();
       const { hash } = await store.putImage(file(1));
       expect(hash).toBe(await imageHashOf(image(1)));
     });
 
     it("keeps one row and one key across repeated puts", async () => {
-      const store = new Store({ sql: temp.sql, blob: temp.blob });
+      const store = newStore();
       const first = await store.putImage(file(1));
       expect(await store.putImage(file(1))).toEqual(first);
       expect(await temp.sql.run({ sql: "SELECT key FROM images" })).toHaveLength(1);
     });
 
-    it("returns a PNG of the exact pixels for a stored image", async () => {
-      const store = new Store({ sql: temp.sql, blob: temp.blob });
+    it("returns a file of the exact pixels for a stored image", async () => {
+      const store = newStore();
       const { hash } = await store.putImage(file(1));
-      const stored = (await store.getImage(hash))!;
-      expect(imageMediaType(stored)).toBe("image/png");
-      expect(await decodeImage(stored)).toEqual(image(1));
+      expect(await decodeImage((await store.getImage(hash))!)).toEqual(image(1));
     });
 
     it("finds an image through a separate connection", async () => {
-      const { hash, key } = await new Store({ sql: temp.sql, blob: temp.blob }).putImage(file(1));
-      const other = new Store({ sql: temp.connect(), blob: temp.blob });
+      const { hash, key } = await newStore().putImage(file(1));
+      const other = new Store({ codec: sharpCodec, sql: temp.connect(), blob: temp.blob });
       expect(await other.lookupKey(hash)).toBe(key);
     });
   });
@@ -128,7 +129,7 @@ describe("Store", () => {
       const ids = [1, 2, 3, 4, 5, 6, 7, 8];
       const truncated = Object.fromEntries(ids.map((id) => [id, 500]));
       const stores = [temp.connect(), temp.connect(), temp.connect()].map(
-        (sql) => new Store({ sql, blob: temp.blob, hash: collidingHash(truncated) }),
+        (sql) => new Store({ codec: sharpCodec, sql, blob: temp.blob, hash: collidingHash(truncated) }),
       );
       const results = await Promise.all(
         stores.flatMap((store) => ids.map((id) => store.putImage(file(id)))),
@@ -143,6 +144,7 @@ describe("Store", () => {
 
     it("refuses a hash function that returns the wrong length", async () => {
       const store = new Store({
+        codec: sharpCodec,
         sql: temp.sql,
         blob: temp.blob,
         hash: async () => new Uint8Array(20),
@@ -161,6 +163,7 @@ describe("Store", () => {
     it("writes bytes before the row", async () => {
       const events: string[] = [];
       const store = new Store({
+        codec: sharpCodec,
         sql: new Sql({
           execute: async (statements) => {
             events.push("sql");
@@ -181,16 +184,16 @@ describe("Store", () => {
     });
 
     it("leaves no row when the blob write fails", async () => {
-      const store = new Store({ sql: temp.sql, blob: new Blobs(failingBlob(temp.blob)) });
+      const store = new Store({ codec: sharpCodec, sql: temp.sql, blob: new Blobs(failingBlob(temp.blob)) });
       await expect(store.putImage(file(1))).rejects.toThrow("blob down");
       expect(await temp.sql.run({ sql: "SELECT key FROM images" })).toEqual([]);
     });
 
     it("treats orphaned bytes as not stored, and an insert retry adopts them", async () => {
-      const broken = new Store({ sql: failingInserts(), blob: temp.blob });
+      const broken = new Store({ codec: sharpCodec, sql: failingInserts(), blob: temp.blob });
       await expect(broken.putImage(file(1))).rejects.toThrow("sql down");
 
-      const store = new Store({ sql: temp.sql, blob: temp.blob });
+      const store = newStore();
       const hash = await imageHashOf(image(1));
       expect(await temp.blob.has(`images/${hash}`)).toBe(true);
       expect(await store.getImage(hash)).toBeNull();
@@ -200,7 +203,7 @@ describe("Store", () => {
     });
 
     it("reports a row with no bytes rather than treating it as absent", async () => {
-      const store = new Store({ sql: temp.sql, blob: temp.blob });
+      const store = newStore();
       const hash = "ab".repeat(32);
       await temp.sql.run({
         sql: "INSERT INTO images(key, hash) VALUES (CAST(?1 AS INTEGER), ?2)",
@@ -221,6 +224,7 @@ describe("Store", () => {
 
     it("returns nothing and sends nothing for no images", async () => {
       const store = new Store({
+        codec: sharpCodec,
         sql: new Sql({ execute: () => Promise.reject(new Error("no SQL expected")) }),
         blob: temp.blob,
       });
@@ -235,6 +239,7 @@ describe("Store", () => {
         pngOf({ width: 1, height: 1, pixels: new Uint8Array([i & 255, i >> 8, 0]) }),
       );
       const store = new Store({
+        codec: sharpCodec,
         sql: new Sql({
           execute: async (statements) => {
             if (statements[0]!.sql.startsWith("SELECT")) {
@@ -270,13 +275,14 @@ describe("Store", () => {
       const files = Array.from({ length: 100 }, (_, i) =>
         pngOf({ width: 1, height: 1, pixels: new Uint8Array([i, 1, 0]) }),
       );
-      const stored = await new Store({ sql: temp.sql, blob: temp.blob }).putImages(files);
+      const stored = await newStore().putImages(files);
 
       let requests = 0;
       const noBlobCalls = (): never => {
         throw new Error("no blob calls expected");
       };
       const store = new Store({
+        codec: sharpCodec,
         sql: new Sql({
           execute: (statements) => {
             requests++;
@@ -297,7 +303,7 @@ describe("Store", () => {
           return temp.connect().batch(statements);
         },
       });
-      const store = new Store({ sql: counting, blob: temp.blob });
+      const store = new Store({ codec: sharpCodec, sql: counting, blob: temp.blob });
       const first = await store.putImage(file(1));
       seen.length = 0;
       const stored = await store.putImages([file(1), file(2), file(2)]);
@@ -309,7 +315,7 @@ describe("Store", () => {
 
     it("decodes a whole group before writing any of it", async () => {
       const transparent = pngOf(image(9), { alpha: () => 128 });
-      const store = new Store({ sql: temp.sql, blob: temp.blob });
+      const store = newStore();
       await expect(store.putImages([file(1), transparent])).rejects.toThrow(ImageDecodeError);
       expect(await temp.blob.has(`images/${await imageHashOf(image(1))}`)).toBe(false);
     });
@@ -322,7 +328,7 @@ describe("Store", () => {
           return temp.connect().batch(statements);
         },
       });
-      const store = new Store({ sql: flaky, blob: temp.blob });
+      const store = new Store({ codec: sharpCodec, sql: flaky, blob: temp.blob });
       await expect(store.putImages([file(1), file(2)])).rejects.toThrow("sql down");
       expect((await store.putImages([file(1), file(2)])).map(({ hash }) => hash)).toHaveLength(2);
       expect(await temp.sql.run({ sql: "SELECT key FROM images" })).toHaveLength(2);
@@ -335,17 +341,6 @@ describe("Store", () => {
     const reencoded = pngOf(image(9), { filters: [4] });
     const withAlpha = pngOf(image(9), { alpha: () => 255 });
     const transparent = pngOf(image(9), { alpha: () => 128 });
-
-    const newStore = () => new Store({ sql: temp.sql, blob: temp.blob });
-
-    it("stores a screenshot's own bytes, not a recompressed copy", async () => {
-      const store = newStore();
-      const png = screenshot();
-      const { hash } = await store.putImage(png);
-      expect(await store.getImage(hash)).toEqual(png);
-      expect(await temp.blob.get(`images/${hash}`)).toEqual(png);
-      expect(imageMediaType((await store.getImage(hash))!)).toBe("image/png");
-    });
 
     it("hashes the decoded pixels, never the file", async () => {
       const png = screenshot();
@@ -368,25 +363,38 @@ describe("Store", () => {
       expect(await temp.sql.run({ sql: "SELECT key FROM images" })).toHaveLength(1);
     });
 
+    // Two encodings of one screenshot: a store keeps a WebP as those exact bytes.
+    const twoWebps = async () => {
+      const { width, height, pixels } = await decodeImage(screenshot());
+      const encode = (effort: number) =>
+        sharp(pixels, { raw: { width, height, channels: 3 } }).webp({ lossless: true, effort }).toBuffer();
+      const [first, second] = await Promise.all([encode(0), encode(6)]);
+      expect(first).not.toEqual(second);
+      return [new Uint8Array(first), new Uint8Array(second)] as const;
+    };
+
     it("keeps the first bytes stored for a hash", async () => {
       const store = newStore();
-      const { hash } = await store.putImage(reencoded);
-      await store.putImage(plain);
-      expect(await store.getImage(hash)).toEqual(reencoded);
+      const [first, second] = await twoWebps();
+      const { hash } = await store.putImage(first);
+      await store.putImage(second);
+      expect(await store.getImage(hash)).toEqual(first);
     });
 
     it("keeps the first of two encodings in one call", async () => {
       const store = newStore();
-      const [first, second] = await store.putImages([reencoded, plain]);
-      expect(first).toEqual(second);
-      expect(await store.getImage(first!.hash)).toEqual(reencoded);
+      const [first, second] = await twoWebps();
+      const [stored, again] = await store.putImages([first, second]);
+      expect(stored).toEqual(again);
+      expect(await store.getImage(stored!.hash)).toEqual(first);
     });
 
     it("adopts orphaned bytes rather than replacing them", async () => {
-      const broken = new Store({ sql: failingInserts(), blob: temp.blob });
-      await expect(broken.putImage(reencoded)).rejects.toThrow("sql down");
-      const { hash } = await newStore().putImage(plain);
-      expect(await newStore().getImage(hash)).toEqual(reencoded);
+      const [first, second] = await twoWebps();
+      const broken = new Store({ codec: sharpCodec, sql: failingInserts(), blob: temp.blob });
+      await expect(broken.putImage(first)).rejects.toThrow("sql down");
+      const { hash } = await newStore().putImage(second);
+      expect(await newStore().getImage(hash)).toEqual(first);
     });
 
     it("writes nothing for a refused file", async () => {
@@ -438,7 +446,7 @@ describe("Store", () => {
     it.each(["", "abc", "AB".repeat(32), "zz".repeat(32), `${"ab".repeat(32)}00`])(
       "refuses %j",
       async (hash) => {
-        const store = new Store({ sql: temp.sql, blob: temp.blob });
+        const store = newStore();
         await expect(store.lookupKey(hash)).rejects.toThrow(RangeError);
         await expect(store.getImage(hash)).rejects.toThrow(RangeError);
       },

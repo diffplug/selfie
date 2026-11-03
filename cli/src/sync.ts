@@ -1,7 +1,7 @@
 // Moving a run, its images, its decisions, and its goldens between this store and another, through
 // the routes in `selfie-ui/sync`. Every step is safe to send again, so a push or pull that dies is
 // finished by running it again. See `docs/specs/sync.md`.
-import { chunks, mapConcurrently, type RunPage } from "selfie-store";
+import { chunks, ImageDecodeError, ImageHashMismatchError, mapConcurrently, type RunPage } from "selfie-store";
 import { SYNC_LIMITS, type GoldensAnswer, type ProjectAccess, type SentDecision, type SentRun, type SentSnapshot, type SyncError } from "selfie-ui/sync-api";
 import { resolveCaptureSettings } from "./config.ts";
 import { SelfieError } from "./errors.ts";
@@ -9,8 +9,8 @@ import { walkToBaseline, type BaselineSearch } from "./git.ts";
 import { normalizeOrigin } from "./paths.ts";
 import { findBaseline, runsAtHead, type Project } from "./project.ts";
 
-/** How many images go at once, which is about a person's connection and not the store's. */
-const IMAGES_AT_ONCE = 8;
+/** How many images go at once. Each is decoded to check it, so this bounds memory, as `Store` does. */
+const IMAGES_AT_ONCE = 4;
 
 export type Fetch = typeof fetch;
 
@@ -122,6 +122,18 @@ export interface PushResult {
   readonly goldens: GoldensAnswer | null;
 }
 
+/** Says which image and where, for bytes that don't decode to the image their hash names. */
+async function notThatImage<T>(work: Promise<T>, message: string): Promise<T> {
+  try {
+    return await work;
+  } catch (error) {
+    if (error instanceof ImageDecodeError || error instanceof ImageHashMismatchError) {
+      throw new SelfieError("corrupt-image", `${message}: ${error.message}`);
+    }
+    throw error;
+  }
+}
+
 /** What the remote lacks of a run it's holding, and the run's snapshots. Says how many images went. */
 async function uploadRun(project: Project, remote: Remote, route: string, runId: string, finishedAt: number | null, held: RunPage["snapshots"]): Promise<number> {
   const missing: string[] = [];
@@ -129,7 +141,8 @@ async function uploadRun(project: Project, remote: Remote, route: string, runId:
     missing.push(...(await askJson<{ missing: readonly string[] }>(remote, `${route}/images/missing`, "POST", { hashes: group })).missing);
   }
   await mapConcurrently(missing, IMAGES_AT_ONCE, async (hash) => {
-    const bytes = await project.store.getImage(hash);
+    // The last check an image gets, since the cloud doesn't decode what it's sent.
+    const bytes = await notThatImage(project.store.getCheckedImage(hash), `This store's copy of image ${hash} isn't that image, so it can't be pushed`);
     if (bytes === null) throw new SelfieError("missing-image", `This store has lost image ${hash}, which run ${runId} holds.`);
     await ask(remote, `${route}/images/${hash}`, { method: "PUT", body: bytes as Uint8Array<ArrayBuffer> });
   });
@@ -207,7 +220,7 @@ export async function pull(project: Project, remote: Remote, { commit, native }:
   const missing = await store.missingImages(hashes);
   await mapConcurrently(missing, IMAGES_AT_ONCE, async (hash) => {
     const response = await ask(remote, `${route}/images/${hash}`);
-    await store.putImage(new Uint8Array(await response.arrayBuffer()), hash);
+    await notThatImage(store.putImage(new Uint8Array(await response.arrayBuffer()), hash), `The remote's copy of image ${hash} isn't that image, so it can't be pulled`);
   });
 
   const { status } = await snapshots.receiveRun(run);

@@ -14,6 +14,7 @@ import { image } from "./support/colliding-hash.ts";
 import { pngOf } from "./support/png-builder.ts";
 import { hashOf } from "./support/sql-params.ts";
 import { createTempStore } from "./support/temp-store.ts";
+import { sharpCodec } from "../src/adapters/sharp-codec.ts";
 
 const TOKEN = "test-token-abc123";
 
@@ -380,7 +381,7 @@ describe("D1RestAdapter replay against a real SQL engine", () => {
     // Every first try of each statement loses its response.
     const { sql, sent } = await losingResponses((request) => request % 2 === 0);
     await initStoreSchema(sql);
-    const store = new Store({ sql, blob: temp.blob });
+    const store = new Store({ codec: sharpCodec, sql, blob: temp.blob });
     const { hash: imageHash, key } = await store.putImage(pngOf(image(1)));
     expect(await store.lookupKey(imageHash)).toBe(key);
     // Twice each: the schema's 6 statements, and the put's lookup, insert, and lookup.

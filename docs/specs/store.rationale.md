@@ -8,24 +8,27 @@
 
 ## Image decoding
 
-**Why so narrow.** All 746 real Chromium screenshots checked, from Linux and macOS at 1× and 2× scale, are 8-bit RGB holding only `IHDR`, `IDAT`, and `IEND`. PNG is only what Chromium hands over and uploads are untrusted, so breadth nobody uses is only parser surface. All-255 RGBA stays because rendering environments are configurable. This can be widened later without changing any hash, since the hash covers decoded pixels.
+**Why so narrow.** All 746 real Chromium screenshots checked, from Linux and macOS at 1× and 2× scale, are 8-bit RGB holding only `IHDR`, `IDAT`, and `IEND`. PNG is only what Chromium hands over, so anything else is a sign that something changed, and refusing it keeps one set of pixels to one hash. All-255 RGBA stays because rendering environments are configurable. This can be widened later without changing any hash, since the hash covers decoded pixels.
 
-**No library.** `store/src/core/image-file.ts` runs on the platform's own `DecompressionStream`, and adds no dependency.
+**Why `sharp` decodes.** A PNG decoder of our own existed so that a Worker could verify uploads, since `sharp` can't run in one. A Worker no longer decodes ([sync's rationale](sync.rationale.md#what-a-store-takes)), and everything else that needs pixels is the CLI, which already has `sharp` for WebP. Every pixel of those 746 screenshots matched between the two decoders, and the suite pins 2 of them and 8 PngSuite files to hashes `sharp` computed, so no hash changed. Over those 746 in Node, mostly 1200×900, the median decode was about 2 ms for `sharp`, against 6.7 ms for our own.
 
-| Option | License | Why not |
-|---|---|---|
-| `fast-png` 8.0.0 | MIT | Decoded every screenshot exactly, but silently accepted a row cut short, 256 MiB of image data declared as 1×1, and an animated file, with `checkCrc: true`. Its API exposes neither the inflate nor the chunks, so a wrapper can't fix this |
-| `sharp` 0.35.5 | Apache-2.0, with LGPL-3.0-or-later libvips | Native, so it can't be in the core or run in a Worker |
-| `@jsquash/png` 3.1.1 | Apache-2.0 | Exact in workerd in the benchmark, but Node and Workers load its WASM differently, so it would need injecting, and it would still need a chunk scan |
-| `pngjs` 7.0.0 | MIT | Needs Node streams and `node:zlib`, with no release since 2023 |
+**Why a check stays in front of it.** `sharp` is much less strict than the decoder it replaced, on files built for the purpose, 2026-11, with `sharp` 0.35.5:
 
-**Checked against `sharp`.** Every pixel of those 746 screenshots matches, in a one-off run outside the test suite. The suite pins 2 of them and 8 PngSuite files to hashes `sharp` computed.
+| File | `sharp` alone |
+|---|---|
+| A color profile | Accepts, and changes the pixels |
+| Real transparency | Accepts, with 4 channels |
+| All-opaque RGBA | Accepts, with 4 channels |
+| Palette, 16-bit, or interlaced | Accepts, same pixels |
+| Grayscale | Accepts, as 3 channels |
+| Extra chunks, bytes after `IEND`, or no `IEND` | Accepts, same pixels |
+| Corrupt or cut-short image data | Refuses |
 
-**Speed.** Over those 746 in Node, mostly 1200×900, the median decode was 6.7 ms (p95 25 ms), against about 10 ms for `fast-png` and about 2 ms for `sharp`. No test has run on a real Worker.
+A color profile is why the chunk rule isn't only tidiness: it would change a hash with no error. It also ignores image data past the last row, even a megabyte for a 1×1, without inflating it all, and that can't change the pixels.
 
-**The pixel limit.** 100,000,000 is a judgment call, and what a Worker does near its 128 MB limit was not tested.
+**A WebP's alpha bit.** Measured 2026-11: a half-transparent lossless WebP, with that bit cleared by hand, passes `checkImageFile`. `sharp` reads it as 3 opaque channels, and Chromium 153 draws half its pixels at alpha 128. So one hash can name two pictures. It isn't closed, since catching it takes a decoder that keeps alpha, Selfie's encoder writes from RGB so an honest client can't make one, and a client lying about this could as easily send any other picture. RFC 9649 says the bit "is a hint only and SHOULD NOT impact decoding".
 
-**Where decoding runs.** In a Worker for any upload through `Store`, since taking the hash from the decoded file is what ties bytes to their hash. Serving doesn't decode.
+**The pixel limit.** 100,000,000 is a judgment call.
 
 ## Storage
 
@@ -55,20 +58,6 @@ All 1,623 of those images came back from `sharp` with exactly the same pixels, i
 **Encoding in the store.** The rule was once that the store never encodes. Encoding before `Store.putImages` would encode every image of every run, when nearly all of them are already stored, since only the store knows which are new. So it asks an injected codec, for new images only.
 
 **`sharp`'s license.** `sharp` is Apache-2.0. Its prebuilt `@img/sharp-libvips-*` packages are LGPL-3.0-or-later, installed as separate npm packages and linked dynamically. That was read from their `package.json` files, and isn't legal advice.
-
-## A Worker reading a WebP
-
-`@jsquash/webp` 1.5.0 (Apache-2.0, libwebp as WebAssembly) decoded real images inside `workerd` 1.20261023.1, run locally, and its pixels hashed the same as `sharp`'s:
-
-| Image | Took | Process memory, before and at its peak |
-|---|---|---|
-| 1200×900 | 14 ms | 37 to 62 MB |
-| 1200×4949 | 42 ms | 62 to 140 MB |
-| 2400×1800 | 30 ms | 140 to 170 MB |
-| 2400×5898 | 96 ms | 170 to 328 MB |
-| 2400×9898 | 169 ms | 305 to 531 MB |
-
-That prototype held RGBA and then RGB, in one process that didn't return memory between images, and nothing ran on real Cloudflare. Cloudflare's docs list a Worker's memory at 128 MB. So a very tall page at 2× likely won't fit, and PNG would have the same trouble, since hashing needs all the raw pixels whatever the format.
 
 ## Adapters
 

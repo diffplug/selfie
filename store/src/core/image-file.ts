@@ -3,11 +3,9 @@
  * writes, and lossless WebP in its simple form, which is how a store keeps them. The
  * image hash never sees any of this: it covers the canonical PAM of the decoded pixels.
  *
- * PNG is written here rather than taken from a library because uploads are untrusted,
- * and a decoder must refuse what it can't decode exactly, which takes control of each
- * chunk and of the inflate. A WebP's body goes to a `WebpCodec`, which depends on the
- * platform, after this has checked its header. See `docs/specs/store.rationale.md` →
- * Image decoding.
+ * `checkImageFile` reads only headers and structure, so it runs anywhere and is all a
+ * Worker does. Decoding goes to an `ImageCodec`, which is native, so it runs on the client.
+ * See `docs/specs/store.rationale.md` → Image decoding.
  */
 
 import type { RawImage } from "./pam.ts";
@@ -17,34 +15,75 @@ export class ImageDecodeError extends Error {
   override readonly name = "ImageDecodeError";
 }
 
-/** Lossless WebP on one platform. An adapter, since no one library runs everywhere this does. */
-export interface WebpCodec {
-  /** Must write the simple form `decodeImage` accepts, and decode to exactly these pixels. */
-  encode(image: RawImage): Promise<Uint8Array>;
-  decode(file: Uint8Array): Promise<RawImage>;
+/** A decoded file's samples: RGB, or RGBA if that's what its header says it holds. */
+interface DecodedFile {
+  readonly width: number;
+  readonly height: number;
+  readonly pixels: Uint8Array;
+}
+
+/** Decodes and encodes image files on one platform. An adapter, since it needs a native library. */
+export interface ImageCodec {
+  /** Given only a file `checkImageFile` accepted. Must throw for a body it can't read. */
+  decode(file: Uint8Array): Promise<DecodedFile>;
+  /** Must write the simple form `checkImageFile` accepts, and decode to exactly these pixels. */
+  encodeWebp(image: RawImage): Promise<Uint8Array>;
+}
+
+/** What a file's header says it holds. */
+interface ImageFileInfo {
+  readonly format: "PNG" | "WebP";
+  readonly width: number;
+  readonly height: number;
+  readonly channels: 3 | 4;
 }
 
 /** The most a WebP can hold on either side. A larger image stays a PNG. */
 export const WEBP_MAX_SIDE = 16383;
 
+// A header of a few bytes decides how much is allocated, so it can't be unbounded.
+const MAX_PIXELS = 100_000_000;
+
+/**
+ * Throws `ImageDecodeError` for a file that isn't a form the store accepts, from its headers
+ * and structure alone. It can't see inside a compressed body, so it doesn't know the file
+ * decodes, or that it's opaque: only `decodeImage` knows that.
+ */
+export function checkImageFile(file: Uint8Array): ImageFileInfo {
+  if (hasPngSignature(file)) return checkPng(file);
+  if (hasWebpSignature(file)) return checkWebp(file);
+  throw new ImageDecodeError("Refusing this file: it isn't a PNG or a WebP, the formats the store accepts");
+}
+
 /**
  * Decodes an image file to its exact 8-bit RGB. Throws `ImageDecodeError` for anything
- * else, including any transparency, and for a WebP when given no codec to read it.
+ * else, including any transparency a decoder can see.
  */
-export async function decodeImage(file: Uint8Array, webp?: WebpCodec): Promise<RawImage> {
-  if (hasPngSignature(file)) return decodePng(file);
-  if (hasWebpSignature(file)) return decodeWebp(file, webp);
-  throw new ImageDecodeError("Refusing this file: it isn't a PNG or a WebP, the formats the store accepts");
+export async function decodeImage(file: Uint8Array, codec: ImageCodec): Promise<RawImage> {
+  const { format, width, height, channels } = checkImageFile(file);
+  let decoded: DecodedFile;
+  try {
+    decoded = await codec.decode(file);
+  } catch (error) {
+    throw new ImageDecodeError(`Refusing this ${format}: it didn't decode: ${(error as Error).message}`);
+  }
+  if (decoded.width !== width || decoded.height !== height || decoded.pixels.length !== width * height * channels) {
+    throw new ImageDecodeError(
+      `Refusing this ${format}: it decoded to ${decoded.width}x${decoded.height} in ${decoded.pixels.length} bytes, ` +
+        `rather than the ${width}x${height} with ${channels} channels its header states`,
+    );
+  }
+  return { width, height, pixels: channels === 3 ? decoded.pixels : droppingOpaqueAlpha(decoded) };
 }
 
 /**
  * The WebP to keep for a new file, or null if it should stay as it is: it isn't a PNG, or
  * it's too large for a WebP. Must only be given a file that has already decoded.
  */
-export async function webpToKeep(file: Uint8Array, webp: WebpCodec): Promise<Uint8Array | null> {
-  if (!hasPngSignature(file)) return null;
-  const image = await decodePng(file);
-  return Math.max(image.width, image.height) > WEBP_MAX_SIDE ? null : webp.encode(image);
+export async function webpToKeep(file: Uint8Array, codec: ImageCodec): Promise<Uint8Array | null> {
+  const { format, width, height } = checkImageFile(file);
+  if (format !== "PNG" || Math.max(width, height) > WEBP_MAX_SIDE) return null;
+  return codec.encodeWebp(await decodeImage(file, codec));
 }
 
 /**
@@ -73,7 +112,7 @@ function refuseWebp(reason: string): never {
   throw new ImageDecodeError(`Refusing this WebP: ${reason}`);
 }
 
-async function decodeWebp(file: Uint8Array, webp: WebpCodec | undefined): Promise<RawImage> {
+function checkWebp(file: Uint8Array): ImageFileInfo {
   if (file.length < VP8L_HEADER_BYTES) refuseWebp("it is truncated");
   const chunk = fourCc(file, 12);
   if (chunk !== "VP8L") refuseWebp(`its ${chunk.trim()} chunk isn't the simple lossless form, the only one accepted`);
@@ -86,21 +125,11 @@ async function decodeWebp(file: Uint8Array, webp: WebpCodec | undefined): Promis
   const bits = view.getUint32(21, true);
   const width = (bits & 0x3fff) + 1;
   const height = ((bits >>> 14) & 0x3fff) + 1;
+  // Only a hint in the format, so a file can clear it and still hold alpha (`docs/specs/store.md`).
   if ((bits >>> 28) & 1) refuseWebp("it has transparency");
   if (bits >>> 29 !== 0) refuseWebp("its VP8L version isn't 0");
   if (width * height > MAX_PIXELS) refuseWebp(`at ${width}x${height} it is over the limit of ${MAX_PIXELS} pixels`);
-  if (webp === undefined) refuseWebp("nothing here can decode one");
-
-  let image: RawImage;
-  try {
-    image = await webp.decode(file);
-  } catch (error) {
-    refuseWebp(`it didn't decode: ${(error as Error).message}`);
-  }
-  if (image.width !== width || image.height !== height || image.pixels.length !== width * height * 3) {
-    refuseWebp(`it decoded to ${image.width}x${image.height} rather than the ${width}x${height} its header states`);
-  }
-  return image;
+  return { format: "WebP", width, height, channels: 3 };
 }
 
 function refuse(reason: string): never {
@@ -117,44 +146,20 @@ const COLOR_TYPE_NAMES: Readonly<Record<number, string>> = {
   4: "grayscale with alpha",
   6: "RGBA",
 };
-
-// A header of a few bytes decides how much is allocated, so it can't be unbounded.
-const MAX_PIXELS = 100_000_000;
 const CHUNK_OVERHEAD = 12;
-
-interface Header {
-  readonly width: number;
-  readonly height: number;
-  readonly colorType: typeof RGB | typeof RGBA;
-}
 
 function hasPngSignature(bytes: Uint8Array): boolean {
   return SIGNATURE.every((byte, i) => bytes[i] === byte);
 }
 
-async function decodePng(png: Uint8Array): Promise<RawImage> {
-  const { header, data } = readChunks(png);
-  const { width, height, colorType } = header;
-  const channels = colorType === RGB ? 3 : 4;
-  const rowBytes = width * channels;
-  const scanlines = await inflate(data, (rowBytes + 1) * height);
-
-  const pixels = new Uint8Array(width * height * 3);
-  for (let y = 0; y < height; y++) {
-    const start = y * (rowBytes + 1) + 1;
-    unfilterRow(scanlines, start, rowBytes, channels, y > 0);
-    const row = scanlines.subarray(start, start + rowBytes);
-    if (colorType === RGB) pixels.set(row, y * rowBytes);
-    else copyDroppingOpaqueAlpha(row, pixels, y, width);
-  }
-  return { width, height, pixels };
-}
-
-/** Allows only IHDR, then IDAT chunks, then IEND, each with a good checksum. */
-function readChunks(png: Uint8Array): { header: Header; data: readonly Uint8Array[] } {
+/**
+ * Allows only IHDR, then IDAT chunks, then IEND. Anything else could change what a decoder
+ * makes of the pixels, as a color profile does, and a library wouldn't say so.
+ */
+function checkPng(png: Uint8Array): ImageFileInfo {
   const view = new DataView(png.buffer, png.byteOffset, png.byteLength);
-  let header: Header | null = null;
-  const data: Uint8Array[] = [];
+  let header: ImageFileInfo | null = null;
+  let hasData = false;
   let offset = SIGNATURE.length;
   for (;;) {
     if (offset + CHUNK_OVERHEAD > png.length) refuse("it ends before its IEND chunk");
@@ -162,28 +167,25 @@ function readChunks(png: Uint8Array): { header: Header; data: readonly Uint8Arra
     const end = offset + CHUNK_OVERHEAD + length;
     if (end > png.length) refuse("it ends inside a chunk");
     const type = fourCc(png, offset + 4);
-    if (view.getUint32(end - 4) !== crc32(png.subarray(offset + 4, end - 4))) {
-      refuse(`its ${type} chunk fails its checksum`);
-    }
     const body = png.subarray(offset + 8, end - 4);
     offset = end;
 
     if (header === null && type === "IHDR") {
       header = readHeader(body);
     } else if (header !== null && type === "IDAT") {
-      data.push(body);
+      hasData = true;
     } else if (header !== null && type === "IEND") {
       if (body.length !== 0) refuse("its IEND chunk is not empty");
       if (offset !== png.length) refuse("it has bytes after its IEND chunk");
-      if (data.length === 0) refuse("it has no IDAT chunk");
-      return { header, data };
+      if (!hasData) refuse("it has no IDAT chunk");
+      return header;
     } else {
       refuse(`its ${type} chunk isn't allowed here: the store accepts only IHDR, IDAT, IEND, in that order`);
     }
   }
 }
 
-function readHeader(body: Uint8Array): Header {
+function readHeader(body: Uint8Array): ImageFileInfo {
   if (body.length !== 13) refuse(`its IHDR chunk is ${body.length} bytes, not 13`);
   const view = new DataView(body.buffer, body.byteOffset, body.byteLength);
   const width = view.getUint32(0);
@@ -201,111 +203,26 @@ function readHeader(body: Uint8Array): Header {
   if (body[10] !== 0) refuse(`its compression method ${body[10]} is not deflate`);
   if (body[11] !== 0) refuse(`its filter method ${body[11]} is not valid`);
   if (body[12] !== 0) refuse("it is interlaced, and the store accepts only non-interlaced files");
-  return { width, height, colorType };
+  return { format: "PNG", width, height, channels: colorType === RGB ? 3 : 4 };
 }
 
-/**
- * Inflates into exactly `size` bytes. It stops as soon as the stream runs over, so a
- * small file can't make it inflate more than the header promised.
- */
-async function inflate(deflated: readonly Uint8Array[], size: number): Promise<Uint8Array> {
-  const stream = new Blob([...deflated] as Uint8Array<ArrayBuffer>[]).stream();
-  const reader = stream.pipeThrough(new DecompressionStream("deflate")).getReader();
-  const inflated = new Uint8Array(size);
-  let length = 0;
-  try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      if (length + value.length > size) {
-        void reader.cancel().catch(() => {});
-        refuse(`its image data inflates to more than the expected ${size} bytes`);
+function droppingOpaqueAlpha({ width, height, pixels: rgba }: DecodedFile): Uint8Array {
+  const pixels = new Uint8Array(width * height * 3);
+  let source = 0;
+  let target = 0;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++, source += 4) {
+      const alpha = rgba[source + 3]!;
+      if (alpha !== 255) {
+        refuse(
+          `pixel (${x}, ${y}) has alpha ${alpha}. Selfie handles only fully opaque images, ` +
+            "and never flattens transparency",
+        );
       }
-      inflated.set(value, length);
-      length += value.length;
+      pixels[target++] = rgba[source]!;
+      pixels[target++] = rgba[source + 1]!;
+      pixels[target++] = rgba[source + 2]!;
     }
-  } catch (error) {
-    if (error instanceof ImageDecodeError) throw error;
-    refuse(`its image data is corrupt: ${String(error)}`);
   }
-  if (length !== size) refuse(`its image data inflates to ${length} bytes, not ${size}`);
-  return inflated;
-}
-
-/**
- * Reverses a row's filter in place. The row above it is unfiltered already. A loop
- * per filter, since calling a predictor per byte measured 3.5× slower.
- */
-function unfilterRow(
-  data: Uint8Array,
-  start: number,
-  rowBytes: number,
-  bytesPerPixel: number,
-  hasRowAbove: boolean,
-): void {
-  const filter = data[start - 1]!;
-  const end = start + rowBytes;
-  const above = rowBytes + 1;
-  switch (filter) {
-    case 0:
-      break;
-    case 1:
-      for (let i = start + bytesPerPixel; i < end; i++) data[i] = data[i]! + data[i - bytesPerPixel]!;
-      break;
-    case 2:
-      if (!hasRowAbove) break;
-      for (let i = start; i < end; i++) data[i] = data[i]! + data[i - above]!;
-      break;
-    case 3:
-      for (let i = start; i < end; i++) {
-        const left = i - start >= bytesPerPixel ? data[i - bytesPerPixel]! : 0;
-        data[i] = data[i]! + ((left + (hasRowAbove ? data[i - above]! : 0)) >> 1);
-      }
-      break;
-    case 4:
-      for (let i = start; i < end; i++) {
-        const hasLeft = i - start >= bytesPerPixel;
-        const left = hasLeft ? data[i - bytesPerPixel]! : 0;
-        const up = hasRowAbove ? data[i - above]! : 0;
-        const upLeft = hasLeft && hasRowAbove ? data[i - above - bytesPerPixel]! : 0;
-        const estimate = left + up - upLeft;
-        const toLeft = Math.abs(estimate - left);
-        const toUp = Math.abs(estimate - up);
-        const toUpLeft = Math.abs(estimate - upLeft);
-        const predicted = toLeft <= toUp && toLeft <= toUpLeft ? left : toUp <= toUpLeft ? up : upLeft;
-        data[i] = data[i]! + predicted;
-      }
-      break;
-    default:
-      refuse(`it has a row with the invalid filter type ${filter}`);
-  }
-}
-
-function copyDroppingOpaqueAlpha(row: Uint8Array, pixels: Uint8Array, y: number, width: number): void {
-  let target = y * width * 3;
-  for (let x = 0; x < width; x++) {
-    const source = x * 4;
-    const alpha = row[source + 3]!;
-    if (alpha !== 255) {
-      refuse(
-        `pixel (${x}, ${y}) has alpha ${alpha}. Selfie handles only fully opaque images, ` +
-          "and never flattens transparency",
-      );
-    }
-    pixels[target++] = row[source]!;
-    pixels[target++] = row[source + 1]!;
-    pixels[target++] = row[source + 2]!;
-  }
-}
-
-const CRC_TABLE = Uint32Array.from({ length: 256 }, (_, n) => {
-  let c = n;
-  for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-  return c;
-});
-
-function crc32(bytes: Uint8Array): number {
-  let c = 0xffffffff;
-  for (let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]!) & 255]! ^ (c >>> 8);
-  return (c ^ 0xffffffff) >>> 0;
+  return pixels;
 }
