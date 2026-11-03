@@ -8,7 +8,7 @@ import { FeedbackBar, NewerRunBanner } from "./Feedback.tsx";
 import { useFeedback, useFetched, useRun } from "./hooks.ts";
 import { StoriesRoutes } from "./StoriesScreen.tsx";
 import { StoryNavLayout } from "./StoryNav.tsx";
-import { differingStories } from "./storyTree.ts";
+import { differingStories, inTreeOrder } from "./storyTree.ts";
 import { AdvisoryLabels, describePixels } from "./words.tsx";
 import { applyFilter, NO_FILTER, parseFilter } from "./filter.ts";
 import { AppLink, parseRoute, storyPath, useLocation, type Route } from "./router.tsx";
@@ -30,6 +30,7 @@ function RunRoutes({ runId, route, search }: { runId: string; route: Route; sear
   const { unchanged } = state;
   const shownRows = useMemo(() => applyFilter(show === "unchanged" ? (unchanged ?? []) : (rows ?? []), { ...NO_FILTER, show }), [show, unchanged, rows]);
   const stories = useMemo(() => (view === null ? [] : differingStories({ ...view, rows: shownRows }, renames, show === "unchanged")), [view, shownRows, renames, show]);
+  const treeOrder = useMemo(() => inTreeOrder(stories).map(({ story }) => story), [stories]);
   const rowOf = useMemo(() => new Map(shownRows.map((row) => [row.story, row])), [shownRows]);
   // Where to put focus on coming back to the list.
   const lastStory = useRef<string | null>(null);
@@ -67,7 +68,7 @@ function RunRoutes({ runId, route, search }: { runId: string; route: Route; sear
       )}
       <FeedbackBar feedback={feedback} storyHref={(story) => storyPath(runId, story, "")} showList={route.kind === "run"} />
       {route.kind === "story" ? (
-        <DetailScreen state={state} view={state.view} story={route.story} search={search} feedback={feedback} />
+        <DetailScreen state={state} view={state.view} story={route.story} search={search} feedback={feedback} treeOrder={treeOrder} />
       ) : route.kind === "accept" ? (
         <AcceptScreen state={state} view={state.view} />
       ) : (

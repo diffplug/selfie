@@ -150,6 +150,7 @@ export function DetailScreen({
   navigation,
   liveStories,
   startNote = false,
+  treeOrder,
 }: {
   state: RunState;
   view: RunView;
@@ -161,6 +162,8 @@ export function DetailScreen({
   liveStories?: readonly [boolean, (open: boolean) => void];
   /** Someone asked to write a note on this story, and it's just been rendered so they can. */
   startNote?: boolean;
+  /** The stories of the list beside this page, from the top. */
+  treeOrder?: readonly string[];
 }) {
   const { unchanged, loadUnchanged } = state;
   const filter = useMemo(() => parseFilter(search), [search]);
@@ -171,7 +174,13 @@ export function DetailScreen({
     if (needsUnchanged) loadUnchanged();
   }, [needsUnchanged, loadUnchanged]);
 
-  const all = filter.show === "unchanged" ? (unchanged ?? []) : view.rows;
+  const source = filter.show === "unchanged" ? (unchanged ?? []) : view.rows;
+  // Next and previous go as the list beside this reads, and through only what's in it.
+  const all = useMemo(() => {
+    if (treeOrder === undefined) return source;
+    const bySource = new Map(source.map((candidate) => [candidate.story, candidate]));
+    return treeOrder.flatMap((name) => bySource.get(name) ?? []);
+  }, [source, treeOrder]);
   const shown = useMemo(() => applyFilter(all, filter), [all, filter]);
   const row = inRows ?? unchanged?.find((candidate) => candidate.story === story) ?? null;
   const { previous: previousRow, next: nextRow } = useMemo(() => neighbors(all, shown, story), [all, shown, story]);

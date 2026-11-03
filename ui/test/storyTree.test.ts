@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import type { ListedStory } from "../src/shared/api.ts";
-import { buildStoryTree, differingStories, initiallyClosed, nameFromId, isSection, openedAround, storiesIn, visibleRows, type StoryFolder } from "../src/client/storyTree.ts";
+import { buildStoryTree, differingStories, inTreeOrder, initiallyClosed, nameFromId, isSection, openedAround, storiesIn, visibleRows, type StoryFolder } from "../src/client/storyTree.ts";
 
 const story = (title: string, name: string): ListedStory => ({ story: `${title}--${name}`.toLowerCase(), title, name, render: null });
 const labels = (nodes: ReturnType<typeof visibleRows>) => nodes.map((row) => `${" ".repeat(row.depth)}${row.kind === "folder" ? row.name : row.entry.name}`);
@@ -72,4 +72,9 @@ describe("a run's differences", () => {
     expect(stories([row("new", "new"), row("old", "removed")], [], new Map([["new", "old"]]))).toEqual(["new"]);
     expect(stories([row("old", "removed")], [], new Map([["new", "old"]]))).toEqual(["old"]);
   });
+});
+
+test("reads from the top of the tree, where a later story joins the folder an earlier one made", () => {
+  const stories = [story("B", "One"), story("A", "Two"), story("B", "Three")];
+  expect(inTreeOrder(stories).map(({ name }) => name)).toEqual(["One", "Three", "Two"]);
 });

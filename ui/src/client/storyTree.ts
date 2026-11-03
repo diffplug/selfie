@@ -107,3 +107,9 @@ export function differingStories(
       render: { runId: run.id, state, decision, renderedAt: run.startedAt, dirty: false, fromHostedStorybook: null },
     }));
 }
+
+/** Stories in the order a tree of them reads from the top, which is the order next and previous must go in. */
+export function inTreeOrder(stories: readonly ListedStory[]): readonly ListedStory[] {
+  const walk = (nodes: readonly StoryTreeNode[]): ListedStory[] => nodes.flatMap((node) => (node.kind === "story" ? [node.entry] : walk(node.children)));
+  return walk(buildStoryTree(stories));
+}

@@ -14,6 +14,7 @@ import { plural } from "./plural.ts";
 import { ActionFailedBanner } from "./RunNotes.tsx";
 import { anyStoryPath, navigate, storiesPath } from "./router.tsx";
 import { matchingStories, StoryNavLayout } from "./StoryNav.tsx";
+import { inTreeOrder } from "./storyTree.ts";
 import { Checklist } from "./Checklist.tsx";
 import { LoadFailure, Loading } from "./Status.tsx";
 
@@ -68,8 +69,9 @@ export function StoriesOverview({ view, renders, recheck }: { view: StoriesView;
 
 /** Next and previous through this list, whichever runs they're from. */
 export function navigationIn(view: StoriesView, story: string, search: string): StoryNavigation {
-  const shown = matchingStories(view.stories, parseFilter(search).text);
-  const { previous, next } = neighbors(view.stories, shown, story);
+  const ordered = inTreeOrder(view.stories);
+  const shown = matchingStories(ordered, parseFilter(search).text);
+  const { previous, next } = neighbors(ordered, shown, story);
   const hrefOf = (entry: ListedStory | null) => (entry === null ? null : anyStoryPath(entry.story, search));
   return {
     previous: hrefOf(previous),
