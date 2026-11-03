@@ -12,7 +12,7 @@ import { createLocalApp, createStorybookApp, serveLocal, serveStorybook, type Lo
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { runCli } from "../src/cli.ts";
 import { openProject, type Project } from "../src/project.ts";
-import { localReviewSource } from "../src/ui.ts";
+import { localReviewSource, type StoryRecorder } from "../src/ui.ts";
 import { BLUE, commit, createHarness, git, GREEN, RED, type Harness } from "./support.ts";
 
 const PORT = 4173;
@@ -1022,6 +1022,16 @@ describe("the hosted Storybook", () => {
       expect((await capturesOf()).a).toMatchObject({ fromHostedBuild: null });
     });
 
+    test("notices any file of the build changing, not only its index", async () => {
+      await withStories("a");
+      await recorded();
+      const source = localReviewSource(project, { storybook: { dir, url: hostedAt } });
+      const fromHosted = async () => (await source.storiesView()).stories[0]!.capture?.fromHostedBuild;
+      expect(await fromHosted()).toBe(true);
+      await writeFile(path.join(dir, "assets", "story.js"), "export const changed = true;");
+      expect(await fromHosted()).toBe(false);
+    });
+
     test("says when a capture came from another build, or uncommitted changes", async () => {
       await withStories("a");
       await recorded();
@@ -1052,6 +1062,87 @@ describe("the hosted Storybook", () => {
       const response = await get("/api/stories");
       expect(response.status).toBe(200);
       expect(await response.json()).toMatchObject({ stories: [] });
+    });
+  });
+
+  describe("capturing from the page", () => {
+    const withStories = async (...ids: string[]) => {
+      await built();
+      await writeFile(path.join(dir, "index.json"), JSON.stringify({ entries: Object.fromEntries(ids.map((id) => [id, { type: "story", id }])) }));
+    };
+    const asked: (readonly string[] | undefined)[] = [];
+    const sourceRecording = (record: StoryRecorder) => localReviewSource(project, { storybook: { dir, url: hostedAt, record } });
+
+    beforeEach(() => {
+      asked.length = 0;
+    });
+
+    test("records just those stories, and says which run", async () => {
+      await withStories("a", "b", "c");
+      const source = sourceRecording(async (stories) => {
+        asked.push(stories);
+        return "the-run";
+      });
+      expect(await source.capture(["a", "b"])).toEqual({ runId: "the-run" });
+      expect(asked).toEqual([["a", "b"]]);
+    });
+
+    test("asking for every story is a whole run, which can become goldens", async () => {
+      await withStories("a", "b");
+      const source = sourceRecording(async (stories) => {
+        asked.push(stories);
+        return "the-run";
+      });
+      await source.capture(["b", "a"]);
+      expect(asked).toEqual([undefined]);
+    });
+
+    test("refuses a story the build doesn't have, or a second capture at once", async () => {
+      await withStories("a");
+      let finish = () => {};
+      const blocked = new Promise<void>((resolve) => {
+        finish = resolve;
+      });
+      const source = sourceRecording(async () => {
+        await blocked;
+        return "the-run";
+      });
+      await expect(source.capture(["nope"])).rejects.toMatchObject({ code: "unknown-story" });
+      const first = source.capture(["a"]);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      await expect(source.capture(["a"])).rejects.toMatchObject({ code: "capture-busy" });
+      finish();
+      await expect(first).resolves.toEqual({ runId: "the-run" });
+      await expect(source.capture(["a"])).resolves.toEqual({ runId: "the-run" });
+    });
+
+    test("says why it failed, and can capture again after", async () => {
+      await withStories("a");
+      let failing = true;
+      const source = sourceRecording(async () => {
+        if (failing) throw new Error("Docker is unavailable");
+        return "the-run";
+      });
+      await expect(source.capture(["a"])).rejects.toMatchObject({ code: "capture-failed", message: expect.stringContaining("Docker is unavailable") });
+      failing = false;
+      await expect(source.capture(["a"])).resolves.toEqual({ runId: "the-run" });
+    });
+
+    test("isn't offered with no build, or nothing to record with", async () => {
+      expect((await localReviewSource(project, { storybook: { dir, url: hostedAt, record: async () => "r" } }).storiesView()).canCapture).toBe(false);
+      await withStories("a");
+      expect((await localReviewSource(project, { storybook: { dir, url: hostedAt } }).storiesView()).canCapture).toBe(false);
+      expect((await sourceRecording(async () => "r").storiesView()).canCapture).toBe(true);
+      await expect(localReviewSource(project).capture(["a"])).rejects.toMatchObject({ code: "capture-failed" });
+    });
+
+    test("answers at /api/captures, only to a change from the page", async () => {
+      const refused = await app.request("/api/captures", { method: "POST", headers: { host: HOST, "content-type": "application/json" }, body: JSON.stringify({ stories: ["a"] }) });
+      expect(refused.status).toBe(403);
+      for (const stories of [undefined, [], [1], [""]]) {
+        expect((await change("/api/captures", { stories })).status, JSON.stringify(stories)).toBe(400);
+      }
+      expect((await change("/api/captures", { stories: ["a"] })).status).toBe(409);
     });
   });
 

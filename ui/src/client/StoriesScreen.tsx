@@ -8,10 +8,11 @@ import type { ListedStory, StoriesView } from "../shared/api.ts";
 import { DetailScreen, StoryPager, type StoryNavigation } from "./DetailScreen.tsx";
 import { FeedbackBar } from "./Feedback.tsx";
 import { filterQuery, matchesText, neighbors, NO_FILTER, parseFilter, positionWords } from "./filter.ts";
-import { useFeedback, useHotkeys, useRun, useStories, useStoryListKeys, useTitle, type FeedbackState, type RunState } from "./hooks.ts";
+import { useCapture, useFeedback, useHotkeys, useRun, useStories, useStoryListKeys, useTitle, type CaptureState, type FeedbackState, type RunState } from "./hooks.ts";
 import { Keys } from "./Keys.tsx";
 import { OpenInStorybook, StoryFrame, storyFrameUrl } from "./LiveStories.tsx";
 import { plural } from "./plural.ts";
+import { ActionFailedBanner } from "./RunNotes.tsx";
 import { anyStoryPath, AppLink, followLink, navigate, runPath, storiesPath } from "./router.tsx";
 import { LoadFailure, Loading } from "./Status.tsx";
 import { DecisionLabel, shortSha, StateLabel } from "./words.tsx";
@@ -44,12 +45,28 @@ function StoryRow({ entry, search }: { entry: ListedStory; search: string }) {
   );
 }
 
-export function StoriesScreen({ view, search }: { view: StoriesView; search: string }) {
+/** What's said while a capture runs, or why the last one didn't. */
+export function CaptureStatus({ capture }: { capture: CaptureState }) {
+  return (
+    <>
+      {capture.error !== null && <ActionFailedBanner error={capture.error} onDismiss={capture.clearError} />}
+      {capture.capturing > 0 && (
+        <Banner variant="info" title={`Capturing ${plural(capture.capturing, "story", "stories")}`} description="It renders in the same browser as any other run, so it can take a moment." />
+      )}
+    </>
+  );
+}
+
+/** Whether a capture is missing or known to be out of date, which is what's left to fan out to. */
+const needsCapture = ({ capture }: ListedStory) => capture === null || capture.fromHostedBuild === false;
+
+export function StoriesScreen({ view, search, capture }: { view: StoriesView; search: string; capture: CaptureState }) {
   useTitle("Every story");
   const filter = useMemo(() => parseFilter(search), [search]);
   const input = useRef<HTMLInputElement>(null);
   const shown = useMemo(() => matching(view.stories, filter.text), [view.stories, filter.text]);
-  const captured = view.stories.filter(({ capture }) => capture !== null).length;
+  const captured = view.stories.filter((entry) => entry.capture !== null).length;
+  const rest = view.stories.filter(needsCapture);
 
   useStoryListKeys(input);
 
@@ -65,7 +82,14 @@ export function StoriesScreen({ view, search }: { view: StoriesView; search: str
             </>
           )}
         </Heading>
-        {view.newestRunId !== null && <AppLink href={runPath(view.newestRunId)}>Review the newest run</AppLink>}
+        <Stack direction="horizontal" align="center" gap="condensed">
+          {view.newestRunId !== null && <AppLink href={runPath(view.newestRunId)}>Review the newest run</AppLink>}
+          {capture.can && rest.length > 0 && (
+            <Button variant="primary" disabled={capture.capturing > 0} onClick={() => void capture.capture(rest.map(({ story }) => story))}>
+              {`Capture the rest (${rest.length.toLocaleString()})`}
+            </Button>
+          )}
+        </Stack>
       </Stack>
       {view.storybookUrl === null && (
         <Banner
@@ -140,6 +164,9 @@ function CapturedStory({
   feedback,
   navigation,
   liveStories,
+  capture,
+  outOfDate,
+  startNote,
   onDecided,
 }: {
   runId: string;
@@ -147,6 +174,9 @@ function CapturedStory({
   feedback: FeedbackState;
   navigation: StoryNavigation;
   liveStories: readonly [boolean, (open: boolean) => void];
+  capture: CaptureState;
+  outOfDate: boolean;
+  startNote: boolean;
   onDecided: () => void;
 }) {
   const state = useRun(runId);
@@ -159,16 +189,36 @@ function CapturedStory({
       return recorded;
     },
   };
-  return <DetailScreen state={deciding} view={state.view} story={story} search="" feedback={feedback} navigation={navigation} liveStories={liveStories} />;
+  return (
+    <Stack gap="condensed">
+      {capture.can && (
+        <Stack direction="horizontal" align="center" gap="condensed" wrap="wrap">
+          <Button disabled={capture.capturing > 0} onClick={() => void capture.capture([story])}>
+            Capture again
+          </Button>
+          {outOfDate && <Text className="selfie-muted">This image is from another build than the one being hosted.</Text>}
+        </Stack>
+      )}
+      <DetailScreen state={deciding} view={state.view} story={story} search="" feedback={feedback} navigation={navigation} liveStories={liveStories} startNote={startNote} />
+    </Stack>
+  );
 }
 
 /** A story with no image yet, which is still a real story to look at. */
-export function UncapturedStory({ view, story, navigation }: { view: StoriesView; story: string; navigation: StoryNavigation }) {
+export function UncapturedStory({ view, story, navigation, capture, onWriteNote }: { view: StoriesView; story: string; navigation: StoryNavigation; capture: CaptureState; onWriteNote: () => void }) {
   useTitle(story);
   const go = (href: string | null) => {
     if (href !== null) navigate(href, { replace: true });
   };
-  useHotkeys({ j: () => go(navigation.next), k: () => go(navigation.previous), u: () => navigate(navigation.list) });
+  const captureNow = () => {
+    if (capture.can && capture.capturing === 0) void capture.capture([story]);
+  };
+  const writeNote = () => {
+    if (!capture.can || capture.capturing > 0) return;
+    onWriteNote();
+    void capture.capture([story]);
+  };
+  useHotkeys({ j: () => go(navigation.next), k: () => go(navigation.previous), u: () => navigate(navigation.list), c: captureNow, m: writeNote });
   const { storybookUrl } = view;
   return (
     <Stack gap="condensed">
@@ -186,26 +236,69 @@ export function UncapturedStory({ view, story, navigation }: { view: StoriesView
         </Heading>
         {storybookUrl !== null && <OpenInStorybook url={storybookUrl} story={story} />}
       </Stack>
-      <Banner
-        variant="info"
-        title="Not captured yet"
-        description={
-          <>
-            No run at this commit has an image of this story. <code>selfie record --story {story}</code> captures one.
-          </>
-        }
-      />
+      {capture.can ? (
+        <Stack direction="horizontal" align="center" gap="condensed" wrap="wrap">
+          <Button variant="primary" disabled={capture.capturing > 0} onClick={writeNote} trailingVisual={() => <Keys keys="m" />}>
+            Write a note on this
+          </Button>
+          <Button disabled={capture.capturing > 0} onClick={captureNow} trailingVisual={() => <Keys keys="c" />}>
+            Capture it
+          </Button>
+          <Text className="selfie-muted">A note is written on an image, so writing one captures this story first.</Text>
+        </Stack>
+      ) : (
+        <Banner
+          variant="info"
+          title="Not captured yet"
+          description={
+            <>
+              No run at this commit has an image of this story. <code>selfie record --story {story}</code> captures one.
+            </>
+          }
+        />
+      )}
       {storybookUrl !== null && <StoryFrame title={`${story}, running`} url={storyFrameUrl(storybookUrl, story)} viewport={view.viewport} />}
     </Stack>
   );
 }
 
-function OneStory({ view, story, search, feedback, liveStories, onDecided }: { view: StoriesView; story: string; search: string; feedback: FeedbackState; liveStories: readonly [boolean, (open: boolean) => void]; onDecided: () => void }) {
+function OneStory({
+  view,
+  story,
+  search,
+  feedback,
+  liveStories,
+  capture,
+  onDecided,
+}: {
+  view: StoriesView;
+  story: string;
+  search: string;
+  feedback: FeedbackState;
+  liveStories: readonly [boolean, (open: boolean) => void];
+  capture: CaptureState;
+  onDecided: () => void;
+}) {
+  // Which story someone asked to write on, whose note box opens once it's been captured.
+  const [noteOn, setNoteOn] = useState<string | null>(null);
   const navigation = navigationIn(view, story, search);
   const entry = view.stories.find((candidate) => candidate.story === story);
   if (entry === undefined) return <Banner variant="warning" title="This Storybook has no such story" description={<AppLink href={navigation.list}>Back to the list</AppLink>} />;
-  if (entry.capture === null) return <UncapturedStory view={view} story={story} navigation={navigation} />;
-  return <CapturedStory key={entry.capture.runId} runId={entry.capture.runId} story={story} feedback={feedback} navigation={navigation} liveStories={liveStories} onDecided={onDecided} />;
+  if (entry.capture === null) return <UncapturedStory view={view} story={story} navigation={navigation} capture={capture} onWriteNote={() => setNoteOn(story)} />;
+  return (
+    <CapturedStory
+      key={entry.capture.runId}
+      runId={entry.capture.runId}
+      story={story}
+      feedback={feedback}
+      navigation={navigation}
+      liveStories={liveStories}
+      capture={capture}
+      outOfDate={entry.capture.fromHostedBuild === false}
+      startNote={noteOn === story}
+      onDecided={onDecided}
+    />
+  );
 }
 
 export function StoriesRoutes({ story, search }: { story: string | null; search: string }) {
@@ -213,14 +306,24 @@ export function StoriesRoutes({ story, search }: { story: string | null; search:
   const stories = useStories(feedback.view?.latestRunId);
   // Here, since each run a story is from has a page of its own.
   const liveStories = useState(false);
+  const capture = useCapture(stories.view?.canCapture ?? false, stories.reload);
   if (stories.view === null) return stories.error !== null ? <LoadFailure error={stories.error} /> : <Loading label="Reading every story" />;
   return (
     <>
       <FeedbackBar feedback={feedback} storyHref={(name) => anyStoryPath(name)} showList={story === null} />
+      <CaptureStatus capture={capture} />
       {story === null ? (
-        <StoriesScreen view={stories.view} search={search} />
+        <StoriesScreen view={stories.view} search={search} capture={capture} />
       ) : (
-        <OneStory view={stories.view} story={story} search={search} feedback={feedback} liveStories={liveStories} onDecided={stories.reload} />
+        <OneStory
+          view={stories.view}
+          story={story}
+          search={search}
+          feedback={feedback}
+          liveStories={liveStories}
+          capture={capture}
+          onDecided={stories.reload}
+        />
       )}
     </>
   );

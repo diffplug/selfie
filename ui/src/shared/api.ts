@@ -190,6 +190,8 @@ export interface StoriesView {
   readonly stories: readonly ListedStory[];
   /** The newest finished run at HEAD, to review and accept. */
   readonly newestRunId: string | null;
+  /** Whether this server can capture a story when asked, which takes a build and a browser to do it with. */
+  readonly canCapture: boolean;
 }
 
 /** Which run the UI opens to: the newest finished one at HEAD, in the project's environment. */
@@ -269,6 +271,8 @@ export type SendVia = "agent" | "copy";
 export interface ReviewSource {
   current(): Promise<CurrentView>;
   storiesView(): Promise<StoriesView>;
+  /** Records a run of just these stories from the hosted Storybook, one at a time. */
+  capture(stories: readonly string[]): Promise<{ readonly runId: string }>;
   runView(runId: string): Promise<RunView>;
   /** Why the run has no baseline: only a screen showing that asks. */
   baseline(runId: string): Promise<BaselineNote>;

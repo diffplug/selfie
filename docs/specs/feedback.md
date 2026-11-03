@@ -89,9 +89,9 @@ A note is where something is. Its messages are the conversation about it.
 
 - **Must remember as this session's newest whichever run `selfie record`, `selfie review` with no run, or `selfie reply --run` names last**, and not one someone only looked at.
 - **Must say when the run being looked at isn't the session's newest, and offer to go there, to the same story if on one, and never switch by itself**, so an image can't change while someone is looking at it (rationale).
-- **Must keep each story's diff as current against golden.** A run's diff doesn't accumulate.
+- **Must keep each story's diff as current against golden, or with no golden, against the image its newest open note is on, and say so** (rationale). A run's diff doesn't accumulate. That's only to look at: a decision is still on the story's new image.
 - **Must show open notes on their story in any run**, whether or not they've been answered.
-- **Must offer one more layer on a story whose newest open note is on an image other than its current and golden ones: When noted**, which is that image, with the boxes of the notes on it. It has no regions, since those are between the current image and the golden, so a note written there can't be on selected ones.
+- **Must offer one more layer on a story whose newest open note is on an image other than its current and golden ones: When noted**, which is that image, with the boxes of the notes on it. With a golden, it has no regions, since those are between the current image and the golden, so a note written there can't be on selected ones. With no golden, it's what the current image is compared with, so the regions and the diff are between those two.
 - **Must say on a replied note, on the run the agent answered from, when its image is identical to the story's there**, so a claimed fix that moved nothing shows at once (rationale). On an older run, the note's image is simply what's there.
 - Decisions need nothing here, since they're on image hashes (`docs/specs/snapshots.md` → Decisions).
 

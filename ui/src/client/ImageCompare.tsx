@@ -2,9 +2,9 @@
 // all three layers stay stacked and loaded, so switching costs no scroll and no flash. How someone
 // is looking stays the same from story to story, since this stays mounted across them.
 import { Button, SegmentedControl, Stack, Text } from "@primer/react";
-import { useLayoutEffect, useRef, useState, type ReactEventHandler, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactEventHandler, type ReactNode } from "react";
 import type { BoundingBox, Note, PixelDiff, SnapshotRow } from "../shared/api.ts";
-import { isOpenNote } from "../shared/notes.ts";
+import { comparedImage, isOpenNote, newestNotedImage } from "../shared/notes.ts";
 import { hull, type RegionGroup } from "../shared/regions.ts";
 import { diffImageUrl, imageUrl } from "./api.ts";
 import { useDevicePixelRatio, useHotkeys, type FeedbackState, type RegionSelection } from "./hooks.ts";
@@ -33,12 +33,12 @@ interface Source {
   readonly hash: string | null;
 }
 
-function sourcesOf({ imageHash, goldenHash }: SnapshotRow, hasDiffImage: boolean, noted: string | null): readonly Source[] {
+function sourcesOf({ imageHash, goldenHash }: SnapshotRow, hasDiffImage: boolean, noted: string | null, compared: string | null): readonly Source[] {
   const sources: Source[] = [];
   if (noted !== null && noted !== imageHash && noted !== goldenHash) sources.push({ name: "noted", src: imageUrl(noted), hash: noted });
   if (goldenHash !== null) sources.push({ name: "golden", src: imageUrl(goldenHash), hash: goldenHash });
   if (imageHash !== null) sources.push({ name: "current", src: imageUrl(imageHash), hash: imageHash });
-  if (hasDiffImage && imageHash !== null && goldenHash !== null) sources.push({ name: "diff", src: diffImageUrl(imageHash, goldenHash), hash: imageHash });
+  if (hasDiffImage && imageHash !== null && compared !== null) sources.push({ name: "diff", src: diffImageUrl(imageHash, compared), hash: imageHash });
   return sources;
 }
 
@@ -131,16 +131,21 @@ interface ImageCompareProps {
   readonly selection: RegionSelection;
   readonly runId: string;
   readonly feedback: FeedbackState;
+  /** Puts someone in the note box from the start, having just asked to write one. */
+  readonly startNote?: boolean;
 }
 
-export function ImageCompare({ row, diff, scale, groups, selection, runId, feedback }: ImageCompareProps) {
+export function ImageCompare({ row, diff, scale, groups, selection, runId, feedback, startNote = false }: ImageCompareProps) {
   const { story, imageHash, goldenHash } = row;
-  const storyNotes = (feedback.view?.notes ?? []).filter((note) => note.story === story);
+  const allNotes = feedback.view?.notes ?? [];
+  const storyNotes = allNotes.filter((note) => note.story === story);
   const openNotes = storyNotes.filter(isOpenNote);
-  // The newest note that's on an image, whichever image that was.
-  const notedImage = openNotes.findLast(({ imageHash: noted }) => noted !== null)?.imageHash ?? null;
-  const sources = sourcesOf(row, diff !== null, notedImage);
-  const canFlip = goldenHash !== null && imageHash !== null;
+  const notedImage = newestNotedImage(allNotes, story);
+  const compared = comparedImage(row, notedImage);
+  const sources = sourcesOf(row, diff !== null, notedImage, compared?.hash ?? null);
+  const canFlip = compared !== null;
+  // Regions are between the current image and what it's compared with, whichever image that is.
+  const regionLayer = (on: Layer): Layer => (on === "noted" && compared?.layer === "noted" ? "golden" : on);
   const box = diff?.boundingBox ?? null;
   const firstChanged = diff?.firstChanged ?? null;
 
@@ -157,6 +162,9 @@ export function ImageCompare({ row, diff, scale, groups, selection, runId, feedb
   const [outlined, setOutlined] = useState(true);
   const { selected, focused, toggle, setSelected, setFocused } = selection;
   const writing = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    if (startNote) writing.current?.focus();
+  }, [startNote]);
   const [sizes, setSizes] = useState<Readonly<Record<string, Size>>>({});
   const viewport = useRef<HTMLDivElement>(null);
   const section = useRef<HTMLDivElement>(null);
@@ -195,7 +203,7 @@ export function ImageCompare({ row, diff, scale, groups, selection, runId, feedb
     // A box too big for the viewport may show nothing changed at its center, as when two distant
     // pixels changed, so go to a pixel that certainly did.
     const whole = fits(box) || firstChanged === null ? box : { ...firstChanged, width: 1, height: 1 };
-    goToBox((focusedGroup === null ? null : boxOn(focusedGroup, layer)) ?? whole);
+    goToBox((focusedGroup === null ? null : boxOn(focusedGroup, regionLayer(layer))) ?? whole);
   };
 
   // A small change is usually off-screen when zoomed, so go to it whenever the zoom changes, and as
@@ -211,14 +219,14 @@ export function ImageCompare({ row, diff, scale, groups, selection, runId, feedb
     const from = flippedFrom.current;
     flippedFrom.current = layer;
     if (from === layer || focusedGroup === null) return;
-    const [was, now] = [boxOn(focusedGroup, from), boxOn(focusedGroup, layer)];
+    const [was, now] = [boxOn(focusedGroup, regionLayer(from)), boxOn(focusedGroup, regionLayer(layer))];
     if (was !== null && now !== null) viewport.current?.scrollBy((now.x - was.x) * cssPixels, (now.y - was.y) * cssPixels);
   }, [layer]);
 
   const goToRegion = (index: number | null) => {
     if (index === null) return;
     setFocused(index);
-    const box = boxOn(groups[index]!, layer);
+    const box = boxOn(groups[index]!, regionLayer(layer));
     if (mode === "flip") {
       if (box !== null) goToBox(box);
     } else section.current?.querySelector(`[data-region="${index}"]`)?.scrollIntoView({ block: "center" });
@@ -229,12 +237,12 @@ export function ImageCompare({ row, diff, scale, groups, selection, runId, feedb
   const outlinesOn = (on: Layer, size: Size | undefined) =>
     size !== undefined && (
       <>
-        {outlined && <RegionOutlines groups={groups} layer={on} size={size} selection={selection} />}
+        {outlined && <RegionOutlines groups={groups} layer={regionLayer(on)} size={size} selection={selection} />}
         <NoteBoxes notes={openNotes.filter(({ imageHash: noted }) => noted === hashOn(on))} drawn={mode === "flip" ? drawn : null} size={size} />
       </>
     );
 
-  const selectedBoxes = [...selected].flatMap((index) => boxOn(groups[index]!, layer) ?? []);
+  const selectedBoxes = [...selected].flatMap((index) => boxOn(groups[index]!, regionLayer(layer)) ?? []);
   const noteBox = drawn ?? (selectedBoxes.length === 0 ? null : selectedBoxes.reduce(hull));
   const imageWords = hashOn(layer) === null ? "this story" : LAYER_IMAGE_WORDS[layer];
   const noteTarget = drawn !== null ? `on the box you drew on ${imageWords}` : selectedBoxes.length > 0 ? `on ${plural(selectedBoxes.length, "selected region")} of ${imageWords}` : `on all of ${imageWords}`;
@@ -255,7 +263,7 @@ export function ImageCompare({ row, diff, scale, groups, selection, runId, feedb
     s: () => setMode("side"),
     f: () => {
       if (mode === "side") setMode("flip");
-      else if (canFlip) setLayer(layer === "current" ? "golden" : "current");
+      else if (compared !== null) setLayer(layer === "current" ? compared.layer : "current");
     },
     d: () => {
       if (!hasDiffLayer) return;
@@ -343,7 +351,7 @@ export function ImageCompare({ row, diff, scale, groups, selection, runId, feedb
             {zoom === "size" ? "at its actual size." : `with one image pixel ${zoom} device ${zoom === 1 ? "pixel" : "pixels"} wide.`}{" "}
             {canFlip && (
               <>
-                <Keys keys="f" /> flips current and golden.{" "}
+                <Keys keys="f" /> flips current and {LAYER_WORDS[compared!.layer].toLowerCase()}.{" "}
               </>
             )}
             {hasDiffLayer && (

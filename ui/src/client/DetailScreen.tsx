@@ -15,6 +15,7 @@ import { ActionFailure } from "./RunNotes.tsx";
 import { LiveStories, StorybookLinkTo } from "./LiveStories.tsx";
 import { LoadFailure, Loading } from "./Status.tsx";
 import { describeBox, groupRegions, isLayoutOnly } from "../shared/regions.ts";
+import { comparedImage, newestNotedImage } from "../shared/notes.ts";
 import { plural } from "./plural.ts";
 import { AdvisoryLabels, DecisionLabel, describePixels, sizeChanged, StateLabel } from "./words.tsx";
 
@@ -133,6 +134,7 @@ export function DetailScreen({
   feedback,
   navigation,
   liveStories,
+  startNote = false,
 }: {
   state: RunState;
   view: RunView;
@@ -142,6 +144,8 @@ export function DetailScreen({
   navigation?: StoryNavigation;
   /** Whether the live stories are open, if it's kept above this screen, which a new run starts afresh. */
   liveStories?: readonly [boolean, (open: boolean) => void];
+  /** Someone asked to write a note on this story, and it's just been captured so they can. */
+  startNote?: boolean;
 }) {
   const { unchanged, loadUnchanged } = state;
   const filter = useMemo(() => parseFilter(search), [search]);
@@ -174,9 +178,11 @@ export function DetailScreen({
   }, []);
 
   // Its review's stats, if they're still on disk, and otherwise computed from the store.
-  const changedPair = row?.state === "changed" && row.imageHash !== null && row.goldenHash !== null;
-  const { data: fetched, error: diffError } = useFetched(changedPair && row.pixelDiff === null ? `${row.imageHash}/${row.goldenHash}` : null, (signal) =>
-    fetchDiff(row!.imageHash!, row!.goldenHash!, signal),
+  const compared = row === null ? null : comparedImage(row, newestNotedImage(feedback.view?.notes ?? [], story));
+  const comparedWithNote = compared?.layer === "noted";
+  const changedPair = row !== null && row.imageHash !== null && compared !== null && (row.state === "changed" || comparedWithNote);
+  const { data: fetched, error: diffError } = useFetched(changedPair && row.pixelDiff === null ? `${row.imageHash}/${compared.hash}` : null, (signal) =>
+    fetchDiff(row!.imageHash!, compared!.hash, signal),
   );
   const diff = row?.pixelDiff ?? fetched;
   const mergeDistance = view.regionMergeDistance * view.run.scale;
@@ -299,9 +305,13 @@ export function DetailScreen({
           }
         />
       )}
-      <Notes row={row} diff={diff} />
+      {comparedWithNote ? (
+        <Banner variant="info" title="Compared with the image when noted" description="This story has no golden, so what's shown is what's changed since its newest note. Approving lets this image become its first golden." />
+      ) : (
+        <Notes row={row} diff={diff} />
+      )}
       <LiveStories row={row} view={view} open={liveOpen} onToggle={() => setLiveOpen(!liveOpen)} />
-      <ImageCompare row={row} diff={diff} scale={view.run.scale} groups={groups} selection={selection} runId={view.run.id} feedback={feedback} />
+      <ImageCompare row={row} diff={diff} scale={view.run.scale} groups={groups} selection={selection} runId={view.run.id} feedback={feedback} startNote={startNote} />
       {helpOpen && <ShortcutsDialog onClose={() => setHelpOpen(false)} />}
     </Stack>
   );

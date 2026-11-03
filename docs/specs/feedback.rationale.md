@@ -24,6 +24,8 @@
 
 ## A new run
 
+**Comparing with a note, with no golden.** The loop this exists for often starts on a story with no golden: someone looks at a live story, notes what's wrong, and an agent changes it. Without this, both images would read as new, with nothing to compare, which is the one moment a person most wants a diff.
+
 **Why no stacking.** Stepping through diffs from run to run raises what each is against, and how to show it, before anyone has needed it. One run, one diff, and one image per note answers "did this get fixed?" with a single flip. Earlier runs are still reachable by URL.
 
 **Why a banner, and not switching.** A person reading an image shouldn't have it change under them because an agent finished. Whether someone actively waiting would rather it switched is an open question for using it.

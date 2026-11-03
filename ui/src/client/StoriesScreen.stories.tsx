@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import type { ListedStory, StoriesView } from "../shared/api.ts";
-import { navigationIn, StoriesScreen, UncapturedStory } from "./StoriesScreen.tsx";
+import { RequestError } from "./api.ts";
+import type { CaptureState } from "./hooks.ts";
+import { CaptureStatus, navigationIn, StoriesScreen, UncapturedStory } from "./StoriesScreen.tsx";
 import { approved, OTHER_RUN_ID, RUN_ID, SHA } from "./stories/fixtures.ts";
 
 // The renderer fixes the clock, so a relative date always reads the same there.
@@ -18,6 +20,7 @@ const view = (stories: readonly ListedStory[], overrides: Partial<StoriesView> =
   viewport: { width: 1200, height: 900 },
   stories,
   newestRunId: RUN_ID,
+  canCapture: true,
   ...overrides,
 });
 
@@ -35,12 +38,27 @@ const screens = { title: "Screens/Every story", component: StoriesScreen } satis
 export default screens;
 type Story = StoryObj<typeof screens>;
 
-export const SomeCaptured: Story = { args: { view: MIXED, search: "" } };
-export const Filtered: Story = { args: { view: MIXED, search: "?q=button" } };
-export const NothingMatches: Story = { args: { view: MIXED, search: "?q=nothing-like-this" } };
-export const NothingCaptured: Story = { args: { view: view([uncaptured("a--one"), uncaptured("a--two")], { newestRunId: null }), search: "" } };
-export const NoBuild: Story = { args: { view: view([captured("components-card--default")], { storybookUrl: null }), search: "" } };
+const capturing = (overrides: Partial<CaptureState> = {}): CaptureState => ({ can: true, capturing: 0, error: null, clearError: () => undefined, capture: async () => undefined, ...overrides });
+const FAILED = new RequestError("capture-failed", "That didn't capture: Docker is unavailable.");
+
+export const SomeCaptured: Story = { args: { view: MIXED, search: "", capture: capturing() } };
+export const Filtered: Story = { args: { view: MIXED, search: "?q=button", capture: capturing() } };
+export const NothingMatches: Story = { args: { view: MIXED, search: "?q=nothing-like-this", capture: capturing() } };
+export const NothingCaptured: Story = { args: { view: view([uncaptured("a--one"), uncaptured("a--two")], { newestRunId: null }), search: "", capture: capturing() } };
+export const NoBuild: Story = { args: { view: view([captured("components-card--default")], { storybookUrl: null, canCapture: false }), search: "", capture: capturing({ can: false }) } };
+const withStatus = ({ view: shown, search, capture }: { view: StoriesView; search: string; capture: CaptureState }) => (
+  <>
+    <CaptureStatus capture={capture} />
+    <StoriesScreen view={shown} search={search} capture={capture} />
+  </>
+);
+export const CapturingTheRest: Story = { args: { view: MIXED, search: "", capture: capturing({ capturing: 3 }) }, render: withStatus };
+export const CaptureFailed: Story = { args: { view: MIXED, search: "", capture: capturing({ error: FAILED }) }, render: withStatus };
 export const NotCaptured: Story = {
-  args: { view: MIXED, search: "" },
-  render: ({ view: shown }) => <UncapturedStory view={shown} story="pages-home--default" navigation={navigationIn(shown, "pages-home--default", "")} />,
+  args: { view: MIXED, search: "", capture: capturing() },
+  render: ({ view: shown, capture }) => <UncapturedStory view={shown} story="pages-home--default" navigation={navigationIn(shown, "pages-home--default", "")} capture={capture} onWriteNote={() => undefined} />,
+};
+export const NotCapturedAndCantBe: Story = {
+  args: { view: { ...MIXED, canCapture: false }, search: "", capture: capturing({ can: false }) },
+  render: ({ view: shown, capture }) => <UncapturedStory view={shown} story="pages-home--default" navigation={navigationIn(shown, "pages-home--default", "")} capture={capture} onWriteNote={() => undefined} />,
 };

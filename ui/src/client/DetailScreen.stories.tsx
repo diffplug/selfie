@@ -59,6 +59,18 @@ export const LiveStoriesOpen: Story = { args: { row: BUTTON, view: liveView(BUTT
 export const LiveStoriesNewStory: Story = { args: { row: FRESH, view: liveView(FRESH) }, play: liveLoaded };
 export const LiveStoriesGoldenNotKept: Story = { args: { row: BUTTON, view: liveView(BUTTON, { goldenStorybookUrl: null }) }, play: liveLoaded };
 export const LiveStoriesSizeUnknown: Story = { args: { row: BUTTON, view: liveView(BUTTON, { viewport: null }) }, play: liveLoaded };
+/** The agent's change to a new story, which has no golden: what's compared is the image the note is on. */
+const SINCE_NOTED = { ...BUTTON, state: "new" as const, goldenHash: null, pixelDiff: null };
+export const NewStoryComparedWithItsNote: Story = {
+  args: { row: SINCE_NOTED, notes: [note(1, { story: BUTTON.story, imageHash: BUTTON.goldenHash })] },
+};
+export const NewStoryComparedWithItsNoteStacked: Story = {
+  args: { row: SINCE_NOTED, notes: [note(1, { story: BUTTON.story, imageHash: BUTTON.goldenHash })] },
+  play: press("f", "f"),
+};
+export const NewStoryWithANoteOnItself: Story = {
+  args: { row: SINCE_NOTED, notes: [note(1, { story: BUTTON.story, imageHash: BUTTON.imageHash })] },
+};
 export const Stacked: Story = { args: { row: BUTTON }, play: press("f") };
 export const StackedGolden: Story = { args: { row: BUTTON }, play: press("f", "f") };
 export const StackedDiff: Story = { args: { row: BUTTON }, play: press("d") };
