@@ -7,7 +7,8 @@ export function chunks<T>(items: readonly T[], size: number): T[][] {
 
 /**
  * Runs `work` on each item, at most `limit` at a time, and returns the results in order. After one
- * fails, nothing new starts, though what's already running finishes.
+ * fails, nothing new starts, and it throws that first failure once what's already running has
+ * finished, so nothing is still going on behind a failed call.
  */
 export async function mapConcurrently<Item, Result>(
   items: readonly Item[],
@@ -16,20 +17,20 @@ export async function mapConcurrently<Item, Result>(
 ): Promise<Result[]> {
   const results: Result[] = new Array(items.length);
   let next = 0;
-  let failed = false;
+  let failure: { readonly error: unknown } | null = null;
   await Promise.all(
     Array.from({ length: Math.min(limit, items.length) }, async () => {
-      while (next < items.length && !failed) {
+      while (next < items.length && failure === null) {
         const at = next;
         next += 1;
         try {
           results[at] = await work(items[at]!);
         } catch (error) {
-          failed = true;
-          throw error;
+          failure ??= { error };
         }
       }
     }),
   );
+  if (failure !== null) throw (failure as { readonly error: unknown }).error;
   return results;
 }

@@ -17,8 +17,13 @@ import {
   unmatchedPatternWarning,
 } from "selfie-render";
 import { STORIES_DIR, storyFileName, totalsOf, writeManifest } from "selfie-render/testing";
+import { decodeImage as decodeWith, type RawImage } from "selfie-store";
+import { sharpCodec } from "selfie-store/adapters/sharp-codec";
 import { runCli } from "../src/cli.ts";
 import { encodePng } from "../src/png.ts";
+
+/** Decoding as this client does, for tests that only need the pixels. */
+export const decodeImage = (file: Uint8Array): Promise<RawImage> => decodeWith(file, sharpCodec);
 
 export type Color = readonly [number, number, number];
 

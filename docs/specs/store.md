@@ -1,6 +1,6 @@
 # Store
 
-> Status: built — the store core, image decoding, WebP storage with PNG as its fallback, its local SQLite and filesystem adapters, and the D1 REST and R2 adapters exist. A question stays open, and a Worker can't yet read a WebP; see `## Future`.
+> Status: built — the store core, image checks and decoding, WebP storage with PNG as its fallback, its local SQLite and filesystem adapters, and the D1 REST and R2 adapters exist. A question stays open; see `## Future`.
 >
 > - See `docs/specs/glossary.md` for image, image hash, image key, and store.
 > - Owns image identity, image decoding, image keys, and hash collisions. The build order belongs to `docs/specs/system.md`. Snapshots, runs, and goldens belong to `docs/specs/snapshots.md`.
@@ -12,20 +12,26 @@ Source of truth: `store/src/core/pam.ts`, `store/src/core/image-hash.ts`.
 - **Must handle only fully opaque images. Transparency is never allowed.** An image is 8-bit RGB with no alpha channel in every interface, hash, and stored form (rationale).
 - **Must compute the image hash over a complete PAM file, header included, with one canonical header form**, so identical bytes at 100×200 and 200×100 are different images, and one set of pixels has one hash. The form is `P7\nWIDTH <w>\nHEIGHT <h>\nDEPTH 3\nMAXVAL 255\nTUPLTYPE RGB\nENDHDR\n`, with `<w>` and `<h>` as plain decimals, followed by the pixels as RGB row by row. The hash is SHA256, written as lowercase hex.
 - **Must hash decoded RGB pixels with a width and height, never an encoded file**, so the source encoding cannot reach the hash. A file is decoded first, per [Image decoding](#image-decoding).
+- **Must treat an image hash as naming one image only among clients that are honest and working**, since `ReceivingStore.receiveImage` takes a file under the hash it's sent with ([Storage](#storage), `docs/specs/sync.md` → What a store takes).
 - **Must exchange images between stores by image hash, never by image key.** The store's API takes and returns image hashes; the key it returns is only for that store's own rows.
 
 ## Image decoding
 
-Source of truth: `store/src/core/image-file.ts`; the contract suite is `store/test/contract/png-contract.ts`, which `store/test/png.test.ts` runs in Node and `store/test/workerd/png.workerd.test.ts` runs in workerd.
+Source of truth: `store/src/core/image-file.ts`, `store/src/adapters/sharp-codec.ts`; the contract for what `checkImageFile` refuses is `store/test/contract/image-check-contract.ts`, which `store/test/png.test.ts` runs in Node and `store/test/workerd/image-check.workerd.test.ts` runs in workerd. Decoding is tested in `store/test/png.test.ts` and `store/test/webp.test.ts`.
+
+`checkImageFile` reads a file's headers and structure. `decodeImage` runs it, then reads the body through an `ImageCodec`.
 
 - **Must accept exactly a non-interlaced 8-bit PNG in RGB, or in RGBA whose every alpha is 255, which is dropped.** Every source encoding of the same pixels decodes to the same RGB, where an encoding means row filters, compression, and how `IDAT` chunks split the data.
 - **Must refuse everything else with an `ImageDecodeError` that names what it refused, and never flatten alpha**, since flattening would give different images one hash. That includes any other alpha, grayscale, palette, 16-bit, below 8 bits, and interlaced (rationale).
-- **Must allow only `IHDR`, then `IDAT`, then `IEND`, with nothing after, and refuse any other chunk**, even harmless metadata.
-- **Must refuse a corrupt file, never repair it**: a failed checksum on any chunk or the zlib stream, an invalid filter type, or image data that doesn't inflate to exactly the expected length.
-- **Must refuse a PNG over 100,000,000 pixels before allocating for it, and stop inflating as soon as the data runs past the expected length**, so a small file can't exhaust memory.
-- **Must accept a WebP only in its simple lossless form:** `RIFF`, `WEBP`, then one `VP8L` chunk with nothing after, version 0, and the alpha bit clear. It refuses a lossy or extended WebP, including any metadata, and any transparency. It checks all this and the 100,000,000 pixel limit in the header, before anything decodes the body.
-- **Must decode a WebP's body through an injected `WebpCodec`, and check the answer against the header**, since no one library runs on every platform. With no codec, a WebP is refused. `sharpWebp` in `store/src/adapters/sharp-webp.ts` is the Node one.
-- **Must run PNG decoding and the WebP header check unchanged in Node and in Workers**, on Web-standard APIs and no library (rationale), since `Store` decodes on both. The whole contract runs in workerd as part of `pnpm test`.
+- **Must allow only `IHDR`, then `IDAT`, then `IEND`, with nothing after, and refuse any other chunk**, even harmless metadata, since `sharp` applies a color profile to the pixels without saying so (rationale).
+- **Must refuse a PNG or WebP over 100,000,000 pixels before decoding it.**
+- **Must accept a WebP only in its simple lossless form:** `RIFF`, `WEBP`, then one `VP8L` chunk with nothing after, version 0, and the alpha bit clear. It refuses a lossy or extended WebP, including any metadata or color profile.
+- **Must refuse a file whose body doesn't decode, never repair it.** A codec may ignore image data past the last row, which can't change the pixels.
+- **Must check a codec's answer against the header.**
+- **Must take no library and no platform API for `checkImageFile`**, since it runs in Node and in Workers, and the contract runs in both as part of `pnpm test`.
+- **Must decode only through an injected `ImageCodec`**, since a decoder is native. `sharpCodec` is the Node one. A Worker has none, and doesn't decode (`docs/specs/sync.md` → What a store takes).
+
+A WebP's alpha bit is only a hint, so a file with it clear may still hold alpha, and hashes as opaque (rationale).
 
 ## Image keys
 
@@ -44,17 +50,19 @@ Source of truth: `store/src/core/store.ts`, `store/src/core/image-file.ts`; test
 
 - **Must keep image bytes in blob storage, never in SQL**, since D1 caps a row at 2 MB. A blob holds an image file, which `Store.getImage` returns ready to serve, and `Store.getPixels` decodes.
 - **Must keep the file format behind `store/src/core/image-file.ts`, and never let it reach the hash or a key**, since compressed bytes differ between tools and the format may change.
-- **Must take a file's hash from decoding it, and with a `WebpCodec`, keep a new PNG as a lossless WebP** (rationale). Anything else stays as the exact bytes given: a WebP it's handed, and every file in a store with no codec.
+- **Must take a file's hash from decoding it, and keep a new PNG as a lossless WebP** (rationale), through `putImage` and `putImages`. A WebP it's handed stays as the exact bytes given.
 - **Must keep a PNG whose width or height is over 16,383**, WebP's limit, so an image of any size the decoder accepts can be stored.
 - **Must decode the WebP and compare its hash before storing it, and store nothing if they differ**, so what's stored always decodes to the pixels that were hashed.
 - **Must encode only an image not yet stored**, so an unchanged image costs no encoding. **May write at most 4 images at once within a group**, each holding a whole image while it encodes.
-- **Must keep the first bytes stored for a hash.** A later encoding of the same pixels changes nothing, and neither does a retry that finds an orphan. Concurrent first puts may leave either one, and both decode to the same pixels.
+- **Must keep the first bytes stored for a hash.** A later encoding of the same pixels changes nothing, and neither does a retry that finds an orphan. Concurrent first puts may leave either one. Through `Store.putImage`, both decode to the same pixels.
 - **Must make a blob state its own format in its first bytes**, so a store can hold more than one format, with no schema change. `imageMediaType` reads it.
 - **Must key blobs by image hash, never by image key.** The key is `images/<image hash>`; the [R2 adapter](#r2-adapter) adds the project.
 - **Must write image bytes before the metadata row that refers to them**, since blob storage and SQL share no transaction: a failure can orphan bytes but never leave a row without bytes.
 - **Must treat bytes with no row as not stored**, so an orphan is never served as an image.
 - **Must say which of a set of images it lacks, with `Store.missingImages`, in one SQL request for up to 5,000**, so another store need only send those (`docs/specs/sync.md`).
 - **Must refuse, before storing anything, bytes that aren't the image they're sent as**, when `putImage` is given the hash another store knows it by.
+- **Must offer `ReceivingStore.receiveImage`, which stores a file's exact bytes under the hash it's sent with, after `checkImageFile` and without decoding it**, in one SQL request. `ReceivingStore` needs no codec and has nothing that reads pixels, and `Store` extends it with what does.
+- **Must offer `Store.getCheckedImage`, which decodes a stored file and refuses it if it isn't the image its hash names**, for sending to another store.
 - **Must offer a bulk put that groups image inserts, at most 100 per SQL request**, so storing many images doesn't spend one API request each. `Store.putImages` writes each group's bytes before its rows.
 - **Must look up each group's hashes in one statement, and do nothing more for a hash with a row**: no blob call and no insert, since bytes are always written first. Everything else inserts as [Image keys](#image-keys) says, so a concurrent insert stays safe.
 - **Must test collisions two ways:** an injected hash function for the logic, and a committed pair of real images whose hashes collide at 53 bits. The test recomputes both hashes from the committed images. `pnpm find-collision` regenerates the pair, separately from the test run.
@@ -116,13 +124,6 @@ Source of truth: `store/src/adapters/r2.ts`; tests in `store/test/workerd/r2.wor
 ## Future
 
 **Scope: store**
-
-### A Worker reading a WebP
-
-`Store` in a Worker can't read a WebP until it has a `WebpCodec` of its own, since `sharpWebp` is native. `@jsquash/webp` decoded real images correctly in local `workerd` (rationale). Two things to settle with **Scope: cloud-deploy**, defined in `docs/specs/system.md` → Build order:
-
-- Hashing needs an image's raw pixels in memory, in either format, so a very tall page at 2× likely doesn't fit a Worker's 128 MB. Something must verify those another way, or refuse them.
-- A Worker has no encoder, so whatever uploads must send WebP itself.
 
 ### Open questions
 

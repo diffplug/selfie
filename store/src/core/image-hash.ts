@@ -30,6 +30,10 @@ export function toHex(digest: Uint8Array): string {
   return hex;
 }
 
+export function fromHex(hex: string): Uint8Array {
+  return Uint8Array.from({ length: hex.length / 2 }, (_, i) => Number.parseInt(hex.slice(i * 2, i * 2 + 2), 16));
+}
+
 const IMAGE_HASH = /^[0-9a-f]{64}$/;
 
 export const isImageHash = (hash: string): boolean => IMAGE_HASH.test(hash);

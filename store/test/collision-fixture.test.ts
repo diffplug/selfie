@@ -1,7 +1,6 @@
 import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
-  decodeImage,
   encodePam,
   sha256,
   Store,
@@ -11,6 +10,8 @@ import {
 } from "../src/core/index.ts";
 import { pngOf } from "./support/png-builder.ts";
 import { createTempStore } from "./support/temp-store.ts";
+import { sharpCodec } from "../src/adapters/sharp-codec.ts";
+import { decodeImage } from "./support/decode.ts";
 
 // Real images from scripts/find-collision.ts. Nothing about them is trusted:
 // only the image bytes are committed, and both hashes are computed here.
@@ -57,7 +58,7 @@ describe("committed 53-bit collision", () => {
 
     beforeEach(async () => {
       temp = await createTempStore();
-      store = new Store({ sql: temp.sql, blob: temp.blob });
+      store = new Store({ codec: sharpCodec, sql: temp.sql, blob: temp.blob });
     });
 
     afterEach(async () => {

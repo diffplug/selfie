@@ -10,7 +10,7 @@
     "./adapters/r2": "./src/adapters/r2.ts",
     "./adapters/sqlite": "./src/adapters/sqlite.ts",
     "./adapters/filesystem-blob": "./src/adapters/filesystem-blob.ts",
-    "./adapters/sharp-webp": "./src/adapters/sharp-webp.ts"
+    "./adapters/sharp-codec": "./src/adapters/sharp-codec.ts"
   },
   "scripts": {
     "test": "pnpm typecheck && vitest run",

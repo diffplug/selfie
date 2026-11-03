@@ -1,7 +1,7 @@
 // The commands against real Git, a real store, and real files, with only the browser replaced.
 import { access, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { decodeImage } from "selfie-store";
+import { decodeImage } from "./support.ts";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { encodePng } from "../src/png.ts";
 import { BLUE, commit, createHarness, git, GREEN, RED, solid, type Harness } from "./support.ts";

@@ -89,16 +89,6 @@ afterEach(async () => {
   await h.destroy();
 });
 
-/** Its hash, found in a store of its own, so the one under test never sees it. */
-async function hashOfBytes(bytes: Uint8Array) {
-  const other = await openProject({ cwd: h.repo, env: { SELFIE_HOME: path.join(home, "elsewhere") } });
-  try {
-    return (await other.store.putImage(bytes)).hash;
-  } finally {
-    other.close();
-  }
-}
-
 describe("who may ask", () => {
   test("someone who can do nothing there gets the same 404 as for no such project", async () => {
     const nobody = await send("GET", "", "nobody");
@@ -137,20 +127,23 @@ describe("images", () => {
     expect(response.status).toBe(200);
   });
 
-  test("refuses bytes that aren't the image they're sent as, and what isn't an image", async () => {
-    const bytes = await png(BLUE);
-    const wrong = await send("PUT", `/images/${UNKNOWN_HASH}`, "writer", bytes);
-    expect(wrong.status).toBe(400);
-    expect(await wrong.json()).toMatchObject({ error: { code: "hash-mismatch" } });
-    // And what it really was isn't kept.
-    const held = new Set(await cloud.store.missingImages([await hashOfBytes(bytes)]));
-    expect(held.size).toBe(1);
+  test("takes bytes under the hash they're sent with, unread, and the first ones stay", async () => {
+    const first = await png(BLUE);
+    expect((await send("PUT", `/images/${UNKNOWN_HASH}`, "writer", first)).status).toBe(200);
+    expect(await (await send("POST", "/images/missing", "writer", { hashes: [UNKNOWN_HASH] })).json()).toEqual({ missing: [] });
+    expect((await send("PUT", `/images/${UNKNOWN_HASH}`, "writer", await png(RED))).status).toBe(200);
+    expect(new Uint8Array(await (await send("GET", `/images/${UNKNOWN_HASH}`, "reader")).arrayBuffer())).toEqual(new Uint8Array(first));
+  });
+
+  test("refuses what no store keeps, and what isn't a hash", async () => {
     const junk = await send("PUT", `/images/${UNKNOWN_HASH}`, "writer", new Uint8Array([1, 2, 3]));
+    expect(junk.status).toBe(400);
     expect(await junk.json()).toMatchObject({ error: { code: "bad-image" } });
+    expect(await (await send("POST", "/images/missing", "writer", { hashes: [UNKNOWN_HASH] })).json()).toEqual({ missing: [UNKNOWN_HASH] });
     expect((await send("PUT", "/images/nope", "writer", await png(RED))).status).toBe(400);
   });
 
-  test("refuses one too big to verify, before reading it", async () => {
+  test("refuses one too big to take, before reading it", async () => {
     const response = await app.request(`/projects/42/images/${UNKNOWN_HASH}`, {
       method: "PUT",
       headers: { authorization: "Bearer writer", "content-length": "10001" },
@@ -165,6 +158,7 @@ describe("images", () => {
     const response = await send("GET", `/images/${hash}`, "reader");
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toContain("private");
+    expect(response.headers.get("x-content-type-options")).toBe("nosniff");
     expect((await send("GET", `/images/${UNKNOWN_HASH}`, "reader")).status).toBe(404);
   });
 

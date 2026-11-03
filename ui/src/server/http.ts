@@ -9,10 +9,12 @@ export const failure = (code: string, message: string): ApiError => ({ error: { 
 
 export const INTERNAL_ERROR = failure("internal", "Something went wrong in the Selfie server. Its log says what.");
 
+/** `nosniff` since a cloud store takes a file's body unread, so only this type says what it is. */
 export function imageResponse(context: Context, bytes: Uint8Array) {
   return context.body(bytes as Uint8Array<ArrayBuffer>, 200, {
     "Content-Type": imageMediaType(bytes),
     "Cache-Control": CONTENT_ADDRESSED,
+    "X-Content-Type-Options": "nosniff",
   });
 }
 

@@ -3,7 +3,6 @@ import { execFileSync } from "node:child_process";
 import { mkdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { decodeImage } from "selfie-store";
 import { REQUEST_HEADER_VALUE } from "selfie-ui/app";
 import { createLocalApp } from "selfie-ui/local";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
@@ -11,7 +10,7 @@ import { runCli } from "../src/cli.ts";
 import { awaitFeedback, textForAgent, WAITER_STALE_MS, withBoxDrawn } from "../src/notes.ts";
 import { openProject, type Project } from "../src/project.ts";
 import { localReviewSource } from "../src/ui.ts";
-import { createHarness, git, GREEN, type Harness } from "./support.ts";
+import { createHarness, decodeImage, git, GREEN, type Harness } from "./support.ts";
 
 const PORT = 4173;
 const HOST = `127.0.0.1:${PORT}`;

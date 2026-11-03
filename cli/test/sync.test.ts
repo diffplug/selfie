@@ -1,15 +1,16 @@
 // push and pull between two machines and a cloud store, on real Git and real stores, with a stand-in
 // for GitHub. See docs/specs/sync.md.
 import { execFileSync } from "node:child_process";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { createServer, type Server } from "node:http";
 import { createSyncApi, type SyncAccess } from "selfie-ui/sync";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { runCli } from "../src/cli.ts";
+import { encodePng } from "../src/png.ts";
 import { openProject, type Project } from "../src/project.ts";
-import { commit, createHarness, fakeCapture, git, GREEN, RED, type FakeStory, type Harness } from "./support.ts";
+import { commit, createHarness, fakeCapture, git, GREEN, RED, solid, type FakeStory, type Harness } from "./support.ts";
 
 const REMOTE = "http://127.0.0.1:9";
 /** What the cloud would answer, in the shape the client calls it. */
@@ -58,6 +59,16 @@ async function accepted() {
   await laptop(null, "approve", runId, "--all");
   expect((await laptop(null, "accept", runId)).code).toBe(0);
   return runId;
+}
+
+/** The image hashes of a run on the laptop. */
+async function imagesOf(runId: string) {
+  const local = await openProject({ cwd: h.repo, env: { SELFIE_HOME: h.home } });
+  try {
+    return (await local.snapshots.readRun(runId)).snapshots.map(({ imageHash }) => imageHash);
+  } finally {
+    local.close();
+  }
 }
 
 beforeEach(async () => {
@@ -175,6 +186,23 @@ describe("pushing", () => {
     stories = [{ id: "a", color: GREEN }, { id: "b", color: GREEN }];
     await record();
     expect((await laptop("writer", "push")).json.runId).toBe(clean);
+  });
+
+  test.each([
+    ["another image", (other: Uint8Array) => other],
+    ["bytes that don't decode", (other: Uint8Array) => other.subarray(0, other.length - 1)],
+  ])("won't send a copy holding %s, and says which", async (_, damage) => {
+    const runId = await accepted();
+    const [hash, other] = await imagesOf(runId);
+    const local = await openProject({ cwd: h.repo, env: { SELFIE_HOME: h.home } });
+    const blobs = path.join(local.directory, "blobs", "images");
+    local.close();
+    await writeFile(path.join(blobs, hash!), damage(await readFile(path.join(blobs, other!))));
+    const { code, json } = await laptop("writer", "push");
+    expect(code).toBe(2);
+    expect(json.error.code).toBe("corrupt-image");
+    expect(json.error.message).toContain(hash);
+    expect(await cloud.store.lookupKey(hash!)).toBeNull();
   });
 
   test("a run from a dirty tree is refused, by name, and stores nothing", async () => {
@@ -340,6 +368,32 @@ describe("another machine", () => {
     const { json } = await desktop("reader", "pull", head);
     expect(json).toMatchObject({ runId, replaced: null });
     expect(json.images.received + json.images.alreadyHere).toBe(2);
+  });
+
+  test.each([
+    ["another image", () => encodePng(solid(4, 4, [0, 0, 255]))],
+    ["bytes that don't decode", async () => {
+      const png = Uint8Array.from(await encodePng(solid(4, 4, [0, 0, 255])));
+      const idat = Buffer.from(png).indexOf("IDAT") + 4;
+      png.fill(0xff, idat, idat + 8);
+      return png;
+    }],
+  ])("the cloud holding %s under a hash stops a pull, by name, and keeps nothing here", async (_, bytes) => {
+    const runId = await accepted();
+    const [hash] = await imagesOf(runId);
+    // A client took it on trust from someone else, and the first bytes stay, so the push doesn't correct it.
+    await cloud.store.receiveImage(await bytes(), hash!);
+    expect((await laptop("writer", "push")).json.images).toEqual({ sent: 1, alreadyThere: 1 });
+
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const { code, json } = await desktop("reader", "pull", headOf());
+      expect(code).toBe(2);
+      expect(json.error.code).toBe("corrupt-image");
+      expect(json.error.message).toContain(hash);
+    }
+    const here = await openProject({ cwd: desktopRepo, env: { SELFIE_HOME: desktopHome } });
+    expect(await here.store.lookupKey(hash!)).toBeNull();
+    here.close();
   });
 
   test("a later decision here isn't undone by an older one pulled", async () => {

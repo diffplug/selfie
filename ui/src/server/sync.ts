@@ -3,7 +3,7 @@
 // so they run on any platform, and are tested with a stand-in for it.
 import { Hono, type Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { ImageDecodeError, ImageHashMismatchError, isGitSha, isImageHash, isRunId, SnapshotError, type ReceivedDecision, type ReceivedRun, type RecordedSnapshot, type Snapshots, type Store, type StoryFilter } from "selfie-store";
+import { ImageDecodeError, isGitSha, isImageHash, isRunId, SnapshotError, type ReceivedDecision, type ReceivedRun, type ReceivingStore, type RecordedSnapshot, type Snapshots, type StoryFilter } from "selfie-store";
 import { SYNC_LIMITS, type GoldensAnswer, type ProjectAccess } from "../shared/sync-api.ts";
 import { failure, imageResponse, INTERNAL_ERROR, noStoreByDefault } from "./http.ts";
 
@@ -19,7 +19,7 @@ export interface SyncAccess {
 export interface SyncProject {
   readonly access: SyncAccess;
   readonly snapshots: Snapshots;
-  readonly store: Store;
+  readonly store: ReceivingStore;
   /** Whether the project's repository has this commit where anyone may see it. */
   hasCommit(gitSha: string): Promise<boolean>;
 }
@@ -30,7 +30,7 @@ export interface SyncHost {
   open(project: string, token: string | null): Promise<SyncProject | null>;
   /** The project of this repository, or null if this token can't know, whether or not it exists. */
   findProject(owner: string, name: string, token: string | null): Promise<string | null>;
-  /** The largest image file to read, since a platform's memory is what it can afford to verify. */
+  /** The largest image file to read, since a request holds a whole one in memory. */
   readonly maxImageBytes?: number;
   readonly now?: () => number;
 }
@@ -220,16 +220,15 @@ export function createSyncApi(host: SyncHost): Hono {
   api.put("/projects/:project/images/:hash", async (context) => {
     const { store } = await uploadable(context);
     const hash = readHash(context.req.param("hash"));
-    // Before reading it, since it can't be verified without holding it.
+    // Before reading it, since it can't be checked without holding it.
     if (Number(context.req.header("content-length") ?? 0) > maxImageBytes) {
       throw new Refusal(413, "image-too-large", `This server takes images of at most ${maxImageBytes} bytes.`);
     }
     const bytes = new Uint8Array(await context.req.arrayBuffer());
     if (bytes.length > maxImageBytes) throw new Refusal(413, "image-too-large", `This server takes images of at most ${maxImageBytes} bytes.`);
     try {
-      await store.putImage(bytes, hash);
+      await store.receiveImage(bytes, hash);
     } catch (error) {
-      if (error instanceof ImageHashMismatchError) throw new Refusal(400, "hash-mismatch", error.message);
       if (error instanceof ImageDecodeError) throw new Refusal(400, "bad-image", error.message);
       throw error;
     }

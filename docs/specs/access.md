@@ -52,6 +52,7 @@ GitHub decides. Selfie keeps no member list of its own.
 - **Never give an image a direct R2 URL.** Every image is served by the Worker after an access check. The bucket's `r2.dev` access and custom domains stay off, and it issues no presigned URLs.
 - **Never treat an image hash as a secret**, since anyone holding an image can compute it. Access depends on who is asking and which project they ask about.
 - **Must serve images with `Cache-Control: private`, for public repositories too**, since a repository can become private and a shared cache would keep serving it.
+- **Must serve images with `X-Content-Type-Options: nosniff`, and a type read from their first bytes**, since the cloud doesn't read a file's body (`docs/specs/sync.md` → What a store takes).
 - **Must rate-limit anonymous requests**, since anyone can make them and each one costs an R2 read.
 
 ### Signing in
@@ -77,5 +78,5 @@ GitHub decides. Selfie keeps no member list of its own.
 
 A run isn't uploaded until GitHub has its commit (`docs/specs/sync.md` → What goes), so anonymous viewers see no unpushed work.
 
-- **Running an approved capture pass.** Decide how a maintainer approves it and how it runs, since it executes the fork's code and needs a token to upload. GitHub's docs don't say whether a fork's `pull_request` run can get an OIDC token, and `pull_request_target` runs with write access even from a public fork, so both need testing. The fork's code could forge its screenshots, so its run must stay subject to normal approval.
+- **Running an approved capture pass.** Decide how a maintainer approves it and how it runs, since it executes the fork's code and needs a token to upload. GitHub's docs don't say whether a fork's `pull_request` run can get an OIDC token, and `pull_request_target` runs with write access even from a public fork, so both need testing. The fork's code could forge its screenshots, so its run must stay subject to normal approval. It would also be the one uploader without write access, so it must not reach the project's images through the route that takes a client's hash on trust: it could plant a false picture under the hash of an image that hasn't been rendered yet.
 - **Reading code for `change-grouping`.** That scope sends code diffs to a Meta model, which needs more app permissions and means private code leaves GitHub. Decide how a repository owner consents.
