@@ -47,6 +47,8 @@ Write `selfie.config.json` at the top of the repository, with the directory rela
 
 ## 3. Prove it
 
+Make sure the repository's dependencies are installed first, since a fresh clone or worktree has none, and a build then fails on whatever it can't find. If `node_modules` is missing, install them with the repository's package manager, and say that you did. This doesn't change any tracked file, or it shouldn't: if it does, say so. The build may need network access, so if you're in a sandbox and it fails on a fetch or seems to hang, ask for network access rather than killing it and guessing.
+
 Run the build command from the top of the repository. Then confirm `iframe.html` and `index.json` are in `storybookDir`, and count the entries in `index.json` whose `type` is `story`. If the build fails, or there are no stories, stop and show what happened.
 
 Then render one story for real, which records nothing:
@@ -65,7 +67,7 @@ Check each of these, and warn about what applies:
 - **The build isn't ignored:** `git check-ignore <storybookDir>`. If it isn't, the build itself makes every render uncommitted. Say to add it to `.gitignore`.
 - **Not on the default branch:** only goldens on the default branch's history become a baseline for others. `selfie find-baseline` says what this branch would compare with. Say so if a person making their first goldens here should switch branch.
 - **A shallow clone:** `git rev-parse --is-shallow-repository`. Finding a baseline may stop early.
-- **A big Storybook:** rendering every story can take a while. If there are many, say roughly how long the one story took, and that a whole run takes longer.
+- **A big Storybook:** give a rough time for rendering every story, from how long `selfie flakes` took per render of the one story and how many stories there are. Stories render several at once, and the first render's download doesn't count, so call it an estimate.
 
 ## 5. Hand it over
 
@@ -75,7 +77,7 @@ Then report, briefly:
 
 - what you found: the Storybook, its build command, how many stories
 - what you changed: `selfie.config.json`
-- every warning from step 4, and what to do about each
+- every warning from step 4, and what to do about each. Leave out the project's own build warnings, such as CSS or bundle sizes, which have nothing to do with Selfie
 - what's next:
   1. In the browser, pick a story and press `c` to render it.
   2. To make goldens, on a clean tree on the default branch: **Render all**, **Review the newest run**, **Approve all**, **Accept this run**.
