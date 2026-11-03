@@ -55,7 +55,7 @@ Then render one story for real, which records nothing:
 selfie flakes --runs 2 --story '<any story ID from index.json>'
 ```
 
-The first run downloads the browser, which can take minutes, so say that before you start. Exit 0 means it renders. Exit 1 means it rendered and something varied, which is worth reporting and doesn't block anything. Exit 2 means it couldn't run, so stop and show why. If Docker can't get the image for this machine's platform, say so, since the default is `linux/arm64`, and a project can set `environment.runner` in the config.
+The first run downloads the browser, which can take minutes, so say that before you start. Exit 0 means it renders. Exit 1 means it rendered and something varied, which is worth reporting and doesn't block anything. Exit 2 means it couldn't run, so stop and show why. If Docker can't get the image for this machine's platform, say so, and that a project can set `environment.runner` in the config.
 
 ## 4. Look for what will get in their way
 
@@ -69,7 +69,7 @@ Check each of these, and warn about what applies:
 
 ## 5. Hand it over
 
-`selfie` keeps running until it's stopped, so **never wait for it to finish**. It builds, serves, and prints `{ url, ... }` on stdout. If you can start long-running processes, start it there, and give the person the URL. Otherwise, give them the command to run themselves, which also opens their browser.
+`selfie` keeps running until it's stopped, so **never wait for it to finish**. It builds, serves, and prints `{ url, ... }` on stdout. If you can start long-running processes, start it there with `--no-build`, since step 3 just built it, and give the person the URL. Otherwise, give them the command to run themselves, which also opens their browser.
 
 Then report, briefly:
 

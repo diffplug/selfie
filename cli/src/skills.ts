@@ -2,7 +2,7 @@
 import { readFile } from "node:fs/promises";
 import { SelfieError } from "./errors.ts";
 
-const SKILLS: readonly string[] = ["quickstart", "fix-flakes"];
+export const SKILLS: readonly string[] = ["quickstart", "fix-flakes"];
 
 export async function readSkill(name: string): Promise<string> {
   // Checked, since this goes in a path.

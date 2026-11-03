@@ -140,6 +140,12 @@ function RendersItem({ view, setup, renders }: { view: StoriesView; setup: Story
   const renderFirst = async () => {
     if (await renders.render([first.story])) navigate(anyStoryPath(first.story));
   };
+  // The rest alone records a filtered run, and this records a whole one.
+  const renderAll = (
+    <Button disabled={renders.rendering > 0} onClick={() => void renders.render(view.stories.map(({ story }) => story))}>
+      Render all {view.stories.length.toLocaleString()}
+    </Button>
+  );
   if (rendered === 0) {
     return (
       <Item mark="todo" title="No renders yet">
@@ -152,9 +158,7 @@ function RendersItem({ view, setup, renders }: { view: StoriesView; setup: Story
             <Button variant="primary" disabled={renders.rendering > 0} onClick={() => void renderFirst()}>
               Render {fullName(first)}
             </Button>
-            <Button disabled={renders.rendering > 0} onClick={() => void renders.render(rest.map(({ story }) => story))}>
-              Render all {view.stories.length.toLocaleString()}
-            </Button>
+            {renderAll}
             <Text className="selfie-muted">Or pick a story, and look at it running first.</Text>
           </Stack>
         ) : (
@@ -176,12 +180,7 @@ function RendersItem({ view, setup, renders }: { view: StoriesView; setup: Story
             {`Render the rest (${rest.length.toLocaleString()})`}
           </Button>
         )}
-        {/* Only a run of every story can become goldens, which the rest alone isn't. */}
-        {renders.can && (
-          <Button disabled={renders.rendering > 0} onClick={() => void renders.render(view.stories.map(({ story }) => story))}>
-            Render all {view.stories.length.toLocaleString()}
-          </Button>
-        )}
+        {renders.can && renderAll}
         {view.newestRunId !== null && <AppLink href={runPath(view.newestRunId)}>Review the newest run</AppLink>}
       </Stack>
     </Item>
