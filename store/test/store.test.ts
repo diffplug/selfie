@@ -7,6 +7,7 @@ import {
   imageMediaType,
   Sql,
   sha256,
+  ImageHashMismatchError,
   Store,
   toHex,
   type BlobStorage,
@@ -414,6 +415,14 @@ describe("Store", () => {
 
     it("refuses what isn't a hash", async () => {
       await expect(storeWith({}).missingImages(["nope"])).rejects.toThrow();
+    });
+
+    it("won't store bytes as a different image from what they are", async () => {
+      const store = storeWith({});
+      const absent = "f".repeat(64);
+      const { hash } = await storeWith({}).putImage(file(1));
+      await expect(store.putImage(file(2), absent)).rejects.toThrow(ImageHashMismatchError);
+      expect(await store.putImage(file(1), hash)).toMatchObject({ hash });
     });
 
     it("asks once for each distinct hash, however often it's named", async () => {

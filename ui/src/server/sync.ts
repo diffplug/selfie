@@ -1,0 +1,315 @@
+// The routes other stores sync through, over `Snapshots` and `Store` and whatever the platform says
+// about access. See `docs/specs/sync.md`, which owns what they do and why. Nothing here knows GitHub,
+// so they run on any platform, and are tested with a stand-in for it.
+import { Hono, type Context } from "hono";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
+import { ImageDecodeError, ImageHashMismatchError, isGitSha, isImageHash, isRunId, SnapshotError, type ReceivedDecision, type ReceivedRun, type RecordedSnapshot, type Snapshots, type Store, type StoryFilter } from "selfie-store";
+import { SYNC_LIMITS, type GoldensAnswer, type ProjectAccess } from "../shared/sync-api.ts";
+import { failure, imageResponse, INTERNAL_ERROR, noStoreByDefault } from "./http.ts";
+
+/** What a token may do in a project. */
+export interface SyncAccess {
+  readonly view: boolean;
+  readonly upload: boolean;
+  /** Who a decision from this token is by, or null if it can't decide. */
+  readonly decider: string | null;
+}
+
+/** One project, as this token sees it. */
+export interface SyncProject {
+  readonly access: SyncAccess;
+  readonly snapshots: Snapshots;
+  readonly store: Store;
+  /** Whether the project's repository has this commit where anyone may see it. */
+  hasCommit(gitSha: string): Promise<boolean>;
+}
+
+/** What the routes are given by a platform. */
+export interface SyncHost {
+  /** A project this token can do something in, or null, whether or not it exists. */
+  open(project: string, token: string | null): Promise<SyncProject | null>;
+  /** The project of this repository, or null if this token can't know, whether or not it exists. */
+  findProject(owner: string, name: string, token: string | null): Promise<string | null>;
+  /** The largest image file to read, since a platform's memory is what it can afford to verify. */
+  readonly maxImageBytes?: number;
+  readonly now?: () => number;
+}
+
+const RUN_PAGE = 1_000;
+const DEFAULT_MAX_IMAGE_BYTES = 64 * 1024 * 1024;
+
+class Refusal extends Error {
+  readonly code: string;
+  readonly status: ContentfulStatusCode;
+
+  constructor(status: ContentfulStatusCode, code: string, message: string) {
+    super(message);
+    this.code = code;
+    this.status = status;
+  }
+}
+
+const badRequest = (message: string) => new Refusal(400, "bad-request", message);
+/** The same whether it doesn't exist or can't be seen, so nobody learns which. */
+const notFound = () => new Refusal(404, "not-found", "This project doesn't exist, or you can't see it.");
+
+const asRecord = (value: unknown): Record<string, unknown> => {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) throw badRequest("Expected a JSON object.");
+  return value as Record<string, unknown>;
+};
+
+async function bodyOf(context: Context): Promise<Record<string, unknown>> {
+  return asRecord(await context.req.json().catch(() => null));
+}
+
+function listOf(value: unknown, most: number, what: string): readonly unknown[] {
+  if (!Array.isArray(value) || value.length > most) throw badRequest(`${what} must be a list of at most ${most}.`);
+  return value;
+}
+
+const readText = (value: unknown, what: string): string => {
+  if (typeof value !== "string" || value === "") throw badRequest(`${what} must be text.`);
+  return value;
+};
+
+const orNull = <T>(value: unknown, read: (present: unknown) => T): T | null => (value === null || value === undefined ? null : read(value));
+
+function readSha(value: unknown, what: string): string {
+  if (typeof value !== "string" || !isGitSha(value)) throw badRequest(`${what} must be a full Git SHA.`);
+  return value;
+}
+
+function readRunId(value: unknown): string {
+  if (typeof value !== "string" || !isRunId(value)) throw badRequest("That isn't a run ID.");
+  return value;
+}
+
+const readWhole = (value: unknown, what: string): number => {
+  if (!Number.isSafeInteger(value) || (value as number) < 0) throw badRequest(`${what} must be a whole number.`);
+  return value as number;
+};
+
+function readHash(value: unknown): string {
+  if (typeof value !== "string" || !isImageHash(value)) throw badRequest("That isn't an image hash.");
+  return value;
+}
+
+function recordedSnapshot(value: unknown): RecordedSnapshot {
+  const { story, imageHash, failure: failed, playError } = asRecord(value);
+  const named = { story: readText(story, "story"), playError: orNull(playError, (error) => readText(error, "playError")) };
+  return imageHash === null || imageHash === undefined ? { ...named, failure: readText(failed, "failure") } : { ...named, imageHash: readHash(imageHash) };
+}
+
+/** A run's facts as a sender states them, whose times can't be later than now. */
+function receivedRun(id: string, body: Record<string, unknown>, now: number): ReceivedRun {
+  const { gitSha, environment, startedAt, dirty, baselineSha, storyFilter, reusedFromRun, scale } = body;
+  if (typeof dirty !== "boolean") throw badRequest("dirty must be true or false.");
+  if (typeof scale !== "number") throw badRequest("scale must be a number.");
+  return {
+    id,
+    gitSha: readSha(gitSha, "gitSha"),
+    environment: readText(environment, "environment"),
+    startedAt: Math.min(readWhole(startedAt, "startedAt"), now),
+    dirty,
+    baselineSha: orNull(baselineSha, (sha) => readSha(sha, "baselineSha")),
+    storyFilter: (storyFilter ?? null) as StoryFilter | null,
+    reusedFromRun: orNull(reusedFromRun, (run) => readText(run, "reusedFromRun")),
+    scale,
+  };
+}
+
+function receivedDecision(value: unknown, decider: string, now: number): ReceivedDecision {
+  const { story, imageHash, decision, at } = asRecord(value);
+  if (decision !== "approved" && decision !== "rejected") throw badRequest('decision must be "approved" or "rejected".');
+  return { story: readText(story, "story"), imageHash: readHash(imageHash), decision, actor: decider, at: Math.min(readWhole(at, "at"), now) };
+}
+
+/** The same stories, in any order. */
+const sameStories = (p: readonly string[], q: readonly string[]) => p.length === q.length && [...p].sort().join("\0") === [...q].sort().join("\0");
+
+const refused = (code: string, message: string): GoldensAnswer => ({ outcome: "refused", acceptedRunId: null, refusal: { code, message } });
+
+/** The cloud decides a SHA's goldens: `docs/specs/sync.md` -> Goldens. */
+async function makeGoldens({ snapshots }: SyncProject, id: string, removed: readonly string[]): Promise<GoldensAnswer> {
+  const run = await snapshots.getRun(id);
+  if (run === null) throw new Refusal(404, "unknown-run", `No run ${id} in this project.`);
+  const accepted = await snapshots.acceptedRunAt(run.gitSha, run.environment);
+  if (accepted === id) return { outcome: "already", acceptedRunId: id, refusal: null };
+  if (accepted !== null) {
+    return { outcome: "conflict", acceptedRunId: accepted, refusal: { code: "goldens-conflict", message: `Run ${accepted} is already the goldens of ${run.gitSha}, and a push never replaces them.` } };
+  }
+  try {
+    const found = await snapshots.removedFrom(id, run.baselineSha);
+    if (!sameStories(found, removed)) {
+      return refused("wrong-removed", `This would remove ${found.length} goldens here, and not the ${removed.length} you named: ${found.join(", ") || "none"}.`);
+    }
+    if (!(await snapshots.acceptRun(id, run.baselineSha, found.length))) {
+      return refused("not-approved", "Some of this run's images are neither the same as the baseline's, nor approved.");
+    }
+    return { outcome: "accepted", acceptedRunId: id, refusal: null };
+  } catch (error) {
+    if (error instanceof SnapshotError) return refused(error.code, error.message);
+    throw error;
+  }
+}
+
+/** The routes, to mount under `/api`. */
+export function createSyncApi(host: SyncHost): Hono {
+  const api = new Hono();
+  const now = host.now ?? Date.now;
+  const maxImageBytes = host.maxImageBytes ?? DEFAULT_MAX_IMAGE_BYTES;
+
+  const tokenOf = (context: Context) => context.req.header("authorization")?.match(/^Bearer (.+)$/)?.[1] ?? null;
+
+  /** The project, if this token can do anything there, or else nobody learns it exists. */
+  const projectOf = async (context: Context): Promise<SyncProject> => {
+    const project = await host.open(context.req.param("project") ?? "", tokenOf(context));
+    if (project === null) throw notFound();
+    const { view, upload, decider } = project.access;
+    if (!view && !upload && decider === null) throw notFound();
+    return project;
+  };
+  const refuseUnless = (allowed: boolean) => {
+    if (!allowed) throw new Refusal(403, "not-allowed", "You can't do this in this project.");
+  };
+  const viewable = async (context: Context) => {
+    const project = await projectOf(context);
+    refuseUnless(project.access.view);
+    return project;
+  };
+  const uploadable = async (context: Context) => {
+    const project = await projectOf(context);
+    refuseUnless(project.access.upload);
+    return project;
+  };
+  /** What says which commits have goldens tells CI its baseline, and nothing else about a private project. */
+  const knowsGoldens = async (context: Context) => {
+    const project = await projectOf(context);
+    refuseUnless(project.access.view || project.access.upload);
+    return project;
+  };
+
+  api.onError((error, context) => {
+    if (error instanceof Refusal) return context.json(failure(error.code, error.message), error.status);
+    if (error instanceof SnapshotError) return context.json(failure(error.code, error.message), error.code === "unknown-run" ? 404 : 409);
+    if (error instanceof RangeError || error instanceof TypeError) return context.json(failure("bad-request", error.message), 400);
+    console.error(error);
+    return context.json(INTERNAL_ERROR, 500);
+  });
+
+  api.use(noStoreByDefault);
+
+  api.get("/repositories/:owner/:name", async (context) => {
+    const { owner, name } = context.req.param();
+    const project = await host.findProject(owner, name, tokenOf(context));
+    if (project === null) throw notFound();
+    return context.json({ project });
+  });
+
+  api.get("/projects/:project", async (context) => {
+    const { view, upload, decider } = (await projectOf(context)).access;
+    return context.json({ view, upload, decide: decider !== null } satisfies ProjectAccess);
+  });
+
+  api.post("/projects/:project/images/missing", async (context) => {
+    const { store } = await uploadable(context);
+    const hashes = listOf((await bodyOf(context)).hashes, SYNC_LIMITS.hashes, "hashes").map(readHash);
+    return context.json({ missing: await store.missingImages(hashes) });
+  });
+
+  api.put("/projects/:project/images/:hash", async (context) => {
+    const { store } = await uploadable(context);
+    const hash = readHash(context.req.param("hash"));
+    // Before reading it, since it can't be verified without holding it.
+    if (Number(context.req.header("content-length") ?? 0) > maxImageBytes) {
+      throw new Refusal(413, "image-too-large", `This server takes images of at most ${maxImageBytes} bytes.`);
+    }
+    const bytes = new Uint8Array(await context.req.arrayBuffer());
+    if (bytes.length > maxImageBytes) throw new Refusal(413, "image-too-large", `This server takes images of at most ${maxImageBytes} bytes.`);
+    try {
+      await store.putImage(bytes, hash);
+    } catch (error) {
+      if (error instanceof ImageHashMismatchError) throw new Refusal(400, "hash-mismatch", error.message);
+      if (error instanceof ImageDecodeError) throw new Refusal(400, "bad-image", error.message);
+      throw error;
+    }
+    return context.json({ hash });
+  });
+
+  api.get("/projects/:project/images/:hash", async (context) => {
+    const { store } = await viewable(context);
+    const bytes = await store.getImage(readHash(context.req.param("hash")));
+    if (bytes === null) throw new Refusal(404, "unknown-image", "This project doesn't hold that image.");
+    return imageResponse(context, bytes);
+  });
+
+  api.put("/projects/:project/runs/:id", async (context) => {
+    const project = await uploadable(context);
+    const { snapshots } = project;
+    const id = readRunId(context.req.param("id"));
+    const received = receivedRun(id, await bodyOf(context), now());
+    if (received.dirty) throw new Refusal(409, "run-dirty", "This run is from a dirty tree, so it may show work that's in no commit.");
+    const existing = await snapshots.getRun(id);
+    if (existing?.gitSha !== received.gitSha && !(await project.hasCommit(received.gitSha))) {
+      throw new Refusal(409, "commit-not-pushed", `The repository doesn't have ${received.gitSha}. Push your commit, then this run.`);
+    }
+    // A resend keeps the time it was first given, which its clock may since have passed.
+    const { status } = await snapshots.receiveRun(existing === null ? received : { ...received, startedAt: existing.startedAt });
+    return context.json({ status });
+  });
+
+  api.post("/projects/:project/runs/:id/snapshots", async (context) => {
+    const { snapshots } = await uploadable(context);
+    const items = listOf((await bodyOf(context)).snapshots, SYNC_LIMITS.snapshots, "snapshots").map(recordedSnapshot);
+    await snapshots.recordSnapshots(readRunId(context.req.param("id")), items);
+    return context.json({ recorded: items.length });
+  });
+
+  api.post("/projects/:project/runs/:id/finish", async (context) => {
+    const { snapshots } = await uploadable(context);
+    const { count, finishedAt } = await bodyOf(context);
+    const { status } = await snapshots.finishRun(readRunId(context.req.param("id")), readWhole(count, "count"), Math.min(readWhole(finishedAt, "finishedAt"), now()));
+    return context.json({ status });
+  });
+
+  api.get("/projects/:project/runs/:id", async (context) => {
+    const { snapshots } = await viewable(context);
+    return context.json(await snapshots.readRun(readRunId(context.req.param("id")), context.req.query("after") ?? "", RUN_PAGE));
+  });
+
+  api.post("/projects/:project/decisions", async (context) => {
+    const { snapshots, access } = await projectOf(context);
+    refuseUnless(access.decider !== null);
+    const { environment, decisions } = await bodyOf(context);
+    const at = now();
+    const received = listOf(decisions, SYNC_LIMITS.decisions, "decisions").map((decision) => receivedDecision(decision, access.decider!, at));
+    await snapshots.mergeDecisions(readText(environment, "environment"), received);
+    return context.json({ merged: received.length });
+  });
+
+  api.post("/projects/:project/goldens", async (context) => {
+    const project = await projectOf(context);
+    const { runId, removed } = await bodyOf(context);
+    const named = listOf(removed ?? [], SYNC_LIMITS.snapshots, "removed").map((story) => readText(story, "A removed story"));
+    // With nothing removed, this makes no judgment: docs/specs/sync.md -> Goldens.
+    refuseUnless(project.access.decider !== null || (project.access.upload && named.length === 0));
+    return context.json(await makeGoldens(project, readRunId(runId), named));
+  });
+
+  api.get("/projects/:project/goldens", async (context) => {
+    const { snapshots } = await knowsGoldens(context);
+    const runId = await snapshots.acceptedRunAt(readSha(context.req.query("sha"), "sha"), readText(context.req.query("environment"), "environment"));
+    return context.json({ runId });
+  });
+
+  api.post("/projects/:project/goldens/first", async (context) => {
+    const { snapshots } = await knowsGoldens(context);
+    const { shas, environment } = await bodyOf(context);
+    const candidates = listOf(shas, SYNC_LIMITS.shas, "shas").map((sha) => readSha(sha, "A SHA"));
+    return context.json({ sha: await snapshots.firstWithGoldens(candidates, readText(environment, "environment")) });
+  });
+
+  api.all("*", (context) => context.json(failure("not-found", "No such route."), 404));
+
+  return api;
+}

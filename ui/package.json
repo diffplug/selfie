@@ -7,7 +7,9 @@
   "exports": {
     "./app": "./src/server/app.ts",
     "./regions": "./src/shared/regions.ts",
-    "./local": "./src/server/local.ts"
+    "./local": "./src/server/local.ts",
+    "./sync": "./src/server/sync.ts",
+    "./sync-api": "./src/shared/sync-api.ts"
   },
   "scripts": {
     "build": "vite build",

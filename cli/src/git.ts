@@ -1,10 +1,10 @@
 // Everything Selfie asks Git. Always argument arrays through `execFile`, never a shell.
+import { isGitSha } from "selfie-store";
 import { execFile } from "node:child_process";
 import { realpath } from "node:fs/promises";
 import { SelfieError } from "./errors.ts";
 
 const MAX_OUTPUT_BYTES = 64 * 1024 * 1024;
-const FULL_SHA = /^[0-9a-f]{40}(?:[0-9a-f]{24})?$/;
 
 /** The first-parent commits `find-baseline` looks at, from the merge-base. */
 const MAX_COMMITS = 1000;
@@ -72,7 +72,7 @@ export async function openRepo(cwd: string): Promise<Repo> {
 /** HEAD's full SHA, or null if the repository has no commits yet. */
 export async function headSha(repo: Repo): Promise<string | null> {
   const sha = await ask(repo.root, ["rev-parse", "--verify", "--quiet", "HEAD^{commit}"]);
-  return sha !== null && FULL_SHA.test(sha) ? sha : null;
+  return sha !== null && isGitSha(sha) ? sha : null;
 }
 
 /** Modified, staged, and untracked paths across the whole working tree. Ignored files don't count. */

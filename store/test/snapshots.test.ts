@@ -788,6 +788,7 @@ describe("Snapshots", () => {
       await model.finishRun(head.id, 2);
       await model.finishRun(head.id, 99).catch(() => {});
       await model.readRun(head.id);
+      await model.removedFrom(head.id, SHA_A);
       await model.mergeDecisions(ENV, [{ story: "a", imageHash: hashOf(3), decision: "approved", actor: "ned", at: 1 }]);
       await model.adoptGoldens(clean.id);
       await model.receiveRun(clean);

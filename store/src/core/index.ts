@@ -5,6 +5,8 @@ export { decodeImage, ImageDecodeError, imageMediaType, WEBP_MAX_SIDE, type Webp
 export { encodePam, type RawImage } from "./pam.ts";
 export {
   isDecidable,
+  isGitSha,
+  isRunId,
   Snapshots,
   SnapshotError,
   type CompareOptions,
@@ -34,6 +36,7 @@ export {
   type SqlValue,
 } from "./sql.ts";
 export {
+  ImageHashMismatchError,
   imageInsertStatement,
   initStoreSchema,
   Store,
