@@ -8,8 +8,7 @@
   </div>
   <script>
     (() => {
-      const { tl, at, stage } = S.begin("ripple", 5);
-      const w = (word, o) => S.say("ripple", word, o);
+      const { tl, at, w, stage } = S.begin("ripple", 5);
       const zoom = S.html(stage, `<div class="abs" style="width:1920px;height:1080px;transform-origin:0 0"></div>`);
       const frame = S.storybookFrame(zoom);
       gsap.set(frame.items[3], { backgroundColor: S.SUN });
@@ -21,7 +20,7 @@
 
       const target = S.framedCell(3, 2);
       const r = S.robot(zoom, { id: "ripple-robot", prop: "hammer", scale: 1.1 });
-      gsap.set(r.el, { x: target.x - S.HAMMER.x * 1.1, y: target.y - S.HAMMER.y * 1.1 });
+      gsap.set(r.el, S.hammerAt(target, 1.1));
       gsap.set(r.armR, { rotation: -60 });
 
       // The hammer's last strike, and the ripple it sends through every story.

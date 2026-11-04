@@ -7,7 +7,7 @@
   </div>
   <script>
     (() => {
-      const { tl, w, stage, D } = S.begin("approve");
+      const { tl, w, stage } = S.begin("approve");
       const a = S.app(stage, ["a2-layout", "c1-dialog", "c2-approved"], { pointer: [420, 620] });
       a.point(tl, 0.1, "c1-dialog", 0.55);
       a.press(tl, w("i") + 0.45);

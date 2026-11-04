@@ -8,9 +8,8 @@
   </div>
   <script>
     (() => {
-      const { tl, at, stage } = S.begin("goofy", 7.8);
-      const w = (word, o) => S.say("goofy", word, o);
-      const kinds = ["chart", "form", "profile", "list", "stat", "tabs"];
+      const { tl, at, w, stage } = S.begin("goofy", 7.8);
+      const kinds = S.KIND_ORDER;
       const r = S.robot(stage, { id: "goofy-robot", prop: "phone", scale: 2.2 });
       gsap.set(r.el, { x: 20, y: 130 });
       gsap.set(r.armR, { rotation: -128 });
@@ -41,7 +40,7 @@
         tl.to(r.prop, { rotation: -pose.arm, duration: 0.26, ease: "power2.out" }, t + 0.05);
         const shot = t + at(0.46);
         S.flash(tl, white, shot, 0.7);
-        const pic = S.selfiePhoto(stage, k, { tilt: pose.head });
+        const pic = S.selfiePhoto(stage, k, pose.head);
         gsap.set(pic, { x: wall[i][0], y: wall[i][1], scale: 0, rotation: [-6, 3, 5, -4, 6, -3][i], transformOrigin: "50% 50%" });
         tl.to(pic, { scale: 0.86, duration: 0.3, ease: "back.out(1.8)" }, shot + 0.02);
         tl.set(c, { opacity: 0 }, t + at(0.88));
@@ -53,9 +52,8 @@
       tl.to(machine, { opacity: 1, duration: 0.14 }, w("m4"));
 
       // The numbers land last.
-      [["$0 per image", 1020, w("paying"), "var(--ink)"], ["541 stories", 1020, w("541"), "var(--pink)"], ["~70 s", 1490, w("70"), "var(--pink)"]].forEach(([text, x, t, bg], i) => {
-        const y = i === 0 ? 610 : 730;
-        const n = S.html(stage, `<div class="tag display" style="font-size:78px;padding:14px 30px 18px;background:${bg};color:${bg.includes("ink") ? "#fff" : "var(--ink)"}">${text}</div>`);
+      [["$0 per image", 1020, 610, w("paying"), "var(--ink)"], ["541 stories", 1020, 730, w("541"), "var(--pink)"], ["~70 s", 1490, 730, w("70"), "var(--pink)"]].forEach(([text, x, y, t, bg]) => {
+        const n = S.html(stage, `<div class="tag display" style="font-size:78px;padding:14px 30px 18px;background:${bg};color:#fff">${text}</div>`);
         gsap.set(n, { x, y, opacity: 0, scale: 1.2, transformOrigin: "0 50%" });
         tl.to(n, { opacity: 1, scale: 1, duration: 0.3, ease: "expo.out" }, t);
       });

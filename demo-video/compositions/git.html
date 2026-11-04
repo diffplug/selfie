@@ -8,8 +8,7 @@
   </div>
   <script>
     (() => {
-      const { tl, at, stage } = S.begin("git", 12.8);
-      const w = (word, o) => S.say("git", word, o);
+      const { tl, w, stage } = S.begin("git");
 
       // The cloud has a shared wall of photos, and the agents below each have their own suitcase.
       const cl = S.cloud(stage, "git-cloud", 1040);
@@ -20,18 +19,18 @@
       tl.to(line, { opacity: 1, duration: 0.15 }, w("just"));
       const spots = [[740, 190], [900, 170], [1060, 190], [1220, 170]];
       const kinds = ["chart", "form", "profile", "list"];
-      const robots = [[150, 0], [830, 1], [1490, 2]].map(([x, i]) => {
+      const robots = [150, 830, 1490].map((x, i) => {
         const r = S.robot(stage, { id: `git-robot${i}`, prop: "suitcase", scale: 1.25 });
         tl.fromTo(r.el, { x, y: 1100 }, { x, y: 520, duration: 0.5, ease: "back.out(1.2)" }, w("images") - 0.3 + i * 0.28);
         tl.to(r.armL, { rotation: 130, duration: 0.3, ease: "back.out(2)" }, w("locally") + 0.3 + i * 0.2);
         [0, 1, 2, 3].forEach((n) => tl.to(r.armL, { rotation: n % 2 ? 130 : 100, duration: 0.2, ease: "power1.inOut" }, w("locally") + 0.6 + i * 0.2 + n * 0.2));
-        return { r, x };
+        return x;
       });
 
       // Photos go up from every suitcase.
       kinds.forEach((k, i) => {
         const from = robots[i % 3], p = S.photo(stage, k, "easy");
-        gsap.set(p, { x: from.x + 220, y: 800, scale: 0.15, rotation: 10, transformOrigin: "0 0", opacity: 0 });
+        gsap.set(p, { x: from + 220, y: 800, scale: 0.15, rotation: 10, transformOrigin: "0 0", opacity: 0 });
         const t = w("running") + i * 0.35;
         tl.set(p, { opacity: 1 }, t);
         tl.to(p, { x: spots[i][0], duration: 0.7, ease: "power1.inOut" }, t);
@@ -46,7 +45,7 @@
       tl.to(win, { y: 0, duration: 0.5, ease: "expo.out" }, w("so"));
       // The status text is what Selfie really posts on a commit.
       const row = (y, msg, sha, mark, status, bg) => {
-        const el = S.html(stage, `<div class="abs" style="left:170px;top:${y}px;width:1580px;height:96px;border-bottom:4px solid var(--grey);display:flex;align-items:center;gap:26px" data-layout-ignore><div style="font:600 42px Jost,sans-serif;flex:1;white-space:nowrap">${msg}</div><div style="font:500 32px Jost,sans-serif;color:#666">${sha}</div><div class="st" style="font:700 32px Jost,sans-serif;padding:6px 20px 8px;border-radius:12px;background:${bg};border:4px solid var(--ink);white-space:nowrap">${mark} selfie: ${status}</div></div>`);
+        const el = S.html(stage, `<div class="abs" style="left:170px;top:${y}px;width:1580px;height:96px;border-bottom:4px solid var(--grey);display:flex;align-items:center;gap:26px" data-layout-ignore><div style="font:600 42px Jost,sans-serif;flex:1;white-space:nowrap">${msg}</div><div style="font:500 32px Jost,sans-serif;color:#666">${sha}</div><div style="font:700 32px Jost,sans-serif;padding:6px 20px 8px;border-radius:12px;background:${bg};border:4px solid var(--ink);white-space:nowrap">${mark} selfie: ${status}</div></div>`);
         gsap.set(el, { opacity: 0 });
         return el;
       };
@@ -56,7 +55,7 @@
 
       // The consequences of the first commit, laid out under it.
       S.KIND_ORDER.forEach((k, i) => {
-        const c = S.card(stage, k, i === 1 ? "easy" : "easy", { changed: i === 1 });
+        const c = S.card(stage, k, "easy", { changed: i === 1 });
         const pos = { x: 170 + i * 268, y: 240, scale: 0.98 };
         S.place(c, { ...pos, scale: 0.7 });
         gsap.set(c, { opacity: 0 });

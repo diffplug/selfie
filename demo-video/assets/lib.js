@@ -1,6 +1,6 @@
-// Shared art and helpers for the scenes. Everything here is a pure function of its arguments.
+// Shared art and helpers for the scenes. Everything here is deterministic, so every render is identical.
 (function () {
-  const INK = "#23232b", PINK = "#f4689f", CORAL = "#e35c61", TEAL = "#78acae", BLUE = "#63b9e3", ORANGE = "#f58a3c", SUN = "#ffd95e", LILAC = "#abcbf2", GREY = "#d7dbe3";
+  const INK = "#23232b", PINK = "#f4689f", CORAL = "#e35c61", TEAL = "#78acae", BLUE = "#63b9e3", ORANGE = "#f58a3c", SUN = "#ffd95e", PALE_BLUE = "#abcbf2", GREY = "#d7dbe3";
 
   /** A scene is authored against a nominal length, and its beats stretch to its slot. Move speeds stay as written. */
   function clock(id, authored) {
@@ -81,17 +81,17 @@
     let out = state === "simple" ? k.simple() : k.draw(dense);
     if (k.button) {
       const fill = opts.changed ? BLUE : PINK;
-      const [w, x] = opts.changed ? [208, 2] : [120, 2];
+      const w = opts.changed ? 208 : 120, x = 2;
       out += `<g class="btn"><rect x="${x}" y="84" width="${w}" height="42" rx="${opts.changed ? 21 : 10}" fill="${fill}" stroke="${INK}" stroke-width="4"/><text x="${x + w / 2}" y="113" text-anchor="middle" font-family="Jost" font-weight="700" font-size="24" fill="#fff">Join</text></g>`;
     }
     return out;
   }
 
-  /** A component in a state: easy, empty, error or hard. 245 x 190 before scaling. */
+  /** A component in a state: easy, empty, error, simple or complex. 245 x 190 before scaling. */
   function card(parent, kind, state = "easy", opts = {}) {
     const k = KINDS[kind];
     const title = state === "complex" ? k.long : k.title;
-    return html(parent, `<div class="card"${opts.id ? ` id="${opts.id}"` : ""} data-layout-ignore><div class="t">${title}</div><svg class="body" viewBox="0 0 212 132">${cardBody(kind, state, opts)}</svg><div class="flag"></div>${crackPath}</div>`);
+    return html(parent, `<div class="card" data-layout-ignore><div class="t">${title}</div><svg class="body" viewBox="0 0 212 132">${cardBody(kind, state, opts)}</svg><div class="flag"></div>${crackPath}</div>`);
   }
 
   // The app and the grid put the same cards in different places, which is what lets a scene hand over to the next.
@@ -111,7 +111,7 @@
 
   /**
    * The robot, 240 x 340 at scale 1: a plain cousin of the mascot, with its eyes and colors.
-   * Returns its parts so a scene can act with them: head, armL, armR, legL, legR, eyes, mouthSmile, mouthO, prop.
+   * Returns its parts so a scene can act with them: head, armL, armR, legL, legR, eyes, smile, o, prop.
    */
   function robot(parent, opts = {}) {
     const { id = "", prop = "", scale = 1 } = opts;
@@ -121,8 +121,8 @@
       suitcase: `<g class="rb-prop"><path d="M-20 12 v-14 h40 v14" fill="none" stroke="${INK}" stroke-width="7"/><rect x="-48" y="10" width="96" height="66" rx="10" fill="${ORANGE}" stroke="${INK}" stroke-width="6"/><path d="M-48 38 H48" stroke="${INK}" stroke-width="5"/></g>`,
     };
     const el = html(parent, `<svg class="prop" ${id ? `id="${id}"` : ""} width="${240 * scale}" height="${340 * scale}" viewBox="0 0 240 340" data-layout-ignore>
-      <g class="rb-legL"><rect x="82" y="238" width="30" height="78" rx="12" fill="${LILAC}" stroke="${INK}" stroke-width="6"/><path d="M70 332 q2 -24 26 -24 h18 v24 z" fill="${ORANGE}" stroke="${INK}" stroke-width="6" stroke-linejoin="round"/></g>
-      <g class="rb-legR"><rect x="128" y="238" width="30" height="78" rx="12" fill="${LILAC}" stroke="${INK}" stroke-width="6"/><path d="M126 332 v-24 h18 q24 0 26 24 z" fill="${ORANGE}" stroke="${INK}" stroke-width="6" stroke-linejoin="round"/></g>
+      <g class="rb-legL"><rect x="82" y="238" width="30" height="78" rx="12" fill="${PALE_BLUE}" stroke="${INK}" stroke-width="6"/><path d="M70 332 q2 -24 26 -24 h18 v24 z" fill="${ORANGE}" stroke="${INK}" stroke-width="6" stroke-linejoin="round"/></g>
+      <g class="rb-legR"><rect x="128" y="238" width="30" height="78" rx="12" fill="${PALE_BLUE}" stroke="${INK}" stroke-width="6"/><path d="M126 332 v-24 h18 q24 0 26 24 z" fill="${ORANGE}" stroke="${INK}" stroke-width="6" stroke-linejoin="round"/></g>
       <g class="rb-armL"><rect x="28" y="150" width="30" height="88" rx="14" fill="${TEAL}" stroke="${INK}" stroke-width="6"/><circle cx="43" cy="242" r="17" fill="${GREY}" stroke="${INK}" stroke-width="6"/></g>
       <rect x="56" y="136" width="128" height="116" rx="28" fill="${SUN}" stroke="${INK}" stroke-width="6"/>
       <path d="M88 166 h64 l-10 44 h-44 z" fill="${ORANGE}" stroke="${INK}" stroke-width="5" stroke-linejoin="round"/>
@@ -165,13 +165,13 @@
   }
 
   /** The cloud, flat with an ink outline. width x width * 0.56. */
-  function cloud(parent, id, width, fill = "#fff") {
-    return html(parent, `<svg class="prop" id="${id}" width="${width}" height="${width * 0.56}" viewBox="0 0 500 280" data-layout-ignore><path d="M110 260 C40 260 12 208 30 164 C10 120 54 74 104 92 C118 34 196 12 244 54 C282 14 366 28 380 92 C440 82 492 130 470 188 C488 232 448 262 400 260 Z" fill="${fill}" stroke="${INK}" stroke-width="7" stroke-linejoin="round"/></svg>`);
+  function cloud(parent, id, width) {
+    return html(parent, `<svg class="prop" id="${id}" width="${width}" height="${width * 0.56}" viewBox="0 0 500 280" data-layout-ignore><path d="M110 260 C40 260 12 208 30 164 C10 120 54 74 104 92 C118 34 196 12 244 54 C282 14 366 28 380 92 C440 82 492 130 470 188 C488 232 448 262 400 260 Z" fill="#fff" stroke="${INK}" stroke-width="7" stroke-linejoin="round"/></svg>`);
   }
 
   /** A photo of a component: the card, in a white frame. 283 x 256 before scaling. */
   function photo(parent, kind, state, opts = {}) {
-    const el = html(parent, `<div class="photo" ${opts.id ? `id="${opts.id}"` : ""} style="width:283px;height:256px" data-layout-ignore></div>`);
+    const el = html(parent, `<div class="photo" style="width:283px;height:256px" data-layout-ignore></div>`);
     const c = card(el, kind, state, opts);
     gsap.set(c, { x: 14, y: 14 });
     c.style.boxShadow = "none";
@@ -189,9 +189,9 @@
   }
 
   /** One swing of an arm-held prop: wind up, strike. The hit lands at t. */
-  function swing(tl, arm, t, { from = -95, to = HAMMER.angle, rest = null, wind = 0.2 } = {}) {
-    tl.to(arm, { rotation: from, duration: wind, ease: "power2.out" }, t - 0.08 - wind);
-    tl.to(arm, { rotation: to, duration: 0.08, ease: "power3.in" }, t - 0.08);
+  function swing(tl, arm, t, { rest = null, wind = 0.2 } = {}) {
+    tl.to(arm, { rotation: -95, duration: wind, ease: "power2.out" }, t - 0.08 - wind);
+    tl.to(arm, { rotation: HAMMER.angle, duration: 0.08, ease: "power3.in" }, t - 0.08);
     if (rest !== null) tl.to(arm, { rotation: rest, duration: 0.25, ease: "power2.out" }, t + 0.1);
   }
 
@@ -209,7 +209,7 @@
   }
 
   /** A flash that lands at t. */
-  function flash(tl, el, t, peak = 0.95) {
+  function flash(tl, el, t, peak) {
     tl.set(el, { opacity: peak }, t);
     tl.to(el, { opacity: 0, duration: 0.32, ease: "power2.out" }, t + 0.001);
   }
@@ -227,8 +227,8 @@
   const HAMMER = { x: 347, y: 248, angle: -15 };
 
   /** Build a scene's stage. Returns the timeline, its clock and the element to draw into. */
-  function begin(id, authored) {
-    return { tl: gsap.timeline({ paused: true }), at: clock(id, authored), stage: document.getElementById(`${id}-stage`) };
+  function begin(id, authored = window.SCENE_DURATIONS[id]) {
+    return { tl: gsap.timeline({ paused: true }), at: clock(id, authored), w: (word, o) => say(id, word, o), stage: document.getElementById(`${id}-stage`) };
   }
 
   /** Every component in every state, in the grid's places. cards[column][row]. */
@@ -237,14 +237,18 @@
   }
   const ROW_NAMES = ["", "Empty", "Error", "Simple", "Complex"];
   function rowLabels(parent) {
-    return ROW_NAMES.map((n, r) => html(parent, `<div class="abs label" style="font-size:42px;font-weight:700;width:190px;text-align:right" data-layout-ignore>${n}</div>`)).map((el, r) => { gsap.set(el, { x: 8, y: gridPos(0, r).y + 70 }); return el; });
+    return ROW_NAMES.map((n, r) => {
+      const el = html(parent, `<div class="abs label" style="font-size:42px;font-weight:700;width:190px;text-align:right" data-layout-ignore>${n}</div>`);
+      gsap.set(el, { x: 8, y: gridPos(0, r).y + 70 });
+      return el;
+    });
   }
 
   // The grid framed by Storybook, shared by the scenes on either side of the ripple.
   const GRID_CAM = { x: 184, y: 0, scale: 0.85 }; // The whole grid, clear of the subtitles.
   const FRAMED = { x: 530, y: 85, scale: 0.66 };
   const framedCell = (c, r) => { const p = gridPos(c, r); return { x: FRAMED.x + (p.x + 122) * FRAMED.scale, y: FRAMED.y + (p.y + 95) * FRAMED.scale }; };
-  const STORIES = ["Revenue", "Sign up", "Profile", "Team", "Sales", "Settings"];
+  const STORIES = KIND_ORDER.map((k) => KINDS[k].title);
   function storybookFrame(parent) {
     const el = html(parent, `<div class="window" style="left:40px;top:34px;width:1840px;height:800px" data-layout-ignore><div class="bar"><span class="dot" style="background:${CORAL}"></span><span class="dot" style="background:${SUN}"></span><span class="dot" style="background:${TEAL}"></span><span class="url">localhost:6006</span></div><div style="position:absolute;left:0;top:64px;bottom:0;width:372px;border-right:6px solid ${INK};padding:26px 30px"><div class="display" style="font-size:54px;margin-bottom:26px">Storybook</div>${STORIES.map((n, i) => `<div class="sb-item" style="font:600 36px/1.15 Jost,sans-serif;padding:9px 16px;border-radius:10px;margin-bottom:6px">${n}</div>`).join("")}</div></div>`);
     return { el, items: [...el.querySelectorAll(".sb-item")] };
@@ -254,11 +258,11 @@
     return html(parent, `<svg class="prop" id="${id}" width="${300 * scale}" height="${220 * scale}" viewBox="0 0 300 220" data-layout-ignore><rect x="96" y="6" width="96" height="36" rx="8" fill="${GREY}" stroke="${INK}" stroke-width="7"/><rect x="10" y="34" width="280" height="176" rx="22" fill="${TEAL}" stroke="${INK}" stroke-width="7"/><circle cx="150" cy="122" r="66" fill="#fff" stroke="${INK}" stroke-width="7"/><circle cx="150" cy="122" r="42" fill="${INK}"/><circle cx="166" cy="104" r="11" fill="#fff"/><rect x="226" y="54" width="44" height="28" rx="6" fill="${SUN}" stroke="${INK}" stroke-width="6"/></svg>`);
   }
 
-  function rocket(parent, id, scale = 1) {
-    const head = (cy) => `<g class="rk-win"><circle cx="180" cy="${cy}" r="48" fill="#dff1ff" stroke="${INK}" stroke-width="8"/><rect x="156" y="${cy - 24}" width="48" height="40" rx="14" fill="${GREY}" stroke="${INK}" stroke-width="5"/><circle cx="170" cy="${cy - 6}" r="7" fill="${BLUE}" stroke="${INK}" stroke-width="3"/><circle cx="190" cy="${cy - 6}" r="7" fill="${BLUE}" stroke="${INK}" stroke-width="3"/><rect class="rk-flash" x="196" y="${cy + 2}" width="16" height="26" rx="4" fill="${PINK}" stroke="${INK}" stroke-width="3"/></g>`;
-    const el = html(parent, `<svg class="prop" id="${id}" width="${360 * scale}" height="${760 * scale}" viewBox="0 0 360 760" data-layout-ignore><path d="M84 520 L10 660 L92 640 Z M276 520 L350 660 L268 640 Z" fill="${CORAL}" stroke="${INK}" stroke-width="8" stroke-linejoin="round"/><path d="M180 8 C270 90 290 240 280 400 L272 640 H88 L80 400 C70 240 90 90 180 8 Z" fill="#fff" stroke="${INK}" stroke-width="8" stroke-linejoin="round"/><path d="M180 8 C226 50 254 106 268 170 H92 C106 106 134 50 180 8 Z" fill="${PINK}" stroke="${INK}" stroke-width="8" stroke-linejoin="round"/>${head(240)}${head(372)}${head(504)}<rect x="110" y="640" width="140" height="40" fill="${GREY}" stroke="${INK}" stroke-width="8"/><path class="rk-fire" d="M124 684 C120 740 160 760 180 760 C200 760 240 740 236 684 Z" fill="${ORANGE}" stroke="${INK}" stroke-width="8" stroke-linejoin="round" opacity="0"/></svg>`);
+  function rocket(parent, id) {
+    const head = (cy) => `<g><circle cx="180" cy="${cy}" r="48" fill="#dff1ff" stroke="${INK}" stroke-width="8"/><rect x="156" y="${cy - 24}" width="48" height="40" rx="14" fill="${GREY}" stroke="${INK}" stroke-width="5"/><circle cx="170" cy="${cy - 6}" r="7" fill="${BLUE}" stroke="${INK}" stroke-width="3"/><circle cx="190" cy="${cy - 6}" r="7" fill="${BLUE}" stroke="${INK}" stroke-width="3"/><rect x="196" y="${cy + 2}" width="16" height="26" rx="4" fill="${PINK}" stroke="${INK}" stroke-width="3"/></g>`;
+    const el = html(parent, `<svg class="prop" id="${id}" width="360" height="760" viewBox="0 0 360 760" data-layout-ignore><path d="M84 520 L10 660 L92 640 Z M276 520 L350 660 L268 640 Z" fill="${CORAL}" stroke="${INK}" stroke-width="8" stroke-linejoin="round"/><path d="M180 8 C270 90 290 240 280 400 L272 640 H88 L80 400 C70 240 90 90 180 8 Z" fill="#fff" stroke="${INK}" stroke-width="8" stroke-linejoin="round"/><path d="M180 8 C226 50 254 106 268 170 H92 C106 106 134 50 180 8 Z" fill="${PINK}" stroke="${INK}" stroke-width="8" stroke-linejoin="round"/>${head(240)}${head(372)}${head(504)}<rect x="110" y="640" width="140" height="40" fill="${GREY}" stroke="${INK}" stroke-width="8"/><path class="rk-fire" d="M124 684 C120 740 160 760 180 760 C200 760 240 740 236 684 Z" fill="${ORANGE}" stroke="${INK}" stroke-width="8" stroke-linejoin="round" opacity="0"/></svg>`);
     gsap.set(el.querySelector(".rk-fire"), { svgOrigin: "180 684" });
-    return { el, wins: [...el.querySelectorAll(".rk-win")], flashes: [...el.querySelectorAll(".rk-flash")], fire: el.querySelector(".rk-fire") };
+    return { el, fire: el.querySelector(".rk-fire") };
   }
 
   function plane(parent, id, scale = 1) {
@@ -266,21 +270,21 @@
   }
 
   /** A selfie: the robot's face crowding a component. 283 x 256 before scaling. */
-  function selfiePhoto(parent, kind, opts = {}) {
-    const el = photo(parent, kind, opts.state ?? "easy");
+  function selfiePhoto(parent, kind, tilt) {
+    const el = photo(parent, kind, "easy");
     const r = robot(el, { scale: 0.62 });
     gsap.set(r.el, { x: 136, y: 30 });
-    gsap.set(r.head, { rotation: opts.tilt ?? 10 });
+    gsap.set(r.head, { rotation: tilt });
     return el;
   }
 
   const DAMAGED = [[0, -6], [3, 8], [4, -4], [5, 7]];
-  const COLD_ROBOT = { scale: 1.6, x: FORM_BUTTON.x - 347 * 1.6, y: FORM_BUTTON.y - 248 * 1.6 };
+  /** Where to stand a robot of this scale, so its hammer's face lands on this point. */
+  const hammerAt = ({ x, y }, scale) => ({ x: x - HAMMER.x * scale, y: y - HAMMER.y * scale });
+  const COLD_ROBOT = { scale: 1.6, ...hammerAt(FORM_BUTTON, 1.6) };
 
-  window.S = { clock, say, rand, html, card, photo, robot, hand, cloud, appWindow, appPos, rowPos, gridPos, place, ringAt, swing, gasp, blink, flash, ticker, FORM_BUTTON, begin, grid, rowLabels, GRID_CAM, FRAMED, framedCell, storybookFrame, camera, rocket, plane, selfiePhoto, DAMAGED, COLD_ROBOT, HAMMER, KIND_ORDER, STATES, INK, PINK, CORAL, TEAL, BLUE, ORANGE, SUN, GREY };
-})();
+  window.S = { say, rand, hammerAt, html, card, photo, robot, hand, cloud, appWindow, appPos, rowPos, gridPos, place, ringAt, swing, gasp, blink, flash, ticker, FORM_BUTTON, begin, grid, rowLabels, GRID_CAM, FRAMED, framedCell, storybookFrame, camera, rocket, plane, selfiePhoto, DAMAGED, COLD_ROBOT, HAMMER, KIND_ORDER, INK, CORAL, TEAL, ORANGE, SUN, GREY };
 
-(function () {
   /** The pay-per-image booth: a cloud with a waiting bar, a button, a meter and a coin jar. */
   S.booth = function (stage) {
     const cl = S.cloud(stage, "", 800);
@@ -305,8 +309,8 @@
     return { bar, screen, per, digit, button, jar };
   };
   // Seams. A flash is a photo being taken, and a whip carries the eye sideways into the next idea.
-  S.flashIn = function (tl, stage, peak = 0.9) {
-    const white = S.html(stage, `<div class="flash" style="opacity:${peak}"></div>`);
+  S.flashIn = function (tl, stage) {
+    const white = S.html(stage, `<div class="flash" style="opacity:0.9"></div>`);
     tl.to(white, { opacity: 0, duration: 0.34, ease: "power2.out" }, 0.001);
   };
   S.whipOut = function (tl, stage, id) {

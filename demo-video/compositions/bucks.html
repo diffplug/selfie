@@ -8,8 +8,7 @@
   </div>
   <script>
     (() => {
-      const { tl, at, stage } = S.begin("bucks", 8.6);
-      const w = (word, o) => S.say("bucks", word, o);
+      const { tl, at, w, stage } = S.begin("bucks", 8.6);
       const b = S.booth(stage);
       gsap.set(b.bar, { scaleX: 1 });
       const rnd = S.rand(7);
@@ -20,14 +19,12 @@
       tl.to(hand, { x: 880, y: 1160, duration: 0.4, ease: "power3.in" }, at(0.1));
       const r = S.robot(stage, { id: "bucks-robot", prop: "hammer", scale: 1.5 });
       gsap.set(r.armR, { rotation: -60 });
-      const rx = 560 - S.HAMMER.x * 1.5, ry = 772 - S.HAMMER.y * 1.5;
+      const { x: rx, y: ry } = S.hammerAt({ x: 560, y: 772 }, 1.5);
       tl.fromTo(r.el, { x: rx, y: -640 }, { x: rx, y: ry, duration: 0.45, ease: "power3.in" }, at(0.45));
 
       // Each run is 1,000 images, and the hammer never stops.
       const sum = S.html(stage, `<div class="abs label" style="left:1040px;top:280px;width:720px;text-align:center;font-size:48px;font-weight:700;color:#a8232a">1,000 stories × 0.8¢ = $8</div>`);
       gsap.set(sum, { opacity: 0 });
-      gsap.set(b.per, { opacity: 0 });
-      tl.set(b.per, { opacity: 1 }, at(0));
       tl.set(b.per, { opacity: 0 }, w("1000"));
       tl.set(sum, { opacity: 1 }, w("1000"));
 

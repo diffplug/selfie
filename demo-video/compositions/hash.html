@@ -8,8 +8,7 @@
   </div>
   <script>
     (() => {
-      const { tl, at, stage } = S.begin("hash", 8.6);
-      const w = (word, o) => S.say("hash", word, o);
+      const { tl, w, stage } = S.begin("hash");
       const cl = S.cloud(stage, "hash-cloud", 680);
       gsap.set(cl, { x: 1210, y: -10 });
 
@@ -20,11 +19,11 @@
         const x = 70 + (i % 3) * 300, y = 40 + Math.floor(i / 3) * 400;
         const wrap = S.html(stage, `<div class="abs" style="width:283px;height:340px" data-layout-ignore></div>`);
         S.photo(wrap, k, "easy", { changed: i === CHANGED });
-        const tag = S.html(wrap, `<div class="abs display" style="top:268px;width:283px;text-align:center;font-size:50px">#${h}</div>`);
+        S.html(wrap, `<div class="abs display" style="top:268px;width:283px;text-align:center;font-size:50px">#${h}</div>`);
         gsap.set(wrap, { x, y, scale: 0.8, opacity: 0, transformOrigin: "0 0" });
         tl.to(wrap, { opacity: 1, duration: 0.14 }, 0.3 + i * 0.26);
         tl.fromTo(wrap, { y: y + 26 }, { y, duration: 0.35, ease: "expo.out", immediateRender: false }, 0.3 + i * 0.26);
-        return { wrap, x, y, tag };
+        return { wrap, x, y };
       });
 
       // Most changes touch only a few. The rest are already in the cloud.

@@ -8,8 +8,7 @@
   </div>
   <script>
     (() => {
-      const { tl, at, stage } = S.begin("compare", 5);
-      const w = (word, o) => S.say("compare", word, o);
+      const { tl, at, w, stage } = S.begin("compare", 5);
       const before = S.photo(stage, "form", "easy", { caption: "Before" });
       const after = S.photo(stage, "form", "easy", { changed: true, caption: "After" });
       gsap.set([before, after], { scale: 2.2, transformOrigin: "0 0" });

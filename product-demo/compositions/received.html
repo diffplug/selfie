@@ -7,11 +7,11 @@
   </div>
   <script>
     (() => {
-      const { tl, w, stage, D } = S.begin("received");
+      const { tl, w, stage } = S.begin("received");
       const t = S.term(stage);
       S.slideIn(tl, t.win);
       t.write(tl, [
-        [0.3, `<span class="p">$</span> <span class="b">selfie agent-await-feedback</span>`, { type: false }],
+        [0.3, `<span class="p">$</span> <span class="b">selfie agent-await-feedback</span>`],
         [0.4, `<span class="c">{</span>`],
         [0.4, `  <span class="k">"outcome"</span>: <span class="s">"notes"</span>,`],
         [0.4, `  <span class="k">"notes"</span>: [{`],

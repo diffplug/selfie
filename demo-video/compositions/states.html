@@ -8,8 +8,7 @@
   </div>
   <script>
     (() => {
-      const { tl, at, stage } = S.begin("states", 8.2);
-      const w = (word, o) => S.say("states", word, o);
+      const { tl, at, w, stage } = S.begin("states", 8.2);
       const cam = S.html(stage, `<div class="abs" style="width:1920px;height:1080px;transform-origin:0 0"></div>`);
       const cards = S.grid(cam);
       const labels = S.rowLabels(cam);

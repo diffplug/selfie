@@ -7,7 +7,7 @@
   </div>
   <script>
     (() => {
-      const { tl, w, stage, D } = S.begin("batch");
+      const { tl, w, stage } = S.begin("batch");
       const a = S.app(stage, ["a1-batch"]);
       S.slideIn(tl, a.win);
       a.point(tl, w("selfie"), [700, 300], 0.8);

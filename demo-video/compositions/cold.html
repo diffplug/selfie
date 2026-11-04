@@ -8,8 +8,7 @@
   </div>
   <script>
     (() => {
-      const { tl, at, stage } = S.begin("cold", 6.4);
-      const w = (word, o) => S.say("cold", word, o);
+      const { tl, at, w, stage } = S.begin("cold", 6.4);
       const cam = S.html(stage, `<div class="abs" style="width:1920px;height:1080px"></div>`);
       S.appWindow(cam, "cold-window");
       const cards = S.KIND_ORDER.map((k, i) => { const c = S.card(cam, k); S.place(c, S.appPos(i)); return c; });

@@ -7,7 +7,7 @@
   </div>
   <script>
     (() => {
-      const { tl, w, stage, D } = S.begin("render");
+      const { tl, w, stage } = S.begin("render");
       const t = S.term(stage);
       S.slideIn(tl, t.win);
       t.write(tl, [
@@ -17,7 +17,7 @@
       // The real log of the real render, sped up. It took what the last line says it took.
       const log = ["1/124 ok pages-batch--action-failed", "15/124 ok pages-batch--some-decided", "29/124 ok pages-every-story--rendering-with-an-estimate", "43/124 ok pages-story-comparing--moved-only", "57/124 ok pages-story-comparing--tall-page", "71/124 ok pages-story-live--open", "85/124 ok pages-story-notes--resolved-note", "99/124 ok pages-story-states--play-error", "113/124 ok parts-feedback-bar--resolved-notes-dont-count", "124/124 ok parts-feedback-bar--copy-dialog"];
       const from = w("renders"), to = w("twentyfive") - 0.15;
-      S.ticker(tl, log.map((line, i) => [from + ((to - from) * i) / (log.length - 1), S.html(t.win, `<div class="ln" style="top:${26 + 4 * 46}px"><span class="k">render</span> ${line}</div>`)]));
+      S.ticker(tl, log.map((line, i) => [from + ((to - from) * i) / (log.length - 1), S.html(t.win, `<div class="ln" style="top:${t.rowY(4)}px"><span class="k">render</span> ${line}</div>`)]));
       t.write(tl, [
         [to + 0.05, `Recorded batch 4da43f5f-e3ca-4cb9-b074-a55eb2041942: <span class="n">124</span> stories.`, { row: 6 }],
         [to + 0.05, `Timings: render 19882 ms, store 653 ms, compare 57 ms, diff 1592 ms, <span class="b">total 25155 ms</span>`, { row: 7, hl: true }],

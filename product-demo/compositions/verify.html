@@ -7,8 +7,8 @@
   </div>
   <script>
     (() => {
-      const { tl, w, stage, D } = S.begin("verify");
-      const a = S.app(stage, ["h1-newer", "h2-replied"], { pointer: [1000, 500] });
+      const { tl, w, stage } = S.begin("verify");
+      const a = S.app(stage, ["h1-newer", "h2-replied"]);
       S.slideIn(tl, a.win);
       a.point(tl, w("newer") - 0.3, "h2-replied", 0.5);
       a.press(tl, w("and") - 0.05);

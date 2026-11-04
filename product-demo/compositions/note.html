@@ -24,7 +24,7 @@
       tl.set(cover, { opacity: 1 }, typing - 0.05);
       tl.fromTo(cover, { scaleX: 1 }, { scaleX: 0.48, duration: 0.8, ease: "steps(32)", immediateRender: false }, typing);
       tl.set(cover, { opacity: 0 }, typing + 0.83);
-      a.point(tl, typing + 0.55, "f2-note-hover" in window.UI_POINTS ? "f2-note-hover" : [1533, 565], 0.4);
+      a.point(tl, typing + 0.55, "f2-note-hover", 0.4);
       a.press(tl, w("send") - 0.2);
       a.show(tl, "f3-note-added", w("send") - 0.17);
       a.zoom(tl, w("send") - 0.1, null, 0.4);

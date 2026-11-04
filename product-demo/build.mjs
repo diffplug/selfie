@@ -1,6 +1,6 @@
 // Generates index.html, compositions/captions.html and the subtitle files from SCRIPT.md, scenes.json and the voiceover.
 // SCRIPT.md owns the words, the voiceover's timing file owns when they happen, compositions/<id>.html owns the pictures.
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 
 const AUDIO = "assets/narration.mp3";
 const TIMING = "assets/narration-timing.json";
@@ -14,25 +14,7 @@ if (narration.length !== scenes.length) {
 }
 
 const plain = (w) => w.toLowerCase().replace(/[^a-z0-9]/g, "");
-const hasVoice = existsSync(TIMING);
-
-/** Until there's a voiceover, a word lasts by its length, and punctuation pauses. */
-function estimate() {
-  let clock = 0.12;
-  return narration.map((paragraph, i) => {
-    const words = paragraph.split(/\s+/).map((text) => {
-      const spokenLonger = /\d/.test(text) ? 2.2 : 1;
-      const start = clock;
-      const end = start + ((text.length + 1) * spokenLonger) / 18;
-      clock = end + (/[.?!:]$/.test(text) ? 0.32 : /,$/.test(text) ? 0.14 : 0);
-      return { text, start, end };
-    });
-    clock += scenes[i].hold ?? 0.35;
-    return words;
-  });
-}
-
-/** With a voiceover, each word of the script takes its time from what the voice said, and a difference is an error. */
+// Each word of the script takes its time from what the voice said, and a difference is an error.
 function fromVoice() {
   const SPOKEN_AS = { "1": ["one"], "0": ["zero"], "13": ["thirteen"], twentyfive: ["25"] };
   const spoken = JSON.parse(readFileSync(TIMING, "utf8"))
@@ -53,8 +35,7 @@ function fromVoice() {
   return words;
 }
 
-const wordsByScene = hasVoice ? fromVoice() : estimate();
-if (!hasVoice) console.warn("No voiceover yet, so timing is estimated.");
+const wordsByScene = fromVoice();
 
 const timed = scenes.map((s, i) => {
   const start = i === 0 ? 0 : wordsByScene[i][0].start - LEAD_IN;
@@ -115,7 +96,7 @@ const captions = flat.map((g, i) => {
 const esc = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const hosts = timed
   .map(
-    (s, i) => `      <div id="${s.id}" data-composition-id="${s.id}" data-composition-src="compositions/${s.id}.html" data-start="${s.start}" data-duration="${s.dur}" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>`,
+    (s) => `      <div id="${s.id}" data-composition-id="${s.id}" data-composition-src="compositions/${s.id}.html" data-start="${s.start}" data-duration="${s.dur}" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>`,
   )
   .join("\n");
 const durations = Object.fromEntries(timed.map((s) => [s.id, s.dur]));
@@ -139,7 +120,8 @@ writeFileSync(
     <div id="root" data-composition-id="main" data-start="0" data-duration="${total}" data-width="1920" data-height="1080">
 ${hosts}
       <div id="captions" data-composition-id="captions" data-composition-src="compositions/captions.html" data-start="0" data-duration="${total}" data-track-index="2" data-track-kind="captions" data-width="1920" data-height="1080"></div>
-${hasVoice ? `      <audio id="narration" src="${AUDIO}" data-start="0" data-track-index="3" data-volume="1"></audio>\n` : ""}    </div>
+      <audio id="narration" src="${AUDIO}" data-start="0" data-track-index="3" data-volume="1"></audio>
+    </div>
     <script>
       window.__timelines["main"] = gsap.timeline({ paused: true });
     </script>

@@ -136,7 +136,7 @@ const captions = flat.map((g, i) => {
 const esc = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const hosts = timed
   .map(
-    (s, i) => `      <div id="${s.id}" data-composition-id="${s.id}" data-composition-src="compositions/${s.id}.html" data-start="${s.start}" data-duration="${s.dur}" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>`,
+    (s) => `      <div id="${s.id}" data-composition-id="${s.id}" data-composition-src="compositions/${s.id}.html" data-start="${s.start}" data-duration="${s.dur}" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>`,
   )
   .join("\n");
 const durations = Object.fromEntries(timed.map((s) => [s.id, s.dur]));

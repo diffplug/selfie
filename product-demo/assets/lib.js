@@ -7,6 +7,13 @@
     return after ? hit[2] : hit[1];
   };
 
+  /** Where the pointer really was for a shot. An unknown name is an error, so it can't silently land elsewhere. */
+  function pointNamed(name) {
+    const point = window.UI_POINTS[name];
+    if (!point) throw new Error(`No pointer position for "${name}"`);
+    return point;
+  }
+
   function html(parent, markup) {
     const t = document.createElement("template");
     t.innerHTML = markup.trim();
@@ -22,13 +29,13 @@
    * screen. The pointer and the camera are the only things added. Coordinates are the page's, 1600 x 900.
    */
   function app(stage, names, { pointer = [1000, 500] } = {}) {
+    const start = typeof pointer === "string" ? pointNamed(pointer) : pointer;
     const win = html(stage, `<div class="win" data-layout-ignore></div>`);
     const cam = html(win, `<div class="cam"></div>`);
     const shots = Object.fromEntries(names.map((n, i) => [n, html(cam, `<img class="shot" src="assets/ui/${n}.png" alt="" style="opacity:${i ? 0 : 1}" />`)]));
     const arrow = html(cam, `<svg class="pointer" viewBox="0 0 34 46"><path d="M3 2 L3 37 L12 29 L18.5 43 L25 40 L18.5 26.5 L30 26 Z" fill="#fff" stroke="#111" stroke-width="3" stroke-linejoin="round"/></svg>`);
-    gsap.set(arrow, { x: pointer[0], y: pointer[1], transformOrigin: "3px 2px" });
+    gsap.set(arrow, { x: start[0], y: start[1], transformOrigin: "3px 2px" });
     let showing = names[0];
-    let zoomed = { x: 0, y: 0, scale: 1 };
     const api = {
       win, cam, arrow,
       show(tl, name, t) {
@@ -37,7 +44,7 @@
         showing = name;
       },
       point(tl, t, to, dur = 0.55) {
-        const [x, y] = typeof to === "string" ? window.UI_POINTS[to] : to;
+        const [x, y] = typeof to === "string" ? pointNamed(to) : to;
         tl.to(arrow, { x, y, duration: dur, ease: "power3.inOut" }, t);
       },
       /** The press lands at t. */
@@ -49,12 +56,10 @@
       zoom(tl, t, region, dur = 0.7) {
         const to = region ? fit(region) : { x: 0, y: 0, scale: 1 };
         tl.to(cam, { ...to, duration: dur, ease: "power2.inOut" }, t);
-        zoomed = to;
       },
       /** Starts already zoomed, to continue from a shot before. */
       zoomNow(region) {
-        zoomed = fit(region);
-        gsap.set(cam, zoomed);
+        gsap.set(cam, fit(region));
       },
     };
     function fit({ x, y, w }) {
@@ -65,15 +70,16 @@
     return api;
   }
 
-  /** The terminal. Lines are [time, markup, options]; `type` reveals a monospaced line a character at a time. */
-  function term(stage, lines, { lineHeight = 46 } = {}) {
+  /** The terminal. `write` takes rows of [time, markup, options]; `type` reveals a monospaced line a character at a time. */
+  function term(stage) {
     const win = html(stage, `<div class="win term" data-layout-ignore></div>`);
+    const rowY = (row) => 26 + row * 46;
     return {
       win,
+      rowY,
       write(tl, rows) {
         rows.forEach(([t, markup, o = {}], i) => {
-          const y = 26 + (o.row ?? i) * lineHeight;
-          const ln = html(win, `<div class="ln${o.hl ? " hl" : ""}" style="top:${y}px">${markup || " "}</div>`);
+          const ln = html(win, `<div class="ln${o.hl ? " hl" : ""}" style="top:${rowY(o.row ?? i)}px">${markup}</div>`);
           if (t <= 0) return;
           if (o.type) {
             const chars = ln.textContent.length;
@@ -110,5 +116,5 @@
   const slideIn = (tl, el) => tl.fromTo(el, { x: 1920 }, { x: 0, duration: 0.4, ease: "expo.out" }, 0);
   const slideOut = (tl, el, D) => tl.to(el, { x: -1920, duration: 0.2, ease: "power3.in" }, D - 0.21);
 
-  window.S = { say, html, begin, app, term, ticker, call, slideIn, slideOut };
+  window.S = { html, begin, app, term, ticker, call, slideIn, slideOut };
 })();

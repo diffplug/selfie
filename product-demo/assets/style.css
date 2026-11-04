@@ -1,7 +1,7 @@
 @font-face { font-family: "Bagel Fat One"; src: url("fonts/BagelFatOne.woff2") format("woff2"); }
 @font-face { font-family: "Jost"; src: url("fonts/Jost.woff2") format("woff2"); font-weight: 100 900; }
 
-:root { --ground: #bfd9f5; --sun: #ffd95e; --ink: #23232b; --paper: #fff; --pink: #f4689f; --coral: #e35c61; --teal: #78acae; --blue: #63b9e3; }
+:root { --ground: #bfd9f5; --sun: #ffd95e; --ink: #23232b; }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { width: 1920px; height: 1080px; overflow: hidden; background: var(--ground); font-family: "Jost", sans-serif; color: var(--ink); }
 

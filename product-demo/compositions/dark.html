@@ -7,7 +7,7 @@
   </div>
   <script>
     (() => {
-      const { tl, w, stage, D } = S.begin("dark");
+      const { tl, w, stage } = S.begin("dark");
       const a = S.app(stage, ["a1-batch", "d1-search", "d2-dark", "d5-dark-current", "d4-dark-golden"], { pointer: [948, 644] });
       a.point(tl, w("search") - 0.5, [120, 84], 0.5);
       a.show(tl, "d1-search", w("dark", { nth: 1 }) - 0.1);

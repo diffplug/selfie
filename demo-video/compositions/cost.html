@@ -8,8 +8,7 @@
   </div>
   <script>
     (() => {
-      const { tl, at, stage } = S.begin("cost", 10.2);
-      const w = (word, o) => S.say("cost", word, o);
+      const { tl, at, w, stage } = S.begin("cost", 10.2);
       const b = S.booth(stage);
 
       // "This works great, but it requires waiting": the bar crawls and nothing else happens.
@@ -19,21 +18,17 @@
 
       // "0.8 cents per image": the meter comes on.
       const zero = b.digit("$0.000");
-      tl.set(zero, { opacity: 1 }, w("at") - 0.1);
       tl.to(b.per, { opacity: 1, duration: 0.15 }, w("08"));
-      const one = b.digit("$0.008"), two = b.digit("$0.016");
+      S.ticker(tl, [[w("at") - 0.1, zero], [w("reasonable"), b.digit("$0.008")], [w("human"), b.digit("$0.016")]]);
 
       // "The speed of human code": one unhurried press at a time.
       const hand = S.hand(stage, "cost-hand");
       const bx = 560, by = 776;
       tl.fromTo(hand, { x: bx + 300, y: 1120 }, { x: bx, y: by - 40, duration: 0.7, ease: "expo.out" }, w("image") + 0.1);
-      [[w("reasonable"), one, 1190, 828], [w("human"), two, 1290, 832]].forEach(([t, d, x, y]) => {
+      [[w("reasonable"), 1190, 828], [w("human"), 1290, 832]].forEach(([t, x, y]) => {
         tl.to(hand, { y: by + 8, duration: 0.09, ease: "power2.in" }, t - 0.09);
         tl.to(hand, { y: by - 40, duration: 0.3, ease: "power2.out" }, t + 0.02);
         S.press(tl, b.button, t - 0.02);
-        tl.set(zero, { opacity: 0 }, t);
-        tl.set(d, { opacity: 1 }, t);
-        if (d === two) tl.set(one, { opacity: 0 }, t);
         S.coinDrop(tl, stage, t + 0.04, x, y);
       });
       S.whipIn(tl, stage);

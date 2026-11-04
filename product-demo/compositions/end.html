@@ -7,22 +7,18 @@
   </div>
   <script>
     (() => {
-      const { tl, w, stage, D } = S.begin("end");
+      const { tl, w, stage } = S.begin("end");
       const white = S.html(stage, `<div class="flash" style="opacity:1;z-index:5"></div>`);
       stage.style.background = "var(--sun)";
       tl.to(white, { opacity: 0, duration: 0.4, ease: "power2.out" }, 0.02);
       const logo = S.html(stage, `<div class="abs wordmark" style="font-size:200px;white-space:nowrap" data-layout-ignore>selfie.dev</div>`);
       gsap.set(logo, { x: 110, y: 240 });
       tl.fromTo(logo, { scale: 1.05, transformOrigin: "0 50%" }, { scale: 1, duration: 0.6, ease: "expo.out" }, 0.02);
-      const agent = S.html(stage, `<div class="abs" style="font:600 56px/1.2 Jost,sans-serif;width:1050px" data-layout-ignore>Works with any coding agent.</div>`);
-      gsap.set(agent, { x: 120, y: 500, opacity: 0 });
-      tl.to(agent, { opacity: 1, duration: 0.18 }, 0.25);
-      const local = S.html(stage, `<div class="abs" style="font:600 56px/1.2 Jost,sans-serif;width:1050px" data-layout-ignore>Start locally today.</div>`);
-      gsap.set(local, { x: 120, y: 580, opacity: 0 });
-      tl.to(local, { opacity: 1, duration: 0.18 }, w("start") - 0.05);
-      const wait = S.html(stage, `<div class="abs" style="font:600 56px/1.2 Jost,sans-serif;width:1050px" data-layout-ignore>Join the waitlist for the cloud.</div>`);
-      gsap.set(wait, { x: 120, y: 660, opacity: 0 });
-      tl.to(wait, { opacity: 1, duration: 0.18 }, w("join") - 0.05);
+      [["Works with any coding agent.", 500, 0.25], ["Start locally today.", 580, w("start") - 0.05], ["Join the waitlist for the cloud.", 660, w("join") - 0.05]].forEach(([text, y, t]) => {
+        const line = S.html(stage, `<div class="abs" style="font:600 56px/1.2 Jost,sans-serif;width:1050px" data-layout-ignore>${text}</div>`);
+        gsap.set(line, { x: 120, y, opacity: 0 });
+        tl.to(line, { opacity: 1, duration: 0.18 }, t);
+      });
       const mascot = S.html(stage, `<img class="abs" src="assets/mascot-cutout.png" alt="" style="height:1040px;width:auto" data-layout-ignore />`);
       gsap.set(mascot, { x: 1260, y: 24 });
       tl.fromTo(mascot, { x: 1340 }, { x: 1260, duration: 0.7, ease: "expo.out" }, 0.02);

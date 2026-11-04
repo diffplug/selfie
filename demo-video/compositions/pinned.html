@@ -8,8 +8,7 @@
   </div>
   <script>
     (() => {
-      const { tl, at, stage } = S.begin("pinned", 5);
-      const w = (word, o) => S.say("pinned", word, o);
+      const { tl, w, stage } = S.begin("pinned");
       const machines = [["your laptop", 110], ["an agent", 720], ["CI", 1330]];
       machines.forEach(([name, x], i) => {
         const t = 0.15 + i * 0.4;
@@ -24,8 +23,8 @@
         stage.insertBefore(p, c);
         tl.to(p, { y: 460, scale: 1, duration: 0.45, ease: "back.out(1.5)" }, w("same") + i * 0.32);
       });
-      ["=", "="].forEach((eq, i) => {
-        const e = S.html(stage, `<div class="abs display" style="font-size:150px">${eq}</div>`);
+      [0, 1].forEach((i) => {
+        const e = S.html(stage, `<div class="abs display" style="font-size:150px">=</div>`);
         gsap.set(e, { x: 575 + i * 610, y: 500, opacity: 0, scale: 1.5, transformOrigin: "50% 50%" });
         tl.to(e, { opacity: 1, scale: 1, duration: 0.25, ease: "expo.out" }, w("wherever") + i * 0.25);
       });

@@ -7,8 +7,8 @@
   </div>
   <script>
     (() => {
-      const { tl, w, stage, D } = S.begin("cloud");
-      const a = S.app(stage, ["m1-github-commits", "m1b-github-status", "m2-hosted-batch"], { pointer: [1000, 500] });
+      const { tl, w, stage } = S.begin("cloud");
+      const a = S.app(stage, ["m1-github-commits", "m1b-github-status", "m2-hosted-batch"]);
       S.slideIn(tl, a.win);
       a.point(tl, w("renders"), "m1b-github-status", 0.6);
       a.press(tl, w("status") - 0.05);

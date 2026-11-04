@@ -8,7 +8,7 @@
   <script>
     (() => {
       const { tl, w, stage, D } = S.begin("decide");
-      const a = S.app(stage, ["h2-replied", "i4-resolved", "j1-batch", "k1-dialog", "k2-all-approved"], { pointer: "h2-replied" in window.UI_POINTS ? window.UI_POINTS["h2-replied"] : [461, 132] });
+      const a = S.app(stage, ["h2-replied", "i4-resolved", "j1-batch", "k1-dialog", "k2-all-approved"], { pointer: "h2-replied" });
       a.point(tl, 0.1, "i4-resolved", 0.45);
       a.press(tl, w("note") - 0.15);
       a.show(tl, "i4-resolved", w("note") - 0.12);

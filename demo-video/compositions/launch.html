@@ -8,8 +8,7 @@
   </div>
   <script>
     (() => {
-      const { tl, at, stage } = S.begin("launch", 12.5);
-      const w = (word, o) => S.say("launch", word, o);
+      const { tl, at, w, stage } = S.begin("launch", 12.5);
       const space = S.html(stage, `<div class="abs" style="width:1920px;height:1080px;background:#2b2f5e;opacity:0" data-layout-ignore></div>`);
       const rnd = S.rand(11);
       const stars = S.html(stage, `<div class="abs" style="width:1920px;height:3400px" data-layout-ignore></div>`);
@@ -31,7 +30,7 @@
       tl.to(last.el, { x: 1500, y: 700, scale: 0.1, opacity: 0, duration: 0.6, ease: "power2.in" }, at(0.25));
 
       // Lift-off. The rocket moves to the middle, and the world falls away below it.
-      const rk = S.rocket(stage, "launch-rocket", 1.0);
+      const rk = S.rocket(stage, "launch-rocket");
       gsap.set(rk.el, { x: 1420, y: 72 });
       gsap.set(rk.fire, { scaleY: 0 });
       const lift = w("get");
@@ -40,7 +39,7 @@
       [-5, 5, -4, 4, -3, 3, 0].forEach((v, i) => tl.to(rk.el, { x: 1420 + v, duration: 0.05 }, lift - 0.4 + i * 0.05));
       tl.to(tag, { opacity: 0, duration: 0.15 }, lift + 0.7);
       tl.to(ground, { y: 1300, duration: 1.6, ease: "power3.in" }, lift);
-      tl.to(rk.el, { x: 780, y: 60, rotation: 0, duration: w("launch") - lift - 0.05, ease: "power2.inOut" }, lift);
+      tl.to(rk.el, { x: 780, y: 60, duration: w("launch") - lift - 0.05, ease: "power2.inOut" }, lift);
       tl.to(space, { opacity: 1, duration: 1.4, ease: "power1.in" }, lift + 0.4);
       tl.to(stars, { opacity: 1, duration: 0.8 }, lift + 1);
       const endAt = w("midnovember", { after: true }) + 0.25;
@@ -69,7 +68,7 @@
       gsap.set(sub, { x: 124, y: 500, opacity: 0 });
       tl.set(end, { opacity: 1 }, endAt);
       S.flash(tl, white, endAt, 1);
-      tl.set([word], { opacity: 1 }, endAt);
+      tl.set(word, { opacity: 1 }, endAt);
       tl.fromTo(word, { scale: 1.06, transformOrigin: "0 50%" }, { scale: 1, duration: 0.6, ease: "expo.out", immediateRender: false }, endAt);
       tl.set(mascot, { opacity: 1 }, endAt);
       tl.fromTo(mascot, { x: 1340 }, { x: 1270, duration: 0.7, ease: "expo.out", immediateRender: false }, endAt);

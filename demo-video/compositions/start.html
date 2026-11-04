@@ -8,10 +8,9 @@
   </div>
   <script>
     (() => {
-      const { tl, at, stage } = S.begin("start", 7.2);
-      const w = (word, o) => S.say("start", word, o);
+      const { tl, at, w, stage } = S.begin("start", 7.2);
       S.html(stage, `<div class="abs" style="left:0;top:800px;width:1920px;height:280px;background:#9fbd8f;border-top:7px solid var(--ink)" data-layout-ignore></div>`);
-      const rk = S.rocket(stage, "start-rocket", 1.0);
+      const rk = S.rocket(stage, "start-rocket");
       gsap.set(rk.el, { x: 1420, y: 72 });
       S.html(stage, `<div class="abs" style="left:1340px;top:770px;width:520px;height:42px;background:var(--grey);border:7px solid var(--ink);border-radius:8px" data-layout-ignore></div>`);
 

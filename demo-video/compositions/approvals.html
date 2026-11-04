@@ -8,8 +8,7 @@
   </div>
   <script>
     (() => {
-      const { tl, at, stage } = S.begin("approvals", 6);
-      const w = (word, o) => S.say("approvals", word, o);
+      const { tl, w, stage } = S.begin("approvals");
       const nodes = [[370, 760], [880, 760], [1390, 450]];
       S.html(stage, `<svg class="prop" width="1920" height="1080" viewBox="0 0 1920 1080" data-layout-ignore>
         <path d="M60 450 H1860" stroke="${S.GREY}" stroke-width="20"/><path d="M60 450 H1860" stroke="${S.INK}" stroke-width="6" stroke-dasharray="1"/>

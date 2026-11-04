@@ -8,8 +8,7 @@
   </div>
   <script>
     (() => {
-      const { tl, at, stage } = S.begin("chromatic", 6.6);
-      const w = (word, o) => S.say("chromatic", word, o);
+      const { tl, at, w, stage } = S.begin("chromatic", 6.6);
       const cl = S.cloud(stage, "chromatic-cloud", 1680);
       gsap.set(cl, { x: 120, y: -70, transformOrigin: "50% 50%" });
       tl.fromTo(cl, { scale: 0.86 }, { scale: 1, duration: 0.55, ease: "back.out(1.5)" }, 0);

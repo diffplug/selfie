@@ -8,8 +8,7 @@
   </div>
   <script>
     (() => {
-      const { tl, at, stage } = S.begin("reveal", 8.2);
-      const w = (word, o) => S.say("reveal", word, o);
+      const { tl, at, w, stage } = S.begin("reveal", 8.2);
       const flood = S.html(stage, `<div class="flash" style="opacity:1"></div>`);
       const word = S.html(stage, `<div class="abs" style="left:110px;top:150px;font-size:280px;white-space:nowrap" data-layout-allow-overlap></div>`);
       // The brand's gradient runs across the whole word, so each letter shows its own slice of it.
@@ -52,10 +51,9 @@
       S.flash(tl, white, w("picture"), 0.85);
 
       // There it is.
-      const pic = S.selfiePhoto(stage, "form", { tilt: 10 });
-      gsap.set(pic, { x: 610, y: 620, scale: 0, rotation: -24, transformOrigin: "50% 50%" });
+      const pic = S.selfiePhoto(stage, "form", 10);
+      gsap.set(pic, { x: 610, y: 650, scale: 0, rotation: -24, transformOrigin: "50% 50%" });
       tl.to(pic, { scale: 1.0, rotation: -6, duration: 0.45, ease: "back.out(1.5)" }, w("picture") + 0.08);
-      gsap.set(pic, { y: 650 });
       window.__timelines["reveal"] = tl;
     })();
   </script>
