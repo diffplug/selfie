@@ -2,7 +2,7 @@
 // rebuilt. Files are kept by their hash, as images are, so built Storybooks that share files share bytes.
 // See docs/specs/store.md -> built Storybooks.
 import type { Blobs } from "./blob.ts";
-import { chunks } from "./chunks.ts";
+import { chunks, STATEMENTS_PER_REQUEST } from "./chunks.ts";
 import { assertImageHash, isImageHash, sha256, toHex } from "./image-hash.ts";
 import type { Sql } from "./sql.ts";
 
@@ -14,10 +14,6 @@ export const CREATE_BUILT_STORYBOOK_TABLES: readonly string[] = [
   "CREATE TABLE IF NOT EXISTS story_viewports (batch_id TEXT NOT NULL, story TEXT NOT NULL, width INTEGER NOT NULL, height INTEGER NOT NULL, PRIMARY KEY (batch_id, story)) WITHOUT ROWID",
 ];
 
-// With the batch's ID, within the SQL interface's 100 bound parameters.
-const STORY_VIEWPORTS_PER_STATEMENT = 33;
-// The most statements in one request, as `docs/specs/renders.md` -> Requests says of a batch's renders.
-const STATEMENTS_PER_REQUEST = 400;
 
 /** A built Storybook's files by their path in it. Written last and whole, so that having one means having them all. */
 type StorybookManifest = Readonly<Record<string, string>>;
@@ -120,9 +116,9 @@ export class BuiltStorybooks {
 
   /** Says which of a batch's stories rendered at a size other than its environment's. A batch's first answer stays. */
   async recordStoryViewports(batchId: string, viewports: Readonly<Record<string, StoryViewport>>): Promise<void> {
-    const statements = chunks(Object.entries(viewports), STORY_VIEWPORTS_PER_STATEMENT).map((group) => ({
-      sql: `INSERT OR IGNORE INTO story_viewports(batch_id, story, width, height) VALUES ${group.map((_, i) => `(?1, ?${3 * i + 2}, ?${3 * i + 3}, ?${3 * i + 4})`).join(", ")}`,
-      params: [batchId, ...group.flatMap(([story, { width, height }]) => [story, width, height])],
+    const statements = Object.entries(viewports).map(([story, { width, height }]) => ({
+      sql: "INSERT OR IGNORE INTO story_viewports(batch_id, story, width, height) VALUES (?1, ?2, ?3, ?4)",
+      params: [batchId, story, width, height],
       idempotent: true,
     }));
     for (const request of chunks(statements, STATEMENTS_PER_REQUEST)) await this.#sql.batch(request);

@@ -4,7 +4,7 @@ import { Banner, Button, Stack, Text } from "@primer/react";
 import { useEffect, type ReactNode } from "react";
 import type { ListedStory, StoriesView, StorySetup } from "../shared/api.ts";
 import type { RenderingState } from "./hooks.ts";
-import { plural } from "./plural.ts";
+import { plural } from "../shared/plural.ts";
 import { anyStoryPath, AppLink, navigate, batchPath } from "./router.tsx";
 import { Sha, shortSha } from "./words.tsx";
 

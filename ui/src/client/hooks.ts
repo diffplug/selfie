@@ -336,6 +336,7 @@ export function useRenderProgress(running: boolean): { readonly progress: Render
     let reading = new AbortController();
     const tick = () => {
       setNow(Date.now());
+      if (document.hidden) return;
       reading.abort();
       reading = new AbortController();
       fetchRenderProgress(reading.signal).then(

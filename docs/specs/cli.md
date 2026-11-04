@@ -3,7 +3,7 @@
 > Status: built — the `selfie-cli` library and the `selfie` binary: `review`, `approve`, `reject`, and `ui`, on the local store. `docs/specs/sync.md` owns `push`, `pull`, and what a remote adds; see `## Future`.
 >
 > - See `docs/specs/glossary.md` for batch, render, reference, baseline, decision, and environment.
-> - Owns local data's layout, each command's checks and exit code, and the shape of what they print and return. `docs/specs/renders.md` owns what a batch, a decision, and a golden are. `docs/specs/render.md` owns render. `docs/specs/store.md` owns images.
+> - Owns local data's layout, each command's checks and exit code, and the shape of what they print and return. `docs/specs/renders.md` owns what a batch, a decision, and an approval are. `docs/specs/render.md` owns render. `docs/specs/store.md` owns images.
 
 ## Commands
 
@@ -16,7 +16,7 @@ Source of truth: `cli/src/cli.ts`, `cli/src/document.ts`; the real binary's test
 | `selfie flakes` | Renders a built Storybook several times, and prints what wasn't the same each time ([Flakes](#flakes)) |
 | `selfie skill <name>` | Prints a guide for a coding agent ([Flakes](#flakes)) |
 | `selfie review [<batch>]` | Prints the diff of a batch against what history has approved. With no batch, uses the one for this built Storybook, and records one [only if necessary](#recording-only-if-necessary) |
-| `selfie approve <batch>`, `selfie reject <batch>` | Records a decision on a batch's changed and added images, with `--all` or `--story <pattern>` |
+| `selfie approve <batch>`, `selfie reject <batch>` | Records a decision on what a batch changed, added, or removed, with `--all` or `--story <pattern>` |
 | `selfie push`, `selfie pull` | Moves a batch and its goldens to and from a remote (`docs/specs/sync.md`) |
 | `selfie notes` | Prints the open notes a person has sent to an agent from this folder (`docs/specs/feedback.md`) |
 | `selfie reply <note> <text>` | Answers a note (`docs/specs/feedback.md`) |

@@ -6,7 +6,8 @@ import path from "node:path";
 import { render as realRender, type Manifest, type ManifestStory, type RenderProgressEvent, type StoryError } from "selfie-render";
 import { decodeImage } from "selfie-store";
 import { sharpCodec } from "selfie-store/adapters/sharp-codec";
-import { describeRenderProgress } from "selfie-ui/render-progress";
+import type { RenderProgress } from "selfie-ui/app";
+import { advanceRenderProgress, describeRenderProgress } from "selfie-ui/render-progress";
 import { resolveRenderSettings } from "./config.ts";
 import { diffImages, type PixelDiff } from "./diff.ts";
 import { regularFileInside, storyDirName } from "./paths.ts";
@@ -52,14 +53,14 @@ const PROGRESS_LINE_EVERY_MS = 10_000;
 /** Says how one render is going, with whatever `prefix` says about which it is. */
 function progressLines(log: (line: string) => void, prefix: string): (progress: RenderProgressEvent) => void {
   const startedAtMs = Date.now();
-  let firstStoryStartedAtMs: number | null = null;
+  let progress: RenderProgress = { total: 0, finished: 0, startedAtMs, firstStoryStartedAtMs: null };
   let saidAt = startedAtMs;
-  return ({ event, finished, total }) => {
+  return (event) => {
     const now = Date.now();
-    if (event === "started") firstStoryStartedAtMs = now;
+    progress = advanceRenderProgress(progress, event, now);
     if (now - saidAt < PROGRESS_LINE_EVERY_MS) return;
     saidAt = now;
-    log(`${prefix}: ${describeRenderProgress({ total, finished, startedAtMs, firstStoryStartedAtMs }, now)}`);
+    log(`${prefix}: ${describeRenderProgress(progress, now)}`);
   };
 }
 

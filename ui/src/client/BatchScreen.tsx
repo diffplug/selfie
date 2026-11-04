@@ -23,7 +23,7 @@ import { Keys } from "./Keys.tsx";
 import { AppLink, AppLinkButton, navigate, batchPath, storiesPath, storyPath } from "./router.tsx";
 import { ActionFailure } from "./ActionFailure.tsx";
 import { StoryLinks } from "./StoryLinks.tsx";
-import { plural } from "./plural.ts";
+import { plural } from "../shared/plural.ts";
 import { BLOCKER_WORDS, ReusedPixels, Sha, shortSha } from "./words.tsx";
 
 const PATTERNS_LISTED = 3;

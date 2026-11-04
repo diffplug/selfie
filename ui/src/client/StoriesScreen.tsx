@@ -11,7 +11,7 @@ import { useRender, useRenderProgress, useFeedback, useHotkeys, useBatch, useSto
 import { Keys } from "./Keys.tsx";
 import { usePageFacts } from "./PageFacts.tsx";
 import { OpenInStorybook, StoryFrame, storyFrameUrl } from "./LiveStories.tsx";
-import { plural } from "./plural.ts";
+import { plural } from "../shared/plural.ts";
 import { ActionFailedBanner } from "./ActionFailure.tsx";
 import { anyStoryPath, navigate, storiesPath } from "./router.tsx";
 import { matchingStories, StoryNavLayout } from "./StoryNav.tsx";

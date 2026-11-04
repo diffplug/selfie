@@ -149,7 +149,7 @@ Source of truth: `ui/src/client/`.
 - **Must let someone select any set of hunks, from the list, from an outline, or with a key, and keep that only while they stay on the story.** Clicking a stacked hunk's outline selects it, and side by side only its number does, since clicking an image there stacks it.
 - **Must keep the hunk being looked at still when flipping between images**, since it can be somewhere else in the other one (rationale).
 - **Must link a render to its story in the very built Storybook that rendered its batch, if that's kept, or else the directory `selfie ui` hosts, and then say it may not match** (`BatchView.storybook`). A removed story has no link.
-- **Must offer the live stories, closed and loading nothing until opened, and stay open or closed from story to story**: the kept built Storybook of the batch behind its reference, beside the batch's own, in frames (`docs/specs/access.md` → Local review server), each at the size its own image rendered at, which is the story's own (`BatchView.storyViewports`, `goldenStoryViewports`) or else its environment's (`BatchView.viewport`), and scaled to fit, or else saying that size wasn't recorded, each saying why if it has none (rationale).
+- **Must offer the live stories, closed and loading nothing until opened, and stay open or closed from story to story**: the kept built Storybook of the batch behind its reference, beside the batch's own, in frames (`docs/specs/access.md` → Local review server), each at the size its own image rendered at, which is the story's own (`BatchView.storyViewports`, `RenderRow.goldenViewport`) or else its environment's (`BatchView.viewport`), and scaled to fit, or else saying that size wasn't recorded, each saying why if it has none (rationale).
 - **Must give a live story the keyboard only when it's clicked in**, taking focus back from one that focuses itself as it loads, so this page's keys keep working (rationale).
 - **Must leave the browser's history alone when moving a live story along**, so Back leaves the screen as it does anywhere else (rationale).
 - **Must keep how someone is looking when moving between stories**, and must never show one story's image under another's name while it loads.
@@ -231,7 +231,6 @@ Source of truth: `ui/src/client/*.stories.tsx`, `ui/src/client/stories/`.
 - **Must not read a blob to show a list.** Row data comes from `compareFromHistory` and `review.json` (rationale).
 - **Must not read the unchanged stories until asked.**
 - **Must not virtualize the list, or put `content-visibility` on its rows** (rationale).
-- **Must render only the banner again each second of a render**, not the list beside it (rationale).
 
 ## Future
 
