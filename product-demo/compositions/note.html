@@ -1,0 +1,38 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; }
+  </style>
+  <div id="root" data-composition-id="note" data-width="1920" data-height="1080">
+    <div id="note-stage" class="stage" data-layout-allow-overflow></div>
+  </div>
+  <script>
+    (() => {
+      const { tl, w, stage, D } = S.begin("note");
+      const a = S.app(stage, ["d5-dark-current", "e2-box", "f1-note-typed", "f3-note-added", "g1-sent"], { pointer: [1140, 660] });
+      a.zoomNow({ x: 320, y: 590, w: 1270 });
+      // The click selects the hunk under the pointer: the real app's own selection.
+      a.point(tl, w("click") - 0.35, [922, 647], 0.35);
+      a.press(tl, w("change"));
+      a.show(tl, "e2-box", w("change") + 0.03);
+      a.zoom(tl, w("change") + 0.25, { x: 320, y: 410, w: 1000 }, 0.45);
+      // Press M, and type. The note's words are uncovered in its real shot.
+      const typing = w("write");
+      a.show(tl, "f1-note-typed", typing - 0.05);
+      const cover = S.html(a.cam, `<div class="abs" style="width:1100px;height:30px;background:#fff" data-layout-ignore></div>`);
+      a.cam.insertBefore(cover, a.arrow);
+      gsap.set(cover, { x: 332, y: 552, opacity: 0, transformOrigin: "100% 50%" });
+      tl.set(cover, { opacity: 1 }, typing - 0.05);
+      tl.fromTo(cover, { scaleX: 1 }, { scaleX: 0.48, duration: 0.8, ease: "steps(32)", immediateRender: false }, typing);
+      tl.set(cover, { opacity: 0 }, typing + 0.83);
+      a.point(tl, typing + 0.55, "f2-note-hover" in window.UI_POINTS ? "f2-note-hover" : [1533, 565], 0.4);
+      a.press(tl, w("send") - 0.2);
+      a.show(tl, "f3-note-added", w("send") - 0.17);
+      a.zoom(tl, w("send") - 0.1, null, 0.4);
+      a.point(tl, w("send") - 0.1, "g1-sent", 0.4);
+      a.press(tl, w("agent") + 0.15);
+      a.show(tl, "g1-sent", w("agent") + 0.18);
+      S.slideOut(tl, a.win, D);
+      window.__timelines["note"] = tl;
+    })();
+  </script>
+</template>

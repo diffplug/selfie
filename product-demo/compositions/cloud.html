@@ -1,0 +1,26 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; }
+  </style>
+  <div id="root" data-composition-id="cloud" data-width="1920" data-height="1080">
+    <div id="cloud-stage" class="stage" data-layout-allow-overflow></div>
+  </div>
+  <script>
+    (() => {
+      const { tl, w, stage, D } = S.begin("cloud");
+      const a = S.app(stage, ["m1-github-commits", "m1b-github-status", "m2-hosted-batch"], { pointer: [1000, 500] });
+      S.slideIn(tl, a.win);
+      a.point(tl, w("renders"), "m1b-github-status", 0.6);
+      a.press(tl, w("status") - 0.05);
+      a.show(tl, "m1b-github-status", w("status") - 0.02);
+      a.zoom(tl, w("status"), { x: 440, y: 340, w: 760 }, 0.5);
+      a.point(tl, w("click") - 0.4, [1082, 465], 0.4);
+      a.press(tl, w("through") + 0.1);
+      a.zoom(tl, w("through") + 0.13, null, 0.01);
+      a.show(tl, "m2-hosted-batch", w("through") + 0.13);
+      a.point(tl, w("through") + 0.2, [1000, 620], 0.3);
+      S.call(tl, stage, "hackathon.selfie.dev", 1180, 780, w("same"));
+      window.__timelines["cloud"] = tl;
+    })();
+  </script>
+</template>

@@ -1,0 +1,34 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; }
+  </style>
+  <div id="root" data-composition-id="json" data-width="1920" data-height="1080">
+    <div id="json-stage" class="stage" data-layout-allow-overflow></div>
+  </div>
+  <script>
+    (() => {
+      const { tl, w, stage, D } = S.begin("json");
+      const t = S.term(stage);
+      t.write(tl, [
+        [-1, `<span class="c">{</span>`],
+        [-1, `  <span class="k">"batchId"</span>: <span class="s">"4da43f5f-e3ca-4cb9-b074-a55eb2041942"</span>,`],
+        [-1, `  <span class="k">"gitSha"</span>: <span class="s">"7121302d5c653ad23435b07e3a45462aa74a6545"</span>,`],
+        [-1, `  <span class="k">"counts"</span>: {`],
+        [-1, `    <span class="k">"stories"</span>: <span class="n">124</span>, <span class="k">"unchanged"</span>: <span class="n">0</span>, <span class="b"><span class="k">"changed"</span>: <span class="n">124</span></span>, <span class="k">"undecided"</span>: <span class="n">124</span>`, { hl: false }],
+        [-1, `  },`],
+        [-1, `  <span class="k">"blockers"</span>: [`],
+        [-1, `    { <span class="k">"story"</span>: <span class="s">"pages-batch--action-failed"</span>, <span class="k">"reason"</span>: <span class="s">"changed-unapproved"</span> },`],
+        [-1, `    <span class="c">… 123 more</span>`],
+        [-1, `  ],`],
+        [-1, `  <span class="k">"differences"</span>: [ <span class="c">… each with its images, its pixels, and its hunks</span> ],`],
+        [-1, `  <span class="k">"next"</span>: [ <span class="s">"Look at the images, then: selfie approve 4da43f5f-… --all"</span> ]`],
+        [-1, `<span class="c">}</span>`],
+        [w("exit") - 0.2, `<span class="p">$</span> <span class="b">echo $?</span>`, { row: 14 }],
+        [w("exit") + 0.05, `<span class="n">1</span>`, { row: 15, hl: true }],
+      ]);
+      S.call(tl, stage, "all 124 stories", 300, 752, w("touched"));
+      S.slideOut(tl, t.win, D);
+      window.__timelines["json"] = tl;
+    })();
+  </script>
+</template>

@@ -1,0 +1,21 @@
+{
+  "comment": "One scene per narration paragraph of SCRIPT.md, in order. Timing comes from the voiceover once assets/narration-timing.json exists, and is estimated until then. hold is how long a scene stays up after its last word.",
+  "scenes": [
+    { "id": "ask", "hold": 0.6 },
+    { "id": "render", "hold": 0.5 },
+    { "id": "json", "hold": 0.6 },
+    { "id": "batch", "hold": 0.4 },
+    { "id": "layout", "hold": 0.5 },
+    { "id": "flip", "hold": 0.6 },
+    { "id": "approve", "hold": 0.6 },
+    { "id": "dark", "hold": 0.8 },
+    { "id": "note", "hold": 0.6 },
+    { "id": "received", "hold": 0.8 },
+    { "id": "fix", "hold": 0.6 },
+    { "id": "verify", "hold": 0.6 },
+    { "id": "decide", "hold": 0.6 },
+    { "id": "final", "hold": 0.8 },
+    { "id": "cloud", "hold": 0.8 },
+    { "id": "end", "hold": 3.5 }
+  ]
+}

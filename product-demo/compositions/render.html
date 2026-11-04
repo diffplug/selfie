@@ -1,0 +1,32 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; }
+  </style>
+  <div id="root" data-composition-id="render" data-width="1920" data-height="1080">
+    <div id="render-stage" class="stage" data-layout-allow-overflow></div>
+  </div>
+  <script>
+    (() => {
+      const { tl, w, stage, D } = S.begin("render");
+      const t = S.term(stage);
+      S.slideIn(tl, t.win);
+      t.write(tl, [
+        [0.3, `<span class="p">$</span> <span class="b">selfie review --build</span>`, { type: true }],
+        [w("renders") - 0.5, `<span class="c">└  Storybook build completed successfully</span>`, { row: 2 }],
+      ]);
+      // The real log of the real render, sped up. It took what the last line says it took.
+      const log = ["1/124 ok pages-batch--action-failed", "15/124 ok pages-batch--some-decided", "29/124 ok pages-every-story--rendering-with-an-estimate", "43/124 ok pages-story-comparing--moved-only", "57/124 ok pages-story-comparing--tall-page", "71/124 ok pages-story-live--open", "85/124 ok pages-story-notes--resolved-note", "99/124 ok pages-story-states--play-error", "113/124 ok parts-feedback-bar--resolved-notes-dont-count", "124/124 ok parts-feedback-bar--copy-dialog"];
+      const from = w("renders"), to = w("twentyfive") - 0.15;
+      S.ticker(tl, log.map((line, i) => [from + ((to - from) * i) / (log.length - 1), S.html(t.win, `<div class="ln" style="top:${26 + 4 * 46}px"><span class="k">render</span> ${line}</div>`)]));
+      t.write(tl, [
+        [to + 0.05, `Recorded batch 4da43f5f-e3ca-4cb9-b074-a55eb2041942: <span class="n">124</span> stories.`, { row: 6 }],
+        [to + 0.05, `Timings: render 19882 ms, store 653 ms, compare 57 ms, diff 1592 ms, <span class="b">total 25155 ms</span>`, { row: 7, hl: true }],
+      ]);
+      S.call(tl, stage, "124 stories", 240, 540, w("124"));
+      S.call(tl, stage, "M4 MacBook Air", 590, 540, w("macbook") - 0.1, { style: "background:#fff" });
+      S.call(tl, stage, "25 seconds", 1020, 540, w("twentyfive"));
+      S.call(tl, stage, "no cloud, no bill per image", 240, 660, w("no"), { style: "background:#fff" });
+      window.__timelines["render"] = tl;
+    })();
+  </script>
+</template>

@@ -1,0 +1,32 @@
+@font-face { font-family: "Bagel Fat One"; src: url("fonts/BagelFatOne.woff2") format("woff2"); }
+@font-face { font-family: "Jost"; src: url("fonts/Jost.woff2") format("woff2"); font-weight: 100 900; }
+
+:root { --ground: #bfd9f5; --sun: #ffd95e; --ink: #23232b; --paper: #fff; --pink: #f4689f; --coral: #e35c61; --teal: #78acae; --blue: #63b9e3; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 1920px; height: 1080px; overflow: hidden; background: var(--ground); font-family: "Jost", sans-serif; color: var(--ink); }
+
+.stage { position: absolute; inset: 0; overflow: hidden; background: var(--ground); }
+.abs { position: absolute; left: 0; top: 0; }
+
+/* One window, in one place, for the whole film: the app or the terminal. */
+.win { position: absolute; left: 160px; top: 20px; width: 1600px; height: 900px; overflow: hidden; border-radius: 14px; outline: 5px solid var(--ink); background: #fff; box-shadow: 10px 10px 0 var(--ink); }
+.cam { position: absolute; left: 0; top: 0; width: 1600px; height: 900px; transform-origin: 0 0; }
+.shot { position: absolute; left: 0; top: 0; width: 1600px; height: 900px; }
+.pointer { position: absolute; left: 0; top: 0; width: 34px; height: 46px; overflow: visible; }
+
+.term { background: #17181f; color: #e8e9ee; font: 500 30px/46px "JetBrains Mono", monospace; padding: 26px 34px; }
+.term .ln { position: absolute; left: 34px; right: 34px; white-space: pre; isolation: isolate; }
+.term .ln.hl::before { content: ""; position: absolute; left: -14px; right: -14px; top: 1px; bottom: 1px; border-radius: 6px; background: rgba(244, 104, 159, 0.2); z-index: -1; }
+.term .p { color: #f4689f; font-weight: 700; }
+.term .c { color: #8b8fa3; }
+.term .k { color: #8fc7ee; }
+.term .n { color: #ffd95e; }
+.term .s { color: #a9dcb4; }
+.term .add { color: #7ee2a0; }
+.term .del { color: #ff8b92; }
+.term .b { color: #fff; font-weight: 700; }
+
+/* A word or number the voice is saying, set beside what it's about. */
+.call { position: absolute; left: 0; top: 0; padding: 10px 26px 15px; border-radius: 12px; background: var(--sun); color: var(--ink); border: 5px solid var(--ink); box-shadow: 6px 6px 0 var(--ink); font: 700 46px/1.1 "Jost", sans-serif; white-space: nowrap; }
+.flash { position: absolute; inset: 0; background: #fff; opacity: 0; }
+.wordmark { font-family: "Bagel Fat One", sans-serif; line-height: 1; background: linear-gradient(90deg, #63b9e3, #78acae 50%, #e35c61); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(7px 7px 0 #4d4d4d); }
