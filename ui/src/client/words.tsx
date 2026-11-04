@@ -114,6 +114,7 @@ export function StateLabel({ state }: { readonly state: RenderState }) {
 }
 
 export function DecisionLabel({ row }: { readonly row: Pick<RenderRow, "state" | "decision"> }) {
+  if (row.state === "failed") return <span className="selfie-muted">Can't be approved until it's fixed</span>;
   if (!isDecidable(row.state)) return <span className="selfie-muted">No decision needed</span>;
   if (row.decision?.decision === "approved") {
     return (
