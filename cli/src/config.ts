@@ -7,6 +7,7 @@ import { resolveInside } from "./paths.ts";
 
 /** At the Git top level. It's the only place a project configures Selfie. */
 const CONFIG_FILE = "selfie.config.json";
+const EXAMPLE_CONFIG = { storybookDir: "storybook-static", buildCommand: "npm run build-storybook" };
 const KNOWN_KEYS = new Set(["environment", "initScript", "storybookDir", "buildCommand", "hunkMergeDistance", "settleMs", "storyTimeoutMs"]);
 
 interface ProjectConfig {
@@ -26,7 +27,7 @@ async function loadConfig(repo: Repo): Promise<ProjectConfig> {
   const file = path.join(repo.root, CONFIG_FILE);
   const text = await readFile(file, "utf8").catch(() => null);
   if (text === null) {
-    throw new SelfieError("no-config", `There's no ${CONFIG_FILE} at ${repo.root}, which says where this project's built Storybook is and how to build it. selfie skill quickstart is a guide to setting it up.`);
+    throw new SelfieError("no-config", `There's no ${CONFIG_FILE} at ${repo.root}. Write one that says where this project's built Storybook is and how to build it, such as ${JSON.stringify(EXAMPLE_CONFIG)}, or have a coding agent follow selfie skill quickstart.`);
   }
 
   let parsed: unknown;

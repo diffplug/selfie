@@ -315,9 +315,8 @@ Source of truth: `cli/src/config.ts`.
 | `storyTimeoutMs` | The bound on one story, from opening its context to its screenshot. Default 60000 |
 | `hunkMergeDistance` | How close changed hunks group for showing, in CSS pixels, multiplied by the batch's scale. Default 12 |
 
-- **May let `--native` win over its `runner`.**
-- **Must refuse, with exit 2, a repository with no config, or one missing a required key**, and say that `selfie skill quickstart` sets it up (rationale).
-- **Never take a flag or environment variable for what the config says**, except `--native`.
+- **Must refuse, with exit 2, a repository with no config, or one missing a required key**, and show what to write, and that `selfie skill quickstart` is a guide for a coding agent (rationale).
+- **Never take a flag or environment variable for anything about the project.** Those describe this machine or this one command, such as `--native`, `--story`, and `SELFIE_HOME` (rationale).
 - **Must refuse an unknown key**, so a typo can't silently render the wrong environment.
 - **Must run `buildCommand` only when a person asks: `selfie` alone, or `--build` on `render` or `review`, and never from a page or by default**, printing it first, so a checkout can only run a command on someone who asked for its built Storybook (rationale).
 

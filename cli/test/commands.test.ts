@@ -277,7 +277,8 @@ describe("selfie.config.json", () => {
     await rm(path.join(h.repo, "selfie.config.json"));
     const { code, json } = await h.cli("render");
     expect(code).toBe(2);
-    expect(json.error).toMatchObject({ code: "no-config", message: expect.stringContaining("selfie skill quickstart") });
+    expect(json.error).toMatchObject({ code: "no-config", message: expect.stringContaining('{"storybookDir":"storybook-static","buildCommand":"npm run build-storybook"}') });
+    expect(json.error.message).toContain("selfie skill quickstart");
   });
 
   test.each(["storybookDir", "buildCommand"])("must say %s", async (key) => {

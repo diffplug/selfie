@@ -106,7 +106,7 @@ It takes 4 to 10 ms an image on average, 17 ms at worst, and a story's stats com
 
 ## Configuration
 
-**Required, and the only place.** A default directory and flags that overrode the file meant a project's setup could live in a command someone typed, an agent's guess, or a skill's fallback, and two people could render different things and not know. So there's one file, and a repository without it is told how to get one.
+**Required, and the only place.** A default directory and flags that overrode the file meant a project's setup could live in a command someone typed, an agent's guess, or a skill's fallback, and two people could render different things and not know. So there's one file, and a repository without it is told how to get one. `--native` isn't an exception to this: which browser this machine can use is about the machine, and a checked-in file shouldn't choose it for everyone.
 
 **One file, in one place.** Every command that needs an environment must find the same one, or `find-baseline` and `review` disagree. `--config` and `--init-script` let them, so they went. A file at the Git top level does the job without a flag on each call. `--native` stays, for a machine trying something locally, since a checked-in file shouldn't choose that.
 
