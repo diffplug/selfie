@@ -153,6 +153,15 @@ async function firstParentHistory(repo: Repo, start: string, maxCommits: number)
   return stdout.split("\n").filter((line) => line !== "");
 }
 
+/** Each commit this one reaches with what came right before it, for a server with no Git to ask. Nothing if this clone doesn't have it. */
+export async function commitGraph(repo: Repo, sha: string): Promise<readonly { readonly sha: string; readonly parents: readonly string[] }[]> {
+  const listed = await ask(repo.root, ["rev-list", "--parents", `--max-count=${MAX_COMMITS}`, sha]);
+  return listed === null ? [] : listed.split("\n").map((line) => {
+    const [commit, ...parents] = line.split(" ");
+    return { sha: commit!, parents };
+  });
+}
+
 /**
  * The nearest commit at or before the merge-base with the default branch, on first-parent
  * history, for which `firstWithGoldens` answers. It is given those commits, nearest first.

@@ -2,7 +2,7 @@
 // here, since none of it belongs in anything a store or a UI would keep.
 import { groupHunks } from "selfie-ui/hunks";
 import type { RenderBatchResult, ReviewResult } from "./review.ts";
-import { summarizeBatch, type BatchSummary } from "./summary.ts";
+import { summarizeBatch, type BatchSummary } from "selfie-store";
 
 const DIRTY_PATHS_SHOWN = 20;
 

@@ -3,9 +3,9 @@
 // so they run on any platform, and are tested with a stand-in for it.
 import { Hono, type Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { assertViewport, ImageDecodeError, isGitSha, isImageHash, isBatchId, BatchError, type ReceivedDecision, type ReceivedBatch, type ReceivingStore, type RecordedRender, type RenderBatches, type StoryFilter, type Viewport } from "selfie-store";
+import { assertViewport, ImageDecodeError, isGitSha, isImageHash, isBatchId, BatchError, type ReceivedDecision, type ReceivedBatch, type BuiltStorybooks, type StoredDiffs, type ReceivingStore, type RecordedRender, type RenderBatches, type StoryFilter, type Viewport } from "selfie-store";
 import { SYNC_LIMITS, type GoldensAnswer, type ProjectAccess } from "../shared/sync-api.ts";
-import { failure, imageResponse, INTERNAL_ERROR, noStoreByDefault } from "./http.ts";
+import { afterResponse, failure, imageResponse, INTERNAL_ERROR, noStoreByDefault } from "./http.ts";
 
 /** What a token may do in a project. */
 export interface SyncAccess {
@@ -20,8 +20,12 @@ export interface SyncProject {
   readonly access: SyncAccess;
   readonly batches: RenderBatches;
   readonly store: ReceivingStore;
+  readonly storybooks: BuiltStorybooks;
+  readonly diffs: StoredDiffs;
   /** Whether the project's repository has this commit where anyone may see it. */
   hasCommit(gitSha: string): Promise<boolean>;
+  /** Told when what a commit's batch reads as may have changed, so it can say so where people look. */
+  commitChanged?(gitSha: string, environment: string): Promise<void>;
 }
 
 /** What the routes are given by a platform. */
@@ -110,7 +114,7 @@ function recordedRender(value: unknown): RecordedRender {
 
 /** A batch's facts as a sender states them, whose times can't be later than now. */
 function receivedBatch(id: string, body: Record<string, unknown>, now: number): ReceivedBatch {
-  const { gitSha, environment, startedAt, dirty, storyFilter, reusedFromBatch, scale, viewport } = body;
+  const { gitSha, environment, startedAt, dirty, storyFilter, reusedFromBatch, scale, viewport, branch } = body;
   if (typeof dirty !== "boolean") throw badRequest("dirty must be true or false.");
   if (typeof scale !== "number") throw badRequest("scale must be a number.");
   return {
@@ -123,6 +127,7 @@ function receivedBatch(id: string, body: Record<string, unknown>, now: number): 
     reusedFromBatch: orNull(reusedFromBatch, (batch) => readText(batch, "reusedFromBatch")),
     scale,
     viewport: readViewport(viewport),
+    branch: orNull(branch, (name) => readText(name, "branch")),
   };
 }
 
@@ -197,6 +202,15 @@ export function createSyncApi(host: SyncHost): Hono {
     return project;
   };
 
+  /** Refused before reading it where its length says so, since it can't be checked without holding it. */
+  const readLimited = async (context: Context, kind: "image" | "file" = "file") => {
+    const tooLarge = () => new Refusal(413, `${kind}-too-large`, `This server takes ${kind}s of at most ${maxImageBytes} bytes.`);
+    if (Number(context.req.header("content-length") ?? 0) > maxImageBytes) throw tooLarge();
+    const bytes = new Uint8Array(await context.req.arrayBuffer());
+    if (bytes.length > maxImageBytes) throw tooLarge();
+    return bytes;
+  };
+
   api.onError((error, context) => {
     if (error instanceof Refusal) return context.json(failure(error.code, error.message), error.status);
     if (error instanceof BatchError) return context.json(failure(error.code, error.message), error.code === "unknown-batch" || error.code === "unknown-image" ? 404 : 409);
@@ -228,12 +242,7 @@ export function createSyncApi(host: SyncHost): Hono {
   api.put("/projects/:project/images/:hash", async (context) => {
     const { store } = await uploadable(context);
     const hash = readHash(context.req.param("hash"));
-    // Before reading it, since it can't be checked without holding it.
-    if (Number(context.req.header("content-length") ?? 0) > maxImageBytes) {
-      throw new Refusal(413, "image-too-large", `This server takes images of at most ${maxImageBytes} bytes.`);
-    }
-    const bytes = new Uint8Array(await context.req.arrayBuffer());
-    if (bytes.length > maxImageBytes) throw new Refusal(413, "image-too-large", `This server takes images of at most ${maxImageBytes} bytes.`);
+    const bytes = await readLimited(context, "image");
     try {
       await store.receiveImage(bytes, hash);
     } catch (error) {
@@ -273,9 +282,10 @@ export function createSyncApi(host: SyncHost): Hono {
   });
 
   api.post("/projects/:project/batches/:id/finish", async (context) => {
-    const { batches } = await uploadable(context);
+    const project = await uploadable(context);
     const { count, finishedAt } = await bodyOf(context);
-    const { status } = await batches.finishBatch(readBatchId(context.req.param("id")), readWhole(count, "count"), Math.min(readWhole(finishedAt, "finishedAt"), now()));
+    const { status, gitSha, environment } = await project.batches.finishBatch(readBatchId(context.req.param("id")), readWhole(count, "count"), Math.min(readWhole(finishedAt, "finishedAt"), now()));
+    if (project.commitChanged !== undefined) await afterResponse(context, project.commitChanged(gitSha, environment));
     return context.json({ status });
   });
 
@@ -285,13 +295,91 @@ export function createSyncApi(host: SyncHost): Hono {
   });
 
   api.post("/projects/:project/decisions", async (context) => {
-    const { batches, access } = await projectOf(context);
+    const project = await projectOf(context);
+    const { batches, access } = project;
     refuseUnless(access.decider !== null);
     const { environment, decisions } = await bodyOf(context);
     const at = now();
+    const named = readText(environment, "environment");
     const received = listOf(decisions, SYNC_LIMITS.decisions, "decisions").map((decision) => receivedDecision(decision, access.decider!, at));
-    await batches.mergeDecisions(readText(environment, "environment"), received);
+    await batches.mergeDecisions(named, received);
+    if (project.commitChanged !== undefined) {
+      await afterResponse(context, Promise.all([...new Set(received.map(({ gitSha }) => gitSha))].map((gitSha) => project.commitChanged!(gitSha, named))).then(() => undefined));
+    }
     return context.json({ merged: received.length });
+  });
+
+  api.post("/projects/:project/commits", async (context) => {
+    const { batches } = await uploadable(context);
+    const commits = listOf((await bodyOf(context)).commits, SYNC_LIMITS.commits, "commits").map((value) => {
+      const { sha, parents } = asRecord(value);
+      return { sha: readSha(sha, "sha"), parents: listOf(parents, 64, "parents").map((parent) => readSha(parent, "A parent")) };
+    });
+    await batches.recordCommits(commits);
+    return context.json({ recorded: commits.length });
+  });
+
+  api.post("/projects/:project/storybooks/files/missing", async (context) => {
+    const { storybooks } = await uploadable(context);
+    const hashes = listOf((await bodyOf(context)).hashes, SYNC_LIMITS.hashes, "hashes").map(readHash);
+    return context.json({ missing: await storybooks.missingFiles(hashes) });
+  });
+
+  api.put("/projects/:project/storybooks/files/:hash", async (context) => {
+    const { storybooks } = await uploadable(context);
+    const hash = readHash(context.req.param("hash"));
+    // Whatever a built Storybook is, a file's name is its bytes' hash, so one file can't stand in for another.
+    const kept = await storybooks.putFile(await readLimited(context));
+    if (kept !== hash) throw badRequest(`Those bytes hash to ${kept}, not ${hash}.`);
+    return context.json({ hash });
+  });
+
+  api.get("/projects/:project/storybooks/:build", async (context) => {
+    const { storybooks } = await uploadable(context);
+    return context.json({ kept: await storybooks.has(readHash(context.req.param("build"))) });
+  });
+
+  api.put("/projects/:project/storybooks/:build", async (context) => {
+    const { storybooks } = await uploadable(context);
+    const build = readHash(context.req.param("build"));
+    const files = listOf((await bodyOf(context)).files, 100_000, "files").map((value) => {
+      const { path, fileHash } = asRecord(value);
+      return { path: readText(path, "path"), fileHash: readHash(fileHash) };
+    });
+    // A row says every file is here, so it's only written once that's so.
+    const missing = await storybooks.missingFiles(files.map(({ fileHash }) => fileHash));
+    if (missing.length > 0) throw new Refusal(409, "missing-files", `${missing.length} of this built Storybook's files aren't here yet.`);
+    await storybooks.putStorybook(build, files);
+    return context.json({ build });
+  });
+
+  api.post("/projects/:project/batches/:id/storybook", async (context) => {
+    const { storybooks } = await uploadable(context);
+    const build = readHash((await bodyOf(context)).build);
+    await storybooks.recordBatchStorybook(readBatchId(context.req.param("id")), build);
+    return context.json({ build });
+  });
+
+  api.get("/projects/:project/batches/:id/diffs/needed", async (context) => {
+    const { batches, diffs } = await uploadable(context);
+    const { renders } = await batches.compareReached(readBatchId(context.req.param("id")));
+    const pairs = renders.flatMap(({ state, imageHash, goldenHash }) => (state === "changed" && imageHash !== null && goldenHash !== null ? [{ current: imageHash, golden: goldenHash }] : []));
+    const held = await Promise.all(pairs.map(({ current, golden }) => diffs.has(current, golden)));
+    return context.json({ pairs: pairs.filter((_, i) => !held[i]) });
+  });
+
+  api.put("/projects/:project/diffs/:current/:golden/image", async (context) => {
+    const { diffs } = await uploadable(context);
+    const { current, golden } = context.req.param();
+    await diffs.putImage(readHash(current), readHash(golden), await readLimited(context));
+    return context.json({ stored: true });
+  });
+
+  api.put("/projects/:project/diffs/:current/:golden", async (context) => {
+    const { diffs } = await uploadable(context);
+    const { current, golden } = context.req.param();
+    await diffs.putStats(readHash(current), readHash(golden), JSON.stringify(await bodyOf(context)));
+    return context.json({ stored: true });
   });
 
   api.post("/projects/:project/goldens", async (context) => {

@@ -43,7 +43,7 @@ import {
   writeReviewCache,
   type Project,
 } from "./project.ts";
-import { isDecidable, summarizeBatch } from "./summary.ts";
+import { isDecidable, summarizeBatch } from "selfie-store";
 
 /** Each group is read into memory whole. */
 const IMAGES_PER_GROUP = 100;

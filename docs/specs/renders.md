@@ -130,6 +130,7 @@ render_batches(key PK, id UNIQUE, commit_key → commits.key, environment_key �
 renders(batch_key → render_batches.key, story_key → stories.key, image_key → images.key, failure, viewport_width, viewport_height)  PK (batch_key, story_key)  WITHOUT ROWID
 decisions(environment_key → environments.key, commit_key → commits.key, story_key → stories.key, image_key, rejected, decided_at, actor_key → actors.key, batch_id)  PK (environment_key, commit_key, story_key, image_key)  WITHOUT ROWID
   INDEX decisions_by_image(environment_key, story_key, image_key)
+commit_parents(commit_key → commits.key, parent_key → commits.key)  PK (commit_key, parent_key)  WITHOUT ROWID
 goldens(commit_key → commits.key, environment_key → environments.key, batch_key → render_batches.key)  PK (commit_key, environment_key)  WITHOUT ROWID
 ```
 

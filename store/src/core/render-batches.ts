@@ -59,6 +59,12 @@ export const CREATE_BATCH_TABLES: readonly string[] = [
   PRIMARY KEY (environment_key, commit_key, story_key, image_key)
 ) WITHOUT ROWID`,
   "CREATE INDEX IF NOT EXISTS decisions_by_image ON decisions(environment_key, story_key, image_key)",
+  // Which commits came before which, for a server with no Git to ask. Only ever added to, by whoever pushes.
+  `CREATE TABLE IF NOT EXISTS commit_parents (
+  commit_key INTEGER NOT NULL REFERENCES commits(key),
+  parent_key INTEGER NOT NULL REFERENCES commits(key),
+  PRIMARY KEY (commit_key, parent_key)
+) WITHOUT ROWID`,
   `CREATE TABLE IF NOT EXISTS goldens (
   commit_key INTEGER NOT NULL REFERENCES commits(key),
   environment_key INTEGER NOT NULL REFERENCES environments(key),
@@ -88,6 +94,9 @@ const BATCH_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
 export const isGitSha = (value: string) => GIT_SHA.test(value);
 /** What leaves a store to name a batch. */
 export const isBatchId = (value: string) => BATCH_ID.test(value);
+
+// As `git rev-list` is asked for: see `docs/specs/renders.md` -> Scope: approvals-sync.
+const MAX_REACHED_COMMITS = 1_000;
 
 // Subqueries rather than joins, since a `RETURNING` can't join.
 const BATCH_COLUMNS = `id, (SELECT sha FROM commits WHERE key = commit_key) AS git_sha,
@@ -246,6 +255,22 @@ CROSS JOIN decisions d ON d.environment_key = ${environmentKey("?1")} AND d.comm
 CROSS JOIN actors a ON a.key = d.actor_key
 CROSS JOIN stories s ON s.key = d.story_key
 LEFT JOIN images i ON i.key = d.image_key`;
+
+// What a batch's commit reaches, walked by key, so that a long history's SHAs never leave the database.
+const DECISIONS_REACHED = `WITH RECURSIVE reach(key) AS (
+  SELECT commit_key FROM render_batches WHERE id = ?1
+  UNION
+  SELECT p.parent_key FROM reach r CROSS JOIN commit_parents p ON p.commit_key = r.key
+  LIMIT ${MAX_REACHED_COMMITS}
+)
+SELECT s.id AS story, i.hash AS image_hash, ${DECISION_WORD} AS decision, a.name AS actor, d.decided_at, d.batch_id
+FROM reach r
+CROSS JOIN decisions d ON d.environment_key = (SELECT environment_key FROM render_batches WHERE id = ?1) AND d.commit_key = r.key
+CROSS JOIN actors a ON a.key = d.actor_key
+CROSS JOIN stories s ON s.key = d.story_key
+LEFT JOIN images i ON i.key = d.image_key`;
+
+const rendersPage = (batchId: string, after: string): SqlStatement => ({ sql: READ_RENDERS_PAGE, params: [batchId, after, ROWS_PER_PAGE], idempotent: true });
 
 const COMMITS_OF_BRANCH = `SELECT DISTINCT c.sha AS git_sha FROM render_batches r JOIN commits c ON c.key = r.commit_key
 WHERE r.branch = ?1 AND r.environment_key = ${environmentKey("?2")} AND r.started_at BETWEEN CAST(?3 AS INTEGER) AND CAST(?4 AS INTEGER)`;
@@ -638,25 +663,60 @@ ORDER BY started_at DESC, key DESC`,
    * would read as unchanged the moment someone approved it, but later batches do see them. Taking
    * the decisions lets a caller read them once for many batches. See `docs/specs/renders.md` -> Approvals.
    */
-  async compareFromHistory(batchId: string, decisions: readonly PlacedDecision[], { includeUnchanged = false }: CompareOptions = {}): Promise<Comparison> {
-    const rendersPage = (after: string): SqlStatement => ({ sql: READ_RENDERS_PAGE, params: [batchId, after, ROWS_PER_PAGE], idempotent: true });
-    const [batchRows, firstRenders] = (await this.#sql.batch([{ sql: SELECT_BATCH, params: [batchId], idempotent: true }, rendersPage(START)])) as [SqlRow[], SqlRow[]];
+  async compareFromHistory(batchId: string, decisions: readonly PlacedDecision[], options?: CompareOptions): Promise<Comparison> {
+    const [batchRows, firstRenders] = (await this.#sql.batch([{ sql: SELECT_BATCH, params: [batchId], idempotent: true }, rendersPage(batchId, START)])) as [SqlRow[], SqlRow[]];
+    return this.#withApprovals(batchId, batchRows, firstRenders, decisions, options);
+  }
+
+  /** As `compareFromHistory`, with what the batch's commit reaches by `recordCommits`, for a store with no Git to ask. One request, for a batch shorter than a page. */
+  async compareReached(batchId: string, options?: CompareOptions): Promise<Comparison> {
+    const [batchRows, decisionRows, firstRenders] = (await this.#sql.batch([
+      { sql: SELECT_BATCH, params: [batchId], idempotent: true },
+      { sql: DECISIONS_REACHED, params: [batchId], idempotent: true },
+      rendersPage(batchId, START),
+    ])) as [SqlRow[], SqlRow[], SqlRow[]];
+    return this.#withApprovals(batchId, batchRows, firstRenders, decisionRows.map(toPlacedDecision), options);
+  }
+
+  async #withApprovals(batchId: string, batchRows: readonly SqlRow[], firstRenders: readonly SqlRow[], decisions: readonly PlacedDecision[], { includeUnchanged = false }: CompareOptions = {}): Promise<Comparison> {
     const batch = finishedBatch(batchRows, batchId);
-    const rows = await this.#remainingPages(firstRenders, rendersPage);
+    const rows = await this.#remainingPages(firstRenders, (after) => rendersPage(batchId, after));
     return compareWithApprovals(batch, rows.map((row) => ({ story: row.story as string, imageHash: row.image_hash as string | null, failure: row.failure as string | null })).sort(byStory), decisions, { includeUnchanged });
   }
 
   /** Every decision made at these commits. One parameter however many, so a long history is one statement. */
   async decisionsAt(environment: string, commits: readonly string[]): Promise<readonly PlacedDecision[]> {
     const rows = await this.#sql.run({ sql: DECISIONS_AT, params: [environment, JSON.stringify(commits)], idempotent: true });
-    return rows.map((row) => ({
-      story: row.story as string,
-      imageHash: row.image_hash as string | null,
-      decision: row.decision as DecisionKind,
-      actor: row.actor as string,
-      at: row.decided_at as number,
-      batchId: row.batch_id as string,
-    }));
+    return rows.map(toPlacedDecision);
+  }
+
+  /** Says which commits came before which, for a store with no Git to ask. Sending one again changes nothing. */
+  async recordCommits(commits: readonly { readonly sha: string; readonly parents: readonly string[] }[]): Promise<void> {
+    for (const { sha, parents } of commits) [sha, ...parents].forEach(assertGitSha);
+    const edges = commits.flatMap(({ sha, parents }) => parents.map((parent) => [sha, parent]));
+    const statements: SqlStatement[] = [
+      ...nameStatements("commits", commits.flatMap(({ sha, parents }) => [sha, ...parents])),
+      ...chunks(edges, NAMES_PER_STATEMENT).map((group) => ({
+        sql: `INSERT INTO commit_parents(commit_key, parent_key)
+SELECT c.key, p.key FROM json_each(?1) j
+CROSS JOIN commits c ON c.sha = json_extract(j.value, '$[0]')
+CROSS JOIN commits p ON p.sha = json_extract(j.value, '$[1]')
+WHERE true ON CONFLICT(commit_key, parent_key) DO NOTHING`,
+        params: [JSON.stringify(group)],
+        idempotent: true,
+      })),
+    ];
+    for (const group of chunks(statements, STATEMENTS_PER_REQUEST)) await this.#sql.batch(group);
+  }
+
+  /** The newest finished batch here, on this branch if one is given, or null. */
+  async newestFinished(branch?: string): Promise<RenderBatch | null> {
+    const [row] = await this.#sql.run({
+      sql: `SELECT ${BATCH_COLUMNS} FROM render_batches WHERE finished_at IS NOT NULL${branch === undefined ? "" : " AND branch = ?1"} ORDER BY key DESC LIMIT 1`,
+      ...(branch === undefined ? {} : { params: [branch] }),
+      idempotent: true,
+    });
+    return row === undefined ? null : toBatch(row);
   }
 
   /** The commits of a branch's batches between two times, which a rebase may have left out of its history. */
@@ -972,6 +1032,15 @@ function toBatch(row: SqlRow): RenderBatch {
 }
 
 // The same order as `DECISION_ON_RENDER` and the merge rule: latest first, then `rejected` before `approved`.
+const toPlacedDecision = (row: SqlRow): PlacedDecision => ({
+  story: row.story as string,
+  imageHash: row.image_hash as string | null,
+  decision: row.decision as DecisionKind,
+  actor: row.actor as string,
+  at: row.decided_at as number,
+  batchId: row.batch_id as string,
+});
+
 const newestFirst = (a: PlacedDecision, b: PlacedDecision) => b.at - a.at || b.decision.localeCompare(a.decision);
 
 /**

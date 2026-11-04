@@ -233,6 +233,30 @@ export function describeBatchContract(
       expect(await batches.getBatch(clean.id)).toMatchObject({ dirty: false, storyFilter: null });
     });
 
+    it("compares with what a commit reaches by the graph it was told, through every parent", async () => {
+      const [merged, left, right, root, unrelated] = ["a", "b", "c", "d", "9"].map((digit) => digit!.repeat(40)) as [string, string, string, string, string];
+      await batches.recordCommits([{ sha: merged, parents: [left, right] }, { sha: right, parents: [root] }, { sha: left, parents: [root] }, { sha: root, parents: [] }]);
+      await batches.recordCommits([{ sha: merged, parents: [left, right] }]);
+      const environment = "reached";
+      const batch = await batches.beginBatch({ gitSha: merged, environment, scale: 1, viewport: { width: 1200, height: 900 }, dirty: false });
+      await batches.recordRenders(batch.id, [rendered("through-a-merge", 1), rendered("elsewhere", 2), rendered("no-decision", 3)]);
+      await batches.finishBatch(batch.id, 3);
+      const decision = { decision: "approved" as const, actor: "ned", at: 1, batchId: ON.batchId };
+      await batches.mergeDecisions(environment, [{ story: "through-a-merge", imageHash: hashOf(1), gitSha: right, ...decision }, { story: "elsewhere", imageHash: hashOf(2), gitSha: unrelated, ...decision }]);
+      const { renders } = await batches.compareReached(batch.id, { includeUnchanged: true });
+      expect(renders.map(({ story, state }) => [story, state])).toEqual([["elsewhere", "added"], ["no-decision", "added"], ["through-a-merge", "unchanged"]]);
+    });
+
+    it("finds the newest finished batch on a branch, or anywhere", async () => {
+      const on = (branch: string) => batches.beginBatch({ gitSha: SHA_0, environment: "newest", scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, branch });
+      const finishedOnTopic = await on("topic-newest");
+      await batches.finishBatch(finishedOnTopic.id, 0);
+      await on("topic-newest");
+      expect((await batches.newestFinished("topic-newest"))?.id).toBe(finishedOnTopic.id);
+      expect(await batches.newestFinished("no-such-branch")).toBeNull();
+      expect((await batches.newestFinished())?.id).toBe(finishedOnTopic.id);
+    });
+
     it("keeps a batch's scale, whole or not", async () => {
       for (const scale of [1, 1.5, 2]) {
         const batch = await batches.beginBatch({ gitSha: SHA_0, environment: "scaled", scale, viewport: { width: 1200, height: 900 }, dirty: false, });

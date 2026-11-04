@@ -1,15 +1,12 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { filterStories, storyEntriesIn, type StoryEntry } from "selfie-store";
 
 export class RenderError extends Error {
   override name = "RenderError";
 }
 
-export interface StoryEntry {
-  id: string;
-  title: string;
-  name: string;
-}
+export type { StoryEntry };
 
 /** The stories in a build's `index.json`, sorted by ID. Docs entries are left out. */
 export async function readStoryIndex(storybookDir: string): Promise<StoryEntry[]> {
@@ -32,36 +29,11 @@ export async function readStoriesInOrder(storybookDir: string): Promise<StoryEnt
 
 /** The stories in a parsed `index.json`, in its order. `file` says where it's from, for an error. */
 export function storiesInIndex(parsed: unknown, file: string): StoryEntry[] {
-  const entries = (parsed as { entries?: unknown } | null)?.entries;
-  if (entries === null || typeof entries !== "object")
-    throw new RenderError(`${file} has no "entries" object. Selfie needs Storybook 7 or later.`);
-  const stories: StoryEntry[] = [];
-  for (const entry of Object.values(entries as Record<string, Partial<StoryEntry> & { type?: string }>)) {
-    if (entry.type === "story" && typeof entry.id === "string") {
-      stories.push({ id: entry.id, title: entry.title ?? "", name: entry.name ?? "" });
-    }
-  }
+  const stories = storyEntriesIn(parsed);
+  if (stories === null) throw new RenderError(`${file} has no "entries" object. Selfie needs Storybook 7 or later.`);
   return stories;
 }
 
 export const unmatchedPatternWarning = (pattern: string) => `Story pattern "${pattern}" matched nothing.`;
 
-/**
- * Keeps the stories whose ID matches a pattern, where `*` matches any run of characters.
- * `unmatched` lists the patterns that matched nothing, so a typo doesn't look like a pass.
- */
-export function filterStories<Story extends { id: string }>(
-  stories: readonly Story[],
-  patterns: readonly string[],
-): { stories: Story[]; unmatched: string[] } {
-  const matchers = patterns.map((pattern) => ({
-    pattern,
-    regex: new RegExp(`^${pattern.split("*").map(RegExp.escape).join(".*")}$`),
-  }));
-  return {
-    stories: stories.filter((story) => matchers.some(({ regex }) => regex.test(story.id))),
-    unmatched: matchers
-      .filter(({ regex }) => !stories.some((story) => regex.test(story.id)))
-      .map(({ pattern }) => pattern),
-  };
-}
+export { filterStories };

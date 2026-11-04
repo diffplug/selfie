@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, useLayoutEffect } from "react";
+import { isHosted } from "./base.ts";
 import type { DecisionKind, DecisionTarget, FeedbackView, StoriesView, NewNote, BatchView, SendVia, RenderProgress, RenderRow } from "../shared/api.ts";
 import { deleteNote, fetchFeedback, fetchRenderProgress, fetchStories, fetchBatch, fetchUnchanged, postAnswer, postRender, postDecision, postNote, postResolve, postSendNotes, RequestError } from "./api.ts";
 import { reuseRows } from "./filter.ts";
@@ -145,6 +146,8 @@ export function useFeedback(): FeedbackState {
   const apply = useCallback((next: FeedbackView) => setView((previous) => (JSON.stringify(previous) === JSON.stringify(next) ? previous : next)), []);
 
   useEffect(() => {
+    // Notes stay on a person's own machine, so there's nothing to ask for.
+    if (isHosted) return;
     const read = () => {
       reading.current?.abort();
       const controller = new AbortController();

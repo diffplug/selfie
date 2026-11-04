@@ -1,0 +1,29 @@
+name: Selfie
+description: Builds this repository's Storybook, renders every story in the pinned environment, and pushes the batch, which sets the commit's `selfie` status.
+inputs:
+  upload-token:
+    description: What the Selfie service knows CI by. It can upload, and can't approve anything.
+    required: true
+  remote:
+    description: The Selfie service.
+    default: https://hackathon.selfie.dev
+runs:
+  using: composite
+  steps:
+    - name: Install Selfie
+      shell: bash
+      run: |
+        selfie_root="$(cd "$GITHUB_ACTION_PATH/../../.." && pwd)"
+        echo "SELFIE_ROOT=$selfie_root" >> "$GITHUB_ENV"
+        npm install --global pnpm@10.30.1
+        (cd "$selfie_root" && pnpm install --frozen-lockfile --filter "selfie-cli..." --ignore-scripts)
+    - name: Build the Storybook and render every story
+      shell: bash
+      # Exits 0 once a batch is recorded, even with failed stories, which the status says.
+      run: node "$SELFIE_ROOT/cli/src/main.ts" render --build
+    - name: Push the batch
+      shell: bash
+      env:
+        SELFIE_REMOTE: ${{ inputs.remote }}
+        SELFIE_TOKEN: ${{ inputs.upload-token }}
+      run: node "$SELFIE_ROOT/cli/src/main.ts" push

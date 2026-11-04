@@ -32,4 +32,4 @@ export {
   type Attention,
   type BlockerReason,
   type BatchSummary,
-} from "./summary.ts";
+} from "selfie-store";

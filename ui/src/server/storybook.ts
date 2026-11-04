@@ -1,6 +1,6 @@
 // A hosted Storybook's headers and kept built Storybooks, which any platform can serve. Which host may ask,
 // and the directory as it stands, are `local.ts`'s. See docs/specs/ui.md -> Routes.
-import { Hono, type MiddlewareHandler } from "hono";
+import { Hono, type Context, type MiddlewareHandler } from "hono";
 import { secureHeaders } from "hono/secure-headers";
 import { getMimeType } from "hono/utils/mime";
 import { tryDecodeURIComponent } from "hono/utils/url";
@@ -21,15 +21,17 @@ export const storybookHeaders = (reviewOrigins: () => readonly string[]): Middle
     strictTransportSecurity: false,
   });
 
-export type StorybookFileReader = (build: string, file: string) => Promise<Uint8Array | null>;
+export type StorybookFileReader = (build: string, file: string, context: Context) => Promise<Uint8Array | null>;
 
 /** Every kept built Storybook's files, which never change, so a browser may hold on to them. */
 export function keptStorybookRoutes(readStorybookFile: StorybookFileReader): Hono {
   const app = new Hono();
   app.get(`${keptStorybookPath(":build")}*`, async (context) => {
     const build = context.req.param("build")!;
-    const file = tryDecodeURIComponent(context.req.path.slice(keptStorybookPath(build).length)) || "index.html";
-    const bytes = await readStorybookFile(build, file);
+    // After its own prefix, whatever a platform mounts these under.
+    const kept = keptStorybookPath(build);
+    const file = tryDecodeURIComponent(context.req.path.slice(context.req.path.indexOf(kept) + kept.length)) || "index.html";
+    const bytes = await readStorybookFile(build, file, context);
     if (bytes === null) return context.text("That isn't a file of a kept built Storybook.", 404);
     return context.body(bytes as Uint8Array<ArrayBuffer>, 200, {
       "Content-Type": getMimeType(file) ?? "application/octet-stream",

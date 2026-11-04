@@ -234,7 +234,7 @@ Source of truth: `ui/src/client/*.stories.tsx`, `ui/src/client/stories/`.
 
 ## Future
 
-**Scope: cloud-deploy** is defined in `docs/specs/system.md` → Build order. What it must do first, since the local UI needs none of it:
+`docs/specs/cloud.md` hosts these screens in a Worker, through `hostedReviewSource`. What's left of **Scope: cloud-deploy** (`docs/specs/system.md` → Build order), since neither a few projects nor the local UI need it yet:
 
 1. **Move the review rules into platform-free code, and narrow `ReviewSource` to platform facts.** `storiesView` is the newest such rule that needs moving, beyond `newestRenders` itself. `render` is for a source with something to render with, so a hosted one says `canRender: false`. A hosted source needs the commits a batch reaches as one of those facts, to compare at all (`docs/specs/renders.md` → Approvals). A Worker can't load `selfie-cli`, which reaches Git, Docker, and the filesystem, and today `summarizeBatch` and diffing live there, and `localReviewSource` applies them. `filterStories`, which `summarizeBatch` calls, has to move out of `selfie-render` for that. `isDecidable` has moved already.
 2. **Make the source a per-request factory, `(context) => ReviewSource`, with a client base path.** A hosted service has many projects and viewers, where `createLocalApp` has one project for its whole life, and a client that always asks at `/api`.
@@ -255,4 +255,3 @@ Also its own guard in place of `loopbackHosts`, keeping `sameOriginWrites` and `
 - Finding batches at other commits. `/batches/:id` opens any of them, and `selfie ui <batch>` prints that URL, but nothing lists them: `render_batches` has no index that would serve it without a scan.
 - Keeping how someone's looking at the images when the next story's render is from another batch, since each batch's page is its own, and it reads that batch again. The live stories do stay as they were.
 - Sorting the list by size of change.
-- A hosted Storybook in the cloud (**Scope: cloud-deploy**), where its origin needs the same separation, and a built Storybook needs uploading.

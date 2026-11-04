@@ -1,0 +1,30 @@
+name = "selfie-hackathon"
+main = "src/worker/index.ts"
+compatibility_date = "2026-11-01"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+preview_urls = false
+routes = [{ pattern = "hackathon.selfie.dev", custom_domain = true }]
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+run_worker_first = true
+
+[vars]
+REVIEW_ORIGIN = "https://hackathon.selfie.dev"
+STORYBOOK_ORIGIN = "https://selfie-hackathon.ned-twigg.workers.dev"
+
+[[r2_buckets]]
+binding = "BLOBS"
+bucket_name = "selfie-hackathon-images"
+
+[[d1_databases]]
+binding = "DB_1442175397"
+database_name = "selfie-project-1442175397"
+database_id = "89537c43-e95e-44d6-b2ec-b35b489d82b9"
+
+[[d1_databases]]
+binding = "DB_1445291541"
+database_name = "selfie-project-1445291541"
+database_id = "066cdcab-f1cc-4752-9666-17d2136e255a"

@@ -1,11 +1,10 @@
 // Deciding on a batch, from what the store knows about it, whether or not its exported images are
 // still on disk.
 import { filterStories } from "selfie-render";
-import type { ComparedRender, Comparison, DecisionKind } from "selfie-store";
+import { exactRows, isDecidable, staleDecisionMessage, summarizeBatch, type ComparedRender, type Comparison, type DecisionKind } from "selfie-store";
 import type { DecisionTarget } from "selfie-ui/app";
 import { SelfieError } from "./errors.ts";
 import { compareAsReviewed, type Project } from "./project.ts";
-import { isDecidable, summarizeBatch } from "./summary.ts";
 
 export interface DecideRequest {
   readonly batchId: string;
@@ -31,15 +30,9 @@ export interface DecideResult {
 
 /** Exactly these rows, each still holding the image named, or nothing is decided. */
 function exactly(renders: readonly ComparedRender[], targets: readonly DecisionTarget[]): readonly ComparedRender[] {
-  const rows = new Map(renders.filter(({ state }) => isDecidable(state)).map((row) => [row.story, row]));
-  const stale = targets.filter(({ story, imageHash }) => rows.get(story)?.imageHash !== imageHash);
-  if (stale.length > 0) {
-    throw new SelfieError(
-      "stale-decision",
-      `${stale.length} of these images aren't what this batch holds now, so nothing was decided. Look again.`,
-    );
-  }
-  return targets.map(({ story }) => rows.get(story)!);
+  const { rows, stale } = exactRows(renders, targets);
+  if (stale > 0) throw new SelfieError("stale-decision", staleDecisionMessage(stale));
+  return rows;
 }
 
 export async function decide(project: Project, { batchId, decision, actor, stories }: DecideRequest): Promise<DecideResult> {

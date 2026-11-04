@@ -55,6 +55,22 @@ export class BuiltStorybooks {
     return fileHash;
   }
 
+  /** Those of these file hashes whose bytes aren't here, for a sender deciding what to upload. */
+  async missingFiles(fileHashes: readonly string[]): Promise<readonly string[]> {
+    const held = await Promise.all(fileHashes.map(async (fileHash) => {
+      assertImageHash(fileHash);
+      return this.#blob.has(fileBlobKey(fileHash));
+    }));
+    return fileHashes.filter((_, i) => !held[i]);
+  }
+
+  /** Each file of a kept built Storybook, or null if it isn't kept. */
+  async filesOf(build: string): Promise<readonly BuiltStorybookFile[] | null> {
+    assertImageHash(build);
+    const manifest = await this.#manifest(build);
+    return manifest === null ? null : Object.entries(manifest).map(([path, fileHash]) => ({ path, fileHash }));
+  }
+
   /** Says which files make up a built Storybook, once all their bytes are here. The first answer stays. */
   async putStorybook(build: string, files: readonly BuiltStorybookFile[]): Promise<void> {
     if (await this.has(build)) return;

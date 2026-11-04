@@ -3,7 +3,8 @@
 // order, each on what the last left. See docs/specs/sync.md.
 import { env } from "cloudflare:workers";
 import { beforeAll, describe, expect, it } from "vitest";
-import { Blobs, initStoreSchema, ReceivingStore, RenderBatches, Sql, type SqlAdapter, type SqlRow } from "selfie-store";
+import { Blobs, BuiltStorybooks, initStoreSchema, ReceivingStore, RenderBatches, Sql, StoredDiffs } from "selfie-store";
+import { D1BindingAdapter } from "selfie-store/adapters/d1-binding";
 import { R2BlobStorage, type R2BucketLike } from "selfie-store/adapters/r2";
 import { createSyncApi, type SyncAccess } from "../../src/server/sync.ts";
 
@@ -27,14 +28,6 @@ const ACCESS: Readonly<Record<string, SyncAccess>> = {
   ci: { view: false, upload: true, decider: null },
 };
 
-/** `Sql` over a D1 binding, which isn't an adapter the product has yet, since it reaches D1 by REST. */
-const d1Binding = (db: D1Database): SqlAdapter => ({
-  execute: async (statements) => {
-    const results = await db.batch(statements.map(({ sql, params = [] }) => db.prepare(sql).bind(...params)));
-    return results.map(({ results: rows }) => rows as SqlRow[]);
-  },
-});
-
 let app: ReturnType<typeof createSyncApi>;
 
 const send = (method: string, route: string, token: string, body?: unknown) =>
@@ -49,14 +42,17 @@ const sendJson = async (method: string, route: string, token: string, body?: unk
 const batchFacts = (gitSha: string) => ({ gitSha, environment: ENV, startedAt: 500, dirty: false, storyFilter: null, reusedFromBatch: null, scale: 1, viewport: { width: 1200, height: 900 } });
 
 beforeAll(async () => {
-  const sql = new Sql(d1Binding(env.DB));
+  const sql = new Sql(new D1BindingAdapter(env.DB as never));
   await initStoreSchema(sql);
-  const store = new ReceivingStore({ sql, blob: new Blobs(new R2BlobStorage({ bucket: env.BLOBS as R2BucketLike, project: "42" })) });
+  const blob = new Blobs(new R2BlobStorage({ bucket: env.BLOBS as R2BucketLike, project: "42" }));
+  const store = new ReceivingStore({ sql, blob });
+  const storybooks = new BuiltStorybooks({ sql, blob });
+  const diffs = new StoredDiffs(blob);
   const batches = new RenderBatches({ sql });
   app = createSyncApi({
     open: async (_project, token) => {
       const access = token === null ? undefined : ACCESS[token];
-      return access === undefined ? null : { access, batches, store, hasCommit: async () => true };
+      return access === undefined ? null : { access, batches, store, storybooks, diffs, hasCommit: async () => true };
     },
     findProject: async () => "42",
   });

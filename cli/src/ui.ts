@@ -1,12 +1,13 @@
 // The review UI's window on a local repository: the library, as the shape its routes want. It reads
 // what's been recorded, records decisions on it, and renders only when a page asks it to render.
-import { newestRenders, type Comparison, type DecisionKind, type PlacedDecision, type RenderBatch } from "selfie-store";
+import { newestRenders, type DecisionKind, type PlacedDecision, type RenderBatch } from "selfie-store";
 import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
 import { isBuiltStorybook } from "selfie-ui/local";
 import { keptStorybookPath } from "selfie-ui/api";
-import { storybookHash, readStoriesInOrder, readStoryIndex, storiesInIndex, type RenderProgressEvent, type StoryEntry } from "selfie-render";
-import type { DecisionTarget, FeedbackView, NewNote, RenderProgress, ReviewSource, BatchView, RenderRow, StoriesView, StorybookLink, StorySetup } from "selfie-ui/app";
+import { storybookHash, readStoriesInOrder, readStoryIndex, type RenderProgressEvent } from "selfie-render";
+import { batchViews } from "selfie-ui/batch-view";
+import type { DecisionTarget, FeedbackView, NewNote, RenderProgress, ReviewSource, StoriesView, StorybookLink } from "selfie-ui/app";
 import { resolveRenderSettings, resolveHunkMergeDistance } from "./config.ts";
 import { decide } from "./decisions.ts";
 import { diffToPng, type PixelDiff } from "./diff.ts";
@@ -16,13 +17,9 @@ import { isOpenNote } from "selfie-ui/notes";
 import { advanceRenderProgress } from "selfie-ui/render-progress";
 import { sentNotes, textForAgent } from "./notes.ts";
 import { batchesAtHead, compareAsReviewed, reachableCommits, readReviewCache, requireBatch, type Project } from "./project.ts";
-import { summarizeBatch } from "./summary.ts";
 
 /** Each is about 20 KB of PNG. This is a reviewer going back and forth, not a cache of a batch. */
 const DIFFS_KEPT = 32;
-
-/** A person looks at a few batches at a time. */
-const KEPT_INDEXES_HELD = 8;
 
 /** Records a batch from a hosted Storybook, of just these stories, or of every one, and says which batch. */
 export type RenderStories = (stories: readonly string[] | undefined, onProgress: (progress: RenderProgressEvent) => void) => Promise<string>;
@@ -70,32 +67,6 @@ export function localReviewSource(
     return storybook !== undefined && isBuiltStorybook(storybook.dir) ? { url: storybook.url, exactStorybook: false } : null;
   };
 
-  /** A kept built Storybook's stories, which never change, or nothing if it can't say. */
-  const keptIndexes = new Map<string, Promise<readonly StoryEntry[]>>();
-  const storiesOfKept = (hash: string) => {
-    let index = keptIndexes.get(hash);
-    if (index === undefined) {
-      index = project.storybooks.readFile(hash, "index.json").then(
-        (bytes) => (bytes === null ? [] : storiesInIndex(JSON.parse(new TextDecoder().decode(bytes)), "a kept index.json")),
-      ).catch(() => []);
-      keptIndexes.set(hash, index);
-      for (const oldest of keptIndexes.keys()) {
-        if (keptIndexes.size <= KEPT_INDEXES_HELD) break;
-        keptIndexes.delete(oldest);
-      }
-    }
-    return index;
-  };
-
-  /** What the batch's own Storybook calls its stories, then what the batches behind its approvals called those it no longer has. */
-  const storyNamesFor = async (batch: RenderBatch, approvedIn: ReadonlySet<string>, stories: ReadonlySet<string>) => {
-    const kept = await Promise.all([batch.id, ...approvedIn].map((id) => project.storybooks.storybookOfBatch(id)));
-    const entries = (await Promise.all(kept.map((hash) => (hash === null ? [] : storiesOfKept(hash))))).flat();
-    const named = new Map<string, StoryEntry>();
-    for (const entry of entries) if (stories.has(entry.id) && !named.has(entry.id)) named.set(entry.id, entry);
-    return [...named.values()].map(({ id: story, title, name }) => ({ story, title, name }));
-  };
-
   /** A corrupt cache costs only pixel stats in a list, so it isn't worth failing a page over. */
   const cachedDiffs = async (batchId: string): Promise<ReadonlyMap<string, PixelDiff>> => {
     const cache = await readReviewCache(project, batchId).catch(() => null);
@@ -104,45 +75,14 @@ export function localReviewSource(
     );
   };
 
-  const toRows = async (batchId: string, compared: Comparison["renders"]): Promise<RenderRow[]> => {
-    const pixelDiffs = await cachedDiffs(batchId);
-    const references = new Map(
-      await Promise.all(
-        [...new Set(compared.flatMap(({ goldenBatchId }) => goldenBatchId ?? []))].map(
-          async (id) => [id, { url: await keptStorybookUrl(id), viewports: await project.batches.storyViewportsOf(id) }] as const,
-        ),
-      ),
-    );
-    return compared.map((render) => {
-      const reference = render.goldenBatchId === undefined ? undefined : references.get(render.goldenBatchId);
-      return {
-        ...render,
-        pixelDiff: pixelDiffs.get(render.story) ?? null,
-        goldenStorybookUrl: reference?.url ?? null,
-        goldenViewport: reference?.viewports[render.story] ?? null,
-      };
-    });
-  };
-
-  /** Everything recomputed from what deciding compares with, which the caller already has. */
-  const viewOf = async (comparison: Comparison, actor: string | null): Promise<BatchView> => {
-    const { batch } = comparison;
-    const summary = summarizeBatch(comparison);
-    const rows = await toRows(batch.id, summary.inFilter);
-    return {
-      batch,
-      storybook: await storybookFor(batch.id),
-      storyViewports: await project.batches.storyViewportsOf(batch.id),
-      hunkMergeDistance: await resolveHunkMergeDistance(repo),
-      actor,
-      blockers: summary.blockers,
-      counts: { ...summary.counts, failed: summary.failed.length },
-      rows,
-      storyNames: await storyNamesFor(batch, new Set(rows.flatMap(({ goldenBatchId }) => goldenBatchId ?? [])), new Set(rows.map(({ story }) => story))),
-      outsideFilter: summary.notRendered.length,
-      siblings: (await batches.batchesAt(batch.gitSha, batch.environment)).map(({ id, startedAt, status, dirty }) => ({ id, startedAt, status, dirty })),
-    };
-  };
+  const { toRows, viewOf } = batchViews({
+    batches,
+    storybooks: project.storybooks,
+    keptStorybookUrl,
+    storybookFor,
+    pixelDiffs: cachedDiffs,
+    hunkMergeDistance: () => resolveHunkMergeDistance(repo),
+  });
 
   /** Diffs by content, so any batch that compares these two images shares the work. */
   const diffs = new Map<string, Promise<{ diff: PixelDiff; png: Uint8Array } | null>>();
@@ -158,6 +98,32 @@ export function localReviewSource(
     const actor = await gitUserEmail(repo);
     if (actor === null) throw new SelfieError("no-actor", `Git doesn't say who you are, so ${consequence}. Set git config user.email.`);
     return actor;
+  };
+
+  const diff = (current: string, golden: string): Promise<{ diff: PixelDiff; png: Uint8Array } | null> => {
+    const key = `${current}/${golden}`;
+    const known = diffs.get(key);
+    if (known !== undefined) {
+      // Newest last, so the oldest is the one to drop.
+      diffs.delete(key);
+      diffs.set(key, known);
+      return known;
+    }
+    // Kept while it's working too, since a page asks for a diff's stats and its image at once.
+    const working = (async () => {
+      const [currentImage, goldenImage] = await Promise.all([store.getPixels(current), store.getPixels(golden)]);
+      return currentImage === null || goldenImage === null ? null : diffToPng(currentImage, goldenImage);
+    })();
+    diffs.set(key, working);
+    for (const oldest of diffs.keys()) {
+      if (diffs.size <= DIFFS_KEPT) break;
+      diffs.delete(oldest);
+    }
+    const forget = () => void diffs.delete(key);
+    working.then((result) => {
+      if (result === null) forget();
+    }, forget);
+    return working;
   };
 
   return {
@@ -311,30 +277,7 @@ export function localReviewSource(
 
     image: (hash) => store.getImage(hash),
 
-    diff(current, golden) {
-      const key = `${current}/${golden}`;
-      const known = diffs.get(key);
-      if (known !== undefined) {
-        // Newest last, so the oldest is the one to drop.
-        diffs.delete(key);
-        diffs.set(key, known);
-        return known;
-      }
-      // Kept while it's working too, since a page asks for a diff's stats and its image at once.
-      const working = (async () => {
-        const [currentImage, goldenImage] = await Promise.all([store.getPixels(current), store.getPixels(golden)]);
-        return currentImage === null || goldenImage === null ? null : diffToPng(currentImage, goldenImage);
-      })();
-      diffs.set(key, working);
-      for (const oldest of diffs.keys()) {
-        if (diffs.size <= DIFFS_KEPT) break;
-        diffs.delete(oldest);
-      }
-      const forget = () => void diffs.delete(key);
-      working.then((result) => {
-        if (result === null) forget();
-      }, forget);
-      return working;
-    },
+    diffStats: async (current, golden) => (await diff(current, golden))?.diff ?? null,
+    diffImage: async (current, golden) => (await diff(current, golden))?.png ?? null,
   };
 }

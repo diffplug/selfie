@@ -1,6 +1,7 @@
 // The page's four places. Small enough not to need a router package.
 import { Link, LinkButton, type LinkButtonProps, type LinkProps } from "@primer/react";
 import { useSyncExternalStore, type MouseEvent } from "react";
+import { BASE } from "./base.ts";
 
 export type Route =
   | { readonly kind: "batch"; readonly batchId: string }
@@ -9,13 +10,14 @@ export type Route =
   | { readonly kind: "anyStory"; readonly story: string }
   | { readonly kind: "missing" };
 
-export const batchPath = (batchId: string, query = "") => `/batches/${batchId}${query}`;
+export const batchPath = (batchId: string, query = "") => `${BASE}/batches/${batchId}${query}`;
 export const storyPath = (batchId: string, story: string, query = "") =>
-  `/batches/${batchId}/stories/${encodeURIComponent(story)}${query}`;
-export const storiesPath = (query = "") => `/${query}`;
-export const anyStoryPath = (story: string, query = "") => `/stories/${encodeURIComponent(story)}${query}`;
+  `${BASE}/batches/${batchId}/stories/${encodeURIComponent(story)}${query}`;
+export const storiesPath = (query = "") => `${BASE}/${query}`;
+export const anyStoryPath = (story: string, query = "") => `${BASE}/stories/${encodeURIComponent(story)}${query}`;
 
-export function parseRoute(pathname: string): Route {
+export function parseRoute(fullPathname: string): Route {
+  const pathname = fullPathname.startsWith(BASE) ? fullPathname.slice(BASE.length) || "/" : fullPathname;
   if (pathname === "/") return { kind: "stories" };
   const listed = /^\/stories\/([^/]+)$/.exec(pathname);
   if (listed !== null) {

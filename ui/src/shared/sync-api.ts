@@ -35,4 +35,10 @@ export interface SyncError {
 }
 
 /** The most of each a request may hold. */
-export const SYNC_LIMITS = { hashes: 500, renders: 1_000, decisions: 1_000, shas: 1_000 } as const;
+export const SYNC_LIMITS = { hashes: 500, renders: 1_000, decisions: 1_000, shas: 1_000, commits: 1_000 } as const;
+
+/** Two images a server can't compare for itself, whose difference it wants. */
+export interface DiffPair {
+  readonly current: string;
+  readonly golden: string;
+}

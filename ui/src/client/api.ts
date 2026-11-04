@@ -15,6 +15,7 @@ import {
   type RenderRow,
   type StoriesView,
 } from "../shared/api.ts";
+import { BASE, isHosted } from "./base.ts";
 
 /** What went wrong, in words a screen can show. `code` tells the cases apart. */
 export class RequestError extends Error {
@@ -29,10 +30,10 @@ export class RequestError extends Error {
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(`/api${path}`, init);
+    response = await fetch(`${BASE}/api${path}`, init);
   } catch (error) {
     if (init?.signal?.aborted) throw error;
-    throw new RequestError("unreachable", "Can't reach the Selfie server. Is selfie ui still running?");
+    throw new RequestError("unreachable", isHosted ? "Can't reach Selfie. Check your connection, and try again." : "Can't reach the Selfie server. Is selfie ui still running?");
   }
   const body = (await response.json().catch(() => null)) as T | ApiError | null;
   if (!response.ok || body === null) {
@@ -66,5 +67,5 @@ export const postAnswer = (id: number, text: string, batchId: string) => post<Fe
 export const postResolve = (id: number) => post<FeedbackView>(`/notes/${id}/resolve`, {});
 export const deleteNote = (id: number) => request<FeedbackView>(`/notes/${id}`, { method: "DELETE", headers: WRITE_HEADERS });
 
-export const imageUrl = (hash: string) => `/api/images/${hash}`;
-export const diffImageUrl = (current: string, golden: string) => `/api/diffs/${current}/${golden}/image`;
+export const imageUrl = (hash: string) => `${BASE}/api/images/${hash}`;
+export const diffImageUrl = (current: string, golden: string) => `${BASE}/api/diffs/${current}/${golden}/image`;

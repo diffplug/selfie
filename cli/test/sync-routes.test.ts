@@ -80,7 +80,7 @@ beforeEach(async () => {
     // With no token, it's a public repository's anonymous viewer.
     open: async (project, token) => {
       const access = project === "42" ? ACCESS[token ?? "reader"] : undefined;
-      return access === undefined ? null : { access, batches: cloud.batches, store: cloud.store, hasCommit: async (sha) => PUSHED.has(sha) };
+      return access === undefined ? null : { access, batches: cloud.batches, store: cloud.store, storybooks: cloud.storybooks, diffs: cloud.diffs, hasCommit: async (sha) => PUSHED.has(sha) };
     },
     findProject: async (owner, name) => (owner === "diffplug" && name === "selfie" ? "42" : null),
   });
