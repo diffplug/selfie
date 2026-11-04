@@ -64,23 +64,28 @@ describe("an unchanged build", () => {
     project.close();
   });
 
-  test.each([
-    ["the tree is now dirty", () => writeFile(path.join(h.repo, "untracked.txt"), "changed")],
-    ["the baseline moved", null],
-  ])("at this commit, records a new batch if %s", async (_, change) => {
+  test("at this commit, records a new batch if the tree is now dirty", async () => {
     const first = await review();
-    if (change === null) {
-      await h.cli("approve", first.json.batchId, "--all");
-      await h.cli("accept", first.json.batchId);
-    } else {
-      await change();
-    }
+    await writeFile(path.join(h.repo, "untracked.txt"), "changed");
     const second = await review();
     expect(second.rendered).toBe(false);
     expect(second.json.batchId).not.toBe(first.json.batchId);
     expect(second.json.reusedFromBatch).toBe(first.json.batchId);
     // And now that one is what's already there.
     expect((await review()).json.batchId).toBe(second.json.batchId);
+  });
+
+  test("at this commit, an approval needs no new batch, and it stays in its own review", async () => {
+    const first = await review();
+    await h.cli("approve", first.json.batchId, "--all");
+    const second = await review();
+    expect(second.rendered).toBe(false);
+    expect(second.json.batchId).toBe(first.json.batchId);
+    expect(second.code).toBe(0);
+    expect(second.json.differences.map(({ state, decision }: any) => [state, decision.decision])).toEqual([
+      ["added", "approved"],
+      ["added", "approved"],
+    ]);
   });
 
   test("at a new commit, skips render, and records the same images in a new batch", async () => {
@@ -286,7 +291,6 @@ describe("a filter", () => {
   test("reports what it left out and what it didn't match, as a render would", async () => {
     const reviewed = await review();
     await h.cli("approve", reviewed.json.batchId, "--all");
-    expect((await h.cli("accept", reviewed.json.batchId)).code).toBe(0);
 
     const flags = ["--story", "a--one", "--story", "nope--*"];
     const reused = await review(...flags);
@@ -348,23 +352,20 @@ describe("selfie render", () => {
 });
 
 describe("a reused batch is a real batch", () => {
-  test("through approve, accept, the exit codes, and the next review", async () => {
+  test("through approve, the exit codes, and the next review", async () => {
     const first = await review();
     expect(first.code).toBe(1);
 
     await newCommit();
     const reused = await review();
     expect(reused.code).toBe(1);
+    expect(reused.json.reusedFromBatch).toBe(first.json.batchId);
     expect(reasons(reused.json.blockers)).toEqual(["added-unapproved", "added-unapproved"]);
-    expect((await h.cli("accept", reused.json.batchId)).code).toBe(1);
 
     expect((await h.cli("approve", reused.json.batchId, "--all")).code).toBe(0);
-    const accepted = await h.cli("accept", reused.json.batchId);
-    expect(accepted.code).toBe(0);
-    expect(accepted.json).toMatchObject({ accepted: true, batchId: reused.json.batchId, reusedFromBatch: first.json.batchId });
-    expect(accepted.stderr).toContain(`This batch's pixels came from the render of batch ${first.json.batchId}`);
-    expect((await h.cli("find-baseline")).json.sha).toBe(reused.json.gitSha);
+    expect((await h.cli("review", reused.json.batchId)).code).toBe(0);
 
+    await newCommit();
     const next = await review();
     expect(next.rendered).toBe(false);
     expect(next.code).toBe(0);
@@ -372,65 +373,50 @@ describe("a reused batch is a real batch", () => {
     expect(next.json.counts).toMatchObject({ stories: 2, unchanged: 2, undecided: 0 });
   });
 
-  test("accepting a batch that rendered says so too", async () => {
-    const first = await review();
-    await h.cli("approve", first.json.batchId, "--all");
-    const accepted = await h.cli("accept", first.json.batchId);
-    expect(accepted.json.reusedFromBatch).toBeNull();
-    expect(accepted.stderr).not.toContain("pixels came from");
-  });
-
-  test("accept still knows after the batch's directory is pruned", async () => {
+  test("a review still knows after the batch's directory is pruned", async () => {
     const first = await review();
     await newCommit();
     const reused = await review();
-    await h.cli("approve", reused.json.batchId, "--all");
     await pruneBatches();
-    expect((await h.cli("accept", reused.json.batchId)).json.reusedFromBatch).toBe(first.json.batchId);
+    expect((await h.cli("review", reused.json.batchId)).json.reusedFromBatch).toBe(first.json.batchId);
   });
 
-  test("records a new commit and its baseline, not the earlier batch's", async () => {
+  test("records a new commit, not the earlier batch's", async () => {
     const first = await review();
     await h.cli("approve", first.json.batchId, "--all");
-    await h.cli("accept", first.json.batchId);
 
     const sha = await commit(h.repo, "touches nothing the built Storybook holds");
     const reused = await review();
     expect(reused.rendered).toBe(false);
     expect(reused.json.gitSha).toBe(sha);
     expect(reused.json.gitSha).not.toBe(first.json.gitSha);
-    expect(reused.json.baseline.sha).toBe(first.json.gitSha);
     expect(reused.json.dirtyPaths).toEqual([]);
     expect(reused.code).toBe(0);
-    expect((await h.cli("accept", reused.json.batchId)).json.gitSha).toBe(sha);
-    expect((await h.cli("find-baseline")).json.sha).toBe(sha);
   });
 
-  test("records a dirty tree, and accept refuses it, until a commit makes it clean", async () => {
+  test("records a dirty tree, until a commit makes it clean", async () => {
     const first = await review();
     await h.cli("approve", first.json.batchId, "--all");
 
     await writeFile(path.join(h.repo, "edit.txt"), "not committed\n");
     const dirty = await review();
     expect(dirty.rendered).toBe(false);
+    expect(dirty.json.dirty).toBe(true);
     expect(dirty.json.dirtyPaths).toEqual(["edit.txt"]);
-    const refused = await h.cli("accept", dirty.json.batchId);
-    expect(refused.code).toBe(1);
-    expect(reasons(refused.json.refusals)).toEqual(["recorded-on-dirty-tree"]);
 
     git(h.repo, "add", "edit.txt");
     git(h.repo, "commit", "--quiet", "-m", "commit it");
     const clean = await review();
     expect(clean.rendered).toBe(false);
+    expect(clean.json.dirty).toBe(false);
     expect(clean.json.dirtyPaths).toEqual([]);
     expect(clean.json.gitSha).toBe(git(h.repo, "rev-parse", "HEAD"));
-    expect((await h.cli("accept", clean.json.batchId)).code).toBe(0);
+    expect(clean.code).toBe(0);
   });
 
   test("a changed build renders, and reports its change", async () => {
     const first = await review();
     await h.cli("approve", first.json.batchId, "--all");
-    await h.cli("accept", first.json.batchId);
 
     await writeFile(inBuild("assets/app.css"), ".a{color:tan}");
     h.stories = [{ id: "a--one", color: BLUE }, { id: "a--two", color: BLUE }];

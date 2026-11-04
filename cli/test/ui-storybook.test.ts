@@ -5,7 +5,7 @@ import { createLocalApp, createStorybookApp, serveLocal, serveStorybook } from "
 import { beforeEach, describe, expect, test } from "vitest";
 import { openProject } from "../src/project.ts";
 import { localReviewSource, type RenderStories } from "../src/ui.ts";
-import { commit, git, TEST_CONFIG, writeTestConfig } from "./support.ts";
+import { BLUE, commit, git, TEST_CONFIG, writeTestConfig } from "./support.ts";
 import { PORT, HOST, ORIGIN, h, project, clientDir, app, review, get, change } from "./ui-support.ts";
 
 describe("the hosted Storybook", () => {
@@ -300,7 +300,7 @@ describe("the hosted Storybook", () => {
       expect(asked).toEqual([["a", "b"]]);
     });
 
-    test("asking for every story is a whole batch, which can become goldens", async () => {
+    test("asking for every story is a whole batch", async () => {
       await withStories("a", "b");
       const source = sourceRendering(async (stories) => {
         asked.push(stories);
@@ -404,19 +404,20 @@ describe("the hosted Storybook", () => {
       expect((await linkOf(await reviewedBuild()))?.exactStorybook).toBe(true);
     });
 
-    test("the goldens' own build too, if it's kept, once a later batch is compared with them", async () => {
+    test("each row's reference's own build too, if it's kept", async () => {
       await built();
       const first = await reviewedBuild();
-      expect((await hosted().batchView(first)).goldenStorybookUrl).toBeNull();
+      const rowOf = async (batchId: string) => (await hosted().batchView(batchId)).rows.find(({ story }) => story === "a")!;
+      expect((await rowOf(first)).goldenStorybookUrl).toBeNull();
       expect((await h.cli("approve", first, "--all")).code).toBe(0);
-      expect((await h.cli("accept", first)).code).toBe(0);
-      const goldens = (await linkOf(first))!.url;
+      const approved = (await linkOf(first))!.url;
 
       await commit(h.repo, "the next change");
       await writeFile(path.join(dir, "index.html"), "<!doctype html><title>the next build</title>");
-      const view = await hosted().batchView(await reviewedBuild());
-      expect(view.goldenStorybookUrl).toBe(goldens);
-      expect(view.storybook?.url).not.toBe(goldens);
+      h.stories = [{ id: "a", color: BLUE }, { id: "b" }];
+      const next = await reviewedBuild();
+      expect((await rowOf(next)).goldenStorybookUrl).toBe(approved);
+      expect((await linkOf(next))?.url).not.toBe(approved);
     });
 
     test("the size its environment rendered at, whatever the config says now", async () => {

@@ -60,8 +60,8 @@ describe("who may ask", () => {
       expect(noHeader.status).toBe(403);
       const wrongType = await change(`/api/batches/${batchId}/decisions`, body(), { "content-type": "text/plain" });
       expect(wrongType.status).toBe(403);
-      const accepting = await app.request(`/api/batches/${batchId}/accept`, { method: "POST", body: "{}", headers: { host: HOST } });
-      expect(accepting.status).toBe(403);
+      const nothing = await app.request(`/api/batches/${batchId}/decisions`, { method: "POST", body: "{}", headers: { host: HOST } });
+      expect(nothing.status).toBe(403);
       await nothingDecided();
     });
 
@@ -107,7 +107,7 @@ describe("who may ask", () => {
 
 describe("pages", () => {
   test("any page is the client's one document, and an unknown API route isn't", async () => {
-    for (const url of ["/", `/batches/${UNKNOWN_BATCH}`, `/batches/${UNKNOWN_BATCH}/accept`, `/batches/${UNKNOWN_BATCH}/stories/a%20story%2Fone`]) {
+    for (const url of ["/", `/batches/${UNKNOWN_BATCH}`, `/batches/${UNKNOWN_BATCH}/stories/a%20story%2Fone`]) {
       const response = await get(url);
       expect(await response.text(), url).toContain("the client");
       expect(response.headers.get("cache-control")).toBe("no-store");

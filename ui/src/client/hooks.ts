@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { AcceptRefusal, DecisionKind, DecisionTarget, FeedbackView, StoriesView, NewNote, BatchView, SendVia, RenderRow } from "../shared/api.ts";
-import { deleteNote, fetchFeedback, fetchStories, fetchBatch, fetchUnchanged, postAccept, postAnswer, postRender, postDecision, postNote, postResolve, postSendNotes, RequestError } from "./api.ts";
+import type { DecisionKind, DecisionTarget, FeedbackView, StoriesView, NewNote, BatchView, SendVia, RenderRow } from "../shared/api.ts";
+import { deleteNote, fetchFeedback, fetchStories, fetchBatch, fetchUnchanged, postAnswer, postRender, postDecision, postNote, postResolve, postSendNotes, RequestError } from "./api.ts";
 import { reuseRows } from "./filter.ts";
 import { toggled } from "./selection.ts";
 
@@ -16,8 +16,6 @@ export interface BatchState {
   readonly clearActionError: () => void;
   /** True if the decision was recorded. */
   readonly decide: (decision: DecisionKind, targets: readonly DecisionTarget[]) => Promise<boolean>;
-  /** The refusals, or null if the request never got an answer. */
-  readonly accept: (removedSeen: number | undefined) => Promise<{ accepted: boolean; refusals: readonly AcceptRefusal[] } | null>;
 }
 
 const asRequestError = (error: unknown) =>
@@ -93,12 +91,6 @@ export function useBatch(batchId: string): BatchState {
       const next = await act(() => postDecision(batchId, decision, targets));
       if (next !== null) apply(next);
       return next !== null;
-    },
-    accept: async (removedSeen) => {
-      const outcome = await act(() => postAccept(batchId, removedSeen));
-      if (outcome === null) return null;
-      apply(outcome.view);
-      return { accepted: outcome.accepted, refusals: outcome.refusals };
     },
   };
 }

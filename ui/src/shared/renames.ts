@@ -1,7 +1,7 @@
 import type { ComparedRender } from "./api.ts";
 
 // A story that's gone and a new one with the very same image read as one story renamed. Only for
-// saying so: to the store they're still one removed and one new, which accepting treats as ever.
+// saying so: to the store they're still one removed and one added, each with a decision of its own.
 
 type ComparedRow = Pick<ComparedRender, "story" | "state" | "imageHash" | "goldenHash">;
 

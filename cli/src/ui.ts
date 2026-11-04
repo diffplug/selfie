@@ -1,20 +1,20 @@
 // The review UI's window on a local repository: the library, as the shape its routes want. It reads
 // what's been recorded, records decisions on it, and renders only when a page asks it to render.
-import { newestRenders, type Comparison, type DecisionKind, type RenderBatch } from "selfie-store";
+import { newestRenders, type Comparison, type DecisionKind, type PlacedDecision, type RenderBatch } from "selfie-store";
 import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
 import { isBuiltStorybook } from "selfie-ui/local";
 import { keptStorybookPath } from "selfie-ui/api";
 import { storybookHash, readStoriesInOrder, readStoryIndex, storiesInIndex, type StoryEntry } from "selfie-render";
-import type { AcceptOutcome, DecisionTarget, FeedbackView, NewNote, ReviewSource, BatchView, RenderRow, StoriesView, StorybookLink, StorySetup } from "selfie-ui/app";
+import type { DecisionTarget, FeedbackView, NewNote, ReviewSource, BatchView, RenderRow, StoriesView, StorybookLink, StorySetup } from "selfie-ui/app";
 import { resolveRenderSettings, resolveHunkMergeDistance } from "./config.ts";
-import { accept, checkAccept, decide } from "./decisions.ts";
+import { decide } from "./decisions.ts";
 import { diffToPng, type PixelDiff } from "./diff.ts";
 import { SelfieError } from "./errors.ts";
-import { currentBranch, dirtyPaths, gitUserEmail, headMovedAt, headSha, type BaselineSearch } from "./git.ts";
+import { currentBranch, dirtyPaths, gitUserEmail, headMovedAt, headSha } from "./git.ts";
 import { isOpenNote } from "selfie-ui/notes";
 import { sentNotes, textForAgent } from "./notes.ts";
-import { branchGoldens, compareAsReviewed, compareAsShown, findBaseline, readReviewCache, requireBatch, batchesAtHead, type Project } from "./project.ts";
+import { batchesAtHead, compareAsReviewed, reachableCommits, readReviewCache, requireBatch, type Project } from "./project.ts";
 import { summarizeBatch } from "./summary.ts";
 
 /** Each is about 20 KB of PNG. This is a reviewer going back and forth, not a cache of a batch. */
@@ -22,8 +22,6 @@ const DIFFS_KEPT = 32;
 
 /** A person looks at a few batches at a time. */
 const KEPT_INDEXES_HELD = 8;
-
-const baselineNote = ({ sha, message }: BaselineSearch) => ({ sha, message });
 
 /** Records a batch from a hosted Storybook, of just these stories, or of every one, and says which batch. */
 export type RenderStories = (stories: readonly string[] | undefined) => Promise<string>;
@@ -71,12 +69,6 @@ export function localReviewSource(
     return storybook !== undefined && isBuiltStorybook(storybook.dir) ? { url: storybook.url, exactStorybook: false } : null;
   };
 
-  /** The kept built Storybook of the goldens a batch is compared with. Never the directory, which wouldn't be them. */
-  const goldenStorybookFor = async ({ environment }: RenderBatch, sha: string | null): Promise<string | null> => {
-    const goldens = sha === null ? null : await batches.acceptedBatchAt(sha, environment);
-    return goldens === null ? null : keptStorybookUrl(goldens);
-  };
-
   /** A kept built Storybook's stories, which never change, or nothing if it can't say. */
   const keptIndexes = new Map<string, Promise<readonly StoryEntry[]>>();
   const storiesOfKept = (hash: string) => {
@@ -94,10 +86,9 @@ export function localReviewSource(
     return index;
   };
 
-  /** What the batch's own Storybook calls its stories, then what its goldens' called those it no longer has. */
-  const storyNamesFor = async (batch: RenderBatch, goldensSha: string | null, stories: ReadonlySet<string>) => {
-    const goldens = goldensSha === null ? null : await batches.acceptedBatchAt(goldensSha, batch.environment);
-    const kept = await Promise.all([batch.id, goldens].map((id) => (id === null ? null : project.storybooks.keptStorybookOfBatch(id))));
+  /** What the batch's own Storybook calls its stories, then what the batches behind its approvals called those it no longer has. */
+  const storyNamesFor = async (batch: RenderBatch, approvedIn: ReadonlySet<string>, stories: ReadonlySet<string>) => {
+    const kept = await Promise.all([batch.id, ...approvedIn].map((id) => project.storybooks.keptStorybookOfBatch(id)));
     const entries = (await Promise.all(kept.map((hash) => (hash === null ? [] : storiesOfKept(hash))))).flat();
     const named = new Map<string, StoryEntry>();
     for (const entry of entries) if (stories.has(entry.id) && !named.has(entry.id)) named.set(entry.id, entry);
@@ -114,42 +105,31 @@ export function localReviewSource(
 
   const toRows = async (batchId: string, compared: Comparison["renders"]): Promise<RenderRow[]> => {
     const pixelDiffs = await cachedDiffs(batchId);
-    return compared.map((render) => ({ ...render, pixelDiff: pixelDiffs.get(render.story) ?? null }));
+    const urls = new Map(await Promise.all([...new Set(compared.flatMap(({ goldenBatchId }) => goldenBatchId ?? []))].map(async (id) => [id, await keptStorybookUrl(id)] as const)));
+    return compared.map((render) => ({
+      ...render,
+      pixelDiff: pixelDiffs.get(render.story) ?? null,
+      goldenStorybookUrl: render.goldenBatchId === undefined ? null : (urls.get(render.goldenBatchId) ?? null),
+    }));
   };
 
-  /**
-   * Everything recomputed from what deciding and accepting compare with, which the caller already
-   * has, and which says what blocks. What it shows may be against the branch's goldens instead.
-   */
-  const viewOf = async (reviewed: Comparison, actor: string | null): Promise<BatchView> => {
-    const { batch } = reviewed;
-    const onBranch = await branchGoldens(project, batch);
-    const comparison = onBranch === null ? reviewed : await batches.compareBatch(batch.id, onBranch);
+  /** Everything recomputed from what deciding compares with, which the caller already has. */
+  const viewOf = async (comparison: Comparison, actor: string | null): Promise<BatchView> => {
+    const { batch } = comparison;
     const summary = summarizeBatch(comparison);
-    const checked = onBranch === null ? summary : summarizeBatch(reviewed);
-    const notRendered = new Set(summary.notRendered.map(({ story }) => story));
-    const { refusals, usableAsBaseline, removals } = await checkAccept(project, reviewed);
-    const rows = await toRows(
-      batch.id,
-      comparison.renders.filter(({ story }) => !notRendered.has(story)),
-    );
+    const rows = await toRows(batch.id, summary.inFilter);
     return {
       batch,
       storybook: await storybookFor(batch.id),
-      goldenStorybookUrl: await goldenStorybookFor(batch, onBranch ?? batch.baselineSha),
       viewport: await project.storybooks.viewportOf(batch.environment),
-      branchGoldens: onBranch,
       hunkMergeDistance: await resolveHunkMergeDistance(repo),
-      acceptedBatchId: await batches.acceptedBatchAt(batch.gitSha, batch.environment),
       actor,
-      blockers: checked.blockers,
+      blockers: summary.blockers,
       advisories: summary.advisories,
-      counts: { ...summary.counts, undecided: checked.counts.undecided, failed: summary.failed.length },
+      counts: { ...summary.counts, failed: summary.failed.length },
       rows,
-      storyNames: await storyNamesFor(batch, onBranch ?? batch.baselineSha, new Set(rows.map(({ story }) => story))),
-      refusals,
-      removals,
-      usableAsBaseline,
+      storyNames: await storyNamesFor(batch, new Set(rows.flatMap(({ goldenBatchId }) => goldenBatchId ?? [])), new Set(rows.map(({ story }) => story))),
+      outsideFilter: summary.notRendered.length,
       siblings: (await batches.batchesAt(batch.gitSha, batch.environment)).map(({ id, startedAt, status, dirty }) => ({ id, startedAt, status, dirty })),
     };
   };
@@ -215,11 +195,11 @@ export function localReviewSource(
       const built = storybook !== undefined && isBuiltStorybook(storybook.dir);
       const index = built ? await readStoriesInOrder(storybook.dir) : [];
 
-      // Batches at one commit all find the same goldens on its branch, and finding them takes Git.
-      let onBranch: Promise<string | null> | undefined;
+      // Batches at one commit on one branch see the same decisions, and a filtered render at a time can make many batches.
+      const decisions = new Map<string | null, Promise<readonly PlacedDecision[]>>();
       const rowsOf = async (batch: RenderBatch) => {
-        const against = batch.baselineSha ?? (await (onBranch ??= branchGoldens(project, batch)));
-        return (await compareAsShown(project, batch, against)).renders;
+        if (!decisions.has(batch.branch)) decisions.set(batch.branch, reachableCommits(project, batch).then((commits) => project.batches.decisionsAt(batch.environment, commits)));
+        return (await project.batches.compareFromHistory(batch.id, await decisions.get(batch.branch)!, { includeUnchanged: true })).renders;
       };
       const renders = await newestRenders(finished, rowsOf, index.length > 0 ? new Set(index.map(({ id }) => id)) : undefined);
 
@@ -282,7 +262,7 @@ export function localReviewSource(
         const index = new Set((await readStoryIndex(storybook.dir)).map(({ id }) => id));
         const unknown = stories.find((story) => !index.has(story));
         if (unknown !== undefined) throw new SelfieError("unknown-story", `The hosted Storybook has no story ${unknown}.`);
-        // Every story is a whole batch, which can become goldens, and not a filtered one that can't.
+        // Every story is a whole batch, which can say what's been removed, and not a filtered one that can't.
         return { batchId: await storybook.renderStories(new Set(stories).size === index.size ? undefined : stories) };
       } catch (error) {
         if (error instanceof SelfieError && error.code === "unknown-story") throw error;
@@ -292,20 +272,14 @@ export function localReviewSource(
       }
     },
 
-    async baseline(batchId) {
-      const batch = await requireBatch(project, batchId);
-      return baselineNote(await findBaseline(project, batch.environment));
-    },
-
     async batchContext(batchId) {
-      const batch = await requireBatch(project, batchId);
-      const [head, branch, { mergeBase, defaultBranch }] = await Promise.all([headSha(repo), currentBranch(repo), findBaseline(project, batch.environment)]);
-      return { head, branch, mergeBase, defaultBranch };
+      await requireBatch(project, batchId);
+      const [head, branch] = await Promise.all([headSha(repo), currentBranch(repo)]);
+      return { head, branch };
     },
 
     async unchanged(batchId) {
-      const batch = await requireBatch(project, batchId);
-      const { renders: compared } = await compareAsShown(project, batch);
+      const { renders: compared } = await compareAsReviewed(project, batchId, { includeUnchanged: true });
       return toRows(
         batchId,
         compared.filter(({ state }) => state === "unchanged"),
@@ -316,11 +290,6 @@ export function localReviewSource(
       const actor = await requireActor("no decision was recorded");
       const { comparison } = await decide(project, { batchId, decision, actor, stories: { targets } });
       return viewOf(comparison, actor);
-    },
-
-    async accept(batchId: string, removedSeen: number | undefined): Promise<AcceptOutcome> {
-      const { accepted, refusals, comparison } = await accept(project, { batchId, removedSeen });
-      return { accepted, refusals, view: await viewOf(comparison, await gitUserEmail(repo)) };
     },
 
     image: (hash) => store.getImage(hash),

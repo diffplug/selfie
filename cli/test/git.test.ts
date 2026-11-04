@@ -1,9 +1,9 @@
-// `find-baseline`'s walk against real Git history, in repositories shaped for each case.
+// The walk to a remote's goldens, against real Git history, in repositories shaped for each case.
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
-import { dirtyPaths, headSha, isOnBaselineHistory, openRepo, walkToBaseline } from "../src/git.ts";
+import { dirtyPaths, headSha, openRepo, walkToBaseline } from "../src/git.ts";
 import { commit, createRepo, git } from "./support.ts";
 
 let scratch: string;
@@ -168,31 +168,6 @@ test("a repository with no commits says so", async () => {
   git(scratch, "init", "--quiet", "--initial-branch=main", repo);
   const found = await find(repo, []);
   expect(found).toMatchObject({ sha: null, reason: "no-commits" });
-});
-
-describe("isOnBaselineHistory", () => {
-  test("is true on the default branch's first-parent history, and false off it", async () => {
-    const repo = await createRepo(scratch);
-    const opened = await openRepo(repo);
-    const onMain = git(repo, "rev-parse", "HEAD");
-    git(repo, "switch", "--quiet", "-c", "side");
-    const onSide = await commit(repo, "side", "side.txt");
-    expect(await isOnBaselineHistory(opened, onMain)).toBe(true);
-    expect(await isOnBaselineHistory(opened, onSide)).toBe(false);
-
-    git(repo, "switch", "--quiet", "main");
-    await commit(repo, "main", "main.txt");
-    git(repo, "merge", "--quiet", "--no-edit", "side");
-    expect(await isOnBaselineHistory(opened, git(repo, "rev-parse", "HEAD"))).toBe(true);
-    expect(await isOnBaselineHistory(opened, onSide)).toBe(false);
-  });
-
-  test("with no default branch, uses HEAD's history", async () => {
-    const repo = await createRepo(scratch);
-    git(repo, "branch", "--quiet", "-m", "trunk");
-    const sha = git(repo, "rev-parse", "HEAD");
-    expect(await isOnBaselineHistory(await openRepo(repo), sha)).toBe(true);
-  });
 });
 
 describe("dirtyPaths", () => {

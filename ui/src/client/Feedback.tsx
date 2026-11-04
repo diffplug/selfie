@@ -5,7 +5,7 @@ import { isOpenNote } from "../shared/notes.ts";
 import type { FeedbackState } from "./hooks.ts";
 import { plural } from "./plural.ts";
 import { AppLink, batchPath, storyPath } from "./router.tsx";
-import { ActionFailedBanner } from "./BatchNotes.tsx";
+import { ActionFailedBanner } from "./ActionFailure.tsx";
 import { NoteLabel } from "./words.tsx";
 
 function CopyDialog({ text, onClose }: { readonly text: string; readonly onClose: () => void }) {

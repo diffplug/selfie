@@ -81,7 +81,7 @@ Done means exit 0. It doesn't prove there's no flake left, only that none showed
 
 ## 5. Report
 
-Say what the causes were, how many stories each one explained, what you changed, and how many clean renders you ended on. Fixing flakes changes images, so a review afterward will show real differences, which a person needs to accept: **never** approve them for someone in order to make a review pass.
+Say what the causes were, how many stories each one explained, what you changed, and how many clean renders you ended on. Fixing flakes changes images, so a review afterward will show real differences, which a person needs to approve: **never** approve them for someone in order to make a review pass.
 
 ## What not to do
 

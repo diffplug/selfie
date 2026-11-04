@@ -85,7 +85,7 @@ export function StoryFrame({ title, url, viewport }: { title: string; url: strin
 
 export function LiveStories({ row, view, open, onToggle }: { row: RenderRow; view: BatchView; open: boolean; onToggle: () => void }) {
   const current = row.state === "removed" ? null : (view.storybook?.url ?? null);
-  const golden = row.state === "added" ? null : view.goldenStorybookUrl;
+  const golden = row.goldenStorybookUrl;
   if (current === null && golden === null) return null;
   const side = (layer: "golden" | "current", url: string | null, missing: string) => (
     <div className="selfie-live-side">

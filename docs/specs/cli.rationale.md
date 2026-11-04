@@ -22,17 +22,15 @@
 
 **A hash after the readable slug.** Slugifying is lossy: `a/b-c` and `a-b/c` read the same. Eight hex digits keep them apart, and since a slug always ends with them and never holds a dot, nothing can equal `d1.env`.
 
-**One store across SSH and HTTPS.** Someone cloning a repository twice, once each way, is the same project with the same goldens. Dropping the port costs nothing real: two different repositories at one host and path, on two ports, is not worth a separate case.
+**One store across SSH and HTTPS.** Someone cloning a repository twice, once each way, is the same project with the same approvals. Dropping the port costs nothing real: two different repositories at one host and path, on two ports, is not worth a separate case.
 
 ## Review
 
-**A dirty batch is recorded, not refused.** Rendering uncommitted work is the point of the loop. It can be compared and approved, and [`accept`](#accept) is where it stops.
+**A dirty batch is recorded, not refused.** Rendering uncommitted work is the point of the loop. It can be compared and approved like any other.
 
 **A gitignored built Storybook isn't dirty.** It usually is ignored, so counting it would make every review dirty. The cost is the [open question](cli.md#open-questions) about stale built Storybooks.
 
-**`--baseline` exits 1 on any difference.** Blockers answer "what stops accepting this batch", and two batches that differ can have every image approved. Someone looking for flakiness is asking what differs.
-
-**A branch's goldens, only to look at.** Reviewing Selfie's own stories on a branch read every story as added, until a batch was compared with the branch's own earlier goldens by hand. So a batch with no baseline is shown against them. Nothing about acceptance moves: every image still needs its own approval, so an image matching a golden that someone has since rejected is still refused. So what's shown and what's checked can differ. Blockers and the exit code stay with what's checked, or a review could exit 0 before `accept` refused it, and the document's `baseline` stays the real one, with `comparedWith` saying what this review showed.
+**`--baseline` exits 1 on any difference.** Blockers answer "what has nobody approved", and two batches that differ can have every image approved. Someone looking for flakiness is asking what differs.
 
 **Hunks, by a recursive 9-slice.** Whole-page render made any change in a page's height a size change, and a size change once compared nothing: on Selfie's own stories, moving one row put 5 of 18 changed stories there with nothing highlighted. Matching from the edges fixed that, but a heading changed near the top and rows moved near the bottom were then one band, where shifted rows ghost. Trimming all four sides and recursing gives the heading its own 182×18 box, and separates changes side by side, which rows alone can't.
 
@@ -72,11 +70,9 @@ It takes 4 to 10 ms an image on average, 17 ms at worst, and a story's stats com
 
 **An approved change doesn't.** This is what makes "commit, review again, no re-approval" exit 0, and it's the behavior `docs/specs/system.md` → Approvals asks for. The change stays in `differences`, with who approved it, so nothing is hidden.
 
-**A removal does, though no decision exists for it.** It takes `--removed` to accept, so a review that exits 0 mustn't be followed by an `accept` that refuses.
-
 ## Output directories
 
-**Pruning loses no facts.** Batch directories were first where a batch's dirty flag and baseline lived, so pruning one stopped it being acted on, and made the rule against accepting dirty batches depend on a file. Those moved to the store (`docs/specs/renders.rationale.md` → Render batches), and `review.json` can be deleted at any time.
+**Pruning loses no facts.** Batch directories were first where a batch's dirty flag and baseline lived, so pruning one stopped it being acted on. Those moved to the store (`docs/specs/renders.rationale.md` → Render batches), and `review.json` can be deleted at any time.
 
 **Per-batch directories rather than one reused one.** A reused directory would be smaller to describe, but a concurrent review, or an agent still reading the last review's images, would see files change underneath it. A batch ID in the path also means a batch's JSON keeps pointing at its own images.
 
@@ -84,23 +80,7 @@ It takes 4 to 10 ms an image on average, 17 ms at worst, and a story's stats com
 
 **The store still grows.** Blobs grow only with new images, but nothing deletes either them or a batch's rows: `docs/specs/renders.md` → Open questions owns retention. After the 12 batches below and in the sample loop, holding 2,914 batch rows and 650 images, `store.db` was 512 KB and `blobs/` 25 MB.
 
-## Accept
-
-**Only how the batch was recorded.** The images come from the moment it rendered, so review with an edit in place, `git checkout .`, and the tree is clean while the batch's images aren't that commit's. The same goes for reviewing dirty and committing, where the batch's SHA is the commit before the edit. Either way a golden would misdescribe its SHA. A check of the tree as it is now adds nothing to that: a batch recorded clean describes its SHA whatever has happened to the tree since. Refusing a dirty batch costs one more render after committing, and no approvals, since those carry over. `cli/test/commands.test.ts` covers both.
-
-**Reporting every refusal at once.** An agent otherwise fixes one, runs again, and finds the next.
-
-**No extra gate for a filtered batch.** `acceptBatch`'s count already catches it, and the refusal says how many removals are only outside the filter. A person who wants a partial golden set can have one, and the rest read as added later, with their approvals intact.
-
-**`usableAsBaseline`.** Accepting on a feature branch succeeds, and no later review reads the result, since a baseline comes from the default branch's history. That's correct by the README's definition, and surprising, so it's reported rather than refused. Off-branch goldens may still be wanted by a later sync.
-
-## find-baseline
-
-**A branch's own goldens aren't its baseline.** The README defines the baseline as a merge-base, so that a pull request's changes are reported against what it will merge into, cumulatively, however many commits it has. A branch accepting at its own commits doesn't move that. The cost was that a branch saw no baseline until someone accepted on the default branch, which is local to one machine until `sync`, and a project adopting Selfie on a branch had no commit it could accept at: its merge-base has no Storybook.
-
-**First-parent history.** On a default branch, that is the commits it actually was, rather than whatever a merged branch passed through, whose goldens might describe unreviewed work.
-
-**A limit of 1,000, asked in groups.** The bound is for a repository where nothing has goldens, and for `sync`, when these become cloud requests. An `IN` query of 99 SHAs makes that about 10 queries instead of 1,000, and one in the usual case, where a nearby commit has goldens.
+## Git
 
 **Local candidates.** `main` and `master` are checked after `origin/*`, since an agent's scratch repository has no origin, and a clone's `origin/HEAD` is what names a different default.
 
@@ -108,10 +88,9 @@ It takes 4 to 10 ms an image on average, 17 ms at worst, and a story's stats com
 
 **Required, and the only place.** A default directory and flags that overrode the file meant a project's setup could live in a command someone typed, an agent's guess, or a skill's fallback, and two people could render different things and not know. So there's one file, and a repository without it is told how to get one. `--native` isn't an exception to this: which browser this machine can use is about the machine, and a checked-in file shouldn't choose it for everyone.
 
-**One file, in one place.** Every command that needs an environment must find the same one, or `find-baseline` and `review` disagree. `--config` and `--init-script` let them, so they went. A file at the Git top level does the job without a flag on each call.
+**One file, in one place.** Every command that needs an environment must find the same one, or `render` and `review` disagree. `--config` and `--init-script` let them, so they went. A file at the Git top level does the job without a flag on each call.
 
 **A build command in the config, only when asked.** This was once refused, since reading a command from a file lets a checkout run a shell, and rendering is otherwise safe on an untrusted one: stories run in a container with no network. But a project's build is a fact about that project, and retyping it is the friction `selfie` alone exists to remove. So it's in the config, and runs only for someone who asked for that build, by typing `selfie` or `--build`, and it prints first. What's given up: `selfie` in a stranger's checkout runs their command. `--no-build` is the way not to, and `selfie render`, `review`, and `ui` still never do it by themselves, so CI and agents can't run it by accident.
-
 
 **A config can't name a file outside itself.** A checkout's config file isn't the user's choice in the way a flag is. An init script is only ever run in the browser, with no network, so this is a small precaution at the cost of one check.
 
@@ -173,7 +152,7 @@ Without leaving these out, every built Storybook hashed differently and the feat
 
 **A batch's built Storybook isn't `render_keys`.** Those keys say what a later review may skip rendering, so they hold only a built Storybook's newest reusable render, and forget reused, filtered, and failed batches. `selfie ui` asked them first, and called all of those a different build. So a batch says for itself, by a hash of the built Storybook's own files, since the environment and the renderer's code don't change whether a story's page is the one in the image.
 
-**Provenance is on the batch, and the key is local.** `reused_from_batch` is a fact about the batch, which `accept`, the UI, and later `trust` all want, so it's read with the batch, with no second lookup. `render_keys` is only what this machine rendered, which nothing in the cloud needs. It must outlive a pruned `review.json`, and in `store.db` it lives and dies with the batches it names. After 15 batches here it held 2 rows.
+**Provenance is on the batch, and the key is local.** `reused_from_batch` is a fact about the batch, which the UI, and later `trust`, both want, so it's read with the batch, with no second lookup. `render_keys` is only what this machine rendered, which nothing in the cloud needs. It must outlive a pruned `review.json`, and in `store.db` it lives and dies with the batches it names. After 15 batches here it held 2 rows.
 
 **A column added to `render_batches`, against the rule.** `docs/specs/store.md` → Open questions allows only new tables and indexes until migrations are decided, and `CREATE TABLE IF NOT EXISTS` can't add a column. It was made anyway since no project database holds this schema yet, and a separate table was the alternative. On a copy of an older store, `selfie review` renders and then fails with exit 2, `table render_batches has no column named reused_from_batch`, and `accept` fails with `no such column: reused_from_batch`. Anyone with a store from before this has to delete it.
 
@@ -181,7 +160,7 @@ Without leaving these out, every built Storybook hashed differently and the feat
 
 **`scale`, another column on `render_batches`.** The same exception, for the same reason, and it comes in the same unmerged stack, so it breaks no store that `reused_from_batch` hadn't already. It's a fact about one batch that every viewer wants with the batch, so a separate table would only add a lookup.
 
-**A batch at this commit needs no copy.** A review repeated at one commit used to copy every row into a new batch, for nothing. A new commit still needs its own batch, since goldens are per SHA, and so does a tree that became dirty or a baseline that moved, since a batch records both.
+**A batch at this commit needs no copy.** A review repeated at one commit used to copy every row into a new batch, for nothing. A new commit still needs its own batch, since approvals are per commit, and so does a tree that became dirty or a change of branch, since a batch records both.
 
 **The newest real render wins.** Pointing a key at the newest reused batch would let `reusedFromBatch` name a batch that rendered nothing, so reuse never chains. Forgetting a key after a bad render means `--no-reuse` can't uncover a deterministic failure only to have the next review hide it behind an older pass.
 

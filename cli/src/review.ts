@@ -30,14 +30,12 @@ import {
 import { resolveRenderSettings, resolveHunkMergeDistance, type RenderSettings } from "./config.ts";
 import { diffToPng, type PixelDiff } from "./diff.ts";
 import { SelfieError } from "./errors.ts";
-import { dirtyPaths, headSha, resolveCommit, type BaselineSearch } from "./git.ts";
+import { ancestorsOf, currentBranch, dirtyPaths, headSha, resolveCommit } from "./git.ts";
 import { isBatchId, regularFileInside, storyDirName } from "./paths.ts";
 import { encodePng } from "./png.ts";
 import {
-  branchGoldens,
   renderDirectory,
   compareAsReviewed,
-  findBaseline,
   pruneOutput,
   requireBatch,
   batchDirectory,
@@ -65,7 +63,7 @@ export interface RenderBatchOptions {
 
 /** A batch to review, or else what to record one from if this built Storybook has none. */
 export type ReviewOptions = ({ readonly batch: string } | (RenderBatchOptions & { readonly batch?: undefined })) & {
-  /** A commit with goldens, or a finished batch. It changes this review alone: `accept` still checks the batch's own. */
+  /** A commit, whose history's approvals to compare with, or a finished batch. It changes this review alone. */
   readonly baseline?: string | undefined;
 };
 
@@ -91,14 +89,8 @@ export interface ReviewResult {
   readonly comparison: Comparison;
   /** Modified, staged, and untracked paths while it rendered. Empty for a batch that was named. */
   readonly dirtyPaths: readonly string[];
-  /** The batch's own: what `accept` checks. */
-  readonly baseline: BaselineSearch;
   /** What this review compared with instead, if anything. */
   readonly given: GivenBaseline | null;
-  /** With no baseline and nothing given, the nearest goldens on this branch, which it compared with. */
-  readonly branchGoldens: string | null;
-  /** The comparison accepting checks, which says what blocks. `comparison`, unless that's against the branch's goldens. */
-  readonly reviewed: Comparison;
   /** How close hunks group here, in image pixels. */
   readonly hunkMergeDistance: number;
   /** Within the batch's filter. */
@@ -259,8 +251,7 @@ async function exportDifference(project: Project, batchDir: string, render: Comp
 
 /** Exports what's needed to act on the comparison: only `changed` renders get diff work. */
 async function exportImages(project: Project, batchDir: string, comparison: Comparison) {
-  const { removed } = summarizeBatch(comparison);
-  const shown = [...comparison.renders.filter(({ state }) => isDecidable(state)), ...removed];
+  const shown = summarizeBatch(comparison).inFilter.filter(({ state }) => isDecidable(state));
   // Each of these holds whole images in memory.
   const limit = Math.min(MAX_CONCURRENT_DIFFS, availableParallelism());
   const differences = await mapConcurrently(shown, limit, (render) => exportDifference(project, batchDir, render));
@@ -317,7 +308,8 @@ async function replay(
 ): Promise<Recording | null> {
   const batchId = await project.renderKeys.find(identity);
   if (batchId === null || (await project.batches.getBatch(batchId))?.status !== "complete") return null;
-  const { renders } = await project.batches.compareBatch(batchId, null, { includeUnchanged: true });
+  // With no decisions, this is only every story it holds.
+  const { renders } = await project.batches.compareFromHistory(batchId, [], { includeUnchanged: true });
   const stories = renders.map((render) => ({ id: render.story, render }));
   const chosen = patterns === undefined ? stories : filterStories(stories, patterns).stories;
   const storyIds = chosen.map(({ id }) => id);
@@ -408,7 +400,7 @@ interface BatchFacts {
   readonly gitSha: string;
   readonly settings: RenderSettings;
   readonly dirty: boolean;
-  readonly baselineSha: string | null;
+  readonly branch: string | null;
   readonly storyFilter: StoryFilter | null;
 }
 
@@ -423,7 +415,7 @@ async function recordBatch(
     environment: fields.settings.environmentId,
     scale: fields.settings.environment.scale,
     dirty: fields.dirty,
-    baselineSha: fields.baselineSha,
+    branch: fields.branch,
     storyFilter: fields.storyFilter,
     reusedFromBatch: recording.reusedFromBatch,
   });
@@ -437,7 +429,6 @@ export interface RenderBatchResult {
   readonly batch: RenderBatch;
   /** Modified, staged, and untracked paths while it rendered. */
   readonly dirtyPaths: readonly string[];
-  readonly baseline: BaselineSearch;
   readonly warnings: readonly string[];
   readonly timings: { readonly renderMs: number; readonly storeMs: number; readonly totalMs: number };
 }
@@ -446,11 +437,11 @@ export interface RenderBatchResult {
 async function sameBatch(project: Project, renderedBy: string, fields: BatchFacts): Promise<RenderBatch | null> {
   const batches = await project.batches.batchesAt(fields.gitSha, fields.settings.environmentId);
   const same = batches.find(
-    ({ id, reusedFromBatch, status, dirty, baselineSha, storyFilter }) =>
+    ({ id, reusedFromBatch, status, dirty, branch, storyFilter }) =>
       (id === renderedBy || reusedFromBatch === renderedBy) &&
       status === "complete" &&
       dirty === fields.dirty &&
-      baselineSha === fields.baselineSha &&
+      branch === fields.branch &&
       JSON.stringify(storyFilter) === JSON.stringify(fields.storyFilter),
   );
   return same ?? null;
@@ -474,7 +465,6 @@ async function renderAndRecord(project: Project, options: RenderBatchOptions, { 
       throw new SelfieError("no-commits", "This repository has no commits yet, and a batch is recorded against a Git SHA.");
     }
     const { storybookDir } = settings;
-    const baseline = await findBaseline(project, settings.environmentId);
     const dirtyBefore = await dirtyPaths(repo);
 
     // 3. Render, unless asked to reuse and this exact built Storybook already rendered.
@@ -498,7 +488,7 @@ async function renderAndRecord(project: Project, options: RenderBatchOptions, { 
       gitSha,
       settings,
       dirty: dirty.length > 0,
-      baselineSha: baseline.sha,
+      branch: await currentBranch(repo),
       storyFilter: storyFilterOf(options.stories, recording.storyIds),
     };
     const existing = recording.reusedFromBatch === null ? null : await sameBatch(project, recording.reusedFromBatch, fields);
@@ -516,7 +506,6 @@ async function renderAndRecord(project: Project, options: RenderBatchOptions, { 
     return {
       batch,
       dirtyPaths: dirty,
-      baseline,
       warnings: recording.warnings,
       timings: { renderMs: rendered - renderStarted, storeMs: stored - rendered, totalMs: Date.now() - started },
     };
@@ -539,7 +528,6 @@ async function namedBatch(project: Project, batchId: string): Promise<RenderBatc
   return {
     batch,
     dirtyPaths: [],
-    baseline: { sha: batch.baselineSha, reason: null, message: null, defaultBranch: null, mergeBase: null },
     warnings: (batch.storyFilter?.unmatched ?? []).map(unmatchedPatternWarning),
     timings: { renderMs: 0, storeMs: 0, totalMs: 0 },
   };
@@ -554,7 +542,7 @@ async function resolveGiven(project: Project, given: string): Promise<GivenBasel
 }
 
 /**
- * Exports what differs from the baseline in a batch: one it's told to look at, or else the one
+ * Exports what differs from what's been approved in a batch: one it's told to look at, or else the one
  * for this built Storybook, recording it only if there's none. A story's failure is a fact in the result.
  * Throws if the review couldn't run.
  */
@@ -562,17 +550,17 @@ export async function review(project: Project, options: ReviewOptions): Promise<
   const started = Date.now();
   const recorded =
     options.batch !== undefined ? await namedBatch(project, options.batch) : await renderAndRecord(project, options, { reuse: true });
-  const { batch, baseline } = recorded;
+  const { batch } = recorded;
   const given = options.baseline === undefined ? null : await resolveGiven(project, options.baseline);
 
   // 6. Compare.
   const comparing = Date.now();
-  const onBranch = given === null ? await branchGoldens(project, batch) : null;
   const comparison =
-    given?.batch !== undefined
-      ? await project.batches.compareWithBatch(batch.id, given.batch)
-      : await project.batches.compareBatch(batch.id, given?.sha ?? onBranch ?? batch.baselineSha);
-  const reviewed = onBranch === null ? comparison : await project.batches.compareBatch(batch.id, batch.baselineSha);
+    given === null
+      ? await compareAsReviewed(project, batch.id)
+      : given.batch !== undefined
+        ? await project.batches.compareWithBatch(batch.id, given.batch)
+        : await project.batches.compareFromHistory(batch.id, await project.batches.decisionsAt(batch.environment, await ancestorsOf(project.repo, given.sha)));
   const compared = Date.now();
 
   // 7. Export, keep a cache of what was exported, and prune older batches. A given baseline answers
@@ -593,10 +581,7 @@ export async function review(project: Project, options: ReviewOptions): Promise<
   return {
     comparison,
     dirtyPaths: recorded.dirtyPaths,
-    baseline,
     given,
-    branchGoldens: onBranch,
-    reviewed,
     hunkMergeDistance: (await resolveHunkMergeDistance(project.repo)) * batch.scale,
     differences,
     playErrors,

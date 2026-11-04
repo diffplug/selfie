@@ -2,14 +2,14 @@
 import { parseArgs, type ParseArgsConfig } from "node:util";
 import type { render } from "selfie-render";
 import { resolveRenderSettings } from "./config.ts";
-import { accept, decide } from "./decisions.ts";
-import { buildAcceptDocument, buildRenderDocument, buildReviewDocument } from "./document.ts";
+import { decide } from "./decisions.ts";
+import { buildRenderDocument, buildReviewDocument } from "./document.ts";
 import { SelfieError } from "./errors.ts";
 import { gitUserEmail, resolveCommit } from "./git.ts";
-import { compareAsReviewed, findBaseline, openProject, type Project } from "./project.ts";
+import { compareAsReviewed, openProject, type Project } from "./project.ts";
 import { renderBatch, review, replyToNote, runBuild } from "./review.ts";
 import { summarizeBatch } from "./summary.ts";
-import { findBaselineWithRemote, pull, push, requireRemote, resolveRemote, type Fetch } from "./sync.ts";
+import { pull, push, requireRemote, type Fetch } from "./sync.ts";
 import { isNoteId, isNoteText, MAX_NOTE_CHARACTERS } from "selfie-ui/notes";
 import { awaitFeedback, notesForAgent } from "./notes.ts";
 
@@ -32,12 +32,11 @@ const USAGE = `Usage: selfie [--port <n>] [--native] [--no-build] [--no-open]
       nothing. Exits 0 once a batch is recorded, even with failed stories, or 2 if it couldn't run.
 
   review [<batch>] [--baseline <commit-or-batch>] [--build] [--story <pattern>]... [--native]
-      Prints a JSON diff of a batch against its baseline. With no <batch>, uses the batch for this
+      Prints a JSON diff of a batch against what history has approved. With no <batch>, uses the batch for this
       exact built Storybook, and records one only if there's none yet, so call render first to render
-      again. --baseline compares with those goldens or that batch for this review alone, and is
-      how to look for flakiness: render twice, then review the second --baseline the first.
-      If the default branch has no goldens yet, it compares with the nearest on this branch and
-      says so, which accept doesn't rely on. Exits 0 if nothing blocks it, 1 if something does or
+      again. --baseline compares with what that commit's history approved, or with that batch, for
+      this review alone, and is how to look for flakiness: render twice, then review the second
+      --baseline the first. Exits 0 if nothing blocks it, 1 if something does or
       anything differs from a --baseline, 2 if the review couldn't run. Play errors are advisories, and don't change the exit code.
 
   flakes [--times <n>] [--concurrency <n>] [--build] [--story <pattern>]... [--native]
@@ -52,15 +51,8 @@ const USAGE = `Usage: selfie [--port <n>] [--native] [--no-build] [--no-open]
 
   approve <batch> (--all | --story <pattern>...) [--actor <who>]
   reject <batch> (--all | --story <pattern>...) [--actor <who>]
-      Decides on a batch's changed and added images. Works on a dirty tree.
-
-  accept <batch> [--removed <n>]
-      Makes a batch the goldens of its Git SHA. Needs a batch recorded on a clean tree, every
-      changed or added image approved, and --removed <n> if the baseline has stories this batch
-      lacks.
-
-  find-baseline [--native]
-      Prints the nearest SHA at or before the merge-base with complete goldens, or null.
+      Decides on what a batch changed, added, or removed. An approval counts from the batch's commit,
+      for that commit and whatever comes after it, without rendering again. Works on a dirty tree.
 
   ui [<batch>] [--port <n>] [--native]
       Serves the review UI on loopback until stopped, and prints its URL. Opens at this batch, or
@@ -95,7 +87,7 @@ const USAGE = `Usage: selfie [--port <n>] [--native] [--no-build] [--no-open]
 
 Local data lives under ~/.config/selfie/<git-origin-slugified>/, or $SELFIE_HOME instead of
 ~/.config/selfie. A project configures Selfie in selfie.config.json at its Git top level, and
-nowhere else. selfie alone, render, review, flakes, find-baseline, ui, push, and pull need one,
+nowhere else. selfie alone, render, review, flakes, ui, push, and pull need one,
 holding at least storybookDir and buildCommand, which only selfie alone and --build run, from that
 top level. It may also set environment, initScript, settleMs, storyTimeoutMs, and hunkMergeDistance. A story pattern matches IDs, where * matches any batch of characters.
 `;
@@ -345,34 +337,6 @@ async function dispatch(command: string | undefined, args: string[], context: Co
         return result.unmatchedPatterns.length > 0 ? EXIT_NEEDS_ATTENTION : EXIT_OK;
       });
     }
-    case "accept": {
-      const { values, positionals } = parse(args, { removed: { type: "string" } });
-      const batchId = onePositional(positionals, "batch ID");
-      const { removed } = values;
-      if (removed !== undefined && !/^\d+$/.test(removed)) {
-        throw new SelfieError("usage", `--removed must be a non-negative integer, got "${removed}".`);
-      }
-      return withProject(context, async (project) => {
-        const result = await accept(project, {
-          batchId,
-          removedSeen: removed === undefined ? undefined : Number(removed),
-        });
-        const document = buildAcceptDocument(result);
-        if (document.reusedFromBatch !== null) {
-          context.stderr(`This batch's pixels came from the render of batch ${document.reusedFromBatch}.\n`);
-        }
-        if (!result.accepted) {
-          const reasons = document.refusals.map(({ message }) => `  ${message}`).join("\n");
-          context.stderr(`Not accepted:\n${reasons}\n`);
-        } else if (!result.usableAsBaseline) {
-          context.stderr(
-            `Accepted. ${document.gitSha} isn't on the default branch's first-parent history, so only later reviews on this branch will compare with these goldens.\n`,
-          );
-        }
-        printJson(context, document);
-        return result.accepted ? EXIT_OK : EXIT_NEEDS_ATTENTION;
-      });
-    }
     case "push": {
       const { values, positionals } = parse(args, { accept: { type: "boolean" }, remote: { type: "string" }, native: { type: "boolean" } });
       const [batch, ...extra] = positionals;
@@ -395,17 +359,6 @@ async function dispatch(command: string | undefined, args: string[], context: Co
         const result = await pull(project, remote, { commit: sha, native: values.native });
         printJson(context, result);
         return result.batchId === null ? EXIT_NEEDS_ATTENTION : EXIT_OK;
-      });
-    }
-    case "find-baseline": {
-      const { values, positionals } = parse(args, { native: { type: "boolean" }, remote: { type: "string" } });
-      noPositionals(command, positionals);
-      const remote = resolveRemote(values.remote, context.env, context.fetch);
-      return withProject(context, async (project) => {
-        const { environmentId } = await resolveRenderSettings(project.repo, { native: values.native });
-        const found = remote === null ? await findBaseline(project, environmentId) : await findBaselineWithRemote(project, remote, environmentId);
-        printJson(context, { ...found, environment: environmentId });
-        return EXIT_OK;
       });
     }
     case "notes": {

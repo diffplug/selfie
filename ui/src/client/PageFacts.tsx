@@ -5,7 +5,7 @@ import { Sha } from "./words.tsx";
 
 export type PageFacts =
   | { readonly kind: "view"; readonly view: Pick<StoriesView, "head" | "branch" | "storybookUrl" | "setup"> }
-  | { readonly kind: "diff"; readonly batch: Pick<RenderBatch, "gitSha" | "dirty" | "baselineSha">; readonly branchGoldens: string | null; readonly context: BatchContext | null };
+  | { readonly kind: "diff"; readonly batch: Pick<RenderBatch, "gitSha" | "dirty">; readonly context: BatchContext | null };
 
 function ofHead(branch: string | null): ReactNode {
   return branch === null ? ", HEAD" : <>, HEAD of <code>{branch}</code></>;
@@ -28,35 +28,15 @@ function ViewFacts({ view: { head, branch, storybookUrl, setup } }: { view: Extr
   );
 }
 
-function Against({ sha, branchGoldens, context }: { sha: string; branchGoldens: string | null; context: BatchContext | null }) {
-  const relation =
-    branchGoldens !== null ? (
-      "the nearest goldens on its branch"
-    ) : context === null ? null : context.defaultBranch === null ? (
-      "the nearest goldens"
-    ) : sha === context.mergeBase ? (
-      <>the merge base with <code>{context.defaultBranch}</code></>
-    ) : (
-      <>the nearest goldens before the merge base with <code>{context.defaultBranch}</code></>
-    );
-  return (
-    <>
-      , and <Sha sha={sha} />
-      {relation !== null && <>, {relation}</>}
-    </>
-  );
-}
-
 export function PageFactsLine({ facts }: { facts: PageFacts }) {
   if (facts.kind === "view") return <ViewFacts view={facts.view} />;
-  const { batch, branchGoldens, context } = facts;
-  const against = branchGoldens ?? batch.baselineSha;
+  const { batch, context } = facts;
   return (
     <>
-      {against === null ? "Built Storybook for" : "Built Storybook diff between"} <Sha sha={batch.gitSha} />
+      Built Storybook diff between <Sha sha={batch.gitSha} />
       {context?.head === batch.gitSha && ofHead(context.branch)}
       {batch.dirty && ", with uncommitted changes"}
-      {against === null ? ", with no goldens to compare with" : <Against sha={against} branchGoldens={branchGoldens} context={context} />}
+      , and what its history has approved
     </>
   );
 }

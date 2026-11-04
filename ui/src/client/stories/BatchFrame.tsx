@@ -4,9 +4,9 @@ import type { BatchContext, BatchView } from "../../shared/api.ts";
 import type { StoryNavigation } from "../filter.ts";
 import type { BatchState } from "../hooks.ts";
 import { BatchLayout, useBatchTree } from "../BatchLayout.tsx";
-import { BASELINE_SHA, SHA } from "./fixtures.ts";
+import { SHA } from "./fixtures.ts";
 
-const CONTEXT: BatchContext = { head: SHA, branch: "topic", mergeBase: BASELINE_SHA, defaultBranch: "main" };
+const CONTEXT: BatchContext = { head: SHA, branch: "topic" };
 
 export function BatchFrame({ view, state, story = null, search = "", children }: { view: BatchView; state: BatchState; story?: string | null; search?: string; children: (navigation: StoryNavigation | null) => ReactNode }) {
   const tree = useBatchTree(view, state.unchanged, search, story);
