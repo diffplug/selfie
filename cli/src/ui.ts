@@ -205,11 +205,13 @@ export function localReviewSource(
       const built = storybook !== undefined && isBuiltStorybook(storybook.dir);
       const index = built ? await readStoriesInOrder(storybook.dir) : [];
 
-      // Batches at one commit on one branch see the same decisions, and a filtered render at a time can make many batches.
-      const decisions = new Map<string | null, Promise<readonly PlacedDecision[]>>();
+      // Batches that reach the same commits see the same decisions, and a filtered render at a time can make many batches.
+      const decisions = new Map<string, Promise<readonly PlacedDecision[]>>();
       const rowsOf = async (batch: RenderBatch) => {
-        if (!decisions.has(batch.branch)) decisions.set(batch.branch, reachableCommits(project, batch).then((commits) => project.batches.decisionsAt(batch.environment, commits)));
-        return (await project.batches.compareFromHistory(batch.id, await decisions.get(batch.branch)!, { includeUnchanged: true })).renders;
+        const commits = await reachableCommits(project, batch);
+        const reach = commits.join();
+        if (!decisions.has(reach)) decisions.set(reach, project.batches.decisionsAt(batch.environment, commits));
+        return (await project.batches.compareFromHistory(batch.id, await decisions.get(reach)!, { includeUnchanged: true })).renders;
       };
       const renders = await newestRenders(finished, rowsOf, index.length > 0 ? new Set(index.map(({ id }) => id)) : undefined);
 

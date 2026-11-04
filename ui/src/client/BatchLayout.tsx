@@ -56,7 +56,7 @@ export function BatchLayout({
         if (row === undefined) return null;
         return (
           <span className="selfie-nav-col" data-size="wide" title={describePixels(row.pixelDiff)}>
-            {row.state === "failed" ? "No image" : describePixels(row.pixelDiff)}
+            {row.state !== "failed" ? describePixels(row.pixelDiff) : row.imageHash === null ? "No image" : "Failed"}
           </span>
         );
       }}
