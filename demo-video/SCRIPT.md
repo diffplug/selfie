@@ -1,37 +1,58 @@
-INTRO STORYBOOK
+## COLD OPEN
 
-What if you took every page and component of your UI, and laid it out next to each other.
-**[Application splits horizontally into pieces]**
+You point your coding agent at one button. But most changes have unforeseen consequences.
+**[A whole app on screen. Human hand points at a button, robot drops in and hammers it, panels far away from the button crack and tilt]**
 
-Now, let’s copy those components, and put them into every state the user will see - error states, empty states, easy ones, hard ones.
-**\[Zoom in on one, split it down the column into error state, empty state, etc]**
+## INTRO STORYBOOK
 
-StorybookJS has made it easy for users to do exactly that for the past 10 years. With the advent of coding agents, it’s more useful than ever - you can use the Storybook as a control surface by pointing to the specific page you want changed
-**\[Human hand points to a spot, Robot comes and hammers on it]**
+What if you took every page and component of your UI, and laid them out next to each other?
+**[The app splits into pieces, which line up in a row]**
 
-INTRO SNAPSHOT
+Now, let’s copy those components into every state the user will see: error states, empty states, easy ones, hard ones.
+**[Zoom in on one, split it down the column into its states, then zoom out as every column fills the grid]**
 
-But most changes have unforseseen consequences.
-**\[Pieces of the robot’s contstruction bang down and damge the components below it]**
+StorybookJS has made that easy for the past 10 years. With coding agents, it’s more useful than ever: you can point at the specific page you want changed.
+**[The grid gets a Storybook frame. Human hand points to a cell, robot comes and hammers on it]**
 
-How can you understand the full ripples of a code change?
-**\[Zoom out for a radial “bump” of the entire compoent grid]**
+But how can you understand the full ripples of a code change?
+**[Radial ripple from the hammer across the whole grid, knocking loose distant cells the robot can’t see]**
 
-Enter Chromatic. This is a cloud service which renders every component of a Storybook to an image. Change the code, render every component to another image, and compare.
-**\[Photo Booth, put the component in front of camera take picture, change component, take another picture, line up the pictures to highlight the difference]**
+## INTRO CHROMATIC
 
-This works great, but it requires waiting on a cloud service. At 0.8 cents per image, this was a reasonable expense at the speed of human code. But for a modest library of 1,000 stories, that’s 8 bucks for each time you even look at a code change!
+Enter Chromatic. This is a cloud service which renders every component of a Storybook to an image.
+**[A photo booth in a cloud. Components ride past the camera, flash, a photo comes out]**
 
-ENTER SELFIE
+Change the code, render every component to another image, and compare.
+**[Two photos of the same component line up, and the difference is highlighted]**
 
-Introducing Selfie.dev - a snapshot testing tool which runs locally and in the cloud. Now your coding agent can take the snapshots itself, without waiting (or paying) for a cloud rendering service.
-**[Robot taking lots of goofy selfies with the components]**
+This works great, but it requires waiting on a cloud service. At 0.8 cents per image, this was a reasonable expense at the speed of human code.
+**[Coin meter on the booth, with a waiting bar. A person presses the button now and then, and a coin drops]**
 
-It works just like git. Screenshots are stored locally wherever the agent is running, and also in the cloud so that every commit in GitHub shows the complete visual consequences of the code change.
-**\[Several robots on the ground, each with their own suitcase of photos, waving up to an agent in a cloud with its own suitcase]**
+But for a modest library of 1,000 stories, that’s 8 bucks for a full run, each time you even look at a code change!
+**[A robot takes over the button, and the meter spins up to $8, $80, $800 under a flood of coins]**
 
-Screenshots are generated inside a reproducible container, so that you get the exact same pixels wherever the test is run. Screenshots are hashed on their content, and most runs change very few snapshots. The client and server show each other the set of hashes for all of the images. They only need to send the full image if a hash has changed.
-**\[Robot takes a single photo out of the suitecase, folds it into a paper airplane, and throws it up to the cloud]**
+## INTRO SELFIE
 
-If you’re using StorybookJS, you can start using the Selfie locally to review your changes right now, at selfie.dev. If you want to use it in the cloud on your GitHub repositories, you can add yourself to our waitlist and get a launch discount when we launch in mid-November.
-**\[Robots signing up outside of a space pad, then launching into space as they take selfies out the window]**
+Introducing Selfie.dev: a snapshot testing tool which runs locally and in the cloud. Your agent takes its own picture.
+**[Flash floods the screen with a new color. Selfie wordmark, robot with a pink phone takes a picture of itself]**
+
+No waiting on a cloud rendering service, and no paying for each image. 541 stories in about 70 seconds.
+**[Robot taking lots of goofy selfies with the components, photos pile up, the numbers land]**
+
+It works just like git. Images are stored locally wherever the agent is running, and also in the cloud, so that every commit on GitHub shows the complete visual consequences of the code change.
+**[Several robots on the ground, each with their own suitcase of photos, waving up to a shared photo wall in a cloud. Cut to a commit list with a `selfie` status on each commit]**
+
+Approvals follow your history too, so they survive a commit, a rebase, or a merge.
+**[A stamped photo rides along a git graph, keeping its stamp at each node]**
+
+Every image is rendered in the same pinned environment, wherever it runs.
+**[Identical containers on different machines, each producing the identical photo]**
+
+Each image is named by a hash of its pixels. Most changes touch only a few, so only those few get sent.
+**[Robot takes a single photo out of the suitcase, folds it into a paper airplane, and throws it up to the cloud]**
+
+If you’re using StorybookJS, you can start using Selfie locally to review your changes right now, at selfie.dev.
+**[Robots signing up outside of a space pad]**
+
+If you want to use it in the cloud on your GitHub repositories, join our waitlist, and get a discount when we launch in mid-November.
+**[Robots launch into space as they take selfies out the window. End card with the full mascot and the URL]**

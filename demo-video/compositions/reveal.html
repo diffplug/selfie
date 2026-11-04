@@ -1,0 +1,54 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; }
+    #reveal-stage { background: var(--sun); }
+  </style>
+  <div data-hf-id="hf-yqoq" id="root" data-composition-id="reveal" data-width="1920" data-height="1080">
+    <div data-hf-id="hf-1cmz" id="reveal-stage" class="stage" data-layout-allow-overflow></div>
+  </div>
+  <script>
+    (() => {
+      const { tl, at, stage } = S.begin("reveal", 8.2);
+      const flood = S.html(stage, `<div class="flash" style="opacity:1"></div>`);
+      const word = S.html(stage, `<div class="abs" style="left:110px;top:150px;font-size:280px;white-space:nowrap" data-layout-allow-overlap></div>`);
+      // The brand's gradient runs across the whole word, so each letter shows its own slice of it.
+      const letters = "Selfie".split("").map((ch, i, all) => S.html(word, `<span class="wordmark" style="display:inline-block;background-size:${all.length * 100}% 100%;background-position:${(i / (all.length - 1)) * 100}% 0">${ch}</span>`));
+      const dev = S.html(stage, `<div class="abs display" style="font-size:100px">.dev</div>`);
+      gsap.set(dev, { x: 850, y: 320, opacity: 0 });
+
+      // A flash is what brings the new color in, and the name lands a letter at a time.
+      tl.to(flood, { opacity: 0, duration: 0.45, ease: "power2.out" }, at(0.05));
+      letters.forEach((l, i) => tl.fromTo(l, { opacity: 0.2, y: 26 }, { opacity: 1, y: 0, duration: 0.3, ease: "back.out(2.4)" }, at(0.15) + i * 0.09));
+      tl.to(dev, { opacity: 1, duration: 0.16 }, at(0.95));
+
+      // "Runs locally and in the cloud."
+      const local = S.html(stage, `<div class="tag" style="font-size:56px;padding:12px 30px 16px">locally</div>`);
+      const cloud = S.html(stage, `<div class="tag" style="font-size:56px;padding:12px 30px 16px;background:var(--pink);color:var(--ink)">and in the cloud</div>`);
+      gsap.set(local, { x: 120, y: 540, opacity: 0 });
+      gsap.set(cloud, { x: 370, y: 540, opacity: 0 });
+      tl.fromTo(local, { y: 570 }, { y: 540, duration: 0.3, ease: "expo.out" }, at(3.2));
+      tl.to(local, { opacity: 1, duration: 0.1 }, at(3.2));
+      tl.fromTo(cloud, { y: 570 }, { y: 540, duration: 0.3, ease: "expo.out" }, at(3.75));
+      tl.to(cloud, { opacity: 1, duration: 0.1 }, at(3.75));
+
+      // The robot lifts the phone and takes its own picture.
+      const r = S.robot(stage, { id: "reveal-robot", prop: "phone", scale: 2.4 });
+      gsap.set(r.el, { x: 1120, y: 110 });
+      gsap.set(r.armR, { rotation: -34 });
+      gsap.set(r.prop, { rotation: 34 });
+      tl.to(r.armR, { rotation: -128, duration: 0.5, ease: "back.out(1.6)" }, at(4.7));
+      tl.to(r.prop, { rotation: 128, duration: 0.5, ease: "power2.out" }, at(4.7));
+      tl.to(r.head, { rotation: 10, duration: 0.3, ease: "power2.inOut" }, at(5.25));
+      S.blink(tl, r, at(5.75));
+      const white = S.html(stage, `<div class="flash"></div>`);
+      S.flash(tl, white, at(6.05), 0.85);
+
+      // There it is.
+      const pic = S.selfiePhoto(stage, "form", { tilt: 10 });
+      gsap.set(pic, { x: 610, y: 620, scale: 0, rotation: -24, transformOrigin: "50% 50%" });
+      tl.to(pic, { scale: 1.0, rotation: -6, duration: 0.5, ease: "back.out(1.5)" }, at(6.15));
+      gsap.set(pic, { y: 650 });
+      window.__timelines["reveal"] = tl;
+    })();
+  </script>
+</template>

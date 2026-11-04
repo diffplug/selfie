@@ -1,0 +1,191 @@
+1
+00:00:00,150 --> 00:00:02,966
+You point your coding agent at one button.
+
+2
+00:00:02,966 --> 00:00:06,050
+But most changes have unforeseen consequences.
+
+3
+00:00:06,550 --> 00:00:10,260
+What if you took every page and component of your UI,
+
+4
+00:00:10,260 --> 00:00:12,850
+and laid them out next to each other?
+
+5
+00:00:13,350 --> 00:00:15,474
+Now, let’s copy those components
+
+6
+00:00:15,474 --> 00:00:17,797
+into every state the user will see:
+
+7
+00:00:17,797 --> 00:00:21,050
+error states, empty states, easy ones, hard ones.
+
+8
+00:00:21,550 --> 00:00:25,002
+StorybookJS has made that easy for the past 10 years.
+
+9
+00:00:25,002 --> 00:00:28,063
+With coding agents, it’s more useful than ever:
+
+10
+00:00:28,063 --> 00:00:31,450
+you can point at the specific page you want changed.
+
+11
+00:00:31,950 --> 00:00:34,200
+But how can you understand the
+
+12
+00:00:34,200 --> 00:00:36,450
+full ripples of a code change?
+
+13
+00:00:36,950 --> 00:00:37,967
+Enter Chromatic.
+
+14
+00:00:37,967 --> 00:00:40,699
+This is a cloud service which renders every
+
+15
+00:00:40,699 --> 00:00:43,050
+component of a Storybook to an image.
+
+16
+00:00:43,550 --> 00:00:46,093
+Change the code, render every component
+
+17
+00:00:46,093 --> 00:00:48,050
+to another image, and compare.
+
+18
+00:00:48,550 --> 00:00:50,836
+This works great, but it requires
+
+19
+00:00:50,836 --> 00:00:52,707
+waiting on a cloud service.
+
+20
+00:00:52,707 --> 00:00:55,825
+At 0.8 cents per image, this was a reasonable
+
+21
+00:00:55,825 --> 00:00:58,250
+expense at the speed of human code.
+
+22
+00:00:58,750 --> 00:01:01,761
+But for a modest library of 1,000 stories,
+
+23
+00:01:01,761 --> 00:01:03,911
+that’s 8 bucks for a full run,
+
+24
+00:01:03,911 --> 00:01:06,850
+each time you even look at a code change!
+
+25
+00:01:07,350 --> 00:01:10,138
+Introducing Selfie.dev: a snapshot testing
+
+26
+00:01:10,138 --> 00:01:12,860
+tool which runs locally and in the cloud.
+
+27
+00:01:12,859 --> 00:01:15,050
+Your agent takes its own picture.
+
+28
+00:01:15,550 --> 00:01:18,441
+No waiting on a cloud rendering service,
+
+29
+00:01:18,441 --> 00:01:20,537
+and no paying for each image.
+
+30
+00:01:20,537 --> 00:01:22,850
+541 stories in about 70 seconds.
+
+31
+00:01:23,350 --> 00:01:24,847
+It works just like git.
+
+32
+00:01:24,847 --> 00:01:27,320
+Images are stored locally wherever the
+
+33
+00:01:27,320 --> 00:01:29,923
+agent is running, and also in the cloud,
+
+34
+00:01:29,923 --> 00:01:33,112
+so that every commit on GitHub shows the complete
+
+35
+00:01:33,112 --> 00:01:35,650
+visual consequences of the code change.
+
+36
+00:01:36,150 --> 00:01:38,459
+Approvals follow your history too,
+
+37
+00:01:38,459 --> 00:01:41,650
+so they survive a commit, a rebase, or a merge.
+
+38
+00:01:42,150 --> 00:01:44,338
+Every image is rendered in the same
+
+39
+00:01:44,338 --> 00:01:46,651
+pinned environment, wherever it runs.
+
+40
+00:01:47,150 --> 00:01:50,679
+Each image is named by a hash of its pixels.
+
+41
+00:01:50,679 --> 00:01:53,085
+Most changes touch only a few,
+
+42
+00:01:53,085 --> 00:01:55,250
+so only those few get sent.
+
+43
+00:01:55,750 --> 00:01:57,455
+If you’re using StorybookJS,
+
+44
+00:01:57,455 --> 00:02:00,135
+you can start using Selfie locally to review
+
+45
+00:02:00,135 --> 00:02:02,450
+your changes right now, at selfie.dev.
+
+46
+00:02:02,950 --> 00:02:05,787
+If you want to use it in the cloud on your
+
+47
+00:02:05,787 --> 00:02:08,422
+GitHub repositories, join our waitlist,
+
+48
+00:02:08,422 --> 00:02:11,800
+and get a discount when we launch in mid-November.

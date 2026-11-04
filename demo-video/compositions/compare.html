@@ -1,0 +1,39 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; }
+    #compare-stage { background: var(--fog); }
+  </style>
+  <div data-hf-id="hf-y43a" id="root" data-composition-id="compare" data-width="1920" data-height="1080">
+    <div data-hf-id="hf-6b0n" id="compare-stage" class="stage" data-layout-allow-overflow></div>
+  </div>
+  <script>
+    (() => {
+      const { tl, at, stage } = S.begin("compare", 5);
+      const before = S.photo(stage, "form", "easy", { caption: "Before" });
+      const after = S.photo(stage, "form", "easy", { changed: true, caption: "After" });
+      gsap.set([before, after], { scale: 2.2, transformOrigin: "0 0" });
+
+      // Two photos of the same component.
+      tl.fromTo(before, { x: -700, y: 130, rotation: -5 }, { x: 240, y: 130, rotation: -2, duration: 0.65, ease: "expo.out" }, at(0.15));
+      tl.fromTo(after, { x: 2000, y: 130, rotation: 5 }, { x: 1060, y: 130, rotation: 2, duration: 0.65, ease: "expo.out" }, at(0.95));
+
+      // They line up exactly.
+      const X = 640, Y = 130;
+      tl.to(before, { x: X, y: Y, rotation: 0, duration: 0.6, ease: "power3.inOut" }, at(2.2));
+      tl.to(after, { x: X, y: Y, rotation: 0, opacity: 0.55, duration: 0.6, ease: "power3.inOut" }, at(2.2));
+      tl.to([before, after].map((p) => p.querySelector(".cap-text")), { opacity: 0, duration: 0.15 }, at(2.2));
+
+      // And what's left is the difference.
+      const box = S.html(stage, `<div class="abs" style="width:520px;height:124px;border:9px solid var(--pink);background:rgba(244,104,159,.28);border-radius:14px" data-layout-ignore></div>`);
+      gsap.set(box, { x: X + 44, y: Y + 280, opacity: 0, scale: 1.25, transformOrigin: "50% 50%" });
+      tl.to(box, { opacity: 1, scale: 1, duration: 0.3, ease: "back.out(2)" }, at(3.15));
+      const tag = S.html(stage, `<div class="tag" style="background:var(--pink);color:var(--ink);font-size:46px;font-weight:700">Changed</div>`);
+      gsap.set(tag, { x: X + 660, y: Y + 300, opacity: 0 });
+      tl.to(tag, { opacity: 1, duration: 0.14 }, at(3.45));
+      tl.fromTo(tag, { x: X + 700 }, { x: X + 660, duration: 0.35, ease: "expo.out" }, at(3.45));
+      S.flashIn(tl, stage);
+      S.whipOut(tl, stage, "compare");
+      window.__timelines["compare"] = tl;
+    })();
+  </script>
+</template>

@@ -1,0 +1,36 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; }
+    #pinned-stage { background: var(--fog); }
+  </style>
+  <div data-hf-id="hf-c8rt" id="root" data-composition-id="pinned" data-width="1920" data-height="1080">
+    <div data-hf-id="hf-fuia" id="pinned-stage" class="stage" data-layout-allow-overflow></div>
+  </div>
+  <script>
+    (() => {
+      const { tl, at, stage } = S.begin("pinned", 5);
+      const machines = [["your laptop", 110], ["an agent", 720], ["CI", 1330]];
+      machines.forEach(([name, x], i) => {
+        const t = at(0.15 + i * 0.5);
+        const c = S.html(stage, `<div class="abs" style="width:480px;height:244px;background:var(--teal);border:8px solid var(--ink);border-radius:12px;box-shadow:8px 8px 0 var(--ink);background-image:repeating-linear-gradient(90deg,transparent 0 44px,rgba(35,35,43,.24) 44px 52px)" data-layout-ignore><div style="position:absolute;left:24px;right:24px;top:58px;background:#fff;border:5px solid var(--ink);border-radius:10px;padding:10px 12px 14px;text-align:center;font:700 38px/1.15 Jost,sans-serif">pinned image<br>sha256:a0f4…</div></div>`);
+        tl.fromTo(c, { x, y: -320 }, { x, y: 110, duration: 0.5, ease: "bounce.out" }, t);
+        const tag = S.html(stage, `<div class="tag" style="font-size:40px">${name}</div>`);
+        gsap.set(tag, { x: x + 110, y: 380, opacity: 0 });
+        tl.to(tag, { opacity: 1, duration: 0.14 }, t + 0.28);
+
+        const p = S.photo(stage, "form", "easy");
+        gsap.set(p, { x: x + 112, y: 250, scale: 0, transformOrigin: "50% 0" });
+        stage.insertBefore(p, c);
+        tl.to(p, { y: 460, scale: 1, duration: 0.45, ease: "back.out(1.5)" }, at(1.9 + i * 0.32));
+      });
+      ["=", "="].forEach((eq, i) => {
+        const e = S.html(stage, `<div class="abs display" style="font-size:150px">${eq}</div>`);
+        gsap.set(e, { x: 575 + i * 610, y: 500, opacity: 0, scale: 1.5, transformOrigin: "50% 50%" });
+        tl.to(e, { opacity: 1, scale: 1, duration: 0.25, ease: "expo.out" }, at(3.25 + i * 0.25));
+      });
+      S.flashIn(tl, stage);
+      S.whipOut(tl, stage, "pinned");
+      window.__timelines["pinned"] = tl;
+    })();
+  </script>
+</template>

@@ -1,0 +1,54 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; }
+    #approvals-stage { background: var(--sky); }
+  </style>
+  <div data-hf-id="hf-a39l" id="root" data-composition-id="approvals" data-width="1920" data-height="1080">
+    <div data-hf-id="hf-slie" id="approvals-stage" class="stage" data-layout-allow-overflow></div>
+  </div>
+  <script>
+    (() => {
+      const { tl, at, stage } = S.begin("approvals", 6);
+      const nodes = [[370, 760], [880, 760], [1390, 450]];
+      S.html(stage, `<svg class="prop" width="1920" height="1080" viewBox="0 0 1920 1080" data-layout-ignore>
+        <path d="M60 450 H1860" stroke="${S.GREY}" stroke-width="20"/><path d="M60 450 H1860" stroke="${S.INK}" stroke-width="6" stroke-dasharray="1"/>
+        <path d="M150 450 C240 450 240 760 370 760 H880 C1100 760 1140 450 1390 450" fill="none" stroke="${S.INK}" stroke-width="12"/>
+      </svg>`);
+      const words = ["a commit", "a rebase", "a merge"];
+      const dots = nodes.map(([x, y], i) => {
+        const d = S.html(stage, `<div class="abs" style="width:64px;height:64px;border-radius:50%;background:#fff;border:9px solid var(--ink)" data-layout-ignore></div>`);
+        gsap.set(d, { x: x - 32, y: y - 32 });
+        const w = S.html(stage, `<div class="abs display" style="font-size:66px">${words[i]}</div>`);
+        gsap.set(w, { x: x - (i === 2 ? 110 : 120), y: y + 44, opacity: 0 });
+        return { d, w };
+      });
+
+      // A photo, and a person's approval stamped onto it.
+      const pic = S.html(stage, `<div class="abs" style="width:283px;height:256px" data-layout-ignore></div>`);
+      S.photo(pic, "form", "easy", { changed: true });
+      const stamp = S.html(pic, `<div class="abs display" style="left:-10px;top:88px;font-size:50px;padding:6px 16px 10px;border:7px solid var(--coral);border-radius:10px;color:var(--coral);background:rgba(255,255,255,.88);white-space:nowrap">APPROVED</div>`);
+      const above = ([x, y]) => ({ x: x - 141, y: y - 300 });
+      gsap.set(pic, { ...above(nodes[0]), scale: 1 });
+      gsap.set(stamp, { opacity: 0, scale: 2.2, rotation: -18, transformOrigin: "50% 50%" });
+      tl.to(stamp, { opacity: 1, scale: 1, duration: 0.16, ease: "power4.in" }, at(0.75));
+      tl.to(pic, { y: above(nodes[0]).y + 10, duration: 0.06 }, at(0.91));
+      tl.to(pic, { y: above(nodes[0]).y, duration: 0.2, ease: "power2.out" }, at(0.97));
+
+      // It rides along history, and the stamp never comes off.
+      const reach = [2.75, 3.6, 4.45];
+      nodes.forEach(([x, y], i) => {
+        const t = at(reach[i]);
+        if (i) {
+          tl.to(pic, { x: above(nodes[i]).x, duration: 0.6, ease: "power2.inOut" }, t - 0.5);
+          tl.to(pic, { y: above(nodes[i]).y - 40, duration: 0.3, ease: "power2.out" }, t - 0.5);
+          tl.to(pic, { y: above(nodes[i]).y, duration: 0.3, ease: "power2.in" }, t - 0.2);
+        }
+        tl.to(dots[i].d, { backgroundColor: "#7ed08c", duration: 0.1 }, t);
+        tl.to(dots[i].w, { opacity: 1, duration: 0.14 }, t);
+        tl.fromTo(dots[i].w, { scale: 1.2 }, { scale: 1, duration: 0.3, ease: "expo.out", transformOrigin: "50% 50%", immediateRender: false }, t);
+      });
+      S.whipIn(tl, stage);
+      window.__timelines["approvals"] = tl;
+    })();
+  </script>
+</template>

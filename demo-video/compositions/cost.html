@@ -1,0 +1,42 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; }
+    #cost-stage { background: var(--fog); }
+  </style>
+  <div data-hf-id="hf-mivm" id="root" data-composition-id="cost" data-width="1920" data-height="1080">
+    <div data-hf-id="hf-dd0f" id="cost-stage" class="stage" data-layout-allow-overflow></div>
+  </div>
+  <script>
+    (() => {
+      const { tl, at, stage } = S.begin("cost", 10.2);
+      const b = S.booth(stage);
+
+      // "This works great, but it requires waiting": the bar crawls and nothing else happens.
+      tl.to(b.bar, { scaleX: 0.62, duration: at(4.2), ease: "none" }, at(0));
+      tl.to(b.bar, { scaleX: 1, duration: at(6), ease: "none" }, at(4.2));
+      gsap.set(b.per, { opacity: 0 });
+
+      // "0.8 cents per image": the meter comes on.
+      const zero = b.digit("$0.000");
+      tl.set(zero, { opacity: 1 }, at(4.3));
+      tl.to(b.per, { opacity: 1, duration: 0.15 }, at(4.45));
+      const one = b.digit("$0.008"), two = b.digit("$0.016");
+
+      // "The speed of human code": one unhurried press at a time.
+      const hand = S.hand(stage, "cost-hand");
+      const bx = 560, by = 776;
+      tl.fromTo(hand, { x: bx + 300, y: 1120 }, { x: bx, y: by - 40, duration: 0.7, ease: "expo.out" }, at(5.0));
+      [[6.1, one, 1190, 828], [8.3, two, 1290, 832]].forEach(([t, d, x, y]) => {
+        tl.to(hand, { y: by + 8, duration: 0.09, ease: "power2.in" }, at(t) - 0.09);
+        tl.to(hand, { y: by - 40, duration: 0.3, ease: "power2.out" }, at(t) + 0.02);
+        S.press(tl, b.button, at(t) - 0.02);
+        tl.set(zero, { opacity: 0 }, at(t));
+        tl.set(d, { opacity: 1 }, at(t));
+        if (d === two) tl.set(one, { opacity: 0 }, at(t));
+        S.coinDrop(tl, stage, at(t) + 0.04, x, y);
+      });
+      S.whipIn(tl, stage);
+      window.__timelines["cost"] = tl;
+    })();
+  </script>
+</template>

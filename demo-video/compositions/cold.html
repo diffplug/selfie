@@ -1,0 +1,55 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; }
+    #cold-stage { background: var(--sky); }
+  </style>
+  <div data-hf-id="hf-tbrt" id="root" data-composition-id="cold" data-width="1920" data-height="1080">
+    <div data-hf-id="hf-6f02" id="cold-stage" class="stage" data-layout-allow-overflow></div>
+  </div>
+  <script>
+    (() => {
+      const { tl, at, stage } = S.begin("cold", 6.4);
+      const cam = S.html(stage, `<div class="abs" style="width:1920px;height:1080px"></div>`);
+      S.appWindow(cam, "cold-window");
+      const cards = S.KIND_ORDER.map((k, i) => { const c = S.card(cam, k); S.place(c, S.appPos(i)); return c; });
+      const hit = S.FORM_BUTTON;
+
+      // The hand points at the button.
+      const hand = S.hand(cam, "cold-hand");
+      tl.fromTo(hand, { x: hit.x + 330, y: 1120 }, { x: hit.x, y: hit.y, duration: 0.8, ease: "expo.out" }, at(0.15));
+      tl.to(hand, { y: hit.y + 16, duration: 0.09, ease: "power2.in" }, at(1.05));
+      tl.to(hand, { y: hit.y, duration: 0.2, ease: "power2.out" }, at(1.14));
+
+      // The robot drops in, and the hand gets out of the way.
+      const r = S.robot(cam, { id: "cold-robot", prop: "hammer", scale: S.COLD_ROBOT.scale });
+      gsap.set(r.armR, { rotation: -60 });
+      const { x: rx, y: ry } = S.COLD_ROBOT;
+      tl.fromTo(r.el, { x: rx, y: -620 }, { x: rx, y: ry, duration: 0.5, ease: "power3.in" }, at(1.5));
+      tl.set(r.el, { scaleY: 0.88, transformOrigin: "50% 100%" }, at(1.5) + 0.5);
+      tl.to(r.el, { scaleY: 1, duration: 0.5, ease: "elastic.out(1, 0.45)" }, at(1.5) + 0.501);
+      tl.to(hand, { x: hit.x + 420, y: 1160, duration: 0.45, ease: "power3.in" }, at(1.9));
+
+      // Three strikes. The third reaches panels nowhere near the button.
+      const strikes = [at(2.7), at(3.15), at(3.6)];
+      strikes.forEach((t) => {
+        S.swing(tl, r.armR, t, { rest: -60 });
+        S.ringAt(tl, cam, hit.x, hit.y, t, { size: 300, color: S.ORANGE, dur: 0.35 });
+      });
+      const last = strikes[2];
+      S.ringAt(tl, cam, hit.x, hit.y, last, { size: 2000, dur: 0.9 });
+      [-14, 11, -7, 4, 0].forEach((v, i) => tl.to(cam, { y: v, x: -v * 0.6, duration: 0.05 }, last + i * 0.05));
+      S.DAMAGED.forEach(([i, rot], n) => {
+        const d = 0.22 + n * 0.1;
+        tl.to(cards[i], { rotation: rot, y: S.appPos(i).y + 18, duration: 0.3, ease: "back.out(2.5)" }, last + d);
+        tl.to(cards[i].querySelector(".crack"), { opacity: 1, duration: 0.03 }, last + d);
+        tl.to(cards[i].querySelector(".flag"), { opacity: 1, duration: 0.03 }, last + d);
+      });
+
+      // The robot is delighted. It hasn't looked over there yet, and then it does.
+      S.blink(tl, r, at(4.6));
+      tl.to(r.head, { rotation: 16, duration: 0.3, ease: "power2.inOut" }, at(5.2));
+      S.gasp(tl, r, at(5.5));
+      window.__timelines["cold"] = tl;
+    })();
+  </script>
+</template>

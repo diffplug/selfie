@@ -1,0 +1,45 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; }
+    #chromatic-stage { background: var(--fog); }
+  </style>
+  <div data-hf-id="hf-4qab" id="root" data-composition-id="chromatic" data-width="1920" data-height="1080">
+    <div data-hf-id="hf-gzj8" id="chromatic-stage" class="stage" data-layout-allow-overflow></div>
+  </div>
+  <script>
+    (() => {
+      const { tl, at, stage } = S.begin("chromatic", 6.6);
+      const cl = S.cloud(stage, "chromatic-cloud", 1680);
+      gsap.set(cl, { x: 120, y: -70, transformOrigin: "50% 50%" });
+      tl.fromTo(cl, { scale: 0.86 }, { scale: 1, duration: 0.55, ease: "back.out(1.5)" }, 0);
+      const title = S.html(stage, `<div class="abs display" style="font-size:96px">Chromatic</div>`);
+      gsap.set(title, { x: 330, y: 330, opacity: 0 });
+      tl.fromTo(title, { filter: "blur(8px)", opacity: 0 }, { filter: "blur(0px)", opacity: 1, duration: 0.2, ease: "power4.out" }, at(0.2));
+
+      const belt = S.html(stage, `<div class="abs" style="width:1920px;height:26px;background:var(--ink);border-radius:8px"></div>`);
+      gsap.set(belt, { y: 754 });
+      const cam = S.camera(stage, "chromatic-camera", 1.25);
+      gsap.set(cam, { x: 860, y: 110 });
+      tl.fromTo(cam, { y: -320 }, { y: 110, duration: 0.45, ease: "back.out(1.3)" }, 0.08);
+      const cone = S.html(stage, `<svg class="prop" width="520" height="440" viewBox="0 0 520 440" data-layout-ignore><path d="M210 0 H310 L520 440 H0 Z" fill="#fff6c9"/></svg>`);
+      gsap.set(cone, { x: 798, y: 320, opacity: 0 });
+      stage.insertBefore(cone, cam);
+
+      // Each component rides under the camera, stops, flashes, and leaves a photo behind.
+      const kinds = ["chart", "form", "profile", "list"];
+      kinds.forEach((k, i) => {
+        const c = S.card(stage, k), t = at(0.5 + i * 1.45);
+        S.place(c, { x: -320, y: 520, scale: 1.18 });
+        tl.to(c, { x: 914, duration: 0.6, ease: "power3.out" }, t);
+        tl.to(c, { x: 2000, duration: 0.6, ease: "power3.in" }, t + at(1.08));
+        S.flash(tl, cone, t + at(0.72), 0.95);
+        const p = S.photo(stage, k, "easy");
+        const dest = { x: 1330 + i * 44, y: 250 + i * 26, rot: [-7, 4, -3, 6][i] };
+        gsap.set(p, { x: 968, y: 290, scale: 0.2, opacity: 0, rotation: 0, transformOrigin: "50% 50%" });
+        tl.set(p, { opacity: 1 }, t + at(0.74));
+        tl.to(p, { x: dest.x, y: dest.y, scale: 0.92, rotation: dest.rot, duration: 0.5, ease: "expo.out" }, t + at(0.74));
+      });
+      window.__timelines["chromatic"] = tl;
+    })();
+  </script>
+</template>

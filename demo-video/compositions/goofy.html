@@ -1,0 +1,59 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; }
+    #goofy-stage { background: var(--sun); }
+  </style>
+  <div data-hf-id="hf-9gsv" id="root" data-composition-id="goofy" data-width="1920" data-height="1080">
+    <div data-hf-id="hf-cod4" id="goofy-stage" class="stage" data-layout-allow-overflow></div>
+  </div>
+  <script>
+    (() => {
+      const { tl, at, stage } = S.begin("goofy", 7.8);
+      const kinds = ["chart", "form", "profile", "list", "stat", "tabs"];
+      const r = S.robot(stage, { id: "goofy-robot", prop: "phone", scale: 2.2 });
+      gsap.set(r.el, { x: 20, y: 130 });
+      gsap.set(r.armR, { rotation: -128 });
+      gsap.set(r.prop, { rotation: 128 });
+      const white = S.html(stage, `<div class="flash"></div>`);
+
+      // A component for each pose, each snapped into a growing wall of photos.
+      const poses = [
+        { y: 130, head: 10, arm: -128, scaleY: 1 },
+        { y: 190, head: -16, arm: -112, scaleY: 0.9 },
+        { y: 60, head: 22, arm: -146, scaleY: 1.04 },
+        { y: 170, head: -24, arm: -120, scaleY: 0.92 },
+        { y: 100, head: 14, arm: -150, scaleY: 1 },
+        { y: 150, head: -8, arm: -118, scaleY: 0.96 },
+      ];
+      const wall = [[1040, 40], [1320, 30], [1600, 50], [1050, 310], [1330, 300], [1610, 320]];
+      gsap.set(r.el, { transformOrigin: "50% 100%" });
+      kinds.forEach((k, i) => {
+        const t = at(0.3 + i * 0.93), pose = poses[i];
+        const c = S.card(stage, k);
+        S.place(c, { x: 500, y: 520, scale: 1.3, rotation: [-5, 4, -3, 6, -6, 3][i] });
+        gsap.set(c, { opacity: 0 });
+        tl.set(c, { opacity: 1 }, t);
+        tl.fromTo(c, { x: 720 }, { x: 500, duration: 0.3, ease: "back.out(1.6)", immediateRender: false }, t);
+        tl.to(r.el, { y: pose.y, scaleY: pose.scaleY, duration: 0.3, ease: "back.out(2)" }, t);
+        tl.to(r.head, { rotation: pose.head, duration: 0.28, ease: "power2.out" }, t + 0.03);
+        tl.to(r.armR, { rotation: pose.arm, duration: 0.26, ease: "power2.out" }, t + 0.05);
+        tl.to(r.prop, { rotation: -pose.arm, duration: 0.26, ease: "power2.out" }, t + 0.05);
+        const shot = t + at(0.46);
+        S.flash(tl, white, shot, 0.7);
+        const pic = S.selfiePhoto(stage, k, { tilt: pose.head });
+        gsap.set(pic, { x: wall[i][0], y: wall[i][1], scale: 0, rotation: [-6, 3, 5, -4, 6, -3][i], transformOrigin: "50% 50%" });
+        tl.to(pic, { scale: 0.86, duration: 0.3, ease: "back.out(1.8)" }, shot + 0.02);
+        tl.set(c, { opacity: 0 }, t + at(0.88));
+      });
+
+      // The numbers land last.
+      [["$0 per image", 1020, 3.2, "var(--ink)"], ["541 stories", 1020, 5.4, "var(--pink)"], ["~70 s", 1490, 6.3, "var(--pink)"]].forEach(([text, x, t, bg], i) => {
+        const y = i === 0 ? 610 : 730;
+        const n = S.html(stage, `<div class="tag display" style="font-size:78px;padding:14px 30px 18px;background:${bg};color:${bg.includes("ink") ? "#fff" : "var(--ink)"}">${text}</div>`);
+        gsap.set(n, { x, y, opacity: 0, scale: 1.2, transformOrigin: "0 50%" });
+        tl.to(n, { opacity: 1, scale: 1, duration: 0.3, ease: "expo.out" }, at(t));
+      });
+      window.__timelines["goofy"] = tl;
+    })();
+  </script>
+</template>

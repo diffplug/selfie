@@ -1,0 +1,66 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; }
+    #hash-stage { background: var(--sky); }
+  </style>
+  <div data-hf-id="hf-jbk3" id="root" data-composition-id="hash" data-width="1920" data-height="1080">
+    <div data-hf-id="hf-pv1g" id="hash-stage" class="stage" data-layout-allow-overflow></div>
+  </div>
+  <script>
+    (() => {
+      const { tl, at, stage } = S.begin("hash", 8.6);
+      const cl = S.cloud(stage, "hash-cloud", 680);
+      gsap.set(cl, { x: 1210, y: -10 });
+
+      // Every photo in the suitcase, named by a hash.
+      const cases = [["chart", "a3f9c1"], ["form", "7c21e8"], ["profile", "04bd6e"], ["list", "e19a52"], ["stat", "5fd07b"], ["tabs", "b862ad"]];
+      const CHANGED = 1;
+      const items = cases.map(([k, h], i) => {
+        const x = 70 + (i % 3) * 300, y = 40 + Math.floor(i / 3) * 400;
+        const wrap = S.html(stage, `<div class="abs" style="width:283px;height:340px" data-layout-ignore></div>`);
+        S.photo(wrap, k, "easy", { changed: i === CHANGED });
+        const tag = S.html(wrap, `<div class="abs display" style="top:268px;width:283px;text-align:center;font-size:50px">#${h}</div>`);
+        gsap.set(wrap, { x, y, scale: 0.8, opacity: 0, transformOrigin: "0 0" });
+        tl.to(wrap, { opacity: 1, duration: 0.14 }, at(0.15 + i * 0.28));
+        tl.fromTo(wrap, { y: y + 26 }, { y, duration: 0.35, ease: "expo.out", immediateRender: false }, at(0.15 + i * 0.28));
+        return { wrap, x, y, tag };
+      });
+
+      // Most changes touch only a few. The rest are already in the cloud.
+      items.forEach((it, i) => { if (i !== CHANGED) tl.to(it.wrap, { opacity: 0.28, duration: 0.3 }, at(4.2) + (i % 3) * 0.06); });
+      const newTag = S.html(stage, `<div class="tag" style="font-size:38px;background:var(--pink);color:var(--ink)">new image</div>`);
+      gsap.set(newTag, { x: items[CHANGED].x + 16, y: items[CHANGED].y - 6, opacity: 0 });
+      tl.to(newTag, { opacity: 1, duration: 0.14 }, at(4.4));
+      const have = S.html(stage, `<div class="tag" style="font-size:38px">the rest are already in the cloud</div>`);
+      gsap.set(have, { x: 200, y: 372, opacity: 0 });
+      tl.to(have, { opacity: 1, duration: 0.14 }, at(4.75));
+
+      // The robot takes the one that's new.
+      const r = S.robot(stage, { id: "hash-robot", scale: 1.5 });
+      tl.fromTo(r.el, { x: 2000, y: 430 }, { x: 980, y: 430, duration: 0.5, ease: "back.out(1.2)" }, at(4.9));
+      tl.to(newTag, { opacity: 0, duration: 0.1 }, at(5.45));
+      tl.to(r.armR, { rotation: -150, duration: 0.3, ease: "power2.out" }, at(5.45));
+      tl.to(items[CHANGED].wrap, { x: 1300, y: 190, scale: 0.72, duration: 0.5, ease: "power3.inOut" }, at(5.45));
+
+      // Folds it, and throws it up to the cloud.
+      const pl = S.plane(stage, "hash-plane", 1.3);
+      gsap.set(pl, { x: 1340, y: 290, opacity: 0, scale: 0.4, rotation: -4, transformOrigin: "50% 50%" });
+      tl.to(items[CHANGED].wrap, { scaleX: 0.02, duration: 0.2, ease: "power2.in" }, at(6.15));
+      tl.set(items[CHANGED].wrap, { opacity: 0 }, at(6.15) + 0.2);
+      tl.set(pl, { opacity: 1 }, at(6.15) + 0.2);
+      tl.to(pl, { scale: 1, duration: 0.25, ease: "back.out(2.5)" }, at(6.15) + 0.2);
+      tl.to(r.armR, { rotation: -95, duration: 0.25, ease: "power2.out" }, at(6.6));
+      tl.to(r.armR, { rotation: -172, duration: 0.14, ease: "power3.in" }, at(6.92));
+      const throwAt = at(7.05);
+      tl.to(pl, { x: 1500, duration: 0.8, ease: "power1.out" }, throwAt);
+      tl.to(pl, { y: 120, duration: 0.8, ease: "power2.out" }, throwAt);
+      tl.to(pl, { rotation: -16, duration: 0.5, ease: "power1.out" }, throwAt);
+      tl.to(pl, { scale: 0.4, opacity: 0, duration: 0.2, ease: "power2.in" }, throwAt + 0.68);
+      tl.to(cl, { y: -28, duration: 0.1, ease: "power2.out" }, throwAt + 0.8);
+      tl.to(cl, { y: -10, duration: 0.4, ease: "bounce.out" }, throwAt + 0.9);
+      S.whipIn(tl, stage);
+      S.whipOut(tl, stage, "hash");
+      window.__timelines["hash"] = tl;
+    })();
+  </script>
+</template>

@@ -1,0 +1,22 @@
+{
+  "comment": "One scene per narration paragraph of SCRIPT.md, in order. dur is the scene's slot in seconds, hold is how much of it stays silent at the end. Run `node build.mjs` after changing either file.",
+  "scenes": [
+    { "id": "cold", "dur": 6.4 },
+    { "id": "split", "dur": 6.8 },
+    { "id": "states", "dur": 8.2 },
+    { "id": "storybook", "dur": 10.4 },
+    { "id": "ripple", "dur": 5.0 },
+    { "id": "chromatic", "dur": 6.6 },
+    { "id": "compare", "dur": 5.0 },
+    { "id": "cost", "dur": 10.2 },
+    { "id": "bucks", "dur": 8.6 },
+    { "id": "reveal", "dur": 8.2 },
+    { "id": "goofy", "dur": 7.8 },
+    { "id": "git", "dur": 12.8 },
+    { "id": "approvals", "dur": 6.0 },
+    { "id": "pinned", "dur": 5.0 },
+    { "id": "hash", "dur": 8.6 },
+    { "id": "start", "dur": 7.2 },
+    { "id": "launch", "dur": 12.5, "hold": 3.5 }
+  ]
+}
