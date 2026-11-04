@@ -13,7 +13,7 @@ export interface DecideRequest {
   readonly decision: DecisionKind;
   readonly actor: string;
   /**
-   * Every changed and new image, those whose story IDs match these patterns, or exactly these
+   * Every changed and added image, those whose story IDs match these patterns, or exactly these
    * images, for a caller that showed them, which refuses all of them if any is out of date.
    */
   readonly stories: "all" | readonly string[] | { readonly targets: readonly DecisionTarget[] };

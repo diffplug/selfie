@@ -485,7 +485,7 @@ ORDER BY started_at DESC, key DESC`,
   /**
    * Gives a finished batch's renders their states, from image hashes alone, against the
    * goldens of `baselineSha` in the batch's own environment. A null baseline means there
-   * are none yet, so every rendered render is `added`. Lists only what a reviewer needs
+   * are none yet, so every render with an image is `added`. Lists only what a reviewer needs
    * unless told otherwise: see `Comparison`.
    */
   async compareBatch(batchId: string, baselineSha: string | null, options?: CompareOptions): Promise<Comparison> {

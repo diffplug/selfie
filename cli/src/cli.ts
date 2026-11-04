@@ -58,7 +58,7 @@ const USAGE = `Usage: selfie [--port <n>] [--storybook-dir <dir>] [--native] [--
 
   accept <batch> [--removed <n>]
       Makes a batch the goldens of its Git SHA. Needs a batch recorded on a clean tree, every
-      changed or new image approved, and --removed <n> if the baseline has stories this batch
+      changed or added image approved, and --removed <n> if the baseline has stories this batch
       lacks.
 
   find-baseline [--native]
@@ -213,7 +213,7 @@ async function serveReview(
         storybook: {
           dir,
           url,
-          render: async (stories) =>
+          renderStories: async (stories) =>
             (await renderBatch(project, { storybookDir: dir, native, stories, render: context.render, log: (line) => context.stderr(`${line}\n`) })).batch.id,
         },
       }),
@@ -251,7 +251,7 @@ function openEveryStory(args: string[], context: Context): Promise<number> {
   );
 }
 
-function renderBatchOptions(values: ReturnType<typeof parse<typeof BUILD_OPTIONS>>["values"], context: Context) {
+function batchOptionsFrom(values: ReturnType<typeof parse<typeof BUILD_OPTIONS>>["values"], context: Context) {
   return {
     storybookDir: values["storybook-dir"],
     buildCommand: values["build-command"],
@@ -275,7 +275,7 @@ async function dispatch(command: string | undefined, args: string[], context: Co
       const { values, positionals } = parse(args, BUILD_OPTIONS);
       noPositionals(command, positionals);
       return withProject(context, async (project) => {
-        const result = await renderBatch(project, renderBatchOptions(values, context));
+        const result = await renderBatch(project, batchOptionsFrom(values, context));
         printTimings(context, result.timings);
         printJson(context, buildRenderDocument(result));
         return EXIT_OK;
@@ -289,7 +289,7 @@ async function dispatch(command: string | undefined, args: string[], context: Co
       const concurrency = values.concurrency === undefined ? undefined : positiveInteger("--concurrency", values.concurrency);
       return withProject(context, async (project) => {
         const { findFlakes } = await import("./flakes.ts");
-        const report = await findFlakes(project, { ...renderBatchOptions(values, context), times, concurrency });
+        const report = await findFlakes(project, { ...batchOptionsFrom(values, context), times, concurrency });
         printJson(context, { schemaVersion: 1, ...report });
         return report.flaky.length === 0 ? EXIT_OK : EXIT_NEEDS_ATTENTION;
       });
@@ -316,7 +316,7 @@ async function dispatch(command: string | undefined, args: string[], context: Co
         const baseline = values.baseline;
         const result = await review(
           project,
-          batch === undefined ? { ...renderBatchOptions(values, context), baseline } : { batch, baseline },
+          batch === undefined ? { ...batchOptionsFrom(values, context), baseline } : { batch, baseline },
         );
         printTimings(context, result.timings);
         const document = buildReviewDocument(result);

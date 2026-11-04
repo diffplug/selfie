@@ -1,6 +1,6 @@
 # RenderBatches — Rationale
 
-> Informative companion to [batches.md](renders.md): the evidence behind its rules, keyed by that spec's headings. Nothing here is normative.
+> Informative companion to [renders.md](renders.md): the evidence behind its rules, keyed by that spec's headings. Nothing here is normative.
 
 ## Render names
 
@@ -30,7 +30,7 @@
 
 ## Compare
 
-**Refusing a missing baseline.** Reporting everything as new would look like a first batch, and hide a wrong SHA.
+**Refusing a missing baseline.** Reporting everything as added would look like a first batch, and hide a wrong SHA.
 
 **Only differences by default.** A mostly unchanged compare fell from 3 requests and 2.9 MB of responses to 1 request and 56 KB, with 250 differences listed, or about 220 bytes each. Rows read barely moved, from 70,015 to 60,213, since finding differences still reads both sides and the count reads them again. That costs about $0.00006 at D1's listed $0.001 per million rows.
 
@@ -54,7 +54,7 @@
 
 ## Requests
 
-**Measured on real D1, 2026-11**, from one Mac over the REST API at 10,000 renders, with the sizes in the spec. `compareBatch` is of a batch with 100 changed, 50 failed, 50 new, 50 removed, and 9,800 unchanged:
+**Measured on real D1, 2026-11**, from one Mac over the REST API at 10,000 renders, with the sizes in the spec. `compareBatch` is of a batch with 100 changed, 50 failed, 50 added, 50 removed, and 9,800 unchanged:
 
 | Operation | Time | Requests | Rows read | Rows written | Response |
 |---|---|---|---|---|---|

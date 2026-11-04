@@ -52,7 +52,7 @@ const headOf = () => git(h.repo, "rev-parse", "HEAD");
 let laptop: ReturnType<typeof machine>;
 let stories: readonly FakeStory[];
 
-const record = async (batch = laptop) => (await batch("writer", "render", "--storybook-dir", "ignored")).json.batchId as string;
+const record = async (run = laptop) => (await run("writer", "render", "--storybook-dir", "ignored")).json.batchId as string;
 /** A batch on the laptop, approved, and accepted as HEAD's goldens. */
 async function accepted() {
   const batchId = await record();

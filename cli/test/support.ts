@@ -175,7 +175,7 @@ export interface Harness {
   readonly scratch: string;
   readonly repo: string;
   readonly home: string;
-  /** What the next render renders. */
+  /** The stories the next render produces. */
   stories: readonly FakeStory[];
   /** Runs a command in-process. `json` is stdout parsed, which fails if it isn't one document. */
   cli: (...argv: string[]) => Promise<{ code: number; json: any; stdout: string; stderr: string }>;

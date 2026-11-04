@@ -88,7 +88,7 @@ On a hosted Storybook's own origin (`docs/specs/access.md` → Local review serv
 - **Must give a kept built Storybook's files `Cache-Control: private, max-age=31536000, immutable`**, since a kept built Storybook never changes, and the directory as it stands `no-store`, since a rebuild does.
 - **Must refuse an image hash that isn't 64 lowercase hex digits before it reaches the store.**
 - **Must give images, diff images, and diff stats `Cache-Control: private, max-age=31536000, immutable`**, since all are addressed by content (`docs/specs/access.md` → Local review server), and every other API answer `no-store`.
-- **Must decide on exactly the images a request names, or none:** the library's `decide` refuses with `stale-decision` if any named story and hash isn't a changed or new image of that batch, and takes the names exactly, never as patterns (rationale).
+- **Must decide on exactly the images a request names, or none:** the library's `decide` refuses with `stale-decision` if any named story and hash isn't a changed or added image of that batch, and takes the names exactly, never as patterns (rationale).
 - **Must refuse a bulk request no differently from a single one.** Nothing on the server knows "all": the client sends what it showed.
 - **Must compare a batch at most twice for a decision, and once for anything else, plus once for each if it's shown against branch goldens**, never reading unchanged rows unless a route asks for them.
 - **Must pass `removedSeen` as given, and let `accept` judge it**, so a count that moved comes back as `wrong-removed-count`.
@@ -123,11 +123,11 @@ Source of truth: `ui/src/client/`.
 
 **The top bar** says what a page is looking at: on every story, the built Storybook, its commit and branch, and whether it's clean; on a batch's pages, the diff, between the batch's commit and what it's compared with, and how that relates to the merge base with the default branch.
 
-**A batch's pages** have the same list at their left, of what differs, which is what's changed, new, removed, or failed, narrowed by what Show says, and showing what's unchanged only if that's what Show asks for, or if it has an advisory. Next and previous go down that list, as far as it's narrowed. The list is where a batch's stories are: there's no table of them on the right.
+**A batch's pages** have the same list at their left, of what differs, which is what's changed, added, removed, or failed, narrowed by what Show says, and showing what's unchanged only if that's what Show asks for, or if it has an advisory. Next and previous go down that list, as far as it's narrowed. The list is where a batch's stories are: there's no table of them on the right.
 
 - **Must say more of each story as the list is dragged wider:** its state and decision, then its pixels and advisories on a batch's pages, or when it was rendered on every story.
 
-- **Must say a story is renamed if it's new and a removed story's golden is its very image**, one to one, and the closest names first where several share an image (rationale). The list has it once, under its new name. This is only to look at: to decisions and accepting they're still one new and one removed.
+- **Must say a story is renamed if it's added and a removed story's golden is its very image**, one to one, and the closest names first where several share an image (rationale). The list has it once, under its new name. This is only to look at: to decisions and accepting they're still one added and one removed.
 
 **The batch** shows, in order: its commit, batch ID, whether its pixels were rendered earlier and by which batch, dirty state, baseline, environment, and decision actor; a warning if it was recorded dirty, has no baseline, is shown against branch goldens (`docs/specs/cli.md` → Review), or its SHA can't be a baseline; the counts; blockers; advisories; and the differences.
 
@@ -137,7 +137,7 @@ Source of truth: `ui/src/client/`.
 
 **Bulk decisions:** approve or reject all, or all the current filter shows.
 
-- **Must confirm every bulk decision in a dialog, with the count, how many are changed and new, how many are already decided, how many have an advisory, and which stories.** Focus starts on Cancel.
+- **Must confirm every bulk decision in a dialog, with the count, how many are changed and added, how many are already decided, how many have an advisory, and which stories.** Focus starts on Cancel.
 - **Must hold the rows in the dialog from when it opens, and send those**, so what it listed is what's sent, whatever a filter or a read does meanwhile.
 
 **One render** shows its state and decision, pixel stats, and images.
@@ -157,7 +157,7 @@ Source of truth: `ui/src/client/`.
 - **Must leave the browser's history alone when moving a live story along**, so Back leaves the screen as it does anywhere else (rationale).
 - **Must keep how someone is looking when moving between stories**, and must never show one story's image under another's name while it loads.
 - **Must compute diff images, and pixel stats a batch's `review.json` no longer holds, on demand, from the store, by hash pair**, so a pruned batch reads like any other. A list shows stats only from `review.json`, and one render uses them rather than ask (rationale).
-- **Must explain each kind of render:** new has no golden, removed has no current and takes no decision, failed shows its message, and a changed size says so, and shows the images from their top left corners.
+- **Must explain each kind of render:** added has no golden, removed has no current and takes no decision, failed shows its message, and a changed size says so, and shows the images from their top left corners.
 - **Must say when a changed render is only moves and spacing, in the list, the pixel stats, and a banner, and that it still needs a decision**, and offer those as a filter of the list, so they can be approved together (rationale).
 - **Must say what the diff image's colors mean wherever it has more than one.**
 - **Must not offer a decision on what has no image to decide on.**

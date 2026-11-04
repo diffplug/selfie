@@ -38,7 +38,7 @@ describe("a first review, with no baseline", () => {
     h.stories = [{ id: "a--one" }, { id: "a--two", color: BLUE }];
   });
 
-  test("reports every story as new, with a current image, and exits 1", async () => {
+  test("reports every story as added, with a current image, and exits 1", async () => {
     const { code, json, stderr } = await review();
     expect(code).toBe(1);
     expect(json.schemaVersion).toBe(1);
@@ -492,7 +492,7 @@ describe("blockers and advisories", () => {
       { id: "a--fine" },
     ];
     const first = await review();
-    expect(first.code).toBe(1); // Everything is new, which does block.
+    expect(first.code).toBe(1); // Everything is added, which does block.
     expect(reasons(first.json.blockers)).toEqual(["added-unapproved", "added-unapproved"]);
     expect(first.json.advisories).toEqual([
       { story: "a--play", reason: "play-error", detail: "the play failed" },

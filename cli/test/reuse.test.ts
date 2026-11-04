@@ -1,4 +1,4 @@
-// Skipping the render of a build that already rendered, against real Git, a real store, real
+// Skipping the render of a built Storybook that already rendered, against real Git, a real store, real
 // files, and only the browser replaced. `render/test/identity.test.ts` covers what makes two
 // builds the same.
 import { writeFileSync } from "node:fs";
@@ -13,7 +13,7 @@ let h: Harness;
 let build: string;
 let renders: number;
 
-/** Runs a command on the build, and says whether it rendered. */
+/** Runs a command on the built Storybook, and says whether it rendered. */
 async function onBuild(command: "render" | "review", flags: string[]) {
   const before = renders;
   const result = await h.cli(command, "--storybook-dir", build, ...flags);
@@ -22,7 +22,7 @@ async function onBuild(command: "render" | "review", flags: string[]) {
 const review = (...flags: string[]) => onBuild("review", flags);
 const record = (...flags: string[]) => onBuild("render", flags);
 let commits = 0;
-/** A new commit the build doesn't hold, since a batch is per commit. */
+/** A new commit the built Storybook doesn't hold, since a batch is per commit. */
 const newCommit = () => commit(h.repo, `elsewhere ${++commits}`);
 const writeConfig = (config: unknown) => writeFile(path.join(h.repo, "selfie.config.json"), JSON.stringify(config));
 const inBuild = (file: string) => path.join(build, file);
@@ -129,7 +129,7 @@ describe("a change to what decides pixels renders", () => {
     await review();
   });
 
-  test("one byte of the build, and going back reuses the first render", async () => {
+  test("one byte of the built Storybook, and going back reuses the first render", async () => {
     const before = await readFile(inBuild("assets/app.css"));
     await writeFile(inBuild("assets/app.css"), ".a{color:ted}");
     expect((await review()).rendered).toBe(true);
@@ -213,7 +213,7 @@ describe("a render that isn't reusable", () => {
     expect((await review()).rendered).toBe(true);
   });
 
-  test("a build that changed while it rendered isn't remembered", async () => {
+  test("a built Storybook that changed while it rendered isn't remembered", async () => {
     h.onRender = () => {
       renders += 1;
       writeFileSync(inBuild("assets/during.txt"), "written during the render");
@@ -229,7 +229,7 @@ describe("a render that isn't reusable", () => {
     expect((await review()).rendered).toBe(true);
   });
 
-  test("a build holding a symlink always renders, and stderr says why", async () => {
+  test("a built Storybook holding a symlink always renders, and stderr says why", async () => {
     await symlink(path.join(h.scratch, "elsewhere.css"), inBuild("assets/link.css"));
     expect((await review()).stderr).toContain("won't be reused: a native environment, or a built Storybook holding a symlink");
     expect((await review()).rendered).toBe(true);
@@ -269,7 +269,7 @@ describe("play errors", () => {
 });
 
 describe("a filter", () => {
-  test("is answered from the build's whole batch", async () => {
+  test("is answered from the built Storybook's whole batch", async () => {
     const whole = await review();
     const filtered = await review("--story", "a--one");
     expect(filtered.rendered).toBe(false);
@@ -390,7 +390,7 @@ describe("a reused batch is a real batch", () => {
     await h.cli("approve", first.json.batchId, "--all");
     await h.cli("accept", first.json.batchId);
 
-    const sha = await commit(h.repo, "touches nothing the build holds");
+    const sha = await commit(h.repo, "touches nothing the built Storybook holds");
     const reused = await review();
     expect(reused.rendered).toBe(false);
     expect(reused.json.gitSha).toBe(sha);

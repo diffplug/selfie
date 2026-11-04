@@ -1,5 +1,5 @@
 // The real binary, real Chromium in the real pinned container, and the renderer's fixture
-// Storybook. vitest.config.ts decides whether these batch, and says why if they don't.
+// Storybook. vitest.config.ts decides whether these run, and says why if they don't.
 import { spawn } from "node:child_process";
 import { access, cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -46,7 +46,7 @@ afterAll(async () => {
 });
 
 describe.runIf(process.env.SELFIE_CLI_CONTAINER === "1")("in the pinned container", () => {
-  test("the whole loop: new, approved, accepted, unchanged, then changed with a diff", async () => {
+  test("the whole loop: added, approved, accepted, unchanged, then changed with a diff", async () => {
     const first = await review(...STORIES);
     expect(first.status).toBe(1);
     expect(first.json.counts).toMatchObject({ stories: 2, added: 2, undecided: 2 });

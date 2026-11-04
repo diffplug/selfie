@@ -378,7 +378,7 @@ describe("selfie review --baseline", () => {
     expect(refused.json.error.code).toBe("no-baseline-batch");
   });
 
-  test("works with no batch too, on the batch for this build", async () => {
+  test("works with no batch too, on the batch for this built Storybook", async () => {
     const one = await record();
     const { code, json } = await reviewBuild("--baseline", one.json.batchId);
     expect(code).toBe(0);

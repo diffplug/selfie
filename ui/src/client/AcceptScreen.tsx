@@ -47,7 +47,7 @@ function refusalWords(refusal: AcceptRefusal, batchId: string): ReactNode {
       const parts = [undecided > 0 ? `${undecided} undecided` : null, rejected > 0 ? `${rejected} rejected` : null].filter(Boolean);
       return (
         <Refusal title={`${plural(refusal.stories.length, "image")} not approved: ${parts.join(", ")}`}>
-          <Text as="p">Every changed or new image must be approved before this batch can become goldens.</Text>
+          <Text as="p">Every changed or added image must be approved before this batch can become goldens.</Text>
           <StoryLinks batchId={batchId} stories={refusal.stories} show={rejected > 0 && undecided === 0 ? "rejected" : "all"} />
         </Refusal>
       );

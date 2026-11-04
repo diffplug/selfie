@@ -57,7 +57,7 @@ Access follows GitHub through a GitHub App: anyone can view a public repository'
 Selfie has the following commands:
 
 - find-baseline - returns the Git sha of the nearest merge-base with a complete set of goldens
-- record - always renders the Storybook, and records a batch
+- render - always renders the Storybook, and records a batch
 - review - shows a batch's diff against its baseline, or until one exists, against the nearest goldens on its branch, as one JSON document whose exit code says whether anything blocks. With no batch, it uses the one for this exact built Storybook, which takes about 0.3 s rather than 70 s on 541 stories, and records one only if there's none yet. `--baseline` compares with a commit's goldens or another batch, so recording twice and comparing is how to look for flakiness
 - approve, reject - decides on a batch's changed renders, on a dirty tree if you like, so committing doesn't ask again
 - accept - makes a batch's renders the goldens for its Git sha, on a clean tree

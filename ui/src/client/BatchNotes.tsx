@@ -36,7 +36,7 @@ export function BatchNotes({ view: { batch, usableAsBaseline, branchGoldens } }:
         <Banner
           variant="info"
           title="No baseline"
-          description={`There were no goldens to compare with, so every story reads as new and needs an approval. ${baseline?.message ?? ""}`}
+          description={`There were no goldens to compare with, so every story reads as added and needs an approval. ${baseline?.message ?? ""}`}
         />
       )}
       {!usableAsBaseline && (

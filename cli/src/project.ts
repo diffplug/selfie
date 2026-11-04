@@ -20,7 +20,7 @@ const STALE_RENDER_MS = 24 * 60 * 60 * 1000;
 const CACHE_FILE = "review.json";
 
 /**
- * The newest real render of each build this machine can reuse. Local only: it's in the project's
+ * The newest real render of each built Storybook this machine can reuse. Local only: it's in the project's
  * `store.db`, and not in the store's schema, which D1 also has.
  */
 export interface RenderKeys {

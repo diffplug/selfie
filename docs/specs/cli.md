@@ -48,9 +48,9 @@ Source of truth: `cli/src/index.ts`; tests in `cli/test/library.test.ts`.
 | Export | Does |
 |---|---|
 | `openProject({ cwd, env })` | The repository's `Project`: its `repo`, `directory`, `renders`, `notes`, `store`, `renders`, and `close()` |
-| `record(project, options)` | Returns a `RenderBatchResult`: the `batch`, `dirtyPaths`, `baseline`, `warnings`, and `timings` |
-| `review(project, options)` | `options` is a `batch`, or what `render` takes. Returns a `ReviewResult`: the `comparison`, `dirtyPaths`, `baseline`, `differences`, `playErrors`, `warnings`, and `timings` |
-| `decide(project, { batchId, decision, actor, stories })` | `stories` is `"all"`, patterns, or `{ targets }`: exact stories and image hashes, for a caller that showed them, refused whole with `stale-decision` if any isn't a changed or new image the batch holds. Returns `decided`, `skipped`, `unmatchedPatterns`, and the `comparison` after it. It compares twice, and reads unchanged rows only for patterns |
+| `renderBatch(project, options)` | Returns a `RenderBatchResult`: the `batch`, `dirtyPaths`, `baseline`, `warnings`, and `timings` |
+| `review(project, options)` | `options` is a `batch`, or what `renderBatch` takes. Returns a `ReviewResult`: the `comparison`, `dirtyPaths`, `baseline`, `differences`, `playErrors`, `warnings`, and `timings` |
+| `decide(project, { batchId, decision, actor, stories })` | `stories` is `"all"`, patterns, or `{ targets }`: exact stories and image hashes, for a caller that showed them, refused whole with `stale-decision` if any isn't a changed or added image the batch holds. Returns `decided`, `skipped`, `unmatchedPatterns`, and the `comparison` after it. It compares twice, and reads unchanged rows only for patterns |
 | `accept(project, { batchId, removedSeen })` | Returns `accepted`, `refusals`, `usableAsBaseline`, and the `comparison` |
 | `checkAccept(project, comparison, removedSeen)` | What `accept` would refuse of a comparison a caller holds, changing nothing: `refusals`, `usableAsBaseline`, and `removals` |
 | `summarizeBatch(comparison)` | Returns `blockers`, `advisories`, `counts`, `undecided`, `unapproved`, `failed`, `removed`, and `notRendered` |
@@ -107,7 +107,7 @@ A review of a named batch starts at step 6. `selfie render` is steps 1 to 5, alw
 - **Must refuse a named batch with any flag for making a batch**, since it's already recorded.
 - **Must take `--baseline` as a batch ID, or else anything Git resolves to a commit, whose goldens it means**, and fail with exit 2 if there's no such finished batch in this environment or the commit has no goldens.
 - **Must keep `--baseline` to this one review.** It changes nothing about the batch: `selfie approve` and `selfie accept` still compare with the baseline the batch recorded, its exports go under `batches/<batch id>/against/<baseline>/`, and `review.json` isn't written. It exits 1 if anything differs, even when every image is approved, since the question was what differs (rationale).
-- **Must do diff work only on a `changed` render.** A `added` or `removed` one exports its one image, and an unchanged one nothing, unless it has an advisory.
+- **Must do diff work only on a `changed` render.** An `added` or `removed` one exports its one image, and an unchanged one nothing, unless it has an advisory.
 - **Must write every exported image as a PNG, whatever the store keeps**, so a document's paths stay what they say and any agent can open them.
 - **Must report what changed as hunks:** rectangles of each image that correspond and differ, with everything outside them matching once what's between them is lined up, found by a recursive 9-slice in `cli/src/hunks.ts` (rationale).
 - **Must make hunks depend on the two images alone**, so the same pair always gives the same hunks, and a decision or a cache can rely on it.
@@ -226,7 +226,7 @@ Source of truth: `accept` in `cli/src/decisions.ts`.
 |---|---|---|
 | `recorded-on-dirty-tree` | The batch was recorded on a dirty tree, even if it is clean now (rationale). `acceptBatch` refuses this for every caller | `gitSha` |
 | `batch-has-failures` | A story failed to render | `stories` |
-| `unapproved` | A changed or new image isn't approved | `stories` of `story`, `state`, `decision` |
+| `unapproved` | A changed or added image isn't approved | `stories` of `story`, `state`, `decision` |
 | `removed-unacknowledged` | The baseline has stories this batch lacks, and `--removed` wasn't passed | `stories`, `outsideFilter` |
 | `wrong-removed-count` | `--removed` isn't the count there is | `stories`, `outsideFilter`, `seen` |
 

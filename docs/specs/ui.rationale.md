@@ -47,7 +47,7 @@ Evidence and reasoning for `docs/specs/ui.md`, keyed by its headings.
 
 **What "clean" can mean.** A built Storybook may not have been made by Selfie, so nothing records what it came from. Comparing its time with when HEAD last moved, from the reflog, catches a commit or checkout since it was built, which the commit's own time wouldn't for moving to an older commit. It can't catch changes that were there during a build and then reverted, which is why it's a time and not a guarantee.
 
-**A rename is only said.** Storybook gives a story its ID from its title and name, so moving one reads as one removed and one new. An identical image is good evidence and not proof, so it changes what a person reads and not what's recorded: a golden still needs approving under its new name, and its loss still needs acknowledging. A rename that also changed pixels reads as a new and a removed, since no comparison is made across names.
+**A rename is only said.** Storybook gives a story its ID from its title and name, so moving one reads as one removed and one added. An identical image is good evidence and not proof, so it changes what a person reads and not what's recorded: a golden still needs approving under its new name, and its loss still needs acknowledging. A rename that also changed pixels reads as an added and a removed, since no comparison is made across names.
 
 **A sidebar, as in Storybook.** With the list as a page of its own, moving between stories meant going back to it, and a person who knows Storybook looks left for them. It takes the table's columns with it, so a row says only a story's state and any caveat, and a story's page says the rest.
 
@@ -66,11 +66,11 @@ Evidence and reasoning for `docs/specs/ui.md`, keyed by its headings.
 
 ## Accessibility
 
-axe-core 4.10.3 was run on the no batches, no commits, run, filtered batch, accept, side by side, stacked, and shortcuts screens in a real browser. It found one issue, a link in text told apart only by color. Primer's `inline` underlines one only under `data-a11y-link-underlines="true"`, so `ui/index.html` sets that on the body. Primer's own components passed.
+axe-core 4.10.3 was run on the no batches, no commits, batch, filtered batch, accept, side by side, stacked, and shortcuts screens in a real browser. It found one issue, a link in text told apart only by color. Primer's `inline` underlines one only under `data-a11y-link-underlines="true"`, so `ui/index.html` sets that on the body. Primer's own components passed.
 
 ## Scale
 
-Measured in headless Chromium through Playwright on a Mac, on a copy of the end-to-end store, against a batch of 541 stories with 512 listed, all new, and its batch directory pruned:
+Measured in headless Chromium through Playwright on a Mac, on a copy of the end-to-end store, against a batch of 541 stories with 512 listed, all added, and its batch directory pruned:
 
 | What | Measured |
 |---|---|

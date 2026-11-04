@@ -17,7 +17,7 @@ Source of truth: `store/src/core/pam.ts`, `store/src/core/image-hash.ts`.
 
 ## Image decoding
 
-Source of truth: `store/src/core/image-file.ts`, `store/src/adapters/sharp-codec.ts`; the contract for what `checkImageFile` refuses is `store/test/contract/image-check-contract.ts`, which `store/test/png.test.ts` batches in Node and `store/test/workerd/image-check.workerd.test.ts` batches in workerd. Decoding is tested in `store/test/png.test.ts` and `store/test/webp.test.ts`.
+Source of truth: `store/src/core/image-file.ts`, `store/src/adapters/sharp-codec.ts`; the contract for what `checkImageFile` refuses is `store/test/contract/image-check-contract.ts`, which `store/test/png.test.ts` runs in Node and `store/test/workerd/image-check.workerd.test.ts` runs in workerd. Decoding is tested in `store/test/png.test.ts` and `store/test/webp.test.ts`.
 
 `checkImageFile` reads a file's headers and structure. `decodeImage` runs it, then reads the body through an `ImageCodec`.
 
@@ -28,7 +28,7 @@ Source of truth: `store/src/core/image-file.ts`, `store/src/adapters/sharp-codec
 - **Must accept a WebP only in its simple lossless form:** `RIFF`, `WEBP`, then one `VP8L` chunk with nothing after, version 0, and the alpha bit clear. It refuses a lossy or extended WebP, including any metadata or color profile.
 - **Must refuse a file whose body doesn't decode, never repair it.** A codec may ignore image data past the last row, which can't change the pixels.
 - **Must check a codec's answer against the header.**
-- **Must take no library and no platform API for `checkImageFile`**, since it batches in Node and in Workers, and the contract batches in both as part of `pnpm test`.
+- **Must take no library and no platform API for `checkImageFile`**, since it runs in Node and in Workers, and the contract runs in both as part of `pnpm test`.
 - **Must decode only through an injected `ImageCodec`**, since a decoder is native. `sharpCodec` is the Node one. A Worker has none, and doesn't decode (`docs/specs/sync.md` → What a store takes).
 
 A WebP's alpha bit is only a hint, so a file with it clear may still hold alpha, and hashes as opaque (rationale).
@@ -110,7 +110,7 @@ Neon stays outside these interfaces: accounts are Postgres and only ever in the 
 
 Source of truth: `store/src/adapters/d1-rest.ts`; tests in `store/test/d1-rest.test.ts` and, against real D1, `store/test/d1-rest.real.test.ts` and `store/test/workerd/d1.real.workerd.test.ts`.
 
-- **Must reach a project's D1 through the D1 REST API, with Web-standard APIs only**, so it batches in a Worker and in Node. Typecheck enforces this as it does for the core, and `store/test/workerd/d1.real.workerd.test.ts` runs it inside workerd. Moving to a Worker binding replaces only this adapter (`docs/specs/system.md` → `platforms-upgrade`).
+- **Must reach a project's D1 through the D1 REST API, with Web-standard APIs only**, so it runs in a Worker and in Node. Typecheck enforces this as it does for the core, and `store/test/workerd/d1.real.workerd.test.ts` runs it inside workerd. Moving to a Worker binding replaces only this adapter (`docs/specs/system.md` → `platforms-upgrade`).
 - **Must send one `execute` as one REST request**, since every project shares one limit of 1,200 Cloudflare API requests per 5 minutes per user. No documented D1 limit sits on top of it, and a client cannot see what remains of it (rationale).
 - **Must back off and resend on HTTP 429, whatever the statements are**, since exceeding the limit blocks all API calls for 5 minutes and a 429 means the request never ran. It waits as long as `Retry-After` asks, or else a jittered doubling delay.
 - **Never wait out a block.** A 429 asking for longer than the longest allowed wait fails at once, reporting the wait.
@@ -118,7 +118,7 @@ Source of truth: `store/src/adapters/d1-rest.ts`; tests in `store/test/d1-rest.t
 - **Must fail at once on any other failure**, such as a SQL error or a bad token, with D1's message.
 - **Must bound every retry and every attempt**: a limit on attempts, a limit on any one wait, and a timeout on each request.
 - **Never put the token in an error or in anything a log could print.**
-- **Must keep tests against real D1 opt-in**, so `pnpm test` runs offline with no credentials. `pnpm test:d1` runs the contract in Node, and `docs/specs/renders.md`'s after it, and sends about 495 requests against the shared limit, so never loop it. `pnpm test:d1:renders`, in `store/`, runs only the second, at about 90. `pnpm test:d1:workerd` runs inside workerd, with the whole store over this adapter and the [R2 adapter](#r2-adapter), and stops at a budget of 30. Run one at a time, of either, since all batches share one database.
+- **Must keep tests against real D1 opt-in**, so `pnpm test` runs offline with no credentials. `pnpm test:d1` runs the contract in Node, and `docs/specs/renders.md`'s after it, and sends about 495 requests against the shared limit, so never loop it. `pnpm test:d1:render-batches`, in `store/`, runs only the second, at about 90. `pnpm test:d1:workerd` runs inside workerd, with the whole store over this adapter and the [R2 adapter](#r2-adapter), and stops at a budget of 30. Run one at a time, of either, since all batches share one database.
 
 ## R2 adapter
 

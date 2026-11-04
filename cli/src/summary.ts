@@ -21,9 +21,9 @@ export interface BatchSummary {
     readonly undecided: number;
     readonly advisories: number;
   };
-  /** Changed or new, with no decision. */
+  /** Changed or added, with no decision. */
   readonly undecided: readonly ComparedRender[];
-  /** Changed or new, and not approved, which includes rejected. */
+  /** Changed or added, and not approved, which includes rejected. */
   readonly unapproved: readonly ComparedRender[];
   readonly failed: readonly ComparedRender[];
   /** Goldens this batch lacks, which a filter asked for. */
@@ -82,7 +82,7 @@ export function summarizeBatch({ batch, renders, unchangedCount }: Comparison): 
       stories: unchangedCount + changed + added + failed.length,
       unchanged: unchangedCount,
       changed,
-      added: added,
+      added,
       removed: removed.length,
       undecided: undecided.length,
       advisories: advisories.length,

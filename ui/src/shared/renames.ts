@@ -13,7 +13,7 @@ function closeness(a: string, b: string): number {
   return [...wordsOf(a)].filter((word) => theirs.has(word)).length;
 }
 
-/** Each new story that took over from a removed one, with what it was, one to one. */
+/** Each added story that took over from a removed one, with what it was, one to one. */
 export function findRenames(rows: readonly ComparedRow[]): ReadonlyMap<string, string> {
   const removedByImage = new Map<string, string[]>();
   for (const { state, story, goldenHash } of rows) {

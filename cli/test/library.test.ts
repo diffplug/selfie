@@ -31,7 +31,7 @@ afterEach(async () => {
   await h.destroy();
 });
 
-test("isDecidable is true only of what has an added image", () => {
+test("isDecidable is true only of what has an image to decide on", () => {
   expect(["changed", "added", "unchanged", "removed", "failed"].filter((state) => isDecidable(state as any))).toEqual([
     "changed",
     "added",

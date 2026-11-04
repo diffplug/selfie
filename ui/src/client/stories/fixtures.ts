@@ -90,14 +90,14 @@ export function batchOf(overrides: Partial<RenderBatch> = {}): RenderBatch {
 
 export function viewOf(
   list: readonly RenderRow[],
-  { batch: runOverrides, unchanged = 512, ...overrides }: Partial<Omit<BatchView, "batch">> & { readonly batch?: Partial<RenderBatch>; readonly unchanged?: number } = {},
+  { batch: batchOverrides, unchanged = 512, ...overrides }: Partial<Omit<BatchView, "batch">> & { readonly batch?: Partial<RenderBatch>; readonly unchanged?: number } = {},
 ): BatchView {
   const inState = (state: RenderRow["state"]) => list.filter((row) => row.state === state);
   const undecided = list.filter((row) => isDecidable(row.state) && row.decision === null);
   const unapproved = list.filter((row) => isDecidable(row.state) && row.decision?.decision !== "approved");
   const failed = inState("failed");
   const removed = inState("removed");
-  const batch = batchOf({ failedCount: failed.length, status: failed.length > 0 ? "failed" : "complete", ...runOverrides });
+  const batch = batchOf({ failedCount: failed.length, status: failed.length > 0 ? "failed" : "complete", ...batchOverrides });
 
   const blockers: Attention<BlockerReason>[] = [
     ...failed.map(({ story, failure }) => ({ story, reason: "failed" as const, detail: failure })),

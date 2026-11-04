@@ -82,7 +82,7 @@ export interface Difference {
   readonly decision: Decision | null;
   readonly imageHash: string | null;
   readonly goldenHash: string | null;
-  /** Absolute paths. `current` is null if removed, `golden` if new, `diff` unless pixels could be compared. */
+  /** Absolute paths. `current` is null if removed, `golden` if added, `diff` unless pixels could be compared. */
   readonly current: string | null;
   readonly golden: string | null;
   readonly diff: string | null;
@@ -338,7 +338,7 @@ async function replay(
     records: async () =>
       chosen.map(({ render: { story, imageHash, playError } }) => ({ story, imageHash: imageHash!, playError })),
     finished: async () =>
-      log(`Reused the images of batch ${batchId}, since this exact built Storybook already rendered. selfie render renders again.`),
+      log(`Reused the images of batch ${batchId}, since this exact built Storybook already rendered. Run selfie render to render again.`),
   };
 }
 
@@ -530,7 +530,7 @@ async function renderAndRecord(project: Project, options: RenderBatchOptions, { 
       await project.storybooks.recordViewport(batch.environment, settings.environment.viewport);
       await keepStorybook(project, batch, storybookDir, buildBefore, log);
     } else {
-      log(`Batch ${batch.id} already describes this built Storybook at this commit, so nothing new was recorded. selfie render renders again.`);
+      log(`Batch ${batch.id} already describes this built Storybook at this commit, so nothing new was recorded. Run selfie render to render again.`);
     }
     await project.notes.rememberBatch(batch.id);
     return {

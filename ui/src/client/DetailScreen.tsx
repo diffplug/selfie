@@ -95,7 +95,7 @@ function Notes({ row, diff, renamedFrom, renamedTo }: { row: RenderRow; diff: Pi
           <Banner variant="info" title="Added story" description="The baseline has no golden for it, so there's nothing to compare. Approving lets this image become its first golden." />
         ))}
       {row.state === "removed" && renamedTo !== undefined && (
-        <Banner variant="info" title="Renamed story" description={<>The new story <code>{renamedTo}</code> has this very image, so it looks to have been renamed.</>} />
+        <Banner variant="info" title="Renamed story" description={<>The added story <code>{renamedTo}</code> has this very image, so it looks to have been renamed.</>} />
       )}
       {row.state === "removed" && (
         <Banner variant="warning" title="Removed story" description="The baseline has this golden, and this batch doesn't have the story. There's no image to decide on: accepting asks you to acknowledge the removal." />
