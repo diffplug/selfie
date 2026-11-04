@@ -117,6 +117,8 @@ export interface WorkerRuntime {
 
 export type WorkerEvent =
   | { type: "ready"; runtime: WorkerRuntime }
+  /** Once, as the first story starts, which is after the browser is up. */
+  | { type: "started" }
   | { type: "story"; result: WorkerStoryResult }
   | { type: "fatal"; message: string }
   | { type: "done" };

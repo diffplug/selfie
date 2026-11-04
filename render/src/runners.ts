@@ -135,6 +135,7 @@ export interface WorkerRun {
   buildDir: string;
   outDir: string;
   signal: AbortSignal | undefined;
+  onStarted: () => void;
   onStory: (result: WorkerStoryResult) => void;
 }
 
@@ -198,6 +199,8 @@ export function runWorker(run: WorkerRun): Promise<WorkerOutcome> {
       }
       if (event.type === "ready") {
         runtime = event.runtime;
+      } else if (event.type === "started") {
+        run.onStarted();
       } else if (event.type === "story") {
         results.set(event.result.id, event.result);
         run.onStory(event.result);

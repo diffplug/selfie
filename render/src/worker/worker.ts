@@ -312,6 +312,7 @@ async function main(): Promise<void> {
   });
 
   const queue = [...job.stories];
+  emit({ type: "started" });
   await Promise.all(
     Array.from({ length: job.concurrency }, async () => {
       for (let story = queue.shift(); story; story = queue.shift()) {
