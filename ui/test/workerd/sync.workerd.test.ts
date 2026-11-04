@@ -46,7 +46,7 @@ const send = (method: string, route: string, token: string, body?: unknown) =>
 
 const sendJson = async (method: string, route: string, token: string, body?: unknown) => (await send(method, route, token, body)).json();
 
-const batchFacts = (gitSha: string) => ({ gitSha, environment: ENV, startedAt: 500, dirty: false, storyFilter: null, reusedFromBatch: null, scale: 1 });
+const batchFacts = (gitSha: string) => ({ gitSha, environment: ENV, startedAt: 500, dirty: false, storyFilter: null, reusedFromBatch: null, scale: 1, viewport: { width: 1200, height: 900 } });
 
 beforeAll(async () => {
   const sql = new Sql(d1Binding(env.DB));

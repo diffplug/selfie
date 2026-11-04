@@ -53,4 +53,3 @@ export const SizeOfItsOwn: Story = {
     await expect(current!.style.height).toBe("896px");
   },
 };
-export const SizeUnknown: Story = { args: { row: BUTTON, view: liveView(BUTTON, { viewport: null }) }, play: liveLoaded };

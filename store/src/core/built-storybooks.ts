@@ -13,10 +13,6 @@ export const CREATE_BUILT_STORYBOOK_TABLES: readonly string[] = [
   key INTEGER PRIMARY KEY,
   hash TEXT NOT NULL UNIQUE
 )`,
-  // By environment, whose ID already covers it, so a batch's story can lay out as it was rendered.
-  "CREATE TABLE IF NOT EXISTS environment_viewports (environment TEXT PRIMARY KEY, width INTEGER NOT NULL, height INTEGER NOT NULL) WITHOUT ROWID",
-  // Only a story that declared a size other than its environment's, so nearly every batch has no rows here.
-  "CREATE TABLE IF NOT EXISTS story_viewports (batch_id TEXT NOT NULL REFERENCES render_batches(id), story TEXT NOT NULL, width INTEGER NOT NULL, height INTEGER NOT NULL, PRIMARY KEY (batch_id, story)) WITHOUT ROWID",
 ];
 
 
@@ -33,12 +29,6 @@ const manifestBlobKey = (build: string) => `built-storybooks/${build}`;
 export interface BuiltStorybookFile {
   readonly path: string;
   readonly fileHash: string;
-}
-
-/** The size a story renders at, in CSS pixels. */
-export interface StoryViewport {
-  readonly width: number;
-  readonly height: number;
 }
 
 export class BuiltStorybooks {
@@ -108,37 +98,6 @@ export class BuiltStorybooks {
       idempotent: true,
     });
     if (rows.length === 0) throw new RangeError(`This store doesn't hold both batch ${batchId} and built Storybook ${build}`);
-  }
-
-  /** Says what size an environment renders at, which can't change, since its ID covers it. */
-  async recordViewport(environment: string, { width, height }: StoryViewport): Promise<void> {
-    await this.#sql.run({
-      sql: "INSERT OR IGNORE INTO environment_viewports(environment, width, height) VALUES (?1, ?2, ?3)",
-      params: [environment, width, height],
-      idempotent: true,
-    });
-  }
-
-  /** What size an environment renders at, or null for one no batch has recorded this. */
-  async viewportOf(environment: string): Promise<StoryViewport | null> {
-    const [row] = await this.#sql.run({ sql: "SELECT width, height FROM environment_viewports WHERE environment = ?1", params: [environment], idempotent: true });
-    return row === undefined ? null : { width: row.width as number, height: row.height as number };
-  }
-
-  /** Says which of a batch's stories rendered at a size other than its environment's. A batch's first answer stays. */
-  async recordStoryViewports(batchId: string, viewports: Readonly<Record<string, StoryViewport>>): Promise<void> {
-    const statements = Object.entries(viewports).map(([story, { width, height }]) => ({
-      sql: "INSERT OR IGNORE INTO story_viewports(batch_id, story, width, height) VALUES (?1, ?2, ?3, ?4)",
-      params: [batchId, story, width, height],
-      idempotent: true,
-    }));
-    for (const request of chunks(statements, STATEMENTS_PER_REQUEST)) await this.#sql.batch(request);
-  }
-
-  /** Those of a batch's stories that rendered at a size other than its environment's. */
-  async storyViewportsOf(batchId: string): Promise<Readonly<Record<string, StoryViewport>>> {
-    const rows = await this.#sql.run({ sql: "SELECT story, width, height FROM story_viewports WHERE batch_id = ?1", params: [batchId], idempotent: true });
-    return Object.fromEntries(rows.map(({ story, width, height }) => [story as string, { width: width as number, height: height as number }]));
   }
 
   /** The kept built Storybook that rendered a batch, if there is one. */

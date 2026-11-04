@@ -26,6 +26,8 @@
 
 **Not yet run on real D1.** The three new columns on `render_batches`, the longest statement of failures, and `firstWithGoldens` are in the contract suite, and pass on local SQLite through the same `Sql` limits. The batch on real D1 wasn't made when they went in, so their fit there is unproven, and the suite's size of about 90 requests is counted from the code rather than measured. A statement of 33 renders with both messages at their 2,000 characters binds about 132 KB, which is the case to watch.
 
+**Windows in columns.** The image's size can't say what window a story laid out in, since a full-page image may be taller or wider than its window, and neither can the environment's ID, which is a hash. On the batch beside `scale`, since it's the same kind of fact. A story's own on its render, empty for nearly every row, so sync and reuse carry it with the row. This costs 2 bytes a row and replaced two tables that didn't sync, and left a cloud batch unable to size a live story.
+
 **A filter as a fact.** Whether an approved story is really gone or only outside the batch's filter needs the patterns, so they're kept too. What's unmatched is kept alongside them, since a comparison lists too little to work it out.
 
 ## Compare

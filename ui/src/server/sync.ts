@@ -3,7 +3,7 @@
 // so they run on any platform, and are tested with a stand-in for it.
 import { Hono, type Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { ImageDecodeError, isGitSha, isImageHash, isBatchId, BatchError, type ReceivedDecision, type ReceivedBatch, type ReceivingStore, type RecordedRender, type RenderBatches, type StoryFilter } from "selfie-store";
+import { ImageDecodeError, isGitSha, isImageHash, isBatchId, BatchError, type ReceivedDecision, type ReceivedBatch, type ReceivingStore, type RecordedRender, type RenderBatches, type StoryFilter, type Viewport } from "selfie-store";
 import { SYNC_LIMITS, type GoldensAnswer, type ProjectAccess } from "../shared/sync-api.ts";
 import { failure, imageResponse, INTERNAL_ERROR, noStoreByDefault } from "./http.ts";
 
@@ -94,16 +94,22 @@ function readHash(value: unknown): string {
   return value;
 }
 
+function readViewport(value: unknown, what: string): Viewport {
+  const { width, height } = asRecord(value);
+  if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || (width as number) <= 0 || (height as number) <= 0) throw badRequest(`${what} must be a positive whole width and height.`);
+  return { width: width as number, height: height as number };
+}
+
 function recordedRender(value: unknown): RecordedRender {
-  const { story, imageHash, failure } = asRecord(value);
-  const named = readText(story, "story");
-  if (imageHash === null || imageHash === undefined) return { story: named, failure: readText(failure, "failure") };
-  return { story: named, imageHash: readHash(imageHash), ...(failure === null || failure === undefined ? {} : { failure: readText(failure, "failure") }) };
+  const { story, imageHash, failure, viewport } = asRecord(value);
+  const named = { story: readText(story, "story"), ...(viewport === null || viewport === undefined ? {} : { viewport: readViewport(viewport, "viewport") }) };
+  if (imageHash === null || imageHash === undefined) return { ...named, failure: readText(failure, "failure") };
+  return { ...named, imageHash: readHash(imageHash), ...(failure === null || failure === undefined ? {} : { failure: readText(failure, "failure") }) };
 }
 
 /** A batch's facts as a sender states them, whose times can't be later than now. */
 function receivedBatch(id: string, body: Record<string, unknown>, now: number): ReceivedBatch {
-  const { gitSha, environment, startedAt, dirty, storyFilter, reusedFromBatch, scale } = body;
+  const { gitSha, environment, startedAt, dirty, storyFilter, reusedFromBatch, scale, viewport } = body;
   if (typeof dirty !== "boolean") throw badRequest("dirty must be true or false.");
   if (typeof scale !== "number") throw badRequest("scale must be a number.");
   return {
@@ -115,6 +121,7 @@ function receivedBatch(id: string, body: Record<string, unknown>, now: number): 
     storyFilter: (storyFilter ?? null) as StoryFilter | null,
     reusedFromBatch: orNull(reusedFromBatch, (batch) => readText(batch, "reusedFromBatch")),
     scale,
+    viewport: readViewport(viewport, "viewport"),
   };
 }
 

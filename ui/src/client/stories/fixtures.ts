@@ -82,6 +82,7 @@ export function batchOf(overrides: Partial<RenderBatch> = {}): RenderBatch {
     storyFilter: null,
     reusedFromBatch: null,
     scale: 1,
+    viewport: { width: 1200, height: 900 },
     ...overrides,
   };
 }
@@ -111,7 +112,6 @@ export function viewOf(
   return {
     batch,
     storybook: null,
-    viewport: { width: 1200, height: 900 },
     storyViewports: {},
     storyNames: [],
     hunkMergeDistance: 12,

@@ -26,7 +26,7 @@ import {
   type RenderBatch,
   type BuiltStorybookFile,
   type StoryFilter,
-  type StoryViewport,
+  type Viewport,
 } from "selfie-store";
 import { resolveRenderSettings, resolveHunkMergeDistance, type RenderSettings } from "./config.ts";
 import { diffToPng, type PixelDiff } from "./diff.ts";
@@ -176,6 +176,11 @@ async function storeGroup(
   return { hashes, refused };
 }
 
+/** The window a story laid out in, if that isn't its environment's. */
+function ownViewport({ viewport }: Manifest["stories"][number], { width, height }: Viewport): Viewport | undefined {
+  return viewport === null || (viewport.width === width && viewport.height === height) ? undefined : viewport;
+}
+
 /** Puts the render's images in the store, and returns one row per story. */
 async function storeRender(project: Project, renderDir: string, manifest: Manifest): Promise<RecordedRender[]> {
   const records: RecordedRender[] = [];
@@ -195,7 +200,8 @@ async function storeRender(project: Project, renderDir: string, manifest: Manife
     for (const [story, message] of stored.refused) failures.set(story, `The store refused its image: ${message}`);
     for (const story of group) {
       const imageHash = stored.hashes.get(story.id);
-      records.push(imageHash !== undefined ? { story: story.id, imageHash, failure: playFailureOf(story) } : { story: story.id, failure: failures.get(story.id)! });
+      const viewport = ownViewport(story, manifest.environment.viewport);
+      records.push(imageHash !== undefined ? { story: story.id, viewport, imageHash, failure: playFailureOf(story) } : { story: story.id, viewport, failure: failures.get(story.id)! });
     }
   }
   return records;
@@ -282,8 +288,6 @@ interface Recording {
   readonly storyIds: readonly string[];
   readonly warnings: readonly string[];
   readonly records: () => Promise<readonly RecordedRender[]>;
-  /** The stories that rendered at a size other than their environment's. */
-  readonly storyViewports: () => Promise<Readonly<Record<string, StoryViewport>>>;
   /** Called with the finished batch, if a new one was recorded. */
   readonly finished: (batch: RenderBatch) => Promise<void>;
 }
@@ -323,22 +327,13 @@ async function replay(
     reusedFromBatch: batchId,
     storyIds,
     warnings: (storyFilterOf(patterns, storyIds)?.unmatched ?? []).map(unmatchedPatternWarning),
-    records: async () => chosen.map(({ render: { story, imageHash, failure } }) => ({ story, imageHash: imageHash!, ...(failure === null ? {} : { failure }) })),
-    storyViewports: async () => {
-      const kept = new Set(storyIds);
-      return Object.fromEntries(Object.entries(await project.storybooks.storyViewportsOf(batchId)).filter(([story]) => kept.has(story)));
+    records: async () => {
+      const viewports = await project.batches.storyViewportsOf(batchId);
+      return chosen.map(({ render: { story, imageHash, failure } }) => ({ story, imageHash: imageHash!, viewport: viewports[story], ...(failure === null ? {} : { failure }) }));
     },
     finished: async () =>
       log(`Reused the images of batch ${batchId}, since this exact built Storybook already rendered. Run selfie render to render again.`),
   };
-}
-
-/** The stories in a manifest that laid out at a size other than its environment's. */
-function ownViewports({ environment, stories }: Manifest): Record<string, StoryViewport> {
-  const { width, height } = environment.viewport;
-  return Object.fromEntries(
-    stories.flatMap(({ id, viewport }) => (viewport === null || (viewport.width === width && viewport.height === height) ? [] : [[id, viewport]])),
-  );
 }
 
 /** What a render takes from a project's settings and a command's options. */
@@ -380,7 +375,6 @@ async function renderFresh(
     storyIds: manifest.stories.map(({ id }) => id),
     warnings: manifest.warnings,
     records: async () => (stored = await storeRender(project, renderDir, manifest)),
-    storyViewports: async () => ownViewports(manifest),
     async finished(batch) {
       if (options.stories !== undefined) return;
       if (identity === null) {
@@ -433,6 +427,7 @@ async function recordBatch(
     gitSha: fields.gitSha,
     environment: fields.settings.environmentId,
     scale: fields.settings.environment.scale,
+    viewport: fields.settings.environment.viewport,
     dirty: fields.dirty,
     branch: fields.branch,
     storyFilter: fields.storyFilter,
@@ -516,8 +511,6 @@ async function renderAndRecord(project: Project, options: RenderBatchOptions, { 
     if (existing === null) {
       log(`Recorded batch ${batch.id}: ${recording.storyIds.length} stories.`);
       await recording.finished(batch);
-      await project.storybooks.recordViewport(batch.environment, settings.environment.viewport);
-      await project.storybooks.recordStoryViewports(batch.id, await recording.storyViewports());
       await keepStorybook(project, batch, storybookDir, buildBefore, log);
     } else {
       log(`Batch ${batch.id} already describes this built Storybook at this commit, so nothing new was recorded. Run selfie render to render again.`);

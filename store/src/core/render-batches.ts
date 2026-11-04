@@ -20,6 +20,8 @@ export const CREATE_BATCH_TABLES: readonly string[] = [
   story_filter TEXT,
   reused_from_batch TEXT,
   scale REAL NOT NULL,
+  viewport_width INTEGER NOT NULL,
+  viewport_height INTEGER NOT NULL,
   branch TEXT,
   storybook_key INTEGER REFERENCES built_storybooks(key)
 )`,
@@ -30,8 +32,11 @@ export const CREATE_BATCH_TABLES: readonly string[] = [
   story TEXT NOT NULL,
   image_key INTEGER REFERENCES images(key),
   failure TEXT,
+  viewport_width INTEGER,
+  viewport_height INTEGER,
   PRIMARY KEY (batch_key, story),
-  CHECK (image_key IS NOT NULL OR failure IS NOT NULL)
+  CHECK (image_key IS NOT NULL OR failure IS NOT NULL),
+  CHECK ((viewport_width IS NULL) = (viewport_height IS NULL))
 ) WITHOUT ROWID`,
   `CREATE TABLE IF NOT EXISTS decisions (
   environment TEXT NOT NULL,
@@ -53,9 +58,9 @@ export const CREATE_BATCH_TABLES: readonly string[] = [
 ) WITHOUT ROWID`,
 ];
 
-// These fit the limit of 100 bound parameters per statement, beside what all of a
-// statement's rows share. A recorded render takes two, or three with both an image and a
-// failure, so a statement holds 49 when none has both, and at least 33.
+// These fit the limit of 100 bound parameters per statement, beside what all of a statement's
+// rows share. A recorded render takes two, one more with both an image and a failure, and two
+// more with a viewport of its own, so a statement holds 49 when none has either, and at least 19.
 const MAX_RECORD_PARAMS = 100;
 const RENDERS_PER_DECISION_STATEMENT = 47;
 // Beside the environment, a merged decision takes seven.
@@ -78,7 +83,7 @@ export const isGitSha = (value: string) => GIT_SHA.test(value);
 export const isBatchId = (value: string) => BATCH_ID.test(value);
 
 const BATCH_COLUMNS =
-  "id, git_sha, environment, started_at, finished_at, failed_count, dirty, story_filter, reused_from_batch, scale, branch";
+  "id, git_sha, environment, started_at, finished_at, failed_count, dirty, story_filter, reused_from_batch, scale, viewport_width, viewport_height, branch";
 
 const SELECT_BATCH = `SELECT ${BATCH_COLUMNS} FROM render_batches WHERE id = ?1`;
 
@@ -196,7 +201,7 @@ const BATCH_PAGE_TAIL = `WHERE r.id = ?1 AND rs.story > ?2
 ORDER BY rs.story
 LIMIT CAST(?3 AS INTEGER)`;
 
-const READ_BATCH_PAGE = `SELECT rs.story, i.hash AS image_hash, rs.failure, d.decision, d.actor, d.decided_at, d.git_sha, d.batch_id
+const READ_BATCH_PAGE = `SELECT rs.story, i.hash AS image_hash, rs.failure, rs.viewport_width, rs.viewport_height, d.decision, d.actor, d.decided_at, d.git_sha, d.batch_id
 FROM render_batches r
 CROSS JOIN renders rs ON rs.batch_key = r.key
 LEFT JOIN images i ON i.key = rs.image_key
@@ -224,14 +229,21 @@ WHERE batch_key = (SELECT key FROM render_batches WHERE id = ?1)`;
 // A row with a hash the images table lacks, or a finished batch, matches nothing, so the
 // statement returns too few rows, which is how `recordRenders` knows.
 const recordSql = (values: string) =>
-  `WITH v(story, image_hash, failure) AS (VALUES ${values})
-INSERT INTO renders(batch_key, story, image_key, failure)
-SELECT r.key, v.story, i.key, v.failure
+  `WITH v(story, image_hash, failure, viewport_width, viewport_height) AS (VALUES ${values})
+INSERT INTO renders(batch_key, story, image_key, failure, viewport_width, viewport_height)
+SELECT r.key, v.story, i.key, v.failure, v.viewport_width, v.viewport_height
 FROM render_batches r CROSS JOIN v LEFT JOIN images i ON i.hash = v.image_hash
 WHERE r.id = ?1 AND r.finished_at IS NULL AND (v.image_hash IS NULL OR i.key IS NOT NULL)
 ON CONFLICT(batch_key, story) DO UPDATE SET
-  image_key = excluded.image_key, failure = excluded.failure
+  image_key = excluded.image_key, failure = excluded.failure,
+  viewport_width = excluded.viewport_width, viewport_height = excluded.viewport_height
 RETURNING 1 AS written`;
+
+/** A window to lay a story out in, in CSS pixels. */
+export interface Viewport {
+  readonly width: number;
+  readonly height: number;
+}
 
 /**
  * What a batch recorded for one story: the stored image's hash, why it failed, or both, for a story
@@ -240,6 +252,8 @@ RETURNING 1 AS written`;
 export type RecordedRender = {
   /** The story ID, with any render variant in it. Opaque here. */
   readonly story: string;
+  /** The window it laid out in, only if that isn't its batch's. */
+  readonly viewport?: Viewport | undefined;
 } & (
   | { readonly imageHash: string; readonly failure?: string | undefined }
   | { readonly failure: string; readonly imageHash?: undefined }
@@ -279,6 +293,8 @@ export interface RenderBatch {
   readonly reusedFromBatch: string | null;
   /** Image pixels per CSS pixel, which the environment's ID hides inside its hash. */
   readonly scale: number;
+  /** The window a story lays out in, unless it declares its own, which the environment's ID also hides. */
+  readonly viewport: Viewport;
   /** What HEAD was on, which keeps a branch's batches together when a rebase leaves their commits behind. Null if detached. */
   readonly branch: string | null;
 }
@@ -427,6 +443,7 @@ export class RenderBatches {
     gitSha: string;
     environment: string;
     scale: number;
+    viewport: Viewport;
     dirty: boolean;
     storyFilter?: StoryFilter | null;
     reusedFromBatch?: string | null;
@@ -446,8 +463,8 @@ export class RenderBatches {
   async receiveBatch(received: ReceivedBatch): Promise<RenderBatch> {
     const [, rows] = await this.#sql.batch([insertBatchStatement(received), { sql: SELECT_BATCH, params: [received.id], idempotent: true }]);
     const batch = toBatch(rows![0]!);
-    const { gitSha, environment, startedAt, dirty, scale } = received;
-    if (batch.gitSha !== gitSha || batch.environment !== environment || batch.startedAt !== startedAt || batch.dirty !== dirty || batch.scale !== scale) {
+    const { gitSha, environment, startedAt, dirty, scale, viewport } = received;
+    if (batch.gitSha !== gitSha || batch.environment !== environment || batch.startedAt !== startedAt || batch.dirty !== dirty || batch.scale !== scale || batch.viewport.width !== viewport.width || batch.viewport.height !== viewport.height) {
       throw new BatchError("batch-conflict", `Batch ${received.id} is already here, and it isn't this one`);
     }
     return batch;
@@ -478,6 +495,18 @@ export class RenderBatches {
       "unknown-image",
       `${missing} renders were not recorded, since their images are not stored`,
     );
+  }
+
+  /** Those of a batch's stories that laid out in a window other than the batch's. */
+  async storyViewportsOf(batchId: string): Promise<Readonly<Record<string, Viewport>>> {
+    const rows = await this.#sql.run({
+      sql: `SELECT rs.story, rs.viewport_width, rs.viewport_height
+FROM render_batches r CROSS JOIN renders rs ON rs.batch_key = r.key
+WHERE r.id = ?1 AND rs.viewport_width IS NOT NULL`,
+      params: [batchId],
+      idempotent: true,
+    });
+    return Object.fromEntries(rows.map((row) => [row.story as string, { width: row.viewport_width as number, height: row.viewport_height as number }]));
   }
 
   /**
@@ -721,6 +750,7 @@ ON CONFLICT(environment, story, image_hash, git_sha) DO UPDATE SET
       batch,
       renders: page.map((row) => ({
         story: row.story as string,
+        ...(row.viewport_width === null ? {} : { viewport: { width: row.viewport_width as number, height: row.viewport_height as number } }),
         ...(row.image_hash === null ? { failure: row.failure as string } : { imageHash: row.image_hash as string, ...(row.failure === null ? {} : { failure: row.failure as string }) }),
         decision: row.decision === null ? null : { decision: row.decision as DecisionKind, actor: row.actor as string, at: row.decided_at as number, gitSha: row.git_sha as string, batchId: row.batch_id as string },
       })),
@@ -818,9 +848,10 @@ interface RecordStatement {
 
 function recordStatements(batchId: string, renders: readonly RecordedRender[]): RecordStatement[] {
   const names = new Set<string>();
-  for (const { story, imageHash } of renders) {
+  for (const { story, imageHash, viewport } of renders) {
     assertNamePart(story, "story");
     if (imageHash !== undefined) assertImageHash(imageHash);
+    if (viewport !== undefined) assertViewport(viewport);
     if (names.has(story)) throw new RangeError(`Story recorded twice in one call: ${story}`);
     names.add(story);
   }
@@ -837,14 +868,15 @@ function recordStatements(batchId: string, renders: readonly RecordedRender[]): 
     params = [batchId];
     values = [];
   };
-  for (const { story, imageHash, failure } of renders) {
-    const needed = imageHash !== undefined && failure !== undefined ? 3 : 2;
+  for (const { story, imageHash, failure, viewport } of renders) {
+    const needed = 1 + (imageHash === undefined ? 0 : 1) + (failure === undefined ? 0 : 1) + (viewport === undefined ? 0 : 2);
     if (params.length + needed > MAX_RECORD_PARAMS) flush();
     const name = `?${params.push(story)}`;
     // Sql binds no nulls, so the column a row leaves empty is a literal.
     const image = imageHash === undefined ? "NULL" : `?${params.push(imageHash)}`;
     const why = failure === undefined ? "NULL" : `?${params.push(cleanMessage(failure))}`;
-    values.push(`(${name}, ${image}, ${why})`);
+    const size = viewport === undefined ? "NULL, NULL" : `?${params.push(viewport.width)}, ?${params.push(viewport.height)}`;
+    values.push(`(${name}, ${image}, ${why}, ${size})`);
   }
   flush();
   return statements;
@@ -893,6 +925,7 @@ function toBatch(row: SqlRow): RenderBatch {
     storyFilter: row.story_filter === null ? null : (JSON.parse(row.story_filter as string) as StoryFilter),
     reusedFromBatch: row.reused_from_batch as string | null,
     scale: row.scale as number,
+    viewport: { width: row.viewport_width as number, height: row.viewport_height as number },
     branch: row.branch as string | null,
   };
 }
@@ -1007,16 +1040,21 @@ function assertCanBeGoldens(batch: RenderBatch): void {
   }
 }
 
-function insertBatchStatement({ id, gitSha, environment, startedAt, dirty, storyFilter, reusedFromBatch, scale, branch }: ReceivedBatch): SqlStatement {
+function assertViewport({ width, height }: Viewport): void {
+  if (!Number.isInteger(width) || !Number.isInteger(height) || width <= 0 || height <= 0) throw new RangeError(`A viewport must be positive whole numbers, got ${width}x${height}`);
+}
+
+function insertBatchStatement({ id, gitSha, environment, startedAt, dirty, storyFilter, reusedFromBatch, scale, viewport, branch }: ReceivedBatch): SqlStatement {
   assertGitSha(gitSha);
   assertNamePart(environment, "environment");
   if (!Number.isFinite(scale) || scale <= 0) throw new RangeError(`A batch's scale must be a positive number, got ${scale}`);
+  assertViewport(viewport);
   return {
     // Sql binds no nulls, so an empty string stands for one.
-    sql: `INSERT INTO render_batches(id, git_sha, environment, started_at, dirty, story_filter, reused_from_batch, scale, branch)
-VALUES (?1, ?2, ?3, CAST(?4 AS INTEGER), CAST(?5 AS INTEGER), NULLIF(?6, ''), NULLIF(?7, ''), ?8, NULLIF(?9, ''))
+    sql: `INSERT INTO render_batches(id, git_sha, environment, started_at, dirty, story_filter, reused_from_batch, scale, branch, viewport_width, viewport_height)
+VALUES (?1, ?2, ?3, CAST(?4 AS INTEGER), CAST(?5 AS INTEGER), NULLIF(?6, ''), NULLIF(?7, ''), ?8, NULLIF(?9, ''), CAST(?10 AS INTEGER), CAST(?11 AS INTEGER))
 ON CONFLICT(id) DO NOTHING`,
-    params: [id, gitSha, environment, startedAt, dirty ? 1 : 0, storyFilter === null ? "" : JSON.stringify(storyFilter), reusedFromBatch ?? "", scale, branch ?? ""],
+    params: [id, gitSha, environment, startedAt, dirty ? 1 : 0, storyFilter === null ? "" : JSON.stringify(storyFilter), reusedFromBatch ?? "", scale, branch ?? "", viewport.width, viewport.height],
     idempotent: true,
   };
 }

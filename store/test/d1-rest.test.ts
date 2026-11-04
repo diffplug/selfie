@@ -386,8 +386,8 @@ describe("D1RestAdapter replay against a real SQL engine", () => {
     const store = new Store({ codec: sharpCodec, sql, blob: temp.blob });
     const { hash: imageHash, key } = await store.putImage(pngOf(image(1)));
     expect(await store.lookupKey(imageHash)).toBe(key);
-    // Twice each: the schema's 11 statements, and the put's lookup, insert, and lookup.
-    expect(sent).toHaveLength(28);
+    // Twice each: the schema's 9 statements, and the put's lookup, insert, and lookup.
+    expect(sent).toHaveLength(24);
   });
 
   it("resends everything the render model sends, so a lost response never fails it", async () => {
@@ -397,7 +397,7 @@ describe("D1RestAdapter replay against a real SQL engine", () => {
     const batches = new RenderBatches({ sql });
     const environment = "env";
     const gitSha = "a".repeat(40);
-    const batch = await batches.beginBatch({ gitSha, environment, scale: 1, dirty: false, });
+    const batch = await batches.beginBatch({ gitSha, environment, scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, });
     await batches.recordRenders(batch.id, [{ story: "a", imageHash: hashOf(1) }]);
     expect(await batches.finishBatch(batch.id, 1)).toMatchObject({ status: "complete" });
     await batches.decide({ on: ON,

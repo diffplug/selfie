@@ -72,7 +72,7 @@ describe("RenderBatches", () => {
     environment = ENV,
     model = batches,
   ) => {
-    const batch = await model.beginBatch({ gitSha, environment, scale: 1, dirty: false, });
+    const batch = await model.beginBatch({ gitSha, environment, scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, });
     await model.recordRenders(batch.id, items);
     return model.finishBatch(batch.id, items.length);
   };
@@ -136,7 +136,7 @@ describe("RenderBatches", () => {
 
   describe("recording a failure", () => {
     it("cuts it by code point", async () => {
-      const batch = await batches.beginBatch({ gitSha: SHA_A, environment: ENV, scale: 1, dirty: false, });
+      const batch = await batches.beginBatch({ gitSha: SHA_A, environment: ENV, scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, });
       await batches.recordRenders(batch.id, [{ story: "a", failure: `${"x".repeat(1999)}😀😀\0` }]);
       await batches.finishBatch(batch.id, 1);
       const { renders: compared } = await batches.compareBatch(batch.id, null);
@@ -147,7 +147,7 @@ describe("RenderBatches", () => {
       await recordBatch(SHA_B, [rendered("holds-the-image", 9)]);
       const { sent, adapter: counted } = counting(adapter);
       const model = new RenderBatches({ sql: new Sql(counted) });
-      const batch = await batches.beginBatch({ gitSha: SHA_A, environment: ENV, scale: 1, dirty: false, });
+      const batch = await batches.beginBatch({ gitSha: SHA_A, environment: ENV, scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, });
       const rows = Array.from({ length: 200 }, (_, i) => (i % 2 === 0 ? { ...rendered(`s${i}`, 9), failure: "boom" } : { story: `s${i}`, failure: "boom" }));
       await model.recordRenders(batch.id, rows);
       for (const { params = [] } of sent.flat()) expect(params.length).toBeLessThanOrEqual(100);
@@ -165,15 +165,15 @@ describe("RenderBatches", () => {
 
     it("refuses a scale that isn't a positive number", async () => {
       for (const scale of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
-        await expect(batches.beginBatch({ gitSha: SHA_A, environment: ENV, scale, dirty: false, })).rejects.toThrow(RangeError);
+        await expect(batches.beginBatch({ gitSha: SHA_A, environment: ENV, scale, viewport: { width: 1200, height: 900 }, dirty: false, })).rejects.toThrow(RangeError);
       }
     });
 
     it("refuses what can't name a render", async () => {
-      const batch = await batches.beginBatch({ gitSha: SHA_A, environment: ENV, scale: 1, dirty: false, });
+      const batch = await batches.beginBatch({ gitSha: SHA_A, environment: ENV, scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, });
       for (const bad of ["", "a\0b"]) {
         await expect(batches.recordRenders(batch.id, [rendered(bad, 1)])).rejects.toThrow(RangeError);
-        await expect(batches.beginBatch({ gitSha: SHA_A, environment: bad, scale: 1, dirty: false, })).rejects.toThrow(RangeError);
+        await expect(batches.beginBatch({ gitSha: SHA_A, environment: bad, scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, })).rejects.toThrow(RangeError);
       }
       await expect(
         batches.recordRenders(batch.id, [{ story: "a", imageHash: "abc" }]),
@@ -182,7 +182,7 @@ describe("RenderBatches", () => {
         "recorded twice",
       );
       for (const sha of ["abc123", SHA_A.toUpperCase()]) {
-        await expect(batches.beginBatch({ gitSha: sha, environment: ENV, scale: 1, dirty: false, })).rejects.toThrow("Git SHA");
+        await expect(batches.beginBatch({ gitSha: sha, environment: ENV, scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, })).rejects.toThrow("Git SHA");
       }
       await expect(batches.finishBatch(batch.id, 0)).resolves.toMatchObject({ status: "complete" });
     });
@@ -190,7 +190,7 @@ describe("RenderBatches", () => {
 
   describe("recording", () => {
     it("takes the newer result for a name, until the batch is finished", async () => {
-      const batch = await batches.beginBatch({ gitSha: SHA_A, environment: ENV, scale: 1, dirty: false, });
+      const batch = await batches.beginBatch({ gitSha: SHA_A, environment: ENV, scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, });
       await batches.recordRenders(batch.id, [{ story: "a", failure: "Timeout" }, rendered("b", 1)]);
       await batches.recordRenders(batch.id, [rendered("a", 2), { story: "b", failure: "Crash" }]);
       expect(await batches.finishBatch(batch.id, 2)).toMatchObject({ status: "failed", failedCount: 1 });
@@ -214,7 +214,7 @@ describe("RenderBatches", () => {
     it("records a mix of results in one statement", async () => {
       const { adapter: counted, sent } = counting(adapter);
       const model = new RenderBatches({ sql: new Sql(counted) });
-      const batch = await model.beginBatch({ gitSha: SHA_A, environment: ENV, scale: 1, dirty: false, });
+      const batch = await model.beginBatch({ gitSha: SHA_A, environment: ENV, scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, });
       sent.length = 0;
       await model.recordRenders(batch.id, [
         rendered("a", 1),
@@ -235,14 +235,14 @@ describe("RenderBatches", () => {
     });
 
     it("bounds a failure message without splitting a character", async () => {
-      const batch = await batches.beginBatch({ gitSha: SHA_A, environment: ENV, scale: 1, dirty: false, });
+      const batch = await batches.beginBatch({ gitSha: SHA_A, environment: ENV, scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, });
       await batches.recordRenders(batch.id, [{ story: "a", failure: "\0\u{1F600}".repeat(5_000) }]);
       await batches.finishBatch(batch.id, 1);
       expect((await heldBy(batch.id))[0]?.failure).toBe("\u{1F600}".repeat(2_000));
     });
 
     it("refuses an image that isn't stored, and a batch that doesn't exist", async () => {
-      const batch = await batches.beginBatch({ gitSha: SHA_A, environment: ENV, scale: 1, dirty: false, });
+      const batch = await batches.beginBatch({ gitSha: SHA_A, environment: ENV, scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, });
       await expect(batches.recordRenders(batch.id, [rendered("a", 9_999)])).rejects.toMatchObject({
         code: "unknown-image",
       });
@@ -256,7 +256,7 @@ describe("RenderBatches", () => {
     });
 
     it("keeps the good rows of a statement that also names an unstored image", async () => {
-      const batch = await batches.beginBatch({ gitSha: SHA_A, environment: ENV, scale: 1, dirty: false, });
+      const batch = await batches.beginBatch({ gitSha: SHA_A, environment: ENV, scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, });
       await expect(
         batches.recordRenders(batch.id, [rendered("a", 1), rendered("b", 9_999)]),
       ).rejects.toMatchObject({ code: "unknown-image", message: expect.stringContaining("1 renders") });
@@ -268,7 +268,7 @@ describe("RenderBatches", () => {
     it("finishes an empty batch, and sends nothing for an empty call", async () => {
       const { adapter: counted, sent } = counting(adapter);
       const model = new RenderBatches({ sql: new Sql(counted) });
-      const batch = await model.beginBatch({ gitSha: SHA_A, environment: ENV, scale: 1, dirty: false, });
+      const batch = await model.beginBatch({ gitSha: SHA_A, environment: ENV, scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, });
       await model.recordRenders(batch.id, []);
       await model.decide({ on: ON, environment: ENV, decision: "approved", actor: "ned", renders: [] });
       expect(sent).toHaveLength(1);
@@ -276,7 +276,7 @@ describe("RenderBatches", () => {
     });
 
     it("lists batches at a SHA, crashed ones included, for one environment", async () => {
-      const crashed = await batches.beginBatch({ gitSha: SHA_A, environment: ENV, scale: 1, dirty: false, });
+      const crashed = await batches.beginBatch({ gitSha: SHA_A, environment: ENV, scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, });
       const later = await recordBatch(SHA_A, []);
       await recordBatch(SHA_A, [], "other");
       await recordBatch(SHA_B, []);
@@ -298,7 +298,7 @@ describe("RenderBatches", () => {
     it("sends a large run in as few requests as the limits allow", async () => {
       const { adapter: counted, sent } = counting(adapter);
       const model = new RenderBatches({ sql: new Sql(counted) });
-      const batch = await model.beginBatch({ gitSha: SHA_A, environment: ENV, scale: 1, dirty: false, });
+      const batch = await model.beginBatch({ gitSha: SHA_A, environment: ENV, scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, });
       sent.length = 0;
       await model.recordRenders(batch.id, items);
       expect(sent.map((statements) => statements.length)).toEqual([400, 9]);
@@ -308,7 +308,7 @@ describe("RenderBatches", () => {
       ["nothing landed", 0, 19_600],
       ["its statements landed in part", 5, 19_600 + 5 * 49],
     ])("leaves a batch that says so when its statements die and %s", async (_, ran, stored) => {
-      const batch = await batches.beginBatch({ gitSha: SHA_A, environment: ENV, scale: 1, dirty: false, });
+      const batch = await batches.beginBatch({ gitSha: SHA_A, environment: ENV, scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, });
       let requests = 0;
       const dying = over((inner) => failing(inner, () => ++requests === 2, ran));
 
@@ -337,7 +337,7 @@ describe("RenderBatches", () => {
     });
 
     it("can send a failed call again, whatever of it landed", async () => {
-      const batch = await batches.beginBatch({ gitSha: SHA_A, environment: ENV, scale: 1, dirty: false, });
+      const batch = await batches.beginBatch({ gitSha: SHA_A, environment: ENV, scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, });
       let requests = 0;
       const dying = over((inner) => failing(inner, () => ++requests === 2, 5));
       await expect(dying.recordRenders(batch.id, items)).rejects.toThrow("Simulated");
@@ -346,7 +346,7 @@ describe("RenderBatches", () => {
     });
 
     it("keeps one row per name when a request commits and its response is lost", async () => {
-      const batch = await batches.beginBatch({ gitSha: SHA_A, environment: ENV, scale: 1, dirty: false, });
+      const batch = await batches.beginBatch({ gitSha: SHA_A, environment: ENV, scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, });
       let lost = false;
       const losing = over((inner) => ({
         execute: async (statements) => {
@@ -545,7 +545,7 @@ describe("RenderBatches", () => {
       await expect(batches.acceptBatch(failed.id, null, 0)).rejects.toMatchObject({
         code: "batch-has-failures",
       });
-      const recording = await batches.beginBatch({ gitSha: SHA_A, environment: ENV, scale: 1, dirty: false, });
+      const recording = await batches.beginBatch({ gitSha: SHA_A, environment: ENV, scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, });
       await expect(batches.acceptBatch(recording.id, null, 0)).rejects.toMatchObject({
         code: "batch-not-finished",
       });
@@ -725,7 +725,7 @@ describe("RenderBatches", () => {
       };
 
       const goldenItems = Array.from({ length: N }, (_, i) => rendered(pad(i), 1_000_000 + i));
-      const golden = await measure("beginBatch", () => model.beginBatch({ gitSha: SHA_A, environment: ENV, scale: 1, dirty: false, }));
+      const golden = await measure("beginBatch", () => model.beginBatch({ gitSha: SHA_A, environment: ENV, scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, }));
       await measure("recordRenders", () => model.recordRenders(golden.id, goldenItems));
       await measure("finishBatch", () => model.finishBatch(golden.id, N));
       await measure("decide (all)", () => approve(goldenItems, ENV, model));
@@ -741,7 +741,7 @@ describe("RenderBatches", () => {
             : item,
       );
       for (let i = 0; i < 50; i++) head.push(rendered(`zz-new-${i}`, 1_000_000 + N + 500 + i));
-      const batch = await measure("beginBatch (head)", () => model.beginBatch({ gitSha: SHA_B, environment: ENV, scale: 1, dirty: false, }));
+      const batch = await measure("beginBatch (head)", () => model.beginBatch({ gitSha: SHA_B, environment: ENV, scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, }));
       await measure("recordRenders (head)", () => model.recordRenders(batch.id, head));
       const finished = await measure("finishBatch (head)", () => model.finishBatch(batch.id, head.length));
       expect(finished.failedCount).toBe(50);

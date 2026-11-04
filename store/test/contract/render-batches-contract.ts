@@ -83,7 +83,7 @@ export function describeBatchContract(
         Array.from({ length: 12 }, (_, i) => imageInsertStatement(hashOf(i + 1), 1000 + i)),
       );
 
-      const golden = await batches.beginBatch({ gitSha: SHA_0, environment: "shared", scale: 1, dirty: false, });
+      const golden = await batches.beginBatch({ gitSha: SHA_0, environment: "shared", scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, });
       await batches.recordRenders(golden.id, GOLDENS);
       await batches.finishBatch(golden.id, GOLDENS.length);
       await batches.decide({ on: ON,
@@ -95,7 +95,7 @@ export function describeBatchContract(
       expect(await batches.acceptBatch(golden.id, null, 0)).toBe(true);
 
       // Against those goldens: a is unchanged, b changed, c failed, d removed, and e new.
-      const head = await batches.beginBatch({ gitSha: SHA_1, environment: "shared", scale: 1, dirty: false, });
+      const head = await batches.beginBatch({ gitSha: SHA_1, environment: "shared", scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, });
       headBatch = head.id;
       await batches.recordRenders(headBatch, [
         rendered("a", 1),
@@ -106,7 +106,7 @@ export function describeBatchContract(
       await batches.finishBatch(headBatch, 4);
 
       // The same SHA again, where b came out differently and c rendered, unstably.
-      const again = await batches.beginBatch({ gitSha: SHA_1, environment: "shared", scale: 1, dirty: false, });
+      const again = await batches.beginBatch({ gitSha: SHA_1, environment: "shared", scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, });
       rerun = again.id;
       await batches.recordRenders(rerun, [
         rendered("a", 1),
@@ -160,7 +160,7 @@ export function describeBatchContract(
     });
 
     it("never compares across environments", async () => {
-      const other = await batches.beginBatch({ gitSha: SHA_1, environment: "other", scale: 1, dirty: false, });
+      const other = await batches.beginBatch({ gitSha: SHA_1, environment: "other", scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, });
       await batches.recordRenders(other.id, [rendered("a", 1)]);
       await batches.finishBatch(other.id, 1);
       // `SHA_0` has goldens, and the same image for the same story, in another environment.
@@ -172,7 +172,7 @@ export function describeBatchContract(
 
     it("leaves a crashed batch recording, beside the new batch that replaces it", async () => {
       const environment = "crash";
-      const crashed = await batches.beginBatch({ gitSha: SHA_1, environment, scale: 1, dirty: false, });
+      const crashed = await batches.beginBatch({ gitSha: SHA_1, environment, scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, });
       await batches.recordRenders(crashed.id, [rendered("a", 1)]);
 
       const dying = over((adapter) => failing(adapter, () => true));
@@ -181,7 +181,7 @@ export function describeBatchContract(
       await expect(batches.finishBatch(crashed.id, 2)).rejects.toMatchObject({ code: "wrong-render-count" });
       await expect(batches.compareBatch(crashed.id, null)).rejects.toMatchObject({ code: "batch-not-finished" });
 
-      const fresh = await batches.beginBatch({ gitSha: SHA_1, environment, scale: 1, dirty: false, });
+      const fresh = await batches.beginBatch({ gitSha: SHA_1, environment, scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, });
       await batches.recordRenders(fresh.id, [rendered("a", 1), rendered("b", 2)]);
       expect(await batches.finishBatch(fresh.id, 2)).toMatchObject({ status: "complete", failedCount: 0 });
     });
@@ -189,7 +189,7 @@ export function describeBatchContract(
     it("survives writes being resent, and ends with a complete set of goldens", async () => {
       const environment = "retried";
       const replayed = over(replaying);
-      const batch = await batches.beginBatch({ gitSha: SHA_2, environment, scale: 1, dirty: false, });
+      const batch = await batches.beginBatch({ gitSha: SHA_2, environment, scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, });
       await replayed.recordRenders(batch.id, [rendered("a", 8)]);
       expect(await replayed.finishBatch(batch.id, 1)).toMatchObject({ status: "complete" });
       await batches.decide({ on: ON,
@@ -211,7 +211,7 @@ export function describeBatchContract(
       const batch = await batches.beginBatch({
         gitSha: SHA_2,
         environment,
-        scale: 1,
+        scale: 1, viewport: { width: 1200, height: 900 },
         dirty: true,
         storyFilter,
       });
@@ -228,14 +228,14 @@ export function describeBatchContract(
       await expect(batches.acceptBatch(batch.id, null, 0)).rejects.toMatchObject({ code: "batch-dirty" });
       expect(await batches.acceptedBatchAt(SHA_2, environment)).toBeNull();
 
-      const clean = await batches.beginBatch({ gitSha: SHA_2, environment, scale: 1, dirty: false, });
+      const clean = await batches.beginBatch({ gitSha: SHA_2, environment, scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, });
       expect(clean).toMatchObject({ dirty: false, storyFilter: null });
       expect(await batches.getBatch(clean.id)).toMatchObject({ dirty: false, storyFilter: null });
     });
 
     it("keeps a batch's scale, whole or not", async () => {
       for (const scale of [1, 1.5, 2]) {
-        const batch = await batches.beginBatch({ gitSha: SHA_0, environment: "scaled", scale, dirty: false, });
+        const batch = await batches.beginBatch({ gitSha: SHA_0, environment: "scaled", scale, viewport: { width: 1200, height: 900 }, dirty: false, });
         expect(batch.scale).toBe(scale);
         expect((await batches.getBatch(batch.id))?.scale).toBe(scale);
         expect((await batches.finishBatch(batch.id, 0)).scale).toBe(scale);
@@ -243,9 +243,27 @@ export function describeBatchContract(
       }
     });
 
+    it("keeps the window a batch laid out in, and only the stories that differ from it", async () => {
+      const viewport = { width: 640, height: 480 };
+      const batch = await batches.beginBatch({ gitSha: SHA_0, environment: "sized", scale: 1, viewport, dirty: false });
+      expect((await batches.getBatch(batch.id))?.viewport).toEqual(viewport);
+      const phone = { width: 414, height: 896 };
+      await batches.recordRenders(batch.id, [{ story: "a", failure: "boom", viewport: phone }, { story: "b", failure: "boom" }]);
+      expect(await batches.storyViewportsOf(batch.id)).toEqual({ a: phone });
+      expect((await batches.finishBatch(batch.id, 2)).viewport).toEqual(viewport);
+      await expect(batches.beginBatch({ gitSha: SHA_0, environment: "sized", scale: 1, viewport: { width: 0, height: 480 }, dirty: false })).rejects.toThrow(RangeError);
+    });
+
+    it("fits a whole statement of renders with a window of their own, past what one statement holds", async () => {
+      const batch = await batches.beginBatch({ gitSha: SHA_0, environment: "sized-many", scale: 1, viewport: { width: 640, height: 480 }, dirty: false });
+      const renders = Array.from({ length: 100 }, (_, i) => ({ story: `story--${i}`, failure: "boom", viewport: { width: 100 + i, height: 200 + i } }));
+      await batches.recordRenders(batch.id, renders);
+      expect(await batches.storyViewportsOf(batch.id)).toEqual(Object.fromEntries(renders.map(({ story, viewport }) => [story, viewport])));
+    });
+
     it("compares with a finished batch in its environment, and refuses any other", async () => {
       const environment = "against-a-batch";
-      const begin = (env = environment) => batches.beginBatch({ gitSha: SHA_0, environment: env, scale: 1, dirty: false, });
+      const begin = (env = environment) => batches.beginBatch({ gitSha: SHA_0, environment: env, scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, });
       const finished = async (env: string | undefined, rows: readonly RecordedRender[]) => {
         const batch = await begin(env);
         await batches.recordRenders(batch.id, rows);
@@ -271,14 +289,14 @@ export function describeBatchContract(
 
     it("keeps which batch really rendered a batch's images, and which didn't", async () => {
       const environment = "reused";
-      const rendered_ = await batches.beginBatch({ gitSha: SHA_0, environment, scale: 1, dirty: false, });
+      const rendered_ = await batches.beginBatch({ gitSha: SHA_0, environment, scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, });
       expect(rendered_.reusedFromBatch).toBeNull();
       expect((await batches.getBatch(rendered_.id))?.reusedFromBatch).toBeNull();
 
       const reused = await batches.beginBatch({
         gitSha: SHA_1,
         environment,
-        scale: 1,
+        scale: 1, viewport: { width: 1200, height: 900 },
         dirty: false,
         reusedFromBatch: rendered_.id,
       });
@@ -292,7 +310,7 @@ export function describeBatchContract(
 
     it("keeps the image of a story that failed after rendering, and lists it as failed", async () => {
       const environment = "play";
-      const batch = await batches.beginBatch({ gitSha: SHA_0, environment, scale: 1, dirty: false, });
+      const batch = await batches.beginBatch({ gitSha: SHA_0, environment, scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, });
       const played = [
         { ...rendered("a", 10), failure: "play: threw" },
         rendered("b", 11),
@@ -307,7 +325,7 @@ export function describeBatchContract(
         ["c", "failed", null, "Render threw"],
       ]);
 
-      const golden = await batches.beginBatch({ gitSha: SHA_1, environment, scale: 1, dirty: false, });
+      const golden = await batches.beginBatch({ gitSha: SHA_1, environment, scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, });
       const clean = [rendered("a", 10), rendered("b", 11)];
       await batches.recordRenders(golden.id, clean);
       await batches.finishBatch(golden.id, 2);
@@ -319,7 +337,7 @@ export function describeBatchContract(
       });
       expect(await batches.acceptBatch(golden.id, null, 0)).toBe(true);
 
-      const next = await batches.beginBatch({ gitSha: SHA_2, environment, scale: 1, dirty: false, });
+      const next = await batches.beginBatch({ gitSha: SHA_2, environment, scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, });
       await batches.recordRenders(next.id, [played[0]!, played[1]!]);
       await batches.finishBatch(next.id, 2);
       const compared = await batches.compareBatch(next.id, SHA_1);
@@ -329,7 +347,7 @@ export function describeBatchContract(
 
     it("fits a whole statement of the longest failures", async () => {
       const environment = "long-play";
-      const batch = await batches.beginBatch({ gitSha: SHA_0, environment, scale: 1, dirty: false, });
+      const batch = await batches.beginBatch({ gitSha: SHA_0, environment, scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, });
       const count = 100;
       const long = "x".repeat(2_000);
       await batches.recordRenders(
@@ -360,7 +378,7 @@ export function describeBatchContract(
         dirty: false,
         storyFilter: null,
         reusedFromBatch: null,
-        scale: 2,
+        scale: 2, viewport: { width: 1200, height: 900 },
       });
       const on = (decision: "approved" | "rejected", actor: string, at: number) => ({ story: "a", imageHash: hashOf(1), decision, actor, at, gitSha: ON.gitSha, batchId: ON.batchId });
       const decisionsOn = async (batchId: string) => (await batches.readBatch(batchId)).renders[0]?.decision;
@@ -383,6 +401,7 @@ export function describeBatchContract(
         const batch = await finished("received-again", undefined, 2_000);
         expect(await batches.receiveBatch(batch)).toMatchObject({ status: "complete", finishedAt: 2_000 });
         await expect(batches.receiveBatch({ ...batch, gitSha: SHA_1 })).rejects.toMatchObject({ code: "batch-conflict" });
+        await expect(batches.receiveBatch({ ...batch, viewport: { width: 1, height: 1 } })).rejects.toMatchObject({ code: "batch-conflict" });
       });
 
       it("reads back what a batch holds, in pages, with what's been decided", async () => {

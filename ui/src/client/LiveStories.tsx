@@ -3,6 +3,7 @@
 import { ChevronDownIcon, ChevronRightIcon, LinkExternalIcon } from "@primer/octicons-react";
 import { Button, Heading, Link, Text } from "@primer/react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import type { Viewport } from "selfie-store";
 import type { BatchView, RenderRow } from "../shared/api.ts";
 import { LAYER_WORDS } from "./ImageCompare.tsx";
 import { Keys } from "./Keys.tsx";
@@ -30,11 +31,8 @@ export function StorybookLinkTo({ row, view }: { row: RenderRow; view: BatchView
   );
 }
 
-// For a batch from before its viewport was recorded, which is laid out at this column's own width.
-const UNKNOWN_SIZE_HEIGHT = 600;
-
 /** Lays a story out at the size it was rendered at, and scales it to fit, as an image is. */
-export function StoryFrame({ title, url, viewport }: { title: string; url: string; viewport: BatchView["viewport"] }) {
+export function StoryFrame({ title, url, viewport }: { title: string; url: string; viewport: Viewport }) {
   const box = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
   useLayoutEffect(() => {
@@ -42,7 +40,7 @@ export function StoryFrame({ title, url, viewport }: { title: string; url: strin
     observer.observe(box.current!);
     return () => observer.disconnect();
   }, []);
-  const scale = viewport === null ? 1 : width / viewport.width;
+  const scale = width / viewport.width;
 
   // A story may focus itself as it loads, as a terminal does, and then this page's keys would go to
   // it. A frame gets the keyboard only by being clicked, which the pointer being over it tells.
@@ -69,7 +67,7 @@ export function StoryFrame({ title, url, viewport }: { title: string; url: strin
       onPointerLeave={() => {
         pointerInside.current = false;
       }}
-      style={{ height: viewport === null ? UNKNOWN_SIZE_HEIGHT : viewport.height * scale }}>
+      style={{ height: viewport.height * scale }}>
       {/* A new element per story, since moving one frame along would add to the browser's history. */}
       <iframe
         key={url}
@@ -77,7 +75,7 @@ export function StoryFrame({ title, url, viewport }: { title: string; url: strin
         src={url}
         sandbox="allow-scripts allow-same-origin"
         referrerPolicy="no-referrer"
-        style={viewport === null ? { width: "100%", height: UNKNOWN_SIZE_HEIGHT } : { width: viewport.width, height: viewport.height, transform: `scale(${scale})` }}
+        style={{ width: viewport.width, height: viewport.height, transform: `scale(${scale})` }}
       />
     </div>
   );
@@ -87,7 +85,7 @@ export function LiveStories({ row, view, open, onToggle }: { row: RenderRow; vie
   const current = row.state === "removed" ? null : (view.storybook?.url ?? null);
   const golden = row.goldenStorybookUrl;
   if (current === null && golden === null) return null;
-  const side = (layer: "golden" | "current", url: string | null, missing: string, viewport: BatchView["viewport"]) => (
+  const side = (layer: "golden" | "current", url: string | null, missing: string, viewport: Viewport) => (
     <div className="selfie-live-side">
       <Heading as="h3" variant="small">
         {LAYER_WORDS[layer]}
@@ -108,11 +106,10 @@ export function LiveStories({ row, view, open, onToggle }: { row: RenderRow; vie
         <>
           <Text as="p" className="selfie-muted">
             These run for real, so time and animation aren&apos;t frozen as they are in an image. Once you click in one, keys go to the story.
-            {view.viewport === null && " This batch didn't record the size it rendered at, so these may lay out differently."}
           </Text>
           <div className="selfie-live-sides">
-            {side("golden", golden, row.state === "added" ? "An added story has no golden." : "The golden's built Storybook wasn't kept.", row.goldenViewport ?? view.viewport)}
-            {side("current", current, "A removed story isn't in this batch.", view.storyViewports[row.story] ?? view.viewport)}
+            {side("golden", golden, row.state === "added" ? "An added story has no golden." : "The golden's built Storybook wasn't kept.", row.goldenViewport ?? view.batch.viewport)}
+            {side("current", current, "A removed story isn't in this batch.", view.storyViewports[row.story] ?? view.batch.viewport)}
           </div>
         </>
       )}

@@ -109,7 +109,7 @@ export function localReviewSource(
     const references = new Map(
       await Promise.all(
         [...new Set(compared.flatMap(({ goldenBatchId }) => goldenBatchId ?? []))].map(
-          async (id) => [id, { url: await keptStorybookUrl(id), viewports: await project.storybooks.storyViewportsOf(id) }] as const,
+          async (id) => [id, { url: await keptStorybookUrl(id), viewports: await project.batches.storyViewportsOf(id) }] as const,
         ),
       ),
     );
@@ -132,8 +132,7 @@ export function localReviewSource(
     return {
       batch,
       storybook: await storybookFor(batch.id),
-      viewport: await project.storybooks.viewportOf(batch.environment),
-      storyViewports: await project.storybooks.storyViewportsOf(batch.id),
+      storyViewports: await project.batches.storyViewportsOf(batch.id),
       hunkMergeDistance: await resolveHunkMergeDistance(repo),
       actor,
       blockers: summary.blockers,

@@ -554,9 +554,9 @@ describe("the hosted Storybook", () => {
     test("the size its environment rendered at, whatever the config says now", async () => {
       await built();
       const before = await reviewedBuild();
-      expect((await hosted().batchView(before)).viewport).toEqual({ width: 1200, height: 900 });
+      expect((await hosted().batchView(before)).batch.viewport).toEqual({ width: 1200, height: 900 });
       await writeTestConfig(h.repo, { environment: { viewport: { width: 640, height: 480 } } });
-      expect((await hosted().batchView(before)).viewport).toEqual({ width: 1200, height: 900 });
+      expect((await hosted().batchView(before)).batch.viewport).toEqual({ width: 1200, height: 900 });
     });
 
     describe("a story that declared a size of its own", () => {
@@ -567,7 +567,7 @@ describe("the hosted Storybook", () => {
         h.stories = [{ id: "a", viewport: PHONE }, { id: "b" }, { id: "c", viewport: { width: 1200, height: 900 } }];
         const view = await hosted().batchView(await reviewedBuild());
         expect(view.storyViewports).toEqual({ a: PHONE });
-        expect(view.viewport).toEqual({ width: 1200, height: 900 });
+        expect(view.batch.viewport).toEqual({ width: 1200, height: 900 });
       });
 
       test("keeps it through a batch that reuses its images", async () => {

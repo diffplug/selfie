@@ -37,6 +37,7 @@ describe("which batch", () => {
       gitSha: git(h.repo, "rev-parse", "HEAD"),
       environment,
       scale: 1,
+      viewport: { width: 1200, height: 900 },
       dirty: false,
     });
     expect((await newest()).newestBatchId).toBe(second);

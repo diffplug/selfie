@@ -103,7 +103,7 @@ describe.skipIf(!ENABLED)("real D1 renders (opt-in: pnpm test:d1:render-batches)
     }));
     const environment = "size";
     const gitSha = "3".repeat(40);
-    const batch = await measure("beginBatch", () => batches.beginBatch({ gitSha, environment, scale: 1, dirty: false, }));
+    const batch = await measure("beginBatch", () => batches.beginBatch({ gitSha, environment, scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, }));
     await measure("recordRenders", () => batches.recordRenders(batch.id, items));
     await measure("finishBatch", () => batches.finishBatch(batch.id, RENDERS));
     await measure("decide", () =>
@@ -121,7 +121,7 @@ describe.skipIf(!ENABLED)("real D1 renders (opt-in: pnpm test:d1:render-batches)
     for (let i = 0; i < NEW; i++) {
       head.push({ story: `zz-new-${i}`, imageHash: hashes[RENDERS + CHANGED + i]! });
     }
-    const headBatch = await batches.beginBatch({ gitSha: "4".repeat(40), environment, scale: 1, dirty: false, });
+    const headBatch = await batches.beginBatch({ gitSha: "4".repeat(40), environment, scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, });
     await batches.recordRenders(headBatch.id, head);
     await batches.finishBatch(headBatch.id, head.length);
     const { renders: compared, unchangedCount } = await measure("compareBatch (differences)", () =>

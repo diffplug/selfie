@@ -54,6 +54,7 @@ const batchFacts = (overrides: Record<string, unknown> = {}) => ({
   storyFilter: null,
   reusedFromBatch: null,
   scale: 1,
+  viewport: { width: 1200, height: 900 },
   ...overrides,
 });
 
@@ -237,10 +238,22 @@ describe("batches", () => {
     expect(page.renders).toEqual([{ story: "a", failure: "boom", decision: null }, { story: "b", imageHash: hash, failure: "threw", decision: null }]);
   });
 
+  test("keeps the window a story laid out in, if it was its own", async () => {
+    const { hash } = await putImage(RED);
+    await send("PUT", `/batches/${BATCH}`, "writer", batchFacts());
+    await send("POST", `/batches/${BATCH}/renders`, "writer", { renders: [{ story: "a", imageHash: hash, viewport: { width: 414, height: 896 } }, { story: "b", imageHash: hash }] });
+    expect((await send("POST", `/batches/${BATCH}/renders`, "writer", { renders: [{ story: "c", imageHash: hash, viewport: { width: 0, height: 896 } }] })).status).toBe(400);
+    await send("POST", `/batches/${BATCH}/finish`, "writer", { count: 2, finishedAt: 600 });
+    const page = (await (await send("GET", `/batches/${BATCH}`, "reader")).json()) as any;
+    expect(page.batch.viewport).toEqual({ width: 1200, height: 900 });
+    expect(page.renders).toEqual([{ story: "a", imageHash: hash, viewport: { width: 414, height: 896 }, decision: null }, { story: "b", imageHash: hash, decision: null }]);
+  });
+
   test("refuses what isn't a batch", async () => {
     expect((await send("PUT", "/batches/nope", "writer", batchFacts())).status).toBe(400);
     expect((await send("PUT", `/batches/${BATCH}`, "writer", batchFacts({ gitSha: "nope" }))).status).toBe(400);
     expect((await send("PUT", `/batches/${BATCH}`, "writer", batchFacts({ scale: "big" }))).status).toBe(400);
+    expect((await send("PUT", `/batches/${BATCH}`, "writer", batchFacts({ viewport: null }))).status).toBe(400);
     expect((await send("GET", `/batches/${OTHER_BATCH}`, "reader")).status).toBe(404);
   });
 });

@@ -83,7 +83,7 @@ describe("on a store", () => {
     const entries = Object.entries(stories);
     const hashes = entries.map(([, image]) => hashOf(image));
     await temp.sql.batch(entries.map(([, image]) => imageInsertStatement(hashOf(image), image)));
-    const batch = await batches.beginBatch({ gitSha, environment: ENV, scale: 1, dirty: false, branch: "topic" });
+    const batch = await batches.beginBatch({ gitSha, environment: ENV, scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, branch: "topic" });
     await batches.recordRenders(batch.id, entries.map(([story], at) => ({ story, imageHash: hashes[at]! })));
     await batches.finishBatch(batch.id, entries.length);
     return { batch, hash: (story: string) => hashes[entries.findIndex(([name]) => name === story)]! };

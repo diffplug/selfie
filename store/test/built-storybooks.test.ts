@@ -18,7 +18,7 @@ describe("BuiltStorybooks", () => {
     temp = await createTempStore();
     builds = new BuiltStorybooks({ sql: temp.sql, blob: temp.blob });
     const batches = new RenderBatches({ sql: temp.sql });
-    const begin = async () => (await batches.beginBatch({ gitSha: "c".repeat(40), environment: "env", scale: 1, dirty: false })).id;
+    const begin = async () => (await batches.beginBatch({ gitSha: "c".repeat(40), environment: "env", scale: 1, viewport: { width: 1200, height: 900 }, dirty: false })).id;
     batch = await begin();
     otherBatch = await begin();
   });
@@ -115,34 +115,10 @@ describe("BuiltStorybooks", () => {
     await expect(builds.has("nope")).rejects.toThrow(RangeError);
   });
 
-  it("knows the size an environment renders at, once a batch says", async () => {
-    expect(await builds.viewportOf("env")).toBeNull();
-    await builds.recordViewport("env", { width: 1200, height: 900 });
-    await builds.recordViewport("env", { width: 640, height: 480 });
-    expect(await builds.viewportOf("env")).toEqual({ width: 1200, height: 900 });
-  });
-
-  it("knows which of a batch's stories rendered at a size of their own", async () => {
-    expect(await builds.storyViewportsOf(batch)).toEqual({});
-    await builds.recordStoryViewports(batch, {});
-    await builds.recordStoryViewports(batch, { "a--phone": { width: 414, height: 896 }, "a--tablet": { width: 834, height: 1112 } });
-    await builds.recordStoryViewports(otherBatch, { "a--phone": { width: 320, height: 568 } });
-    await builds.recordStoryViewports(batch, { "a--phone": { width: 1, height: 1 } });
-    expect(await builds.storyViewportsOf(batch)).toEqual({ "a--phone": { width: 414, height: 896 }, "a--tablet": { width: 834, height: 1112 } });
-    expect(await builds.storyViewportsOf(otherBatch)).toEqual({ "a--phone": { width: 320, height: 568 } });
-  });
-
-  it("keeps every story's size, past what fits in a statement", async () => {
-    const viewports = Object.fromEntries(Array.from({ length: 100 }, (_, i) => [`story--${i}`, { width: 100 + i, height: 200 + i }]));
-    await builds.recordStoryViewports(batch, viewports);
-    expect(await builds.storyViewportsOf(batch)).toEqual(viewports);
-  });
-
   it("takes nothing for a batch this store doesn't hold", async () => {
     await keep(BUILD, { "index.html": "page" });
     await expect(builds.recordBatchStorybook("00000000-0000-4000-8000-000000000009", BUILD)).rejects.toThrow(/doesn't hold/);
     await expect(builds.recordBatchStorybook(batch, OTHER)).rejects.toThrow(/doesn't hold/);
-    await expect(builds.recordStoryViewports("00000000-0000-4000-8000-000000000009", { a: { width: 1, height: 1 } })).rejects.toThrow(/FOREIGN KEY/);
   });
 
   it("is safe to create twice", async () => {

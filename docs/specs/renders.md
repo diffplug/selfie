@@ -120,10 +120,10 @@ Goldens are per Git SHA and environment, and are the images of the one batch acc
 Source of truth: `CREATE_BATCH_TABLES` in `store/src/core/render-batches.ts`, `initStoreSchema` in `store/src/core/store.ts`.
 
 ```sql
-render_batches(key PK, id UNIQUE, git_sha, environment, started_at, finished_at, failed_count, dirty, story_filter, reused_from_batch, scale, branch, storybook_key → built_storybooks.key)
+render_batches(key PK, id UNIQUE, git_sha, environment, started_at, finished_at, failed_count, dirty, story_filter, reused_from_batch, scale, viewport_width, viewport_height, branch, storybook_key → built_storybooks.key)
   INDEX batches_by_sha(git_sha, environment, started_at)
   INDEX batches_by_branch(branch, environment, started_at)
-renders(batch_key → render_batches.key, story, image_key → images.key, failure)  PK (batch_key, story)  WITHOUT ROWID
+renders(batch_key → render_batches.key, story, image_key → images.key, failure, viewport_width, viewport_height)  PK (batch_key, story)  WITHOUT ROWID
 decisions(environment, story, image_hash, decision, actor, decided_at, git_sha, batch_id)  PK (environment, story, image_hash, git_sha)  WITHOUT ROWID
   INDEX decisions_by_commit(environment, git_sha)
 goldens(git_sha, environment, batch_key → render_batches.key)  PK (git_sha, environment)  WITHOUT ROWID
@@ -131,8 +131,9 @@ goldens(git_sha, environment, batch_key → render_batches.key)  PK (git_sha, en
 
 - **Must leave out the CLI's local table** (`docs/specs/cli.md` → Recording only if necessary): it's in a local `store.db`, not this schema, and D1 doesn't have it.
 - **Must only add what is missing:** `initStoreSchema` is one request of `CREATE ... IF NOT EXISTS`, so running it upgrades a store holding only images. It changes no existing table, and there is no version number. Any other change needs `docs/specs/store.md` → Open questions decided first. `render_batches.reused_from_batch`, the rename of its tables and columns (`docs/specs/cli.rationale.md`), and its foreign keys are the exceptions, made before any project database existed (rationale): `CREATE TABLE IF NOT EXISTS` doesn't add it to an older store, whose reviews and accepts fail with exit 2 until the store is recreated.
-- **Must declare a foreign key wherever a row's parent is always written first and held here**, as `→` shows above, and as `docs/specs/store.md` → Built Storybooks has for `story_viewports`, so a store refuses an orphan instead of holding one (rationale).
+- **Must declare a foreign key wherever a row's parent is always written first and held here**, as `→` shows above, so a store refuses an orphan instead of holding one (rationale).
 - **Never declare one on `decisions` or `reused_from_batch`**, since a decision may name an image or batch this store doesn't hold, and sync may move a batch without the one it was reused from.
+- **Must say in `render_batches.viewport_width` and `viewport_height` the window a batch's stories lay out in, in CSS pixels, and in those columns of `renders` only a story's own, if it differs**, both or neither, so a story with neither laid out in its batch's (`docs/specs/render.md` → A story's viewport). They only size a story running live, so a comparison never reads them (rationale). **A batch reusing another's images must hold the same sizes.**
 - **Must keep `render_batches.key` and `renders.image_key` inside the store, as with image keys.** A batch's `id`, a UUID, is what leaves it.
 - **Never scan a table:** every statement reaches its rows through one of these keys. `store/test/render-batches.test.ts` checks SQLite's query plan for everything a review sends.
 
@@ -140,7 +141,7 @@ goldens(git_sha, environment, batch_key → render_batches.key)  PK (git_sha, en
 
 Source of truth: `store/src/core/render-batches.ts`; `store/test/render-batches.test.ts` measures these at 10,000 renders.
 
-- **Must send at most 400 statements per request, and at most 5,000 rows per page**, so that a batch under 19,600 renders records in one request (rationale). A statement holds 49 renders, or as few as 33 if each has both an image and a failure, since each needs one more parameter.
+- **Must send at most 400 statements per request, and at most 5,000 rows per page**, so that a batch under 19,600 renders records in one request (rationale). A statement holds 49 renders, or as few as 19 if each has an image, a failure, and a window of its own, since each of those needs more parameters.
 - **Must run the model's contract against every SQL adapter.** `pnpm test` runs it on local SQLite with both parameter forms. In `store/`, `pnpm test:d1:render-batches` runs it on real D1 at about 90 requests, and `pnpm test:d1` runs it after the SQL contract (`docs/specs/store.md` → D1 REST adapter).
 
 ## Future
