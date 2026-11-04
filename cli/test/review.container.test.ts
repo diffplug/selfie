@@ -5,8 +5,8 @@ import { access, cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { decodeImage } from "./support.ts";
-import { afterAll, beforeAll, describe, expect, test } from "vitest";
+import { decodeImage, TEST_CONFIG, git, writeTestConfig } from "./support.ts";
+import { afterAll, beforeAll, describe, expect, test, beforeEach } from "vitest";
 import { openProject } from "../src/project.ts";
 import { commit, createRepo } from "./support.ts";
 
@@ -34,13 +34,15 @@ function selfie(...args: string[]): Promise<{ status: number | null; json: any; 
     child.once("close", (status) => resolve({ status, json: JSON.parse(stdout), stderr }));
   });
 }
-const review = (...args: string[]) => selfie("review", "--storybook-dir", STORYBOOK, ...args);
+const review = (...args: string[]) => selfie("review", ...args);
 
 beforeAll(async () => {
   scratch = await mkdtemp(path.join(tmpdir(), "selfie-review-test-"));
   repo = await createRepo(scratch);
   home = path.join(scratch, "home");
 });
+// A test may narrow it to the stories it wants.
+beforeEach(() => cp(STORYBOOK, path.join(repo, TEST_CONFIG.storybookDir), { recursive: true }));
 afterAll(async () => {
   await rm(scratch, { recursive: true, force: true });
 });
@@ -71,7 +73,7 @@ describe.runIf(process.env.SELFIE_CLI_CONTAINER === "1")("in the pinned containe
       path.join(repo, "paint.js"),
       `addEventListener("DOMContentLoaded", () => { document.documentElement.style.filter = "invert(1)"; });`,
     );
-    await writeFile(path.join(repo, "selfie.config.json"), JSON.stringify({ initScript: "paint.js" }));
+    await writeTestConfig(repo, { initScript: "paint.js" });
     const changed = await review(...STORIES);
     expect(changed.status).toBe(1);
     expect(changed.json.counts.changed).toBe(2);
@@ -86,13 +88,12 @@ describe.runIf(process.env.SELFIE_CLI_CONTAINER === "1")("in the pinned containe
 
   test("reuses a whole batch with no failures, and its images match a real render's", async () => {
     // The fixture's other stories fail on purpose, and a batch with a failure is never reused.
-    const build = path.join(scratch, "passing");
-    await cp(STORYBOOK, build, { recursive: true });
+    const build = path.join(repo, TEST_CONFIG.storybookDir);
     const index = JSON.parse(await readFile(path.join(build, "index.json"), "utf8"));
     const kept = Object.entries(index.entries).filter(([id]) => ["basic--detail", "timers--frozen-by-selfie"].includes(id));
     await writeFile(path.join(build, "index.json"), JSON.stringify({ ...index, entries: Object.fromEntries(kept) }));
-    await rm(path.join(repo, "selfie.config.json"), { force: true });
-    const reviewBuild = (...args: string[]) => selfie("review", "--storybook-dir", build, ...args);
+    git(repo, "checkout", "--", "selfie.config.json");
+    const reviewBuild = (...args: string[]) => selfie("review", ...args);
 
     const first = await reviewBuild();
     expect(first.stderr).toContain("render 2/2");
@@ -111,7 +112,7 @@ describe.runIf(process.env.SELFIE_CLI_CONTAINER === "1")("in the pinned containe
     expect(filtered.json.reusedFromBatch).toBe(first.json.batchId);
     expect(filtered.json.counts.stories).toBe(1);
 
-    const rendered = await selfie("render", "--storybook-dir", build);
+    const rendered = await selfie("render");
     expect(rendered.stderr).toContain("render 2/2");
     expect((await reviewBuild()).json.batchId).toBe(rendered.json.batchId);
 

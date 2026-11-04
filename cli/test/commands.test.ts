@@ -1,7 +1,7 @@
 // The commands against real Git, a real store, and real files, with only the browser replaced.
 import { access, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { decodeImage } from "./support.ts";
+import { decodeImage, TEST_CONFIG, writeTestConfig } from "./support.ts";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { encodePng } from "../src/png.ts";
 import { BLUE, commit, createHarness, git, GREEN, RED, solid, type Harness } from "./support.ts";
@@ -20,8 +20,8 @@ const exists = (file: string) =>
     () => false,
   );
 const reasons = (list: readonly any[]) => list.map(({ reason }) => reason);
-const review = (...flags: string[]) => h.cli("review", "--storybook-dir", "ignored", ...flags);
-const writeConfig = (config: unknown) => writeFile(path.join(h.repo, "selfie.config.json"), JSON.stringify(config));
+const review = (...flags: string[]) => h.cli("review", ...flags);
+const writeConfig = (config: object) => writeTestConfig(h.repo, config);
 const projectDirectory = async () => path.join(h.home, (await readdir(h.home)).find((name) => name !== "d1.env")!);
 
 /** Reviews, approves all, and accepts, so `h.stories` become the goldens of HEAD. */
@@ -267,12 +267,32 @@ describe("comparing with a baseline", () => {
     expect(reviewed.json.baseline.sha).toBeNull();
     expect(reviewed.json.counts.added).toBe(3);
 
-    await rm(path.join(h.repo, "selfie.config.json"));
+    await writeTestConfig(h.repo);
     expect((await h.cli("find-baseline")).json.sha).not.toBeNull();
   });
 });
 
 describe("selfie.config.json", () => {
+  test("is required, by anything that renders, and says how to get one", async () => {
+    await rm(path.join(h.repo, "selfie.config.json"));
+    const { code, json } = await h.cli("render");
+    expect(code).toBe(2);
+    expect(json.error).toMatchObject({ code: "no-config", message: expect.stringContaining('{"storybookDir":"storybook-static","buildCommand":"npm run build-storybook"}') });
+    expect(json.error.message).toContain("selfie skill quickstart");
+  });
+
+  test.each(["storybookDir", "buildCommand"])("must say %s", async (key) => {
+    const { [key as keyof typeof TEST_CONFIG]: _, ...rest } = TEST_CONFIG;
+    await writeFile(path.join(h.repo, "selfie.config.json"), JSON.stringify(rest));
+    const { code, json } = await h.cli("render");
+    expect(code).toBe(2);
+    expect(json.error).toMatchObject({ code: "bad-config", message: expect.stringContaining(key) });
+  });
+
+  test.each(["--storybook-dir", "--build-command"])("has no %s flag to get around it", async (flag) => {
+    expect((await h.cli("render", flag, "x")).code).toBe(2);
+  });
+
   beforeEach(() => {
     h.stories = [{ id: "a--one" }];
   });
@@ -304,7 +324,7 @@ describe("selfie.config.json", () => {
     [{ initScript: "missing.js" }, "Can't read the init script"],
     [[1], "must hold a JSON object"],
   ])("refuses %j", async (config, message) => {
-    await writeConfig(config);
+    await writeFile(path.join(h.repo, "selfie.config.json"), JSON.stringify(Array.isArray(config) ? config : { ...TEST_CONFIG, ...config }));
     const { code, json } = await review();
     expect(code).toBe(2);
     expect(json.error).toMatchObject({ code: "bad-config", message: expect.stringContaining(message) });
@@ -679,11 +699,13 @@ describe("local data", () => {
 describe("the build command", () => {
   test("runs first, in a shell, and a failure stops the review with exit 2", async () => {
     h.stories = [{ id: "a--one" }];
-    const failed = await review("--build-command", "exit 3");
+    await writeConfig({ buildCommand: "exit 3" });
+    const failed = await review("--build");
     expect(failed.code).toBe(2);
     expect(failed.json.error).toMatchObject({ code: "build-failed", message: expect.stringContaining("exit code 3") });
 
-    const ok = await review("--build-command", `echo built > "${path.join(h.scratch, "marker")}"`);
+    await writeConfig({ buildCommand: `echo built > "${path.join(h.scratch, "marker")}"` });
+    const ok = await review("--build");
     expect(ok.code).toBe(1);
     expect(await readFile(path.join(h.scratch, "marker"), "utf8")).toBe("built\n");
   });

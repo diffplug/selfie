@@ -27,7 +27,7 @@ import {
   type BuiltStorybookFile,
   type StoryFilter,
 } from "selfie-store";
-import { resolveRenderSettings, resolveHunkMergeDistance, resolveStorybookDir, type RenderSettings } from "./config.ts";
+import { resolveRenderSettings, resolveHunkMergeDistance, type RenderSettings } from "./config.ts";
 import { diffToPng, type PixelDiff } from "./diff.ts";
 import { SelfieError } from "./errors.ts";
 import { dirtyPaths, headSha, resolveCommit, type BaselineSearch } from "./git.ts";
@@ -51,12 +51,8 @@ const IMAGES_PER_GROUP = 100;
 const MAX_CONCURRENT_DIFFS = 6;
 
 export interface RenderBatchOptions {
-  /** Relative to the project's `cwd`. Defaults to the config's, and then to `storybook-static`. */
-  readonly storybookDir?: string | undefined;
-  /** The caller's own command, run in a shell. Its stdout goes to stderr. */
-  readonly buildCommand?: string | undefined;
   /** Run the config's `buildCommand`, from the Git top level. Only ever because someone asked. */
-  readonly buildFromConfig?: boolean | undefined;
+  readonly build?: boolean | undefined;
   /** Story ID patterns. Defaults to every story. */
   readonly stories?: readonly string[] | undefined;
   readonly native?: boolean | undefined;
@@ -122,16 +118,11 @@ export interface ReviewResult {
   };
 }
 
-/** Builds, if someone asked to. Nothing else ever runs a shell. */
-export async function buildIfAsked(command: string | undefined, cwd: string, signal: AbortSignal | undefined, log: (line: string) => void): Promise<void> {
-  if (command === undefined) return;
+/** Runs the config's build, from the Git top level, which only someone asking leads to. Nothing else ever runs a shell. */
+export async function runBuild(project: Project, { buildCommand: command }: RenderSettings, signal: AbortSignal | undefined, log: (line: string) => void): Promise<void> {
   log(`Building: ${command}`);
-  await runBuildCommand(command, cwd, signal);
-}
-
-function runBuildCommand(command: string, cwd: string, signal: AbortSignal | undefined): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const child = spawn(command, { shell: true, cwd, stdio: ["ignore", 2, 2], ...(signal ? { signal } : {}) });
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn(command, { shell: true, cwd: project.repo.root, stdio: ["ignore", 2, 2], ...(signal ? { signal } : {}) });
     child.once("error", (error) =>
       reject(new SelfieError("build-failed", `The build command couldn't run: ${error.message}`)),
     );
@@ -342,15 +333,14 @@ async function replay(
   };
 }
 
-/** Renders the built Storybook. Only a render of every story can answer a later review, so only it is remembered. */
 /** What a render takes from a project's settings and a command's options. */
 export function renderInput(
-  { storybookDir, outDir, log }: { readonly storybookDir: string; readonly outDir: string; readonly log: (line: string) => void },
+  { outDir, log }: { readonly outDir: string; readonly log: (line: string) => void },
   settings: RenderSettings,
   options: Pick<RenderBatchOptions, "stories" | "signal">,
 ): RenderOptions {
   return {
-    storybookDir,
+    storybookDir: settings.storybookDir,
     outDir,
     environment: settings.environment,
     log,
@@ -362,29 +352,19 @@ export function renderInput(
   };
 }
 
-/** Whatever build was asked for, if one was: the config's from the Git top level, or a given command from here. */
-export async function buildAsAsked(project: Project, settings: RenderSettings, options: Pick<RenderBatchOptions, "buildCommand" | "buildFromConfig" | "signal">, log: (line: string) => void): Promise<void> {
-  if (options.buildFromConfig === true) {
-    if (settings.buildCommand === undefined) throw new SelfieError("usage", "--build runs the config's buildCommand, and selfie.config.json doesn't have one.");
-    await buildIfAsked(settings.buildCommand, project.repo.root, options.signal, log);
-  } else {
-    await buildIfAsked(options.buildCommand, project.cwd, options.signal, log);
-  }
-}
-
+/** Renders the built Storybook. Only a render of every story can answer a later review, so only it is remembered. */
 async function renderFresh(
   project: Project,
   renderDir: string,
   render: typeof realRender,
-  { storybookDir, identity, settings, options, log }: {
-    readonly storybookDir: string;
+  { identity, settings, options, log }: {
     readonly identity: string | null;
     readonly settings: RenderSettings;
     readonly options: RenderBatchOptions;
     readonly log: (line: string) => void;
   },
 ): Promise<Recording> {
-  const manifest = await render(renderInput({ storybookDir, outDir: renderDir, log }, settings, options));
+  const manifest = await render(renderInput({ outDir: renderDir, log }, settings, options));
   return {
     reusedFromBatch: null,
     storyIds: manifest.stories.map(({ id }) => id),
@@ -397,7 +377,7 @@ async function renderFresh(
         return;
       }
       // A built Storybook that changed while it rendered has no identity that describes these images.
-      const after = await renderIdentity({ storybookDir, environment: settings.environment, initScript: settings.initScript, settleMs: settings.settleMs });
+      const after = await renderIdentity({ storybookDir: settings.storybookDir, environment: settings.environment, initScript: settings.initScript, settleMs: settings.settleMs });
       const whyNot = after === identity ? whyNotReusable(manifest, batch) : "the built Storybook changed while it rendered";
       await project.renderKeys.remember(identity, whyNot === null ? batch.id : null);
       if (whyNot !== null) log(`This render won't be reused: ${whyNot}.`);
@@ -486,14 +466,14 @@ async function renderAndRecord(project: Project, options: RenderBatchOptions, { 
     // 1. Build. Whatever it writes is part of what this describes, so it comes first.
     // Before building, so a bad config doesn't cost a whole built Storybook to find out.
     const settings = await resolveRenderSettings(repo, { native: options.native });
-    await buildAsAsked(project, settings, options, log);
+    if (options.build === true) await runBuild(project, settings, options.signal, log);
 
     // 2. Read where we are.
     const gitSha = await headSha(repo);
     if (gitSha === null) {
       throw new SelfieError("no-commits", "This repository has no commits yet, and a batch is recorded against a Git SHA.");
     }
-    const storybookDir = resolveStorybookDir(project.cwd, options.storybookDir, settings);
+    const { storybookDir } = settings;
     const baseline = await findBaseline(project, settings.environmentId);
     const dirtyBefore = await dirtyPaths(repo);
 
@@ -502,7 +482,7 @@ async function renderAndRecord(project: Project, options: RenderBatchOptions, { 
     const buildBefore = await storybookHash(storybookDir);
     const identity = await renderIdentity({ storybookDir, environment: settings.environment, initScript: settings.initScript, settleMs: settings.settleMs });
     const replayed = identity !== null && reuse ? await replay(project, identity, options.stories, log) : null;
-    const recording = replayed ?? (await renderFresh(project, renderDir, render, { storybookDir, identity, settings, options, log }));
+    const recording = replayed ?? (await renderFresh(project, renderDir, render, { identity, settings, options, log }));
     const rendered = Date.now();
     assertStoriesRendered(recording.storyIds.length, storybookDir, options.stories);
 

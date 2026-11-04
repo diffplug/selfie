@@ -56,8 +56,6 @@ ON CONFLICT(key) DO UPDATE SET batch_id = excluded.batch_id`,
 }
 
 export interface Project {
-  /** What a relative path in a request is relative to. */
-  readonly cwd: string;
   readonly repo: Repo;
   /** `<home>/<slug>` */
   readonly directory: string;
@@ -82,7 +80,6 @@ export async function openProject({ cwd, env }: { cwd: string; env: NodeJS.Proce
   for (const statement of CREATE_NOTES_TABLES) await sql.run({ sql: statement });
   const blob = new Blobs(new FilesystemBlobStorage(path.join(directory, "blobs")));
   return {
-    cwd,
     repo,
     directory,
     renderKeys: renderKeysIn(sql),

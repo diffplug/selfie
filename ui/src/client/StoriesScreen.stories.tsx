@@ -22,12 +22,9 @@ const FAILED = new RequestError("render-failed", "That didn't render: Docker is 
 
 export const SomeRendered: Story = { args: { view: MIXED, search: "", renders: rendering() } };
 const NOT_RENDERED = [unrendered("components-button--primary"), unrendered("components-button--secondary")];
-const NOT_BUILT = { storybookUrl: null, canRender: false, newestBatchId: null, setup: setupOf({}) };
+const NOT_BUILT = { storybookUrl: null, canRender: false, newestBatchId: null, setup: setupOf({ storybookDir: "ui/storybook-static", buildCommand: "pnpm --filter ui build-storybook" }) };
 export const NoCommits: Story = { args: { view: view([], { ...NOT_BUILT, head: null }), search: "", renders: rendering({ can: false }) } };
 export const NoBuiltStorybook: Story = { args: { view: view([], NOT_BUILT), search: "", renders: rendering({ can: false }) } };
-export const NoBuiltStorybookWithItsCommand: Story = {
-  args: { view: view([], { ...NOT_BUILT, setup: setupOf({ storybookDir: "ui/storybook-static", buildCommand: "pnpm --filter ui build-storybook" }) }), search: "", renders: rendering({ can: false }) },
-};
 export const NoStories: Story = { args: { view: view([], { newestBatchId: null, canRender: false }), search: "", renders: rendering({ can: false }) } };
 export const BuiltBeforeThisCommit: Story = { args: { view: view(NOT_RENDERED, { newestBatchId: null, setup: setupOf({ builtBeforeHead: true }) }), search: "", renders: rendering() } };
 export const DetachedHead: Story = { args: { view: view(NOT_RENDERED, { newestBatchId: null, branch: null }), search: "", renders: rendering() } };
