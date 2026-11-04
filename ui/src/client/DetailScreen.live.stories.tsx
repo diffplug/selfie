@@ -44,7 +44,7 @@ export const KeepsTheKeyboard: Story = {
 };
 /** A phone-sized story, whose golden was still at the environment's size, lays out on each side as its image did. */
 export const SizeOfItsOwn: Story = {
-  args: { row: BUTTON, view: liveView(BUTTON, { storyViewports: { [BUTTON.story]: { width: 414, height: 896 } } }) },
+  args: { row: kept(BUTTON), view: liveView(kept(BUTTON), { storyViewports: { [BUTTON.story]: { width: 414, height: 896 } } }) },
   play: async (context) => {
     await liveLoaded(context);
     const [golden, current] = within(context.canvasElement).getAllByTitle<HTMLIFrameElement>(/running/);
