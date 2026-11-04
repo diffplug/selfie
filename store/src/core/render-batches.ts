@@ -5,7 +5,7 @@ import type { Sql, SqlParam, SqlRow, SqlStatement } from "./sql.ts";
 /**
  * The tables behind `RenderBatches`, which `initStoreSchema` creates. Anything repeated across a great
  * many rows is held once and named by an integer: an image, a batch, a story, a commit, an environment,
- * an actor, and all that one click decided. Those keys stay private to this store: everything this
+ * and an actor. Those keys stay private to this store: everything this
  * module takes or returns names each by its own text. See `docs/specs/renders.md` -> Schema.
  */
 export const CREATE_BATCH_TABLES: readonly string[] = [
@@ -43,24 +43,18 @@ export const CREATE_BATCH_TABLES: readonly string[] = [
   CHECK (image_key IS NOT NULL OR failure IS NOT NULL),
   CHECK ((viewport_width IS NULL) = (viewport_height IS NULL))
 ) WITHOUT ROWID`,
-  // One click: every decision it made shares these, however many stories that was. Unique, so that
-  // a resend or another store's copy of it finds this row. Its batch may never have come here.
-  `CREATE TABLE IF NOT EXISTS decision_events (
-  key INTEGER PRIMARY KEY,
-  rejected INTEGER NOT NULL CHECK (rejected IN (0, 1)),
-  decided_at INTEGER NOT NULL,
-  actor_key INTEGER NOT NULL REFERENCES actors(key),
-  batch_id TEXT NOT NULL,
-  UNIQUE (decided_at, batch_id, actor_key, rejected)
-)`,
   // By commit first, since what history reaches is read a commit at a time. An image key of 0, which no
-  // image is ever given, is a decision on a story being gone, so that column can't be a foreign key.
+  // image is ever given, is a decision on a story being gone, so that column can't be a foreign key. Its
+  // batch may never have come here, so that stays an ID.
   `CREATE TABLE IF NOT EXISTS decisions (
   environment_key INTEGER NOT NULL REFERENCES environments(key),
   commit_key INTEGER NOT NULL REFERENCES commits(key),
   story_key INTEGER NOT NULL REFERENCES stories(key),
   image_key INTEGER NOT NULL,
-  event_key INTEGER NOT NULL REFERENCES decision_events(key),
+  rejected INTEGER NOT NULL CHECK (rejected IN (0, 1)),
+  decided_at INTEGER NOT NULL,
+  actor_key INTEGER NOT NULL REFERENCES actors(key),
+  batch_id TEXT NOT NULL,
   PRIMARY KEY (environment_key, commit_key, story_key, image_key)
 ) WITHOUT ROWID`,
   "CREATE INDEX IF NOT EXISTS decisions_by_image ON decisions(environment_key, story_key, image_key)",
@@ -77,7 +71,7 @@ export const CREATE_BATCH_TABLES: readonly string[] = [
 // more with a viewport of its own, so a statement holds 49 when none has either, and at least 19.
 const MAX_RECORD_PARAMS = 100;
 const RENDERS_PER_DECISION_STATEMENT = 47;
-// As one bound parameter, of about 120 bytes each.
+// As one bound parameter, of about 200 bytes each.
 const DECISIONS_PER_MERGE_STATEMENT = 200;
 // As one bound parameter, in a statement that gives them all keys.
 const NAMES_PER_STATEMENT = 1_000;
@@ -122,20 +116,19 @@ const NAMED_BATCH_KEY = `(SELECT b.key FROM render_batches b
 // newest, latest first, and at the same moment a rejection, then by commit so that one row wins.
 const DECISION_ON_RENDER = `LEFT JOIN decisions d ON d.environment_key = r.environment_key AND d.story_key = rs.story_key
   AND d.image_key = rs.image_key
-  AND NOT EXISTS (SELECT 1 FROM decisions n JOIN decision_events ne ON ne.key = n.event_key
+  AND NOT EXISTS (SELECT 1 FROM decisions n
     WHERE n.environment_key = d.environment_key AND n.story_key = d.story_key AND n.image_key = d.image_key
-      AND (ne.decided_at, ne.rejected, n.commit_key) > (SELECT de.decided_at, de.rejected, d.commit_key FROM decision_events de WHERE de.key = d.event_key))
-LEFT JOIN decision_events e ON e.key = d.event_key
-LEFT JOIN actors a ON a.key = e.actor_key`;
+      AND (n.decided_at, n.rejected, n.commit_key) > (d.decided_at, d.rejected, d.commit_key))
+LEFT JOIN actors a ON a.key = d.actor_key`;
 
-const DECISION_WORD = "CASE e.rejected WHEN 1 THEN 'rejected' WHEN 0 THEN 'approved' END";
+const DECISION_WORD = "CASE d.rejected WHEN 1 THEN 'rejected' WHEN 0 THEN 'approved' END";
 
 /** A comparison's statements, against whichever batch a key expression finds. */
 const comparisonStatements = (baselineKey: string) => ({
   baseline: `SELECT ${baselineKey} AS batch_key`,
   // `gs` joins before the images so that a row left out never reads them.
   comparedPage: `SELECT rs.story_key, s.id AS story, i.hash AS image_hash, rs.failure,
-  gi.hash AS golden_hash, ${DECISION_WORD} AS decision, a.name AS actor, e.decided_at
+  gi.hash AS golden_hash, ${DECISION_WORD} AS decision, a.name AS actor, d.decided_at
 FROM render_batches r
 CROSS JOIN renders rs ON rs.batch_key = r.key
 LEFT JOIN renders gs ON gs.batch_key = ${baselineKey} AND gs.story_key = rs.story_key
@@ -194,9 +187,9 @@ WHERE r.id = ?1 AND ${CAN_BE_GOLDENS}
         LEFT JOIN renders gs ON gs.batch_key = ${GOLDENS_BATCH_KEY} AND gs.story_key = rs.story_key
         WHERE rs.batch_key = r.key AND gs.image_key IS NOT rs.image_key
           AND NOT EXISTS (
-            SELECT 1 FROM decisions d JOIN decision_events e ON e.key = d.event_key
+            SELECT 1 FROM decisions d
             WHERE d.environment_key = r.environment_key AND d.story_key = rs.story_key
-              AND d.image_key = rs.image_key AND e.rejected = 0
+              AND d.image_key = rs.image_key AND d.rejected = 0
           )
       )
     )
@@ -229,7 +222,7 @@ ORDER BY rs.story_key
 LIMIT CAST(?3 AS INTEGER)`;
 
 const READ_BATCH_PAGE = `SELECT rs.story_key, s.id AS story, i.hash AS image_hash, rs.failure, rs.viewport_width, rs.viewport_height,
-  ${DECISION_WORD} AS decision, a.name AS actor, e.decided_at, c.sha AS git_sha, e.batch_id
+  ${DECISION_WORD} AS decision, a.name AS actor, d.decided_at, c.sha AS git_sha, d.batch_id
 FROM render_batches r
 CROSS JOIN renders rs ON rs.batch_key = r.key
 LEFT JOIN images i ON i.key = rs.image_key
@@ -249,12 +242,11 @@ LEFT JOIN stories s ON s.key = rs.story_key
 ${BATCH_PAGE_TAIL}`;
 
 // A commit at a time, each of which is a range of the primary key. A commit this store has never heard of finds nothing.
-const DECISIONS_AT = `SELECT s.id AS story, i.hash AS image_hash, e.rejected, a.name AS actor, e.decided_at, e.batch_id
+const DECISIONS_AT = `SELECT s.id AS story, i.hash AS image_hash, d.rejected, a.name AS actor, d.decided_at, d.batch_id
 FROM json_each(?2) j
 CROSS JOIN commits c ON c.sha = j.value
 CROSS JOIN decisions d ON d.environment_key = ${environmentKey("?1")} AND d.commit_key = c.key
-CROSS JOIN decision_events e ON e.key = d.event_key
-CROSS JOIN actors a ON a.key = e.actor_key
+CROSS JOIN actors a ON a.key = d.actor_key
 CROSS JOIN stories s ON s.key = d.story_key
 LEFT JOIN images i ON i.key = d.image_key`;
 
@@ -285,27 +277,6 @@ function nameStatements(table: keyof typeof NAME_COLUMNS, names: readonly string
   return chunks([...new Set(names)], NAMES_PER_STATEMENT).map((group) => ({
     sql: `INSERT INTO ${table}(${column}) SELECT value FROM json_each(?1) WHERE true ON CONFLICT(${column}) DO NOTHING`,
     params: [JSON.stringify(group)],
-    idempotent: true,
-  }));
-}
-
-/** What every decision of one click shares. */
-interface ClickFacts {
-  readonly rejected: 0 | 1;
-  readonly at: number;
-  readonly actor: string;
-  readonly batchId: string;
-}
-
-/** Gives each click its row, unless a resend or another store already has. Its actor must have a key. */
-function eventStatements(clicks: readonly ClickFacts[]): SqlStatement[] {
-  const rows = [...new Set(clicks.map(({ rejected, at, actor, batchId }) => JSON.stringify([rejected, at, actor, batchId])))];
-  return chunks(rows, DECISIONS_PER_MERGE_STATEMENT).map((group) => ({
-    sql: `INSERT INTO decision_events(rejected, decided_at, actor_key, batch_id)
-SELECT json_extract(j.value, '$[0]'), json_extract(j.value, '$[1]'), a.key, json_extract(j.value, '$[3]')
-FROM json_each(?1) j CROSS JOIN actors a ON a.name = json_extract(j.value, '$[2]')
-WHERE true ON CONFLICT(decided_at, batch_id, actor_key, rejected) DO NOTHING`,
-    params: [`[${group.join(",")}]`],
     idempotent: true,
   }));
 }
@@ -752,19 +723,18 @@ ORDER BY started_at DESC, key DESC`,
       ...nameStatements("commits", [on.gitSha]),
       ...nameStatements("actors", [actor]),
       ...nameStatements("stories", renders.map(({ story }) => story)),
-      ...eventStatements([{ rejected, at, actor, batchId: on.batchId }]),
       ...chunks(renders, RENDERS_PER_DECISION_STATEMENT).map((group) => {
         const params: SqlParam[] = [environment, on.gitSha, rejected, at, actor, on.batchId];
         const values = group.map(({ story, imageHash }) => `(?${params.push(story)}, ?${params.push(imageHash ?? REMOVAL)})`);
         return {
           sql: `WITH v(story, image_hash) AS (VALUES ${values.join(", ")})
-INSERT INTO decisions(environment_key, commit_key, story_key, image_key, event_key)
-SELECT ${environmentKey("?1")}, ${commitKey("?2")}, s.key, COALESCE(i.key, 0),
-  (SELECT key FROM decision_events WHERE decided_at = CAST(?4 AS INTEGER) AND batch_id = ?6
-    AND actor_key = (SELECT key FROM actors WHERE name = ?5) AND rejected = CAST(?3 AS INTEGER))
+INSERT INTO decisions(environment_key, commit_key, story_key, image_key, rejected, decided_at, actor_key, batch_id)
+SELECT ${environmentKey("?1")}, ${commitKey("?2")}, s.key, COALESCE(i.key, 0), CAST(?3 AS INTEGER), CAST(?4 AS INTEGER),
+  (SELECT key FROM actors WHERE name = ?5), ?6
 FROM v JOIN stories s ON s.id = v.story LEFT JOIN images i ON i.hash = v.image_hash
 WHERE true
-ON CONFLICT(environment_key, commit_key, story_key, image_key) DO UPDATE SET event_key = excluded.event_key`,
+ON CONFLICT(environment_key, commit_key, story_key, image_key) DO UPDATE SET
+  rejected = excluded.rejected, decided_at = excluded.decided_at, actor_key = excluded.actor_key, batch_id = excluded.batch_id`,
           params,
           idempotent: true,
         };
@@ -877,24 +847,22 @@ ON CONFLICT(environment_key, commit_key, story_key, image_key) DO UPDATE SET eve
       ...nameStatements("commits", decisions.map(({ gitSha }) => gitSha)),
       ...nameStatements("actors", decisions.map(({ actor }) => actor)),
       ...nameStatements("stories", decisions.map(({ story }) => story)),
-      ...eventStatements(decisions.map((decision) => ({ rejected: rejectedOf(decision), at: decision.at, actor: decision.actor, batchId: decision.batchId }))),
       ...chunks(decisions, DECISIONS_PER_MERGE_STATEMENT).map((group) => ({
         sql: `WITH v(story, image_hash, sha, rejected, decided_at, actor, batch_id) AS (
   SELECT json_extract(value, '$[0]'), json_extract(value, '$[1]'), json_extract(value, '$[2]'), json_extract(value, '$[3]'), json_extract(value, '$[4]'), json_extract(value, '$[5]'), json_extract(value, '$[6]')
   FROM json_each(?2)
 )
-INSERT INTO decisions(environment_key, commit_key, story_key, image_key, event_key)
-SELECT ${environmentKey("?1")}, c.key, s.key, i.key, e.key
+INSERT INTO decisions(environment_key, commit_key, story_key, image_key, rejected, decided_at, actor_key, batch_id)
+SELECT ${environmentKey("?1")}, c.key, s.key, i.key, v.rejected, v.decided_at, a.key, v.batch_id
 FROM v
 CROSS JOIN commits c ON c.sha = v.sha
 CROSS JOIN stories s ON s.id = v.story
 CROSS JOIN images i ON i.hash = v.image_hash
 CROSS JOIN actors a ON a.name = v.actor
-CROSS JOIN decision_events e ON e.decided_at = v.decided_at AND e.batch_id = v.batch_id AND e.actor_key = a.key AND e.rejected = v.rejected
 WHERE true
-ON CONFLICT(environment_key, commit_key, story_key, image_key) DO UPDATE SET event_key = excluded.event_key
-WHERE (SELECT decided_at, rejected FROM decision_events WHERE key = excluded.event_key)
-  > (SELECT decided_at, rejected FROM decision_events WHERE key = decisions.event_key)`,
+ON CONFLICT(environment_key, commit_key, story_key, image_key) DO UPDATE SET
+  rejected = excluded.rejected, decided_at = excluded.decided_at, actor_key = excluded.actor_key, batch_id = excluded.batch_id
+WHERE (excluded.decided_at, excluded.rejected) > (decisions.decided_at, decisions.rejected)`,
         params: [environment, JSON.stringify(group.map((decision) => [decision.story, decision.imageHash, decision.gitSha, rejectedOf(decision), decision.at, decision.actor, decision.batchId]))],
         idempotent: true,
       })),

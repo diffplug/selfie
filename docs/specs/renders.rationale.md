@@ -8,7 +8,7 @@
 
 **The environment is on the batch, not each row.** It makes a mixed-environment batch impossible to store. Decisions keep the environment in their key, since they outlive any batch.
 
-**Names as integers.** Measured on local SQLite, 2026-11, with 10,000 stories: a render went from 60 bytes to 21, and across 499,800 decisions from 20,000 clicks over 20,000 commits, a decision went from 479 bytes to about 50, with reading those at the newest 1,000 commits going from 54 ms to about 40. Each write costs a statement that gives its names keys, which writes nothing for a name already held, and each read joins them back. Real D1 hasn't run these numbers.
+**Names as integers.** Measured on local SQLite, 2026-11, with 10,000 stories: a render went from 60 bytes to 21, and across 499,800 decisions from 20,000 clicks over 20,000 commits, a decision went from 479 bytes to about 87, with reading those at the newest 1,000 commits going from 54 ms to about 38. Each write costs a statement that gives its names keys, which writes nothing for a name already held, and each read joins them back. Real D1 hasn't run these numbers.
 
 ## Render batches
 
@@ -38,7 +38,7 @@
 
 ## Decisions
 
-**One row per click.** A person approving 500 stories makes 500 decisions with one verdict, time, actor, and batch. Held once, the batch's 36-character ID stops repeating, and it can't simply be an integer, since a decision can name a batch that never came here. Those four facts are unique because a resend has to find the row it already wrote.
+**No table of clicks.** Approving 500 stories makes 500 decisions with one verdict, time, actor, and batch, so those could be held once. Measured with the numbers above, that takes a decision from about 87 bytes to about 48, which on that whole history is 20 MB, or about 2 cents a month, for a table, a unique key, a join on every read, and rows left behind when a decision is replaced. A decision's batch stays an ID, since it can name a batch that never came here.
 
 **By commit first.** History is read a commit at a time, so the primary key makes that a range, and the index that remains is the one for finding a decision on an image.
 

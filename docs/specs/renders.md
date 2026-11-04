@@ -82,7 +82,6 @@ A decision is an approval or a rejection, by an actor, at the time it is recorde
 - **Must keep one decision per name, hash, and commit, the one most recently recorded.** There is no history of replaced decisions.
 - **Must merge a decision from another store by its own time, latest first, then `rejected` before `approved`, and never by who made it**, so two stores reach one verdict whichever order they hear in, a person changing their mind still works, and sending a decision twice changes nothing. It keeps its commit and batch there, so history reaches it as it would here.
 - **Must refuse every decision in a request if any names an image this store doesn't hold**, with `unknown-image`, as a render already must, so a decision can hold the image's key (rationale). Sync sends a batch's images before its decisions (`docs/specs/sync.md` → Pushing and pulling).
-- **Must keep what one click shares in one row of `decision_events`**: its verdict, time, actor, and batch. **The same four facts must find that row**, so a resend or another store's copy of a decision adds none.
 
 ## Approvals
 
@@ -129,8 +128,7 @@ render_batches(key PK, id UNIQUE, commit_key → commits.key, environment_key �
   INDEX batches_by_commit(commit_key, environment_key, started_at)
   INDEX batches_by_branch(branch, environment_key, started_at)
 renders(batch_key → render_batches.key, story_key → stories.key, image_key → images.key, failure, viewport_width, viewport_height)  PK (batch_key, story_key)  WITHOUT ROWID
-decision_events(key PK, rejected, decided_at, actor_key → actors.key, batch_id)  UNIQUE (decided_at, batch_id, actor_key, rejected)
-decisions(environment_key → environments.key, commit_key → commits.key, story_key → stories.key, image_key, event_key → decision_events.key)  PK (environment_key, commit_key, story_key, image_key)  WITHOUT ROWID
+decisions(environment_key → environments.key, commit_key → commits.key, story_key → stories.key, image_key, rejected, decided_at, actor_key → actors.key, batch_id)  PK (environment_key, commit_key, story_key, image_key)  WITHOUT ROWID
   INDEX decisions_by_image(environment_key, story_key, image_key)
 goldens(commit_key → commits.key, environment_key → environments.key, batch_key → render_batches.key)  PK (commit_key, environment_key)  WITHOUT ROWID
 ```
@@ -138,7 +136,7 @@ goldens(commit_key → commits.key, environment_key → environments.key, batch_
 - **Must leave out the CLI's local table** (`docs/specs/cli.md` → Recording only if necessary): it's in a local `store.db`, not this schema, and D1 doesn't have it.
 - **Must only add what is missing:** `initStoreSchema` is one request of `CREATE ... IF NOT EXISTS`, so running it upgrades a store holding only images. It changes no existing table, and there is no version number. Any other change needs `docs/specs/store.md` → Open questions decided first. `render_batches.reused_from_batch`, the rename of its tables and columns (`docs/specs/cli.rationale.md`), and its foreign keys are the exceptions, made before any project database existed (rationale): `CREATE TABLE IF NOT EXISTS` doesn't add it to an older store, whose reviews and accepts fail with exit 2 until the store is recreated.
 - **Must declare a foreign key wherever a row's parent is always written first and held here**, as `→` shows above, so a store refuses an orphan instead of holding one (rationale).
-- **Never declare one on `decisions.image_key`, `decision_events.batch_id`, or `reused_from_batch`**, since a key of 0 is a removal, a decision may name a batch this store doesn't hold, and sync may move a batch without the one it was reused from.
+- **Never declare one on `decisions.image_key`, `decisions.batch_id`, or `reused_from_batch`**, since a key of 0 is a removal, a decision may name a batch this store doesn't hold, and sync may move a batch without the one it was reused from.
 - **Must say in `render_batches.viewport_width` and `viewport_height` the window a batch's stories lay out in, in CSS pixels, and in those columns of `renders` only a story's own, if it differs**, both or neither, so a story with neither laid out in its batch's (`docs/specs/render.md` → A story's viewport). They only size a story running live, so a comparison never reads them (rationale). **A batch reusing another's images must hold the same sizes.**
 - **Must hold what repeats across a great many rows once, by an integer key, and never let a key leave the store**, as with image keys (rationale). A batch's `id`, a story's ID, a commit's SHA, an environment's ID, an actor's name, and an image's hash are what leave it. **Must give a name its key in the same request, before the first row that uses it.**
 - **May list a batch's pages in any order**, and `next` only says where the next one starts. A comparison lists stories by name.

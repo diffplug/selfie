@@ -438,18 +438,6 @@ describe("RenderBatches", () => {
       expect(await batches.decisionsAt(ENV, [ON.gitSha])).toEqual([]);
     });
 
-    it("keeps one row for a click, however many stories it decided, and finds it again when it's resent", async () => {
-      const renders = [{ story: "a", imageHash: hashOf(1) }, { story: "b", imageHash: hashOf(2) }, { story: "c", imageHash: null }];
-      await batches.decide({ on: ON, environment: "one-click", decision: "approved", actor: "ned", renders });
-      const [{ total: after }] = (await sql.run({ sql: "SELECT COUNT(*) AS total FROM decision_events" })) as [{ total: number }];
-      const decided = await batches.decisionsAt("one-click", [ON.gitSha]);
-      expect(decided.map(({ story, imageHash }) => [story, imageHash]).sort()).toEqual([["a", hashOf(1)], ["b", hashOf(2)], ["c", null]]);
-      const at = decided[0]!.at;
-      await batches.mergeDecisions("one-click", [{ story: "a", imageHash: hashOf(1), decision: "approved", actor: "ned", at, gitSha: ON.gitSha, batchId: ON.batchId }]);
-      const [{ total }] = (await sql.run({ sql: "SELECT COUNT(*) AS total FROM decision_events" })) as [{ total: number }];
-      expect(total).toBe(after);
-    });
-
     it("refuses a malformed hash, and a decision by nobody", async () => {
       await expect(
         batches.decide({ on: ON,
@@ -680,7 +668,7 @@ describe("RenderBatches", () => {
       const elsewhere = await createTempStore();
       try {
         await elsewhere.sql.batch(
-          ["goldens", "decisions", "decision_events", "renders", "render_batches", "actors", "commits", "stories", "environments"].map((table) => ({
+          ["goldens", "decisions", "renders", "render_batches", "actors", "commits", "stories", "environments"].map((table) => ({
             sql: `DROP TABLE ${table}`,
           })),
         );
@@ -781,7 +769,7 @@ describe("RenderBatches", () => {
       const sql = new Sql(adapter);
       await expect(sql.run({ sql: "INSERT INTO renders(batch_key, story_key, failure) VALUES (424242, 424242, 'boom')" })).rejects.toThrow(/FOREIGN KEY/);
       await expect(sql.run({ sql: "INSERT INTO goldens(commit_key, environment_key, batch_key) VALUES (424242, 424242, 424242)" })).rejects.toThrow(/FOREIGN KEY/);
-      await expect(sql.run({ sql: "INSERT INTO decisions(environment_key, commit_key, story_key, image_key, event_key) VALUES (424242, 424242, 424242, 0, 424242)" })).rejects.toThrow(/FOREIGN KEY/);
+      await expect(sql.run({ sql: "INSERT INTO decisions(environment_key, commit_key, story_key, image_key, rejected, decided_at, actor_key, batch_id) VALUES (424242, 424242, 424242, 0, 0, 1, 424242, 'x')" })).rejects.toThrow(/FOREIGN KEY/);
       const batch = await recordBatch(SHA_A, [rendered("a", 1)]);
       const [{ key }] = (await sql.run({ sql: "SELECT key FROM render_batches WHERE id = ?1", params: [batch.id] })) as [{ key: number }];
       await sql.run({ sql: "INSERT INTO stories(id) VALUES ('never-rendered')" });
@@ -821,7 +809,7 @@ describe("RenderBatches", () => {
           seen.add(text);
           // A new name may fix a foreign key that's pending, so its plan lists every table that refers to it. SQLite skips
           // those while none is pending, and none ever is, since every statement here writes a parent first.
-          if (/^INSERT INTO (environments|stories|commits|actors|decision_events)\b/.test(text)) return [];
+          if (/^INSERT INTO (environments|stories|commits|actors)\b/.test(text)) return [];
           const plan = db.prepare(`EXPLAIN QUERY PLAN ${text}`).all(...params);
           return plan
             .map(({ detail }) => String(detail))
