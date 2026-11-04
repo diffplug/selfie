@@ -22,7 +22,7 @@ With the flag, 7 full batches of all 541 stories, across the settle times, quiet
 
 **Settle time outside the ID.** With a project's timers frozen, settle times from 0 to 500 ms gave identical PNGs on all 541 stories, so tuning it shouldn't start approvals over. A story that does depend on it reports as changed, like any other project input.
 
-**A declared viewport outside the ID.** It's in a story, as its code is, so it reaches the image the same way: that story reads as changed, a person looks, and every other story keeps its goldens. The order of the waits didn't change either, since a loaded story always comes before the render phase, so `waitSequence` stayed where it was.
+**A declared viewport outside the ID.** It's in a story, as its code is, so it reaches the image the same way: that story reads as changed, a person looks, and every other story keeps its approvals. The order of the waits didn't change either, since a loaded story always comes before the render phase, so `waitSequence` stayed where it was.
 
 ## Render
 

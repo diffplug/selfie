@@ -323,7 +323,10 @@ async function replay(
     // A remembered batch is `complete`, so every row has an image.
     records: async () =>
       chosen.map(({ render: { story, imageHash, playError } }) => ({ story, imageHash: imageHash!, playError })),
-    storyViewports: () => project.storybooks.storyViewportsOf(batchId),
+    storyViewports: async () => {
+      const kept = new Set(storyIds);
+      return Object.fromEntries(Object.entries(await project.storybooks.storyViewportsOf(batchId)).filter(([story]) => kept.has(story)));
+    },
     finished: async () =>
       log(`Reused the images of batch ${batchId}, since this exact built Storybook already rendered. Run selfie render to render again.`),
   };

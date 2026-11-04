@@ -1,3 +1,6 @@
+// The most statements in one request, as `docs/specs/renders.md` -> Requests says. It holds 19,600 renders, so a batch of up to that many costs one.
+export const STATEMENTS_PER_REQUEST = 400;
+
 /** Splits items into groups of at most `size`, in order. */
 export function chunks<T>(items: readonly T[], size: number): T[][] {
   const groups: T[][] = [];
