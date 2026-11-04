@@ -162,6 +162,7 @@ Source of truth: `store/src/core/render-batches.ts`; `store/test/render-batches.
 
 Open:
 
+- **Known limit: history stops at 1,000 commits.** A story whose newest approval is further back has no reference, and reads as added. It's accepted for now, and a cache will replace it. Only approvals count, so this starts to matter 1,000 commits after a project's first approval, however long its history was before that.
 - Whether the reference needs a derived table for the cloud. Locally it doesn't (rationale). If it does, that table can always be rebuilt, and is never a source of truth.
 - With no remote, a squash or a rebase onto the default branch leaves no pull request to follow, so its approvals are out of reach, and it asks again. A commit whose Git tree matches an approved batch's commit might carry them.
 - A shallow clone can't walk its history, so CI needs a full clone, or to ask the store.
