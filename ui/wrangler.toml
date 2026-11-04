@@ -25,6 +25,11 @@ database_name = "selfie-project-1442175397"
 database_id = "89537c43-e95e-44d6-b2ec-b35b489d82b9"
 
 [[d1_databases]]
+binding = "DB_1183663019"
+database_name = "selfie-project-1183663019"
+database_id = "2bee75dd-fa10-47a3-95f4-8912044bf801"
+
+[[d1_databases]]
 binding = "DB_1445291541"
 database_name = "selfie-project-1445291541"
 database_id = "066cdcab-f1cc-4752-9666-17d2136e255a"

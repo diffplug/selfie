@@ -26,7 +26,7 @@ pnpm install there. Then run this, and follow what it prints:
 node --disable-warning=ExperimentalWarning <checkout>/cli/src/main.ts skill quickstart
 ```
 
-It works out how your Storybook builds, writes `selfie.config.json`, proves that a story really renders, and warns you about anything in your way, such as uncommitted changes. It won't commit anything without asking. You'll get a URL to open, and what to do next.
+It works out how your Storybook builds, writes `selfie.config.json`, proves that a story really renders, warns you about anything in your way, such as uncommitted changes, and offers to set up commit statuses on GitHub. It won't commit anything without asking. You'll get a URL to open, and what to do next.
 
 You'll need Node 26 or later, pnpm, and Docker. Selfie isn't on npm yet, which is why this starts from a checkout.
 

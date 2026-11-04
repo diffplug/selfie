@@ -1,13 +1,13 @@
 ---
 name: quickstart
-description: Set up Selfie in a repository with a Storybook, and get a person to their first rendered story. Use when someone asks to set up, install, or try Selfie. Works out the configuration, checks it really renders, and warns about anything that will get in their way.
+description: Set up Selfie in a repository with a Storybook, get a person to their first rendered story, and offer commit statuses on GitHub. Use when someone asks to set up, install, or try Selfie. Works out the configuration, checks it really renders, and warns about anything that will get in their way.
 ---
 
 # Set up Selfie
 
 Get this repository to where a person can open Selfie and see their stories. Work it out yourself and don't ask for what you can find. Say what you found and every warning at the end, in plain words.
 
-Never commit, stash, delete, or install a Storybook without asking. Those are the person's to decide. Writing `selfie.config.json` is the one change you're here to make.
+Never commit, stash, delete, or install a Storybook without asking. Those are the person's to decide. Writing `selfie.config.json` is the one change you're here to make, until the person asks for [commit statuses](#6-offer-commit-statuses).
 
 Below, `selfie` means however it runs here: `selfie` if it's on the PATH, or `node --disable-warning=ExperimentalWarning <checkout>/cli/src/main.ts`.
 
@@ -63,7 +63,7 @@ The first render downloads the browser, which can take minutes, so say that befo
 
 Check each of these, and warn about what applies:
 
-- **Uncommitted changes:** `git status --porcelain`, which counts untracked files, and now includes `selfie.config.json`. Rendering still works, but every render is marked as uncommitted, so what it shows may not match the commit. List the files, and separate the config you just wrote from what was already there. Don't touch them: say what to commit or ignore.
+- **Uncommitted changes:** `git status --porcelain`, which counts untracked files, and now includes `selfie.config.json`. Rendering still works, but every render is marked as uncommitted, so what it shows may not match the commit, and `selfie push` won't send it. Say that a folder that's always there, such as one of worktrees, belongs in `.gitignore`. List the files, and separate the config you just wrote from what was already there. Don't touch them: say what to commit or ignore.
 - **The built Storybook isn't ignored:** `git check-ignore <storybookDir>`. If it isn't, the built Storybook itself makes every render uncommitted. Say to add it to `.gitignore`.
 - **A shallow clone:** `git rev-parse --is-shallow-repository`. Approvals from before where its history stops can't be reached, so stories may ask again.
 - **A big Storybook:** say how many stories there are, and that rendering them all takes a while. Don't guess how long from one story.
@@ -82,4 +82,71 @@ Then report, briefly:
   2. To set what later renders compare with: **Render all**, **Review the newest batch**, **Approve all**. Any branch will do.
   3. Then change a component, commit, restart `selfie`, and **Render all**. The tree shows only what changed since what was approved.
 
-If `selfie flakes` reported anything, mention `selfie skill fix-flakes`.
+If `selfie flakes` reported anything, mention `selfie skill fix-flakes`. Say that a story whose play function throws reads as failed, and can't be approved until it's fixed, so a project with some will show them on its first full render.
+
+Approvals made here stay here until they're pushed, so someone who goes on to step 6 approves on the site.
+
+## 6. Offer commit statuses
+
+Selfie can give every pushed commit a `selfie` status on GitHub, linked to its renders and its Storybook: red if a story failed or a change was rejected, yellow if something's undecided, green if it all matches what's approved. Offer this at the end, and do it only if the person says yes, since it commits a workflow and needs them to act on GitHub.
+
+Say first what it asks of them, then go through these in order, and stop and say so if one fails.
+
+1. **Check the service hosts this repository**, from the owner and name in its `origin`:
+
+   ```sh
+   curl -s -o /dev/null -w '%{http_code}\n' https://hackathon.selfie.dev/api/repositories/<owner>/<name>
+   ```
+
+   200 means it does. 404 means it doesn't, since the service only hosts the public repositories written into `ui/src/worker/index.ts`, so stop here and say so.
+
+2. **Have the person install the GitHub App on this repository.** It's theirs to do, at <https://github.com/apps/selfie-hackathon/installations/new>. It only writes statuses and reads commits. Wait until they say it's done.
+
+3. **Set the upload token as a repository secret**, which can upload and can't approve anything. It's kept in a file, so never print it:
+
+   ```sh
+   gh secret set SELFIE_UPLOAD_TOKEN -R <owner>/<name> < ~/.config/selfie-cloud/upload-token
+   ```
+
+   If that file isn't there, stop, and ask the person for the token.
+
+4. **Write `.github/workflows/selfie.yml`**, and fill in the step that installs the repository's dependencies, using its package manager at the version it pins:
+
+   ```yaml
+   name: Selfie
+   on:
+     push:
+       branches: ["**"]
+   jobs:
+     selfie:
+       runs-on: ubuntu-24.04-arm
+       steps:
+         - uses: actions/checkout@v4
+           with:
+             # What a commit reaches is what its approvals come from, so this needs all of its history.
+             fetch-depth: 0
+         - uses: actions/setup-node@v4
+           with:
+             node-version: 26
+         # Install the repository's dependencies here, such as `npm ci`, or `pnpm/action-setup` then `pnpm install --frozen-lockfile`.
+         - uses: diffplug/selfie-hackathon/.github/actions/selfie@main
+           with:
+             upload-token: ${{ secrets.SELFIE_UPLOAD_TOKEN }}
+   ```
+
+   It needs Node 26 for Selfie, and arm64 so that its images match the pinned environment. If the repository pins another Node for its own scripts, leave that as it is, and say that this combination hasn't been tried if it's the first.
+
+5. **Ask before committing and pushing** `selfie.config.json`, the workflow, and any `.gitignore` change, on a branch or wherever the person says. Pushing starts the first run, which takes a few minutes, and more for a big Storybook.
+
+6. **Check the run**, with `gh run list --branch <branch>` and `gh run view <id> --log-failed`. Once it's done, the commit has a status:
+
+   ```sh
+   gh api repos/<owner>/<name>/commits/<sha>/status --jq '.statuses[] | [.context, .state, .description] | join(" | ")'
+   ```
+
+Then tell them:
+
+- Every story reads as added at first, so the status is yellow, or red if any story failed.
+- To approve, follow the status's **Details** link, sign in with the writer's password, and **Approve all**. That's what later commits compare with, and a merge commit reaches it by itself, as long as the repository merges with merge commits rather than squashing or rebasing.
+- To see those approvals locally: `SELFIE_REMOTE=https://hackathon.selfie.dev selfie pull`.
+- The `selfie` status only blocks merging if they make it a required check in branch protection.
