@@ -61,6 +61,11 @@ body {
   margin: 0;
 }
 
+/* Digits of one width, so a time that ticks doesn't move what's beside it. */
+.selfie-render-progress {
+  font-variant-numeric: tabular-nums;
+}
+
 .selfie-muted {
   color: var(--fgColor-muted);
 }

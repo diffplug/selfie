@@ -1,12 +1,13 @@
 // Every story of the hosted Storybook, each with its newest render at HEAD, whichever batch that was.
 // A story's page is its batch's, so looking at one here and in that batch's review is the same screen.
-import { Banner, Button, Heading, RelativeTime, Stack, Text } from "@primer/react";
+import { Banner, Button, Heading, RelativeTime, Stack, Text, VisuallyHidden } from "@primer/react";
 import { useMemo, useState, type ReactNode } from "react";
-import type { ListedStory, StoriesView } from "../shared/api.ts";
+import type { ListedStory, RenderProgress, StoriesView } from "../shared/api.ts";
+import { describeRenderProgress, spokenStretch } from "../shared/renderProgress.ts";
 import { DetailScreen, StoryPager } from "./DetailScreen.tsx";
 import { FeedbackBar } from "./Feedback.tsx";
 import { navigationThrough, parseFilter, type StoryNavigation } from "./filter.ts";
-import { useRender, useFeedback, useHotkeys, useBatch, useStories, useStoryFocusKeys, useTitle, type RenderingState, type FeedbackState, type BatchState } from "./hooks.ts";
+import { useRender, useRenderProgress, useFeedback, useHotkeys, useBatch, useStories, useStoryFocusKeys, useTitle, type RenderingState, type FeedbackState, type BatchState } from "./hooks.ts";
 import { Keys } from "./Keys.tsx";
 import { usePageFacts } from "./PageFacts.tsx";
 import { OpenInStorybook, StoryFrame, storyFrameUrl } from "./LiveStories.tsx";
@@ -41,16 +42,35 @@ export function StoriesLayout({ view, story, search, children }: { view: Stories
   );
 }
 
-/** What's said while a render runs, or why the last one didn't. */
-export function RenderingStatus({ renders }: { renders: RenderingState }) {
+/**
+ * What's said while a render runs, or why the last one didn't. The banner changes every second, so a
+ * screen reader follows a separate status, which changes far less often. That's always there, since
+ * one is only heard when what's in it changes.
+ */
+export function RenderingStatus({ renders, progress, now }: { renders: RenderingState; progress: RenderProgress | null; now: number }) {
+  const { rendering } = renders;
+  const title = `Rendering ${plural(rendering, "story", "stories")}`;
+  const shown = progress ?? { total: rendering, finished: 0, startedAtMs: now, firstStoryStartedAtMs: null };
+  const description = describeRenderProgress(shown, now);
+
+  const stretch = spokenStretch(shown, now);
+  const spokenFor = `${rendering} ${stretch}`;
+  const [spoken, setSpoken] = useState({ spokenFor, text: title });
+  if (spoken.spokenFor !== spokenFor) setSpoken({ spokenFor, text: stretch === 0 ? title : description });
+
   return (
     <>
       {renders.error !== null && <ActionFailedBanner error={renders.error} onDismiss={renders.clearError} />}
-      {renders.rendering > 0 && (
-        <Banner variant="info" title={`Rendering ${plural(renders.rendering, "story", "stories")}`} description="It renders in the same browser as any other batch, so it can take a moment." />
-      )}
+      {rendering > 0 && <Banner variant="info" title={title} description={<span className="selfie-render-progress">{description}</span>} />}
+      <VisuallyHidden role="status">{rendering > 0 ? spoken.text : ""}</VisuallyHidden>
     </>
   );
+}
+
+/** Holds a render's progress here, so that each second renders this banner again, and not the list of every story. */
+function LiveRenderingStatus({ renders }: { renders: RenderingState }) {
+  const { progress, now } = useRenderProgress(renders.rendering > 0);
+  return <RenderingStatus renders={renders} progress={progress} now={now} />;
 }
 
 /** What's on the right with no story picked. */
@@ -229,7 +249,7 @@ export function StoriesRoutes({ story, search }: { story: string | null; search:
   return (
     <StoriesLayout view={stories.view} story={story} search={search}>
       <FeedbackBar feedback={feedback} storyHref={(name) => anyStoryPath(name)} showList={story === null} />
-      <RenderingStatus renders={renders} />
+      <LiveRenderingStatus renders={renders} />
       {story === null ? (
         <StoriesOverview view={stories.view} renders={renders} recheck={stories.recheck} />
       ) : (

@@ -12,6 +12,7 @@ import {
   type NewNote,
   type PixelDiff,
   type BatchView,
+  type RenderProgress,
   type SendVia,
   type RenderRow,
   type StoriesView,
@@ -62,6 +63,7 @@ export const postAccept = (batchId: string, removedSeen: number | undefined) =>
 
 export const fetchStories = (signal: AbortSignal) => request<StoriesView>("/stories", { signal });
 export const postRender = (stories: readonly string[]) => post<{ readonly batchId: string }>("/renders", { stories });
+export const fetchRenderProgress = (signal: AbortSignal) => request<{ readonly progress: RenderProgress | null }>("/renders/progress", { signal });
 export const fetchFeedback = (signal: AbortSignal) => request<FeedbackView>("/feedback", { signal });
 export const postNote = (note: NewNote) => post<FeedbackView>("/notes", note);
 export const postSendNotes = (via: SendVia) => post<{ readonly feedback: FeedbackView; readonly text: string }>("/notes/send", { via });

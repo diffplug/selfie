@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { AcceptRefusal, DecisionKind, DecisionTarget, FeedbackView, StoriesView, NewNote, BatchView, SendVia, RenderRow } from "../shared/api.ts";
-import { deleteNote, fetchFeedback, fetchStories, fetchBatch, fetchUnchanged, postAccept, postAnswer, postRender, postDecision, postNote, postResolve, postSendNotes, RequestError } from "./api.ts";
+import type { AcceptRefusal, DecisionKind, DecisionTarget, FeedbackView, StoriesView, NewNote, BatchView, SendVia, RenderProgress, RenderRow } from "../shared/api.ts";
+import { deleteNote, fetchFeedback, fetchRenderProgress, fetchStories, fetchBatch, fetchUnchanged, postAccept, postAnswer, postRender, postDecision, postNote, postResolve, postSendNotes, RequestError } from "./api.ts";
 import { reuseRows } from "./filter.ts";
 import { toggled } from "./selection.ts";
 
@@ -327,6 +327,42 @@ export function useRender(can: boolean, onRendered: () => void): RenderingState 
       }
     },
   };
+}
+
+const RENDER_PROGRESS_EVERY_MS = 1_000;
+
+/**
+ * While a render runs, how it's going and what time it is, once a second. The time moves whatever
+ * the server says, so a slow answer doesn't look stuck, and `POST /api/renders` is what says if the
+ * server has gone, so a read that fails is just tried again.
+ */
+export function useRenderProgress(running: boolean): { readonly progress: RenderProgress | null; readonly now: number } {
+  const [progress, setProgress] = useState<RenderProgress | null>(null);
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    if (!running) return undefined;
+    let reading = new AbortController();
+    const tick = () => {
+      setNow(Date.now());
+      reading.abort();
+      reading = new AbortController();
+      fetchRenderProgress(reading.signal).then(
+        (answer) => {
+          // Nothing yet can mean this read overtook the request that starts the render.
+          if (answer.progress !== null) setProgress(answer.progress);
+        },
+        () => undefined,
+      );
+    };
+    tick();
+    const timer = setInterval(tick, RENDER_PROGRESS_EVERY_MS);
+    return () => {
+      clearInterval(timer);
+      reading.abort();
+      setProgress(null);
+    };
+  }, [running]);
+  return { progress, now };
 }
 
 /** Next and previous move focus through a list of stories' links. */
