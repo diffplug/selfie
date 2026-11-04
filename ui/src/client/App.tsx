@@ -5,7 +5,7 @@ import { DetailScreen } from "./DetailScreen.tsx";
 import { FeedbackBar, NewerBatchBanner } from "./Feedback.tsx";
 import { useFeedback, useFetched, useBatch } from "./hooks.ts";
 import { StoriesRoutes } from "./StoriesScreen.tsx";
-import { AppLink, parseRoute, storyPath, useLocation, type Route } from "./router.tsx";
+import { AppLink, parseRoute, storyPath, useLocation, type Route, storiesPath } from "./router.tsx";
 import { PageFactsLine, PageFactsProvider } from "./PageFacts.tsx";
 import { BatchLayout, useBatchTree } from "./BatchLayout.tsx";
 import { BatchScreen } from "./BatchScreen.tsx";
@@ -48,7 +48,7 @@ export function Page({ children }: { readonly children: ReactNode }) {
           <>
             <header className="selfie-header">
               <Heading as="h1" className="selfie-brand">
-                <AppLink href="/" muted>
+                <AppLink href={storiesPath()} muted>
                   Selfie
                 </AppLink>
               </Heading>

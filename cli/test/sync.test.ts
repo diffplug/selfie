@@ -81,7 +81,7 @@ beforeEach(async () => {
   app = createSyncApi({
     open: async (project, token) => {
       const access = project === "42" && token !== null ? ACCESS[token] : undefined;
-      return access === undefined ? null : { access, batches: cloud.batches, store: cloud.store, hasCommit: async (sha) => pushedCommits === null || pushedCommits.has(sha) };
+      return access === undefined ? null : { access, batches: cloud.batches, store: cloud.store, storybooks: cloud.storybooks, diffs: cloud.diffs, hasCommit: async (sha) => pushedCommits === null || pushedCommits.has(sha) };
     },
     findProject: async (owner, name) => (owner === "diffplug" && name === "selfie" ? "42" : null),
   });

@@ -7,6 +7,7 @@ import type { BoundingBox, Note, PixelDiff, RenderRow } from "../shared/api.ts";
 import { comparedImage, isOpenNote, newestNotedImage } from "../shared/notes.ts";
 import { hull, type HunkGroup } from "../shared/hunks.ts";
 import { diffImageUrl, imageUrl } from "./api.ts";
+import { isHosted } from "./base.ts";
 import { useDevicePixelRatio, useHotkeys, type FeedbackState, type HunkSelection } from "./hooks.ts";
 import { Keys } from "./Keys.tsx";
 import { NotesPanel } from "./NotesPanel.tsx";
@@ -339,18 +340,20 @@ export function ImageCompare({ row, diff, scale, groups, selection, batchId, fee
   return (
     <Stack as="section" aria-label="Images" gap="condensed" ref={section}>
       {groups.length > 0 && <HunkList groups={groups} selection={selection} onGo={goToHunk} outlined={outlined} onOutlined={setOutlined} />}
-      <NotesPanel
-        notes={storyNotes}
-        batchId={batchId}
-        currentImage={imageHash}
-        target={noteTarget}
-        onAdd={addNote}
-        onRemove={(id) => void feedback.remove(id)}
-        onAnswer={(id, text) => feedback.answer(id, text, batchId)}
-        onResolve={(id) => void feedback.resolve(id)}
-        writing={writing}
-        drawsOn={oneImage ? "a zoomed image" : "a stacked image"}
-      />
+      {!isHosted && (
+        <NotesPanel
+          notes={storyNotes}
+          batchId={batchId}
+          currentImage={imageHash}
+          target={noteTarget}
+          onAdd={addNote}
+          onRemove={(id) => void feedback.remove(id)}
+          onAnswer={(id, text) => feedback.answer(id, text, batchId)}
+          onResolve={(id) => void feedback.resolve(id)}
+          writing={writing}
+          drawsOn={oneImage ? "a zoomed image" : "a stacked image"}
+        />
+      )}
       <Stack direction="horizontal" wrap="wrap" align="end" gap="normal">
         {!oneImage && (
           <SegmentedControl aria-label="How to compare the images" onChange={(index) => setMode(index === 0 ? "side" : "flip")}>
@@ -450,7 +453,7 @@ export function ImageCompare({ row, diff, scale, groups, selection, batchId, fee
         </div>
       ) : (
         <div className="selfie-viewport" ref={viewport} tabIndex={0} role="group" aria-label={`${LAYER_WORDS[layer]} image, ${zoomWords(zoom).toLowerCase()}. Scroll to pan.`}>
-          <div className="selfie-stack" {...drawing} style={shownSize === undefined ? undefined : { width: shownSize.width * cssPixels, height: shownSize.height * cssPixels }}>
+          <div className="selfie-stack" {...(isHosted ? {} : drawing)} style={shownSize === undefined ? undefined : { width: shownSize.width * cssPixels, height: shownSize.height * cssPixels }}>
             {sources.map(({ name, src }) => {
               const size = sizes[src];
               return (

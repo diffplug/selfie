@@ -31,6 +31,8 @@ const ERROR_STATUS: Readonly<Record<string, ContentfulStatusCode>> = {
   "no-agent-waiting": 409,
   "stale-decision": 409,
   "no-actor": 409,
+  "not-signed-in": 401,
+  "read-only": 403,
   "batch-not-finished": 409,
   "no-goldens": 409,
   "batch-dirty": 409,

@@ -6,7 +6,7 @@ import path from "node:path";
 import { FilesystemBlobStorage } from "selfie-store/adapters/filesystem-blob";
 import { sharpCodec } from "selfie-store/adapters/sharp-codec";
 import { SqliteAdapter } from "selfie-store/adapters/sqlite";
-import { Blobs, initStoreSchema, RenderBatches, Sql, Store, BuiltStorybooks, type CompareOptions, type Comparison, type RenderBatch } from "selfie-store";
+import { Blobs, initStoreSchema, RenderBatches, Sql, Store, BuiltStorybooks, StoredDiffs, type CompareOptions, type Comparison, type RenderBatch } from "selfie-store";
 import type { PixelDiff } from "./diff.ts";
 import { SelfieError } from "./errors.ts";
 import { ancestorsOf, defaultBranchOf, earliestAuthoredSince, headSha, openRepo, type Repo } from "./git.ts";
@@ -63,6 +63,7 @@ export interface Project {
   readonly notes: Notes;
   readonly store: Store;
   readonly storybooks: BuiltStorybooks;
+  readonly diffs: StoredDiffs;
   readonly batches: RenderBatches;
   readonly close: () => void;
 }
@@ -86,6 +87,7 @@ export async function openProject({ cwd, env }: { cwd: string; env: NodeJS.Proce
     notes: notesIn(sql, repo.root),
     store: new Store({ sql, blob, codec: sharpCodec }),
     storybooks: new BuiltStorybooks({ sql, blob }),
+    diffs: new StoredDiffs(blob),
     batches: new RenderBatches({ sql }),
     close: () => adapter.close(),
   };

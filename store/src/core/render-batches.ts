@@ -59,6 +59,12 @@ export const CREATE_BATCH_TABLES: readonly string[] = [
   PRIMARY KEY (environment_key, commit_key, story_key, image_key)
 ) WITHOUT ROWID`,
   "CREATE INDEX IF NOT EXISTS decisions_by_image ON decisions(environment_key, story_key, image_key)",
+  // Which commits came before which, for a server with no Git to ask. Only ever added to, by whoever pushes.
+  `CREATE TABLE IF NOT EXISTS commit_parents (
+  commit_key INTEGER NOT NULL REFERENCES commits(key),
+  parent_key INTEGER NOT NULL REFERENCES commits(key),
+  PRIMARY KEY (commit_key, parent_key)
+) WITHOUT ROWID`,
   `CREATE TABLE IF NOT EXISTS goldens (
   commit_key INTEGER NOT NULL REFERENCES commits(key),
   environment_key INTEGER NOT NULL REFERENCES environments(key),
@@ -70,6 +76,8 @@ export const CREATE_BATCH_TABLES: readonly string[] = [
 // Each as one bound parameter. Renders by what a request of them was measured at, and decisions of about 200 bytes.
 const RENDERS_PER_STATEMENT = 49;
 const DECISIONS_PER_STATEMENT = 200;
+// As `git rev-list` is asked for: see `docs/specs/renders.md` -> Scope: approvals-sync.
+const MAX_REACHED_COMMITS = 1_000;
 // As one bound parameter, in a statement that gives them all keys.
 const NAMES_PER_STATEMENT = 1_000;
 // Nearest first, beside the environment.
@@ -657,6 +665,65 @@ ORDER BY started_at DESC, key DESC`,
       at: row.decided_at as number,
       batchId: row.batch_id as string,
     }));
+  }
+
+  /** Says which commits came before which, for a store with no Git to ask. Sending one again changes nothing. */
+  async recordCommits(commits: readonly { readonly sha: string; readonly parents: readonly string[] }[]): Promise<void> {
+    for (const { sha, parents } of commits) [sha, ...parents].forEach(assertGitSha);
+    const edges = commits.flatMap(({ sha, parents }) => parents.map((parent) => [sha, parent]));
+    const statements: SqlStatement[] = [
+      ...nameStatements("commits", commits.flatMap(({ sha, parents }) => [sha, ...parents])),
+      ...chunks(edges, NAMES_PER_STATEMENT).map((group) => ({
+        sql: `INSERT INTO commit_parents(commit_key, parent_key)
+SELECT c.key, p.key FROM json_each(?1) j
+CROSS JOIN commits c ON c.sha = json_extract(j.value, '$[0]')
+CROSS JOIN commits p ON p.sha = json_extract(j.value, '$[1]')
+WHERE true ON CONFLICT(commit_key, parent_key) DO NOTHING`,
+        params: [JSON.stringify(group)],
+        idempotent: true,
+      })),
+    ];
+    for (const group of chunks(statements, STATEMENTS_PER_REQUEST)) await this.#sql.batch(group);
+  }
+
+  /** A commit and what came before it, as `recordCommits` was told, up to 1,000, as `git rev-list` is asked for locally. */
+  async reachableFrom(gitSha: string): Promise<readonly string[]> {
+    assertGitSha(gitSha);
+    const rows = await this.#sql.run({
+      sql: `WITH RECURSIVE reach(key) AS (
+  SELECT key FROM commits WHERE sha = ?1
+  UNION
+  SELECT p.parent_key FROM reach r CROSS JOIN commit_parents p ON p.commit_key = r.key
+  LIMIT ${MAX_REACHED_COMMITS}
+)
+SELECT c.sha FROM reach r CROSS JOIN commits c ON c.key = r.key`,
+      params: [gitSha],
+      idempotent: true,
+    });
+    return rows.map((row) => row.sha as string);
+  }
+
+  /** A batch compared with what its commit reaches by `recordCommits`, for a store with no Git to ask. */
+  async compareReached(batchId: string, options?: CompareOptions): Promise<Comparison> {
+    const batch = await this.getBatch(batchId);
+    if (batch === null) throw new BatchError("unknown-batch", `No batch ${batchId}`);
+    return this.compareFromHistory(batchId, await this.decisionsAt(batch.environment, await this.reachableFrom(batch.gitSha)), options);
+  }
+
+  /** The newest finished batch on this branch, or null. */
+  async newestOnBranch(branch: string): Promise<RenderBatch | null> {
+    const [row] = await this.#sql.run({
+      sql: `SELECT ${BATCH_COLUMNS} FROM render_batches WHERE branch = ?1 AND finished_at IS NOT NULL ORDER BY started_at DESC, key DESC LIMIT 1`,
+      params: [branch],
+      idempotent: true,
+    });
+    return row === undefined ? null : toBatch(row);
+  }
+
+  /** The newest finished batch here, whichever branch it's on, or null. */
+  async newestOfAll(): Promise<RenderBatch | null> {
+    const [row] = await this.#sql.run({ sql: `SELECT ${BATCH_COLUMNS} FROM render_batches WHERE finished_at IS NOT NULL ORDER BY key DESC LIMIT 1`, idempotent: true });
+    return row === undefined ? null : toBatch(row);
   }
 
   /** The commits of a branch's batches between two times, which a rebase may have left out of its history. */

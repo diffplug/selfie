@@ -35,4 +35,16 @@ export interface SyncError {
 }
 
 /** The most of each a request may hold. */
-export const SYNC_LIMITS = { hashes: 500, renders: 1_000, decisions: 1_000, shas: 1_000 } as const;
+export const SYNC_LIMITS = { hashes: 500, renders: 1_000, decisions: 1_000, shas: 1_000, commits: 1_000 } as const;
+
+/** A commit and what came right before it, for a server with no Git to ask. */
+export interface SentCommit {
+  readonly sha: string;
+  readonly parents: readonly string[];
+}
+
+/** Two images a server can't compare for itself, whose difference it wants. */
+export interface DiffPair {
+  readonly current: string;
+  readonly golden: string;
+}

@@ -1,12 +1,13 @@
 // One render: its images, its numbers, and its decision, with the keyboard doing most of the work.
 import { CheckIcon, XIcon } from "@primer/octicons-react";
-import { Banner, Button, Dialog, Heading, RelativeTime, Stack, Text } from "@primer/react";
+import { Banner, Button, Dialog, Heading, RelativeTime, Stack, Text, LinkButton } from "@primer/react";
 import { AriaStatus } from "@primer/react/experimental";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { findRenames } from "../shared/renames.ts";
 import { isDecidable } from "selfie-store";
 import type { DecisionKind, PixelDiff, BatchView, RenderRow } from "../shared/api.ts";
 import { diffImageUrl, fetchDiff, imageUrl } from "./api.ts";
+import { isHosted, signInHref } from "./base.ts";
 import { parseFilter, targetsOf, type StoryNavigation } from "./filter.ts";
 import { useFetched, useHotkeys, useHunkSelection, useTitle, type FeedbackState, type BatchState } from "./hooks.ts";
 import { imageCount, ImageCompare } from "./ImageCompare.tsx";
@@ -195,8 +196,13 @@ export function DetailScreen({
     }
   }, [preloading]);
 
+  const canDecide = !isHosted || view.actor !== null;
   const decide = async (decision: DecisionKind) => {
     if (row === null || state.busy) return;
+    if (!canDecide) {
+      setMessage("Sign in to approve or reject.");
+      return;
+    }
     if (!isDecidable(row.state)) {
       setMessage(row.state === "unchanged" ? "An unchanged image needs no decision." : "This story failed, so it takes no decision. Fix it and render again.");
       return;
@@ -249,7 +255,8 @@ export function DetailScreen({
           </Heading>
           <StorybookLinkTo row={row} view={view} />
         </Stack>
-        {decidable && (
+        {decidable && !canDecide && <LinkButton href={signInHref()}>Sign in to approve</LinkButton>}
+        {decidable && canDecide && (
           <Stack direction="horizontal" gap="condensed">
             <Button variant="primary" leadingVisual={CheckIcon} disabled={state.busy} onClick={() => void decide("approved")} trailingVisual={() => <Keys keys="a" onPrimary />}>
               Approve

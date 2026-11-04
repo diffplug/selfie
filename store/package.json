@@ -6,6 +6,7 @@
   "type": "module",
   "exports": {
     ".": "./src/core/index.ts",
+    "./adapters/d1-binding": "./src/adapters/d1-binding.ts",
     "./adapters/d1-rest": "./src/adapters/d1-rest.ts",
     "./adapters/r2": "./src/adapters/r2.ts",
     "./adapters/sqlite": "./src/adapters/sqlite.ts",

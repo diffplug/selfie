@@ -1,3 +1,4 @@
+import { isHosted, signInHref } from "./base.ts";
 // The batch: its facts, what blocks it, what to look at, and bulk decisions on what differs.
 import {
   Banner,
@@ -59,7 +60,7 @@ function Facts({ view }: { view: BatchView }) {
       <Fact term="Recorded">
         <RelativeTime date={new Date(batch.startedAt)} />
       </Fact>
-      <Fact term="Decisions are by">{actor ?? "Nobody: set git config user.email"}</Fact>
+      <Fact term="Decisions are by">{actor ?? (isHosted ? <Link href={signInHref()}>Sign in to approve</Link> : "Nobody: set git config user.email")}</Fact>
       {batch.storyFilter !== null && (
         <Fact term="Story filter">
           {batch.storyFilter.patterns.length > PATTERNS_LISTED ? (
@@ -307,16 +308,18 @@ function Differences({
             ))}
           </Select>
         </FormControl>
-        <Stack direction="horizontal" wrap="wrap" gap="condensed" className="selfie-bulk" role="group" aria-label="Decide on many images">
-          {isFiltered && (
-            <>
-              <BulkButton decision="approved" scope="shown" rows={shownDecidable} busy={state.busy} onPick={setPending} />
-              <BulkButton decision="rejected" scope="shown" rows={shownDecidable} busy={state.busy} onPick={setPending} />
-            </>
-          )}
-          <BulkButton decision="approved" scope="all" rows={allDecidable} busy={state.busy} onPick={setPending} />
-          <BulkButton decision="rejected" scope="all" rows={allDecidable} busy={state.busy} onPick={setPending} />
-        </Stack>
+        {(!isHosted || view.actor !== null) && (
+          <Stack direction="horizontal" wrap="wrap" gap="condensed" className="selfie-bulk" role="group" aria-label="Decide on many images">
+            {isFiltered && (
+              <>
+                <BulkButton decision="approved" scope="shown" rows={shownDecidable} busy={state.busy} onPick={setPending} />
+                <BulkButton decision="rejected" scope="shown" rows={shownDecidable} busy={state.busy} onPick={setPending} />
+              </>
+            )}
+            <BulkButton decision="approved" scope="all" rows={allDecidable} busy={state.busy} onPick={setPending} />
+            <BulkButton decision="rejected" scope="all" rows={allDecidable} busy={state.busy} onPick={setPending} />
+          </Stack>
+        )}
       </Stack>
       <Text as="p" className="selfie-muted" role="status">
         {loadingUnchanged ? "Reading the unchanged stories…" : `Showing ${shown.length.toLocaleString()} of ${source.length.toLocaleString()}.`}{" "}

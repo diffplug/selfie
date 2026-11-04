@@ -1,7 +1,7 @@
 // What crosses between the browser and the server, and what the server needs from its platform.
 // Types only, so the client's bundle holds none of the server, and the server none of the client.
 // `selfie-cli` takes its own result types from here, so each has one definition.
-import type { ComparedRender, DecisionKind, RenderBatch, Viewport } from "selfie-store";
+import type { Attention, ComparedRender, DecisionKind, RenderBatch, Viewport } from "selfie-store";
 
 export type { ComparedRender, DecisionKind, RenderBatch, RenderState } from "selfie-store";
 
@@ -51,21 +51,7 @@ export interface PixelDiff {
   readonly maxChannelDelta: number;
 }
 
-export type BlockerReason =
-  | "failed"
-  | "changed-unapproved"
-  | "added-unapproved"
-  | "rejected"
-  | "removed"
-  | "pattern-unmatched";
-
-export interface Attention {
-  /** Null only for `pattern-unmatched`. */
-  readonly story: string | null;
-  readonly reason: BlockerReason;
-  /** The fact behind it, if there's more than its name: a message, an actor, or a pattern. */
-  readonly detail: string | null;
-}
+export type { Attention, BlockerReason } from "selfie-store";
 
 /** A compared render, with the pixel stats its review exported, if they're still on disk. */
 export interface RenderRow extends ComparedRender {

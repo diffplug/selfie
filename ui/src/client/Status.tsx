@@ -4,7 +4,7 @@ import { Button, Spinner, Stack, Text } from "@primer/react";
 import { Blankslate } from "@primer/react/experimental";
 import type { ReactNode } from "react";
 import type { RequestError } from "./api.ts";
-import { AppLinkButton } from "./router.tsx";
+import { AppLinkButton, storiesPath } from "./router.tsx";
 
 export function Loading({ label }: { readonly label: string }) {
   return (
@@ -35,7 +35,7 @@ function Blank({ icon: Visual, title, action, children }: { icon: Icon; title: s
 }
 
 const TO_EVERY_STORY = (
-  <AppLinkButton variant="primary" href="/">
+  <AppLinkButton variant="primary" href={storiesPath()}>
     Go to every story
   </AppLinkButton>
 );

@@ -2,10 +2,11 @@
 // the routes in `selfie-ui/sync`. Every step is safe to send again, so a push or pull that dies is
 // finished by running it again. See `docs/specs/sync.md`.
 import { chunks, ImageDecodeError, ImageHashMismatchError, mapConcurrently, type BatchPage } from "selfie-store";
-import { SYNC_LIMITS, type GoldensAnswer, type ProjectAccess, type SentDecision, type SentBatch, type SentRender, type SyncError } from "selfie-ui/sync-api";
+import { SYNC_LIMITS, type DiffPair, type GoldensAnswer, type ProjectAccess, type SentDecision, type SentBatch, type SentRender, type SyncError } from "selfie-ui/sync-api";
 import { resolveRenderSettings } from "./config.ts";
 import { SelfieError } from "./errors.ts";
-import { walkToBaseline } from "./git.ts";
+import { diffToPng } from "./diff.ts";
+import { commitGraph, walkToBaseline } from "./git.ts";
 import { normalizeOrigin } from "./paths.ts";
 import { batchesAtHead, type Project } from "./project.ts";
 
@@ -120,6 +121,10 @@ export interface PushResult {
   readonly decisions: number | null;
   /** What became of its goldens, or null if none were asked for. */
   readonly goldens: GoldensAnswer | null;
+  /** Whether this batch's built Storybook is there to open, which it can't be if it was never kept here. */
+  readonly storybook: boolean;
+  /** How many differences went for the remote to show, since it can't decode an image to work one out. */
+  readonly diffs: number;
 }
 
 /** Says which image and where, for bytes that don't decode to the image their hash names. */
@@ -153,6 +158,57 @@ async function uploadBatch(project: Project, remote: Remote, route: string, batc
   return missing.length;
 }
 
+/** What a server with no Git needs to know what this commit's history reaches. */
+async function uploadCommits(project: Project, remote: Remote, route: string, gitSha: string): Promise<void> {
+  for (const group of chunks(await commitGraph(project.repo, gitSha), SYNC_LIMITS.commits)) {
+    await askJson(remote, `${route}/commits`, "POST", { commits: group });
+  }
+}
+
+/** A batch's kept built Storybook, sending only the files the remote lacks. Says whether there was one to send. */
+async function uploadStorybook(project: Project, remote: Remote, route: string, batchId: string): Promise<boolean> {
+  const { storybooks } = project;
+  const build = await storybooks.storybookOfBatch(batchId);
+  if (build === null) return false;
+  const { kept } = await askJson<{ kept: boolean }>(remote, `${route}/storybooks/${build}`);
+  if (!kept) {
+    const files = (await storybooks.filesOf(build)) ?? [];
+    const pathOf = new Map(files.map(({ path, fileHash }) => [fileHash, path]));
+    const missing: string[] = [];
+    for (const group of chunks([...pathOf.keys()], SYNC_LIMITS.hashes)) {
+      missing.push(...(await askJson<{ missing: readonly string[] }>(remote, `${route}/storybooks/files/missing`, "POST", { hashes: group })).missing);
+    }
+    await mapConcurrently(missing, IMAGES_AT_ONCE, async (fileHash) => {
+      const bytes = await storybooks.readFile(build, pathOf.get(fileHash)!);
+      if (bytes === null) throw new SelfieError("missing-image", `This store has lost a file of built Storybook ${build}.`);
+      await ask(remote, `${route}/storybooks/files/${fileHash}`, { method: "PUT", body: bytes as Uint8Array<ArrayBuffer> });
+    });
+    await askJson(remote, `${route}/storybooks/${build}`, "PUT", { files });
+  }
+  await askJson(remote, `${route}/batches/${batchId}/storybook`, "POST", { build });
+  return true;
+}
+
+/** Works out each difference the remote wants, fetching what it's compared with, since a server can't decode an image. */
+async function uploadDiffs(project: Project, remote: Remote, route: string, batchId: string): Promise<number> {
+  const { store } = project;
+  const { pairs } = await askJson<{ pairs: readonly DiffPair[] }>(remote, `${route}/batches/${batchId}/diffs/needed`);
+  const pixelsOf = async (hash: string) => {
+    const held = await store.getPixels(hash);
+    if (held !== null) return held;
+    const response = await ask(remote, `${route}/images/${hash}`);
+    await notThatImage(store.putImage(new Uint8Array(await response.arrayBuffer()), hash), `The remote's copy of image ${hash} isn't that image`);
+    return store.getPixels(hash);
+  };
+  await mapConcurrently(pairs, IMAGES_AT_ONCE, async ({ current, golden }) => {
+    const [currentImage, goldenImage] = await Promise.all([pixelsOf(current), pixelsOf(golden)]);
+    if (currentImage === null || goldenImage === null) throw new SelfieError("missing-image", `Couldn't read ${current} and ${golden} to compare them.`);
+    const { diff, png } = await diffToPng(currentImage, goldenImage);
+    await askJson(remote, `${route}/diffs/${current}/${golden}`, "PUT", { stats: diff, png: Buffer.from(png).toString("base64") });
+  });
+  return pairs.length;
+}
+
 /** Sends a batch, by the order in `docs/specs/sync.md` -> Pushing and pulling. */
 export async function push(project: Project, remote: Remote, { batch: given, accept, native }: { readonly batch: string | undefined; readonly accept: boolean | undefined; readonly native: boolean | undefined }): Promise<PushResult> {
   const { batches } = project;
@@ -168,6 +224,8 @@ export async function push(project: Project, remote: Remote, { batch: given, acc
   // First, since this is what's refused for a dirty tree or an unpushed commit, and that should cost nothing.
   const { id: _, status: __, finishedAt, failedCount: ___, ...facts } = batch;
   const { status } = await askJson<{ status: string }>(remote, `${route}/batches/${batchId}`, "PUT", facts satisfies SentBatch);
+  await uploadCommits(project, remote, route, batch.gitSha);
+  const storybook = await uploadStorybook(project, remote, route, batchId);
   const total = hashesIn(held).length;
   const sent = status === "recording" ? await uploadBatch(project, remote, route, batchId, finishedAt, held) : 0;
 
@@ -187,7 +245,7 @@ export async function push(project: Project, remote: Remote, { batch: given, acc
     const baselineSha = (await remoteBaseline(project, remote, route, batch.environment)).sha;
     goldens = await askJson<GoldensAnswer>(remote, `${route}/goldens`, "POST", { batchId, baselineSha, removed: await batches.removedFrom(batchId, baselineSha) });
   }
-  return { batchId, images: { sent, alreadyThere: total - sent }, decisions, goldens };
+  return { batchId, images: { sent, alreadyThere: total - sent }, decisions, goldens, storybook, diffs: await uploadDiffs(project, remote, route, batchId) };
 }
 
 export interface PullResult {

@@ -6,6 +6,7 @@
   "type": "module",
   "exports": {
     "./api": "./src/shared/api.ts",
+    "./batch-view": "./src/server/batch-view.ts",
     "./app": "./src/server/app.ts",
     "./hunks": "./src/shared/hunks.ts",
     "./notes": "./src/shared/notes.ts",
@@ -21,7 +22,8 @@
     "storybook": "node --disable-warning=ExperimentalWarning ../cli/scripts/generate-storybook-fixtures.ts && storybook dev -p 6007",
     "prepare": "vite build",
     "test": "pnpm typecheck && vite build --logLevel warn && vitest run",
-    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.workerd.json"
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.workerd.json",
+    "deploy": "vite build --logLevel warn && wrangler deploy"
   },
   "dependencies": {
     "@hono/node-server": "2.1.5",
@@ -47,6 +49,7 @@
     "storybook": "10.6.5",
     "typescript": "catalog:",
     "vite": "8.3.5",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "wrangler": "^4.156.2"
   }
 }
