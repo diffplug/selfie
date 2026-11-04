@@ -8,8 +8,8 @@ You point your coding agent at one button. But most changes have unforeseen cons
 What if you took every page and component of your UI, and laid them out next to each other?
 **[The app splits into pieces, which line up in a row]**
 
-Now, let’s copy those components into every state the user will see: error states, empty states, easy ones, hard ones.
-**[Zoom in on one, split it down the column into its states, then zoom out as every column fills the grid]**
+Now, let’s copy those components into every state the user will see: empty states, error states, simple states, and complex ones.
+**[Zoom in on one, and copy it down the column into each state as it’s named, only ever moving down. Then zoom out as every column fills the grid]**
 
 StorybookJS has made that easy for the past 10 years. With coding agents, it’s more useful than ever: you can point at the specific page you want changed.
 **[The grid gets a Storybook frame. Human hand points to a cell, robot comes and hammers on it]**
@@ -36,7 +36,7 @@ But for a modest library of 1,000 stories, that’s 8 bucks for a full run, each
 Introducing Selfie.dev: a snapshot testing tool which runs locally and in the cloud. Your agent takes its own picture.
 **[Flash floods the screen with a new color. Selfie wordmark, robot with a pink phone takes a picture of itself]**
 
-No waiting on a cloud rendering service, and no paying for each image. 541 stories in about 70 seconds.
+No waiting on a cloud rendering service, and no paying for each image. On an M4 MacBook Air, Selfie’s own test suite of 541 stories runs in about 70 seconds.
 **[Robot taking lots of goofy selfies with the components, photos pile up, the numbers land]**
 
 It works just like git. Images are stored locally wherever the agent is running, and also in the cloud, so that every commit on GitHub shows the complete visual consequences of the code change.

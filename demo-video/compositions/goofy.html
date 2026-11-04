@@ -47,6 +47,11 @@
         tl.set(c, { opacity: 0 }, t + at(0.88));
       });
 
+      // The machine is named first, so the numbers land with what they were measured on.
+      const machine = S.html(stage, `<div class="tag" style="font-size:46px">on an M4 MacBook Air</div>`);
+      gsap.set(machine, { x: 1020, y: 856, opacity: 0 });
+      tl.to(machine, { opacity: 1, duration: 0.14 }, w("m4"));
+
       // The numbers land last.
       [["$0 per image", 1020, w("paying"), "var(--ink)"], ["541 stories", 1020, w("541"), "var(--pink)"], ["~70 s", 1490, w("70"), "var(--pink)"]].forEach(([text, x, t, bg], i) => {
         const y = i === 0 ? 610 : 730;

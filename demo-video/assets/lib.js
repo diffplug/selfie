@@ -47,24 +47,24 @@
       const hs = dense ? [40, 62, 30, 88, 52, 104, 70, 34, 96, 58, 110, 76] : [46, 74, 58, 104, 86, 118];
       const w = 196 / hs.length;
       return hs.map((h, i) => bar(4 + i * w, 128 - h, w - 5, h, i % 2 ? BLUE : TEAL)).join("");
-    } },
+    }, simple: () => bar(60, 70, 40, 58, TEAL) + bar(112, 40, 40, 88, BLUE) },
     list: { title: "Team", long: "Everyone in the Northern Hemisphere o…", draw(dense) {
       const n = dense ? 6 : 3, step = 128 / n;
       return Array.from({ length: n }, (_, i) => dot(16, step * i + step / 2, Math.min(step / 2 - 2, 15), [PINK, BLUE, ORANGE][i % 3]) + bar(40, step * i + step / 2 - 6, 150 - i * 12, 12, GREY)).join("");
-    } },
+    }, simple: () => dot(30, 64, 22, PINK) + bar(66, 56, 130, 16, GREY) },
     form: { title: "Sign up", long: "Create your extremely long account na…", draw(dense) {
       return bar(2, 4, 208, 30, GREY) + bar(2, 42, 208, 30, GREY) + (dense ? bar(2, 42, 208, 30, CORAL) : "");
-    }, button: true },
+    }, simple: () => bar(2, 26, 208, 30, GREY), button: true },
     profile: { title: "Profile", long: "Wolfeschlegelsteinhausenbergerdorff…", draw(dense) {
       return dot(50, 58, 42, ORANGE) + dot(50, 44, 15, "#fff") + `<path d="M24 86c6-24 46-24 52 0z" fill="#fff"/>` + bar(108, 26, 96, 14, GREY) + bar(108, 52, 72, 14, GREY) + bar(108, 78, dense ? 104 : 54, 14, dense ? CORAL : TEAL);
-    } },
+    }, simple: () => dot(106, 62, 44, ORANGE) + dot(106, 48, 15, "#fff") + `<path d="M80 90c6-24 46-24 52 0z" fill="#fff"/>` },
     stat: { title: "Sales", long: "Sales in every currency since the d…", draw(dense) {
       return `<text x="4" y="58" font-family="Jost" font-weight="800" font-size="${dense ? 32 : 54}" fill="${INK}">${dense ? "$1,204,399,210.07" : "$4,210"}</text>` + `<path d="M6 118 L46 96 L82 106 L122 76 L158 88 L204 62" fill="none" stroke="${PINK}" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>`;
-    } },
+    }, simple: () => `<text x="106" y="84" text-anchor="middle" font-family="Jost" font-weight="800" font-size="62" fill="${INK}">$5</text>` },
     tabs: { title: "Settings", long: "Notification preferences for all of…", draw(dense) {
       const n = dense ? 5 : 3, step = 128 / n;
       return Array.from({ length: n }, (_, i) => bar(4, step * i + step / 2 - 6, 110, 12, GREY) + bar(150, step * i + step / 2 - 12, 54, 24, i % 2 ? GREY : TEAL) + dot(i % 2 ? 163 : 192, step * i + step / 2, 10, "#fff")).join("");
-    } },
+    }, simple: () => bar(4, 58, 110, 12, GREY) + bar(150, 52, 54, 24, TEAL) + dot(192, 64, 10, "#fff") },
   };
 
   const crackPath = `<svg class="crack" viewBox="0 0 245 190" preserveAspectRatio="none"><path d="M0 40 L60 72 L44 104 L112 118 L96 150 L150 190" fill="none" stroke="${CORAL}" stroke-width="7" stroke-linejoin="round"/><path d="M245 22 L190 60 L205 92 L150 96" fill="none" stroke="${CORAL}" stroke-width="7" stroke-linejoin="round"/></svg>`;
@@ -77,8 +77,8 @@
     if (state === "error") {
       return `<path d="M106 12 L150 86 L62 86 Z" fill="${CORAL}" stroke="${CORAL}" stroke-width="10" stroke-linejoin="round"/><rect x="101" y="34" width="10" height="28" rx="4" fill="#fff"/><circle cx="106" cy="74" r="6" fill="#fff"/><text x="106" y="122" text-anchor="middle" font-family="Jost" font-weight="600" font-size="23" fill="${INK}">Couldn’t load</text>`;
     }
-    const dense = state === "hard";
-    let out = k.draw(dense);
+    const dense = state === "complex";
+    let out = state === "simple" ? k.simple() : k.draw(dense);
     if (k.button) {
       const fill = opts.changed ? BLUE : PINK;
       const [w, x] = opts.changed ? [208, 2] : [120, 2];
@@ -90,13 +90,13 @@
   /** A component in a state: easy, empty, error or hard. 245 x 190 before scaling. */
   function card(parent, kind, state = "easy", opts = {}) {
     const k = KINDS[kind];
-    const title = state === "hard" ? k.long : k.title;
+    const title = state === "complex" ? k.long : k.title;
     return html(parent, `<div class="card"${opts.id ? ` id="${opts.id}"` : ""} data-layout-ignore><div class="t">${title}</div><svg class="body" viewBox="0 0 212 132">${cardBody(kind, state, opts)}</svg><div class="flag"></div>${crackPath}</div>`);
   }
 
   // The app and the grid put the same cards in different places, which is what lets a scene hand over to the next.
   const KIND_ORDER = ["chart", "form", "profile", "list", "stat", "tabs"];
-  const STATES = ["easy", "empty", "error", "hard"];
+  const STATES = ["easy", "empty", "error", "simple", "complex"];
   const APP = { x: 366, y: 142, scale: 1.55 };
   const appPos = (i) => ({ x: APP.x + 30 + (i % 3) * 392, y: APP.y + 28 + Math.floor(i / 3) * 312, scale: APP.scale, rotation: 0 });
   const rowPos = (c) => ({ x: 116 + c * 284, y: 330, scale: 1.1, rotation: 0 });
@@ -110,7 +110,7 @@
   const place = (el, p) => gsap.set(el, { x: p.x, y: p.y, scale: p.scale ?? 1, rotation: p.rotation ?? 0, transformOrigin: "0 0" });
 
   /**
-   * The robot, 240 x 340 at scale 1: a plain cousin of the mascot, with its horns, eyes and colors.
+   * The robot, 240 x 340 at scale 1: a plain cousin of the mascot, with its eyes and colors.
    * Returns its parts so a scene can act with them: head, armL, armR, legL, legR, eyes, mouthSmile, mouthO, prop.
    */
   function robot(parent, opts = {}) {
@@ -128,9 +128,7 @@
       <path d="M88 166 h64 l-10 44 h-44 z" fill="${ORANGE}" stroke="${INK}" stroke-width="5" stroke-linejoin="round"/>
       <g class="rb-armR"><g transform="translate(197 242)">${props[prop] ?? ""}</g><rect x="182" y="150" width="30" height="88" rx="14" fill="${TEAL}" stroke="${INK}" stroke-width="6"/><circle cx="197" cy="242" r="17" fill="${GREY}" stroke="${INK}" stroke-width="6"/></g>
       <g class="rb-head">
-        <path d="M66 62 L34 8 L92 44 Z" fill="${ORANGE}" stroke="${INK}" stroke-width="6" stroke-linejoin="round"/>
-        <path d="M174 62 L206 8 L148 44 Z" fill="${SUN}" stroke="${INK}" stroke-width="6" stroke-linejoin="round"/>
-        <rect x="50" y="34" width="140" height="104" rx="38" fill="#fff" stroke="${INK}" stroke-width="6"/>
+        <rect x="50" y="34" width="140" height="104" rx="38" fill="${GREY}" stroke="${INK}" stroke-width="6"/>
         <g class="rb-eyes"><circle cx="90" cy="80" r="21" fill="${BLUE}" stroke="${INK}" stroke-width="6"/><circle cx="150" cy="80" r="21" fill="${BLUE}" stroke="${INK}" stroke-width="6"/><circle cx="94" cy="83" r="9" fill="${INK}"/><circle cx="154" cy="83" r="9" fill="${INK}"/><circle cx="97" cy="78" r="3.5" fill="#fff"/><circle cx="157" cy="78" r="3.5" fill="#fff"/></g>
         <path class="rb-smile" d="M100 112 q20 16 40 0" fill="none" stroke="${INK}" stroke-width="6" stroke-linecap="round"/>
         <ellipse class="rb-o" cx="120" cy="118" rx="11" ry="12" fill="${INK}" opacity="0"/>
@@ -145,9 +143,25 @@
     return { el, head: part(".rb-head"), armL: part(".rb-armL"), armR: part(".rb-armR"), legL: part(".rb-legL"), legR: part(".rb-legR"), eyes: part(".rb-eyes"), smile: part(".rb-smile"), o: part(".rb-o"), prop: part(".rb-prop") };
   }
 
-  /** A pointing hand whose fingertip is at the local origin of (0, 0), reaching up from below-right. */
+  /**
+   * A person's right hand, seen from the back, pointing up and to the left, with its sleeve running off-screen.
+   * The element's origin is the fingertip, so placing the element places the point.
+   */
   function hand(parent, id) {
-    return html(parent, `<svg class="prop" id="${id}" width="420" height="520" viewBox="-40 -20 420 520" data-layout-ignore><g fill="#f6c9a8" stroke="${INK}" stroke-width="8" stroke-linejoin="round"><path d="M0 0 C-16 16 -8 34 6 44 L100 150 C60 170 54 220 74 280 L150 480 H340 L330 300 C340 240 310 170 260 150 C240 136 214 138 200 150 C186 134 160 134 146 146 C136 134 124 128 112 128 L36 -6 C22 -22 8 -12 0 0 Z"/></g><path d="M152 150 L170 214 M204 150 L216 212" stroke="${INK}" stroke-width="7" fill="none" stroke-linecap="round"/><rect x="118" y="440" width="240" height="60" fill="${BLUE}" stroke="${INK}" stroke-width="8"/></svg>`);
+    const SKIN = "#f3c6a5", CREASE = "#c98f6c";
+    const line = `stroke="${INK}" stroke-width="7" stroke-linejoin="round" stroke-linecap="round"`;
+    const knuckle = (x0, x1, top) => `<path d="M${x0} 285 V${top + 30} C${x0} ${top + 12} ${x0 + 13} ${top} ${(x0 + x1) / 2} ${top} C${x1 - 13} ${top} ${x1} ${top + 12} ${x1} ${top + 30} V285" fill="${SKIN}" ${line}/>`;
+    const crease = (x0, x1, y) => `<path d="M${x0} ${y} Q${(x0 + x1) / 2} ${y + 6} ${x1} ${y}" fill="none" stroke="${CREASE}" stroke-width="5" stroke-linecap="round"/>`;
+    return html(parent, `<svg class="prop" id="${id}" width="10" height="10" viewBox="0 0 10 10" data-layout-ignore><g transform="rotate(-28)">
+      <rect x="-28" y="480" width="204" height="1300" fill="${BLUE}" ${line}/>
+      <g transform="translate(-22 352) rotate(-40)"><rect x="-31" y="-138" width="62" height="176" rx="31" fill="${SKIN}" ${line}/>${crease(-16, 16, -62)}</g>
+      <path d="M-29 30 C-29 9 -15 0 0 0 C15 0 29 9 29 30 L31 205 L172 250 C196 280 190 335 166 388 L152 440 L-6 440 L-24 392 C-44 340 -42 270 -32 214 Z" fill="${SKIN}" ${line}/>
+      <rect x="-17" y="9" width="34" height="38" rx="14" fill="#fbe6d8" stroke="${CREASE}" stroke-width="4"/>
+      ${crease(-17, 17, 92)}${crease(-17, 17, 158)}
+      ${knuckle(145, 192, 212)}${knuckle(90, 146, 188)}${knuckle(31, 91, 172)}
+      ${crease(46, 76, 214)}${crease(104, 132, 228)}${crease(156, 182, 248)}
+      <rect x="-40" y="424" width="228" height="64" rx="12" fill="#fff" ${line}/>
+    </g></svg>`);
   }
 
   /** The cloud, flat with an ink outline. width x width * 0.56. */
@@ -168,7 +182,9 @@
   /** A shock ring centered on (x, y), expanding once. */
   function ringAt(tl, parent, x, y, t, { size = 900, color = CORAL, dur = 0.8 } = {}) {
     const r = html(parent, `<div class="ring" style="width:100px;height:100px;border-color:${color}" data-layout-ignore></div>`);
-    tl.fromTo(r, { x: x - 50, y: y - 50, scale: 0.2, opacity: 0.95 }, { scale: size / 100, opacity: 0, duration: dur, ease: "power2.out" }, t);
+    gsap.set(r, { x: x - 50, y: y - 50, scale: 0.2, opacity: 0 });
+    tl.set(r, { opacity: 0.95 }, t);
+    tl.to(r, { scale: size / 100, opacity: 0, duration: dur, ease: "power2.out" }, t + 0.001);
     return r;
   }
 
@@ -219,13 +235,14 @@
   function grid(parent) {
     return KIND_ORDER.map((k, c) => STATES.map((st, r) => { const el = card(parent, k, st); place(el, gridPos(c, r)); return el; }));
   }
-  const ROW_NAMES = ["Easy", "Empty", "Error", "Hard"];
+  const ROW_NAMES = ["", "Empty", "Error", "Simple", "Complex"];
   function rowLabels(parent) {
-    return ROW_NAMES.map((n, r) => html(parent, `<div class="abs label" style="font-size:36px;font-weight:700;width:170px;text-align:right" data-layout-ignore>${n}</div>`)).map((el, r) => { gsap.set(el, { x: 26, y: gridPos(0, r).y + 72 }); return el; });
+    return ROW_NAMES.map((n, r) => html(parent, `<div class="abs label" style="font-size:42px;font-weight:700;width:190px;text-align:right" data-layout-ignore>${n}</div>`)).map((el, r) => { gsap.set(el, { x: 8, y: gridPos(0, r).y + 70 }); return el; });
   }
 
   // The grid framed by Storybook, shared by the scenes on either side of the ripple.
-  const FRAMED = { x: 440, y: 112, scale: 0.74 };
+  const GRID_CAM = { x: 184, y: 0, scale: 0.85 }; // The whole grid, clear of the subtitles.
+  const FRAMED = { x: 530, y: 85, scale: 0.66 };
   const framedCell = (c, r) => { const p = gridPos(c, r); return { x: FRAMED.x + (p.x + 122) * FRAMED.scale, y: FRAMED.y + (p.y + 95) * FRAMED.scale }; };
   const STORIES = ["Revenue", "Sign up", "Profile", "Team", "Sales", "Settings"];
   function storybookFrame(parent) {
@@ -238,7 +255,7 @@
   }
 
   function rocket(parent, id, scale = 1) {
-    const head = (cy) => `<g class="rk-win"><circle cx="180" cy="${cy}" r="48" fill="#dff1ff" stroke="${INK}" stroke-width="8"/><rect x="156" y="${cy - 24}" width="48" height="40" rx="14" fill="#fff" stroke="${INK}" stroke-width="5"/><circle cx="170" cy="${cy - 6}" r="7" fill="${BLUE}" stroke="${INK}" stroke-width="3"/><circle cx="190" cy="${cy - 6}" r="7" fill="${BLUE}" stroke="${INK}" stroke-width="3"/><rect class="rk-flash" x="196" y="${cy + 2}" width="16" height="26" rx="4" fill="${PINK}" stroke="${INK}" stroke-width="3"/></g>`;
+    const head = (cy) => `<g class="rk-win"><circle cx="180" cy="${cy}" r="48" fill="#dff1ff" stroke="${INK}" stroke-width="8"/><rect x="156" y="${cy - 24}" width="48" height="40" rx="14" fill="${GREY}" stroke="${INK}" stroke-width="5"/><circle cx="170" cy="${cy - 6}" r="7" fill="${BLUE}" stroke="${INK}" stroke-width="3"/><circle cx="190" cy="${cy - 6}" r="7" fill="${BLUE}" stroke="${INK}" stroke-width="3"/><rect class="rk-flash" x="196" y="${cy + 2}" width="16" height="26" rx="4" fill="${PINK}" stroke="${INK}" stroke-width="3"/></g>`;
     const el = html(parent, `<svg class="prop" id="${id}" width="${360 * scale}" height="${760 * scale}" viewBox="0 0 360 760" data-layout-ignore><path d="M84 520 L10 660 L92 640 Z M276 520 L350 660 L268 640 Z" fill="${CORAL}" stroke="${INK}" stroke-width="8" stroke-linejoin="round"/><path d="M180 8 C270 90 290 240 280 400 L272 640 H88 L80 400 C70 240 90 90 180 8 Z" fill="#fff" stroke="${INK}" stroke-width="8" stroke-linejoin="round"/><path d="M180 8 C226 50 254 106 268 170 H92 C106 106 134 50 180 8 Z" fill="${PINK}" stroke="${INK}" stroke-width="8" stroke-linejoin="round"/>${head(240)}${head(372)}${head(504)}<rect x="110" y="640" width="140" height="40" fill="${GREY}" stroke="${INK}" stroke-width="8"/><path class="rk-fire" d="M124 684 C120 740 160 760 180 760 C200 760 240 740 236 684 Z" fill="${ORANGE}" stroke="${INK}" stroke-width="8" stroke-linejoin="round" opacity="0"/></svg>`);
     gsap.set(el.querySelector(".rk-fire"), { svgOrigin: "180 684" });
     return { el, wins: [...el.querySelectorAll(".rk-win")], flashes: [...el.querySelectorAll(".rk-flash")], fire: el.querySelector(".rk-fire") };
@@ -260,7 +277,7 @@
   const DAMAGED = [[0, -6], [3, 8], [4, -4], [5, 7]];
   const COLD_ROBOT = { scale: 1.6, x: FORM_BUTTON.x - 347 * 1.6, y: FORM_BUTTON.y - 248 * 1.6 };
 
-  window.S = { clock, say, rand, html, card, photo, robot, hand, cloud, appWindow, appPos, rowPos, gridPos, place, ringAt, swing, gasp, blink, flash, ticker, FORM_BUTTON, begin, grid, rowLabels, FRAMED, framedCell, storybookFrame, camera, rocket, plane, selfiePhoto, DAMAGED, COLD_ROBOT, HAMMER, KIND_ORDER, STATES, INK, PINK, CORAL, TEAL, BLUE, ORANGE, SUN, GREY };
+  window.S = { clock, say, rand, html, card, photo, robot, hand, cloud, appWindow, appPos, rowPos, gridPos, place, ringAt, swing, gasp, blink, flash, ticker, FORM_BUTTON, begin, grid, rowLabels, GRID_CAM, FRAMED, framedCell, storybookFrame, camera, rocket, plane, selfiePhoto, DAMAGED, COLD_ROBOT, HAMMER, KIND_ORDER, STATES, INK, PINK, CORAL, TEAL, BLUE, ORANGE, SUN, GREY };
 })();
 
 (function () {
@@ -271,6 +288,7 @@
     S.html(stage, `<div class="abs" style="left:0;top:905px;width:1920px;height:175px;background:#c6ccd8;border-top:7px solid var(--ink)" data-layout-ignore></div>`);
     S.html(stage, `<div class="abs label" style="left:300px;top:176px;font-size:46px;font-weight:700">Waiting…</div>`);
     S.html(stage, `<div class="abs" style="left:206px;top:236px;width:470px;height:50px;border:6px solid var(--ink);border-radius:25px;background:#fff" data-layout-ignore></div>`);
+    S.html(stage, `<img class="abs" src="assets/chromatic-logo.svg" alt="Chromatic" style="left:286px;top:318px;width:300px;height:auto" data-layout-ignore />`);
     const bar = S.html(stage, `<div class="abs" style="left:216px;top:246px;width:450px;height:30px;border-radius:15px;background:var(--teal);transform-origin:0 50%" data-layout-ignore></div>`);
     gsap.set(bar, { scaleX: 0.02 });
 

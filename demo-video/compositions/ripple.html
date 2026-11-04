@@ -38,7 +38,7 @@
       }));
 
       // Stories far from the hammer come back wrong, behind the robot's back.
-      [[0, 3, -7], [5, 0, 6], [0, 0, 5], [5, 3, -5], [1, 1, 6]].forEach(([c, row, rot]) => {
+      [[0, 4, -7], [5, 0, 6], [0, 0, 5], [5, 4, -5], [1, 1, 6]].forEach(([c, row, rot]) => {
         const t = hit + dist(c, row) * 0.09 + 0.15, el = cards[c][row];
         tl.to(el, { rotation: rot, duration: 0.3, ease: "back.out(3)" }, t);
         tl.to(el.querySelector(".crack"), { opacity: 1, duration: 0.03 }, t);
@@ -48,7 +48,7 @@
       S.gasp(tl, r, w("code") + 0.05);
 
       // Into the broken story the question points at, and out into the next world.
-      const c = S.framedCell(0, 3);
+      const c = S.framedCell(0, 4);
       tl.to(zoom, { x: 960 - c.x * 6, y: 540 - c.y * 6, scale: 6, duration: 0.65, ease: "power3.in" }, at(5) - 0.68);
       tl.to(fog, { opacity: 1, duration: 0.26, ease: "power2.in" }, at(5) - 0.28);
       window.__timelines["ripple"] = tl;

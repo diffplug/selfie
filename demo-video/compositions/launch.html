@@ -40,7 +40,7 @@
       [-5, 5, -4, 4, -3, 3, 0].forEach((v, i) => tl.to(rk.el, { x: 1420 + v, duration: 0.05 }, lift - 0.4 + i * 0.05));
       tl.to(tag, { opacity: 0, duration: 0.15 }, lift + 0.7);
       tl.to(ground, { y: 1300, duration: 1.6, ease: "power3.in" }, lift);
-      tl.to(rk.el, { x: 780, y: 60, rotation: 0, duration: 2.2, ease: "power2.inOut" }, lift);
+      tl.to(rk.el, { x: 780, y: 60, rotation: 0, duration: w("launch") - lift - 0.05, ease: "power2.inOut" }, lift);
       tl.to(space, { opacity: 1, duration: 1.4, ease: "power1.in" }, lift + 0.4);
       tl.to(stars, { opacity: 1, duration: 0.8 }, lift + 1);
       const endAt = w("midnovember", { after: true }) + 0.25;

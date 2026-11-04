@@ -23,4 +23,6 @@ npx hyperframes render -o renders/selfie-demo.mp4
 
 Replace the two `assets/narration*` files with a new take, and run `node build.mjs`. Scene lengths, subtitles and any beat written as `w("word")` all follow the words. The build stops with an error if `SCRIPT.md` and the audio disagree on a word.
 
+`"draftScript": true` in `scenes.json` allows that while editing: an edited paragraph keeps its slot in the take, and the build lists it as out of date. Remove it once a new take is in.
+
 To turn burned-in subtitles off, remove the captions host from the template in `build.mjs`.

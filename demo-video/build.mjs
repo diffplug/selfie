@@ -5,7 +5,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 const AUDIO = "assets/narration.mp3";
 const LEAD_IN = 0.08; // A scene's picture arrives just before its first word.
 
-const { scenes } = JSON.parse(readFileSync("scenes.json", "utf8"));
+const { scenes, draftScript = false } = JSON.parse(readFileSync("scenes.json", "utf8"));
 const lines = readFileSync("SCRIPT.md", "utf8").split("\n").map((l) => l.trim());
 const narration = lines.filter((l) => l && !l.startsWith("#") && !l.startsWith("**"));
 if (narration.length !== scenes.length) {
@@ -21,18 +21,61 @@ const spoken = JSON.parse(readFileSync("assets/narration-timing.json", "utf8"))
   .map((w) => ({ word: plain(w.text), start: w.start_time, end: w.end_time }));
 
 // Each word of the script takes its time from what the voice said, and a difference is an error.
-let cursor = 0;
-function timeWord(text) {
-  const expected = SPOKEN_AS[plain(text)] ?? [plain(text)];
-  const said = spoken.slice(cursor, cursor + expected.length);
-  if (said.map((w) => w.word).join(" ") !== expected.join(" ")) {
-    throw new Error(`SCRIPT.md says "${text}", but the voiceover says "${said.map((w) => w.word).join(" ")}" at ${said[0]?.start} s. Regenerate the audio, or make the script match it.`);
+// With "draftScript" in scenes.json, a paragraph that differs keeps its slot in the take instead, so later scenes don't drift.
+// The words it shares with the take keep their times, and the rest share what's left of the slot by length.
+const expect = (text) => SPOKEN_AS[plain(text)] ?? [plain(text)];
+const saidAt = (at, tokens) => tokens.every((t, i) => spoken[at + i]?.word === t);
+function endOfParagraph(from, later) {
+  for (const paragraph of later) {
+    const opening = paragraph.split(/\s+/).slice(0, 4).flatMap(expect);
+    for (let at = from; at < spoken.length; at++) if (saidAt(at, opening)) return at;
   }
-  cursor += expected.length;
-  return { text, start: said[0].start, end: said.at(-1).end };
+  return spoken.length;
 }
-const wordsByScene = narration.map((paragraph) => paragraph.split(/\s+/).map(timeWord));
+let cursor = 0;
+const edited = [];
+const wordsByScene = narration.map((paragraph, i) => {
+  const words = paragraph.split(/\s+/);
+  const tokens = words.flatMap(expect);
+  if (saidAt(cursor, tokens) && (i + 1 < narration.length || cursor + tokens.length === spoken.length)) {
+    return words.map((text) => {
+      const n = expect(text).length, first = spoken[cursor], last = spoken[cursor + n - 1];
+      cursor += n;
+      return { text, start: first.start, end: last.end };
+    });
+  }
+  if (!draftScript) {
+    throw new Error(`Paragraph ${i + 1} of SCRIPT.md doesn't match the voiceover at ${spoken[cursor]?.start} s: "${paragraph}". Regenerate the audio, or set "draftScript" in scenes.json for now.`);
+  }
+  edited.push(i + 1);
+  const end = endOfParagraph(cursor, narration.slice(i + 1));
+  const timedWords = Array(words.length);
+  let head = 0, at = cursor;
+  while (head < words.length && saidAt(at, expect(words[head]))) {
+    const n = expect(words[head]).length;
+    timedWords[head++] = { text: words[head - 1], start: spoken[at].start, end: spoken[at + n - 1].end };
+    at += n;
+  }
+  let tail = words.length, back = end;
+  while (tail > head && back - expect(words[tail - 1]).length >= at && saidAt(back - expect(words[tail - 1]).length, expect(words[tail - 1]))) {
+    const n = expect(words[tail - 1]).length;
+    back -= n;
+    timedWords[--tail] = { text: words[tail], start: spoken[back].start, end: spoken[back + n - 1].end };
+  }
+  const from = at < spoken.length ? spoken[at].start : spoken.at(-1).end;
+  const to = back > at ? spoken[back - 1].end : from;
+  const chars = words.slice(head, tail).reduce((n, w) => n + w.length + 1, 0);
+  let clock = from;
+  for (let k = head; k < tail; k++) {
+    const length = ((to - from) * (words[k].length + 1)) / chars;
+    timedWords[k] = { text: words[k], start: clock, end: clock + length };
+    clock += length;
+  }
+  cursor = end;
+  return timedWords;
+});
 if (cursor !== spoken.length) throw new Error(`The voiceover goes on after SCRIPT.md ends, at "${spoken[cursor].word}".`);
+if (edited.length) console.warn(`DRAFT: paragraphs ${edited.join(", ")} don't match the voiceover, so their audio is out of date. Regenerate it before publishing.`);
 
 const timed = scenes.map((s, i) => {
   const start = i === 0 ? 0 : wordsByScene[i][0].start - LEAD_IN;
