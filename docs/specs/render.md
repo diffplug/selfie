@@ -22,7 +22,7 @@ A `RenderEnvironment` is a typed object:
 - **Must keep one ID format:** `container-<os>-<arch>-<hash>` or `native-<os>-<arch>-<hash>`, where the hash is 16 hex digits and the prefix is only for reading. `environmentId()` is what a render's name carries (`docs/specs/renders.md` → Render names).
 - **Must hash the image digest and platform, or the native OS, OS release, and architecture; the browser flags; viewport; scale; `recipe`; and the Playwright version.**
 - **Never hash an image's registry, the order of flags, or the order of properties**, since they can't change pixels.
-- **Never hash `settleMs` or `initScript`.** They are project input like story code, so changing them reports changed stories rather than starting new goldens. The manifest records both (rationale).
+- **Never hash `settleMs` or `initScript`.** They are project input like story code, so changing them reports changed stories rather than starting over. The manifest records both (rationale).
 - **Must refuse a browser flag given twice**, since the ID sorts flags and Chromium's last duplicate wins.
 - **Must take everything else that can decide pixels from the environment's `recipe`**, which the worker reads directly, and which starts from `DEFAULT_RECIPE`:
 
@@ -37,7 +37,7 @@ A `RenderEnvironment` is a typed object:
 | `loadImages` | `true` |
 | `screenshot` | `{ animations: "disabled", caret: "hide", scale: "device", fullPage: true }` |
 
-- **Must let a project set any of those, and start new goldens by changing one**, since they're hashed like the rest (rationale).
+- **Must let a project set any of those, and start over by changing one**, since they're hashed like the rest (rationale).
 - **Must refuse a recipe setting it doesn't have, or a value it can't use**, so a typo can't quietly render the default.
 - **Never let a project set `waitSequence`, `headless`, or `serviceWorkers`.** The first says what the worker does, a container has no display, and a service worker could answer requests that the worker has to (rationale).
 - **Must bump `waitSequence` when the order of waits changes.**

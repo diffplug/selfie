@@ -95,7 +95,6 @@ A push sends a batch's goldens if it's accepted locally, or `--accept` asks for 
 - **Must find a repository's project from its GitHub origin**, by the owner and name there, and use the numeric ID the server answers (`docs/specs/access.md` → GitHub App).
 - **Must take the remote's address only from `--remote` or `SELFIE_REMOTE`, and the token only from `SELFIE_TOKEN`, never from `selfie.config.json`**, since a checkout must not be able to send someone's token to another server (`docs/specs/cli.md` → Commands). Signing in replaces the token with **Scope: github-access**.
 - **Must refuse a remote that isn't https, unless it's this machine**, since a token goes to it.
-- **Must have `find-baseline`, when a remote is set, answer with the nearest of what the local store and the remote have, with `source` saying whether this store holds those goldens (`local`) or only the remote does (`remote`), null if there are none, and if the remote can't answer for any reason, answer from local data, with `remoteError` saying why**, so it never fails because of the network. With no remote set, it's local only (`docs/specs/cli.md` → find-baseline).
 
 ## Future
 

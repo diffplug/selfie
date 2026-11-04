@@ -63,10 +63,9 @@ The first render downloads the browser, which can take minutes, so say that befo
 
 Check each of these, and warn about what applies:
 
-- **Uncommitted changes:** `git status --porcelain`, which counts untracked files, and now includes `selfie.config.json`. Rendering still works, but every render is marked as uncommitted, and **no batch can be accepted as goldens until the tree is clean**. List the files, and separate the config you just wrote from what was already there. Don't touch them: say what to commit or ignore.
+- **Uncommitted changes:** `git status --porcelain`, which counts untracked files, and now includes `selfie.config.json`. Rendering still works, but every render is marked as uncommitted, so what it shows may not match the commit. List the files, and separate the config you just wrote from what was already there. Don't touch them: say what to commit or ignore.
 - **The build isn't ignored:** `git check-ignore <storybookDir>`. If it isn't, the build itself makes every render uncommitted. Say to add it to `.gitignore`.
-- **Not on the default branch:** only goldens on the default branch's history become a baseline for others. `selfie find-baseline` says what this branch would compare with. Say so if a person making their first goldens here should switch branch.
-- **A shallow clone:** `git rev-parse --is-shallow-repository`. Finding a baseline may stop early.
+- **A shallow clone:** `git rev-parse --is-shallow-repository`. Approvals from before where its history stops can't be reached, so stories may ask again.
 - **A big Storybook:** say how many stories there are, and that rendering them all takes a while. Don't guess how long from one story.
 
 ## 5. Hand it over
@@ -80,7 +79,7 @@ Then report, briefly:
 - every warning from step 4, and what to do about each. Leave out the project's own build warnings, such as CSS or bundle sizes, which have nothing to do with Selfie
 - what's next:
   1. In the browser, pick a story and press `c` to render it.
-  2. To make goldens, on a clean tree on the default branch: **Render all**, **Review the newest batch**, **Approve all**, **Accept this batch**.
-  3. Then change a component on a branch, commit, restart `selfie`, and **Render all**. The tree shows only what changed.
+  2. To set what later renders compare with: **Render all**, **Review the newest batch**, **Approve all**. Any branch will do.
+  3. Then change a component, commit, restart `selfie`, and **Render all**. The tree shows only what changed since what was approved.
 
 If `selfie flakes` reported anything, mention `selfie skill fix-flakes`.

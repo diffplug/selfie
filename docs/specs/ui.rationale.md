@@ -15,7 +15,7 @@ Evidence and reasoning for `docs/specs/ui.md`, keyed by its headings.
 ## Routes
 
 - **Why targets are taken exactly.** `decide` also takes patterns, where `*` matches anything, and a story's ID comes from a project's built Storybook. An ID `a*` passed as a pattern also approves `ab`, which the reviewer never saw. `cli/test/ui-*.test.ts` checks this with those two IDs.
-- **Why a request names hashes.** A decision belongs to a name and a hash, so naming them says what the reviewer saw. A later accepted batch can change a baseline's goldens, and so a batch's differences, while a page is open. `stale-decision` is the difference between a confused screen and a wrong approval.
+- **Why a request names hashes.** A decision belongs to a name and a hash, so naming them says what the reviewer saw. A newer approval can change what a batch is compared with, and so its differences, while a page is open. `stale-decision` is the difference between a confused screen and a wrong approval.
 - **Why bulk has no route of its own.** A server-side "all" would approve whatever is there at that moment, and the dialog would describe something else.
 
 ## Recomputing
@@ -32,7 +32,7 @@ Evidence and reasoning for `docs/specs/ui.md`, keyed by its headings.
 - **Why `firstChanged` is in `PixelDiff`.** The diff loop already visits every pixel, and only the server has the pixels at no extra cost. It adds one field to `selfie review`'s document.
 - **Why two kinds of size.** 1× was one CSS pixel at first, so that an image wouldn't be half the width on some screens and not others. Actual size now gives that consistent size, and a person looking for one wrong pixel needs to know what a pixel on their screen is, which only device pixels can say. A 1× image on a 2× display is half its actual width at 1×, and that's the point of choosing it.
 - **Why the layers stay stacked.** A reviewer finding a 1 px change flips between two images and watches for what moves, which only works with no shift and no flash. Each layer's key is its URL, so moving to another story can't show the last story's image while its own loads, which could otherwise get the wrong image approved.
-- **Why reuse a review's stats.** A later accepted batch could change a baseline's goldens under a batch, and then `review.json`'s stats would describe the old pair while the images show the new one. That's rare, and it only misstates numbers, against a request for every story.
+- **Why reuse a review's stats.** A newer approval could change what a batch is compared with, and then `review.json`'s stats would describe the old pair while the images show the new one. That's rare, and it only misstates numbers, against a request for every story.
 - **Why thumbnails, given they cost a read each.** They're lazy, and 30 load on opening a 512 row list. They let someone scan for the one that's different, which pixel counts don't.
 
 **Live stories.** Closed by default since a page per side is a lot to load for what most reviews don't need. They lay out at the rendered viewport and scale down, since a story laid out at half the width could look nothing like its image. They aren't frozen, as a render is, so they can differ from an image without anything being wrong, which the screen says. Each story gets a new frame, since moving one frame along would add to the browser's history, and Back would walk through stories in it.

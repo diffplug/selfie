@@ -44,6 +44,7 @@ export const CREATE_BATCH_TABLES: readonly string[] = [
   batch_id TEXT NOT NULL DEFAULT '',
   PRIMARY KEY (environment, story, image_hash, git_sha)
 ) WITHOUT ROWID`,
+  "CREATE INDEX IF NOT EXISTS decisions_by_commit ON decisions(environment, git_sha)",
   `CREATE TABLE IF NOT EXISTS goldens (
   git_sha TEXT NOT NULL,
   environment TEXT NOT NULL,

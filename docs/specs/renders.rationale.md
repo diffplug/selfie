@@ -38,7 +38,19 @@
 
 **Keeping no history.** A log of every decision would merge cleanly, but nothing in `selfie review` or the review UI reads one.
 
-**A reappearing image.** A name and hash is exactly what the system spec asks for, and it is what stops a re-approval at push. Its cost is that A → B → A shows the second A as approved, if A was ever explicitly approved. A review could ask again by comparing times, but that needs a decision about what approval means.
+## Approvals
+
+**History, not a promoted set.** Asking someone to accept a batch on a clean default branch made them render again after a merge, to end up with what they'd already approved. Working it out from history asks nothing at a merge, since a batch there finds the approvals its branch brought.
+
+**Author time as a branch's start.** A branch name can be reused, so its old batches mustn't count forever, and the merge-base can't bound them, since a rebase moves it past the batches it's meant to find. A rebase keeps author times, so the earliest among the branch's own commits holds still. An older commit merged in only widens the window, on the same branch name.
+
+**Leaving out a batch's own approvals.** A story approved on a batch still has to be listed there, approved, or a person going through a review sees rows vanish as they decide, and can't see what they approved.
+
+**Newer than the reference.** This replaces a name and hash holding forever, whose cost was that A → B → A showed the second A as approved. Now it asks, since B was the last thing anyone said was right.
+
+**One parameter however long the history.** `json_each` takes 1,000 commits as one bound parameter, where an `IN` list would take a request per 99.
+
+**No derived table, locally.** Measured on local SQLite at Dormouse's 568 stories, reaching 1,000 commits: reading 11,360 decisions takes about 0.4 s, 113,600 about 1.7 s, and 568,000 about 4 s. Those have every story approved at every commit, which is much worse than a commit that changes a few stories. A compare reads them once, and an approval twice.
 
 ## Goldens
 

@@ -2,7 +2,7 @@
 
 > Status: built — the local review UI, served by `selfie ui`. It runs on one person's machine with no login. Deploying it is `cloud-deploy`; see `## Future`.
 >
-> - See `docs/specs/glossary.md` for batch, render, golden, baseline, decision, and environment.
+> - See `docs/specs/glossary.md` for batch, render, reference, decision, and environment.
 > - Owns the routes, the seam a platform implements, and what each screen must show. `docs/specs/access.md` → Local review server owns who may reach it. `docs/specs/cli.md` → ui owns the command, and → Library the facts it shows. `docs/specs/renders.md` owns what the facts mean.
 
 ## Package
@@ -36,14 +36,12 @@ Source of truth: `ReviewSource` in `ui/src/shared/api.ts`.
 
 | Method | Returns |
 |---|---|
-| `current()` | HEAD, the newest finished batch there, whether it has only unfinished ones, and the baseline search if there's no batch to open |
+| `current()` | HEAD, the newest finished batch there, and whether it has only unfinished ones |
 | `storiesView()` | Every story of the hosted Storybook, each with its newest render at HEAD ([Every story](#screens)) |
 | `render(stories)` | Records a batch of those stories from the hosted Storybook, and says which |
 | `batchView(batchId)` | A `BatchView` ([Recomputing](#recomputing)) |
-| `baseline(batchId)` | The baseline search of a batch's environment, for a screen saying why it has none |
 | `unchanged(batchId)` | The batch's unchanged rows |
 | `decide(batchId, decision, targets)` | The new `BatchView` |
-| `accept(batchId, removedSeen)` | `accepted`, `refusals`, and the new `BatchView` |
 | `feedback()`, `addNote(note)`, `removeNote(id)` | This session's notes (`docs/specs/feedback.md`) |
 | `answerNote(id, text, batchId)`, `resolveNote(id)` | This session's notes after a person's answer, or closing one |
 | `sendNotes(via)` | The notes after sending every draft, to a waiting agent or to be copied, and the text to paste into an agent |
@@ -62,10 +60,8 @@ Source of truth: `ui/src/server/app.ts`; tests in `cli/test/ui-*.test.ts`.
 | `GET /api/batches/:id/context` | `batchContext(id)` |
 | `POST /api/renders` | `{ stories }`, which `render` records as a batch |
 | `GET /api/batches/:id` | `batchView` |
-| `GET /api/batches/:id/baseline` | `baseline` |
 | `GET /api/batches/:id/unchanged` | `{ rows }` |
 | `POST /api/batches/:id/decisions` | `{ decision, renders: [{ story, imageHash }] }` |
-| `POST /api/batches/:id/accept` | `{ removedSeen? }` |
 | `GET /api/feedback` | `feedback` |
 | `POST /api/notes` | `{ story, batchId, imageHash, box, text }` |
 | `DELETE /api/notes/:id` | `removeNote` |
@@ -81,7 +77,7 @@ Source of truth: `ui/src/server/app.ts`; tests in `cli/test/ui-*.test.ts`.
 | 400 | `bad-batch-id`, `bad-image-hash`, `bad-request` | The request can't mean anything |
 | 403 | `bad-host`, `bad-origin`, `bad-request-kind` | `docs/specs/access.md` → Local review server |
 | 404 | `unknown-batch`, `unknown-image`, `no-diff-image`, `unknown-story`, `not-found` | |
-| 409 | `render-busy`, `render-failed`, `no-agent-waiting`, `stale-decision`, `no-actor`, `batch-not-finished`, `no-goldens`, `batch-dirty`, `batch-has-failures`, `wrong-removed-count` | The request can't apply to the data as it stands |
+| 409 | `render-busy`, `render-failed`, `no-agent-waiting`, `stale-decision`, `no-actor`, `batch-not-finished` | The request can't apply to the data as it stands |
 
 On a hosted Storybook's own origin (`docs/specs/access.md` → Local review server), `selfie-ui/storybook` serves each kept built Storybook's files at `/built-storybooks/<hash>/`, and locally the directory as it stands is at `/`.
 
@@ -90,23 +86,21 @@ On a hosted Storybook's own origin (`docs/specs/access.md` → Local review serv
 - **Must give images, diff images, and diff stats `Cache-Control: private, max-age=31536000, immutable`**, since all are addressed by content (`docs/specs/access.md` → Local review server), and every other API answer `no-store`.
 - **Must decide on exactly the images a request names, or none:** the library's `decide` refuses with `stale-decision` if any named story and hash isn't a changed or new image of that batch, and takes the names exactly, never as patterns (rationale).
 - **Must refuse a bulk request no differently from a single one.** Nothing on the server knows "all": the client sends what it showed.
-- **Must compare a batch at most twice for a decision, and once for anything else, plus once for each if it's shown against branch goldens**, never reading unchanged rows unless a route asks for them.
-- **Must pass `removedSeen` as given, and let `accept` judge it**, so a count that moved comes back as `wrong-removed-count`.
+- **Must compare a batch at most twice for a decision, and once for anything else**, never reading unchanged rows unless a route asks for them.
 - **Must serve any page but `/assets/*` and `/api/*` as the client's one document**, with `no-store`, and a missing asset as 404.
 
 ## Recomputing
 
 Source of truth: `localReviewSource` in `cli/src/ui.ts`, `useBatch` in `ui/src/client/hooks.ts`.
 
-- **Must answer every action with a `BatchView` computed afresh through `summarizeBatch` and `checkAccept`, from the comparison made after it, and show only that.** The client holds no verdict of its own.
+- **Must answer every action with a `BatchView` computed afresh through `summarizeBatch`, from the comparison made after it, and show only that.** The client holds no verdict of its own.
 - **Must read the batch once when the window regains focus**, since the CLI or another tab may have decided, and say so if the server can't be reached.
-- **Must show what would stop `accept` before anyone asks**, from `checkAccept`, which changes nothing.
 - **Must abort a read that a newer read or an action's answer supersedes**, so a slow read can't undo an action.
 - **Must keep the objects of rows a new `BatchView` didn't change**, by story, hashes, and decision, so only a changed row re-renders.
 
 ## Which batch
 
-- **Must link [every story](#screens) to the newest finished batch at HEAD in the project's environment, as the batch to review and accept.** A batch still recording, or crashed, is listed on its commit's other batches and can't be opened (`docs/specs/renders.md` → Crashes and retries).
+- **Must link [every story](#screens) to the newest finished batch at HEAD in the project's environment, as the batch to review.** A batch still recording, or crashed, is listed on its commit's other batches and can't be opened (`docs/specs/renders.md` → Crashes and retries).
 - **Must say when a newer batch exists at the viewed batch's commit, on a batch's own screens.** On [every story](#screens), an older batch is what's newest for that story.
 
 ## Screens
@@ -119,7 +113,6 @@ Source of truth: `ui/src/client/`.
 | `/stories/:story` | One story, whichever batch its newest render is from |
 | `/batches/:id` | The batch |
 | `/batches/:id/stories/:story` | One render, in the filter from the query |
-| `/batches/:id/accept` | Accepting |
 
 **The top bar** says what a page is looking at: on every story, the built Storybook, its commit and branch, and whether it's clean; on a batch's pages, the diff, between the batch's commit and what it's compared with, and how that relates to the merge base with the default branch.
 
@@ -127,9 +120,9 @@ Source of truth: `ui/src/client/`.
 
 - **Must say more of each story as the list is dragged wider:** its state and decision, then its pixels and advisories on a batch's pages, or when it was rendered on every story.
 
-- **Must say a story is renamed if it's new and a removed story's golden is its very image**, one to one, and the closest names first where several share an image (rationale). The list has it once, under its new name. This is only to look at: to decisions and accepting they're still one new and one removed.
+- **Must say a story is renamed if it's new and a removed story's reference is its very image**, one to one, and the closest names first where several share an image (rationale). The list has it once, under its new name. This is only to look at: to decisions they're still one added and one removed.
 
-**The batch** shows, in order: its commit, batch ID, whether its pixels were rendered earlier and by which batch, dirty state, baseline, environment, and decision actor; a warning if it was recorded dirty, has no baseline, is shown against branch goldens (`docs/specs/cli.md` → Review), or its SHA can't be a baseline; the counts; blockers; advisories; and the differences.
+**The batch** shows, in order: its commit, batch ID, whether its pixels were rendered earlier and by which batch, dirty state, environment, and decision actor; a warning if it was recorded dirty; the counts; blockers; advisories; and the differences.
 
 - **Must group blockers by reason, in words, and offer each as a filter of the list.**
 - **Must keep the filter, text and state, in the URL, and nowhere else**, so back, reload, and next and previous all follow it.
@@ -152,12 +145,12 @@ Source of truth: `ui/src/client/`.
 - **Must let someone select any set of hunks, from the list, from an outline, or with a key, and keep that only while they stay on the story.** Clicking a stacked hunk's outline selects it, and side by side only its number does, since clicking an image there stacks it.
 - **Must keep the hunk being looked at still when flipping between images**, since it can be somewhere else in the other one (rationale).
 - **Must link a render to its story in the very built Storybook that rendered its batch, if that's kept, or else the directory `selfie ui` hosts, and then say it may not match** (`BatchView.storybook`). A removed story has no link.
-- **Must offer the live stories, closed and loading nothing until opened, and stay open or closed from story to story**: the golden's kept built Storybook beside the batch's, in frames (`docs/specs/access.md` → Local review server), at the size its environment renders at and scaled to fit, or else saying that size wasn't recorded, each saying why if it has none (rationale).
+- **Must offer the live stories, closed and loading nothing until opened, and stay open or closed from story to story**: the kept built Storybook of the batch behind its reference, beside the batch's own, in frames (`docs/specs/access.md` → Local review server), at the size its environment renders at and scaled to fit, or else saying that size wasn't recorded, each saying why if it has none (rationale).
 - **Must give a live story the keyboard only when it's clicked in**, taking focus back from one that focuses itself as it loads, so this page's keys keep working (rationale).
 - **Must leave the browser's history alone when moving a live story along**, so Back leaves the screen as it does anywhere else (rationale).
 - **Must keep how someone is looking when moving between stories**, and must never show one story's image under another's name while it loads.
 - **Must compute diff images, and pixel stats a batch's `review.json` no longer holds, on demand, from the store, by hash pair**, so a pruned batch reads like any other. A list shows stats only from `review.json`, and one render uses them rather than ask (rationale).
-- **Must explain each kind of render:** new has no golden, removed has no current and takes no decision, failed shows its message, and a changed size says so, and shows the images from their top left corners.
+- **Must explain each kind of render:** added has no reference, removed has no current and takes a decision on the story being gone, failed shows its message, and a changed size says so, and shows the images from their top left corners.
 - **Must say when a changed render is only moves and spacing, in the list, the pixel stats, and a banner, and that it still needs a decision**, and offer those as a filter of the list, so they can be approved together (rationale).
 - **Must say what the diff image's colors mean wherever it has more than one.**
 - **Must not offer a decision on what has no image to decide on.**
@@ -166,7 +159,7 @@ Source of truth: `ui/src/client/`.
 
 - **Must say where this commit stands, in order:** the commit and branch; the built Storybook, how many stories it has, and whether it's from a clean checkout; and how many stories have a render (rationale). What's missing says what to do, the page moves on by itself as it's done, and with no renders it offers to render the first story, or all of them, opening that story's page after the first.
 - **Must call a built Storybook clean only if nothing is uncommitted and it was built since HEAD last moved**, which is the most Selfie can know of a built Storybook it may not have made (rationale). Otherwise it says which, or both, and may still render.
-- **Must say, before rendering from uncommitted changes, what they are, that a render is marked so and can't become a golden, and when the built Storybook itself is one of those files.**
+- **Must say, before rendering from uncommitted changes, what they are, that a render is marked so, and when the built Storybook itself is one of those files.**
 - **Must keep the list beside `/` and each `/stories/:story`, on the left, as Storybook's sidebar is** (rationale), with what `/` says, or that story, on the right. A filter stays in the query from page to page, and may be cleared in one click.
 - **Must nest by a story's title, keep the built Storybook's order, and use its names**: a top-level section, then a component, then each story, with Storybook's own icons and colors, so a person finds what they know from it (rationale). Only the sections start open. Moving to a story opens the way to it, and a filter opens everything.
 - **Must mark each story in the list with its state, in words for a screen reader and on hover, and with any caveat**, and give a story's decision and when it was rendered on its page.
@@ -176,14 +169,7 @@ Source of truth: `ui/src/client/`.
 - **Must never read a story a filtered batch left out as removed**, through `newestRenders` in `selfie-store`. It takes that story from an older batch, or else lists it as not rendered.
 - **Must say when a render is from uncommitted changes, or known to be from another built Storybook than the one hosted**, since a render is whichever is newest, not whichever is reliable.
 - **Must leave out a story the hosted built Storybook no longer has**, and with no built Storybook at all, list only what's been rendered, and say so.
-- **Must move next and previous through every story**, not through that story's batch. Decisions go to the batch that rendered the image, and accepting stays a thing one batch does.
-
-**Accepting** shows, in plain words, every refusal `accept` would give, and what to do about it.
-
-- **Must say, for a batch with `reusedFromBatch`, that these pixels were rendered earlier, by which batch, with a link to it**, so a person accepting here knows as much as `selfie accept` tells an agent (`docs/specs/cli.md` → Recording only if necessary).
-- **Must list every golden accepting would drop, say how many are only outside the batch's filter, and require a checkbox before accepting any.** It sends the count it listed, as `removedSeen`.
-- **Must say when another batch is the commit's goldens, that this one would replace them.**
-- **Must show when a batch is accepted**, and never offer it again.
+- **Must move next and previous through every story**, not through that story's batch. Decisions go to the batch that rendered the image.
 
 **Notes** are in `docs/specs/feedback.md`, with what they add to these screens.
 
@@ -233,7 +219,7 @@ Source of truth: `ui/src/client/*.stories.tsx`, `ui/src/client/stories/`.
 ## Scale
 
 - **Must not read a blob to show a list.** Row data comes from `compareBatch` and `review.json` (rationale).
-- **Must not read the unchanged stories until asked**, or ask Git why a batch has no baseline until a screen shows it.
+- **Must not read the unchanged stories until asked.**
 - **Must not virtualize the list, or put `content-visibility` on its rows** (rationale).
 
 ## Future
