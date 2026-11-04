@@ -107,6 +107,78 @@
       "type": "story",
       "importPath": "./recipe.stories.js",
       "exportName": "Says"
+    },
+    "viewport--named": {
+      "id": "viewport--named",
+      "title": "Viewport",
+      "name": "Named",
+      "type": "story",
+      "importPath": "./viewport.stories.js",
+      "exportName": "Named"
+    },
+    "viewport--rotated": {
+      "id": "viewport--rotated",
+      "title": "Viewport",
+      "name": "Rotated",
+      "type": "story",
+      "importPath": "./viewport.stories.js",
+      "exportName": "Rotated"
+    },
+    "viewport--typed": {
+      "id": "viewport--typed",
+      "title": "Viewport",
+      "name": "Typed",
+      "type": "story",
+      "importPath": "./viewport.stories.js",
+      "exportName": "Typed"
+    },
+    "viewport--own-option": {
+      "id": "viewport--own-option",
+      "title": "Viewport",
+      "name": "Own option",
+      "type": "story",
+      "importPath": "./viewport.stories.js",
+      "exportName": "Ownoption"
+    },
+    "viewport--old-storybook": {
+      "id": "viewport--old-storybook",
+      "title": "Viewport",
+      "name": "Old Storybook",
+      "type": "story",
+      "importPath": "./viewport.stories.js",
+      "exportName": "OldStorybook"
+    },
+    "viewport--tall": {
+      "id": "viewport--tall",
+      "title": "Viewport",
+      "name": "Tall",
+      "type": "story",
+      "importPath": "./viewport.stories.js",
+      "exportName": "Tall"
+    },
+    "viewport--unknown-name": {
+      "id": "viewport--unknown-name",
+      "title": "Viewport",
+      "name": "Unknown name",
+      "type": "story",
+      "importPath": "./viewport.stories.js",
+      "exportName": "Unknownname"
+    },
+    "viewport--percent": {
+      "id": "viewport--percent",
+      "title": "Viewport",
+      "name": "Percent",
+      "type": "story",
+      "importPath": "./viewport.stories.js",
+      "exportName": "Percent"
+    },
+    "viewport--percent-option": {
+      "id": "viewport--percent-option",
+      "title": "Viewport",
+      "name": "Percent option",
+      "type": "story",
+      "importPath": "./viewport.stories.js",
+      "exportName": "Percentoption"
     }
   }
 }

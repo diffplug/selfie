@@ -102,8 +102,8 @@ function decisionTargets(value: unknown): DecisionTarget[] {
   }
   return value.map((target: unknown) => {
     const { story, imageHash } = (target ?? {}) as Record<string, unknown>;
-    if (typeof story !== "string" || story === "" || typeof imageHash !== "string" || !isImageHash(imageHash)) {
-      throw new BadRequest("Each render needs a story and an image hash.");
+    if (typeof story !== "string" || story === "" || (imageHash !== null && (typeof imageHash !== "string" || !isImageHash(imageHash)))) {
+      throw new BadRequest("Each render needs a story, and an image hash or null.");
     }
     return { story, imageHash };
   });
@@ -164,7 +164,6 @@ export function createReviewApi(source: ReviewSource): Hono {
   api.get("/renders/progress", async (context) => context.json({ progress: await source.renderProgress() }));
   api.get("/batches/:batchId", async (context) => context.json(await source.batchView(context.req.param("batchId"))));
   api.get("/batches/:batchId/context", async (context) => context.json(await source.batchContext(context.req.param("batchId"))));
-  api.get("/batches/:batchId/baseline", async (context) => context.json(await source.baseline(context.req.param("batchId"))));
   api.get("/batches/:batchId/unchanged", async (context) =>
     context.json({ rows: await source.unchanged(context.req.param("batchId")) }),
   );
@@ -175,14 +174,6 @@ export function createReviewApi(source: ReviewSource): Hono {
       throw new BadRequest('decision must be "approved" or "rejected".');
     }
     return context.json(await source.decide(context.req.param("batchId"), decision, decisionTargets(renders)));
-  });
-
-  api.post("/batches/:batchId/accept", async (context) => {
-    const { removedSeen } = await jsonBody(context);
-    if (removedSeen !== undefined && !(Number.isSafeInteger(removedSeen) && (removedSeen as number) >= 0)) {
-      throw new BadRequest("removedSeen must be a non-negative integer.");
-    }
-    return context.json(await source.accept(context.req.param("batchId"), removedSeen as number | undefined));
   });
 
   api.get("/feedback", async (context) => context.json(await source.feedback()));

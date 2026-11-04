@@ -12,7 +12,7 @@ import { Keys } from "./Keys.tsx";
 import { usePageFacts } from "./PageFacts.tsx";
 import { OpenInStorybook, StoryFrame, storyFrameUrl } from "./LiveStories.tsx";
 import { plural } from "./plural.ts";
-import { ActionFailedBanner } from "./BatchNotes.tsx";
+import { ActionFailedBanner } from "./ActionFailure.tsx";
 import { anyStoryPath, navigate, storiesPath } from "./router.tsx";
 import { matchingStories, StoryNavLayout } from "./StoryNav.tsx";
 import { inTreeOrder } from "./storyTree.ts";

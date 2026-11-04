@@ -1,7 +1,6 @@
 import { Heading } from "@primer/react";
 import { useLayoutEffect, useRef, type ReactNode } from "react";
 import { fetchBatchContext } from "./api.ts";
-import { AcceptScreen } from "./AcceptScreen.tsx";
 import { DetailScreen } from "./DetailScreen.tsx";
 import { FeedbackBar, NewerBatchBanner } from "./Feedback.tsx";
 import { useFeedback, useFetched, useBatch } from "./hooks.ts";
@@ -33,8 +32,6 @@ function BatchRoutes({ batchId, route, search }: { batchId: string; route: Route
       <FeedbackBar feedback={feedback} storyHref={(story) => storyPath(batchId, story, "")} showList={route.kind === "batch"} />
       {route.kind === "story" && tree.navigation !== null ? (
         <DetailScreen state={state} view={state.view} story={route.story} search={search} feedback={feedback} navigation={tree.navigation} />
-      ) : route.kind === "accept" ? (
-        <AcceptScreen state={state} view={state.view} />
       ) : (
         <BatchScreen state={state} view={state.view} search={search} returningFrom={lastStory} />
       )}
@@ -81,7 +78,7 @@ export function App() {
     <Page>
       {route.kind === "missing" && <NotFound />}
       {(route.kind === "stories" || route.kind === "anyStory") && <StoriesRoutes story={route.kind === "anyStory" ? route.story : null} search={search} />}
-      {(route.kind === "batch" || route.kind === "story" || route.kind === "accept") && (
+      {(route.kind === "batch" || route.kind === "story") && (
         <BatchRoutes key={route.batchId} batchId={route.batchId} route={route} search={search} />
       )}
     </Page>

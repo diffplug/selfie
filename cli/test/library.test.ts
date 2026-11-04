@@ -3,24 +3,20 @@ import { rm } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import {
-  accept,
-  checkAccept,
   decide,
-  findBaseline,
   isDecidable,
   openProject,
   readReviewCache,
-  resolveRenderSettings,
   review,
   SelfieError,
   summarizeBatch,
   type Project,
 } from "selfie-cli";
-import { BLUE, createHarness, git, type Harness } from "./support.ts";
+import { BLUE, createHarness, type Harness } from "./support.ts";
 
 let h: Harness;
 let project: Project;
-const options = () => ({ storybookDir: "ignored", render: h.render });
+const options = () => ({ render: h.render });
 
 beforeEach(async () => {
   h = await createHarness();
@@ -31,14 +27,15 @@ afterEach(async () => {
   await h.destroy();
 });
 
-test("isDecidable is true only of what has an added image", () => {
+test("isDecidable is true only of what differs", () => {
   expect(["changed", "added", "unchanged", "removed", "failed"].filter((state) => isDecidable(state as any))).toEqual([
     "changed",
     "added",
+    "removed",
   ]);
 });
 
-test("a decision on exact images takes each as itself, and checkAccept changes nothing", async () => {
+test("a decision on exact images takes each as itself", async () => {
   h.stories = [{ id: "a*" }, { id: "ab" }];
   const { comparison } = await review(project, options());
   const { id: batchId } = comparison.batch;
@@ -51,14 +48,6 @@ test("a decision on exact images takes each as itself, and checkAccept changes n
   await expect(
     decide(project, { batchId, decision: "approved", actor: "ui", stories: { targets: [target, { story: "nobody", imageHash: star.imageHash! }] } }),
   ).rejects.toMatchObject({ code: "stale-decision" });
-
-  const all = await decide(project, { batchId, decision: "approved", actor: "ui", stories: "all" });
-  const check = await checkAccept(project, all.comparison);
-  expect(check.refusals).toEqual([]);
-  const { gitSha, environment } = all.comparison.batch;
-  expect(await project.batches.acceptedBatchAt(gitSha, environment)).toBeNull();
-  expect((await accept(project, { batchId })).accepted).toBe(true);
-  expect(await project.batches.acceptedBatchAt(gitSha, environment)).toBe(batchId);
 });
 
 test("openProject needs only a directory and an environment, and fails with a code", async () => {
@@ -89,23 +78,10 @@ describe("review", () => {
     const rest = await decide(project, { batchId, decision: "rejected", actor: "ui", stories: "all" });
     expect(summarizeBatch(rest.comparison).blockers.map(({ reason }) => reason)).toEqual(["rejected", "rejected"]);
 
-    const refused = await accept(project, { batchId });
-    expect(refused.accepted).toBe(false);
-    expect(refused.refusals).toEqual([
-      {
-        reason: "unapproved",
-        stories: [
-          { story: "a", state: "added", decision: "rejected" },
-          { story: "b", state: "added", decision: "rejected" },
-        ],
-      },
-    ]);
-
-    await decide(project, { batchId, decision: "approved", actor: "ui", stories: "all" });
-    const accepted = await accept(project, { batchId });
-    expect(accepted).toMatchObject({ accepted: true, refusals: [], usableAsBaseline: true });
-    const { environmentId } = await resolveRenderSettings(project.repo);
-    expect((await findBaseline(project, environmentId)).sha).toBe(git(h.repo, "rev-parse", "HEAD"));
+    const all = await decide(project, { batchId, decision: "approved", actor: "ui", stories: "all" });
+    expect(summarizeBatch(all.comparison).blockers).toEqual([]);
+    const next = await review(project, options());
+    expect(summarizeBatch(next.comparison).counts).toMatchObject({ unchanged: 2, undecided: 0 });
   });
 
   test("keeps a filter's unmatched patterns on the batch, and works without one", async () => {
@@ -129,7 +105,6 @@ describe("review", () => {
     const first = await review(project, options());
     const batchId = first.comparison.batch.id;
     await decide(project, { batchId, decision: "approved", actor: "ui", stories: "all" });
-    await accept(project, { batchId });
 
     h.stories = [{ id: "a", color: BLUE }];
     const second = await review(project, options());

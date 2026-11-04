@@ -41,7 +41,7 @@ export function BatchLayout({
   context: BatchContext | null;
   children: ReactNode;
 }) {
-  usePageFacts({ kind: "diff", batch: view.batch, branchGoldens: view.branchGoldens, context });
+  usePageFacts({ kind: "diff", batch: view.batch, context });
   return (
     <StoryNavLayout
       stories={stories}

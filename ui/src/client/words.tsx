@@ -163,6 +163,6 @@ export const BLOCKER_WORDS: Readonly<Record<BlockerReason, (count: number) => st
   "changed-unapproved": (count) => `${plural(count, "changed image")} with no decision`,
   "added-unapproved": (count) => `${plural(count, "added image")} with no decision`,
   rejected: (count) => `${plural(count, "image")} rejected`,
-  removed: (count) => `${plural(count, "golden")} this batch doesn't have, which must be acknowledged to accept`,
+  removed: (count) => `${plural(count, "approved story", "approved stories")} this batch doesn't have, with no decision`,
   "pattern-unmatched": (count) => `${plural(count, "--story pattern")} that matched nothing`,
 };

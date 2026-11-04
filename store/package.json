@@ -15,7 +15,7 @@
   "scripts": {
     "test": "pnpm typecheck && vitest run",
     "test:d1": "SELFIE_D1_CONTRACT=1 vitest run --project node --silent=false --no-file-parallelism test/d1-rest.real.test.ts test/render-batches.real.test.ts",
-    "test:d1:renders": "SELFIE_D1_CONTRACT=1 vitest run --project node --silent=false test/render-batches.real.test.ts",
+    "test:d1:render-batches": "SELFIE_D1_CONTRACT=1 vitest run --project node --silent=false test/render-batches.real.test.ts",
     "test:d1:workerd": "SELFIE_D1_WORKERD=1 vitest run --project workerd --silent=false test/workerd/d1.real.workerd.test.ts",
     "typecheck": "tsc -p tsconfig.core.json && tsc -p tsconfig.json && tsc -p tsconfig.workerd.json",
     "find-collision": "node scripts/find-collision.ts"

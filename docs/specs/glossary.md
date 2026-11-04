@@ -10,16 +10,16 @@
 | **Render** | An image associated with a story, because it was generated for that story in a batch, and making one. A story's newest render is the one from the newest finished batch at HEAD that has it (`docs/specs/ui.md` → Screens). |
 | **Environment** | What decides the pixels apart from the project's own input: the runner, its architecture, the browser and its flags, the viewport and scale, and the render recipe (`docs/specs/system.md`). Its ID is part of a render's name. |
 | **Render batch** | The record of the process that rendered a set of images, against a Git sha. `batch` for short. |
-| **Golden** | The render accepted as correct for its name. |
-| **Baseline** | The Git sha whose goldens a batch is held to: the nearest merge-base with a complete set of goldens. |
-| **Branch goldens** | With no baseline, the nearest goldens on a batch's own branch, which it's shown against. Only to look at: never a baseline (`docs/specs/cli.md` → Review). |
+| **Reference** | What a story is compared with at a commit: the image of the newest approval that commit's history reaches (`docs/specs/renders.md` → Approvals). A story with none has no reference. Code and the page still say "golden" for it, as in `goldenHash`, until that's renamed. |
+| **Golden** | A commit's images in the cloud's store: those of the one batch accepted there. Only `selfie push` and `selfie pull` use them, until sync moves to approvals (`docs/specs/sync.md`). |
+| **Baseline** | What `selfie review --baseline` compares with, for one review: a batch, or a commit's history. In sync, the commit whose goldens a batch is held to. |
 | **Note** | What a person says about a story, for an agent to act on: on an image, and maybe a box of it (`docs/specs/feedback.md`). |
 | **Session** | Whose notes these are: a local Git worktree's top folder (`docs/specs/feedback.md`). |
-| **Approval** | A person's or agent's acceptance of a render change. May be made before the change is pushed (`docs/specs/system.md`). |
+| **Approval** | A person's or agent's acceptance of a render, or of a story being gone, at the commit of the batch it was made on. It counts wherever that commit's history reaches, and may be made before the change is pushed (`docs/specs/renders.md` → Approvals). |
 | **Rejection** | A person's or agent's refusal of a render change. |
-| **Decision** | An approval or a rejection, recorded against a render name and an image hash (`docs/specs/renders.md`). |
+| **Decision** | An approval or a rejection, recorded against a render name, an image hash or a removal, and a commit (`docs/specs/renders.md`). |
 | **Render name** | What identifies a render across batches and stores: its story ID, with any render variant in it, and its environment ID. |
-| **Render state** | How a batch's render compares with the baseline's goldens: unchanged, changed, added, removed, or failed (`docs/specs/renders.md`). |
+| **Render state** | How a batch's render compares with its reference: unchanged, changed, added, removed, or failed (`docs/specs/renders.md`). |
 | **Project** | One GitHub repository's cloud render data, held in its own D1 database. Exists once the GitHub App is installed on that repository (`docs/specs/access.md`). |
 | **Store** | One place that holds images, their metadata, and built Storybooks: a local store on a machine, or a project's cloud store. |
 | **Hosted Storybook** | The Storybook `selfie ui` serves on an origin of its own: the built directory, and each kept built Storybook (`docs/specs/access.md` → Local review server). |

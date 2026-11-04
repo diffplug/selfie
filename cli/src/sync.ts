@@ -5,9 +5,9 @@ import { chunks, ImageDecodeError, ImageHashMismatchError, mapConcurrently, type
 import { SYNC_LIMITS, type GoldensAnswer, type ProjectAccess, type SentDecision, type SentBatch, type SentRender, type SyncError } from "selfie-ui/sync-api";
 import { resolveRenderSettings } from "./config.ts";
 import { SelfieError } from "./errors.ts";
-import { walkToBaseline, type BaselineSearch } from "./git.ts";
+import { walkToBaseline } from "./git.ts";
 import { normalizeOrigin } from "./paths.ts";
-import { findBaseline, batchesAtHead, type Project } from "./project.ts";
+import { batchesAtHead, type Project } from "./project.ts";
 
 /** How many images go at once. Each is decoded to check it, so this bounds memory, as `Store` does. */
 const IMAGES_AT_ONCE = 4;
@@ -185,7 +185,7 @@ export async function push(project: Project, remote: Remote, { batch: given, acc
   if (accept === true || acceptedHere) {
     // A machine that's never pulled, such as CI, recorded no baseline, so ask which the cloud holds this to.
     const baselineSha = batch.baselineSha ?? (await remoteBaseline(project, remote, route, batch.environment)).sha;
-    goldens = await askJson<GoldensAnswer>(remote, `${route}/goldens`, "POST", { batchId, baselineSha, removed: await batches.removedFrom(batchId, batch.baselineSha) });
+    goldens = await askJson<GoldensAnswer>(remote, `${route}/goldens`, "POST", { batchId, baselineSha, removed: await batches.removedFrom(batchId, baselineSha) });
   }
   return { batchId, images: { sent, alreadyThere: total - sent }, decisions, goldens };
 }
@@ -232,33 +232,4 @@ export async function pull(project: Project, remote: Remote, { commit, native }:
   await batches.mergeDecisions(batch.environment, decided);
   await batches.adoptGoldens(batchId);
   return { sha, environment, batchId, images: { received: missing.length, alreadyHere: hashes.length - missing.length }, decisions: decided.length, replaced: before };
-}
-
-/**
- * The nearest of a local baseline and the remote's. If the remote can't answer, the local answer
- * stands, and says so, so that nothing fails because of the network. `source` is whether this store
- * holds those goldens, or the remote alone does, and a pull would fetch them.
- */
-export async function findBaselineWithRemote(
-  project: Project,
-  remote: Remote,
-  environment: string,
-): Promise<BaselineSearch & { readonly source: "local" | "remote" | null; readonly remoteError: string | null }> {
-  const local = (shas: readonly string[]) => project.batches.firstWithGoldens(shas, environment);
-  const sourced = async (search: BaselineSearch, remoteError: string | null) => ({
-    ...search,
-    source: search.sha === null ? null : (await local([search.sha])) === null ? ("remote" as const) : ("local" as const),
-    remoteError,
-  });
-  try {
-    const route = await projectRoute(project, remote);
-    const search = await walkToBaseline(project.repo, async (shas) => {
-      const [here, there] = await Promise.all([local(shas), remoteFirst(remote, route, shas, environment)]);
-      return shas.find((sha) => sha === here || sha === there.sha) ?? null;
-    });
-    return await sourced(search, null);
-  } catch (error) {
-    if (!(error instanceof RemoteError)) throw error;
-    return sourced(await findBaseline(project, environment), error.message);
-  }
 }

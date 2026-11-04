@@ -94,7 +94,7 @@ describe.runIf(process.env.SELFIE_RENDER_CONTAINER === "1")("in the pinned conta
 
     test("renders every story and leaves out docs", () => {
       expect(manifest.stories.map((entry) => entry.id)).not.toContain("guide--docs");
-      expect(manifest.totals.stories).toBe(14);
+      expect(manifest.totals.stories).toBe(23);
     });
 
     test("applies the page conditions before story code runs", () => {
@@ -215,6 +215,54 @@ describe.runIf(process.env.SELFIE_RENDER_CONTAINER === "1")("in the pinned conta
     expect(story(manifest, "basic--tall")).toMatchObject({ status: "ok", width: 800, height: 4000 });
     expect(story(manifest, "basic--animation")).toMatchObject({ status: "ok", width: 800, height: 600 });
     expect(manifest.environmentId).not.toBe(environmentId(defineEnvironment()));
+  });
+
+  describe("a story's declared viewport", () => {
+    let manifest: Manifest;
+
+    beforeAll(async () => {
+      manifest = await run({ stories: ["viewport--*", "basic--detail"] });
+    }, 120_000);
+
+    // Each of these stories throws if it mounts at any other size, so these show the story was there from the start.
+    test.each([
+      ["viewport--named", { width: 414, height: 896 }],
+      ["viewport--rotated", { width: 568, height: 320 }],
+      ["viewport--typed", { width: 500, height: 700 }],
+      ["viewport--own-option", { width: 640, height: 480 }],
+      ["viewport--old-storybook", { width: 480, height: 320 }],
+    ])("%s reaches the image's size", (id, viewport) => {
+      expect(story(manifest, id)).toMatchObject({ status: "ok", errors: [], ...viewport, viewport });
+    });
+
+    test("still lets a tall story grow past it", () => {
+      expect(story(manifest, "viewport--tall")).toMatchObject({ status: "ok", errors: [], width: 414, height: 2000, viewport: { width: 414, height: 896 } });
+    });
+
+    test("leaves a story that declares nothing at the environment's size", () => {
+      expect(story(manifest, "basic--detail")).toMatchObject({ width: 1200, height: 900, viewport: { width: 1200, height: 900 } });
+    });
+
+    test.each([
+      ["viewport--unknown-name", /"no-such-size" isn't one of its options: mobile1, mobile2, tablet, desktop\./],
+      ["viewport--percent", /"50pct-100pct" isn't a size in pixels\./],
+      ["viewport--percent-option", /"stretchy" isn't a size in pixels: .*100%/],
+    ])("warns of %s, and renders at the environment's size", (id, problem) => {
+      const { status, width, height, viewport, errors } = story(manifest, id);
+      expect({ status, width, height, viewport }).toEqual({ status: "ok", width: 1200, height: 900, viewport: { width: 1200, height: 900 } });
+      expect(errors).toEqual([{ source: "viewport", message: expect.stringMatching(problem) }]);
+      expect(errors[0]!.message).toContain("It rendered at the environment's 1200x900.");
+      expect(manifest.warnings).toContain(`${id}: ${errors[0]!.message}`);
+    });
+
+    test("is project input, which leaves the environment alone", () => {
+      expect(manifest.environmentId).toBe(environmentId(defineEnvironment()));
+    });
+
+    test("keeps the environment's scale", async () => {
+      const scaled = await run({ environment: defineEnvironment({ scale: 2 }), stories: ["viewport--named"] });
+      expect(story(scaled, "viewport--named")).toMatchObject({ status: "ok", width: 828, height: 1792, viewport: { width: 414, height: 896 } });
+    });
   });
 
   test("an abort stops the run and removes its container", async () => {

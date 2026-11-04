@@ -2,22 +2,15 @@
 // plain data, with no printing and no exit codes. See `docs/specs/cli.md` -> Library.
 export { resolveRenderSettings, type RenderSettings } from "./config.ts";
 export {
-  accept,
-  checkAccept,
   decide,
-  type AcceptCheck,
-  type AcceptRefusal,
-  type AcceptRequest,
-  type AcceptResult,
   type DecideRequest,
   type DecideResult,
 } from "./decisions.ts";
 export type { BoundingBox, PixelDiff } from "./diff.ts";
 export { SelfieError, type SelfieErrorCode } from "./errors.ts";
-export { gitUserEmail, type Baseline, type BaselineSearch, type NoBaselineReason } from "./git.ts";
+export { gitUserEmail } from "./git.ts";
 export {
   compareAsReviewed,
-  findBaseline,
   openProject,
   readReviewCache,
   type Project,

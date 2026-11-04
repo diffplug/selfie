@@ -61,6 +61,12 @@ export const DEFAULT_RECIPE: RenderRecipe = {
   screenshot: { animations: "disabled", caret: "hide", scale: "device", fullPage: true },
 };
 
+/** A browser window's size, in CSS pixels. */
+export interface Viewport {
+  width: number;
+  height: number;
+}
+
 export interface WorkerStory {
   id: string;
   /** File name inside the job's output directory. */
@@ -72,7 +78,7 @@ export interface WorkerJob {
   outDir: string;
   stories: WorkerStory[];
   launchArgs: string[];
-  viewport: { width: number; height: number };
+  viewport: Viewport;
   scale: number;
   recipe: RenderRecipe;
   settleMs: number;
@@ -90,6 +96,7 @@ export type StoryErrorSource =
   | "page"
   | "console"
   | "request"
+  | "viewport"
   | "worker";
 
 export interface StoryError {
@@ -102,6 +109,8 @@ export interface WorkerStoryResult {
   status: "ok" | "failed";
   width: number | null;
   height: number | null;
+  /** The window it laid out in: what it declared, or else the environment's. */
+  viewport: Viewport;
   pngSha256: string | null;
   errors: StoryError[];
   durationMs: number;

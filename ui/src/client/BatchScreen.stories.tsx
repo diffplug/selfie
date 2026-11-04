@@ -5,7 +5,7 @@ import type { BatchView } from "../shared/api.ts";
 import type { BatchState } from "./hooks.ts";
 import { BatchFrame } from "./stories/BatchFrame.tsx";
 import { BatchScreen } from "./BatchScreen.tsx";
-import { approved, BASELINE_SHA, failure, OTHER_BATCH_ID, rejected, rows, batchOf, stateOf, viewOf } from "./stories/fixtures.ts";
+import { approved, failure, OTHER_BATCH_ID, rejected, rows, batchOf, stateOf, viewOf } from "./stories/fixtures.ts";
 
 interface Args {
   readonly view: BatchView;
@@ -92,20 +92,6 @@ export const NewerBatchExists: Story = {
         { id: batchOf().id, startedAt: batchOf().startedAt, status: "complete", dirty: false },
       ],
     }),
-  },
-};
-export const NoBaselineOffHistory: Story = {
-  args: { view: viewOf(SOME_CHANGES, { batch: { baselineSha: null }, usableAsBaseline: false }) },
-};
-export const ComparedOnBranch: Story = {
-  args: { view: viewOf(SOME_CHANGES, { batch: { baselineSha: null }, branchGoldens: BASELINE_SHA, usableAsBaseline: false }) },
-};
-export const AcceptedHere: Story = {
-  args: {
-    view: viewOf(
-      [rows.changed("components-button--primary", approved())],
-      { acceptedBatchId: batchOf().id },
-    ),
   },
 };
 export const ActionFailed: Story = {
