@@ -23,6 +23,7 @@ interface ProjectConfig {
   readonly hunkMergeDistance?: number;
 }
 
+/** The file, its shape, and its required keys, which every reader refuses alike. What a key means is for whoever resolves it. */
 async function loadConfig(repo: Repo): Promise<ProjectConfig> {
   const file = path.join(repo.root, CONFIG_FILE);
   const text = await readFile(file, "utf8").catch(() => null);

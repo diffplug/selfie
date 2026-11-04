@@ -3,7 +3,7 @@
 import { access, mkdir, readFile, realpath, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
-import { BLUE, commit, createHarness, git, GREEN, type Harness, TEST_CONFIG } from "./support.ts";
+import { BLUE, commit, createHarness, git, GREEN, type Harness, TEST_CONFIG, writeTestConfig } from "./support.ts";
 
 let h: Harness;
 let build: string;
@@ -218,7 +218,7 @@ describe("a branch when the default branch has no goldens", () => {
 });
 
 describe("the config's storybookDir", () => {
-  const config = (value: unknown) => writeFile(path.join(h.repo, "selfie.config.json"), JSON.stringify({ ...TEST_CONFIG, ...(value as object) }));
+  const config = (value: object) => writeTestConfig(h.repo, value);
 
   beforeEach(async () => {
     await mkdir(path.join(h.repo, "built"));
@@ -243,16 +243,9 @@ describe("the config's storybookDir", () => {
     expect(json.error.code).toBe("bad-config");
   });
 
-  test.each(["build-command", "build"])("has no %s, since a checkout must not run a shell", async (key) => {
-    await config({ [key]: "touch pwned" });
-    const { code, json } = await h.cli("render");
-    expect(code).toBe(2);
-    expect(json.error.code).toBe("bad-config");
-  });
-
   test("a buildCommand isn't run unless someone asks, since a checkout must not run a shell by itself", async () => {
     const marker = path.join(h.scratch, "ran");
-    await writeFile(path.join(h.repo, "selfie.config.json"), JSON.stringify({ ...TEST_CONFIG, buildCommand: `touch ${marker}` }));
+    await writeTestConfig(h.repo, { buildCommand: `touch ${marker}` });
     h.stories = [{ id: "a" }];
     await h.cli("render");
     await expect(access(marker)).rejects.toThrow();
@@ -262,7 +255,7 @@ describe("the config's storybookDir", () => {
 });
 
 describe("hunkMergeDistance", () => {
-  const config = (value: unknown) => writeFile(path.join(h.repo, "selfie.config.json"), JSON.stringify({ ...TEST_CONFIG, ...(value as object) }));
+  const config = (value: object) => writeTestConfig(h.repo, value);
 
   test("groups what a review shows, and never what it compares", async () => {
     const one = await record();
@@ -364,7 +357,7 @@ describe("selfie review --baseline", () => {
 
   test("exits 2 for a batch in another environment", async () => {
     const one = await record();
-    await writeFile(path.join(h.repo, "selfie.config.json"), JSON.stringify({ ...TEST_CONFIG, environment: { scale: 2 } }));
+    await writeTestConfig(h.repo, { environment: { scale: 2 } });
     const two = await record();
     const refused = await h.cli("review", two.json.batchId, "--baseline", one.json.batchId);
     expect(refused.code).toBe(2);

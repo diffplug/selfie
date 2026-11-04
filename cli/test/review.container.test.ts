@@ -5,7 +5,7 @@ import { access, cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { decodeImage, TEST_CONFIG, git } from "./support.ts";
+import { decodeImage, TEST_CONFIG, git, writeTestConfig } from "./support.ts";
 import { afterAll, beforeAll, describe, expect, test, beforeEach } from "vitest";
 import { openProject } from "../src/project.ts";
 import { commit, createRepo } from "./support.ts";
@@ -73,7 +73,7 @@ describe.runIf(process.env.SELFIE_CLI_CONTAINER === "1")("in the pinned containe
       path.join(repo, "paint.js"),
       `addEventListener("DOMContentLoaded", () => { document.documentElement.style.filter = "invert(1)"; });`,
     );
-    await writeFile(path.join(repo, "selfie.config.json"), JSON.stringify({ ...TEST_CONFIG, initScript: "paint.js" }));
+    await writeTestConfig(repo, { initScript: "paint.js" });
     const changed = await review(...STORIES);
     expect(changed.status).toBe(1);
     expect(changed.json.counts.changed).toBe(2);

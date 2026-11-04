@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, test } from "vitest";
 import { runCli } from "../src/cli.ts";
 import { localReviewSource } from "../src/ui.ts";
 import { UNKNOWN_BATCH, h, project, clientDir, review } from "./ui-support.ts";
-import { TEST_CONFIG } from "./support.ts";
+import { TEST_CONFIG, writeTestConfig } from "./support.ts";
 
 describe("selfie ui", () => {
   const serve = async (command: string, ...argv: string[]) => {
@@ -70,7 +70,7 @@ describe("selfie ui", () => {
       await writeFile(path.join(dir(), "iframe.html"), "<!doctype html><title>the preview</title>");
       await writeFile(path.join(dir(), "index.json"), JSON.stringify({ entries: { a: { type: "story", id: "a" } } }));
     };
-    const config = (fields: Record<string, unknown>) => writeFile(path.join(h.repo, "selfie.config.json"), JSON.stringify({ ...TEST_CONFIG, ...fields }));
+    const config = (fields: Record<string, unknown>) => writeTestConfig(h.repo, fields);
     /** A build the config says how to run, which leaves a mark at the top level it ran from. */
     const buildScript = async () => {
       const script = path.join(h.scratch, "build.mjs");

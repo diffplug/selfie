@@ -140,6 +140,10 @@ export const git = (cwd: string, ...args: string[]): string =>
 /** What every test repository starts with, committed. A test that changes it commits that, or it reads as dirty. */
 export const TEST_CONFIG = { storybookDir: "storybook-static", buildCommand: "true" };
 
+/** Byte for byte what's committed, with no overrides. */
+export const writeTestConfig = (repo: string, overrides: object = {}) =>
+  writeFile(path.join(repo, "selfie.config.json"), `${JSON.stringify({ ...TEST_CONFIG, ...overrides }, null, 2)}\n`);
+
 let repoTemplate: Promise<string> | undefined;
 
 /** Made once per test file, since nearly every test wants one, and copying it costs no Git processes. */
@@ -155,7 +159,7 @@ const templateRepo = () =>
     git(repo, "config", "commit.gpgsign", "false");
     // A commit starts this in the background, whose lock file could vanish in the middle of a copy.
     git(repo, "config", "maintenance.auto", "false");
-    await writeFile(path.join(repo, "selfie.config.json"), `${JSON.stringify(TEST_CONFIG, null, 2)}\n`);
+    await writeTestConfig(repo);
     await writeFile(path.join(repo, ".gitignore"), `${TEST_CONFIG.storybookDir}\n`);
     git(repo, "add", "selfie.config.json", ".gitignore");
     await commit(repo, "first");

@@ -7,7 +7,7 @@ import { buildAcceptDocument, buildRenderDocument, buildReviewDocument } from ".
 import { SelfieError } from "./errors.ts";
 import { gitUserEmail, resolveCommit } from "./git.ts";
 import { compareAsReviewed, findBaseline, openProject, type Project } from "./project.ts";
-import { buildIfAsked, renderBatch, review, replyToNote } from "./review.ts";
+import { renderBatch, review, replyToNote, runBuild } from "./review.ts";
 import { summarizeBatch } from "./summary.ts";
 import { findBaselineWithRemote, pull, push, requireRemote, resolveRemote, type Fetch } from "./sync.ts";
 import { isNoteId, isNoteText, MAX_NOTE_CHARACTERS } from "selfie-ui/notes";
@@ -95,9 +95,9 @@ const USAGE = `Usage: selfie [--port <n>] [--native] [--no-build] [--no-open]
 
 Local data lives under ~/.config/selfie/<git-origin-slugified>/, or $SELFIE_HOME instead of
 ~/.config/selfie. A project configures Selfie in selfie.config.json at its Git top level, and
-nowhere else. Every command that renders or compares needs one, holding at least storybookDir and
-buildCommand, which only selfie alone and --build run, from that top level. It may also set
-environment, initScript, settleMs, storyTimeoutMs, and hunkMergeDistance. A story pattern matches IDs, where * matches any batch of characters.
+nowhere else. selfie alone, render, review, flakes, find-baseline, ui, push, and pull need one,
+holding at least storybookDir and buildCommand, which only selfie alone and --build run, from that
+top level. It may also set environment, initScript, settleMs, storyTimeoutMs, and hunkMergeDistance. A story pattern matches IDs, where * matches any batch of characters.
 `;
 
 /** What a command reaches the outside through, so tests can supply their own. */
@@ -198,7 +198,7 @@ async function serveReview(
   const settings = await resolveRenderSettings(project.repo, { native });
   const dir = settings.storybookDir;
   if (forStories !== undefined) {
-    if (forStories.build) await buildIfAsked(settings.buildCommand, project.repo.root, context.signal, (line) => context.stderr(`${line}\n`));
+    if (forStories.build) await runBuild(project, settings, context.signal, (line) => context.stderr(`${line}\n`));
     if (!isBuiltStorybook(dir)) context.stderr(`There's no built Storybook at ${dir} yet. The page says what to do.\n`);
   }
   const servers = await serveReviewWithStorybook({
@@ -247,7 +247,7 @@ function openEveryStory(args: string[], context: Context): Promise<number> {
 
 function batchOptionsFrom(values: ReturnType<typeof parse<typeof BUILD_OPTIONS>>["values"], context: Context) {
   return {
-    buildFromConfig: values.build,
+    build: values.build,
     native: values.native,
     stories: values.story,
     render: context.render,

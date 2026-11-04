@@ -4,7 +4,7 @@ import type { RenderOptions } from "selfie-render";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { runCli } from "../src/cli.ts";
 import { SKILLS } from "../src/skills.ts";
-import { BLUE, createHarness, GREEN, RED, type Harness, TEST_CONFIG } from "./support.ts";
+import { BLUE, createHarness, GREEN, RED, type Harness, writeTestConfig } from "./support.ts";
 
 let h: Harness;
 /** What each render makes, in turn. */
@@ -120,7 +120,7 @@ describe("selfie skill", () => {
 });
 
 describe("a project's recipe and timings", () => {
-  const config = (settings: unknown) => writeFile(path.join(h.repo, "selfie.config.json"), JSON.stringify({ ...TEST_CONFIG, ...(settings as object) }));
+  const config = (settings: object) => writeTestConfig(h.repo, settings);
   const seen: RenderOptions[] = [];
 
   beforeEach(() => {

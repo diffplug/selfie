@@ -303,7 +303,7 @@ Source of truth: `cli/src/flakes.ts`, `cli/src/skills.ts`, `cli/skills/`; tests 
 
 Source of truth: `cli/src/config.ts`.
 
-`selfie.config.json` at the Git top level is the only place a project configures Selfie. It's required, by every command that reads it, which is all but `approve`, `reject`, `notes`, `reply`, `agent-await-feedback`, and `skill`:
+`selfie.config.json` at the Git top level is the only place a project configures Selfie. `selfie` alone, `render`, `review`, `flakes`, `find-baseline`, `ui`, `push`, and `pull` require it:
 
 | Key | Meaning |
 |---|---|
@@ -317,9 +317,9 @@ Source of truth: `cli/src/config.ts`.
 
 - **Must refuse, with exit 2, a repository with no config, or one missing a required key**, and show what to write, and that `selfie skill quickstart` is a guide for a coding agent (rationale).
 - **May let `--native` win over its `runner`.**
-- **Never take a flag or environment variable for anything about the project.** Those describe this machine or this one command, such as `--native`, `--story`, and `SELFIE_HOME` (rationale).
+- **Never take a flag or environment variable for anything about the project.** Those describe this machine or this one command, such as `--native`, `--story`, and `SELFIE_HOME`, or a server, as `--remote` does (`docs/specs/sync.md` → Commands) (rationale).
 - **Must refuse an unknown key**, so a typo can't silently render the wrong environment.
-- **Must run `buildCommand` only when a person asks: `selfie` alone, or `--build` on `render` or `review`, and never from a page or by default**, printing it first, so a checkout can only run a command on someone who asked for its built Storybook (rationale).
+- **Must run `buildCommand` only when a person asks: `selfie` alone, or `--build` on `render`, `review`, or `flakes`, and never from a page or by default**, printing it first, so a checkout can only run a command on someone who asked for its built Storybook (rationale).
 
 ## Untrusted input
 

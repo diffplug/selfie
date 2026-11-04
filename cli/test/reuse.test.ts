@@ -7,7 +7,7 @@ import path from "node:path";
 import { defineEnvironment, renderIdentity } from "selfie-render";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { openProject } from "../src/project.ts";
-import { BLUE, commit, createHarness, git, type Harness, TEST_CONFIG } from "./support.ts";
+import { BLUE, commit, createHarness, git, type Harness, TEST_CONFIG, writeTestConfig } from "./support.ts";
 
 let h: Harness;
 let build: string;
@@ -24,7 +24,7 @@ const record = (...flags: string[]) => onBuild("render", flags);
 let commits = 0;
 /** A new commit the built Storybook doesn't hold, since a batch is per commit. */
 const newCommit = () => commit(h.repo, `elsewhere ${++commits}`);
-const writeConfig = (config: unknown) => writeFile(path.join(h.repo, "selfie.config.json"), JSON.stringify({ ...TEST_CONFIG, ...(config as object) }));
+const writeConfig = (config: object) => writeTestConfig(h.repo, config);
 const inBuild = (file: string) => path.join(build, file);
 const reasons = (list: readonly any[]) => list.map(({ reason }) => reason);
 const pruneBatches = async () => rm(path.join(h.home, (await readdir(h.home))[0]!, "batches"), { recursive: true });

@@ -5,7 +5,7 @@ import { createLocalApp, createStorybookApp, serveLocal, serveStorybook } from "
 import { beforeEach, describe, expect, test } from "vitest";
 import { openProject } from "../src/project.ts";
 import { localReviewSource, type RenderStories } from "../src/ui.ts";
-import { commit, git, TEST_CONFIG } from "./support.ts";
+import { commit, git, TEST_CONFIG, writeTestConfig } from "./support.ts";
 import { PORT, HOST, ORIGIN, h, project, clientDir, app, review, get, change } from "./ui-support.ts";
 
 describe("the hosted Storybook", () => {
@@ -242,7 +242,7 @@ describe("the hosted Storybook", () => {
       const setup = async () => (await live()).setup;
       expect(await setup()).toEqual({ storybookDir: expect.any(String), buildCommand: TEST_CONFIG.buildCommand, uncommitted: [], builtBeforeHead: false, usesDocker: true });
       expect((await live()).branch).toBe("main");
-      await writeFile(path.join(h.repo, "selfie.config.json"), JSON.stringify({ ...TEST_CONFIG, buildCommand: "make stories" }));
+      await writeTestConfig(h.repo, { buildCommand: "make stories" });
       expect(await setup()).toMatchObject({ buildCommand: "make stories", uncommitted: ["selfie.config.json"] });
     });
 
@@ -265,7 +265,7 @@ describe("the hosted Storybook", () => {
       expect((await localReviewSource(project, { storybook: { dir, url: hostedAt, renderStories: record } }).storiesView()).canRender).toBe(true);
       const empty = path.join(h.scratch, "no-commits");
       git(h.scratch, "init", "--quiet", "--initial-branch=main", empty);
-      await writeFile(path.join(empty, "selfie.config.json"), JSON.stringify(TEST_CONFIG));
+      await writeTestConfig(empty);
       const uncommitted = await openProject({ cwd: empty, env: { SELFIE_HOME: h.home } });
       const view = await localReviewSource(uncommitted, { storybook: { dir, url: hostedAt, renderStories: record } }).storiesView();
       expect(view).toMatchObject({ head: null, canRender: false });
@@ -423,7 +423,7 @@ describe("the hosted Storybook", () => {
       await built();
       const before = await reviewedBuild();
       expect((await hosted().batchView(before)).viewport).toEqual({ width: 1200, height: 900 });
-      await writeFile(path.join(h.repo, "selfie.config.json"), JSON.stringify({ ...TEST_CONFIG, environment: { viewport: { width: 640, height: 480 } } }));
+      await writeTestConfig(h.repo, { environment: { viewport: { width: 640, height: 480 } } });
       expect((await hosted().batchView(before)).viewport).toEqual({ width: 1200, height: 900 });
     });
 

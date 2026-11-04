@@ -1,7 +1,7 @@
 // The commands against real Git, a real store, and real files, with only the browser replaced.
 import { access, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { decodeImage, TEST_CONFIG } from "./support.ts";
+import { decodeImage, TEST_CONFIG, writeTestConfig } from "./support.ts";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { encodePng } from "../src/png.ts";
 import { BLUE, commit, createHarness, git, GREEN, RED, solid, type Harness } from "./support.ts";
@@ -21,7 +21,7 @@ const exists = (file: string) =>
   );
 const reasons = (list: readonly any[]) => list.map(({ reason }) => reason);
 const review = (...flags: string[]) => h.cli("review", ...flags);
-const writeConfig = (config: unknown) => writeFile(path.join(h.repo, "selfie.config.json"), JSON.stringify({ ...TEST_CONFIG, ...(config as object) }));
+const writeConfig = (config: object) => writeTestConfig(h.repo, config);
 const projectDirectory = async () => path.join(h.home, (await readdir(h.home)).find((name) => name !== "d1.env")!);
 
 /** Reviews, approves all, and accepts, so `h.stories` become the goldens of HEAD. */
@@ -267,7 +267,7 @@ describe("comparing with a baseline", () => {
     expect(reviewed.json.baseline.sha).toBeNull();
     expect(reviewed.json.counts.added).toBe(3);
 
-    await writeFile(path.join(h.repo, "selfie.config.json"), JSON.stringify(TEST_CONFIG));
+    await writeTestConfig(h.repo);
     expect((await h.cli("find-baseline")).json.sha).not.toBeNull();
   });
 });

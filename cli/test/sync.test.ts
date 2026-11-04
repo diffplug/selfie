@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { runCli } from "../src/cli.ts";
 import { encodePng } from "../src/png.ts";
 import { openProject, type Project } from "../src/project.ts";
-import { commit, createHarness, fakeRender, git, GREEN, RED, solid, type FakeStory, type Harness, TEST_CONFIG } from "./support.ts";
+import { commit, createHarness, fakeRender, git, GREEN, RED, solid, type FakeStory, type Harness, writeTestConfig } from "./support.ts";
 
 const REMOTE = "http://127.0.0.1:9";
 /** What the cloud would answer, in the shape the client calls it. */
@@ -272,7 +272,7 @@ describe("the remote", () => {
   });
 
   test("comes from no file in a checkout", async () => {
-    await writeFile(path.join(h.repo, "selfie.config.json"), JSON.stringify({ ...TEST_CONFIG, remote: "https://evil.example" }));
+    await writeTestConfig(h.repo, { remote: "https://evil.example" });
     expect(await plain({ SELFIE_TOKEN: "x" }, "push")).toBe(2);
   });
 

@@ -198,7 +198,7 @@ export interface ListedStory {
 export interface StorySetup {
   /** Where it looks for a built Storybook, from the Git top level. */
   readonly storybookDir: string;
-  /** How the config says to build one, if it does. */
+  /** How the config says to build one. */
   readonly buildCommand: string;
   /** What differs from HEAD now, as Git names it, which a render now would be marked with. */
   readonly uncommitted: readonly string[];

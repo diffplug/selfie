@@ -1,6 +1,6 @@
 import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { decodeImage, TEST_CONFIG } from "./support.ts";
+import { decodeImage, TEST_CONFIG, writeTestConfig } from "./support.ts";
 import { type StoriesView } from "selfie-ui/app";
 import { describe, expect, test } from "vitest";
 import { BLUE, commit, git } from "./support.ts";
@@ -145,7 +145,7 @@ describe("a batch's scale", () => {
     h.stories = [{ id: "a--one" }];
     const standard = (await review()).json;
     expect((await viewOf(standard.batchId)).batch.scale).toBe(1);
-    await writeFile(path.join(h.repo, "selfie.config.json"), JSON.stringify({ ...TEST_CONFIG, environment: { scale: 1.5 } }));
+    await writeTestConfig(h.repo, { environment: { scale: 1.5 } });
     const scaled = (await review()).json;
     expect(scaled.environment).not.toBe(standard.environment);
     expect((await viewOf(scaled.batchId)).batch.scale).toBe(1.5);
