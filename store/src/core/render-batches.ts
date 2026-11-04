@@ -363,7 +363,7 @@ export class BatchError extends Error {
   }
 }
 
-export interface RenderBatchesOptions {
+export interface RenderBatchesPlumbing {
   readonly sql: Sql;
   /** Defaults to `Date.now`. Tests inject one to control time. */
   readonly now?: () => number;
@@ -377,7 +377,7 @@ export class RenderBatches {
   readonly #sql: Sql;
   readonly #now: () => number;
 
-  constructor({ sql, now = Date.now }: RenderBatchesOptions) {
+  constructor({ sql, now = Date.now }: RenderBatchesPlumbing) {
     this.#sql = sql;
     this.#now = now;
   }
