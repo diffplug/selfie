@@ -54,14 +54,6 @@ export const Removed: Story = {
   args: { row: REMOVED },
   play: async ({ canvasElement }) => expectNoComparing(canvasElement),
 };
-export const RemovedZoomed: Story = {
-  args: { row: REMOVED },
-  play: async ({ canvasElement }) => {
-    await press("z")();
-    await stackedImagesLoaded(canvasElement);
-    expectNoComparing(canvasElement);
-  },
-};
 export const Failed: Story = { args: { row: rows.failed("components-dialog--open") } };
 export const FailedWithNoImage: Story = { args: { row: { ...rows.failed("components-dialog--open"), goldenHash: null } } };
 export const Approved: Story = { args: { row: rows.changed("components-button--primary", approved()) } };

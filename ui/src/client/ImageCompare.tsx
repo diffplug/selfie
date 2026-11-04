@@ -38,7 +38,8 @@ interface Source {
 function sourcesOf({ imageHash, goldenHash }: RenderRow, hasDiffImage: boolean, noted: string | null, compared: string | null): readonly Source[] {
   const sources: Source[] = [];
   if (noted !== null && noted !== imageHash && noted !== goldenHash) sources.push({ name: "noted", src: imageUrl(noted), hash: noted });
-  if (goldenHash !== null) sources.push({ name: "golden", src: imageUrl(goldenHash), hash: goldenHash });
+  // The same image twice is still one image to look at, as an unchanged story's are.
+  if (goldenHash !== null && goldenHash !== imageHash) sources.push({ name: "golden", src: imageUrl(goldenHash), hash: goldenHash });
   if (imageHash !== null) sources.push({ name: "current", src: imageUrl(imageHash), hash: imageHash });
   if (hasDiffImage && imageHash !== null && compared !== null) sources.push({ name: "diff", src: diffImageUrl(imageHash, compared), hash: imageHash });
   return sources;
