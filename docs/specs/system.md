@@ -20,7 +20,7 @@ Source of truth: `store/src/core/render-batches.ts`. `docs/specs/renders.md` →
 
 - **Must not make a user re-approve a render change at a new Git SHA in the same store.** `docs/specs/renders.md` → Approvals owns what history reaches.
 
-Reserved: this is the local half of [carrying approvals through a push](#approvals-across-stores).
+- **Must not make a user re-approve at push a render change they already approved locally.** A user can approve changes on an unpushed PR, and those approvals carry through the push, since `docs/specs/sync.md` moves decisions with the commit each counts from.
 
 ## Local CLI
 
@@ -46,10 +46,6 @@ An agent skill could help a project test its own setup and find an environment t
 ### Opaque images only
 
 Selfie is for fully opaque images, and transparency is never allowed: `docs/specs/store.md` → Image identity owns the rule, and `docs/specs/store.md` → Image decoding what happens to an image with alpha.
-
-### Approvals across stores
-
-- **Must not make a user re-approve at push a render change they already approved locally.** A user can approve changes on an unpushed PR, and those approvals carry through the push. The record is built ([Approvals](#approvals)). `docs/specs/sync.md` moves decisions with the commit each counts from, and what's left is **Scope: approvals-sync** (`docs/specs/renders.md` → Future).
 
 ### Cloud data
 

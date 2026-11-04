@@ -1,9 +1,9 @@
 # RenderBatches
 
-> Status: built — the data layer for batches, comparisons, decisions, and approvals, on local SQLite and D1. `selfie review` calls it (`docs/specs/cli.md`), and so does the review UI (`docs/specs/ui.md`). Goldens remain for `docs/specs/sync.md` alone. See `## Future`.
+> Status: built — the data layer for batches, comparisons, decisions, and approvals, on local SQLite and D1. `selfie review` calls it (`docs/specs/cli.md`), and so does the review UI (`docs/specs/ui.md`). See `## Future`.
 >
-> - See `docs/specs/glossary.md` for render, render name, batch, decision, approval, reference, and golden.
-> - Owns what a batch holds, how a crash leaves one, render states, decisions, approvals, and goldens. `docs/specs/system.md` owns why approvals carry through a push and why environments are part of a name. `docs/specs/store.md` owns image identity, image keys, and the `Sql` rules everything here obeys.
+> - See `docs/specs/glossary.md` for render, render name, batch, decision, approval, and reference.
+> - Owns what a batch holds, how a crash leaves one, render states, decisions, and approvals. `docs/specs/system.md` owns why approvals carry through a push and why environments are part of a name. `docs/specs/store.md` owns image identity, image keys, and the `Sql` rules everything here obeys.
 
 ## Render names
 
@@ -14,7 +14,7 @@ A name is two strings: `story` and `environment`.
 - **Must treat both as opaque, compared exactly.** They come from the renderer. A render variant that isn't part of the environment goes in the story ID, in one canonical form its caller owns (rationale).
 - **Must refuse either being empty or holding NUL.**
 - **Must take the environment from the batch, for every render it holds.** Rows hold only the story, so a batch can't mix environments.
-- **Never compare a batch with a reference or goldens, or apply a decision, from another environment.** Every such query takes its environment from the batch.
+- **Never compare a batch with a reference, or apply a decision, from another environment.** Every such query takes its environment from the batch.
 
 ## Render batches
 
@@ -34,7 +34,7 @@ A batch is one recording of a set of renders against one full Git SHA in one env
 - **Must record a story that failed to render as a row with its failure message**, never leave it absent, so only a `recording` batch can lack a story. A message is cut to 2,000 characters.
 - **Must record a story that rendered and then failed, such as by its play function throwing, with both its image and its failure**, so what it looked like is there to work out why. It's `failed` like any other, and `failure` is what says a story failed (`docs/specs/cli.md` → What blocks).
 - **Must refuse a render whose image isn't stored**, so a row's image is always here. A `CHECK` requires a row to have an image, a failure, or both. Rows hold image keys, and the API only takes and returns image hashes, per `docs/specs/store.md` → Image identity.
-- **Must let a batch's newest result for a name replace the older one until it is finished**, and refuse any change after that, since a finished batch may hold goldens. **May set `storybook_key` after that**, since it's only known once a built Storybook is kept, and changes nothing a comparison reads.
+- **Must let a batch's newest result for a name replace the older one until it is finished**, and refuse any change after that, since decisions and later batches read it. **May set `storybook_key` after that**, since it's only known once a built Storybook is kept, and changes nothing a comparison reads.
 - **Must mark a batch finished only in a statement that counts its rows against the number the caller expected.** A batch that never landed fails that count, and the batch stays `recording`.
 - **Must refuse to compare a `recording` batch**, since a render it doesn't hold yet would read as removed.
 
@@ -46,15 +46,15 @@ A batch is one recording of a set of renders against one full Git SHA in one env
 |---|---|---|
 | A process crashes while `recording`, at any point | A `recording` batch, stopped for good, holding any part of its renders: on D1 a failed request may be rolled back, and on local SQLite its earlier statements stay | Start a new batch. `batchesAt` keeps listing the old one as `recording` |
 | A `recordRenders` call fails, and the process lives | The same, with the batch still usable | Send the same renders again |
-| `finishBatch` or `acceptBatch` fails | Each statement is atomic, so the old state or the new | Call it again |
+| `finishBatch` fails | Each statement is atomic, so the old state or the new | Call it again |
 | A `decide` across requests fails | The earlier requests decided | Call it again |
 
 - **Never resume a crashed batch**, since nothing reads back what one holds. A batch received from another store is the exception: `receiveBatch` says how far it got, and its sender has all of it to send again.
-- **Must mark every statement idempotent, and keep that true**: each returns the same rows and changes nothing further when resent after a lost response (`docs/specs/store.md` → Adapters). `finishBatch` keeps its first finish time. `acceptBatch` on the batch already accepted succeeds whatever it is told. `decide` and `acceptBatch` overwrite whatever is there, so a resend can undo another writer's change made since the first send (rationale).
+- **Must mark every statement idempotent, and keep that true**: each returns the same rows and changes nothing further when resent after a lost response (`docs/specs/store.md` → Adapters). `finishBatch` keeps its first finish time. `decide` overwrites whatever is there, so a resend can undo another writer's change made since the first send (rationale).
 
 ## Compare
 
-Source of truth: `compareWithApprovals` and `RenderBatches.compareFromHistory`, `compareBatch`, and `compareWithBatch` in `store/src/core/render-batches.ts`.
+Source of truth: `compareWithApprovals` and `RenderBatches.compareFromHistory`, `compareReached`, and `compareWithBatch` in `store/src/core/render-batches.ts`.
 
 - **Must compare by image alone: the same hash is the same image.** Pixel diffs belong to `selfie review` (`docs/specs/cli.md` → Review).
 - **Must give each render exactly one state**, of which `changed`, `added`, and `removed` are the ones `isDecidable`:
@@ -68,8 +68,7 @@ Source of truth: `compareWithApprovals` and `RenderBatches.compareFromHistory`, 
 | `removed` | Nothing | An image |
 
 - **Must list only what isn't `unchanged`, by default, with a count of every `unchanged` render.** `includeUnchanged` lists them all (rationale).
-- **`compareWithBatch` must compare with a finished batch in the batch's environment**, whose images stand in for the reference, and refuse any other with `no-baseline-batch`. A story that batch left out by a filter reads as `added`. **Never let `acceptBatch` take a batch as its baseline.**
-- **`compareBatch`, which only sync uses, must refuse a baseline SHA that has no goldens in the batch's environment**, rather than report everything as added. A null baseline means there are none yet, and gives `added` and `failed` only.
+- **`compareWithBatch` must compare with a finished batch in the batch's environment**, whose images stand in for the reference, and refuse any other with `no-baseline-batch`. A story that batch left out by a filter reads as `added`. 
 - **Must return the decision on exactly the batch's image for that name, or on the story being gone**, whatever the state, so `selfie review` can show what is already approved. `compareFromHistory` takes the decisions from `decisionsAt`, and returns one only if it's no older than the reference's approval ([Approvals](#approvals)).
 
 ## Decisions
@@ -89,6 +88,7 @@ Source of truth: `compareWithApprovals` and `RenderBatches.compareFromHistory` i
 
 **A story's reference at a commit is the image of its newest approval that commit's history reaches.** Nothing has to be accepted, promoted, or rendered again on the default branch.
 
+- **May assume a repository only ever merges with merge commits**, never a squash, or a rebase onto its default branch, so that what was approved on a pull request's commits stays in the merged commit's history (rationale).
 - **Must reach, from a batch: its commit's ancestors through every parent, up to 1,000 commits, and if it's on a branch other than the default, every commit its branch's batches were recorded at, from the earliest author time of the commits that branch has and the default doesn't, up to when this batch started** (rationale). A branch with no commits of its own reaches only its ancestors. A detached batch reaches only its ancestors. A commit this clone doesn't have reaches only itself.
 - **Must leave Git to the caller.** The store is told which commits are reachable, and runs no Git.
 - **Must leave out approvals made on the batch being compared**, or a story would read as unchanged the moment someone approved it, and vanish from its review. Later batches see them, including later ones at the same commit (rationale).
@@ -98,22 +98,6 @@ Source of truth: `compareWithApprovals` and `RenderBatches.compareFromHistory` i
 - **Never read a story that a batch's filter left out as gone.** It's for `summarizeBatch` to set these apart (`docs/specs/cli.md` → What blocks), and they take no decision.
 - **Must let a batch recorded on a dirty tree take approvals**, which count from its commit.
 - **Must read one commit list as one statement**, however long, so that history isn't a statement per commit (rationale).
-
-## Goldens
-
-Source of truth: `RenderBatches.acceptBatch`, `acceptedBatchAt`, and `firstWithGoldens` in `store/src/core/render-batches.ts`.
-
-Goldens are per Git SHA and environment, and are the images of the one batch accepted there. Only `docs/specs/sync.md` still uses them: nothing local makes or reads them but `selfie pull`, and it reads no comparison from them. A reader finds them as `goldenHash` in `compareBatch`.
-
-- **Must make a SHA's goldens exist whole or not at all**, so `acceptedBatchAt` only asks whether a batch was accepted there. A SHA with no accepted batch has no goldens, however many of its images are approved (rationale).
-- **Must accept only a `complete` batch whose every image either matches the baseline's for that name or is approved at exactly that hash.** `acceptBatch` otherwise returns false and changes nothing, and `compareBatch` shows which. A null baseline means every image needs an approval.
-- **Must refuse a batch recorded on a dirty tree with `batch-dirty`**, since a SHA's goldens must describe that commit, and this holds for every caller (rationale).
-- **Must be told how many removed renders the reviewer saw, and must refuse a different number with `wrong-removed-count`**, so a filtered render or a discovery bug can't silently drop goldens. A removed render needs no decision of its own, since no image is being accepted (rationale).
-- **Must check and write in one statement**, so nothing can change between them.
-- **Must let a later accepted batch replace a SHA's goldens.** `acceptedBatchAt` says which batch's they are now.
-- **Must let `adoptGoldens` take a batch as a SHA's goldens without the checks of accepting, since the store that decides them made those, but never a `recording` or `failed` one, or one from a dirty tree.** It's only for `docs/specs/sync.md`.
-- **May leave finding the SHA to the caller.** Nothing here runs Git. `selfie pull` gives `firstWithGoldens` its merge-base candidates, nearest first.
-- **Must answer `firstWithGoldens` in the order asked, with one query per 99 SHAs, and none after the group holding the answer**, so a walk of 1,000 commits costs at most about 10 requests, and usually one.
 
 ## Schema
 
@@ -131,7 +115,6 @@ renders(batch_key → render_batches.key, story_key → stories.key, image_key �
 decisions(environment_key → environments.key, commit_key → commits.key, story_key → stories.key, image_key, rejected, decided_at, actor_key → actors.key, batch_id)  PK (environment_key, commit_key, story_key, image_key)  WITHOUT ROWID
   INDEX decisions_by_image(environment_key, story_key, image_key)
 commit_parents(commit_key → commits.key, parent_key → commits.key)  PK (commit_key, parent_key)  WITHOUT ROWID
-goldens(commit_key → commits.key, environment_key → environments.key, batch_key → render_batches.key)  PK (commit_key, environment_key)  WITHOUT ROWID
 ```
 
 - **Must leave out the CLI's local table** (`docs/specs/cli.md` → Recording only if necessary): it's in a local `store.db`, not this schema, and D1 doesn't have it.
@@ -154,19 +137,14 @@ Source of truth: `store/src/core/render-batches.ts`; `store/test/render-batches.
 
 ### Approvals from history in the cloud
 
-**Scope: approvals-sync** — The local half is built ([Approvals](#approvals)). What's left, which replaces the goldens above:
-
-- A commit's history also reaches the commits of any pull request merged at one of its ancestors, whatever they were, since a squash, a rebase, or a force-push leaves them out of Git's history. Before a merge, it reaches its own pull request's commits. A pull request ties a branch to its merge commit when it merges.
-- A removal's decision goes across sync, which only sends decisions on a batch's images.
-- A pull request's check is red if a story failed, yellow if anything's undecided, and green if every story matches its reference.
-- Then these go: `POST /goldens`, the goldens table, `acceptBatch`, `compareBatch`, `adoptGoldens`, and `firstWithGoldens`.
+**Scope: approvals-sync** — Approvals work the same in the cloud (`docs/specs/cloud.md` → Without Git or a decoder) and move through `docs/specs/sync.md`. What's left is what's open below.
 
 Open:
 
+- **Squash and rebase merges.** Out of scope for now. Supporting them would need a commit's history to also reach the commits of any pull request merged at one of its ancestors, and a pull request tied to its merge commit when it merges.
 - **Known limit: history stops at 1,000 commits.** A story whose newest approval is further back has no reference, and reads as added. It's accepted for now, and a cache will replace it. Only approvals count, so this starts to matter 1,000 commits after a project's first approval, however long its history was before that.
 - Whether the reference needs a derived table for the cloud. Locally it doesn't (rationale). If it does, that table can always be rebuilt, and is never a source of truth.
-- With no remote, a squash or a rebase onto the default branch leaves no pull request to follow, so its approvals are out of reach, and it asks again. A commit whose Git tree matches an approved batch's commit might carry them.
-- A shallow clone can't walk its history, so CI needs a full clone, or to ask the store.
+- A shallow clone can't walk its history, so CI needs a full clone.
 - An approval on a branch with no commits of its own lands on a commit the default branch also has, so it counts there too.
 
 ### Decisions on hunks
@@ -186,4 +164,4 @@ Every batch writes every row. At 10,000 renders a batch and an assumed 100 batch
 
 ### Open questions
 
-- **Retention.** Every batch keeps its rows, and nothing deletes one. Deleting needs to keep any batch a golden points at, and `docs/specs/store.md` → Image keys forbids reusing a key, so `render_batches` would need a rule of its own.
+- **Retention.** Every batch keeps its rows, and nothing deletes one. Deleting needs to keep what approvals' batches a reference links to, and `docs/specs/store.md` → Image keys forbids reusing a key, so `render_batches` would need a rule of its own.

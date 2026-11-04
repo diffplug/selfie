@@ -76,15 +76,14 @@ const USAGE = `Usage: selfie [--port <n>] [--native] [--no-build] [--no-open]
       notes, 3 if --timeout passed first so it's worth asking again, 130 if stopped by a signal, or
       2 if another agent is already waiting here.
 
-  push [<batch>] [--accept] [--remote <url>] [--native]
-      Sends a batch to the remote, by default the newest from a clean tree at HEAD, and its goldens
-      if it's accepted here or --accept asks, which is what CI uses after render. Needs its commit
-      on GitHub. Safe to run again. Exits 1 if its goldens were refused or there's a different batch
-      there already.
+  push [<batch>] [--remote <url>] [--native]
+      Sends a batch to the remote, by default the newest from a clean tree at HEAD, with its
+      built Storybook, and decisions if the token may decide. Needs its commit on GitHub. Safe to
+      run again.
 
   pull [<commit>] [--remote <url>] [--native]
-      Takes a commit's goldens from the remote, by default the nearest baseline it has, replacing
-      any here. Exits 1 if it has none.
+      Takes the decisions a commit reaches from the remote, by default HEAD's, and the images they
+      name, so a review here reads that commit as the remote does. Safe to run again.
 
 Local data lives under ~/.config/selfie/<git-origin-slugified>/, or $SELFIE_HOME instead of
 ~/.config/selfie. A project configures Selfie in selfie.config.json at its Git top level, and
@@ -347,14 +346,13 @@ async function dispatch(command: string | undefined, args: string[], context: Co
       });
     }
     case "push": {
-      const { values, positionals } = parse(args, { accept: { type: "boolean" }, remote: { type: "string" }, native: { type: "boolean" } });
+      const { values, positionals } = parse(args, { remote: { type: "string" }, native: { type: "boolean" } });
       const [batch, ...extra] = positionals;
       if (extra.length > 0) throw new SelfieError("usage", "Expected at most one batch ID.");
       const remote = requireRemote(values.remote, context.env, context.fetch);
       return withProject(context, async (project) => {
-        const result = await push(project, remote, { batch, accept: values.accept, native: values.native });
-        printJson(context, result);
-        return result.goldens === null || result.goldens.outcome === "accepted" || result.goldens.outcome === "already" ? EXIT_OK : EXIT_NEEDS_ATTENTION;
+        printJson(context, await push(project, remote, { batch, native: values.native }));
+        return EXIT_OK;
       });
     }
     case "pull": {
@@ -365,9 +363,8 @@ async function dispatch(command: string | undefined, args: string[], context: Co
       return withProject(context, async (project) => {
         const sha = commit === undefined ? undefined : await resolveCommit(project.repo, commit);
         if (sha === null) throw new SelfieError("usage", `"${commit}" isn't a commit here.`);
-        const result = await pull(project, remote, { commit: sha, native: values.native });
-        printJson(context, result);
-        return result.batchId === null ? EXIT_NEEDS_ATTENTION : EXIT_OK;
+        printJson(context, await pull(project, remote, { commit: sha, native: values.native }));
+        return EXIT_OK;
       });
     }
     case "notes": {

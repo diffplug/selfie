@@ -109,7 +109,6 @@ describe.skipIf(!ENABLED)("real D1 renders (opt-in: pnpm test:d1:render-batches)
     await measure("decide", () =>
       batches.decide({ on: ON, environment, decision: "approved", actor: "real-d1-test", renders: items }),
     );
-    expect(await measure("acceptBatch", () => batches.acceptBatch(batch.id, null, 0))).toBe(true);
 
     const head: RecordedRender[] = items.slice(0, RENDERS - REMOVED).map((item, i) =>
       i < CHANGED
@@ -124,8 +123,8 @@ describe.skipIf(!ENABLED)("real D1 renders (opt-in: pnpm test:d1:render-batches)
     const headBatch = await batches.beginBatch({ gitSha: "4".repeat(40), environment, scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, });
     await batches.recordRenders(headBatch.id, head);
     await batches.finishBatch(headBatch.id, head.length);
-    const { renders: compared, unchangedCount } = await measure("compareBatch (differences)", () =>
-      batches.compareBatch(headBatch.id, gitSha),
+    const { renders: compared, unchangedCount } = await measure("compareWithBatch (differences)", () =>
+      batches.compareWithBatch(headBatch.id, batch.id),
     );
 
     console.log(`Real D1 at ${RENDERS} renders:`);

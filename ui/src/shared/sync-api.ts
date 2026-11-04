@@ -18,16 +18,8 @@ export type SentRender = RecordedRender;
 /** A decision as a sender states it, which the server says who it's by. */
 export interface SentDecision extends Omit<DecisionOn, "actor"> {
   readonly story: string;
-  readonly imageHash: string;
-}
-
-export type GoldensOutcome = "accepted" | "already" | "conflict" | "refused";
-
-export interface GoldensAnswer {
-  readonly outcome: GoldensOutcome;
-  /** The batch that's now the commit's goldens, if any. */
-  readonly acceptedBatchId: string | null;
-  readonly refusal: { readonly code: string; readonly message: string } | null;
+  /** Null for a removal. */
+  readonly imageHash: string | null;
 }
 
 export interface SyncError {

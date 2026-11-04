@@ -17,7 +17,7 @@ Source of truth: `cli/src/cli.ts`, `cli/src/document.ts`; the real binary's test
 | `selfie skill <name>` | Prints a guide for a coding agent ([Flakes](#flakes)) |
 | `selfie review [<batch>]` | Prints the diff of a batch against what history has approved. With no batch, uses the one for this built Storybook, and records one [only if necessary](#recording-only-if-necessary) |
 | `selfie approve <batch>`, `selfie reject <batch>` | Records a decision on what a batch changed, added, or removed, with `--all` or `--story <pattern>` |
-| `selfie push`, `selfie pull` | Moves a batch and its goldens to and from a remote (`docs/specs/sync.md`) |
+| `selfie push`, `selfie pull` | Sends a batch to a remote, and takes the decisions a commit reaches from one (`docs/specs/sync.md`) |
 | `selfie notes` | Prints the open notes a person has sent to an agent from this folder (`docs/specs/feedback.md`) |
 | `selfie reply <note> <text>` | Answers a note (`docs/specs/feedback.md`) |
 | `selfie agent-await-feedback` | Blocks until a person sends notes from this folder (`docs/specs/feedback.md`) |

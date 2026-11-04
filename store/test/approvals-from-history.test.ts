@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { compareWithApprovals, imageInsertStatement, RenderBatches, type PlacedDecision, type RenderBatch } from "../src/core/index.ts";
+import { compareWithApprovals, decisionsThatCount, imageInsertStatement, RenderBatches, type PlacedDecision, type RenderBatch } from "../src/core/index.ts";
 import { hashOf } from "./support/sql-params.ts";
 import { createTempStore } from "./support/temp-store.ts";
 
@@ -7,10 +7,11 @@ const THIS = "11111111-1111-4111-8111-111111111111";
 const OTHER = "22222222-2222-4222-8222-222222222222";
 const batch = { id: THIS } as RenderBatch;
 const [A, B, C] = [hashOf(1), hashOf(2), hashOf(3)];
+const SHA = "e".repeat(40);
 
 const render = (story: string, imageHash: string | null) => ({ story, imageHash, failure: imageHash === null ? "broke" : null });
-const approved = (story: string, imageHash: string | null, at: number, batchId = OTHER): PlacedDecision => ({ story, imageHash, decision: "approved", actor: "a", at, batchId });
-const rejected = (story: string, imageHash: string, at: number, batchId = OTHER): PlacedDecision => ({ story, imageHash, decision: "rejected", actor: "a", at, batchId });
+const approved = (story: string, imageHash: string | null, at: number, batchId = OTHER): PlacedDecision => ({ story, imageHash, decision: "approved", actor: "a", at, batchId, gitSha: SHA });
+const rejected = (story: string, imageHash: string, at: number, batchId = OTHER): PlacedDecision => ({ story, imageHash, decision: "rejected", actor: "a", at, batchId, gitSha: SHA });
 
 const states = (rendered: Parameters<typeof compareWithApprovals>[1], decisions: readonly PlacedDecision[]) =>
   compareWithApprovals(batch, rendered, decisions, { includeUnchanged: true }).renders.map(({ story, state, goldenHash, decision }) => [story, state, goldenHash, decision?.decision ?? null]);
@@ -64,6 +65,54 @@ describe("comparing with what history has approved", () => {
 
   it("keeps a failed story's reference, with no decision", () => {
     expect(states([render("s", null)], [approved("s", A, 1)])).toEqual([["s", "failed", A, null]]);
+  });
+});
+
+describe("what another store needs of a history", () => {
+  const ats = (decisions: readonly PlacedDecision[]) => decisions.map(({ story, at }) => [story, at]);
+
+  it("keeps everything back through the second approval, and nothing older", () => {
+    const history = [approved("s", A, 1), rejected("s", C, 2), approved("s", B, 3), rejected("s", A, 4), approved("s", C, 5), rejected("s", B, 6)];
+    expect(ats(decisionsThatCount(history))).toEqual([["s", 6], ["s", 5], ["s", 4], ["s", 3]]);
+  });
+
+  it("does it for each story on its own, whatever order they're given in", () => {
+    const history = [approved("t", A, 3), approved("s", C, 3), approved("s", A, 1), approved("t", B, 9), approved("s", B, 2), approved("t", C, 1)];
+    const counted = decisionsThatCount(history);
+    expect(ats(counted.filter(({ story }) => story === "s"))).toEqual([["s", 3], ["s", 2]]);
+    expect(ats(counted.filter(({ story }) => story === "t"))).toEqual([["t", 9], ["t", 3]]);
+  });
+
+  it("keeps a rejection newer than the approvals", () => {
+    const rejection = rejected("s", C, 9);
+    expect(decisionsThatCount([approved("s", A, 1), approved("s", B, 2), rejection])).toContainEqual(rejection);
+    expect(ats(decisionsThatCount([approved("s", A, 1), approved("s", B, 2), approved("s", A, 3), rejection]))).toEqual([["s", 9], ["s", 3], ["s", 2]]);
+  });
+
+  it("keeps a rejection at the same moment as the second approval, since it's read first", () => {
+    const history = [approved("s", A, 1), rejected("s", C, 2), approved("s", B, 2), approved("s", A, 3)];
+    expect(decisionsThatCount(history)).toHaveLength(3);
+    expect(decisionsThatCount(history)).toContainEqual(rejected("s", C, 2));
+  });
+
+  it("keeps all of a story with fewer than two approvals", () => {
+    const none = [rejected("s", A, 1), rejected("s", B, 2)];
+    expect(ats(decisionsThatCount(none))).toEqual([["s", 2], ["s", 1]]);
+    const one = [rejected("t", A, 1), approved("t", B, 2), rejected("t", C, 3)];
+    expect(ats(decisionsThatCount(one))).toEqual([["t", 3], ["t", 2], ["t", 1]]);
+    expect(decisionsThatCount([])).toEqual([]);
+  });
+
+  it("counts an approved removal as an approval, and keeps it", () => {
+    const removal = approved("s", null, 4);
+    expect(decisionsThatCount([approved("s", A, 1), approved("s", B, 2), approved("s", C, 3), removal])).toEqual([removal, approved("s", C, 3)]);
+  });
+
+  it("gives what the whole history would, even for the batch that made the newest approval", () => {
+    const history = [approved("s", A, 1), rejected("s", C, 2), approved("s", B, 3), rejected("s", B, 4), approved("s", C, 5, THIS), approved("t", A, 1), approved("gone", A, 1), approved("gone", B, 2), approved("gone", null, 3, THIS)];
+    const rendered = [render("s", C), render("t", B)];
+    expect(states(rendered, decisionsThatCount(history))).toEqual(states(rendered, history));
+    expect(states(rendered, history)).toEqual([["s", "changed", B, "approved"], ["t", "changed", A, null], ["gone", "removed", B, "approved"]]);
   });
 });
 

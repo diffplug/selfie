@@ -128,6 +128,15 @@ describe("the cloud service", () => {
     expect(statuses.at(-1)).toMatchObject({ sha: NEXT_SHA, status: { state: "success", description: "1 story matches what's approved" } });
   });
 
+  it("says a commit's status again only for the commit decisions were sent for", async () => {
+    const posted = statuses.length;
+    const decision = { story: "a", imageHash: hash, decision: "approved", at: 900, gitSha: FIRST_SHA, batchId: FIRST };
+    expect((await api("POST", "/decisions", PASSWORD, { environment: ENV, decisions: [decision] })).status).toBe(200);
+    expect(statuses.length).toBe(posted);
+    expect((await api("POST", "/decisions", PASSWORD, { environment: ENV, decisions: [decision], commit: NEXT_SHA })).status).toBe(200);
+    expect(statuses.slice(posted).map(({ sha }) => sha)).toEqual([NEXT_SHA]);
+  });
+
   it("serves a kept built Storybook only from its own origin", async () => {
     const file = new TextEncoder().encode("<html>story</html>");
     const fileHash = [...new Uint8Array(await crypto.subtle.digest("SHA-256", file))].map((byte) => byte.toString(16).padStart(2, "0")).join("");

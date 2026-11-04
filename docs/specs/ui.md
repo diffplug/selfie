@@ -48,7 +48,7 @@ Source of truth: `ReviewSource` in `ui/src/shared/api.ts`.
 | `answerNote(id, text, batchId)`, `resolveNote(id)` | This session's notes after a person's answer, or closing one |
 | `sendNotes(via)` | The notes after sending every draft, to a waiting agent or to be copied, and the text to paste into an agent |
 | `image(hash)` | Stored bytes, or null |
-| `diff(current, golden)` | Pixel stats and a PNG, or null if the store lacks either image |
+| `diffStats(current, golden)`, `diffImage(current, golden)` | Pixel stats, and a PNG, or null if the store lacks either image |
 
 - **Must throw an error with a `code` to mean a status.** `ERROR_STATUS` in `ui/src/server/app.ts` maps them, and any other error stays in the server's log, with a generic message to the page.
 
@@ -238,7 +238,7 @@ Source of truth: `ui/src/client/*.stories.tsx`, `ui/src/client/stories/`.
 
 1. **Move the review rules into platform-free code, and narrow `ReviewSource` to platform facts.** `storiesView` is the newest such rule that needs moving, beyond `newestRenders` itself. `render` is for a source with something to render with, so a hosted one says `canRender: false`. A hosted source needs the commits a batch reaches as one of those facts, to compare at all (`docs/specs/renders.md` → Approvals). A Worker can't load `selfie-cli`, which reaches Git, Docker, and the filesystem, and today `summarizeBatch` and diffing live there, and `localReviewSource` applies them. `filterStories`, which `summarizeBatch` calls, has to move out of `selfie-render` for that. `isDecidable` has moved already.
 2. **Make the source a per-request factory, `(context) => ReviewSource`, with a client base path.** A hosted service has many projects and viewers, where `createLocalApp` has one project for its whole life, and a client that always asks at `/api`.
-3. **Fit the Worker's budget.** The shared D1 limit is 1,200 requests per 5 minutes. One approve-and-next is 10 requests as measured on the local adapter: 6 for the decision, as measured before approvals, which read every reachable decision instead (read the batch, compare, write, compare, read whose goldens these are, list the commit's batches), and 4 lookups for the next story's two images and its diff. That's 120 stories per 5 minutes, for every reviewer of every project, down from 15 requests and 80 stories before the comparisons were reduced. What gets it to about 3:
+3. **Fit the Worker's budget.** The shared D1 limit is 1,200 requests per 5 minutes. One approve-and-next is 10 requests as measured on the local adapter: 6 for the decision, as measured before approvals, which read every reachable decision instead (read the batch, compare, write, compare, list the commit's batches), and 4 lookups for the next story's two images and its diff. That's 120 stories per 5 minutes, for every reviewer of every project, down from 15 requests and 80 stories before the comparisons were reduced. What gets it to about 3:
    - no D1 lookup per image, since a content address needs none before reading R2
    - diff stats and diff PNGs stored at review time, not computed in a request, which also moves image decoding and diffing out of a Worker's request
    - answering a decision from the comparison and what the page already knows, and a version check or ETag on focus reads

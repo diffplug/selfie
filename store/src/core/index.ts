@@ -16,6 +16,7 @@ export {
   isBatchId,
   assertViewport,
   compareWithApprovals,
+  decisionsThatCount,
   newestRenders,
   RenderBatches,
   BatchError,

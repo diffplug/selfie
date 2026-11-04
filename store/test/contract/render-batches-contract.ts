@@ -69,8 +69,9 @@ export function describeBatchContract(
     const over = (wrap: (adapter: SqlAdapter) => SqlAdapter) =>
       new RenderBatches({ sql: new Sql(withParamMode(wrap(database.connect()), mode)) });
 
-    /** The goldens of `SHA_0`: a batch of A to D, approved as a whole. */
-    const GOLDENS = [rendered("a", 1), rendered("b", 2), rendered("c", 3), rendered("d", 4)];
+    /** The baseline at `SHA_0`: a batch of A to D, approved as a whole. */
+    const BASELINE = [rendered("a", 1), rendered("b", 2), rendered("c", 3), rendered("d", 4)];
+    let baseline: string;
     let headBatch: string;
     let rerun: string;
 
@@ -83,18 +84,18 @@ export function describeBatchContract(
         Array.from({ length: 12 }, (_, i) => imageInsertStatement(hashOf(i + 1), 1000 + i)),
       );
 
-      const golden = await batches.beginBatch({ gitSha: SHA_0, environment: "shared", scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, });
-      await batches.recordRenders(golden.id, GOLDENS);
-      await batches.finishBatch(golden.id, GOLDENS.length);
+      const first = await batches.beginBatch({ gitSha: SHA_0, environment: "shared", scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, });
+      baseline = first.id;
+      await batches.recordRenders(baseline, BASELINE);
+      await batches.finishBatch(baseline, BASELINE.length);
       await batches.decide({ on: ON,
         environment: "shared",
         decision: "approved",
         actor: "ned",
-        renders: GOLDENS.map((render) => ({ story: render.story, imageHash: render.imageHash! })),
+        renders: BASELINE.map((render) => ({ story: render.story, imageHash: render.imageHash! })),
       });
-      expect(await batches.acceptBatch(golden.id, null, 0)).toBe(true);
 
-      // Against those goldens: a is unchanged, b changed, c failed, d removed, and e new.
+      // Against that baseline: a is unchanged, b changed, c failed, d removed, and e new.
       const head = await batches.beginBatch({ gitSha: SHA_1, environment: "shared", scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, });
       headBatch = head.id;
       await batches.recordRenders(headBatch, [
@@ -122,7 +123,7 @@ export function describeBatchContract(
     });
 
     it("gives each difference its state, and counts what is unchanged", async () => {
-      const { batch, renders: compared, unchangedCount } = await batches.compareBatch(headBatch, SHA_0);
+      const { batch, renders: compared, unchangedCount } = await batches.compareWithBatch(headBatch, baseline);
       expect(batch).toMatchObject({ status: "failed", failedCount: 1 });
       expect(unchangedCount).toBe(1);
       expect(compared).toEqual([
@@ -141,13 +142,13 @@ export function describeBatchContract(
         actor: "ned",
         renders: [{ story: "b", imageHash: hashOf(5) }],
       });
-      const head = await batches.compareBatch(headBatch, SHA_0);
+      const head = await batches.compareWithBatch(headBatch, baseline);
       expect(head.renders[0]).toMatchObject({
         story: "b",
         imageHash: hashOf(5),
         decision: { decision: "approved", actor: "ned", at: expect.any(Number) },
       });
-      const again = await batches.compareBatch(rerun, SHA_0, { includeUnchanged: true });
+      const again = await batches.compareWithBatch(rerun, baseline, { includeUnchanged: true });
       expect(statesOf(again.renders)).toEqual({
         a: "unchanged",
         b: "changed",
@@ -163,11 +164,16 @@ export function describeBatchContract(
       const other = await batches.beginBatch({ gitSha: SHA_1, environment: "other", scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, });
       await batches.recordRenders(other.id, [rendered("a", 1)]);
       await batches.finishBatch(other.id, 1);
-      // `SHA_0` has goldens, and the same image for the same story, in another environment.
-      await expect(batches.compareBatch(other.id, SHA_0)).rejects.toMatchObject({ code: "no-goldens" });
-      const { renders: compared } = await batches.compareBatch(other.id, null);
+      // That baseline has the same image for the same story, in another environment.
+      await expect(batches.compareWithBatch(other.id, baseline)).rejects.toMatchObject({ code: "no-baseline-batch" });
       // Approved in "shared" and not here, so a decision doesn't cross either.
+      expect(await batches.decisionsAt("other", [ON.gitSha])).toEqual([]);
+      const { renders: compared } = await batches.compareFromHistory(other.id, await batches.decisionsAt("other", [ON.gitSha]));
       expect(compared).toMatchObject([{ story: "a", state: "added", decision: null }]);
+      const here = await batches.beginBatch({ gitSha: SHA_0, environment: "other", scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, });
+      await batches.recordRenders(here.id, [rendered("a", 2)]);
+      await batches.finishBatch(here.id, 1);
+      expect((await batches.compareWithBatch(other.id, here.id)).renders).toMatchObject([{ story: "a", state: "changed", decision: null }]);
     });
 
     it("leaves a crashed batch recording, beside the new batch that replaces it", async () => {
@@ -179,14 +185,15 @@ export function describeBatchContract(
       await expect(dying.recordRenders(crashed.id, [rendered("b", 2)])).rejects.toThrow("Simulated");
 
       await expect(batches.finishBatch(crashed.id, 2)).rejects.toMatchObject({ code: "wrong-render-count" });
-      await expect(batches.compareBatch(crashed.id, null)).rejects.toMatchObject({ code: "batch-not-finished" });
+      await expect(batches.compareFromHistory(crashed.id, [])).rejects.toMatchObject({ code: "batch-not-finished" });
+      await expect(batches.compareWithBatch(crashed.id, baseline)).rejects.toMatchObject({ code: "batch-not-finished" });
 
       const fresh = await batches.beginBatch({ gitSha: SHA_1, environment, scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, });
       await batches.recordRenders(fresh.id, [rendered("a", 1), rendered("b", 2)]);
       expect(await batches.finishBatch(fresh.id, 2)).toMatchObject({ status: "complete", failedCount: 0 });
     });
 
-    it("survives writes being resent, and ends with a complete set of goldens", async () => {
+    it("survives writes being resent, and ends with a complete batch", async () => {
       const environment = "retried";
       const replayed = over(replaying);
       const batch = await batches.beginBatch({ gitSha: SHA_2, environment, scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, });
@@ -198,14 +205,13 @@ export function describeBatchContract(
         actor: "ned",
         renders: [{ story: "a", imageHash: hashOf(8) }],
       });
-      expect(await batches.acceptedBatchAt(SHA_2, environment)).toBeNull();
-      expect(await replayed.acceptBatch(batch.id, null, 0)).toBe(true);
-      expect(await batches.acceptedBatchAt(SHA_2, environment)).not.toBeNull();
-      expect(await batches.acceptedBatchAt(SHA_2, environment)).toBe(batch.id);
-      expect(await batches.acceptedBatchAt(SHA_2, "another environment")).toBeNull();
+      const decisions = await batches.decisionsAt(environment, [ON.gitSha]);
+      expect(decisions).toHaveLength(1);
+      expect(await replayed.compareFromHistory(batch.id, decisions, { includeUnchanged: true })).toMatchObject({ renders: [{ story: "a", state: "unchanged" }], unchangedCount: 1 });
+      expect(await batches.decisionsAt("another environment", [ON.gitSha])).toEqual([]);
     });
 
-    it("keeps what a batch was recorded against, and never accepts a dirty one", async () => {
+    it("keeps what a batch was recorded against", async () => {
       const environment = "dirty";
       const storyFilter = { patterns: ["a*", "typo*"], unmatched: ["typo*"] };
       const batch = await batches.beginBatch({
@@ -219,14 +225,6 @@ export function describeBatchContract(
       await batches.recordRenders(batch.id, [rendered("a", 9)]);
       expect(await batches.finishBatch(batch.id, 1)).toMatchObject({ dirty: true, storyFilter });
       expect(await batches.getBatch(batch.id)).toMatchObject({ dirty: true, storyFilter });
-      await batches.decide({ on: ON,
-        environment,
-        decision: "approved",
-        actor: "ned",
-        renders: [{ story: "a", imageHash: hashOf(9) }],
-      });
-      await expect(batches.acceptBatch(batch.id, null, 0)).rejects.toMatchObject({ code: "batch-dirty" });
-      expect(await batches.acceptedBatchAt(SHA_2, environment)).toBeNull();
 
       const clean = await batches.beginBatch({ gitSha: SHA_2, environment, scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, });
       expect(clean).toMatchObject({ dirty: false, storyFilter: null });
@@ -263,7 +261,7 @@ export function describeBatchContract(
         expect(batch.scale).toBe(scale);
         expect((await batches.getBatch(batch.id))?.scale).toBe(scale);
         expect((await batches.finishBatch(batch.id, 0)).scale).toBe(scale);
-        expect((await batches.compareBatch(batch.id, null)).batch.scale).toBe(scale);
+        expect((await batches.compareFromHistory(batch.id, [])).batch.scale).toBe(scale);
       }
     });
 
@@ -329,7 +327,7 @@ export function describeBatchContract(
       expect((await batches.finishBatch(reused.id, 1)).reusedFromBatch).toBe(rendered_.id);
       expect((await batches.getBatch(reused.id))?.reusedFromBatch).toBe(rendered_.id);
       expect((await batches.batchesAt(SHA_1, environment))[0]?.reusedFromBatch).toBe(rendered_.id);
-      expect((await batches.compareBatch(reused.id, null)).batch.reusedFromBatch).toBe(rendered_.id);
+      expect((await batches.compareFromHistory(reused.id, [])).batch.reusedFromBatch).toBe(rendered_.id);
     });
 
     it("keeps the image of a story that failed after rendering, and lists it as failed", async () => {
@@ -342,29 +340,21 @@ export function describeBatchContract(
       ];
       await batches.recordRenders(batch.id, played);
       await batches.finishBatch(batch.id, 3);
-      const first = await batches.compareBatch(batch.id, null);
+      const first = await batches.compareFromHistory(batch.id, []);
       expect(first.renders.map(({ story, state, imageHash, failure }) => [story, state, imageHash, failure])).toEqual([
         ["a", "failed", hashOf(10), "play: threw"],
         ["b", "added", hashOf(11), null],
         ["c", "failed", null, "Render threw"],
       ]);
 
-      const golden = await batches.beginBatch({ gitSha: SHA_1, environment, scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, });
-      const clean = [rendered("a", 10), rendered("b", 11)];
-      await batches.recordRenders(golden.id, clean);
-      await batches.finishBatch(golden.id, 2);
-      await batches.decide({ on: ON,
-        environment,
-        decision: "approved",
-        actor: "ned",
-        renders: clean.map(({ story, imageHash }) => ({ story, imageHash: imageHash! })),
-      });
-      expect(await batches.acceptBatch(golden.id, null, 0)).toBe(true);
+      const clean = await batches.beginBatch({ gitSha: SHA_1, environment, scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, });
+      await batches.recordRenders(clean.id, [rendered("a", 10), rendered("b", 11)]);
+      await batches.finishBatch(clean.id, 2);
 
       const next = await batches.beginBatch({ gitSha: SHA_2, environment, scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, });
       await batches.recordRenders(next.id, [played[0]!, played[1]!]);
       await batches.finishBatch(next.id, 2);
-      const compared = await batches.compareBatch(next.id, SHA_1);
+      const compared = await batches.compareWithBatch(next.id, clean.id);
       expect(compared.unchangedCount).toBe(1);
       expect(compared.renders.map(({ story, state }) => [story, state])).toEqual([["a", "failed"]]);
     });
@@ -379,18 +369,9 @@ export function describeBatchContract(
         Array.from({ length: count }, (_, i) => ({ story: `s${i}`, failure: long })),
       );
       expect(await batches.finishBatch(batch.id, count)).toMatchObject({ status: "failed", failedCount: count });
-      const { renders: compared } = await batches.compareBatch(batch.id, null);
+      const { renders: compared } = await batches.compareFromHistory(batch.id, []);
       expect(compared).toHaveLength(count);
       expect(compared[0]).toMatchObject({ failure: long });
-    });
-
-    it("finds the nearest SHA with goldens, in the order asked, across query groups", async () => {
-      const environment = "shared";
-      const shas = Array.from({ length: 150 }, (_, i) => i.toString(16).padStart(40, "f"));
-      expect(await batches.firstWithGoldens(shas, environment)).toBeNull();
-      expect(await batches.firstWithGoldens([...shas, SHA_0], environment)).toBe(SHA_0);
-      expect(await batches.firstWithGoldens([SHA_0, ...shas], "no-such-environment")).toBeNull();
-      expect(await batches.firstWithGoldens([], environment)).toBeNull();
     });
 
     describe("from another store", () => {
@@ -443,14 +424,6 @@ export function describeBatchContract(
         expect(second.next).toBeNull();
       });
 
-      it("says what accepting would remove, against goldens or against nothing", async () => {
-        const batch = await finished("removes", [rendered("a", 1), rendered("b", 2)]);
-        await batches.adoptGoldens(batch.id);
-        const next = await finished("removes", [rendered("a", 1)]);
-        expect(await batches.removedFrom(next.id, SHA_0)).toEqual(["b"]);
-        expect(await batches.removedFrom(next.id, null)).toEqual([]);
-      });
-
       it("won't read a batch that hasn't finished", async () => {
         const batch = received("read-unfinished");
         await batches.receiveBatch(batch);
@@ -496,34 +469,39 @@ export function describeBatchContract(
         expect(read.every(({ decision }) => decision?.decision === "approved")).toBe(true);
       });
 
-      it("adopts goldens with no decisions, replacing what was there", async () => {
-        const environment = "adopted";
-        const first = await finished(environment, [rendered("a", 1)]);
-        const second = await finished(environment, [rendered("a", 2)]);
-        await over(replaying).adoptGoldens(first.id);
-        expect(await batches.acceptedBatchAt(SHA_0, environment)).toBe(first.id);
-        await batches.adoptGoldens(second.id);
-        expect(await batches.acceptedBatchAt(SHA_0, environment)).toBe(second.id);
+      it("takes a removal, which reads back as none of any image, and as a removal in a comparison", async () => {
+        const environment = "merged-removal";
+        const onThis = await finished(environment, [rendered("b", 2)]);
+        const approval = on("approved", "ned", 1_000);
+        const removal = { ...on("approved", "alice", 2_000), imageHash: null, batchId: onThis.id };
+        await over(replaying).mergeDecisions(environment, [approval, removal]);
+
+        const decisions = await batches.decisionsAt(environment, [ON.gitSha]);
+        expect(decisions).toHaveLength(2);
+        expect(decisions).toContainEqual(removal);
+        expect(decisions).toContainEqual(approval);
+
+        // On the batch it was made on, a is removed, and that's approved.
+        const { renders } = await batches.compareFromHistory(onThis.id, decisions);
+        expect(renders).toEqual([
+          { story: "b", state: "added", imageHash: hashOf(2), goldenHash: null, failure: null, decision: null },
+          { story: "a", state: "removed", imageHash: null, goldenHash: hashOf(1), goldenBatchId: ON.batchId, failure: null, decision: { decision: "approved", actor: "alice", at: 2_000 } },
+        ]);
+
+        // After it, a is gone, and if it comes back it's new.
+        const after = await finished(environment, [rendered("b", 2)]);
+        expect((await batches.compareFromHistory(after.id, decisions)).renders.map(({ story }) => story)).toEqual(["b"]);
+        const back = await finished(environment, [rendered("a", 1)]);
+        expect((await batches.compareFromHistory(back.id, decisions)).renders).toMatchObject([{ story: "a", state: "added", goldenHash: null }]);
       });
 
-      it("won't adopt what can't be goldens", async () => {
-        const dirty = received("adopt-refused");
-        await batches.receiveBatch({ ...dirty, dirty: true });
-        await expect(batches.adoptGoldens(dirty.id)).rejects.toMatchObject({ code: "batch-not-finished" });
-        await batches.recordRenders(dirty.id, [rendered("a", 1)]);
-        await batches.finishBatch(dirty.id, 1);
-        await expect(batches.adoptGoldens(dirty.id)).rejects.toMatchObject({ code: "batch-dirty" });
-        const failed = await finished("adopt-refused", [{ story: "a", failure: "boom" }]);
-        await expect(batches.adoptGoldens(failed.id)).rejects.toMatchObject({ code: "batch-has-failures" });
-        expect(await batches.acceptedBatchAt(SHA_0, "adopt-refused")).toBeNull();
-      });
-    });
-
-    it("refuses an acceptance that would drop goldens the reviewer didn't see", async () => {
-      // The rerun lacks d, and the reviewer says nothing was removed.
-      await expect(batches.acceptBatch(rerun, SHA_0, 0)).rejects.toMatchObject({
-        code: "wrong-removed-count",
-        message: expect.stringContaining("would remove 1 goldens, not the 0"),
+      it("lets the latest say about a removal win, whichever order they arrive in", async () => {
+        const removal = (decision: "approved" | "rejected", actor: string, at: number) => ({ ...on(decision, actor, at), imageHash: null });
+        const [older, newer] = [removal("approved", "ned", 1_000), removal("rejected", "bob", 2_000)];
+        for (const [environment, order] of [["removal-forward", [older, newer]], ["removal-backward", [newer, older]]] as const) {
+          for (const decision of order) await batches.mergeDecisions(environment, [decision]);
+          expect(await batches.decisionsAt(environment, [ON.gitSha])).toEqual([newer]);
+        }
       });
     });
   });

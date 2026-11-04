@@ -6,7 +6,7 @@ import { SelfieError } from "./errors.ts";
 
 const MAX_OUTPUT_BYTES = 64 * 1024 * 1024;
 
-/** How far back history is read, for approvals, and for a remote's goldens. */
+/** How far back history is read, for approvals. */
 const MAX_COMMITS = 1000;
 
 // origin/HEAD is what a clone records. The rest are the usual names, for a repository whose
@@ -106,26 +106,6 @@ export async function resolveCommit(repo: Repo, ref: string): Promise<string | n
   return ask(repo.root, ["rev-parse", "--verify", "--quiet", `${ref}^{commit}`]);
 }
 
-export type NoBaselineReason =
-  | "no-commits"
-  | "no-merge-base"
-  | "shallow-history"
-  | "limit-reached"
-  | "no-goldens";
-
-/** The one shape of a baseline. A null `sha` means there is none, and `reason` and `message` say why. */
-export interface Baseline {
-  readonly sha: string | null;
-  readonly reason: NoBaselineReason | null;
-  readonly message: string | null;
-}
-
-export interface BaselineSearch extends Baseline {
-  /** Null if no default branch was found, and then the walk starts at HEAD. */
-  readonly defaultBranch: string | null;
-  readonly mergeBase: string | null;
-}
-
 /** One process however many names it tries, since this is asked often. */
 async function defaultBranchRef(repo: Repo): Promise<string | null> {
   const listed = await ask(repo.root, ["for-each-ref", "--format=%(objecttype) %(refname) %(symref)", ORIGIN_HEAD, ...DEFAULT_BRANCH_CANDIDATES]);
@@ -142,17 +122,6 @@ async function defaultBranchRef(repo: Repo): Promise<string | null> {
 
 const branchNameOf = (ref: string | null) => ref?.replace(/^refs\/(?:remotes|heads)\//, "") ?? null;
 
-async function firstParentHistory(repo: Repo, start: string, maxCommits: number): Promise<string[]> {
-  const { code, stdout, stderr } = await git(repo.root, [
-    "rev-list",
-    "--first-parent",
-    `--max-count=${maxCommits}`,
-    start,
-  ]);
-  if (code !== 0) throw new SelfieError("git-failed", `git rev-list failed: ${stderr.trim()}`);
-  return stdout.split("\n").filter((line) => line !== "");
-}
-
 /** Each commit this one reaches with what came right before it, for a server with no Git to ask. Nothing if this clone doesn't have it. */
 export async function commitGraph(repo: Repo, sha: string): Promise<readonly { readonly sha: string; readonly parents: readonly string[] }[]> {
   const listed = await ask(repo.root, ["rev-list", "--parents", `--max-count=${MAX_COMMITS}`, sha]);
@@ -160,66 +129,6 @@ export async function commitGraph(repo: Repo, sha: string): Promise<readonly { r
     const [commit, ...parents] = line.split(" ");
     return { sha: commit!, parents };
   });
-}
-
-/**
- * The nearest commit at or before the merge-base with the default branch, on first-parent
- * history, for which `firstWithGoldens` answers. It is given those commits, nearest first.
- */
-export async function walkToBaseline(
-  repo: Repo,
-  firstWithGoldens: (shas: readonly string[]) => Promise<string | null>,
-  maxCommits: number = MAX_COMMITS,
-): Promise<BaselineSearch> {
-  const head = await headSha(repo);
-  const isShallow = async () => (await ask(repo.root, ["rev-parse", "--is-shallow-repository"])) === "true";
-  if (head === null) {
-    return {
-      sha: null,
-      reason: "no-commits",
-      message: "This repository has no commits yet.",
-      defaultBranch: null,
-      mergeBase: null,
-    };
-  }
-
-  const ref = await defaultBranchRef(repo);
-  const defaultBranch = branchNameOf(ref);
-  const mergeBase = ref === null ? head : await ask(repo.root, ["merge-base", "HEAD", ref]);
-  if (mergeBase === null) {
-    const found = { sha: null, defaultBranch, mergeBase: null };
-    return (await isShallow())
-      ? {
-          ...found,
-          reason: "shallow-history",
-          message: `This clone is shallow and its history stops before HEAD meets ${defaultBranch}. Fetch more with \`git fetch --unshallow\`.`,
-        }
-      : { ...found, reason: "no-merge-base", message: `HEAD shares no history with ${defaultBranch}.` };
-  }
-
-  const commits = await firstParentHistory(repo, mergeBase, maxCommits);
-  const noDefaultBranch =
-    ref === null ? "No default branch was found (origin/HEAD, main, or master), so this walked from HEAD." : null;
-  const sha = await firstWithGoldens(commits);
-  if (sha !== null) return { sha, reason: null, message: noDefaultBranch, defaultBranch, mergeBase };
-
-  const none = { sha: null, defaultBranch, mergeBase };
-  const looked = `None of the ${commits.length} first-parent commits from ${mergeBase.slice(0, 12)} has goldens`;
-  if (commits.length === maxCommits) {
-    return { ...none, reason: "limit-reached", message: `${looked}, and the search stops at ${maxCommits}.` };
-  }
-  if (await isShallow()) {
-    return {
-      ...none,
-      reason: "shallow-history",
-      message: `${looked}, but this clone is shallow, so older commits may. Fetch more with \`git fetch --unshallow\`.`,
-    };
-  }
-  return {
-    ...none,
-    reason: "no-goldens",
-    message: `${looked} in this environment.${noDefaultBranch === null ? "" : ` ${noDefaultBranch}`}`,
-  };
 }
 
 /** Every commit this one's history reaches, itself first, through every parent. Itself alone if this clone doesn't have it. */

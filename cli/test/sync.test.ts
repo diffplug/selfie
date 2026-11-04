@@ -5,11 +5,13 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { createServer, type Server } from "node:http";
+import { createLocalApp } from "selfie-ui/local";
 import { createSyncApi, type SyncAccess } from "selfie-ui/sync";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { runCli } from "../src/cli.ts";
 import { encodePng } from "../src/png.ts";
 import { openProject, type Project } from "../src/project.ts";
+import { localReviewSource } from "../src/ui.ts";
 import { commit, createHarness, fakeRender, git, GREEN, RED, solid, type FakeStory, type Harness, writeTestConfig } from "./support.ts";
 
 const REMOTE = "http://127.0.0.1:9";
@@ -53,7 +55,7 @@ let laptop: ReturnType<typeof machine>;
 let stories: readonly FakeStory[];
 
 const record = async (run = laptop) => (await run("writer", "render")).json.batchId as string;
-/** A batch on the laptop with every image approved, which `push --accept` can make HEAD's goldens. */
+/** A batch on the laptop with every image approved. */
 async function approved() {
   const batchId = await record();
   await laptop(null, "approve", batchId, "--all");
@@ -68,6 +70,23 @@ async function imagesOf(batchId: string) {
   } finally {
     local.close();
   }
+}
+
+/** Does this with a machine's store, which is closed again after. */
+async function withStore<T>(repo: string, home: string, work: (project: Project) => Promise<T>): Promise<T> {
+  const project = await openProject({ cwd: repo, env: { SELFIE_HOME: home } });
+  try {
+    return await work(project);
+  } finally {
+    project.close();
+  }
+}
+
+/** An approval or a rejection of every image of a batch, as someone decides it on the remote itself. */
+async function decideOnCloud(batchId: string, decision: "approved" | "rejected" = "approved") {
+  const { batch, renders } = await cloud.batches.readBatch(batchId);
+  await cloud.batches.decide({ environment: batch.environment, decision, actor: "someone-on-the-remote", renders: renders.map(({ story, imageHash }) => ({ story, imageHash: imageHash! })), on: { batchId, gitSha: batch.gitSha } });
+  return batch;
 }
 
 beforeEach(async () => {
@@ -93,15 +112,16 @@ afterEach(async () => {
 });
 
 describe("pushing", () => {
-  test("sends a batch, its images, its decisions, and with --accept its goldens", async () => {
+  test("sends a batch, its images, and its decisions", async () => {
     const batchId = await approved();
-    const { code, json } = await laptop("writer", "push", "--accept");
+    const { code, json } = await laptop("writer", "push");
     expect(code).toBe(0);
-    expect(json).toMatchObject({ batchId, images: { sent: 2, alreadyThere: 0 }, decisions: 2, goldens: { outcome: "accepted", acceptedBatchId: batchId } });
+    expect(json).toMatchObject({ batchId, images: { sent: 2, alreadyThere: 0 }, decisions: 2 });
+    expect(json).not.toHaveProperty("goldens");
     const head = headOf();
     const held = await cloud.batches.getBatch(batchId);
     expect(held).toMatchObject({ id: batchId, gitSha: head, status: "complete" });
-    expect(await cloud.batches.acceptedBatchAt(head, held!.environment)).toBe(batchId);
+    expect(await cloud.batches.decisionsAt(held!.environment, [head])).toHaveLength(2);
   });
 
   test("names who pushed as a decision's author, not what the laptop says", async () => {
@@ -113,15 +133,13 @@ describe("pushing", () => {
 
   test("is safe to run again, and sends nothing twice", async () => {
     await approved();
-    await laptop("writer", "push", "--accept");
-    expect((await laptop("writer", "push", "--accept")).json).toMatchObject({ images: { sent: 0, alreadyThere: 2 }, goldens: { outcome: "already" } });
+    await laptop("writer", "push");
+    expect((await laptop("writer", "push")).json).toMatchObject({ images: { sent: 0, alreadyThere: 2 } });
   });
 
-  test("a batch goes with no goldens unless asked", async () => {
+  test("takes no --accept any more", async () => {
     await approved();
-    const { code, json } = await laptop("writer", "push");
-    expect(code).toBe(0);
-    expect(json).toMatchObject({ decisions: 2, goldens: null });
+    expect((await laptop("writer", "push", "--accept")).code).toBe(2);
   });
 
   test("sends only the images the cloud lacks", async () => {
@@ -144,39 +162,41 @@ describe("pushing", () => {
     expect(await cloud.store.missingImages([imageHash])).toEqual([imageHash]);
   });
 
-  test("CI uploads with no decisions, and is refused goldens nobody approved", async () => {
-    await record();
-    const { code, json } = await laptop("ci", "push", "--accept");
-    expect(code).toBe(1);
-    expect(json).toMatchObject({ decisions: null, goldens: { outcome: "refused", refusal: { code: "not-approved" } } });
+  test("CI uploads with no decisions", async () => {
+    const batchId = await record();
+    const { code, json } = await laptop("ci", "push");
+    expect(code).toBe(0);
+    expect(json).toMatchObject({ decisions: null, images: { sent: 2 } });
+    const held = (await cloud.batches.getBatch(batchId))!;
+    expect(held.status).toBe("complete");
+    expect(await cloud.batches.decisionsAt(held.environment, [held.gitSha])).toEqual([]);
   });
 
-  test("CI makes a merge commit's goldens from a person's approvals, with no re-render", async () => {
+  test("a person's approvals hold for what CI renders at a merge commit, with nothing decided there", async () => {
     // A person approves these images on a branch, and pushes.
     const onBranch = await record();
     await laptop(null, "approve", onBranch, "--all");
     await laptop("writer", "push", onBranch);
     // The same images at the merge commit, rendered by CI.
-    const merge = await commit(h.repo, "merge");
+    await commit(h.repo, "merge");
     const onMerge = await record();
-    const { code, json } = await laptop("ci", "push", onMerge, "--accept");
+    const { code, json } = await laptop("ci", "push", onMerge);
     expect(code).toBe(0);
-    expect(json.goldens).toMatchObject({ outcome: "accepted", acceptedBatchId: onMerge });
-    const { environment } = (await cloud.batches.getBatch(onMerge))!;
-    expect(await cloud.batches.acceptedBatchAt(merge, environment)).toBe(onMerge);
+    expect(json).toMatchObject({ batchId: onMerge, decisions: null });
+    expect(await cloud.batches.compareReached(onMerge)).toMatchObject({ renders: [], unchangedCount: 2 });
   });
 
-  test("CI on a fresh machine, which has never pulled and can't, holds an unchanged batch to the cloud's goldens", async () => {
+  test("CI on a fresh machine, which has never pulled, has its unchanged batch read by the cloud's approvals", async () => {
     await approved();
-    await laptop("writer", "push", "--accept");
-    const merge = await commit(h.repo, "merge");
+    await laptop("writer", "push");
+    await commit(h.repo, "merge");
     // Nothing here but the checkout.
     const fresh = machine(h.repo, path.join(h.scratch, "ci-home"));
     const batchId = (await fresh("ci", "render")).json.batchId;
-    const { code, json } = await fresh("ci", "push", "--accept");
+    const { code, json } = await fresh("ci", "push");
     expect(code).toBe(0);
-    expect(json).toMatchObject({ batchId, decisions: null, images: { sent: 0 }, goldens: { outcome: "accepted", acceptedBatchId: batchId } });
-    expect(await cloud.batches.acceptedBatchAt(merge, (await cloud.batches.getBatch(batchId))!.environment)).toBe(batchId);
+    expect(json).toMatchObject({ batchId, decisions: null, images: { sent: 0 } });
+    expect(await cloud.batches.compareReached(batchId)).toMatchObject({ renders: [], unchangedCount: 2 });
   });
 
   test("the default is the newest from a clean tree, and skips a dirty one", async () => {
@@ -220,21 +240,12 @@ describe("pushing", () => {
       if (init?.method === "PUT" && url.includes("/images/") && imagesLeft-- <= 0) throw new Error("connection lost");
       return toCloud(url, init);
     }) as typeof fetch);
-    expect((await flaky("writer", "push", "--accept")).code).toBe(2);
+    expect((await flaky("writer", "push")).code).toBe(2);
     expect((await cloud.batches.getBatch(batchId))?.status).toBe("recording");
-    const { code, json } = await laptop("writer", "push", "--accept");
+    const { code, json } = await laptop("writer", "push");
     expect(code).toBe(0);
-    expect(json).toMatchObject({ images: { sent: 1, alreadyThere: 1 }, goldens: { outcome: "accepted" } });
-  });
-
-  test("a different batch never replaces the cloud's goldens", async () => {
-    const first = await approved();
-    await laptop("writer", "push", "--accept");
-    stories = [{ id: "a", color: GREEN }, { id: "b", color: GREEN }];
-    await approved();
-    const { code, json } = await laptop("writer", "push", "--accept");
-    expect(code).toBe(1);
-    expect(json.goldens).toMatchObject({ outcome: "conflict", acceptedBatchId: first });
+    expect(json).toMatchObject({ images: { sent: 1, alreadyThere: 1 } });
+    expect((await cloud.batches.getBatch(batchId))?.status).toBe("complete");
   });
 
   test("says when there's nothing at HEAD to push", async () => {
@@ -297,100 +308,178 @@ describe("another machine", () => {
     desktop = machine(desktopRepo, desktopHome);
   });
 
-  test("pulls a commit's goldens, with their batch, images, and decisions", async () => {
+  test("takes the decisions a commit reaches, and their images, and no batch", async () => {
     const batchId = await approved();
-    await laptop("writer", "push", "--accept");
+    await laptop("writer", "push");
     const head = headOf();
+    const hashes = await imagesOf(batchId);
     const { code, json } = await desktop("reader", "pull", head);
     expect(code).toBe(0);
-    expect(json).toMatchObject({ sha: head, batchId, images: { received: 2, alreadyHere: 0 }, decisions: 2, replaced: null });
+    expect(json).toEqual({ sha: head, environment: expect.any(String), images: { received: 2, alreadyHere: 0 }, decisions: 2 });
 
-    const local = await openProject({ cwd: desktopRepo, env: { SELFIE_HOME: desktopHome } });
-    try {
-      expect((await local.batches.getBatch(batchId))?.status).toBe("complete");
-      expect(await local.batches.acceptedBatchAt(head, json.environment)).toBe(batchId);
-      expect(await local.store.getPixels((await local.batches.readBatch(batchId)).renders[0]!.imageHash!)).not.toBeNull();
-    } finally {
-      local.close();
-    }
+    await withStore(desktopRepo, desktopHome, async (local) => {
+      expect(await local.batches.getBatch(batchId)).toBeNull();
+      const decisions = await local.batches.decisionsAt(json.environment, [head]);
+      expect(decisions.map(({ story, decision, actor, gitSha, batchId: on }) => [story, decision, actor, gitSha, on]).sort()).toEqual([
+        ["a", "approved", "writer-login", head, batchId],
+        ["b", "approved", "writer-login", head, batchId],
+      ]);
+      for (const hash of hashes) expect(await local.store.getPixels(hash!)).not.toBeNull();
+    });
   });
 
-  test("counts what a batch removes against the goldens the cloud holds it to", async () => {
+  test("an approval made on the remote reaches a fresh store, with its image, and a review there reads that story as unchanged", async () => {
+    const batchId = await record();
+    await laptop("ci", "push");
+    const { environment } = await decideOnCloud(batchId);
+    const hashes = await imagesOf(batchId);
+
+    const { code, json } = await desktop("reader", "pull");
+    expect(code).toBe(0);
+    expect(json).toMatchObject({ images: { received: 2, alreadyHere: 0 }, decisions: 2 });
+    await withStore(desktopRepo, desktopHome, async (local) => {
+      for (const hash of hashes) expect(await local.store.getPixels(hash!)).not.toBeNull();
+    });
+
+    const own = await record(desktop);
+    const reviewed = await desktop(null, "review", own);
+    expect(reviewed.code).toBe(0);
+    expect(reviewed.json.differences).toEqual([]);
+    expect(reviewed.json.counts).toMatchObject({ unchanged: 2, changed: 0, added: 0, undecided: 0 });
+    await withStore(desktopRepo, desktopHome, async (local) => {
+      const decisions = await local.batches.decisionsAt(environment, [headOf()]);
+      expect((await local.batches.compareFromHistory(own, decisions, { includeUnchanged: true })).renders.map(({ story, state }) => [story, state])).toEqual([["a", "unchanged"], ["b", "unchanged"]]);
+    });
+  });
+
+  test("a batch already here reads differently once its approvals come, with no image to fetch", async () => {
+    const batchId = await record();
+    await laptop("ci", "push");
+    await decideOnCloud(batchId);
+    const own = await record(desktop);
+    expect((await desktop(null, "review", own)).json.counts).toMatchObject({ added: 2, unchanged: 0 });
+    expect((await desktop("reader", "pull")).json).toMatchObject({ images: { received: 0, alreadyHere: 2 }, decisions: 2 });
+    expect((await desktop(null, "review", own)).json.counts).toMatchObject({ added: 0, unchanged: 2 });
+  });
+
+  test("an image that comes with an approval is there to show a change against", async () => {
+    const batchId = await record();
+    await laptop("ci", "push");
+    await decideOnCloud(batchId);
+    await desktop("reader", "pull");
+
+    stories = [{ id: "a", color: [1, 2, 3] }, { id: "b", color: GREEN }];
+    const reviewed = await desktop(null, "review", await record(desktop));
+    expect(reviewed.code).toBe(1);
+    expect(reviewed.json.counts).toMatchObject({ changed: 1, unchanged: 1 });
+    expect(reviewed.json.differences).toMatchObject([{ story: "a", state: "changed" }]);
+    expect(await readFile(reviewed.json.differences[0].golden)).not.toHaveLength(0);
+  });
+
+  test("the review page shows a change against a reference whose batch never came here", async () => {
+    const batchId = await record();
+    await laptop("ci", "push");
+    await decideOnCloud(batchId);
+    await desktop("reader", "pull");
+    stories = [{ id: "a", color: [1, 2, 3] }, { id: "b", color: GREEN }];
+    const own = await record(desktop);
+
+    await withStore(desktopRepo, desktopHome, async (local) => {
+      const page = createLocalApp({ source: localReviewSource(local), port: () => 4173, clientDir: h.scratch });
+      const get = (route: string) => page.request(route, { headers: { host: "127.0.0.1:4173" } });
+      const response = await get(`/api/batches/${own}`);
+      expect(response.status).toBe(200);
+      const { rows, counts } = (await response.json()) as any;
+      expect(counts).toMatchObject({ changed: 1, added: 0 });
+      expect(rows).toMatchObject([{ story: "a", state: "changed", goldenBatchId: batchId, goldenStorybookUrl: null, goldenViewport: null }]);
+      expect((await get(`/api/images/${rows[0].goldenHash}`)).status).toBe(200);
+      expect((await get("/api/stories")).status).toBe(200);
+    });
+  });
+
+  test("a commit that hasn't been pushed works from its ancestors", async () => {
     await approved();
-    await laptop("writer", "push", "--accept");
-    await laptop("reader", "pull", headOf());
-    await commit(h.repo, "drops a story");
-    stories = stories.slice(1);
+    await laptop("writer", "push");
+    const unpushed = await commit(desktopRepo, "only here");
+    const { code, json } = await desktop("reader", "pull");
+    expect(code).toBe(0);
+    expect(json).toMatchObject({ sha: unpushed, images: { received: 2 }, decisions: 2 });
+    const reviewed = await desktop(null, "review", await record(desktop));
+    expect(reviewed.code).toBe(0);
+    expect(reviewed.json.counts).toMatchObject({ unchanged: 2, changed: 0, added: 0 });
+  });
+
+  test("takes nothing from commits it doesn't reach", async () => {
+    const first = await approved();
+    await laptop("writer", "push", first);
+    const reached = headOf();
+    await commit(h.repo, "only there");
+    stories = [{ id: "a", color: RED }, { id: "b", color: [1, 2, 3] }];
     await approved();
-    expect((await laptop("writer", "push", "--accept")).json.goldens).toMatchObject({ outcome: "accepted", refusal: null });
+    await laptop("writer", "push");
+
+    // Still at the commit it was cloned at, which doesn't have that one.
+    expect(git(desktopRepo, "rev-parse", "HEAD")).toBe(reached);
+    expect((await desktop("reader", "pull")).json).toMatchObject({ images: { received: 2 }, decisions: 2 });
+    expect((await desktop("reader", "pull", reached)).json).toMatchObject({ images: { received: 0, alreadyHere: 2 } });
+    git(desktopRepo, "pull", "--quiet", h.repo, "main");
+    expect((await desktop("reader", "pull")).json).toMatchObject({ images: { received: 1, alreadyHere: 2 }, decisions: 3 });
   });
 
   test("a decision pulled here counts from its commit, so a later commit asks nothing", async () => {
     await approved();
-    await laptop("writer", "push", "--accept");
+    await laptop("writer", "push");
     await desktop("reader", "pull", headOf());
     await commit(desktopRepo, "more");
     const { json: reviewed } = await desktop(null, "review");
     expect(reviewed.counts).toMatchObject({ unchanged: 2, changed: 0, added: 0 });
   });
 
-  test("goldens pulled here go with their batch when it's pushed, with no need to ask", async () => {
-    const batchId = await approved();
-    await laptop("writer", "push", "--accept");
-    await desktop("reader", "pull", headOf());
-    expect((await desktop("writer", "push", batchId)).json).toMatchObject({ goldens: { outcome: "already", acceptedBatchId: batchId } });
-  });
-
-  test("finds the nearest baseline in the cloud, if it isn't told a commit", async () => {
-    const batchId = await approved();
-    await laptop("writer", "push", "--accept");
-    const { json } = await desktop("reader", "pull");
-    expect(json).toMatchObject({ batchId });
-  });
-
-  test("is safe to run again", async () => {
+  test("defaults to HEAD, if it isn't told a commit", async () => {
     await approved();
-    await laptop("writer", "push", "--accept");
-    const head = headOf();
-    await desktop("reader", "pull", head);
-    // Reading nothing, since a shared limit pays for every pull CI makes.
-    let asked = 0;
+    await laptop("writer", "push");
+    expect((await desktop("reader", "pull")).json).toMatchObject({ sha: git(desktopRepo, "rev-parse", "HEAD"), decisions: 2 });
+  });
+
+  test("pulling twice changes nothing, and fetches nothing the second time", async () => {
+    await approved();
+    await laptop("writer", "push");
+    const { json: first } = await desktop("reader", "pull");
+    expect(first).toMatchObject({ images: { received: 2, alreadyHere: 0 }, decisions: 2 });
+    const held = () => withStore(desktopRepo, desktopHome, async ({ batches }) => [...(await batches.decisionsAt(first.environment, [first.sha]))]);
+    const before = await held();
+
+    const asked: string[] = [];
     const counting = machine(desktopRepo, desktopHome, () => (async (url: string, init?: RequestInit) => {
-      if (url.includes("/batches/")) asked += 1;
+      asked.push(`${init?.method ?? "GET"} ${new URL(url).pathname}`);
       return toCloud(url, init);
     }) as typeof fetch);
-    expect((await counting("reader", "pull", head)).json).toMatchObject({ batchId: expect.any(String), images: { received: 0, alreadyHere: 0 }, replaced: null });
-    expect(asked).toBe(0);
+    const { code, json: second } = await counting("reader", "pull");
+    expect(code).toBe(0);
+    expect(second).toEqual({ ...first, images: { received: 0, alreadyHere: 2 } });
+    expect(asked.filter((request) => request.includes("/images/") || request.includes("/batches/"))).toEqual([]);
+    expect(asked).toEqual(["GET /api/repositories/diffplug/selfie", "POST /api/projects/42/decisions/reached"]);
+    expect(await held()).toEqual(before);
   });
 
-  test("the cloud's goldens replace different ones here, and it says so", async () => {
-    const batchId = await approved();
-    await laptop("writer", "push", "--accept");
-    const head = headOf();
-    stories = [{ id: "a", color: GREEN }, { id: "b", color: GREEN }];
-    const own = await record(desktop);
-    await desktop(null, "approve", own, "--all");
-    const here = await openProject({ cwd: desktopRepo, env: { SELFIE_HOME: desktopHome } });
-    expect(await here.batches.acceptBatch(own, null, 0)).toBe(true);
-    here.close();
-    const { json } = await desktop("reader", "pull", head);
-    expect(json).toMatchObject({ batchId, replaced: own });
-  });
-
-  test("a pull that dies partway is finished by pulling again", async () => {
-    const batchId = await approved();
-    await laptop("writer", "push", "--accept");
+  test("a pull that dies partway keeps no decisions, and is finished by pulling again", async () => {
+    await approved();
+    await laptop("writer", "push");
     const head = headOf();
     let imagesLeft = 1;
     const flaky = machine(desktopRepo, desktopHome, () => (async (url: string, init?: RequestInit) => {
       if (url.includes("/images/") && imagesLeft-- <= 0) throw new Error("connection lost");
       return toCloud(url, init);
     }) as typeof fetch);
-    expect((await flaky("reader", "pull", head)).code).toBe(2);
+    const died = await flaky("reader", "pull", head);
+    expect(died.code).toBe(2);
+    const environment = (await withStore(h.repo, h.home, ({ batches }) => batches.newestFinished()))!.environment;
+    expect(await withStore(desktopRepo, desktopHome, ({ batches }) => batches.decisionsAt(environment, [head]))).toEqual([]);
     // However many had landed when it died.
     const { json } = await desktop("reader", "pull", head);
-    expect(json).toMatchObject({ batchId, replaced: null });
+    expect(json.decisions).toBe(2);
     expect(json.images.received + json.images.alreadyHere).toBe(2);
+    expect(await withStore(desktopRepo, desktopHome, ({ batches }) => batches.decisionsAt(environment, [head]))).toHaveLength(2);
   });
 
   test.each([
@@ -406,7 +495,7 @@ describe("another machine", () => {
     const [hash] = await imagesOf(batchId);
     // A client took it on trust from someone else, and the first bytes stay, so the push doesn't correct it.
     await cloud.store.receiveImage(await bytes(), hash!);
-    expect((await laptop("writer", "push", "--accept")).json.images).toEqual({ sent: 1, alreadyThere: 1 });
+    expect((await laptop("writer", "push")).json.images).toEqual({ sent: 1, alreadyThere: 1 });
 
     for (let attempt = 0; attempt < 2; attempt++) {
       const { code, json } = await desktop("reader", "pull", headOf());
@@ -414,42 +503,175 @@ describe("another machine", () => {
       expect(json.error.code).toBe("corrupt-image");
       expect(json.error.message).toContain(hash);
     }
-    const here = await openProject({ cwd: desktopRepo, env: { SELFIE_HOME: desktopHome } });
-    expect(await here.store.lookupKey(hash!)).toBeNull();
-    here.close();
+    const { environment } = (await cloud.batches.getBatch(batchId))!;
+    await withStore(desktopRepo, desktopHome, async (here) => {
+      expect(await here.store.lookupKey(hash!)).toBeNull();
+      expect(await here.batches.decisionsAt(environment, [headOf()])).toEqual([]);
+    });
   });
 
-  test("a later decision here isn't undone by an older one pulled", async () => {
-    const batchId = await approved();
-    await laptop("writer", "push", "--accept");
+  test("a later decision here on the same image, at the same commit, isn't undone by an older one pulled", async () => {
+    await approved();
+    await laptop("writer", "push");
     const head = headOf();
-    await desktop("reader", "pull", head);
-    await desktop(null, "reject", batchId, "--all");
-    await desktop("reader", "pull", head);
-    const local = await openProject({ cwd: desktopRepo, env: { SELFIE_HOME: desktopHome } });
-    try {
-      const { renders } = await local.batches.readBatch(batchId);
-      expect(renders.map(({ decision }) => decision?.decision)).toEqual(["rejected", "rejected"]);
-    } finally {
-      local.close();
-    }
+    const own = await record(desktop);
+    await desktop(null, "reject", own, "--all");
+    const { json } = await desktop("reader", "pull", head);
+    expect(json).toMatchObject({ images: { received: 0, alreadyHere: 2 }, decisions: 2 });
+    await withStore(desktopRepo, desktopHome, async (local) => {
+      const decisions = await local.batches.decisionsAt(json.environment, [head]);
+      expect(decisions.map(({ decision, actor }) => [decision, actor])).toEqual([["rejected", "desktop@example.com"], ["rejected", "desktop@example.com"]]);
+    });
   });
 
-  test("a commit with no goldens exits 1", async () => {
+  test("a later approval here of something else stands after a pull", async () => {
+    await approved();
+    await laptop("writer", "push");
+    await desktop("reader", "pull");
+
+    await commit(desktopRepo, "changes a");
+    stories = [{ id: "a", color: [1, 2, 3] }, { id: "b", color: GREEN }];
+    const own = await record(desktop);
+    await desktop(null, "approve", own, "--all");
+    expect((await desktop("reader", "pull")).json).toMatchObject({ images: { received: 0 }, decisions: 2 });
+
+    await commit(desktopRepo, "more");
+    const reviewed = await desktop(null, "review", await record(desktop));
+    expect(reviewed.code).toBe(0);
+    expect(reviewed.json.counts).toMatchObject({ unchanged: 2, changed: 0 });
+  });
+
+  test("a later decision on the remote replaces an older one here", async () => {
+    const batchId = await record();
+    await laptop("ci", "push");
+    const own = await record(desktop);
+    await desktop(null, "reject", own, "--all");
+    await new Promise((resolve) => setTimeout(resolve, 2));
+    const { environment, gitSha } = await decideOnCloud(batchId);
+    await desktop("reader", "pull");
+    await withStore(desktopRepo, desktopHome, async (local) => {
+      expect((await local.batches.decisionsAt(environment, [gitSha])).map(({ decision, actor }) => [decision, actor])).toEqual([["approved", "someone-on-the-remote"], ["approved", "someone-on-the-remote"]]);
+    });
+  });
+
+  describe("a removal", () => {
+    /** The laptop approved a and b, then a's story went away, and that's been rendered and pushed. */
+    async function dropA(token: string) {
+      await approved();
+      await laptop("writer", "push");
+      await commit(h.repo, "drops a");
+      stories = [{ id: "b", color: GREEN }];
+      const batchId = await record();
+      await laptop(token, "push", batchId);
+      return batchId;
+    }
+
+    test("approved on the remote comes down, and a review here stops asking about it", async () => {
+      const batchId = await dropA("ci");
+      const { environment, gitSha } = (await cloud.batches.getBatch(batchId))!;
+      git(desktopRepo, "pull", "--quiet", h.repo, "main");
+
+      await desktop("reader", "pull");
+      const own = await record(desktop);
+      const asked = await desktop(null, "review", own);
+      expect(asked.code).toBe(1);
+      expect(asked.json.differences).toMatchObject([{ story: "a", state: "removed" }]);
+
+      await cloud.batches.decide({ environment, decision: "approved", actor: "someone-on-the-remote", renders: [{ story: "a", imageHash: null }], on: { batchId, gitSha } });
+      const { code, json } = await desktop("reader", "pull");
+      expect(code).toBe(0);
+      expect(json).toMatchObject({ images: { received: 0 }, decisions: 3 });
+      await withStore(desktopRepo, desktopHome, async (local) => {
+        expect((await local.batches.decisionsAt(environment, [gitSha])).map(({ story, imageHash, decision, actor }) => [story, imageHash, decision, actor])).toEqual([["a", null, "approved", "someone-on-the-remote"]]);
+      });
+      const reviewed = await desktop(null, "review", own);
+      expect(reviewed.code).toBe(0);
+      expect(reviewed.json.differences).toEqual([]);
+      expect(reviewed.json.counts).toMatchObject({ removed: 0, unchanged: 1 });
+    });
+
+    test("approved here goes up with a push, by a token that may decide", async () => {
+      const batchId = await dropA("writer");
+      const { environment, gitSha } = (await cloud.batches.getBatch(batchId))!;
+      expect(await cloud.batches.decisionsAt(environment, [gitSha])).toEqual([]);
+      expect((await cloud.batches.compareReached(batchId)).renders).toMatchObject([{ story: "a", state: "removed" }]);
+
+      await laptop(null, "approve", batchId, "--all");
+      const { code, json } = await laptop("writer", "push", batchId);
+      expect(code).toBe(0);
+      // Its own, and b's approval from the commit before, which is on an image of this batch.
+      expect(json.decisions).toBe(2);
+      expect((await cloud.batches.decisionsAt(environment, [gitSha])).map(({ story, imageHash, decision, actor, batchId: on }) => [story, imageHash, decision, actor, on])).toEqual([["a", null, "approved", "writer-login", batchId]]);
+      expect((await cloud.batches.compareReached(batchId)).renders).toMatchObject([{ story: "a", state: "removed", decision: { decision: "approved" } }]);
+
+      // A later commit doesn't ask about it.
+      await commit(h.repo, "later");
+      const later = await record();
+      await laptop("ci", "push", later);
+      expect(await cloud.batches.compareReached(later)).toMatchObject({ renders: [], unchangedCount: 1 });
+    });
+
+    test("approved here stays here, for a token that can't decide", async () => {
+      const batchId = await dropA("ci");
+      const { environment, gitSha } = (await cloud.batches.getBatch(batchId))!;
+      await laptop(null, "approve", batchId, "--all");
+      const { code, json } = await laptop("ci", "push", batchId);
+      expect(code).toBe(0);
+      expect(json.decisions).toBeNull();
+      expect(await cloud.batches.decisionsAt(environment, [gitSha])).toEqual([]);
+    });
+
+    test("is found by what the commit reaches, so it goes up from a later commit's push too", async () => {
+      const batchId = await dropA("ci");
+      const { environment, gitSha } = (await cloud.batches.getBatch(batchId))!;
+      await laptop(null, "approve", batchId, "--all");
+      await commit(h.repo, "later");
+      await record();
+      const { code } = await laptop("writer", "push");
+      expect(code).toBe(0);
+      expect(await cloud.batches.decisionsAt(environment, [gitSha])).toMatchObject([{ story: "a", imageHash: null, decision: "approved", actor: "writer-login" }]);
+    });
+  });
+
+  test("with nothing on the remote, takes no decisions and exits 0", async () => {
+    const head = git(desktopRepo, "rev-parse", "HEAD");
+    const { code, json } = await desktop("reader", "pull");
+    expect(code).toBe(0);
+    expect(json).toEqual({ sha: head, environment: expect.any(String), images: { received: 0, alreadyHere: 0 }, decisions: 0 });
+  });
+
+  test("a batch with nothing decided on it gives no decisions, and exits 0", async () => {
     await record();
+    await laptop("ci", "push");
     const head = headOf();
     const { code, json } = await desktop("reader", "pull", head);
-    expect(code).toBe(1);
-    expect(json).toMatchObject({ sha: head, batchId: null });
+    expect(code).toBe(0);
+    expect(json).toMatchObject({ sha: head, images: { received: 0, alreadyHere: 0 }, decisions: 0 });
   });
 
   test("a commit that isn't one is a usage error", async () => {
     expect((await desktop("reader", "pull", "no-such-commit")).code).toBe(2);
   });
 
+  test("a repository with no commits has nothing to ask about", async () => {
+    const empty = path.join(h.scratch, "empty");
+    git(h.scratch, "init", "--quiet", "--initial-branch=main", empty);
+    git(empty, "remote", "add", "origin", "https://github.com/diffplug/selfie.git");
+    await writeTestConfig(empty);
+    const asked: string[] = [];
+    const run = machine(empty, path.join(h.scratch, "empty-home"), () => (async (url: string, init?: RequestInit) => {
+      asked.push(url);
+      return toCloud(url, init);
+    }) as typeof fetch);
+    const { code, json } = await run("reader", "pull");
+    expect(code).toBe(0);
+    expect(json).toEqual({ sha: null, environment: expect.any(String), images: { received: 0, alreadyHere: 0 }, decisions: 0 });
+    expect(asked).toEqual([]);
+  });
+
   test("CI can't pull a private project", async () => {
     await approved();
-    await laptop("writer", "push", "--accept");
+    await laptop("writer", "push");
     const head = headOf();
     const { code, json } = await desktop("ci", "pull", head);
     expect(code).toBe(2);
@@ -476,14 +698,18 @@ test("over a real socket, with the mount a deployment would use", async () => {
   try {
     const address = server.address() as { port: number };
     let stdout = "";
-    const code = await runCli(["push", "--accept"], {
-      cwd: h.repo,
-      env: { SELFIE_HOME: h.home, SELFIE_REMOTE: `http://127.0.0.1:${address.port}/`, SELFIE_TOKEN: "writer" },
-      stdout: (text) => void (stdout += text),
-      stderr: () => undefined,
-    });
-    expect(code).toBe(0);
-    expect(JSON.parse(stdout)).toMatchObject({ images: { sent: 2 }, goldens: { outcome: "accepted" } });
+    const overSocket = async (argv: string[], home: string) => {
+      stdout = "";
+      const code = await runCli(argv, {
+        cwd: h.repo,
+        env: { SELFIE_HOME: home, SELFIE_REMOTE: `http://127.0.0.1:${address.port}/`, SELFIE_TOKEN: "writer" },
+        stdout: (text) => void (stdout += text),
+        stderr: () => undefined,
+      });
+      return { code, json: JSON.parse(stdout) };
+    };
+    expect(await overSocket(["push"], h.home)).toMatchObject({ code: 0, json: { images: { sent: 2 }, decisions: 2 } });
+    expect(await overSocket(["pull"], path.join(h.scratch, "fresh-home"))).toMatchObject({ code: 0, json: { images: { received: 2 }, decisions: 2 } });
   } finally {
     server.closeAllConnections();
     await new Promise((resolve) => server.close(resolve));

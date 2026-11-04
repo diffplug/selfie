@@ -5,6 +5,7 @@ import path from "node:path";
 import { encodePng } from "../src/png.ts";
 import { openProject, type Project } from "../src/project.ts";
 import { createSyncApi, type SyncAccess } from "selfie-ui/sync";
+import { SYNC_LIMITS } from "selfie-ui/sync-api";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { createHarness, RED, GREEN, BLUE, solid, type Color, type Harness } from "./support.ts";
 
@@ -68,7 +69,6 @@ async function sendBatch(id = BATCH, color: Color = RED, overrides: Record<strin
 }
 
 const approve = (hash: string, at = 700) => send("POST", "/decisions", "writer", { environment: ENV, decisions: [{ story: "a", imageHash: hash, decision: "approved", at, gitSha: SHA, batchId: BATCH }] });
-const goldens = (body: unknown, token = "writer") => send("POST", "/goldens", token, body);
 
 beforeEach(async () => {
   h = await createHarness();
@@ -165,7 +165,7 @@ describe("images", () => {
   });
 
   test("an anonymous caller with a bad body gets the same 404 as anyone, not a 400", async () => {
-    const response = await app.request("/projects/99/goldens", { method: "POST", body: "not json" });
+    const response = await app.request("/projects/99/decisions/reached", { method: "POST", body: "not json" });
     expect(response.status).toBe(404);
   });
 
@@ -282,96 +282,89 @@ describe("decisions", () => {
     expect(((await response.json()) as any).error.code).toBe("unknown-image");
   });
 
+  test("takes a removal, by whoever is pushing, and the latest wins", async () => {
+    const removal = { story: "gone", imageHash: null, decision: "approved", at: 700, gitSha: SHA, batchId: BATCH };
+    expect((await send("POST", "/decisions", "writer", { environment: ENV, decisions: [{ ...removal, actor: "someone-else" }] })).status).toBe(200);
+    expect(await cloud.batches.decisionsAt(ENV, [SHA])).toEqual([{ ...removal, actor: "writer-login" }]);
+    await send("POST", "/decisions", "writer", { environment: ENV, decisions: [{ ...removal, decision: "rejected", at: 800 }] });
+    await send("POST", "/decisions", "writer", { environment: ENV, decisions: [{ ...removal, at: 750 }] });
+    expect(await cloud.batches.decisionsAt(ENV, [SHA])).toMatchObject([{ imageHash: null, decision: "rejected", at: 800 }]);
+    expect((await send("POST", "/decisions", "ci", { environment: ENV, decisions: [removal] })).status).toBe(403);
+  });
+
+  test("won't read a missing image as a removal, which has to say so", async () => {
+    const { imageHash: _, ...withoutOne } = { story: "a", imageHash: null, decision: "approved", at: 1, gitSha: SHA, batchId: BATCH };
+    expect((await send("POST", "/decisions", "writer", { environment: ENV, decisions: [withoutOne] })).status).toBe(400);
+    expect((await send("POST", "/decisions", "writer", { environment: ENV, decisions: [{ ...withoutOne, imageHash: null }] })).status).toBe(200);
+  });
+
   test("refuses what isn't a decision", async () => {
     expect((await send("POST", "/decisions", "writer", { environment: ENV, decisions: [{ story: "a", imageHash: "nope", decision: "approved", at: 1, gitSha: SHA, batchId: BATCH }] })).status).toBe(400);
     expect((await send("POST", "/decisions", "writer", { environment: ENV, decisions: [{ story: "a", imageHash: UNKNOWN_HASH, decision: "maybe", at: 1, gitSha: SHA, batchId: BATCH }] })).status).toBe(400);
   });
 });
 
-describe("goldens", () => {
-  test("a person's approval, and then CI can make them, with nothing to remove", async () => {
+describe("what a commit reaches", () => {
+  const THIRD_SHA = "c".repeat(40);
+  const reached = (body: unknown, token = "reader") => send("POST", "/decisions/reached", token, body);
+  const decide = (story: string, imageHash: string | null, at: number, gitSha: string, decision = "approved", batchId = BATCH) =>
+    send("POST", "/decisions", "writer", { environment: ENV, decisions: [{ story, imageHash, decision, at, gitSha, batchId }] });
+
+  test("answers an anonymous viewer, with who decided, and each decision's commit", async () => {
     const hash = await sendBatch();
     await approve(hash);
-    expect(await (await goldens({ batchId: BATCH, baselineSha: null, removed: [] }, "ci")).json()).toEqual({ outcome: "accepted", acceptedBatchId: BATCH, refusal: null });
-    expect(await cloud.batches.acceptedBatchAt(SHA, ENV)).toBe(BATCH);
+    const response = await app.request("/projects/42/decisions/reached", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ environment: ENV, commits: [OTHER_SHA, SHA] }) });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ decisions: [{ story: "a", imageHash: hash, decision: "approved", actor: "writer-login", at: 700, batchId: BATCH, gitSha: SHA }] });
   });
 
-  test("are refused for what nobody approved, and leave the batch", async () => {
-    await sendBatch();
-    expect(await (await goldens({ batchId: BATCH, baselineSha: null, removed: [] }, "ci")).json()).toMatchObject({ outcome: "refused", refusal: { code: "not-approved" } });
-    expect(await cloud.batches.acceptedBatchAt(SHA, ENV)).toBeNull();
-    expect(await cloud.batches.getBatch(BATCH)).not.toBeNull();
+  test("leaves out what can't change how a story reads, for each story", async () => {
+    const [{ hash: red }, { hash: green }, { hash: blue }] = [await putImage(RED), await putImage(GREEN), await putImage(BLUE)];
+    await decide("a", red, 100, SHA);
+    await decide("a", blue, 200, SHA);
+    await decide("a", green, 300, OTHER_SHA);
+    await decide("a", blue, 400, THIRD_SHA);
+    await decide("a", red, 500, THIRD_SHA, "rejected");
+    await decide("b", green, 150, SHA, "rejected");
+    const { decisions } = (await (await reached({ environment: ENV, commits: [THIRD_SHA, OTHER_SHA, SHA] })).json()) as any;
+    expect(decisions.map(({ story, imageHash, at, gitSha }: any) => [story, imageHash, at, gitSha])).toEqual([
+      ["a", red, 500, THIRD_SHA],
+      ["a", blue, 400, THIRD_SHA],
+      ["a", green, 300, OTHER_SHA],
+      ["b", green, 150, SHA],
+    ]);
   });
 
-  test("the same batch again is fine", async () => {
-    await approve(await sendBatch());
-    await goldens({ batchId: BATCH, baselineSha: null, removed: [] });
-    expect(await (await goldens({ batchId: BATCH, baselineSha: null, removed: [] })).json()).toEqual({ outcome: "already", acceptedBatchId: BATCH, refusal: null });
-  });
-
-  test("a different batch never replaces them", async () => {
-    await approve(await sendBatch());
-    await goldens({ batchId: BATCH, baselineSha: null, removed: [] });
-    await approve(await sendBatch(OTHER_BATCH, GREEN));
-    expect(await (await goldens({ batchId: OTHER_BATCH, baselineSha: null, removed: [] })).json()).toMatchObject({ outcome: "conflict", acceptedBatchId: BATCH });
-    expect(await cloud.batches.acceptedBatchAt(SHA, ENV)).toBe(BATCH);
-  });
-
-  describe("that remove something", () => {
-    beforeEach(async () => {
-      const { hash: a } = await putImage(RED);
-      const { hash: b } = await putImage(BLUE);
-      await send("PUT", `/batches/${BATCH}`, "writer", batchFacts());
-      await send("POST", `/batches/${BATCH}/renders`, "writer", { renders: [{ story: "a", imageHash: a }, { story: "b", imageHash: b }] });
-      await send("POST", `/batches/${BATCH}/finish`, "writer", { count: 2, finishedAt: 600 });
-      await send("POST", "/decisions", "writer", { environment: ENV, decisions: [{ story: "a", imageHash: a, decision: "approved", at: 700, gitSha: SHA, batchId: BATCH }, { story: "b", imageHash: b, decision: "approved", at: 700, gitSha: SHA, batchId: BATCH }] });
-      await goldens({ batchId: BATCH, baselineSha: null, removed: [] });
-      await send("PUT", `/batches/${OTHER_BATCH}`, "writer", batchFacts({ gitSha: OTHER_SHA }));
-      await send("POST", `/batches/${OTHER_BATCH}/renders`, "writer", { renders: [{ story: "a", imageHash: a }] });
-      await send("POST", `/batches/${OTHER_BATCH}/finish`, "writer", { count: 1, finishedAt: 800 });
-    });
-
-    test("need someone who may decide", async () => {
-      expect((await goldens({ batchId: OTHER_BATCH, baselineSha: SHA, removed: ["b"] }, "ci")).status).toBe(403);
-    });
-
-    test("are refused if nothing was named, whoever asks", async () => {
-      expect(await (await goldens({ batchId: OTHER_BATCH, baselineSha: SHA, removed: [] }, "ci")).json()).toMatchObject({ outcome: "refused", refusal: { code: "wrong-removed" } });
-    });
-
-    test("are refused for naming something else", async () => {
-      expect(await (await goldens({ batchId: OTHER_BATCH, baselineSha: SHA, removed: ["c"] })).json()).toMatchObject({ outcome: "refused", refusal: { code: "wrong-removed" } });
-    });
-
-    test("go through for naming just what they remove", async () => {
-      expect(await (await goldens({ batchId: OTHER_BATCH, baselineSha: SHA, removed: ["b"] })).json()).toMatchObject({ outcome: "accepted" });
-    });
-  });
-
-  test("whose baseline isn't here are refused, saying so", async () => {
-    const hash = await sendBatch(BATCH, RED);
+  test("is only what those commits and this environment hold, and nothing of commits it's never heard of", async () => {
+    const hash = await sendBatch();
     await approve(hash);
-    expect(await (await goldens({ batchId: BATCH, baselineSha: OTHER_SHA, removed: [] })).json()).toMatchObject({ outcome: "refused", refusal: { code: "no-goldens" } });
+    expect(await (await reached({ environment: ENV, commits: [OTHER_SHA] })).json()).toEqual({ decisions: [] });
+    expect(await (await reached({ environment: "elsewhere", commits: [SHA] })).json()).toEqual({ decisions: [] });
+    expect(await (await reached({ environment: ENV, commits: [] })).json()).toEqual({ decisions: [] });
   });
 
-  test("hold a batch to whichever goldens the sender names, since CI records no baseline", async () => {
-    await approve(await sendBatch());
-    await goldens({ batchId: BATCH, baselineSha: null, removed: [] });
-    // The same image, at another commit, with no approval or recorded baseline of its own.
-    await sendBatch(OTHER_BATCH, RED, { gitSha: OTHER_SHA });
-    await cloud.batches.mergeDecisions(ENV, []);
-    expect(await (await goldens({ batchId: OTHER_BATCH, baselineSha: SHA, removed: [] }, "ci")).json()).toMatchObject({ outcome: "accepted" });
+  test("hands back a removal, as none of any image", async () => {
+    await decide("gone", null, 700, SHA);
+    const { decisions } = (await (await reached({ environment: ENV, commits: [SHA] })).json()) as any;
+    expect(decisions).toEqual([{ story: "gone", imageHash: null, decision: "approved", actor: "writer-login", at: 700, batchId: BATCH, gitSha: SHA }]);
   });
 
-  test("of a batch from nowhere are a 404", async () => {
-    expect((await goldens({ batchId: OTHER_BATCH, baselineSha: SHA, removed: [] })).status).toBe(404);
+  test("takes as many commits as the limit, and refuses more", async () => {
+    const commits = Array.from({ length: SYNC_LIMITS.shas }, (_, i) => i.toString(16).padStart(40, "f"));
+    expect((await reached({ environment: ENV, commits })).status).toBe(200);
+    expect((await reached({ environment: ENV, commits: [...commits, SHA] })).status).toBe(400);
   });
 
-  test("CI can find which commits have them, and no more", async () => {
-    await approve(await sendBatch());
-    await goldens({ batchId: BATCH, baselineSha: null, removed: [] });
-    expect(await (await send("POST", "/goldens/first", "ci", { shas: [OTHER_SHA, SHA], environment: ENV })).json()).toEqual({ sha: SHA });
-    expect(await (await send("GET", `/goldens?sha=${SHA}&environment=${ENV}`, "ci")).json()).toEqual({ batchId: BATCH });
-    expect((await send("GET", `/batches/${BATCH}`, "ci")).status).toBe(403);
+  test("refuses what isn't a commit, or an environment", async () => {
+    expect((await reached({ environment: ENV, commits: ["abc123"] })).status).toBe(400);
+    expect((await reached({ environment: ENV, commits: [SHA.toUpperCase()] })).status).toBe(400);
+    expect((await reached({ environment: ENV, commits: SHA })).status).toBe(400);
+    expect((await reached({ environment: ENV })).status).toBe(400);
+    expect((await reached({ commits: [SHA] })).status).toBe(400);
+  });
+
+  test("is for whoever can view, and nobody else", async () => {
+    expect((await reached({ environment: ENV, commits: [SHA] }, "ci")).status).toBe(403);
+    expect((await reached({ environment: ENV, commits: [SHA] }, "nobody")).status).toBe(404);
   });
 });

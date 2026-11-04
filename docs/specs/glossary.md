@@ -11,8 +11,7 @@
 | **Environment** | What decides the pixels apart from the project's own input: the runner, its architecture, the browser and its flags, the viewport and scale, and the render recipe (`docs/specs/system.md`). Its ID is part of a render's name. |
 | **Render batch** | The record of the process that rendered a set of images, against a Git sha. `batch` for short. |
 | **Reference** | What a story is compared with at a commit: the image of the newest approval that commit's history reaches (`docs/specs/renders.md` → Approvals). A story with none has no reference. Code and the page still say "golden" for it, as in `goldenHash`, until that's renamed. |
-| **Golden** | A commit's images in the cloud's store: those of the one batch accepted there. Only `selfie push` and `selfie pull` use them, until sync moves to approvals (`docs/specs/sync.md`). |
-| **Baseline** | What `selfie review --baseline` compares with, for one review: a batch, or a commit's history. In sync, the commit whose goldens a batch is held to. |
+| **Baseline** | What `selfie review --baseline` compares with, for one review: a batch, or a commit's history. |
 | **Note** | What a person says about a story, for an agent to act on: on an image, and maybe a box of it (`docs/specs/feedback.md`). |
 | **Session** | Whose notes these are: a local Git worktree's top folder (`docs/specs/feedback.md`). |
 | **Approval** | A person's or agent's acceptance of a render, or of a story being gone, at the commit of the batch it was made on. It counts wherever that commit's history reaches, and may be made before the change is pushed (`docs/specs/renders.md` → Approvals). |

@@ -52,7 +52,7 @@ Source of truth: `commitStatusOf` in `ui/src/shared/commit-status.ts`, `publish`
 | `success`, green | Every story matches what its history approved |
 
 - **Must post one status per commit, in the context `selfie`, linking to its batch's page.**
-- **Must post it from the newest finished batch at that commit, when a batch finishes and on every decision, after answering**, so nobody waits on GitHub to see their decision.
+- **Must post it from the newest finished batch at that commit, when a batch finishes, on every decision made here, and for the commit a push sends decisions for, after answering**, so nobody waits on GitHub to see their decision.
 - **Must keep a decision if GitHub can't take its status**, and log why. The next decision or push says it again.
 - **Must render on every pushed branch, through `.github/actions/selfie` on an arm64 runner, with all of a commit's history**, so what's pinned matches (`docs/specs/render.md`) and what it reaches is known. A failed story is a result the status says, and only a push that fails fails the job.
 - **Never make a commit's status required from here.** Whether `selfie` blocks a merge is the repository owner's choice, in branch protection.
@@ -60,7 +60,7 @@ Source of truth: `commitStatusOf` in `ui/src/shared/commit-status.ts`, `publish`
 ## Future
 
 - A status saying a commit is still rendering, between a push and its batch. Until then a commit has no `selfie` status for those minutes.
-- Following a branch's earlier batches, so a force-push keeps the approvals its old commits had. Until then it asks again. Whether a squash merge carries approvals is **Scope: approvals-sync** (`docs/specs/renders.md` → Future).
+- Following a branch's earlier batches, so a force-push keeps the approvals its old commits had. Until then it asks again.
 - A status on a fork's pull request, which gets no upload token (`docs/specs/access.md` → Pull requests from forks).
 - A list of a project's commits and batches.
 - A project's own `hunkMergeDistance`, since nothing here reads its config. Hunks group at the default of 12.
