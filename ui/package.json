@@ -7,6 +7,8 @@
   "exports": {
     "./api": "./src/shared/api.ts",
     "./batch-view": "./src/server/batch-view.ts",
+    "./deltas": "./src/shared/deltas.ts",
+    "./diff-image": "./src/shared/diff-image.ts",
     "./app": "./src/server/app.ts",
     "./hunks": "./src/shared/hunks.ts",
     "./notes": "./src/shared/notes.ts",

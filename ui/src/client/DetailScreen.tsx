@@ -7,7 +7,8 @@ import { findRenames } from "../shared/renames.ts";
 import { isDecidable } from "selfie-store";
 import type { DecisionKind, PixelDiff, BatchView, RenderRow } from "../shared/api.ts";
 import { diffImageUrl, fetchDiff, imageUrl } from "./api.ts";
-import { isHosted, signInHref } from "./base.ts";
+import { prepareNext, usePatchedGolden, type PatchedGolden } from "./deltas.ts";
+import { canDecide, signInHref } from "./base.ts";
 import { parseFilter, targetsOf, type StoryNavigation } from "./filter.ts";
 import { useFetched, useHotkeys, useHunkSelection, useTitle, type FeedbackState, type BatchState } from "./hooks.ts";
 import { imageCount, ImageCompare } from "./ImageCompare.tsx";
@@ -67,7 +68,7 @@ function PixelStats({ stats }: { stats: PixelDiff }) {
   return (
     <Text className="selfie-muted">
       <strong>{describePixels(stats)}</strong>
-      {!isLayoutOnly(stats) && ` of ${stats.totalPixels.toLocaleString()} changed`}
+      {stats.changedPixels > 0 && ` of ${stats.totalPixels.toLocaleString()} changed`}
       {box === null ? "" : `, within ${describeBox(box)}`}.
       {account.length > 0 && ` ${account.join(", ")} pixels.`}
       {stats.maxChannelDelta > 0 && ` The largest difference in a channel is ${stats.maxChannelDelta} of 255.`}
@@ -107,6 +108,20 @@ function Notes({ row, diff, renamedFrom, renamedTo }: { row: RenderRow; diff: Pi
   );
 }
 
+const NOTHING_ACCEPTED: ReadonlySet<string> = new Set();
+
+/** Says the golden on screen isn't the one on record, and how to see that one. */
+function PatchedBanner({ patched, shown, onShown }: { patched: PatchedGolden; shown: boolean; onShown: (shown: boolean) => void }) {
+  return (
+    <Banner
+      variant="info"
+      title={patched.diff.hunks.length === 0 ? "Accepted deltas account for every difference" : "Accepted deltas account for part of this"}
+      description="They're drawn onto the golden on this page, in this browser, and the golden on record hasn't changed."
+      primaryAction={<Banner.PrimaryAction onClick={() => onShown(!shown)}>{shown ? "Show the golden on record" : "Show with deltas"}</Banner.PrimaryAction>}
+    />
+  );
+}
+
 /** Where this story is, and the way to the ones either side of it. */
 export function StoryPager({ previous, next, position }: Pick<StoryNavigation, "previous" | "next" | "position">) {
   const go = (href: string | null) => {
@@ -134,6 +149,7 @@ export function DetailScreen({
   navigation,
   liveStories,
   startNote = false,
+  accepted = NOTHING_ACCEPTED,
 }: {
   state: BatchState;
   view: BatchView;
@@ -145,6 +161,8 @@ export function DetailScreen({
   liveStories?: readonly [boolean, (open: boolean) => void];
   /** Someone asked to write a note on this story, and it's just been rendered so they can. */
   startNote?: boolean;
+  /** The deltas accepted on this batch, which only its own pages have. */
+  accepted?: ReadonlySet<string>;
 }) {
   const { unchanged, loadUnchanged } = state;
   const filter = useMemo(() => parseFilter(search), [search]);
@@ -176,7 +194,12 @@ export function DetailScreen({
   const { data: fetched, error: diffError } = useFetched(changedPair && row.pixelDiff === null ? `${row.imageHash}/${compared.hash}` : null, (signal) =>
     fetchDiff(row!.imageHash!, compared!.hash, signal),
   );
-  const diff = row?.pixelDiff ?? fetched;
+  const recordedDiff = row?.pixelDiff ?? fetched;
+  const patched = usePatchedGolden(row, accepted);
+  // Here, so that it stays as it is from story to story, like how someone's looking at the images.
+  const [deltasShown, setDeltasShown] = useState(true);
+  const applied = deltasShown ? patched : null;
+  const diff = applied?.diff ?? recordedDiff;
   const mergeDistance = view.hunkMergeDistance * view.batch.scale;
   const groups = useMemo(() => (diff === null ? [] : groupHunks(diff.hunks, mergeDistance)), [diff, mergeDistance]);
   const selection = useHunkSelection(story);
@@ -194,12 +217,13 @@ export function DetailScreen({
     for (const url of urls) {
       if (url !== null) new Image().src = url;
     }
-  }, [preloading]);
+    prepareNext(preloading, accepted);
+  }, [preloading, accepted]);
 
-  const canDecide = !isHosted || view.actor !== null;
+  const mayDecide = canDecide(view);
   const decide = async (decision: DecisionKind) => {
     if (row === null || state.busy) return;
-    if (!canDecide) {
+    if (!mayDecide) {
       setMessage("Sign in to approve or reject.");
       return;
     }
@@ -255,8 +279,8 @@ export function DetailScreen({
           </Heading>
           <StorybookLinkTo row={row} view={view} />
         </Stack>
-        {decidable && !canDecide && <LinkButton href={signInHref()}>Sign in to approve</LinkButton>}
-        {decidable && canDecide && (
+        {decidable && !mayDecide && <LinkButton href={signInHref()}>Sign in to approve</LinkButton>}
+        {decidable && mayDecide && (
           <Stack direction="horizontal" gap="condensed">
             <Button variant="primary" leadingVisual={CheckIcon} disabled={state.busy} onClick={() => void decide("approved")} trailingVisual={() => <Keys keys="a" onPrimary />}>
               Approve
@@ -303,8 +327,9 @@ export function DetailScreen({
       ) : (
         <Notes row={row} diff={diff} renamedFrom={renamedFrom} renamedTo={[...renames].find(([, from]) => from === row.story)?.[0]} />
       )}
+      {patched !== null && <PatchedBanner patched={patched} shown={deltasShown} onShown={setDeltasShown} />}
       <LiveStories row={row} view={view} open={liveOpen} onToggle={() => setLiveOpen(!liveOpen)} />
-      <ImageCompare row={row} diff={diff} scale={view.batch.scale} groups={groups} selection={selection} batchId={view.batch.id} feedback={feedback} startNote={startNote} />
+      <ImageCompare row={row} diff={diff} patched={applied?.images ?? null} scale={view.batch.scale} groups={groups} selection={selection} batchId={view.batch.id} feedback={feedback} startNote={startNote} />
       {helpOpen && <ShortcutsDialog images={imageCount(row, notedImage)} onClose={() => setHelpOpen(false)} />}
     </Stack>
   );

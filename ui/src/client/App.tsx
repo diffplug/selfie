@@ -2,8 +2,10 @@ import { Heading } from "@primer/react";
 import logo from "../../../branding/logo-icon.svg";
 import { useLayoutEffect, useRef, type ReactNode } from "react";
 import { fetchBatchContext } from "./api.ts";
+import { canDecide } from "./base.ts";
 import { DetailScreen } from "./DetailScreen.tsx";
 import { FeedbackBar, NewerBatchBanner } from "./Feedback.tsx";
+import { useDeltas } from "./deltas.ts";
 import { useFeedback, useFetched, useBatch } from "./hooks.ts";
 import { StoriesRoutes } from "./StoriesScreen.tsx";
 import { AppLink, parseRoute, storyPath, useLocation, type Route, storiesPath } from "./router.tsx";
@@ -18,6 +20,7 @@ function BatchRoutes({ batchId, route, search }: { batchId: string; route: Route
   const feedback = useFeedback();
   const { data: context } = useFetched(batchId, (signal) => fetchBatchContext(batchId, signal));
   const tree = useBatchTree(state.view, state.unchanged, search, route.kind === "story" ? route.story : null);
+  const deltas = useDeltas(batchId, state.view?.rows, route.kind === "batch" && state.view !== null && canDecide(state.view));
   // Where to put focus on coming back to the list.
   const lastStory = useRef<string | null>(null);
   if (state.view === null) {
@@ -32,9 +35,9 @@ function BatchRoutes({ batchId, route, search }: { batchId: string; route: Route
       )}
       <FeedbackBar feedback={feedback} storyHref={(story) => storyPath(batchId, story, "")} showList={route.kind === "batch"} />
       {route.kind === "story" && tree.navigation !== null ? (
-        <DetailScreen state={state} view={state.view} story={route.story} search={search} feedback={feedback} navigation={tree.navigation} />
+        <DetailScreen state={state} view={state.view} story={route.story} search={search} feedback={feedback} navigation={tree.navigation} accepted={deltas.accepted} />
       ) : (
-        <BatchScreen state={state} view={state.view} search={search} returningFrom={lastStory} />
+        <BatchScreen state={state} view={state.view} search={search} returningFrom={lastStory} deltas={deltas} />
       )}
     </BatchLayout>
   );

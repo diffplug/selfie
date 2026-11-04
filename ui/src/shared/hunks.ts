@@ -10,7 +10,7 @@ export interface HunkGroup extends BoxPair {
 }
 
 /** Nothing changed but where things are, which a person still decides is right. */
-export const isLayoutOnly = ({ changedPixels }: PixelDiff) => changedPixels === 0;
+export const isLayoutOnly = ({ changedPixels, hunks }: PixelDiff) => changedPixels === 0 && hunks.length > 0;
 
 const strongest = (p: HunkKind, q: HunkKind): HunkKind => (p === "changed" || q === "changed" ? "changed" : p === "moved" || q === "moved" ? "moved" : "spacing");
 

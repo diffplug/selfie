@@ -11,6 +11,7 @@
 | **Environment** | What decides the pixels apart from the project's own input: the runner, its architecture, the browser and its flags, the viewport and scale, and the render recipe (`docs/specs/system.md`). Its ID is part of a render's name. |
 | **Render batch** | The record of the process that rendered a set of images, against a Git sha. `batch` for short. |
 | **Reference** | What a story is compared with at a commit: the image of the newest approval that commit's history reaches (`docs/specs/renders.md` → Approvals). A story with none has no reference. Code and the page still say "golden" for it, as in `goldenHash`, until that's renamed. |
+| **Delta** | One change repeated across stories: hunks whose two sides are the same size and hold the same pixels (`docs/specs/ui.md` → Screens). |
 | **Baseline** | What `selfie review --baseline` compares with, for one review: a batch, or a commit's history. |
 | **Note** | What a person says about a story, for an agent to act on: on an image, and maybe a box of it (`docs/specs/feedback.md`). |
 | **Session** | Whose notes these are: a local Git worktree's top folder (`docs/specs/feedback.md`). |

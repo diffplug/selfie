@@ -7,6 +7,7 @@ import type { BoundingBox, Note, PixelDiff, RenderRow } from "../shared/api.ts";
 import { comparedImage, isOpenNote, newestNotedImage } from "../shared/notes.ts";
 import { hull, type HunkGroup } from "../shared/hunks.ts";
 import { diffImageUrl, imageUrl } from "./api.ts";
+import type { PatchedImages } from "./deltas.ts";
 import { isHosted } from "./base.ts";
 import { useDevicePixelRatio, useHotkeys, type FeedbackState, type HunkSelection } from "./hooks.ts";
 import { Keys } from "./Keys.tsx";
@@ -34,15 +35,20 @@ interface Source {
   readonly src: string;
   /** The image a note written on this layer is about. */
   readonly hash: string | null;
+  readonly words: string;
+  /** Whether a box on this says where in `hash` it is, which it doesn't once a golden's been redrawn. */
+  readonly boxable: boolean;
 }
 
-function sourcesOf({ imageHash, goldenHash }: RenderRow, hasDiffImage: boolean, noted: string | null, compared: string | null): readonly Source[] {
+const sourceOf = (name: Layer, src: string, hash: string | null): Source => ({ name, src, hash, words: LAYER_WORDS[name], boxable: true });
+
+function sourcesOf({ imageHash, goldenHash }: RenderRow, hasDiffImage: boolean, noted: string | null, compared: string | null, patched: PatchedImages | null = null): readonly Source[] {
   const sources: Source[] = [];
-  if (noted !== null && noted !== imageHash && noted !== goldenHash) sources.push({ name: "noted", src: imageUrl(noted), hash: noted });
+  if (noted !== null && noted !== imageHash && noted !== goldenHash) sources.push(sourceOf("noted", imageUrl(noted), noted));
   // The same image twice is still one image to look at, as an unchanged story's are.
-  if (goldenHash !== null && goldenHash !== imageHash) sources.push({ name: "golden", src: imageUrl(goldenHash), hash: goldenHash });
-  if (imageHash !== null) sources.push({ name: "current", src: imageUrl(imageHash), hash: imageHash });
-  if (hasDiffImage && imageHash !== null && compared !== null) sources.push({ name: "diff", src: diffImageUrl(imageHash, compared), hash: imageHash });
+  if (goldenHash !== null && goldenHash !== imageHash) sources.push(patched === null ? sourceOf("golden", imageUrl(goldenHash), goldenHash) : { ...sourceOf("golden", patched.golden, goldenHash), words: "Golden with deltas", boxable: false });
+  if (imageHash !== null) sources.push(sourceOf("current", imageUrl(imageHash), imageHash));
+  if (hasDiffImage && imageHash !== null && compared !== null) sources.push(sourceOf("diff", patched?.diff ?? diffImageUrl(imageHash, compared), imageHash));
   return sources;
 }
 
@@ -117,7 +123,7 @@ function NoteBoxes({ notes, drawn, size }: { notes: readonly Note[]; drawn: Boun
 }
 
 function Pane({
-  layer,
+  words,
   src,
   story,
   captioned,
@@ -126,7 +132,7 @@ function Pane({
   onLoad,
   children,
 }: {
-  layer: Layer;
+  words: string;
   src: string;
   story: string;
   captioned: boolean;
@@ -137,10 +143,10 @@ function Pane({
 }) {
   return (
     <figure className="selfie-pane">
-      {captioned && <figcaption>{LAYER_WORDS[layer]}</figcaption>}
+      {captioned && <figcaption>{words}</figcaption>}
       <div className="selfie-pane-image">
         <button type="button" className="selfie-pane-button" onClick={onOpen} aria-label={openLabel}>
-          <img src={src} alt={`${LAYER_WORDS[layer]} image of ${story}`} loading="lazy" decoding="async" onLoad={onLoad} />
+          <img src={src} alt={`${words} image of ${story}`} loading="lazy" decoding="async" onLoad={onLoad} />
         </button>
         {children}
       </div>
@@ -151,6 +157,8 @@ function Pane({
 interface ImageCompareProps {
   readonly row: RenderRow;
   readonly diff: PixelDiff | null;
+  /** The golden and diff to show instead, which have accepted deltas drawn on them, as `diff` already says. */
+  readonly patched: PatchedImages | null;
   readonly scale: number;
   readonly groups: readonly HunkGroup[];
   readonly selection: HunkSelection;
@@ -160,14 +168,14 @@ interface ImageCompareProps {
   readonly startNote?: boolean;
 }
 
-export function ImageCompare({ row, diff, scale, groups, selection, batchId, feedback, startNote = false }: ImageCompareProps) {
+export function ImageCompare({ row, diff, patched, scale, groups, selection, batchId, feedback, startNote = false }: ImageCompareProps) {
   const { story, imageHash, goldenHash } = row;
   const allNotes = feedback.view?.notes ?? [];
   const storyNotes = allNotes.filter((note) => note.story === story);
   const openNotes = storyNotes.filter(isOpenNote);
   const notedImage = newestNotedImage(allNotes, story);
   const compared = comparedImage(row, notedImage);
-  const sources = sourcesOf(row, diff !== null, notedImage, compared?.hash ?? null);
+  const sources = sourcesOf(row, diff !== null, notedImage, compared?.hash ?? null, patched);
   const oneImage = sources.length === 1;
   const canFlip = sources.length > 1 && compared !== null;
   // A failed story's one image may be its render or its golden, so it has to say which it is.
@@ -182,6 +190,7 @@ export function ImageCompare({ row, diff, scale, groups, selection, batchId, fee
   // The layer someone asked for, or, in a story without it, the one it has.
   const shown = sources.find(({ name }) => name === wantedLayer) ?? sources.find(({ name }) => name === "current") ?? sources[0];
   const layer = shown?.name ?? "current";
+  const shownWords = shown?.words ?? LAYER_WORDS.current;
   const [zoom, setZoom] = useState<Zoom>("size");
   const zoomOptions: readonly ZoomOption[] = oneImage ? ["fit", ...ZOOMS] : ZOOMS;
   const zoomShown: ZoomOption = mode === "side" ? "fit" : zoom;
@@ -268,20 +277,23 @@ export function ImageCompare({ row, diff, scale, groups, selection, batchId, fee
     } else section.current?.querySelector(`[data-hunk="${index}"]`)?.scrollIntoView({ block: "center" });
   };
 
-  const hashOn = (on: Layer) => sources.find(({ name }) => name === on)?.hash ?? null;
+  const sourceOn = (on: Layer) => sources.find(({ name }) => name === on);
+  const hashOn = (on: Layer) => sourceOn(on)?.hash ?? null;
 
   const outlinesOn = (on: Layer, size: Size | undefined) =>
     size !== undefined && (
       <>
         {outlined && <HunkOutlines groups={groups} layer={hunkLayer(on)} size={size} selection={selection} />}
-        <NoteBoxes notes={openNotes.filter(({ imageHash: noted }) => noted === hashOn(on))} drawn={mode === "flip" ? drawn : null} size={size} />
+        <NoteBoxes notes={sourceOn(on)?.boxable === false ? [] : openNotes.filter(({ imageHash: noted }) => noted === hashOn(on))} drawn={mode === "flip" ? drawn : null} size={size} />
       </>
     );
 
-  const selectedBoxes = [...selected].flatMap((index) => boxOn(groups[index]!, hunkLayer(layer)) ?? []);
-  const noteBox = drawn ?? (selectedBoxes.length === 0 ? null : selectedBoxes.reduce(hull));
+  const boxable = shown?.boxable ?? true;
+  const drawnBox = boxable ? drawn : null;
+  const selectedBoxes = boxable ? [...selected].flatMap((index) => boxOn(groups[index]!, hunkLayer(layer)) ?? []) : [];
+  const noteBox = drawnBox ?? (selectedBoxes.length === 0 ? null : selectedBoxes.reduce(hull));
   const imageWords = hashOn(layer) === null ? "this story" : LAYER_IMAGE_WORDS[layer];
-  const noteTarget = drawn !== null ? `on the box you drew on ${imageWords}` : selectedBoxes.length > 0 ? `on ${plural(selectedBoxes.length, "selected hunk")} of ${imageWords}` : `on all of ${imageWords}`;
+  const noteTarget = drawnBox !== null ? `on the box you drew on ${imageWords}` : selectedBoxes.length > 0 ? `on ${plural(selectedBoxes.length, "selected hunk")} of ${imageWords}` : `on all of ${imageWords}`;
 
   const addNote = async (text: string) => {
     const saved = await feedback.add({ story, batchId, imageHash: hashOn(layer), box: noteBox, text });
@@ -365,9 +377,9 @@ export function ImageCompare({ row, diff, scale, groups, selection, batchId, fee
           <>
             {sources.length > 1 && (
               <SegmentedControl aria-label="Which image to show" onChange={(index) => setLayer(sources[index]!.name)}>
-                {sources.map(({ name }) => (
+                {sources.map(({ name, words }) => (
                   <SegmentedControl.Button key={name} selected={layer === name}>
-                    {LAYER_WORDS[name]}
+                    {words}
                   </SegmentedControl.Button>
                 ))}
               </SegmentedControl>
@@ -390,12 +402,12 @@ export function ImageCompare({ row, diff, scale, groups, selection, batchId, fee
       <Text as="p" className="selfie-muted selfie-small">
         {mode === "flip" ? (
           <>
-            Showing {captioned ? <strong>{LAYER_WORDS[layer].toLowerCase()}</strong> : "the image"}
+            Showing {captioned ? <strong>{shownWords.toLowerCase()}</strong> : "the image"}
             {shownSize === undefined ? "" : `, ${shownSize.width}×${shownSize.height}`} rendered at {scale}×,{" "}
             {zoom === "size" ? "at its actual size." : `with one image pixel ${zoom} device ${zoom === 1 ? "pixel" : "pixels"} wide.`}{" "}
             {canFlip && (
               <>
-                <Keys keys="f" /> flips current and {LAYER_WORDS[compared!.layer].toLowerCase()}.{" "}
+                <Keys keys="f" /> flips current and {sourceOn(compared!.layer)?.words.toLowerCase()}.{" "}
               </>
             )}
             {hasDiffLayer && (
@@ -429,10 +441,10 @@ export function ImageCompare({ row, diff, scale, groups, selection, batchId, fee
       {mode === "side" ? (
         <div className="selfie-panes" data-count={sources.length}>
           {/* Keyed by image, so an added story never shows the last one's image while its own loads. */}
-          {sources.map(({ name, src }) => (
+          {sources.map(({ name, src, words }) => (
             <Pane
               key={src}
-              layer={name}
+              words={words}
               src={src}
               story={story}
               captioned={captioned}
@@ -452,15 +464,15 @@ export function ImageCompare({ row, diff, scale, groups, selection, batchId, fee
           ))}
         </div>
       ) : (
-        <div className="selfie-viewport" ref={viewport} tabIndex={0} role="group" aria-label={`${LAYER_WORDS[layer]} image, ${zoomWords(zoom).toLowerCase()}. Scroll to pan.`}>
-          <div className="selfie-stack" {...(isHosted ? {} : drawing)} style={shownSize === undefined ? undefined : { width: shownSize.width * cssPixels, height: shownSize.height * cssPixels }}>
+        <div className="selfie-viewport" ref={viewport} tabIndex={0} role="group" aria-label={`${shownWords} image, ${zoomWords(zoom).toLowerCase()}. Scroll to pan.`}>
+          <div className="selfie-stack" {...(isHosted || !boxable ? {} : drawing)} style={shownSize === undefined ? undefined : { width: shownSize.width * cssPixels, height: shownSize.height * cssPixels }}>
             {sources.map(({ name, src }) => {
               const size = sizes[src];
               return (
                 <img
                   key={src}
                   src={src}
-                  alt={name === layer ? `${LAYER_WORDS[name]} image of ${story}` : ""}
+                  alt={name === layer ? `${shownWords} image of ${story}` : ""}
                   className="selfie-layer"
                   draggable={false}
                   style={{

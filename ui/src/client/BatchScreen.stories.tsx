@@ -5,20 +5,22 @@ import type { BatchView } from "../shared/api.ts";
 import type { BatchState } from "./hooks.ts";
 import { BatchFrame } from "./stories/BatchFrame.tsx";
 import { BatchScreen } from "./BatchScreen.tsx";
-import { approved, failure, OTHER_BATCH_ID, rejected, rows, batchOf, stateOf, viewOf } from "./stories/fixtures.ts";
+import type { DeltaState } from "./deltas.ts";
+import { approved, deltaFrom, deltasOf, failure, OTHER_BATCH_ID, rejected, rows, batchOf, stateOf, viewOf } from "./stories/fixtures.ts";
 
 interface Args {
   readonly view: BatchView;
   readonly state?: Partial<BatchState>;
   readonly search?: string;
+  readonly deltas?: DeltaState;
 }
 
-function Screen({ view, state, search = "" }: Args) {
+function Screen({ view, state, search = "", deltas = deltasOf() }: Args) {
   const returningFrom = useRef<string | null>(null);
   const shown = stateOf(view, state);
   return (
     <BatchFrame view={view} state={shown} search={search}>
-      {() => <BatchScreen state={shown} view={view} search={search} returningFrom={returningFrom} />}
+      {() => <BatchScreen state={shown} view={view} search={search} returningFrom={returningFrom} deltas={deltas} />}
     </BatchFrame>
   );
 }
@@ -114,5 +116,23 @@ export const ConfirmApproveAll: Story = {
   },
   play: async ({ canvasElement }) => {
     await userEvent.click(within(canvasElement).getByRole("button", { name: /^Approve all/ }));
+  },
+};
+
+const AFFECTED = ["components-button--primary", "pages-settings--account", "components-list--with-new-row"];
+const OFFERS = [deltaFrom("taller-golden", [...AFFECTED, "pages-home--rearranged"]), deltaFrom("changed-golden", AFFECTED), deltaFrom("spaced-golden", AFFECTED)];
+export const LookingForRepeatedChanges: Story = { args: { view: viewOf(SOME_CHANGES), deltas: deltasOf({ progress: 40 }) } };
+export const RepeatedChanges: Story = { args: { view: viewOf(SOME_CHANGES), deltas: deltasOf({ offers: OFFERS }) } };
+export const ConfirmAcceptingADelta: Story = {
+  args: { view: viewOf(SOME_CHANGES), deltas: deltasOf({ offers: OFFERS, finishes: () => [rows.changed(AFFECTED[0]!), rows.changed(AFFECTED[1]!)] }) },
+  play: async ({ canvasElement }) => {
+    const [first] = within(canvasElement).getAllByRole("button", { name: "Accept this delta to all affected snapshots" });
+    await userEvent.click(first!);
+  },
+};
+export const AcceptedDeltas: Story = {
+  args: { view: viewOf(SOME_CHANGES), deltas: deltasOf({ offers: OFFERS.slice(1), taken: OFFERS.slice(0, 1) }) },
+  play: async ({ canvasElement }) => {
+    await userEvent.click(within(canvasElement).getByText(/1 delta accepted in this browser/));
   },
 };

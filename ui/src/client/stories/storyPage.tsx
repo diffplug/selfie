@@ -10,14 +10,15 @@ export interface StoryPageArgs {
   readonly others?: readonly RenderRow[];
   readonly view?: BatchView;
   readonly notes?: readonly Note[];
+  readonly accepted?: ReadonlySet<string>;
 }
 
-export function StoryPage({ row, others = [], view, notes = [] }: StoryPageArgs) {
+export function StoryPage({ row, others = [], view, notes = [], accepted }: StoryPageArgs) {
   const shown = view ?? viewOf([row, ...others]);
   const state = stateOf(shown);
   return (
     <BatchFrame view={shown} state={state} story={row.story}>
-      {(navigation) => navigation !== null && <DetailScreen state={state} view={shown} story={row.story} search="" feedback={feedbackOf(notes)} navigation={navigation} />}
+      {(navigation) => navigation !== null && <DetailScreen state={state} view={shown} story={row.story} search="" feedback={feedbackOf(notes)} navigation={navigation} {...(accepted === undefined ? {} : { accepted })} />}
     </BatchFrame>
   );
 }
