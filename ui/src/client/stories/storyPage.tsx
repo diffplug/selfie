@@ -23,6 +23,9 @@ export function StoryPage({ row, others = [], view, notes = [] }: StoryPageArgs)
 }
 
 export const press = (...keys: readonly string[]) => async () => {
+  // A play function starts as the page commits, before its effects have run, and so before anything
+  // is listening for keys. Without this, the first key is lost.
+  await new Promise((resolve) => setTimeout(resolve));
   for (const key of keys) await userEvent.keyboard(key);
 };
 
