@@ -15,8 +15,8 @@ runs:
       run: |
         selfie_root="$(cd "$GITHUB_ACTION_PATH/../../.." && pwd)"
         echo "SELFIE_ROOT=$selfie_root" >> "$GITHUB_ENV"
-        npm install --global pnpm@10.30.1
-        (cd "$selfie_root" && pnpm install --frozen-lockfile --filter "selfie-cli..." --ignore-scripts)
+        # Not installed globally, since a repository may pin another pnpm for its own build.
+        (cd "$selfie_root" && npx --yes pnpm@10.30.1 install --frozen-lockfile --filter "selfie-cli..." --ignore-scripts)
     - name: Build the Storybook and render every story
       shell: bash
       # Exits 0 once a batch is recorded, even with failed stories, which the status says.

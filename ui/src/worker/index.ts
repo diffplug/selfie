@@ -9,6 +9,7 @@ import { githubApp } from "./github.ts";
 interface Env {
   readonly ASSETS: { fetch(request: Request): Promise<Response> };
   readonly BLOBS: R2BucketLike;
+  readonly DB_1183663019: D1DatabaseLike;
   readonly DB_1442175397: D1DatabaseLike;
   readonly DB_1445291541: D1DatabaseLike;
   readonly REVIEW_ORIGIN: string;
@@ -28,6 +29,7 @@ export default {
       projects: [
         { id: "1442175397", owner: "diffplug", name: "selfie-hackathon", defaultBranch: "main", db: env.DB_1442175397 },
         { id: "1445291541", owner: "diffplug", name: "selfie-sandbox", defaultBranch: "main", db: env.DB_1445291541 },
+        { id: "1183663019", owner: "diffplug", name: "dormouse", defaultBranch: "main", db: env.DB_1183663019 },
       ],
       bucket: env.BLOBS,
       reviewOrigin: env.REVIEW_ORIGIN,
