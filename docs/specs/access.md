@@ -86,7 +86,7 @@ GitHub decides. Selfie keeps no member list of its own.
 
 - **Must authenticate CI uploads with GitHub Actions OIDC, so a repository stores no Selfie secret.**
 - **Must verify every OIDC token before accepting it:** an RS256 signature from GitHub's published keys, the issuer `https://token.actions.githubusercontent.com`, an unexpired token, an audience naming Selfie, and a `repository_id` that is the project being uploaded to (rationale). A token for any other audience was meant for another service.
-- **Must accept an OIDC token only for uploading to its own repository's project**, never to view a private project, approve, or reject, since it identifies a workflow and not a person. Uploading includes making goldens that remove nothing, since that approves nothing (`docs/specs/sync.md` → Goldens).
+- **Must accept an OIDC token only for uploading to its own repository's project**, never to view a private project, approve, or reject, since it identifies a workflow and not a person.
 
 ### Pull requests from forks
 

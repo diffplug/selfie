@@ -79,18 +79,26 @@ describe("the sync routes, in a Worker", () => {
     expect((await send("POST", "/decisions", "writer", decisions("rejected", 700))).status).toBe(200);
     expect((await send("POST", "/decisions", "writer", decisions("approved", 800))).status).toBe(200);
     expect((await send("POST", "/decisions", "writer", decisions("rejected", 750))).status).toBe(200);
-    const page = (await sendJson("GET", `/batches/${FIRST}`, "writer")) as { renders: { decision: unknown }[]; batch: unknown };
-    expect(page.renders[0]!.decision).toEqual({ decision: "approved", actor: "writer-login", at: 800, gitSha: SHA, batchId: FIRST });
-    expect(page.batch).toMatchObject({ startedAt: 500, finishedAt: 600 });
+    const reached = (await sendJson("POST", "/decisions/reached", "writer", { environment: ENV, commits: [SHA] })) as { decisions: unknown[] };
+    expect(reached.decisions).toEqual([{ story: "a", imageHash: hash, decision: "approved", actor: "writer-login", at: 800, gitSha: SHA, batchId: FIRST }]);
   });
 
-  it("makes goldens, and then CI can make the next ones from a person's approval", async () => {
-    expect(await sendJson("POST", "/goldens", "writer", { batchId: FIRST, baselineSha: null, removed: [] })).toEqual({ outcome: "accepted", acceptedBatchId: FIRST, refusal: null });
-    await send("PUT", `/batches/${SECOND}`, "ci", batchFacts(NEXT_SHA));
-    await send("POST", `/batches/${SECOND}/renders`, "ci", { renders: [{ story: "a", imageHash: hash }] });
-    await send("POST", `/batches/${SECOND}/finish`, "ci", { count: 1, finishedAt: 900 });
-    expect(await sendJson("POST", "/goldens/first", "ci", { shas: [NEXT_SHA, SHA], environment: ENV })).toEqual({ sha: SHA });
-    expect(await sendJson("POST", "/goldens", "ci", { batchId: SECOND, baselineSha: SHA, removed: [] })).toMatchObject({ outcome: "accepted" });
+  it("takes a batch from CI, and a removal from a person, on D1's own engine", async () => {
+    expect((await send("PUT", `/batches/${SECOND}`, "ci", batchFacts(NEXT_SHA))).status).toBe(200);
+    expect((await send("POST", `/batches/${SECOND}/renders`, "ci", { renders: [{ story: "a", imageHash: hash }] })).status).toBe(200);
+    expect(await sendJson("POST", `/batches/${SECOND}/finish`, "ci", { count: 1, finishedAt: 900 })).toEqual({ status: "complete" });
+    expect((await send("POST", "/decisions", "ci", { environment: ENV, decisions: [] })).status).toBe(403);
+    const removal = { story: "gone", imageHash: null, decision: "approved", at: 950, gitSha: NEXT_SHA, batchId: SECOND };
+    expect((await send("POST", "/decisions", "writer", { environment: ENV, decisions: [removal] })).status).toBe(200);
+  });
+
+  it("says what a commit reaches, each decision with its own commit, to whoever can view", async () => {
+    const { decisions } = (await sendJson("POST", "/decisions/reached", "writer", { environment: ENV, commits: [NEXT_SHA, SHA] })) as { decisions: unknown[] };
+    expect(decisions).toHaveLength(2);
+    expect(decisions).toContainEqual({ story: "a", imageHash: hash, decision: "approved", actor: "writer-login", at: 800, batchId: FIRST, gitSha: SHA });
+    expect(decisions).toContainEqual({ story: "gone", imageHash: null, decision: "approved", actor: "writer-login", at: 950, batchId: SECOND, gitSha: NEXT_SHA });
+    expect(await sendJson("POST", "/decisions/reached", "writer", { environment: ENV, commits: [SHA] })).toMatchObject({ decisions: [{ story: "a" }] });
+    expect((await send("POST", "/decisions/reached", "ci", { environment: ENV, commits: [SHA] })).status).toBe(403);
   });
 
   it("serves an image's bytes back, from R2", async () => {

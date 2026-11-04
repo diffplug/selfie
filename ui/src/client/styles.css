@@ -36,6 +36,16 @@ body {
   margin: 0;
 }
 
+.selfie-brand a {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--base-size-8);
+}
+
+.selfie-brand img {
+  flex-shrink: 0;
+}
+
 .selfie-header-facts {
   color: var(--fgColor-muted);
   font-size: var(--text-body-size-small);

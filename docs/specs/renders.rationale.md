@@ -18,13 +18,11 @@
 
 **A new batch after a crash.** Skipping what already landed would need a way to read a recording batch back, for a case that only follows a crash. The cost is rendering again, and a crashed batch's rows stay, unused.
 
-**What a resend can overwrite.** `decide` and `acceptBatch` have no ordering rule, so a statement resent after a lost response could overwrite another writer's change made in between. The adapter resends within seconds, and on one machine there is rarely another writer. A cloud store with several writers has this gap until sync brings an [ordering rule](renders.md#future).
+**What a resend can overwrite.** `decide` has no ordering rule, so a statement resent after a lost response could overwrite another writer's change made in between. The adapter resends within seconds, and on one machine there is rarely another writer. A cloud store with several writers would have this gap.
 
-**Accepting a batch already accepted.** Accepting a rerun over its own SHA's goldens makes the batch its own baseline, so a resend finds nothing removed and would report a wrong count, after success. The statement passes a batch that already holds the goldens. A test fails without this.
+**A batch's facts in columns.** `selfie review` first kept whether a tree was dirty, its baseline, and its play errors in a file beside the exported images. Pruning that file lost them, so a UI, or anyone else, wasn't bound by it. They became columns while no store held this data, which is why this table could still change: see `docs/specs/store.md` → Open questions for the next time.
 
-**A batch's facts in columns.** `selfie review` first kept whether a tree was dirty, its baseline, and its play errors in a file beside the exported images. Pruning that file lost them, and with them the rule that a dirty batch can't become goldens, so a UI, or anyone else calling `acceptBatch`, wasn't bound by it. They became columns while no store held this data, which is why this table could still change: see `docs/specs/store.md` → Open questions for the next time.
-
-**Not yet run on real D1.** The three new columns on `render_batches`, the longest statement of failures, and `firstWithGoldens` are in the contract suite, and pass on local SQLite through the same `Sql` limits. The batch on real D1 wasn't made when they went in, so their fit there is unproven, and the suite's size of about 90 requests is counted from the code rather than measured. A statement of 49 failures at their 2,000 characters binds about 100 KB, which is the case to watch.
+**Not yet run on real D1.** The three new columns on `render_batches`, and the longest statement of failures are in the contract suite, and pass on local SQLite through the same `Sql` limits. The batch on real D1 wasn't made when they went in, so their fit there is unproven, and the suite's size of about 90 requests is counted from the code rather than measured. A statement of 49 failures at their 2,000 characters binds about 100 KB, which is the case to watch.
 
 **Windows in columns.** The image's size can't say what window a story laid out in, since a full-page image may be taller or wider than its window, and neither can the environment's ID, which is a hash. On the batch beside `scale`, since it's the same kind of fact. A story's own on its render, empty for nearly every row, so sync and reuse carry it with the row. This costs 2 bytes a row and replaced two tables that didn't sync, and left a cloud batch unable to size a live story.
 
@@ -50,6 +48,8 @@
 
 **History, not a promoted set.** Asking someone to accept a batch on a clean default branch made them render again after a merge, to end up with what they'd already approved. Working it out from history asks nothing at a merge, since a batch there finds the approvals its branch brought.
 
+**Only merge commits.** A squash or a rebase onto the default branch leaves a pull request's commits out of the merged commit's history, and so its approvals, unless something ties them together, which is a whole table and a webhook. Every repository here only merges with merge commits, so that waits until one doesn't.
+
 **Up to the batch asking.** A batch looked at again later shouldn't change what it reads as because of work done since, or an earlier batch on a branch would compare with a later commit's approvals.
 
 **Author time as a branch's start.** A branch name can be reused, so its old batches mustn't count forever, and the merge-base can't bound them, since a rebase moves it past the batches it's meant to find. A rebase keeps author times, so the earliest among the branch's own commits holds still. An older commit merged in only widens the window, on the same branch name.
@@ -62,25 +62,13 @@
 
 **No derived table, locally.** Measured on local SQLite at Dormouse's 568 stories, reaching 1,000 commits: reading 11,360 decisions takes about 0.4 s, 113,600 about 1.7 s, and 568,000 about 4 s. Those have every story approved at every commit, which is much worse than a commit that changes a few stories. A compare reads them once, and an approval twice.
 
-## Goldens
-
-**A pointer to a batch, not a copy of its rows.** Copying would write 10,000 rows per accepted SHA, and D1 bills per row written. A pointer writes one, and exists whole by construction, so there is no partial set to explain after a crash. What it gives up is goldens with a mix of images from several batches. A baseline must be complete to be a baseline, so nothing reads a partial set. A future sync can bring goldens in as rows of a local batch.
-
-**All or nothing per SHA.** A SHA with 3 images unapproved has no goldens yet, and a pull's walk moves on to the next candidate. Approvals made meanwhile are kept against their hash, so once the last is made, accepting succeeds with nothing to redo.
-
-**A dirty batch in the statement.** A caller could always check `dirty` itself, and one that forgot would make goldens that misdescribe their SHA. The check is one more condition in a statement that exists to make such a rule hold.
-
-**A gate here, not in the caller.** The statement is the only place the check and the write can't be separated, and it is what makes "golden" mean "accepted". A first set needs its approvals like any other, which costs one request per 19,200 images.
-
-**Counting removals.** Every image in a filtered render is unchanged, so the image gate alone would accept it and drop every story it missed from that SHA's goldens. A test does exactly this with 500. The count is asked for rather than a list because the batch and its baseline already fix which renders are removed.
-
 ## Schema
 
 **Foreign keys, before there's data.** Nothing in the store deletes yet, and every write already goes through a path that writes parents first, so these catch only bugs for now. What they're for is retention: once a batch can be deleted, they're what stop one going while something points at it. SQLite can't add a foreign key to an existing table, so waiting would mean rebuilding tables in a migration, where today it's an edit to their `CREATE` statements. Inserting 10,000 renders took 9 ms with checks and 8 ms without, in one local run. They haven't run on real D1, only on its engine in the Worker tests.
 
 ## Requests
 
-**Measured on real D1, 2026-11**, from one Mac over the REST API at 10,000 renders, with the sizes in the spec. `compareBatch` is of a batch with 100 changed, 50 failed, 50 added, 50 removed, and 9,800 unchanged:
+**Measured on real D1, 2026-11**, from one Mac over the REST API at 10,000 renders, with the sizes in the spec, against what was then `compareBatch`, the same SQL as `compareWithBatch`, of a batch with 100 changed, 50 failed, 50 added, 50 removed, and 9,800 unchanged:
 
 | Operation | Time | Requests | Rows read | Rows written | Response |
 |---|---|---|---|---|---|
@@ -88,10 +76,9 @@
 | `recordRenders` | 748 ms | 1 | 40,205 | 10,000 | 204 KB |
 | `finishBatch` | 128 ms | 1 | 10,006 | 1 | 555 B |
 | `decide` | 560 ms | 1 | 0 | 10,000 | 65 KB |
-| `acceptBatch`, with no baseline | 117 ms | 1 | 30,006 | 1 | 1.2 KB |
 | `compareBatch` | 92 ms | 1 | 60,213 | 0 | 56 KB |
 
-D1's docs say a database runs one query at a time, so a batch this size holds up others for as long as it runs. No test measured concurrent load. `acceptBatch` against a baseline also reads both sides to count removals, which this batch didn't measure.
+D1's docs say a database runs one query at a time, so a batch this size holds up others for as long as it runs. No test measured concurrent load.
 
 **Statement size.** A record statement holds 49 renders as one JSON parameter, which is what the 100 bound parameters allowed when each took a story and either a hash or a failure, so a request stays the size that was measured. JSON can also say null, which a bound parameter here can't, and its SQL is one constant string. At its worst, 49 failures at 2,000 characters, the parameter is about 100 KB of ASCII, and hasn't run on real D1.
 
@@ -113,4 +100,4 @@ D1's docs say a database runs one query at a time, so a batch this size holds up
 
 ## Decisions
 
-**How two stores agree.** A decision is the only thing beside goldens that two stores can hold differently, since images are named by their hash and a finished batch never changes. Latest wins, which needs no schema change, since each row already holds its time, actor, and decision. A tie has to come out the same in either order, so a rejection beats an approval, since that's the mistake that's cheaper to make. The author isn't compared: a decision's author can differ between stores, since the cloud names who pushed it, so comparing it could hand a decision to someone who only re-pushed it. Clocks can differ, which only matters if two people decide on one image within that difference.
+**How two stores agree.** A decision is the only thing that two stores can hold differently, since images are named by their hash and a finished batch never changes. Latest wins, which needs no schema change, since each row already holds its time, actor, and decision. A tie has to come out the same in either order, so a rejection beats an approval, since that's the mistake that's cheaper to make. The author isn't compared: a decision's author can differ between stores, since the cloud names who pushed it, so comparing it could hand a decision to someone who only re-pushed it. Clocks can differ, which only matters if two people decide on one image within that difference.

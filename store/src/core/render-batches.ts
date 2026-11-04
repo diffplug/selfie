@@ -65,12 +65,6 @@ export const CREATE_BATCH_TABLES: readonly string[] = [
   parent_key INTEGER NOT NULL REFERENCES commits(key),
   PRIMARY KEY (commit_key, parent_key)
 ) WITHOUT ROWID`,
-  `CREATE TABLE IF NOT EXISTS goldens (
-  commit_key INTEGER NOT NULL REFERENCES commits(key),
-  environment_key INTEGER NOT NULL REFERENCES environments(key),
-  batch_key INTEGER NOT NULL REFERENCES render_batches(key),
-  PRIMARY KEY (commit_key, environment_key)
-) WITHOUT ROWID`,
 ];
 
 // Each as one bound parameter. Renders by what a request of them was measured at, and decisions of about 200 bytes.
@@ -78,8 +72,6 @@ const RENDERS_PER_STATEMENT = 49;
 const DECISIONS_PER_STATEMENT = 200;
 // As one bound parameter, in a statement that gives them all keys.
 const NAMES_PER_STATEMENT = 1_000;
-// Nearest first, beside the environment.
-const SHAS_PER_GOLDENS_QUERY = 99;
 
 // Sizes measured on real D1: `docs/specs/renders.rationale.md`.
 const ROWS_PER_PAGE = 5_000;
@@ -109,11 +101,6 @@ const BATCH_KEY = "(SELECT key FROM render_batches WHERE id = ?1)";
 const commitKey = (sha: string) => `(SELECT key FROM commits WHERE sha = ${sha})`;
 const environmentKey = (id: string) => `(SELECT key FROM environments WHERE id = ${id})`;
 
-// The key of the batch holding a baseline's goldens, only ever in the batch's own
-// environment. Uncorrelated, so SQLite evaluates it once. An empty ?2 means no baseline.
-const GOLDENS_BATCH_KEY = `(SELECT g.batch_key FROM goldens g
-  WHERE g.commit_key = ${commitKey("?2")} AND g.environment_key = (SELECT environment_key FROM render_batches WHERE id = ?1))`;
-
 // The key of a finished batch named by ?2, only ever in the batch's own environment.
 const NAMED_BATCH_KEY = `(SELECT b.key FROM render_batches b
   WHERE b.id = ?2 AND b.finished_at IS NOT NULL
@@ -132,15 +119,15 @@ LEFT JOIN actors a ON a.key = d.actor_key`;
 
 const DECISION_WORD = "CASE d.rejected WHEN 1 THEN 'rejected' WHEN 0 THEN 'approved' END";
 
-/** A comparison's statements, against whichever batch a key expression finds. */
-const comparisonStatements = (baselineKey: string) => ({
-  baseline: `SELECT ${baselineKey} AS batch_key`,
+/** A comparison's statements, against the finished batch named by ?2. */
+const AGAINST_BATCH = {
+  baseline: `SELECT ${NAMED_BATCH_KEY} AS batch_key`,
   // `gs` joins before the images so that a row left out never reads them.
   comparedPage: `SELECT rs.story_key, s.id AS story, i.hash AS image_hash, rs.failure,
   gi.hash AS golden_hash, ${DECISION_WORD} AS decision, a.name AS actor, d.decided_at
 FROM render_batches r
 CROSS JOIN renders rs ON rs.batch_key = r.key
-LEFT JOIN renders gs ON gs.batch_key = ${baselineKey} AND gs.story_key = rs.story_key
+LEFT JOIN renders gs ON gs.batch_key = ${NAMED_BATCH_KEY} AND gs.story_key = rs.story_key
 LEFT JOIN images i ON i.key = rs.image_key
 LEFT JOIN images gi ON gi.key = gs.image_key
 ${DECISION_ON_RENDER}
@@ -154,57 +141,16 @@ LIMIT CAST(?4 AS INTEGER)`,
 FROM renders gs
 JOIN images gi ON gi.key = gs.image_key
 JOIN stories s ON s.key = gs.story_key
-WHERE gs.batch_key = ${baselineKey} AND gs.story_key > CAST(?3 AS INTEGER)
+WHERE gs.batch_key = ${NAMED_BATCH_KEY} AND gs.story_key > CAST(?3 AS INTEGER)
   AND NOT EXISTS (SELECT 1 FROM renders rs
     WHERE rs.batch_key = ${BATCH_KEY} AND rs.story_key = gs.story_key)
 ORDER BY gs.story_key
 LIMIT CAST(?4 AS INTEGER)`,
   unchangedCount: `SELECT COUNT(*) AS total
 FROM renders rs
-JOIN renders gs ON gs.batch_key = ${baselineKey} AND gs.story_key = rs.story_key
+JOIN renders gs ON gs.batch_key = ${NAMED_BATCH_KEY} AND gs.story_key = rs.story_key
 WHERE rs.batch_key = ${BATCH_KEY} AND rs.image_key = gs.image_key AND rs.failure IS NULL`,
-});
-
-const AGAINST_GOLDENS = comparisonStatements(GOLDENS_BATCH_KEY);
-const AGAINST_BATCH = comparisonStatements(NAMED_BATCH_KEY);
-
-const COUNT_REMOVED = `(SELECT COUNT(*) FROM renders gs
-  WHERE gs.batch_key = ${GOLDENS_BATCH_KEY}
-    AND NOT EXISTS (SELECT 1 FROM renders rs
-      WHERE rs.batch_key = ${BATCH_KEY} AND rs.story_key = gs.story_key))`;
-
-const SELECT_REMOVED_COUNT = `SELECT ${COUNT_REMOVED} AS total`;
-
-const CAN_BE_GOLDENS = "r.finished_at IS NOT NULL AND r.failed_count = 0 AND r.dirty = 0";
-
-// The checks and the write are one statement, so nothing can change between them, and
-// the goldens of a SHA appear whole. Sent again, it must still succeed, so a batch already
-// accepted passes without the checks: accepting a rerun over its own SHA's goldens makes
-// the baseline itself, and then nothing reads as removed.
-const ACCEPT_BATCH = `INSERT INTO goldens(commit_key, environment_key, batch_key)
-SELECT r.commit_key, r.environment_key, r.key
-FROM render_batches r
-WHERE r.id = ?1 AND ${CAN_BE_GOLDENS}
-  AND (?2 = '' OR ${GOLDENS_BATCH_KEY} IS NOT NULL)
-  AND (
-    EXISTS (SELECT 1 FROM goldens a
-      WHERE a.commit_key = r.commit_key AND a.environment_key = r.environment_key AND a.batch_key = r.key)
-    OR (
-      ${COUNT_REMOVED} = CAST(?3 AS INTEGER)
-      AND NOT EXISTS (
-        SELECT 1 FROM renders rs
-        LEFT JOIN renders gs ON gs.batch_key = ${GOLDENS_BATCH_KEY} AND gs.story_key = rs.story_key
-        WHERE rs.batch_key = r.key AND gs.image_key IS NOT rs.image_key
-          AND NOT EXISTS (
-            SELECT 1 FROM decisions d INDEXED BY decisions_by_image
-            WHERE d.environment_key = r.environment_key AND d.story_key = rs.story_key
-              AND d.image_key = rs.image_key AND d.rejected = 0
-          )
-      )
-    )
-  )
-ON CONFLICT(commit_key, environment_key) DO UPDATE SET batch_key = excluded.batch_key
-RETURNING batch_key`;
+};
 
 // Counted in the statement that marks the batch, so statements that never landed can't be
 // marked finished. Running it again changes nothing, since a finished batch takes no rows.
@@ -219,24 +165,14 @@ FROM (
 WHERE render_batches.id = ?1 AND c.total = CAST(?3 AS INTEGER)
 RETURNING ${BATCH_COLUMNS}`;
 
-// Not by the checks that accepting makes, since another store already made them.
-const ADOPT_GOLDENS = `INSERT INTO goldens(commit_key, environment_key, batch_key)
-SELECT r.commit_key, r.environment_key, r.key FROM render_batches r
-WHERE r.id = ?1 AND ${CAN_BE_GOLDENS}
-ON CONFLICT(commit_key, environment_key) DO UPDATE SET batch_key = excluded.batch_key
-RETURNING batch_key`;
-
 const BATCH_PAGE_TAIL = `WHERE r.id = ?1 AND rs.story_key > CAST(?2 AS INTEGER)
 ORDER BY rs.story_key
 LIMIT CAST(?3 AS INTEGER)`;
 
-const READ_BATCH_PAGE = `SELECT rs.story_key, s.id AS story, i.hash AS image_hash, rs.failure, rs.viewport_width, rs.viewport_height,
-  ${DECISION_WORD} AS decision, a.name AS actor, d.decided_at, c.sha AS git_sha, d.batch_id
+const READ_BATCH_PAGE = `SELECT rs.story_key, s.id AS story, i.hash AS image_hash, rs.failure, rs.viewport_width, rs.viewport_height
 FROM render_batches r
 CROSS JOIN renders rs ON rs.batch_key = r.key
 LEFT JOIN images i ON i.key = rs.image_key
-${DECISION_ON_RENDER}
-LEFT JOIN commits c ON c.key = d.commit_key
 LEFT JOIN stories s ON s.key = rs.story_key
 ${BATCH_PAGE_TAIL}`;
 
@@ -248,13 +184,18 @@ LEFT JOIN stories s ON s.key = rs.story_key
 ${BATCH_PAGE_TAIL}`;
 
 // A commit at a time, each of which is a range of the primary key. A commit this store has never heard of finds nothing.
-const DECISIONS_AT = `SELECT s.id AS story, i.hash AS image_hash, ${DECISION_WORD} AS decision, a.name AS actor, d.decided_at, d.batch_id
+// What `toPlacedDecision` reads, of a row of `d` and its commit `c`.
+const PLACED_DECISION = `SELECT s.id AS story, i.hash AS image_hash, ${DECISION_WORD} AS decision, a.name AS actor, d.decided_at, d.batch_id, c.sha AS git_sha`;
+const NAMES_OF_DECISION = `CROSS JOIN actors a ON a.key = d.actor_key
+CROSS JOIN stories s ON s.key = d.story_key
+LEFT JOIN images i ON i.key = d.image_key`;
+
+// A commit at a time, each of which is a range of the primary key. A commit this store has never heard of finds nothing.
+const DECISIONS_AT = `${PLACED_DECISION}
 FROM json_each(?2) j
 CROSS JOIN commits c ON c.sha = j.value
 CROSS JOIN decisions d ON d.environment_key = ${environmentKey("?1")} AND d.commit_key = c.key
-CROSS JOIN actors a ON a.key = d.actor_key
-CROSS JOIN stories s ON s.key = d.story_key
-LEFT JOIN images i ON i.key = d.image_key`;
+${NAMES_OF_DECISION}`;
 
 // What a batch's commit reaches, walked by key, so that a long history's SHAs never leave the database.
 const DECISIONS_REACHED = `WITH RECURSIVE reach(key) AS (
@@ -263,12 +204,11 @@ const DECISIONS_REACHED = `WITH RECURSIVE reach(key) AS (
   SELECT p.parent_key FROM reach r CROSS JOIN commit_parents p ON p.commit_key = r.key
   LIMIT ${MAX_REACHED_COMMITS}
 )
-SELECT s.id AS story, i.hash AS image_hash, ${DECISION_WORD} AS decision, a.name AS actor, d.decided_at, d.batch_id
+${PLACED_DECISION}
 FROM reach r
 CROSS JOIN decisions d ON d.environment_key = (SELECT environment_key FROM render_batches WHERE id = ?1) AND d.commit_key = r.key
-CROSS JOIN actors a ON a.key = d.actor_key
-CROSS JOIN stories s ON s.key = d.story_key
-LEFT JOIN images i ON i.key = d.image_key`;
+CROSS JOIN commits c ON c.key = d.commit_key
+${NAMES_OF_DECISION}`;
 
 const rendersPage = (batchId: string, after: string): SqlStatement => ({ sql: READ_RENDERS_PAGE, params: [batchId, after, ROWS_PER_PAGE], idempotent: true });
 
@@ -445,27 +385,17 @@ export interface PlacedDecision extends Decision {
   /** Null for a removal. */
   readonly imageHash: string | null;
   readonly batchId: string;
+  /** The commit it counts from. */
+  readonly gitSha: string;
 }
 
 /** A batch as another store holds it, which keeps its identity and its times here. */
 export type ReceivedBatch = Omit<RenderBatch, "status" | "finishedAt" | "failedCount" | "branch"> & { readonly branch?: string | null };
 
-/** A decision with the batch it was made on, and the commit it counts from. */
-export interface DecisionOn extends Decision {
-  readonly gitSha: string;
-  readonly batchId: string;
-}
-
-/** A decision as another store holds it, which keeps its time and its commit here. */
-export interface ReceivedDecision extends DecisionOn {
-  readonly story: string;
-  readonly imageHash: string;
-}
-
 /** What a batch holds, as a page of a read by name. */
 export interface BatchPage {
   readonly batch: RenderBatch;
-  readonly renders: readonly (RecordedRender & { readonly decision: DecisionOn | null })[];
+  readonly renders: readonly RecordedRender[];
   /** Where the next page starts, or null if this is the last. */
   readonly next: string | null;
 }
@@ -474,22 +404,14 @@ export type BatchErrorCode =
   | "unknown-batch"
   /** The batch takes no more renders, since it was finished. */
   | "batch-finished"
-  /** The batch is still `recording`, so it can't be compared or accepted. */
+  /** The batch is still `recording`, so it can't be compared. */
   | "batch-not-finished"
-  /** The batch is `failed`, so it can't become goldens. */
-  | "batch-has-failures"
-  /** The batch was recorded on a dirty tree, so it can't become goldens. */
-  | "batch-dirty"
   /** Finishing was asked for with a different count than the batch holds. */
   | "wrong-render-count"
-  /** Accepting was asked for with a different count of removed renders than there are. */
-  | "wrong-removed-count"
   /** A render named an image that isn't stored. */
   | "unknown-image"
   /** A batch with this ID is already here, and it isn't this one. */
   | "batch-conflict"
-  /** The baseline SHA has no goldens in the batch's environment. */
-  | "no-goldens"
   | "no-baseline-batch";
 
 /** The request can't apply to the data as it stands. */
@@ -510,7 +432,7 @@ export interface RenderBatchesPlumbing {
 }
 
 /**
- * Render batches, comparisons, decisions, and goldens, over `Sql` alone. Every statement is safe
+ * Render batches, comparisons, and decisions, over `Sql` alone. Every statement is safe
  * to resend, and nothing relies on a set of statements being atomic. See `docs/specs/renders.md`.
  */
 export class RenderBatches {
@@ -636,25 +558,42 @@ ORDER BY started_at DESC, key DESC`,
   }
 
   /**
-   * Gives a finished batch's renders their states, from image hashes alone, against the
-   * goldens of `baselineSha` in the batch's own environment. A null baseline means there
-   * are none yet, so every render with an image is `added`. Lists only what a reviewer needs
-   * unless told otherwise: see `Comparison`.
+   * Gives a finished batch's renders their states, from image hashes alone, against the images of another
+   * finished batch in this environment. Lists only what a reviewer needs unless told otherwise: see `Comparison`.
    */
-  async compareBatch(batchId: string, baselineSha: string | null, options?: CompareOptions): Promise<Comparison> {
-    if (baselineSha !== null) assertGitSha(baselineSha);
-    return this.#compare(batchId, baselineSha ?? "", AGAINST_GOLDENS, options, (found, batch) =>
-      assertGoldensFound(baselineSha, found, batch),
-    );
-  }
-
-  /** As `compareBatch`, with the images of another finished batch in this environment standing in for goldens. */
-  async compareWithBatch(batchId: string, baselineBatchId: string, options?: CompareOptions): Promise<Comparison> {
-    return this.#compare(batchId, baselineBatchId, AGAINST_BATCH, options, (found, batch) => {
-      if (!found) {
-        throw new BatchError("no-baseline-batch", `${baselineBatchId} isn't a finished batch in environment ${batch.environment}`);
-      }
+  async compareWithBatch(batchId: string, baselineBatchId: string, { includeUnchanged = false }: CompareOptions = {}): Promise<Comparison> {
+    const comparedPage = (after: string): SqlStatement => ({
+      sql: AGAINST_BATCH.comparedPage,
+      params: [batchId, baselineBatchId, after, ROWS_PER_PAGE, includeUnchanged ? 1 : 0],
+      idempotent: true,
     });
+    const removedPage = (after: string): SqlStatement => ({
+      sql: AGAINST_BATCH.removedPage,
+      params: [batchId, baselineBatchId, after, ROWS_PER_PAGE],
+      idempotent: true,
+    });
+
+    // One request, which is all a comparison shorter than a page needs.
+    const [batchRows, baselineRows, unchangedRows, firstCompared, firstRemoved] =
+      (await this.#sql.batch([
+        { sql: SELECT_BATCH, params: [batchId], idempotent: true },
+        { sql: AGAINST_BATCH.baseline, params: [batchId, baselineBatchId], idempotent: true },
+        { sql: AGAINST_BATCH.unchangedCount, params: [batchId, baselineBatchId], idempotent: true },
+        comparedPage(START),
+        removedPage(START),
+      ])) as [SqlRow[], SqlRow[], SqlRow[], SqlRow[], SqlRow[]];
+
+    const batch = finishedBatch(batchRows, batchId);
+    if (baselineRows[0]?.batch_key === null) {
+      throw new BatchError("no-baseline-batch", `${baselineBatchId} isn't a finished batch in environment ${batch.environment}`);
+    }
+    const compared = await this.#remainingPages(firstCompared, comparedPage);
+    const removed = await this.#remainingPages(firstRemoved, removedPage);
+    return {
+      batch,
+      renders: [...compared.map(toComparedRender).sort(byStory), ...removed.map(toRemovedRender).sort(byStory)],
+      unchangedCount: unchangedRows[0]?.total as number,
+    };
   }
 
   /**
@@ -725,45 +664,6 @@ WHERE true ON CONFLICT(commit_key, parent_key) DO NOTHING`,
     return rows.map((row) => row.git_sha as string);
   }
 
-  async #compare(
-    batchId: string,
-    baseline: string,
-    statements: typeof AGAINST_GOLDENS,
-    { includeUnchanged = false }: CompareOptions = {},
-    assertFound: (found: boolean, batch: RenderBatch) => void,
-  ): Promise<Comparison> {
-    const comparedPage = (after: string): SqlStatement => ({
-      sql: statements.comparedPage,
-      params: [batchId, baseline, after, ROWS_PER_PAGE, includeUnchanged ? 1 : 0],
-      idempotent: true,
-    });
-    const removedPage = (after: string): SqlStatement => ({
-      sql: statements.removedPage,
-      params: [batchId, baseline, after, ROWS_PER_PAGE],
-      idempotent: true,
-    });
-
-    // One request, which is all a comparison shorter than a page needs.
-    const [batchRows, baselineRows, unchangedRows, firstCompared, firstRemoved] =
-      (await this.#sql.batch([
-        { sql: SELECT_BATCH, params: [batchId], idempotent: true },
-        { sql: statements.baseline, params: [batchId, baseline], idempotent: true },
-        { sql: statements.unchangedCount, params: [batchId, baseline], idempotent: true },
-        comparedPage(START),
-        removedPage(START),
-      ])) as [SqlRow[], SqlRow[], SqlRow[], SqlRow[], SqlRow[]];
-
-    const batch = finishedBatch(batchRows, batchId);
-    assertFound(baselineRows[0]?.batch_key !== null, batch);
-    const compared = await this.#remainingPages(firstCompared, comparedPage);
-    const removed = await this.#remainingPages(firstRemoved, removedPage);
-    return {
-      batch,
-      renders: [...compared.map(toComparedRender).sort(byStory), ...removed.map(toRemovedRender).sort(byStory)],
-      unchangedCount: unchangedRows[0]?.total as number,
-    };
-  }
-
   async #remainingPages(
     first: readonly SqlRow[],
     pageAfter: (after: string) => SqlStatement,
@@ -797,7 +697,7 @@ WHERE true ON CONFLICT(commit_key, parent_key) DO NOTHING`,
   }
 
   /** A decision names an image held here, as a render does, so that it can hold that image's key. Refuses them all if any isn't. */
-  async #writeDecisions(environment: string, decisions: readonly (Omit<ReceivedDecision, "imageHash"> & { readonly imageHash: string | null })[], upsert: string): Promise<void> {
+  async #writeDecisions(environment: string, decisions: readonly PlacedDecision[], upsert: string): Promise<void> {
     const missing = await missingImages(this.#sql, decisions.flatMap(({ imageHash }) => imageHash ?? []));
     if (missing.length > 0) throw new BatchError("unknown-image", `${missing.length} of these decisions are on images this store doesn't hold, so none were recorded`);
     const statements: SqlStatement[] = [
@@ -814,51 +714,6 @@ WHERE true ON CONFLICT(commit_key, parent_key) DO NOTHING`,
     for (const group of chunks(statements, STATEMENTS_PER_REQUEST)) await this.#sql.batch(group);
   }
 
-  /**
-   * Makes a finished batch's images the goldens of its Git SHA in its environment,
-   * replacing any there, if each is the same as the baseline's or approved at exactly
-   * that hash, and `removedSeen` is how many renders the baseline has and the batch
-   * lacks. If an image isn't accepted, returns false and changes nothing: `compareBatch`
-   * shows which. Throws if the count is wrong, so goldens are never silently dropped by
-   * a filtered render or a discovery bug, and if the batch was recorded on a dirty tree,
-   * since a SHA's goldens must describe that commit. A null baseline means every image
-   * needs an approval, and nothing can be removed.
-   */
-  async acceptBatch(batchId: string, baselineSha: string | null, removedSeen: number): Promise<boolean> {
-    if (baselineSha !== null) assertGitSha(baselineSha);
-    const baseline = baselineSha ?? "";
-    const [batchRows, baselineRows, accepted] = (await this.#sql.batch([
-      { sql: SELECT_BATCH, params: [batchId], idempotent: true },
-      { sql: AGAINST_GOLDENS.baseline, params: [batchId, baseline], idempotent: true },
-      { sql: ACCEPT_BATCH, params: [batchId, baseline, removedSeen], idempotent: true },
-    ])) as [SqlRow[], SqlRow[], SqlRow[]];
-
-    const batch = finishedBatch(batchRows, batchId);
-    assertCanBeGoldens(batch);
-    assertGoldensFound(baselineSha, baselineRows[0]?.batch_key !== null, batch);
-    if (accepted.length > 0) return true;
-
-    const [removed] = await this.#sql.run({
-      sql: SELECT_REMOVED_COUNT,
-      params: [batchId, baseline],
-      idempotent: true,
-    });
-    if (removed?.total !== removedSeen) {
-      throw new BatchError(
-        "wrong-removed-count",
-        `Accepting batch ${batchId} would remove ${String(removed?.total)} goldens, not the ${removedSeen} the reviewer saw`,
-      );
-    }
-    return false;
-  }
-
-  /** The stories a baseline's goldens have, and this batch doesn't, which accepting it would remove. */
-  async removedFrom(batchId: string, baselineSha: string | null): Promise<readonly string[]> {
-    const page = (after: string): SqlStatement => ({ sql: AGAINST_GOLDENS.removedPage, params: [batchId, baselineSha ?? "", after, ROWS_PER_PAGE], idempotent: true });
-    const rows = await this.#remainingPages(await this.#sql.run(page(START)), page);
-    return rows.map(({ story }) => story as string).sort();
-  }
-
   /** A page of all a batch holds, for another store to take, in no order but its own. Unlike a comparison, it needs no baseline. */
   async readBatch(batchId: string, after = "", limit = ROWS_PER_PAGE): Promise<BatchPage> {
     const [batchRows, rows] = (await this.#sql.batch([
@@ -873,7 +728,6 @@ WHERE true ON CONFLICT(commit_key, parent_key) DO NOTHING`,
         story: row.story as string,
         ...(row.viewport_width === null ? {} : { viewport: viewportOf(row) }),
         ...(row.image_hash === null ? { failure: row.failure as string } : { imageHash: row.image_hash as string, ...(row.failure === null ? {} : { failure: row.failure as string }) }),
-        decision: row.decision === null ? null : { decision: row.decision as DecisionKind, actor: row.actor as string, at: row.decided_at as number, gitSha: row.git_sha as string, batchId: row.batch_id as string },
       })),
       next: rows.length > limit ? String(page.at(-1)!.story_key) : null,
     };
@@ -885,64 +739,17 @@ WHERE true ON CONFLICT(commit_key, parent_key) DO NOTHING`,
    * in. Who made it travels with it, and isn't compared, so sending a decision back to where
    * it came from can't change whose it is. Each must name an image this store holds.
    */
-  async mergeDecisions(environment: string, decisions: readonly ReceivedDecision[]): Promise<void> {
+  async mergeDecisions(environment: string, decisions: readonly PlacedDecision[]): Promise<void> {
     assertNamePart(environment, "environment");
     if (decisions.length === 0) return;
     for (const { story, imageHash, actor, gitSha, batchId } of decisions) {
       assertNamePart(story, "story");
-      assertImageHash(imageHash);
+      if (imageHash !== null) assertImageHash(imageHash);
       assertGitSha(gitSha);
       assertBatchIdShape(batchId);
       if (actor === "") throw new RangeError("A decision must say who made it");
     }
     await this.#writeDecisions(environment, decisions, MERGE_DECISION);
-  }
-
-  /**
-   * Makes a finished batch the goldens of its Git SHA because the store that decides them
-   * says so, replacing any here, without the checks of `acceptBatch`, which that store made.
-   * It must still be able to be goldens: complete, and from a clean tree.
-   */
-  async adoptGoldens(batchId: string): Promise<void> {
-    const [batch, adopted] = (await this.#sql.batch([
-      { sql: SELECT_BATCH, params: [batchId], idempotent: true },
-      { sql: ADOPT_GOLDENS, params: [batchId], idempotent: true },
-    ])) as [SqlRow[], SqlRow[]];
-    if (adopted.length === 0) assertCanBeGoldens(finishedBatch(batch, batchId));
-  }
-
-  /** The ID of the batch whose images are this SHA's goldens in this environment, or null. */
-  async acceptedBatchAt(gitSha: string, environment: string): Promise<string | null> {
-    assertGitSha(gitSha);
-    const [row] = await this.#sql.run({
-      sql: `SELECT render_batches.id AS id FROM goldens JOIN render_batches ON render_batches.key = goldens.batch_key
-WHERE goldens.commit_key = ${commitKey("?1")} AND goldens.environment_key = ${environmentKey("?2")}`,
-      params: [gitSha, environment],
-      idempotent: true,
-    });
-    return row === undefined ? null : (row.id as string);
-  }
-
-  /**
-   * The first of these SHAs, in the order given, with complete goldens in this environment,
-   * or null. One query per group, and none after the group that holds it.
-   */
-  async firstWithGoldens(gitShas: readonly string[], environment: string): Promise<string | null> {
-    gitShas.forEach(assertGitSha);
-    for (const group of chunks(gitShas, SHAS_PER_GOLDENS_QUERY)) {
-      const rows = await this.#sql.run({
-        sql: `SELECT c.sha AS git_sha FROM commits c CROSS JOIN goldens g ON g.commit_key = c.key
-WHERE g.environment_key = ${environmentKey("?1")} AND c.sha IN (${group
-          .map((_, i) => `?${i + 2}`)
-          .join(", ")})`,
-        params: [environment, ...group],
-        idempotent: true,
-      });
-      const found = new Set(rows.map((row) => row.git_sha as string));
-      const first = group.find((sha) => found.has(sha));
-      if (first !== undefined) return first;
-    }
-    return null;
   }
 }
 
@@ -999,12 +806,6 @@ function finishedBatch(rows: readonly SqlRow[], batchId: string): RenderBatch {
   return batch;
 }
 
-function assertGoldensFound(baselineSha: string | null, found: boolean, batch: RenderBatch): void {
-  if (baselineSha !== null && !found) {
-    throw new BatchError("no-goldens", `${baselineSha} has no goldens in environment ${batch.environment}`);
-  }
-}
-
 function assertBatchIdShape(batchId: string): void {
   if (!isBatchId(batchId)) throw new RangeError(`A decision's batch must be a batch ID, got ${JSON.stringify(batchId)}`);
 }
@@ -1039,9 +840,35 @@ const toPlacedDecision = (row: SqlRow): PlacedDecision => ({
   actor: row.actor as string,
   at: row.decided_at as number,
   batchId: row.batch_id as string,
+  gitSha: row.git_sha as string,
 });
 
 const newestFirst = (a: PlacedDecision, b: PlacedDecision) => b.at - a.at || b.decision.localeCompare(a.decision);
+
+/**
+ * What another store needs of these decisions to compare the same way: each story's, newest first, back
+ * through its second-newest approval. The second, since an approval made on a batch isn't what that batch
+ * is compared with. Anything older can't change what a story reads as, so its images needn't be fetched.
+ */
+export function decisionsThatCount(decisions: readonly PlacedDecision[]): readonly PlacedDecision[] {
+  return [...decisionsByStory(decisions).values()].flatMap((list) => {
+    let approvals = 0;
+    const end = list.findIndex(({ decision }) => decision === "approved" && ++approvals === 2);
+    return end === -1 ? list : list.slice(0, end + 1);
+  });
+}
+
+/** Each story's decisions, newest first. */
+function decisionsByStory(decisions: readonly PlacedDecision[]): Map<string, PlacedDecision[]> {
+  const byStory = new Map<string, PlacedDecision[]>();
+  for (const decision of decisions) {
+    const list = byStory.get(decision.story);
+    if (list === undefined) byStory.set(decision.story, [decision]);
+    else list.push(decision);
+  }
+  for (const list of byStory.values()) list.sort(newestFirst);
+  return byStory;
+}
 
 /**
  * A batch's renders against the approvals that history reaches. Pure, since this is the rule. A
@@ -1055,13 +882,7 @@ export function compareWithApprovals(
   decisions: readonly PlacedDecision[],
   { includeUnchanged = false }: CompareOptions = {},
 ): Comparison {
-  const decisionsOf = new Map<string, PlacedDecision[]>();
-  for (const decision of decisions) {
-    const list = decisionsOf.get(decision.story);
-    if (list === undefined) decisionsOf.set(decision.story, [decision]);
-    else list.push(decision);
-  }
-  for (const list of decisionsOf.values()) list.sort(newestFirst);
+  const decisionsOf = decisionsByStory(decisions);
 
   const referenceOf = (story: string) => decisionsOf.get(story)?.find(({ decision, batchId }) => decision === "approved" && batchId !== batch.id);
   /** What's been said about this image since the reference, if anything has. */
@@ -1141,16 +962,6 @@ function assertNamePart(part: string, what: string): void {
   }
 }
 
-function assertCanBeGoldens(batch: RenderBatch): void {
-  if (batch.status === "failed") {
-    throw new BatchError("batch-has-failures", `Batch ${batch.id} has ${batch.failedCount} failed stories, so it can't become goldens`);
-  }
-  if (batch.dirty) {
-    throw new BatchError("batch-dirty", `Batch ${batch.id} was recorded on a dirty tree, so it doesn't describe ${batch.gitSha}`);
-  }
-}
-
-/** A viewport is whole and positive, whoever says so. */
 export function assertViewport({ width, height }: Viewport): void {
   if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width <= 0 || height <= 0) throw new RangeError(`A viewport must be positive whole numbers, got ${width}x${height}`);
 }

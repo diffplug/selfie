@@ -2,7 +2,7 @@
 
 > Status: built, and mounted by the Worker at `hackathon.selfie.dev` (`docs/specs/cloud.md`). `selfie push` runs against it from CI. See `## Future`.
 >
-> - Owns moving batches, images, decisions, and goldens between stores, and the routes and commands that do it. `docs/specs/renders.md` owns what each store does with them, `docs/specs/access.md` who may ask, and `docs/specs/system.md` where cloud data lives.
+> - Owns moving batches, images, and decisions between stores, and the routes and commands that do it. `docs/specs/renders.md` owns what each store does with them, `docs/specs/access.md` who may ask, and `docs/specs/system.md` where cloud data lives.
 
 ## What can disagree
 
@@ -11,7 +11,6 @@
 | Images | Named by hash, so never, unless a client [lied or broke](#what-a-store-takes) | Send what's missing |
 | Finished batches | Keep their ID, and never change, so never | Send what's missing |
 | Decisions | One per name, hash, and commit, so yes | Latest wins (`docs/specs/renders.md` → Decisions) |
-| Goldens | One batch per SHA and environment, so yes | [The cloud decides](#goldens) |
 
 ## Routes
 
@@ -28,7 +27,7 @@ To mount under `/api`. `GET /repositories/:owner/:name` finds a repository's pro
 | `GET /images/:hash` | The stored bytes | View |
 | `POST /batches/:id/renders` | `{ renders }`, at most 1,000 | Upload |
 | `POST /batches/:id/finish` | `{ count, finishedAt }` | Upload |
-| `GET /batches/:id` | `?after`, where `next` said the page starts, a page of the batch in no particular order, each render, and the decision on each image, with `next` | View |
+| `POST /batches/:id/status` | Says what this batch's commit reads as, where people look (`docs/specs/cloud.md` → Commit status) | Upload |
 | `POST /commits` | `{ commits }`, at most 1,000, each `{ sha, parents }`, so a server with no Git knows what a commit reaches | Upload |
 | `GET /storybooks/:hash` | `{ kept }` | Upload |
 | `POST /storybooks/files/missing` | `{ hashes }`, at most 500, answers `{ missing }` | Upload |
@@ -38,10 +37,8 @@ To mount under `/api`. `GET /repositories/:owner/:name` finds a repository's pro
 | `GET /batches/:id/diffs/needed` | `{ pairs }`, each `{ current, golden }`, the changed pairs with no diff here | Upload |
 | `PUT /diffs/:current/:golden/image` | The diff image's bytes, sent first | Upload |
 | `PUT /diffs/:current/:golden` | Its `PixelDiff`, which says both are here | Upload |
-| `POST /decisions` | `{ environment, decisions }`, at most 1,000, each with its `gitSha` and `batchId` | Decide |
-| `POST /goldens` | `{ batchId, baselineSha, removed }`, answers `{ outcome, acceptedBatchId, refusal }`, where `outcome` is `accepted`, `already`, `conflict`, or `refused` | Upload, or Decide if `removed` isn't empty |
-| `GET /goldens` | `?sha&environment`, answers `{ batchId }` | View or Upload |
-| `POST /goldens/first` | `{ shas, environment }`, at most 1,000, answers `{ sha }`, the first with goldens | View or Upload |
+| `POST /decisions` | `{ environment, decisions }`, at most 1,000, each with its `gitSha` and `batchId`, and a null `imageHash` for a removal | Decide |
+| `POST /decisions/reached` | `{ environment, commits }`, at most 1,000, answers `{ decisions }`: what counts of those made at them, each with its `gitSha` and `batchId` | View |
 
 | Status | Code | When |
 |---|---|---|
@@ -51,12 +48,9 @@ To mount under `/api`. `GET /repositories/:owner/:name` finds a repository's pro
 | 409 | `batch-dirty`, `commit-not-pushed`, and `BatchError`'s other codes | The request can't apply to the data as it stands |
 | 413 | `image-too-large` | It's more than the server takes |
 
-Inside `POST /goldens`, a refusal is an answer, with a code of `not-approved`, `wrong-removed`, `goldens-conflict`, or one of `BatchError`'s, and status 200.
-
 - **Must answer 404, identical to a project that doesn't exist, to anyone who can do nothing there, before reading anything else about the request, and 403 to anyone who can do something, but not this** (`docs/specs/access.md` → Who can do what).
 - **Must take who's asking only from a bearer token**, never a cookie, so another site's page can't make these requests on someone's behalf.
 - **Must keep what decides access, and whether GitHub has a commit, behind a seam the routes are given**, so they run on any platform, and are tested without GitHub.
-- **Must let Upload learn which SHAs have goldens, and no more**, so that CI on a private repository knows its baseline without being able to view it. CI uploads and leaves comparing to the cloud.
 
 ### What a store takes
 
@@ -68,39 +62,29 @@ Inside `POST /goldens`, a refusal is an answer, with a code of `not-approved`, `
 
 Reserved: a fork's render pass must not upload through this (`docs/specs/access.md` → Open questions).
 
-### Goldens
-
-**The cloud decides a SHA's goldens**, since they're what everyone's reviews are held to.
-
-- **Must run goldens through `acceptBatch` on the server**, against what it now holds, so nothing is taken on trust. `trust` is a separate scope. A refusal is an answer, and leaves the batch there.
-- **Must let CI make goldens, with Upload alone, if the batch removes nothing**, since accepting then adds no judgment: each image already matches the baseline, or was approved by someone who may decide. This is how a merge commit gets goldens without a person re-rendering it (rationale).
-- **Must hold a batch to the baseline the sender names, which must have goldens here**, since no batch records one, and CI on a private repository can't pull. CI's sequence is `selfie render`, then `selfie push --accept` (rationale).
-- **Must need Decide for goldens that remove anything, have the sender name what it counted as removed, and refuse with `wrong-removed` if that isn't what the server finds**, in place of a count, since the local count isn't kept, and the two stores' baselines could differ.
-- **Must never replace a SHA's goldens this way.** If the cloud has a different batch there, it answers `conflict` with that batch's ID. Nothing can replace them yet ([Not yet](#not-yet)).
-- **Must refuse goldens whose baseline's goldens aren't here with `no-goldens`**. Nothing reaches back through history.
-
 ## Pushing and pulling
 
 Source of truth: `cli/src/sync.ts`; tests in `cli/test/sync.test.ts`, between two machines on real Git and a store standing in for the cloud's.
 
 - **Must try a request up to three times if the server can't be reached, or answers 429 or 5xx**, since every step is safe to send again.
-- **Must push one batch at a time, in this order: the batch, what its commit reaches, its built Storybook if it's kept, its images, its renders, finishing it, its decisions, its goldens, and the diffs the remote asks for**, so that a refused batch costs nothing, and nothing refers to what hasn't arrived.
-- **Must make every step safe to send again**, so a push or pull that dies is finished by running it again, with nothing to clean up. A partly received batch stays `recording`, which nothing can compare or accept.
+- **Must push one batch at a time, in this order: the batch, what its commit reaches, its built Storybook if it's kept, its images, its renders, finishing it, its decisions, saying its status, and the diffs the remote asks for**, so that a refused batch costs nothing, and nothing refers to what hasn't arrived.
+- **Must make every step safe to send again**, so a push or pull that dies is finished by running it again, with nothing to clean up. A partly received batch stays `recording`, which nothing can compare.
 - **Must send only the images the receiver lacks, and pull only those this store lacks, decoding each to check it's the image its hash names**, and stop with `corrupt-image` naming it if it isn't, leaving what's stored here as it was. A sender's check is the last that image gets, and a puller's is the only one that finds what another client sent wrongly.
 - **Must carry `reusedFromBatch`**, for `trust`. It may name a batch never pushed.
-- **Must send only the decisions on the batch's own images, each with the commit it counts from**, which are the ones that carry through a push (`docs/specs/system.md` → Approvals across stores).
+- **Must send what its commit reaches, by the same rule as a pull, that's on the batch's own images or a story being gone, each with the commit it counts from**, which are the ones that carry through a push (`docs/specs/system.md` → Approvals), since the remote may hold no other image.
 - **Must ask first what the token may do, and skip what it can't, saying so**, so that CI isn't refused after uploading everything.
-- **Must let a pull replace a SHA's local goldens with the cloud's, and say so**, through `adoptGoldens`. Its decisions merge, so a later one here stands.
-- **Must read nothing more once a SHA's goldens here are already the cloud's**, since a shared limit pays for every pull CI makes.
+- **Must pull what a commit reaches by sending its ancestors, not by the remote's graph**, so a commit that hasn't been pushed yet can still read what its history approved.
+- **Must answer a pull with only what can change what a story reads as: each story's decisions, newest first, back through its second-newest approval**, and fetch only their images, so a long history doesn't mean fetching every image it ever approved (rationale).
+- **Must merge what's pulled**, so a later decision here stands (`docs/specs/renders.md` → Decisions).
 
 ## Commands
 
 | Command | Prints | Exits |
 |---|---|---|
-| `selfie push [<batch>] [--accept] [--remote <url>] [--native]` | `batchId`, `images: { sent, alreadyThere }`, `decisions`, null if the token can't decide, and `goldens`, null if none were asked for | 0 if it all went, 1 if goldens were refused or conflict, 2 if it couldn't run |
-| `selfie pull [<commit>] [--remote <url>] [--native]` | `sha`, `environment`, `batchId`, `images: { received, alreadyHere }`, `decisions`, and `replaced` | 0 with goldens, 1 if the remote has none, 2 if it couldn't run |
+| `selfie push [<batch>] [--remote <url>] [--native]` | `batchId`, `images: { sent, alreadyThere }`, `decisions`, null if the token can't decide, `storybook`, and `diffs` | 0 if it all went, 2 if it couldn't run |
+| `selfie pull [<commit>] [--remote <url>] [--native]` | `sha`, `environment`, `images: { received, alreadyHere }`, and `decisions` | 0 if it all came, whether or not there was anything to take, 2 if it couldn't run |
 
-A push sends a batch's goldens if they're here, which only a pull makes them, or `--accept` asks for them, which is what CI uses on a merge commit. It defaults to the newest finished batch from a clean tree at HEAD. A pull defaults to the nearest baseline the remote has.
+A push defaults to the newest finished batch from a clean tree at HEAD. A pull defaults to HEAD.
 
 - **Must find a repository's project from its GitHub origin**, by the owner and name there, and use the numeric ID the server answers (`docs/specs/access.md` → GitHub App).
 - **Must take the remote's address only from `--remote` or `SELFIE_REMOTE`, and the token only from `SELFIE_TOKEN`, never from `selfie.config.json`**, since a checkout must not be able to send someone's token to another server (`docs/specs/cli.md` → Commands). Signing in replaces the token with **Scope: github-access**.
@@ -119,6 +103,5 @@ A project's first push is the expensive one. Each new image takes one upload and
 - Replacing an image the cloud holds wrongly. Today a pull of it fails, naming it, every time, and a browser shows it as it is. A repair needs someone with write access, and a client that decodes.
 - Decisions on hunks (`docs/specs/renders.md` → Future), which add their own table, and travel the same way.
 - Notes (**Scope: remote-notes**, `docs/specs/feedback.md`).
-- Pulling a batch other than a commit's goldens.
-- Replacing a SHA's goldens in the cloud, which also clears a `conflict`. It would be `POST /goldens` with `replaces`, needing Decide, which `selfie push` never sends.
+- Pulling a batch, for a story's reference to link to its kept built Storybook and declared size locally. A pull brings only decisions and images, so a pulled reference shows no live story here.
 - Moving the routes out of `selfie-ui`, with `app.ts`, once **Scope: cloud-deploy** needs them without a build of the page.

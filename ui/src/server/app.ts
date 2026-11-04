@@ -34,10 +34,6 @@ const ERROR_STATUS: Readonly<Record<string, ContentfulStatusCode>> = {
   "not-signed-in": 401,
   "read-only": 403,
   "batch-not-finished": 409,
-  "no-goldens": 409,
-  "batch-dirty": 409,
-  "batch-has-failures": 409,
-  "wrong-removed-count": 409,
 };
 
 class BadRequest extends Error {

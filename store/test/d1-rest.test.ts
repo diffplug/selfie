@@ -386,8 +386,8 @@ describe("D1RestAdapter replay against a real SQL engine", () => {
     const store = new Store({ codec: sharpCodec, sql, blob: temp.blob });
     const { hash: imageHash, key } = await store.putImage(pngOf(image(1)));
     expect(await store.lookupKey(imageHash)).toBe(key);
-    // Twice each: the schema's 14 statements, and the put's lookup, insert, and lookup.
-    expect(sent).toHaveLength(34);
+    // Twice each: the schema's 13 statements, and the put's lookup, insert, and lookup.
+    expect(sent).toHaveLength(32);
   });
 
   it("resends everything the render model sends, so a lost response never fails it", async () => {
@@ -406,10 +406,13 @@ describe("D1RestAdapter replay against a real SQL engine", () => {
       actor: "ned",
       renders: [{ story: "a", imageHash: hashOf(1) }],
     });
-    expect(await batches.acceptBatch(batch.id, null, 0)).toBe(true);
-    expect(await batches.compareBatch(batch.id, gitSha, { includeUnchanged: true })).toMatchObject({
+    expect(await batches.compareWithBatch(batch.id, batch.id, { includeUnchanged: true })).toMatchObject({
       renders: [{ story: "a", state: "unchanged" }],
     });
-    expect(await batches.acceptedBatchAt(gitSha, environment)).not.toBeNull();
+    const decisions = await batches.decisionsAt(environment, [ON.gitSha]);
+    expect(decisions).toMatchObject([{ story: "a", imageHash: hashOf(1), gitSha: ON.gitSha }]);
+    expect(await batches.compareFromHistory(batch.id, decisions, { includeUnchanged: true })).toMatchObject({
+      renders: [{ story: "a", state: "unchanged" }],
+    });
   });
 });

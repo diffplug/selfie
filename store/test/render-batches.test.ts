@@ -3,10 +3,12 @@ import { DatabaseSync } from "node:sqlite";
 import {
   imageInsertStatement,
   initStoreSchema,
+  decisionsThatCount,
   newestRenders,
   RenderBatches,
   Sql,
   Store,
+  type CompareOptions,
   type ComparedRender,
   type RecordedRender,
   type SqlAdapter,
@@ -85,22 +87,18 @@ describe("RenderBatches", () => {
       renders: items.map(({ story, imageHash }) => ({ story, imageHash: imageHash! })),
     });
 
-  /** Goldens at this SHA, holding these renders. */
-  const goldensAt = async (gitSha: string, items: readonly RecordedRender[]) => {
-    const batch = await recordBatch(gitSha, items);
-    await approve(items);
-    expect(await batches.acceptBatch(batch.id, null, 0)).toBe(true);
-    return batch;
-  };
+  /** Against that batch's images if it's named, or against nothing at all. */
+  const compare = (batchId: string, baseline: string | null, options?: CompareOptions, model = batches) =>
+    baseline === null ? model.compareFromHistory(batchId, [], options) : model.compareWithBatch(batchId, baseline, options);
 
   const statesOf = async (batchId: string, baseline: string | null, model = batches) => {
-    const { renders: compared } = await model.compareBatch(batchId, baseline, { includeUnchanged: true });
+    const { renders: compared } = await compare(batchId, baseline, { includeUnchanged: true }, model);
     return Object.fromEntries(compared.map(({ story, state }) => [story, state]));
   };
 
   /** What a batch holds, as a reader finds out: its full comparison. */
   const heldBy = async (batchId: string) => {
-    const { renders: compared } = await batches.compareBatch(batchId, null, { includeUnchanged: true });
+    const { renders: compared } = await batches.compareFromHistory(batchId, [], { includeUnchanged: true });
     return compared;
   };
 
@@ -117,29 +115,12 @@ describe("RenderBatches", () => {
     await temp.destroy();
   });
 
-  describe("firstWithGoldens's requests", () => {
-    it("stops at the first group holding one, and asks one query per group", async () => {
-      const { sent, adapter: counted } = counting(adapter);
-      const model = new RenderBatches({ sql: new Sql(counted) });
-      const golden = await recordBatch(SHA_A, [rendered("a", 1)]);
-      await approve([rendered("a", 1)]);
-      await batches.acceptBatch(golden.id, null, 0);
-
-      const others = Array.from({ length: 1000 }, (_, i) => i.toString(16).padStart(40, "f"));
-      expect(await model.firstWithGoldens(others, ENV)).toBeNull();
-      expect(sent).toHaveLength(11);
-      sent.length = 0;
-      expect(await model.firstWithGoldens([SHA_A, ...others], ENV)).toBe(SHA_A);
-      expect(sent).toHaveLength(1);
-    });
-  });
-
   describe("recording a failure", () => {
     it("cuts it by code point", async () => {
       const batch = await batches.beginBatch({ gitSha: SHA_A, environment: ENV, scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, });
       await batches.recordRenders(batch.id, [{ story: "a", failure: `${"x".repeat(1999)}😀😀\0` }]);
       await batches.finishBatch(batch.id, 1);
-      const { renders: compared } = await batches.compareBatch(batch.id, null);
+      const { renders: compared } = await batches.compareFromHistory(batch.id, []);
       expect(compared[0]!.failure).toBe(`${"x".repeat(1999)}😀`);
     });
 
@@ -250,8 +231,8 @@ describe("RenderBatches", () => {
         code: "unknown-batch",
       });
       await expect(batches.finishBatch("nope", 0)).rejects.toMatchObject({ code: "unknown-batch" });
-      await expect(batches.compareBatch("nope", null)).rejects.toMatchObject({ code: "unknown-batch" });
-      await expect(batches.acceptBatch("nope", null, 0)).rejects.toMatchObject({ code: "unknown-batch" });
+      await expect(batches.compareFromHistory("nope", [])).rejects.toMatchObject({ code: "unknown-batch" });
+      await expect(batches.compareWithBatch("nope", "nope")).rejects.toMatchObject({ code: "unknown-batch" });
       expect(await batches.getBatch("nope")).toBeNull();
     });
 
@@ -320,10 +301,10 @@ describe("RenderBatches", () => {
         code: "wrong-render-count",
         message: expect.stringContaining(`holds ${stored} renders`),
       });
-      await expect(batches.compareBatch(batch.id, null)).rejects.toMatchObject({
+      await expect(batches.compareFromHistory(batch.id, [])).rejects.toMatchObject({
         code: "batch-not-finished",
       });
-      await expect(batches.acceptBatch(batch.id, null, 0)).rejects.toMatchObject({
+      await expect(batches.compareWithBatch(batch.id, batch.id)).rejects.toMatchObject({
         code: "batch-not-finished",
       });
 
@@ -366,25 +347,24 @@ describe("RenderBatches", () => {
     it("marks everything idempotent, and gives the same answers when all of it is resent", async () => {
       const { adapter: counted, sent } = counting(adapter);
       const model = over(() => replaying(counted));
-      const golden = await recordBatch(SHA_A, [rendered("a", 1), rendered("b", 2), rendered("gone", 5)], ENV, model);
+      const baseline = await recordBatch(SHA_A, [rendered("a", 1), rendered("b", 2), rendered("gone", 5)], ENV, model);
       await approve([rendered("a", 1), rendered("b", 2), rendered("gone", 5)], ENV, model);
-      expect(await model.acceptBatch(golden.id, null, 0)).toBe(true);
       const head = await recordBatch(
         SHA_B,
         [rendered("a", 1), rendered("b", 3), rendered("c", 4), { story: "d", failure: "Boom" }],
         ENV,
         model,
       );
-      const states = await statesOf(head.id, SHA_A, model);
+      const states = await statesOf(head.id, baseline.id, model);
       expect(states).toEqual({ a: "unchanged", b: "changed", c: "added", d: "failed", gone: "removed" });
       expect(await model.batchesAt(SHA_B, ENV)).toHaveLength(1);
-      expect(await model.acceptedBatchAt(SHA_A, ENV)).not.toBeNull();
       expect(await model.getBatch(head.id)).toMatchObject({ failedCount: 1 });
 
-      // A rerun accepted over its own SHA's goldens, with a removal. Sent again, the baseline
-      // is by then the batch itself and nothing reads as removed, so it mustn't report a mismatch.
-      const rerun = await recordBatch(SHA_A, [rendered("a", 1), rendered("b", 2)], ENV, model);
-      expect(await model.acceptBatch(rerun.id, SHA_A, 1)).toBe(true);
+      // From another store, a removal among them, and what history then says.
+      await model.mergeDecisions(ENV, [{ story: "gone", imageHash: null, decision: "approved", actor: "ned", at: clock + 1, gitSha: SHA_B, batchId: head.id }]);
+      const decisions = await model.decisionsAt(ENV, [SHA_B, ON.gitSha]);
+      expect(decisions).toHaveLength(4);
+      expect((await model.compareFromHistory(head.id, decisions)).renders).toMatchObject([{ story: "b", state: "changed" }, { story: "c", state: "added" }, { story: "d", state: "failed" }, { story: "gone", state: "removed", decision: { decision: "approved" } }]);
 
       expect(sent.flat().filter(({ idempotent }) => idempotent !== true)).toEqual([]);
       // Finished at the first send's time, not the second's.
@@ -393,7 +373,7 @@ describe("RenderBatches", () => {
   });
 
   describe("decisions", () => {
-    const decisionOn = async (batchId: string) => (await heldBy(batchId))[0]?.decision;
+    const decisionOn = async (batchId: string, baseline: string) => (await batches.compareWithBatch(batchId, baseline)).renders[0]?.decision;
     const decide = (decision: "approved" | "rejected", actor: string) =>
       batches.decide({ on: ON,
         environment: ENV,
@@ -404,29 +384,38 @@ describe("RenderBatches", () => {
 
     it("keeps the most recent decision, with who and when", async () => {
       clock = 500;
+      const baseline = await recordBatch(SHA_B, [rendered("a", 2)]);
       const batch = await recordBatch(SHA_A, [rendered("a", 1)]);
       clock = 1_000;
       await decide("rejected", "bob");
-      expect(await decisionOn(batch.id)).toEqual({ decision: "rejected", actor: "bob", at: 1_000 });
+      expect(await decisionOn(batch.id, baseline.id)).toEqual({ decision: "rejected", actor: "bob", at: 1_000 });
       clock = 2_000;
       await decide("approved", "ned");
-      expect(await decisionOn(batch.id)).toEqual({ decision: "approved", actor: "ned", at: 2_000 });
+      expect(await decisionOn(batch.id, baseline.id)).toEqual({ decision: "approved", actor: "ned", at: 2_000 });
     });
 
     it("carries through a push: no new approval at a new SHA for the same image", async () => {
-      await goldensAt(SHA_A, [rendered("a", 1)]);
+      const baseline = await recordBatch(SHA_A, [rendered("a", 1)]);
       const local = await recordBatch(SHA_B, [rendered("a", 2)]);
       await approve([rendered("a", 2)]);
-      expect(await batches.compareBatch(local.id, SHA_A)).toMatchObject({
+      expect(await batches.compareWithBatch(local.id, baseline.id)).toMatchObject({
         renders: [{ state: "changed", decision: { decision: "approved", actor: "ned" } }],
       });
 
       // A rebase and push: a new SHA, a new batch, the same pixels.
       const pushed = await recordBatch(SHA_C, [rendered("a", 2)]);
-      expect(await batches.compareBatch(pushed.id, SHA_A)).toMatchObject({
+      expect(await batches.compareWithBatch(pushed.id, baseline.id)).toMatchObject({
         renders: [{ state: "changed", decision: { decision: "approved", actor: "ned" } }],
       });
-      expect(await batches.acceptBatch(pushed.id, SHA_A, 0)).toBe(true);
+    });
+
+    it("doesn't take one from another environment", async () => {
+      const baseline = await recordBatch(SHA_A, [rendered("a", 2)]);
+      const batch = await recordBatch(SHA_B, [rendered("a", 1)]);
+      await approve([rendered("a", 1)], "other");
+      expect((await batches.compareWithBatch(batch.id, baseline.id)).renders).toMatchObject([{ story: "a", decision: null }]);
+      expect(await batches.decisionsAt(ENV, [ON.gitSha])).toEqual([]);
+      expect(await batches.decisionsAt("other", [ON.gitSha])).toHaveLength(1);
     });
 
     it("are refused, all of them, for an image this store doesn't hold", async () => {
@@ -453,124 +442,9 @@ describe("RenderBatches", () => {
     });
   });
 
-  describe("goldens", () => {
-    it("has none until a batch is accepted, then has that batch's images", async () => {
-      expect(await batches.acceptedBatchAt(SHA_A, ENV)).toBeNull();
-      await goldensAt(SHA_A, [rendered("a", 1), rendered("b", 2)]);
-      expect(await batches.acceptedBatchAt(SHA_A, ENV)).not.toBeNull();
-      expect(await batches.acceptedBatchAt(SHA_B, ENV)).toBeNull();
-      expect(await batches.acceptedBatchAt(SHA_A, "other")).toBeNull();
-
-      const head = await recordBatch(SHA_B, [rendered("a", 3), rendered("b", 2)]);
-      expect((await batches.compareBatch(head.id, SHA_A, { includeUnchanged: true })).renders).toMatchObject([
-        { story: "a", goldenHash: hashOf(1) },
-        { story: "b", goldenHash: hashOf(2) },
-      ]);
-    });
-
-    it("accepts what is unchanged or approved, and nothing else", async () => {
-      await goldensAt(SHA_A, [rendered("a", 1), rendered("b", 2), rendered("gone", 3)]);
-      const head = await recordBatch(SHA_B, [rendered("a", 1), rendered("b", 4), rendered("c", 5)]);
-
-      // Nothing decided on the changed b or the new c.
-      expect(await batches.acceptBatch(head.id, SHA_A, 1)).toBe(false);
-      await approve([rendered("b", 4)]);
-      expect(await batches.acceptBatch(head.id, SHA_A, 1)).toBe(false);
-
-      // Another image for c is approved, and c's own is rejected.
-      await approve([rendered("c", 6)]);
-      expect(await batches.acceptBatch(head.id, SHA_A, 1)).toBe(false);
-      await batches.decide({ on: ON,
-        environment: ENV,
-        decision: "rejected",
-        actor: "bob",
-        renders: [{ story: "c", imageHash: hashOf(5) }],
-      });
-      expect(await batches.acceptBatch(head.id, SHA_A, 1)).toBe(false);
-      expect(await batches.acceptedBatchAt(SHA_B, ENV)).toBeNull();
-
-      await approve([rendered("c", 5)]);
-      expect(await batches.acceptBatch(head.id, SHA_A, 1)).toBe(true);
-      expect(await batches.acceptedBatchAt(SHA_B, ENV)).not.toBeNull();
-    });
-
-    it("refuses to silently drop 500 goldens a filtered render missed", async () => {
-      const everything = Array.from({ length: 510 }, (_, i) =>
-        rendered(`story-${String(i).padStart(3, "0")}`, (i % 40) + 1),
-      );
-      await goldensAt(SHA_A, everything);
-
-      // Every image it rendered is unchanged, so without the count this would be accepted.
-      const filtered = await recordBatch(SHA_B, everything.slice(0, 10));
-      const compared = await batches.compareBatch(filtered.id, SHA_A);
-      expect(compared.unchangedCount).toBe(10);
-      const removed = compared.renders.filter(({ state }) => state === "removed");
-      expect(removed).toHaveLength(500);
-
-      await expect(batches.acceptBatch(filtered.id, SHA_A, 0)).rejects.toMatchObject({
-        code: "wrong-removed-count",
-        message: expect.stringContaining("would remove 500 goldens, not the 0 the reviewer saw"),
-      });
-      await expect(batches.acceptBatch(filtered.id, SHA_A, 499)).rejects.toMatchObject({
-        code: "wrong-removed-count",
-      });
-      expect(await batches.acceptedBatchAt(SHA_B, ENV)).toBeNull();
-
-      // A reviewer who saw all 500 may accept them.
-      expect(await batches.acceptBatch(filtered.id, SHA_A, removed.length)).toBe(true);
-      expect(await batches.acceptedBatchAt(SHA_B, ENV)).not.toBeNull();
-    });
-
-    it("refuses a claim of removals with no baseline, and a wrong count of too many", async () => {
-      const batch = await recordBatch(SHA_A, [rendered("a", 1)]);
-      await approve([rendered("a", 1)]);
-      await expect(batches.acceptBatch(batch.id, null, 1)).rejects.toMatchObject({
-        code: "wrong-removed-count",
-      });
-      expect(await batches.acceptBatch(batch.id, null, 0)).toBe(true);
-    });
-
-    it("doesn't take an approval from another environment", async () => {
-      const batch = await recordBatch(SHA_A, [rendered("a", 1)]);
-      await approve([rendered("a", 1)], "other");
-      expect(await batches.acceptBatch(batch.id, null, 0)).toBe(false);
-    });
-
-    it("refuses a batch with failures or still recording, and a baseline with no goldens", async () => {
-      const failed = await recordBatch(SHA_A, [{ story: "a", failure: "Boom" }]);
-      await expect(batches.acceptBatch(failed.id, null, 0)).rejects.toMatchObject({
-        code: "batch-has-failures",
-      });
-      const recording = await batches.beginBatch({ gitSha: SHA_A, environment: ENV, scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, });
-      await expect(batches.acceptBatch(recording.id, null, 0)).rejects.toMatchObject({
-        code: "batch-not-finished",
-      });
-
-      // Approved, so only the missing baseline can stop it, and it must change nothing.
-      const batch = await recordBatch(SHA_A, [rendered("a", 1)]);
-      await approve([rendered("a", 1)]);
-      await expect(batches.acceptBatch(batch.id, SHA_C, 0)).rejects.toMatchObject({ code: "no-goldens" });
-      expect(await batches.acceptedBatchAt(SHA_A, ENV)).toBeNull();
-    });
-
-    it("lets a rerun's acceptance replace a SHA's goldens, all at once", async () => {
-      await goldensAt(SHA_A, [rendered("a", 1), rendered("b", 2)]);
-      const rerun = await recordBatch(SHA_A, [rendered("a", 3)]);
-      expect(await batches.compareBatch(rerun.id, SHA_A)).toMatchObject({
-        renders: [
-          { story: "a", state: "changed", goldenHash: hashOf(1) },
-          { story: "b", state: "removed", goldenHash: hashOf(2) },
-        ],
-      });
-      await approve([rendered("a", 3)]);
-      expect(await batches.acceptBatch(rerun.id, SHA_A, 1)).toBe(true);
-      expect(await statesOf(rerun.id, SHA_A)).toEqual({ a: "unchanged" });
-    });
-  });
-
   describe("compare", () => {
     it("lists only differences and failures, unless asked for everything", async () => {
-      await goldensAt(SHA_A, [rendered("same", 1), rendered("played", 2), rendered("calm", 3)]);
+      const baseline = await recordBatch(SHA_A, [rendered("same", 1), rendered("played", 2), rendered("calm", 3)]);
       const batch = await recordBatch(SHA_B, [
         rendered("same", 1),
         { ...rendered("played", 2), failure: "play: Boom" },
@@ -578,23 +452,23 @@ describe("RenderBatches", () => {
         { story: "broken", failure: "Boom" },
       ]);
 
-      const differences = await batches.compareBatch(batch.id, SHA_A);
+      const differences = await batches.compareWithBatch(batch.id, baseline.id);
       expect(differences.renders.map(({ story, state, failure }) => [story, state, failure])).toEqual([
         ["broken", "failed", "Boom"],
         ["played", "failed", "play: Boom"],
       ]);
       expect(differences.unchangedCount).toBe(2);
 
-      const everything = await batches.compareBatch(batch.id, SHA_A, { includeUnchanged: true });
+      const everything = await batches.compareWithBatch(batch.id, baseline.id, { includeUnchanged: true });
       expect(everything.renders.map(({ story }) => story)).toEqual(["broken", "calm", "played", "same"]);
       expect(everything.unchangedCount).toBe(2);
     });
 
     it("lists a failure that has no golden, with or without a baseline", async () => {
       const batch = await recordBatch(SHA_A, [{ story: "a", failure: "Boom" }]);
-      expect((await batches.compareBatch(batch.id, null)).renders).toMatchObject([{ state: "failed" }]);
-      await goldensAt(SHA_B, [rendered("b", 1)]);
-      expect((await batches.compareBatch(batch.id, SHA_B)).renders).toMatchObject([
+      expect((await batches.compareFromHistory(batch.id, [])).renders).toMatchObject([{ state: "failed" }]);
+      const baseline = await recordBatch(SHA_B, [rendered("b", 1)]);
+      expect((await batches.compareWithBatch(batch.id, baseline.id)).renders).toMatchObject([
         { story: "a", state: "failed", goldenHash: null },
         { story: "b", state: "removed" },
       ]);
@@ -602,19 +476,19 @@ describe("RenderBatches", () => {
 
     it("counts nothing as unchanged with no baseline", async () => {
       const batch = await recordBatch(SHA_A, [rendered("a", 1)]);
-      expect((await batches.compareBatch(batch.id, null)).unchangedCount).toBe(0);
+      expect((await batches.compareFromHistory(batch.id, [])).unchangedCount).toBe(0);
     });
 
     it("compares images with colliding truncated hashes by their full hash", async () => {
       const a = hashOf(50_001);
       const b = hashOf(50_002);
       await sql.batch([imageInsertStatement(a, 500), imageInsertStatement(b, 500)]);
-      await goldensAt(SHA_A, [{ story: "x", imageHash: a }]);
+      const baseline = await recordBatch(SHA_A, [{ story: "x", imageHash: a }]);
       const head = await recordBatch(SHA_B, [{ story: "x", imageHash: b }]);
-      expect(await statesOf(head.id, SHA_A)).toEqual({ x: "changed" });
-      expect(await batches.acceptBatch(head.id, SHA_A, 0)).toBe(false);
+      expect(await statesOf(head.id, baseline.id)).toEqual({ x: "changed" });
+      // An approval of the one isn't an approval of the other.
       await approve([{ story: "x", imageHash: a }]);
-      expect(await batches.acceptBatch(head.id, SHA_A, 0)).toBe(false);
+      expect((await batches.compareWithBatch(head.id, baseline.id)).renders).toMatchObject([{ state: "changed", decision: null }]);
     });
 
     it("uses images a real Store put", async () => {
@@ -623,12 +497,24 @@ describe("RenderBatches", () => {
         pngOf({ width: 1, height: 1, pixels: new Uint8Array([v, 0, 0]) }),
       );
       const [one, two] = await store.putImages(files);
-      await goldensAt(SHA_A, [{ story: "x", imageHash: one!.hash }]);
+      const baseline = await recordBatch(SHA_A, [{ story: "x", imageHash: one!.hash }]);
       const head = await recordBatch(SHA_B, [{ story: "x", imageHash: two!.hash }]);
-      const { renders: compared } = await batches.compareBatch(head.id, SHA_A);
+      const { renders: compared } = await batches.compareWithBatch(head.id, baseline.id);
       expect(compared).toMatchObject([
         { state: "changed", imageHash: two!.hash, goldenHash: one!.hash },
       ]);
+    });
+
+    it("says everything a filtered render missed is removed, beside what it found unchanged", async () => {
+      const everything = Array.from({ length: 510 }, (_, i) =>
+        rendered(`story-${String(i).padStart(3, "0")}`, (i % 40) + 1),
+      );
+      const baseline = await recordBatch(SHA_A, everything);
+      const filtered = await recordBatch(SHA_B, everything.slice(0, 10));
+      const compared = await batches.compareWithBatch(filtered.id, baseline.id);
+      expect(compared.unchangedCount).toBe(10);
+      expect(compared.renders.filter(({ state }) => state === "removed")).toHaveLength(500);
+      expect(compared.renders).toHaveLength(500);
     });
 
     it("reads every page, however the rows fall across them", async () => {
@@ -637,9 +523,9 @@ describe("RenderBatches", () => {
       const golden = Array.from({ length: PAGE + 5_500 }, (_, i) =>
         rendered(`old-${String(i).padStart(5, "0")}`, (i % 40) + 1),
       );
-      await goldensAt(SHA_A, golden);
+      const baseline = await recordBatch(SHA_A, golden);
       const batch = await recordBatch(SHA_B, golden.slice(0, PAGE));
-      const { renders: compared } = await batches.compareBatch(batch.id, SHA_A, { includeUnchanged: true });
+      const { renders: compared } = await batches.compareWithBatch(batch.id, baseline.id, { includeUnchanged: true });
       expect(compared.filter(({ state }) => state === "unchanged")).toHaveLength(PAGE);
       expect(compared.filter(({ state }) => state === "removed")).toHaveLength(5_500);
       expect(new Set(compared.map(({ story }) => story)).size).toBe(PAGE + 5_500);
@@ -650,13 +536,13 @@ describe("RenderBatches", () => {
       const golden = Array.from({ length: PAGE + 200 }, (_, i) =>
         rendered(`s-${String(i).padStart(5, "0")}`, 1),
       );
-      await goldensAt(SHA_A, golden);
+      const baseline = await recordBatch(SHA_A, golden);
       // The first 100 are unchanged, and the rest differ, so differences span two pages.
       const batch = await recordBatch(
         SHA_B,
         golden.map((item, i) => (i < 100 ? item : rendered(item.story, 2))),
       );
-      const { renders: compared, unchangedCount } = await batches.compareBatch(batch.id, SHA_A);
+      const { renders: compared, unchangedCount } = await batches.compareWithBatch(batch.id, baseline.id);
       expect(compared).toHaveLength(PAGE + 100);
       expect(new Set(compared.map(({ story }) => story)).size).toBe(PAGE + 100);
       expect(unchangedCount).toBe(100);
@@ -668,7 +554,7 @@ describe("RenderBatches", () => {
       const elsewhere = await createTempStore();
       try {
         await elsewhere.sql.batch(
-          ["goldens", "decisions", "renders", "render_batches", "actors", "commits", "stories", "environments"].map((table) => ({
+          ["decisions", "renders", "render_batches", "actors", "commits", "stories", "environments"].map((table) => ({
             sql: `DROP TABLE ${table}`,
           })),
         );
@@ -701,7 +587,7 @@ describe("RenderBatches", () => {
       }
     };
 
-    it("records, compares, and accepts 10,000 renders in few requests", { timeout: 120_000 }, async () => {
+    it("records and compares 10,000 renders in few requests", { timeout: 120_000 }, async () => {
       seedMany(1_000_000, N + 1_000);
       const { adapter: counted, sent, responseBytes } = counting(adapter);
       const model = new RenderBatches({ sql: new Sql(counted) });
@@ -721,12 +607,10 @@ describe("RenderBatches", () => {
       };
 
       const goldenItems = Array.from({ length: N }, (_, i) => rendered(pad(i), 1_000_000 + i));
-      const golden = await measure("beginBatch", () => model.beginBatch({ gitSha: SHA_A, environment: ENV, scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, }));
-      await measure("recordRenders", () => model.recordRenders(golden.id, goldenItems));
-      await measure("finishBatch", () => model.finishBatch(golden.id, N));
+      const baseline = await measure("beginBatch", () => model.beginBatch({ gitSha: SHA_A, environment: ENV, scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, }));
+      await measure("recordRenders", () => model.recordRenders(baseline.id, goldenItems));
+      await measure("finishBatch", () => model.finishBatch(baseline.id, N));
       await measure("decide (all)", () => approve(goldenItems, ENV, model));
-      const accepted = await measure("acceptBatch (all approved)", () => model.acceptBatch(golden.id, null, 0));
-      expect(accepted).toBe(true);
 
       // 100 changed, 50 failed, and 50 removed, with 50 new, and the rest unchanged.
       const head: RecordedRender[] = goldenItems.slice(0, N - 50).map((item, i) =>
@@ -742,16 +626,24 @@ describe("RenderBatches", () => {
       const finished = await measure("finishBatch (head)", () => model.finishBatch(batch.id, head.length));
       expect(finished.failedCount).toBe(50);
 
-      const differences = await measure("compareBatch (differences)", () => model.compareBatch(batch.id, SHA_A));
+      const differences = await measure("compareWithBatch (differences)", () => model.compareWithBatch(batch.id, baseline.id));
       expect(differences.renders).toHaveLength(250);
       expect(differences.unchangedCount).toBe(N - 200);
 
-      const { renders: compared } = await measure("compareBatch (includeUnchanged)", () =>
-        model.compareBatch(batch.id, SHA_A, { includeUnchanged: true }),
+      const { renders: compared } = await measure("compareWithBatch (includeUnchanged)", () =>
+        model.compareWithBatch(batch.id, baseline.id, { includeUnchanged: true }),
       );
       const counts: Record<string, number> = {};
       for (const { state } of compared) counts[state] = (counts[state] ?? 0) + 1;
       expect(counts).toEqual({ unchanged: N - 200, changed: 100, failed: 50, added: 50, removed: 50 });
+
+      // The same comparison by history, and what another store would be sent of it.
+      const decisions = await measure("decisionsAt", () => model.decisionsAt(ENV, [ON.gitSha]));
+      expect(decisions).toHaveLength(N);
+      expect(decisionsThatCount(decisions)).toHaveLength(N);
+      const fromHistory = await measure("compareFromHistory", () => model.compareFromHistory(batch.id, decisions));
+      expect(fromHistory.renders).toHaveLength(250);
+      expect(fromHistory.unchangedCount).toBe(N - 200);
 
       console.log(`Render model at ${N} renders:`);
       console.table(report);
@@ -759,16 +651,17 @@ describe("RenderBatches", () => {
       expect(report.recordRenders!.requests).toBe(1);
       // One that checks the images are here, and one that writes.
       expect(report["decide (all)"]!.requests).toBe(2);
-      expect(report["acceptBatch (all approved)"]!.requests).toBe(1);
-      expect(report["compareBatch (differences)"]!.requests).toBe(1);
+      expect(report["compareWithBatch (differences)"]!.requests).toBe(1);
       // 10,000 rows at 5,000 per page, and one more that finds none.
-      expect(report["compareBatch (includeUnchanged)"]!.requests).toBe(3);
+      expect(report["compareWithBatch (includeUnchanged)"]!.requests).toBe(3);
+      expect(report.decisionsAt!.requests).toBe(1);
+      // Every render is read here, whichever are listed, so also 10,000 rows, and one more that finds none.
+      expect(report.compareFromHistory!.requests).toBe(3);
     });
 
     it("refuses a row whose batch or image isn't here, as D1 does", async () => {
       const sql = new Sql(adapter);
       await expect(sql.run({ sql: "INSERT INTO renders(batch_key, story_key, failure) VALUES (424242, 424242, 'boom')" })).rejects.toThrow(/FOREIGN KEY/);
-      await expect(sql.run({ sql: "INSERT INTO goldens(commit_key, environment_key, batch_key) VALUES (424242, 424242, 424242)" })).rejects.toThrow(/FOREIGN KEY/);
       await expect(sql.run({ sql: "INSERT INTO decisions(environment_key, commit_key, story_key, image_key, rejected, decided_at, actor_key, batch_id) VALUES (424242, 424242, 424242, 0, 0, 1, 424242, 'x')" })).rejects.toThrow(/FOREIGN KEY/);
       const batch = await recordBatch(SHA_A, [rendered("a", 1)]);
       const [{ key }] = (await sql.run({ sql: "SELECT key FROM render_batches WHERE id = ?1", params: [batch.id] })) as [{ key: number }];
@@ -780,27 +673,23 @@ describe("RenderBatches", () => {
       const { adapter: counted, sent } = counting(adapter);
       const model = new RenderBatches({ sql: new Sql(counted) });
       const items = [rendered("a", 1), rendered("b", 2)];
-      const golden = await recordBatch(SHA_A, items, ENV, model);
+      const baseline = await recordBatch(SHA_A, items, ENV, model);
       await approve(items, ENV, model);
-      await model.acceptBatch(golden.id, null, 0);
       const head = await recordBatch(SHA_B, [rendered("a", 3), { story: "c", failure: "Boom" }], ENV, model);
-      await model.compareBatch(head.id, SHA_A);
-      await model.compareBatch(head.id, SHA_A, { includeUnchanged: true });
+      await model.compareWithBatch(head.id, baseline.id);
+      await model.compareWithBatch(head.id, baseline.id, { includeUnchanged: true });
       await model.compareFromHistory(head.id, await model.decisionsAt(ENV, [SHA_A, SHA_B]));
       await model.commitsOfBranch("topic", ENV, 0, Number.MAX_SAFE_INTEGER);
-      await model.acceptBatch(head.id, SHA_A, 1).catch(() => {});
       const clean = await recordBatch(SHA_C, [rendered("a", 3)], ENV, model);
-      await model.acceptBatch(clean.id, SHA_A, 0).catch(() => {});
       await model.batchesAt(SHA_A, ENV);
-      await model.firstWithGoldens([SHA_C, SHA_B, SHA_A], ENV);
       await model.getBatch(head.id);
       await model.finishBatch(head.id, 2);
       await model.finishBatch(head.id, 99).catch(() => {});
       await model.readBatch(head.id);
-      await model.removedFrom(head.id, SHA_A);
       await model.mergeDecisions(ENV, [{ story: "a", imageHash: hashOf(3), decision: "approved", actor: "ned", at: 1, gitSha: ON.gitSha, batchId: ON.batchId }]);
-      await model.adoptGoldens(clean.id);
+      await model.mergeDecisions(ENV, [{ story: "b", imageHash: null, decision: "approved", actor: "ned", at: 2, gitSha: ON.gitSha, batchId: ON.batchId }]);
       await model.receiveBatch(clean);
+      await model.recordCommits([{ sha: SHA_B, parents: [SHA_A] }]);
 
       const db = new DatabaseSync(temp.path);
       try {

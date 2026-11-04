@@ -14,7 +14,7 @@
 
 ## Library
 
-**Facts and verdicts apart.** The local review UI is the next caller. It approves images one at a time, and must show what's left after each without re-rendering, so whatever computes a verdict must take only what `compareBatch` returns. `summarizeBatch` does, and the CLI's `blockers` and `undecided` both come from it, so they can't disagree.
+**Facts and verdicts apart.** The local review UI is the next caller. It approves images one at a time, and must show what's left after each without re-rendering, so whatever computes a verdict must take only what a comparison returns. `summarizeBatch` does, and the CLI's `blockers` and `undecided` both come from it, so they can't disagree.
 
 **Coded errors.** A UI wanting to tell "no such batch" from "not a repository" would otherwise be reading message text.
 

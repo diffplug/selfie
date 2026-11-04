@@ -1,9 +1,9 @@
-// The walk to a remote's goldens, against real Git history, in repositories shaped for each case.
+// What Git says of a repository, against real history, in repositories shaped for each case.
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
-import { dirtyPaths, headSha, openRepo, walkToBaseline } from "../src/git.ts";
+import { ancestorsOf, defaultBranchOf, dirtyPaths, headSha, openRepo } from "../src/git.ts";
 import { commit, createRepo, git } from "./support.ts";
 
 let scratch: string;
@@ -14,160 +14,106 @@ afterEach(async () => {
   await rm(scratch, { recursive: true, force: true });
 });
 
-const find = async (cwd: string, goldens: readonly string[], maxCommits?: number) => {
-  const asked: string[] = [];
-  const result = await walkToBaseline(
-    await openRepo(cwd),
-    async (shas) => {
-      asked.push(...shas);
-      return shas.find((sha) => goldens.includes(sha)) ?? null;
-    },
-    maxCommits,
-  );
-  return { ...result, asked };
-};
+describe("defaultBranchOf", () => {
+  const defaultBranch = async (repo: string, sha: string) => defaultBranchOf(await openRepo(repo), sha);
 
-test("on the default branch, the nearest commit with goldens, starting at HEAD", async () => {
-  const repo = await createRepo(scratch);
-  const a = git(repo, "rev-parse", "HEAD");
-  const b = await commit(repo, "b");
-  const c = await commit(repo, "c");
+  test("on the default branch, a commit is where it left", async () => {
+    const repo = await createRepo(scratch);
+    const head = await commit(repo, "b");
+    expect(await defaultBranch(repo, head)).toEqual({ defaultBranch: "main", mergeBase: head });
+  });
 
-  expect((await find(repo, [c, a])).sha).toBe(c);
-  const found = await find(repo, [a]);
-  expect(found.sha).toBe(a);
-  expect(found.asked).toEqual([c, b, a]);
-  expect(found).toMatchObject({ defaultBranch: "main", mergeBase: c, reason: null });
+  test("on a branch, says where it left, however far the default branch has moved on", async () => {
+    const repo = await createRepo(scratch);
+    const left = await commit(repo, "b");
+    git(repo, "switch", "--quiet", "-c", "feature");
+    const onFeature = await commit(repo, "on feature");
+    git(repo, "switch", "--quiet", "main");
+    await commit(repo, "main moved on");
+    git(repo, "switch", "--quiet", "feature");
+    expect(await defaultBranch(repo, onFeature)).toEqual({ defaultBranch: "main", mergeBase: left });
+  });
+
+  test("with no origin, uses a local default branch", async () => {
+    const repo = await createRepo(scratch);
+    expect((await openRepo(repo)).origin).toBeNull();
+    const a = git(repo, "rev-parse", "HEAD");
+    git(repo, "switch", "--quiet", "-c", "feature");
+    const b = await commit(repo, "b");
+    expect(await defaultBranch(repo, b)).toEqual({ defaultBranch: "main", mergeBase: a });
+  });
+
+  test("with no default branch at all, can say neither", async () => {
+    const repo = await createRepo(scratch);
+    git(repo, "branch", "--quiet", "-m", "trunk");
+    const b = await commit(repo, "b");
+    expect(await defaultBranch(repo, b)).toEqual({ defaultBranch: null, mergeBase: null });
+  });
+
+  test("prefers origin/HEAD, which a clone records, even with a differently named branch", async () => {
+    const upstream = await createRepo(scratch, "upstream");
+    git(upstream, "branch", "--quiet", "-m", "develop");
+    const a = await commit(upstream, "a");
+    const clone = path.join(scratch, "clone");
+    git(scratch, "clone", "--quiet", upstream, clone);
+    git(clone, "config", "user.email", "tester@example.com");
+    git(clone, "config", "user.name", "Tester");
+    // A local `main` that isn't the default branch must not win.
+    git(clone, "switch", "--quiet", "-c", "main");
+    const b = await commit(clone, "b", "b.txt");
+    expect(await defaultBranch(clone, b)).toEqual({ defaultBranch: "origin/develop", mergeBase: a });
+  });
+
+  test("works from a detached HEAD", async () => {
+    const repo = await createRepo(scratch);
+    const a = git(repo, "rev-parse", "HEAD");
+    await commit(repo, "b");
+    git(repo, "switch", "--quiet", "--detach", a);
+    const detached = await commit(repo, "c", "c.txt");
+    expect(await headSha(await openRepo(repo))).toBe(detached);
+    expect(await defaultBranch(repo, detached)).toEqual({ defaultBranch: "main", mergeBase: a });
+  });
+
+  test("a branch with no history in common left nowhere", async () => {
+    const repo = await createRepo(scratch);
+    git(repo, "switch", "--quiet", "--orphan", "other");
+    const elsewhere = await commit(repo, "elsewhere", "elsewhere.txt");
+    expect(await defaultBranch(repo, elsewhere)).toEqual({ defaultBranch: "main", mergeBase: null });
+  });
 });
 
-test("on a branch, starts at the merge-base and ignores the branch's own goldens", async () => {
-  const repo = await createRepo(scratch);
-  const a = git(repo, "rev-parse", "HEAD");
-  const b = await commit(repo, "b");
-  git(repo, "switch", "--quiet", "-c", "feature");
-  const onFeature = await commit(repo, "on feature");
-  git(repo, "switch", "--quiet", "main");
-  await commit(repo, "main moved on");
-  git(repo, "switch", "--quiet", "feature");
+describe("ancestorsOf", () => {
+  test("is a commit and all it reaches, itself first, through every parent", async () => {
+    const repo = await createRepo(scratch);
+    const a = git(repo, "rev-parse", "HEAD");
+    git(repo, "switch", "--quiet", "-c", "side");
+    const side = await commit(repo, "side", "side.txt");
+    git(repo, "switch", "--quiet", "main");
+    const main = await commit(repo, "main", "main.txt");
+    git(repo, "merge", "--quiet", "--no-edit", "side");
+    const merged = git(repo, "rev-parse", "HEAD");
+    const ancestors = await ancestorsOf(await openRepo(repo), merged);
+    expect(ancestors[0]).toBe(merged);
+    expect([...ancestors].sort()).toEqual([a, side, main, merged].sort());
+    expect(await ancestorsOf(await openRepo(repo), side)).toEqual([side, a]);
+  });
 
-  const found = await find(repo, [onFeature, a]);
-  expect(found.mergeBase).toBe(b);
-  expect(found.sha).toBe(a);
+  test("is the commit alone if this clone doesn't have it, and all a shallow clone does have", async () => {
+    const upstream = await createRepo(scratch, "upstream");
+    const b = await commit(upstream, "b");
+    const clone = path.join(scratch, "clone");
+    git(scratch, "clone", "--quiet", "--depth=1", `file://${upstream}`, clone);
+    const opened = await openRepo(clone);
+    expect(await ancestorsOf(opened, b)).toEqual([b]);
+    const unknown = "9".repeat(40);
+    expect(await ancestorsOf(opened, unknown)).toEqual([unknown]);
+  });
 });
 
-test("walks first-parent history, so a merged branch's commits don't count", async () => {
-  const repo = await createRepo(scratch);
-  const a = git(repo, "rev-parse", "HEAD");
-  git(repo, "switch", "--quiet", "-c", "side");
-  const side = await commit(repo, "side", "side.txt");
-  git(repo, "switch", "--quiet", "main");
-  await commit(repo, "main", "main.txt");
-  git(repo, "merge", "--quiet", "--no-edit", "side");
-
-  const found = await find(repo, [side, a]);
-  expect(found.sha).toBe(a);
-  expect(found.asked).not.toContain(side);
-});
-
-test("gives up after the bound, and says so", async () => {
-  const repo = await createRepo(scratch);
-  const a = git(repo, "rev-parse", "HEAD");
-  await commit(repo, "b");
-  const c = await commit(repo, "c");
-
-  const found = await find(repo, [a], 2);
-  expect(found).toMatchObject({ sha: null, reason: "limit-reached" });
-  expect(found.asked).toHaveLength(2);
-  expect(found.asked[0]).toBe(c);
-  expect(found.message).toContain("stops at 2");
-});
-
-test("says none were found when none have goldens", async () => {
-  const repo = await createRepo(scratch);
-  const found = await find(repo, []);
-  expect(found).toMatchObject({ sha: null, reason: "no-goldens" });
-});
-
-test("with no origin, uses a local default branch", async () => {
-  const repo = await createRepo(scratch);
-  expect((await openRepo(repo)).origin).toBeNull();
-  const a = git(repo, "rev-parse", "HEAD");
-  git(repo, "switch", "--quiet", "-c", "feature");
-  await commit(repo, "b");
-  const found = await find(repo, [a]);
-  expect(found).toMatchObject({ sha: a, defaultBranch: "main", mergeBase: a });
-});
-
-test("with no default branch at all, walks from HEAD and says so", async () => {
-  const repo = await createRepo(scratch);
-  const a = git(repo, "rev-parse", "HEAD");
-  git(repo, "branch", "--quiet", "-m", "trunk");
-  const b = await commit(repo, "b");
-  const found = await find(repo, [a]);
-  expect(found).toMatchObject({ sha: a, defaultBranch: null, mergeBase: b });
-  expect(found.message).toContain("No default branch");
-  const none = await find(repo, []);
-  expect(none.reason).toBe("no-goldens");
-  expect(none.message).toContain("No default branch");
-});
-
-test("prefers origin/HEAD, which a clone records, even with a differently named branch", async () => {
-  const upstream = await createRepo(scratch, "upstream");
-  git(upstream, "branch", "--quiet", "-m", "develop");
-  const a = await commit(upstream, "a");
-  const clone = path.join(scratch, "clone");
-  git(scratch, "clone", "--quiet", upstream, clone);
-  git(clone, "config", "user.email", "tester@example.com");
-  git(clone, "config", "user.name", "Tester");
-  // A local `main` that isn't the default branch must not win.
-  git(clone, "switch", "--quiet", "-c", "main");
-  await commit(clone, "b", "b.txt");
-
-  const found = await find(clone, [a]);
-  expect(found).toMatchObject({ sha: a, defaultBranch: "origin/develop", mergeBase: a });
-});
-
-test("works from a detached HEAD", async () => {
-  const repo = await createRepo(scratch);
-  const a = git(repo, "rev-parse", "HEAD");
-  const b = await commit(repo, "b");
-  git(repo, "switch", "--quiet", "--detach", b);
-  const found = await find(repo, [a]);
-  expect(found.sha).toBe(a);
-  expect(await headSha(await openRepo(repo))).toBe(b);
-});
-
-test("in a shallow clone, finds what it can and otherwise says history is cut off", async () => {
-  const upstream = await createRepo(scratch, "upstream");
-  const a = git(upstream, "rev-parse", "HEAD");
-  const b = await commit(upstream, "b");
-  const clone = path.join(scratch, "clone");
-  git(scratch, "clone", "--quiet", "--depth=1", `file://${upstream}`, clone);
-
-  const found = await find(clone, [b]);
-  expect(found).toMatchObject({ sha: b, reason: null });
-
-  const cutOff = await find(clone, [a]);
-  expect(cutOff).toMatchObject({ sha: null, reason: "shallow-history" });
-  expect(cutOff.message).toContain("git fetch --unshallow");
-  expect(cutOff.asked).toEqual([b]);
-});
-
-test("a branch with no history in common has no baseline", async () => {
-  const repo = await createRepo(scratch);
-  const a = git(repo, "rev-parse", "HEAD");
-  git(repo, "switch", "--quiet", "--orphan", "other");
-  await commit(repo, "elsewhere", "elsewhere.txt");
-  const found = await find(repo, [a]);
-  expect(found).toMatchObject({ sha: null, reason: "no-merge-base", mergeBase: null, defaultBranch: "main" });
-});
-
-test("a repository with no commits says so", async () => {
+test("a repository with no commits has no HEAD", async () => {
   const repo = path.join(scratch, "empty");
-  await createRepo(scratch, "seed");
   git(scratch, "init", "--quiet", "--initial-branch=main", repo);
-  const found = await find(repo, []);
-  expect(found).toMatchObject({ sha: null, reason: "no-commits" });
+  expect(await headSha(await openRepo(repo))).toBeNull();
 });
 
 describe("dirtyPaths", () => {

@@ -3,8 +3,8 @@
 // so they run on any platform, and are tested with a stand-in for it.
 import { Hono, type Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { assertViewport, ImageDecodeError, isGitSha, isImageHash, isBatchId, BatchError, type ReceivedDecision, type ReceivedBatch, type BuiltStorybooks, type StoredDiffs, type ReceivingStore, type RecordedRender, type RenderBatches, type StoryFilter, type Viewport } from "selfie-store";
-import { SYNC_LIMITS, type GoldensAnswer, type ProjectAccess } from "../shared/sync-api.ts";
+import { assertViewport, decisionsThatCount, ImageDecodeError, isGitSha, isImageHash, isBatchId, BatchError, type PlacedDecision, type ReceivedBatch, type BuiltStorybooks, type StoredDiffs, type ReceivingStore, type RecordedRender, type RenderBatches, type StoryFilter, type Viewport } from "selfie-store";
+import { SYNC_LIMITS, type ProjectAccess } from "../shared/sync-api.ts";
 import { afterResponse, failure, imageResponse, INTERNAL_ERROR, noStoreByDefault } from "./http.ts";
 
 /** What a token may do in a project. */
@@ -39,7 +39,6 @@ export interface SyncHost {
   readonly now?: () => number;
 }
 
-const BATCH_PAGE = 1_000;
 const DEFAULT_MAX_IMAGE_BYTES = 64 * 1024 * 1024;
 
 class Refusal extends Error {
@@ -131,39 +130,10 @@ function receivedBatch(id: string, body: Record<string, unknown>, now: number): 
   };
 }
 
-function receivedDecision(value: unknown, decider: string, now: number): ReceivedDecision {
+function receivedDecision(value: unknown, decider: string, now: number): PlacedDecision {
   const { story, imageHash, decision, at, gitSha, batchId } = asRecord(value);
   if (decision !== "approved" && decision !== "rejected") throw badRequest('decision must be "approved" or "rejected".');
-  return { story: readText(story, "story"), imageHash: readHash(imageHash), decision, actor: decider, at: Math.min(readWhole(at, "at"), now), gitSha: readSha(gitSha, "gitSha"), batchId: readBatchId(batchId) };
-}
-
-/** The same stories, in any order. */
-const sameStories = (p: readonly string[], q: readonly string[]) => p.length === q.length && [...p].sort().join("\0") === [...q].sort().join("\0");
-
-const refused = (code: string, message: string): GoldensAnswer => ({ outcome: "refused", acceptedBatchId: null, refusal: { code, message } });
-
-/** The cloud decides a SHA's goldens: `docs/specs/sync.md` -> Goldens. */
-async function makeGoldens({ batches }: SyncProject, id: string, baselineSha: string | null, removed: readonly string[]): Promise<GoldensAnswer> {
-  const batch = await batches.getBatch(id);
-  if (batch === null) throw new Refusal(404, "unknown-batch", `No batch ${id} in this project.`);
-  const accepted = await batches.acceptedBatchAt(batch.gitSha, batch.environment);
-  if (accepted === id) return { outcome: "already", acceptedBatchId: id, refusal: null };
-  if (accepted !== null) {
-    return { outcome: "conflict", acceptedBatchId: accepted, refusal: { code: "goldens-conflict", message: `Batch ${accepted} is already the goldens of ${batch.gitSha}, and a push never replaces them.` } };
-  }
-  try {
-    const found = await batches.removedFrom(id, baselineSha);
-    if (!sameStories(found, removed)) {
-      return refused("wrong-removed", `This would remove ${found.length} goldens here, and not the ${removed.length} you named: ${found.join(", ") || "none"}.`);
-    }
-    if (!(await batches.acceptBatch(id, baselineSha, found.length))) {
-      return refused("not-approved", "Some of this batch's images are neither the same as the baseline's, nor approved.");
-    }
-    return { outcome: "accepted", acceptedBatchId: id, refusal: null };
-  } catch (error) {
-    if (error instanceof BatchError) return refused(error.code, error.message);
-    throw error;
-  }
+  return { story: readText(story, "story"), imageHash: imageHash === null ? null : readHash(imageHash), decision, actor: decider, at: Math.min(readWhole(at, "at"), now), gitSha: readSha(gitSha, "gitSha"), batchId: readBatchId(batchId) };
 }
 
 /** The routes, to mount under `/api`. */
@@ -193,12 +163,6 @@ export function createSyncApi(host: SyncHost): Hono {
   const uploadable = async (context: Context) => {
     const project = await projectOf(context);
     refuseUnless(project.access.upload);
-    return project;
-  };
-  /** What says which commits have goldens tells CI its baseline, and nothing else about a private project. */
-  const knowsGoldens = async (context: Context) => {
-    const project = await projectOf(context);
-    refuseUnless(project.access.view || project.access.upload);
     return project;
   };
 
@@ -282,30 +246,29 @@ export function createSyncApi(host: SyncHost): Hono {
   });
 
   api.post("/projects/:project/batches/:id/finish", async (context) => {
-    const project = await uploadable(context);
+    const { batches } = await uploadable(context);
     const { count, finishedAt } = await bodyOf(context);
-    const { status, gitSha, environment } = await project.batches.finishBatch(readBatchId(context.req.param("id")), readWhole(count, "count"), Math.min(readWhole(finishedAt, "finishedAt"), now()));
-    if (project.commitChanged !== undefined) await afterResponse(context, project.commitChanged(gitSha, environment));
+    const { status } = await batches.finishBatch(readBatchId(context.req.param("id")), readWhole(count, "count"), Math.min(readWhole(finishedAt, "finishedAt"), now()));
     return context.json({ status });
   });
 
-  api.get("/projects/:project/batches/:id", async (context) => {
-    const { batches } = await viewable(context);
-    return context.json(await batches.readBatch(readBatchId(context.req.param("id")), context.req.query("after") ?? "", BATCH_PAGE));
+  // The last word of a push, once its decisions are there too.
+  api.post("/projects/:project/batches/:id/status", async (context) => {
+    const project = await uploadable(context);
+    const id = readBatchId(context.req.param("id"));
+    const batch = await project.batches.getBatch(id);
+    if (batch === null) throw new Refusal(404, "unknown-batch", `No batch ${id} in this project.`);
+    if (project.commitChanged !== undefined) await afterResponse(context, project.commitChanged(batch.gitSha, batch.environment));
+    return context.json({ asked: true });
   });
 
   api.post("/projects/:project/decisions", async (context) => {
-    const project = await projectOf(context);
-    const { batches, access } = project;
+    const { batches, access } = await projectOf(context);
     refuseUnless(access.decider !== null);
     const { environment, decisions } = await bodyOf(context);
     const at = now();
-    const named = readText(environment, "environment");
     const received = listOf(decisions, SYNC_LIMITS.decisions, "decisions").map((decision) => receivedDecision(decision, access.decider!, at));
-    await batches.mergeDecisions(named, received);
-    if (project.commitChanged !== undefined) {
-      await afterResponse(context, Promise.all([...new Set(received.map(({ gitSha }) => gitSha))].map((gitSha) => project.commitChanged!(gitSha, named))).then(() => undefined));
-    }
+    await batches.mergeDecisions(readText(environment, "environment"), received);
     return context.json({ merged: received.length });
   });
 
@@ -382,26 +345,12 @@ export function createSyncApi(host: SyncHost): Hono {
     return context.json({ stored: true });
   });
 
-  api.post("/projects/:project/goldens", async (context) => {
-    const project = await projectOf(context);
-    const { batchId, baselineSha, removed } = await bodyOf(context);
-    const named = listOf(removed ?? [], SYNC_LIMITS.renders, "removed").map((story) => readText(story, "A removed story"));
-    // With nothing removed, this makes no judgment: docs/specs/sync.md -> Goldens.
-    refuseUnless(project.access.decider !== null || (project.access.upload && named.length === 0));
-    return context.json(await makeGoldens(project, readBatchId(batchId), orNull(baselineSha, (sha) => readSha(sha, "baselineSha")), named));
-  });
-
-  api.get("/projects/:project/goldens", async (context) => {
-    const { batches } = await knowsGoldens(context);
-    const batchId = await batches.acceptedBatchAt(readSha(context.req.query("sha"), "sha"), readText(context.req.query("environment"), "environment"));
-    return context.json({ batchId });
-  });
-
-  api.post("/projects/:project/goldens/first", async (context) => {
-    const { batches } = await knowsGoldens(context);
-    const { shas, environment } = await bodyOf(context);
-    const candidates = listOf(shas, SYNC_LIMITS.shas, "shas").map((sha) => readSha(sha, "A SHA"));
-    return context.json({ sha: await batches.firstWithGoldens(candidates, readText(environment, "environment")) });
+  // What a local store needs to read a commit as this one does. Not by the graph, since that commit may not have been pushed yet.
+  api.post("/projects/:project/decisions/reached", async (context) => {
+    const { batches } = await viewable(context);
+    const { environment, commits } = await bodyOf(context);
+    const shas = listOf(commits, SYNC_LIMITS.shas, "commits").map((sha) => readSha(sha, "A commit"));
+    return context.json({ decisions: decisionsThatCount(await batches.decisionsAt(readText(environment, "environment"), shas)) });
   });
 
   api.all("*", (context) => context.json(failure("not-found", "No such route."), 404));

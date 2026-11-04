@@ -44,6 +44,7 @@ async function pushBatch(id: string, sha: string) {
   expect((await api("PUT", `/batches/${id}`, UPLOAD, facts(sha))).status).toBe(200);
   expect((await api("POST", `/batches/${id}/renders`, UPLOAD, { renders: [{ story: "a", imageHash: hash }] })).status).toBe(200);
   expect((await api("POST", `/batches/${id}/finish`, UPLOAD, { count: 1, finishedAt: 600 })).status).toBe(200);
+  expect((await api("POST", `/batches/${id}/status`, UPLOAD, {})).status).toBe(200);
 }
 
 beforeAll(() => {
@@ -126,6 +127,16 @@ describe("the cloud service", () => {
     expect((await api("POST", "/commits", UPLOAD, { commits: [{ sha: NEXT_SHA, parents: [FIRST_SHA] }, { sha: FIRST_SHA, parents: [] }] })).status).toBe(200);
     await pushBatch(NEXT, NEXT_SHA);
     expect(statuses.at(-1)).toMatchObject({ sha: NEXT_SHA, status: { state: "success", description: "1 story matches what's approved" } });
+  });
+
+  it("says a commit's status only at the end of a push, or on a decision made here", async () => {
+    const posted = statuses.length;
+    const decision = { story: "a", imageHash: hash, decision: "approved", at: 900, gitSha: FIRST_SHA, batchId: FIRST };
+    expect((await api("POST", "/decisions", PASSWORD, { environment: ENV, decisions: [decision] })).status).toBe(200);
+    expect(statuses.length).toBe(posted);
+    expect((await api("POST", `/batches/${NEXT}/status`, null, {})).status).toBe(403);
+    expect((await api("POST", `/batches/${NEXT}/status`, UPLOAD, {})).status).toBe(200);
+    expect(statuses.slice(posted).map(({ sha }) => sha)).toEqual([NEXT_SHA]);
   });
 
   it("serves a kept built Storybook only from its own origin", async () => {
