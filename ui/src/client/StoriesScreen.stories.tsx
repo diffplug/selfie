@@ -43,8 +43,6 @@ const renderingAll = (finished: number, firstStoryStartedAtMs: number | null, no
   args: { view: MIXED, search: "", renders: rendering({ rendering: 568 }), progress: { total: 568, finished, startedAtMs: ASKED, firstStoryStartedAtMs }, now },
 });
 export const RenderingBeforeTheFirstStory = renderingAll(0, null, ASKED + 4_000);
-export const RenderingUnderThreeSeconds = renderingAll(6, FIRST_STORY, FIRST_STORY + 2_000);
-export const RenderingWithNoStoryFinished = renderingAll(0, FIRST_STORY, FIRST_STORY + 20_000);
 export const RenderingWithAnEstimate = renderingAll(120, FIRST_STORY, FIRST_STORY + 54_000);
 export const RenderingAndSavingTheBatch = renderingAll(568, FIRST_STORY, FIRST_STORY + 251_000);
 export const RenderFailed: Story = { args: { view: MIXED, search: "", renders: rendering({ error: FAILED }) } };

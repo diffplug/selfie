@@ -3,7 +3,7 @@
 > Status: built — the store core, image checks and decoding, WebP storage with PNG as its fallback, kept built Storybooks, its local SQLite and filesystem adapters, and the D1 REST and R2 adapters exist. Questions stay open; see `## Future`.
 >
 > - See `docs/specs/glossary.md` for image, image hash, image key, and store.
-> - Owns image identity, image decoding, image keys, hash collisions, and how built Storybooks are kept. The built Storybook order belongs to `docs/specs/system.md`. Batches, and goldens belong to `docs/specs/renders.md`.
+> - Owns image identity, image decoding, image keys, hash collisions, and how built Storybooks are kept. The built Storybook order belongs to `docs/specs/system.md`. Batches, decisions, and approvals belong to `docs/specs/renders.md`.
 
 ## Image identity
 
@@ -138,5 +138,5 @@ Source of truth: `store/src/adapters/r2.ts`; tests in `store/test/workerd/r2.wor
 
 ### Open questions
 
-- **Removing what's kept.** Nothing removes a kept image or built Storybook, so a local store only grows, by what a built Storybook changes. Decide what may go, since a batch or a golden can still refer to it.
+- **Removing what's kept.** Nothing removes a kept image or built Storybook, so a local store only grows, by what a built Storybook changes. Decide what may go, since a batch or a decision can still refer to it.
 - **Schema migrations.** How a schema change reaches every project database, and how the app treats a database still on the older schema. Until then a change may only add tables and indexes, through `initStoreSchema`, with one exception made before any project database existed (`docs/specs/renders.md` → Schema).

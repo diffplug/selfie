@@ -2,12 +2,22 @@
 // finished over the time since the first story started, so starting a browser, or downloading an
 // image, doesn't count against it.
 import type { RenderProgress } from "./api.ts";
+import { plural } from "./plural.ts";
 
 /** How long the first stories get before they say anything about the rest. */
 const ESTIMATE_AFTER_MS = 3_000;
 
 /** How often a screen reader hears how a render is going, while the screen changes every second. */
 const SPOKEN_EVERY_MS = 30_000;
+
+/** Where a render stands after what it just said. The time the first story started stays the time it first said so. */
+export function advanceRenderProgress(
+  progress: RenderProgress,
+  { event, finished, total }: { readonly event: "started" | "finished"; readonly finished: number; readonly total: number },
+  now: number,
+): RenderProgress {
+  return { ...progress, finished, total, firstStoryStartedAtMs: progress.firstStoryStartedAtMs ?? (event === "started" ? now : null) };
+}
 
 /** How long a render has left, or null if it's too early to say. */
 export function estimateRemainingMs({ total, finished, firstStoryStartedAtMs }: RenderProgress, now: number): number | null {
@@ -32,7 +42,7 @@ export function describeRenderProgress(progress: RenderProgress, now: number): s
   const remaining = estimateRemainingMs(progress, now);
   if (remaining === null) return elapsed;
   const { total, finished } = progress;
-  const count = `${finished.toLocaleString()} of ${total.toLocaleString()} ${total === 1 ? "story" : "stories"}`;
+  const count = `${finished.toLocaleString()} of ${plural(total, "story", "stories")}`;
   // Rendering is done by then, but not storing what it made, which has no estimate.
   if (finished === total) return `${count}, ${elapsed}, saving the batch`;
   // Up, so a story still to come never says it has 0:00 left.

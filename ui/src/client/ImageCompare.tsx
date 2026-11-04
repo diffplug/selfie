@@ -10,7 +10,7 @@ import { diffImageUrl, imageUrl } from "./api.ts";
 import { useDevicePixelRatio, useHotkeys, type FeedbackState, type HunkSelection } from "./hooks.ts";
 import { Keys } from "./Keys.tsx";
 import { NotesPanel } from "./NotesPanel.tsx";
-import { plural } from "./plural.ts";
+import { plural } from "../shared/plural.ts";
 import { HunkList } from "./HunkList.tsx";
 import { stepped } from "./selection.ts";
 import { useDrawnBox } from "./useDrawnBox.ts";

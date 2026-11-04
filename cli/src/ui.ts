@@ -13,6 +13,7 @@ import { diffToPng, type PixelDiff } from "./diff.ts";
 import { SelfieError } from "./errors.ts";
 import { currentBranch, dirtyPaths, gitUserEmail, headMovedAt, headSha } from "./git.ts";
 import { isOpenNote } from "selfie-ui/notes";
+import { advanceRenderProgress } from "selfie-ui/render-progress";
 import { sentNotes, textForAgent } from "./notes.ts";
 import { batchesAtHead, compareAsReviewed, reachableCommits, readReviewCache, requireBatch, type Project } from "./project.ts";
 import { summarizeBatch } from "./summary.ts";
@@ -105,7 +106,7 @@ export function localReviewSource(
 
   const toRows = async (batchId: string, compared: Comparison["renders"]): Promise<RenderRow[]> => {
     const pixelDiffs = await cachedDiffs(batchId);
-    const goldens = new Map(
+    const references = new Map(
       await Promise.all(
         [...new Set(compared.flatMap(({ goldenBatchId }) => goldenBatchId ?? []))].map(
           async (id) => [id, { url: await keptStorybookUrl(id), viewports: await project.storybooks.storyViewportsOf(id) }] as const,
@@ -113,12 +114,12 @@ export function localReviewSource(
       ),
     );
     return compared.map((render) => {
-      const golden = render.goldenBatchId === undefined ? undefined : goldens.get(render.goldenBatchId);
+      const reference = render.goldenBatchId === undefined ? undefined : references.get(render.goldenBatchId);
       return {
         ...render,
         pixelDiff: pixelDiffs.get(render.story) ?? null,
-        goldenStorybookUrl: golden?.url ?? null,
-        goldenViewport: golden?.viewports[render.story] ?? null,
+        goldenStorybookUrl: reference?.url ?? null,
+        goldenViewport: reference?.viewports[render.story] ?? null,
       };
     });
   };
@@ -269,15 +270,14 @@ export function localReviewSource(
       }
       if (progress !== null) throw new SelfieError("render-busy", "A render is already running here. Try again once it's done.");
       progress = { total: new Set(stories).size, finished: 0, startedAtMs: Date.now(), firstStoryStartedAtMs: null };
-      const onProgress = ({ event, finished, total }: RenderProgressEvent) => {
-        if (progress === null) return;
-        progress = { ...progress, finished, total, firstStoryStartedAtMs: progress.firstStoryStartedAtMs ?? (event === "started" ? Date.now() : null) };
+      const onProgress = (event: RenderProgressEvent) => {
+        if (progress !== null) progress = advanceRenderProgress(progress, event, Date.now());
       };
       try {
         const index = new Set((await readStoryIndex(storybook.dir)).map(({ id }) => id));
         const unknown = stories.find((story) => !index.has(story));
         if (unknown !== undefined) throw new SelfieError("unknown-story", `The hosted Storybook has no story ${unknown}.`);
-        // Every story is a whole batch, which can become goldens, and not a filtered one that can't.
+        // Every story is a whole batch, which can say what's been removed, and not a filtered one that can't.
         return { batchId: await storybook.renderStories(new Set(stories).size === index.size ? undefined : stories, onProgress) };
       } catch (error) {
         if (error instanceof SelfieError && error.code === "unknown-story") throw error;

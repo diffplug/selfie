@@ -2,7 +2,7 @@
 // each one is. Pure, so a test needs no browser.
 import type { BoundingBox } from "../shared/api.ts";
 import { describeBox, isEmptyBox, type HunkGroup } from "../shared/hunks.ts";
-import { plural } from "./plural.ts";
+import { plural } from "../shared/plural.ts";
 
 /** One step through `count` hunks, wrapping around, from none to whichever end the step comes in at. */
 export function stepped(focused: number | null, count: number, by: 1 | -1): number | null {
