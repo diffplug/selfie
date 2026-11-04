@@ -9,7 +9,7 @@ import type { DecisionKind, PixelDiff, BatchView, RenderRow } from "../shared/ap
 import { diffImageUrl, fetchDiff, imageUrl } from "./api.ts";
 import { parseFilter, targetsOf, type StoryNavigation } from "./filter.ts";
 import { useFetched, useHotkeys, useHunkSelection, useTitle, type FeedbackState, type BatchState } from "./hooks.ts";
-import { ImageCompare } from "./ImageCompare.tsx";
+import { imageCount, ImageCompare } from "./ImageCompare.tsx";
 import { Keys } from "./Keys.tsx";
 import { acceptPath, AppLink, navigate } from "./router.tsx";
 import { ActionFailure } from "./BatchNotes.tsx";
@@ -19,36 +19,37 @@ import { describeBox, groupHunks, isLayoutOnly } from "../shared/hunks.ts";
 import { comparedImage, newestNotedImage } from "../shared/notes.ts";
 import { AdvisoryLabels, DecisionLabel, describePixels, sizeChanged, StateLabel } from "./words.tsx";
 
-const SHORTCUTS: readonly (readonly [string, string])[] = [
-  ["j", "Next story"],
-  ["k", "Previous story"],
-  ["a", "Approve, then go to the next"],
-  ["r", "Reject, then go to the next"],
-  ["s", "Side by side"],
-  ["f", "Stacked at the current zoom, then flip between current and golden"],
-  ["d", "Show the diff"],
-  ["z", "Next zoom: actual size, 1×, 2×, 4×, 8×"],
-  ["c", "Center on the hunk being looked at, or else the change"],
-  ["l", "Open or close the live stories"],
-  ["m", "Write a note for your agent"],
-  ["w", "Show the image a note was written on"],
-  ["n", "Next hunk"],
-  ["p", "Previous hunk"],
-  ["x", "Select the hunk being looked at, or the first"],
-  ["u", "Up to the batch, or to where this commit stands"],
-  ["?", "This list"],
+/** Each key, what it does, and how many images it takes for it to do anything. */
+const SHORTCUTS: readonly (readonly [string, string, number])[] = [
+  ["j", "Next story", 0],
+  ["k", "Previous story", 0],
+  ["a", "Approve, then go to the next", 0],
+  ["r", "Reject, then go to the next", 0],
+  ["s", "Side by side", 2],
+  ["f", "Stacked at the current zoom, then flip between current and what it's compared with", 2],
+  ["d", "Show the diff", 2],
+  ["z", "Next zoom: actual size, 1×, 2×, 4×, 8×", 1],
+  ["c", "Center on the hunk being looked at, or else the change", 2],
+  ["l", "Open or close the live stories", 0],
+  ["m", "Write a note for your agent", 1],
+  ["w", "Show the image a note was written on", 2],
+  ["n", "Next hunk", 2],
+  ["p", "Previous hunk", 2],
+  ["x", "Select the hunk being looked at, or the first", 2],
+  ["u", "Up to the batch, or to where this commit stands", 0],
+  ["?", "This list", 0],
 ];
 
-function ShortcutsDialog({ onClose }: { readonly onClose: () => void }) {
+function ShortcutsDialog({ images, onClose }: { readonly images: number; readonly onClose: () => void }) {
   return (
     <Dialog title="Keyboard shortcuts" onClose={onClose} width="large">
       <dl className="selfie-shortcuts">
-        {SHORTCUTS.map(([key, words]) => (
+        {SHORTCUTS.filter(([, , fewest]) => images >= fewest).map(([key, words]) => (
           <div key={key}>
             <dt>
               <Keys keys={key} />
             </dt>
-            <dd>{words}</dd>
+            <dd>{key === "z" && images === 1 ? "Next zoom: fit, actual size, 1×, 2×, 4×, 8×" : words}</dd>
           </div>
         ))}
       </dl>
@@ -80,25 +81,19 @@ function Notes({ row, diff, renamedFrom, renamedTo }: { row: RenderRow; diff: Pi
       {row.state === "failed" && (
         <Banner variant="critical" title="This story failed to render" description={<code className="selfie-pre">{row.failure ?? "No message was recorded."}</code>} />
       )}
-      {row.state === "added" &&
-        (renamedFrom !== undefined ? (
-          <Banner
-            variant="info"
-            title="Renamed story"
-            description={
-              <>
-                This image is the very one <code>{renamedFrom}</code> has as its golden, and this batch doesn't have that story. Approving lets this be its first golden under this name. Accepting still asks you to acknowledge that <code>{renamedFrom}</code> is gone.
-              </>
-            }
-          />
-        ) : (
-          <Banner variant="info" title="Added story" description="The baseline has no golden for it, so there's nothing to compare. Approving lets this image become its first golden." />
-        ))}
+      {row.state === "added" && renamedFrom !== undefined && (
+        <Banner
+          variant="info"
+          title="Renamed story"
+          description={
+            <>
+              This image is the very one <code>{renamedFrom}</code> has as its golden, and this batch doesn't have that story. Approving lets this be its first golden under this name. Accepting still asks you to acknowledge that <code>{renamedFrom}</code> is gone.
+            </>
+          }
+        />
+      )}
       {row.state === "removed" && renamedTo !== undefined && (
         <Banner variant="info" title="Renamed story" description={<>The new story <code>{renamedTo}</code> has this very image, so it looks to have been renamed.</>} />
-      )}
-      {row.state === "removed" && (
-        <Banner variant="warning" title="Removed story" description="The baseline has this golden, and this batch doesn't have the story. There's no image to decide on: accepting asks you to acknowledge the removal." />
       )}
       {row.state === "unchanged" && <Banner variant="info" title="Unchanged" description="This image is the same as the baseline's." />}
       {diff !== null && isLayoutOnly(diff) && (
@@ -176,7 +171,8 @@ export function DetailScreen({
   }, []);
 
   // Its review's stats, if they're still on disk, and otherwise computed from the store.
-  const compared = row === null ? null : comparedImage(row, newestNotedImage(feedback.view?.notes ?? [], story));
+  const notedImage = newestNotedImage(feedback.view?.notes ?? [], story);
+  const compared = row === null ? null : comparedImage(row, notedImage);
   const comparedWithNote = compared?.layer === "noted";
   const changedPair = row !== null && row.imageHash !== null && compared !== null && (row.state === "changed" || comparedWithNote);
   const { data: fetched, error: diffError } = useFetched(changedPair && row.pixelDiff === null ? `${row.imageHash}/${compared.hash}` : null, (signal) =>
@@ -233,6 +229,7 @@ export function DetailScreen({
 
   const decidable = isDecidable(row.state);
   const finished = view.counts.undecided === 0 && next === null && filter.show === "undecided";
+  const renamedFrom = renames.get(row.story);
 
   return (
     <Stack gap="condensed">
@@ -276,6 +273,8 @@ export function DetailScreen({
             by {row.decision.actor}, <RelativeTime date={new Date(row.decision.at)} />.
           </Text>
         )}
+        {row.state === "added" && !comparedWithNote && renamedFrom === undefined && <Text className="selfie-muted">The baseline has no golden for it. Approving lets this image become its first golden.</Text>}
+        {row.state === "removed" && <Text className="selfie-muted">The baseline has this golden, and this batch doesn't have the story. There's no image to decide on: accepting asks you to acknowledge the removal.</Text>}
         {diff !== null && <PixelStats stats={diff} />}
         {changedPair && diff === null && diffError === null && <Text className="selfie-muted">Comparing pixels…</Text>}
         {diffError !== null && <Text className="selfie-muted">The pixels couldn't be compared: {diffError.message}</Text>}
@@ -303,11 +302,11 @@ export function DetailScreen({
       {comparedWithNote ? (
         <Banner variant="info" title="Compared with the image when noted" description="This story has no golden, so what's shown is what's changed since its newest note. Approving lets this image become its first golden." />
       ) : (
-        <Notes row={row} diff={diff} renamedFrom={renames.get(row.story)} renamedTo={[...renames].find(([, from]) => from === row.story)?.[0]} />
+        <Notes row={row} diff={diff} renamedFrom={renamedFrom} renamedTo={[...renames].find(([, from]) => from === row.story)?.[0]} />
       )}
       <LiveStories row={row} view={view} open={liveOpen} onToggle={() => setLiveOpen(!liveOpen)} />
       <ImageCompare row={row} diff={diff} scale={view.batch.scale} groups={groups} selection={selection} batchId={view.batch.id} feedback={feedback} startNote={startNote} />
-      {helpOpen && <ShortcutsDialog onClose={() => setHelpOpen(false)} />}
+      {helpOpen && <ShortcutsDialog images={imageCount(row, notedImage)} onClose={() => setHelpOpen(false)} />}
     </Stack>
   );
 }
