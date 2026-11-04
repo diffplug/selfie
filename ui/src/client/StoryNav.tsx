@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { ListedStory } from "../shared/api.ts";
 import { filterQuery, matchesText, parseFilter } from "./filter.ts";
 import { useHotkeys } from "./hooks.ts";
-import { plural } from "./plural.ts";
+import { plural } from "../shared/plural.ts";
 import { followLink, navigate } from "./router.tsx";
 import { buildStoryTree, initiallyClosed, isSection, openedAround, storiesIn, visibleRows, type StoryFolder } from "./storyTree.ts";
 import { toggled } from "./selection.ts";

@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import type { HunkGroup } from "../shared/hunks.ts";
 import type { HunkSelection } from "./hooks.ts";
 import { Keys } from "./Keys.tsx";
-import { plural } from "./plural.ts";
+import { plural } from "../shared/plural.ts";
 import { describeHunkPlace, describeHunkSize } from "./selection.ts";
 import { KindLabel } from "./words.tsx";
 

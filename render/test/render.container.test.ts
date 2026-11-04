@@ -7,7 +7,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
-import { render, type RenderOptions } from "../src/render.ts";
+import { render, type RenderOptions, type RenderProgressEvent } from "../src/render.ts";
 import { type ContainerRunner, defineEnvironment, environmentId } from "../src/environment.ts";
 import type { Manifest, ManifestStory } from "../src/manifest.ts";
 
@@ -61,11 +61,17 @@ describe.runIf(process.env.SELFIE_RENDER_CONTAINER === "1")("in the pinned conta
   describe("a full run", () => {
     let outDir: string;
     let manifest: Manifest;
+    const progress: RenderProgressEvent[] = [];
 
     beforeAll(async () => {
       outDir = newOutDir();
-      manifest = await run({ storyTimeoutMs: 5_000 }, outDir);
+      manifest = await run({ storyTimeoutMs: 5_000, onProgress: (event) => progress.push(event) }, outDir);
     }, 120_000);
+
+    test("says when the first story starts, once, and when each one finishes", () => {
+      const total = manifest.totals.stories;
+      expect(progress).toEqual([{ event: "started", finished: 0, total }, ...Array.from({ length: total }, (_, at) => ({ event: "finished", finished: at + 1, total }))]);
+    });
 
     test("runs on the image it was told to, and records it", () => {
       expect(manifest.environmentId).toBe(environmentId(defineEnvironment()));
@@ -288,6 +294,7 @@ test("a build directory that isn't a Storybook is refused", async () => {
 
 test("a native runner warns, and its environment never names the container", async (context) => {
   const lines: string[] = [];
+  const progress: RenderProgressEvent[] = [];
   const environment = defineEnvironment({ runner: { kind: "native" } });
   let manifest: Manifest;
   try {
@@ -297,6 +304,7 @@ test("a native runner warns, and its environment never names the container", asy
       environment,
       stories: ["basic--detail"],
       log: (line) => lines.push(line),
+      onProgress: (event) => progress.push(event),
     });
   } catch (error) {
     if (String(error).includes("Executable doesn't exist")) {
@@ -309,6 +317,10 @@ test("a native runner warns, and its environment never names the container", asy
   expect(manifest.environmentId).toMatch(new RegExp(`^native-${process.platform}-${process.arch}-`));
   expect(manifest.runtime).toMatchObject({ platform: process.platform, arch: process.arch });
   expect(story(manifest, "basic--detail").status).toBe("ok");
+  expect(progress).toEqual([
+    { event: "started", finished: 0, total: 1 },
+    { event: "finished", finished: 1, total: 1 },
+  ]);
 });
 
 test("a native environment from another machine is refused", async () => {

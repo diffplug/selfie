@@ -1,9 +1,11 @@
 import { writeFileSync } from "node:fs";
 import { mkdir, rm, utimes, writeFile } from "node:fs/promises";
 import path from "node:path";
+import type { RenderProgress, ReviewSource } from "selfie-ui/app";
 import { createLocalApp, createStorybookApp, serveLocal, serveStorybook } from "selfie-ui/local";
 import { beforeEach, describe, expect, test } from "vitest";
 import { openProject } from "../src/project.ts";
+import { renderBatch } from "../src/review.ts";
 import { localReviewSource, type RenderStories } from "../src/ui.ts";
 import { BLUE, commit, git, TEST_CONFIG, writeTestConfig } from "./support.ts";
 import { PORT, HOST, ORIGIN, h, project, clientDir, app, review, get, change } from "./ui-support.ts";
@@ -356,6 +358,135 @@ describe("the hosted Storybook", () => {
         expect((await change("/api/renders", { stories })).status, JSON.stringify(stories)).toBe(400);
       }
       expect((await change("/api/renders", { stories: ["a"] })).status).toBe(409);
+    });
+
+    describe("its progress", () => {
+      /** A gate a story waits at, and a way to open it. */
+      const gate = () => {
+        let open = () => {};
+        const shut = new Promise<void>((resolve) => {
+          open = resolve;
+        });
+        return { waitHere: () => shut, open };
+      };
+      const realRenders = () =>
+        localReviewSource(project, {
+          storybook: {
+            dir,
+            url: hostedAt,
+            renderStories: async (stories, onProgress) => (await renderBatch(project, { stories, render: h.render, onProgress })).batch.id,
+          },
+        });
+      const until = async (source: ReviewSource, reached: (progress: RenderProgress) => boolean) => {
+        await expect.poll(async () => {
+          const progress = await source.renderProgress();
+          return progress !== null && reached(progress);
+        }).toBe(true);
+        return (await source.renderProgress())!;
+      };
+
+      test("is nothing with no render", async () => {
+        await withStories("a");
+        await expect(realRenders().renderProgress()).resolves.toBeNull();
+      });
+
+      test("has only when it was asked for until the first story starts", async () => {
+        await withStories("a", "b", "c");
+        const held = gate();
+        const before = Date.now();
+        const source = sourceRendering(async () => {
+          await held.waitHere();
+          return "the-batch";
+        });
+        const render = source.render(["a", "b", "a"]);
+        const progress = await until(source, () => true);
+        expect(progress).toMatchObject({ total: 2, finished: 0, firstStoryStartedAtMs: null });
+        expect(progress.startedAtMs).toBeGreaterThanOrEqual(before);
+        held.open();
+        await render;
+      });
+
+      test("follows the render as its stories start and finish, and is gone with it", async () => {
+        await withStories("a", "b");
+        const first = gate();
+        const second = gate();
+        h.stories = [
+          { id: "a", beforeRendering: first.waitHere },
+          { id: "b", beforeRendering: second.waitHere },
+        ];
+        const source = realRenders();
+        const render = source.render(["a", "b"]);
+
+        const started = await until(source, ({ firstStoryStartedAtMs }) => firstStoryStartedAtMs !== null);
+        expect(started).toMatchObject({ total: 2, finished: 0 });
+        expect(started.firstStoryStartedAtMs).toBeGreaterThanOrEqual(started.startedAtMs);
+
+        first.open();
+        const halfway = await until(source, ({ finished }) => finished === 1);
+        expect(halfway).toEqual({ ...started, finished: 1 });
+
+        second.open();
+        await render;
+        await expect(source.renderProgress()).resolves.toBeNull();
+      });
+
+      test("starts again with each render, whether the last worked or not", async () => {
+        await withStories("a", "b");
+        const source = realRenders();
+        h.stories = [{ id: "a" }, { id: "b" }];
+        await source.render(["a", "b"]);
+
+        const held = gate();
+        h.stories = [{ id: "a", beforeRendering: held.waitHere }];
+        const again = source.render(["a"]);
+        expect(await until(source, ({ firstStoryStartedAtMs }) => firstStoryStartedAtMs !== null)).toMatchObject({ total: 1, finished: 0 });
+        held.open();
+        await again;
+
+        h.stories = [
+          {
+            id: "a",
+            beforeRendering: () => {
+              throw new Error("Docker is unavailable");
+            },
+          },
+        ];
+        await expect(source.render(["a"])).rejects.toMatchObject({ code: "render-failed" });
+        await expect(source.renderProgress()).resolves.toBeNull();
+      });
+
+      test("isn't anything after refusing a story the build doesn't have", async () => {
+        await withStories("a");
+        const source = realRenders();
+        await expect(source.render(["nope"])).rejects.toMatchObject({ code: "unknown-story" });
+        await expect(source.renderProgress()).resolves.toBeNull();
+      });
+
+      test("answers a read at /api/renders/progress, and only from the page's own host and origin", async () => {
+        await withStories("a");
+        const held = gate();
+        h.stories = [{ id: "a", beforeRendering: held.waitHere }];
+        const source = realRenders();
+        const local = createLocalApp({ source, port: () => PORT, clientDir });
+        const read = (headers: Record<string, string>) => local.request("/api/renders/progress", { headers: { host: HOST, ...headers } });
+
+        const idle = await read({});
+        expect(idle.status).toBe(200);
+        expect(idle.headers.get("cache-control")).toBe("no-store");
+        expect(await idle.json()).toEqual({ progress: null });
+
+        const render = source.render(["a"]);
+        await until(source, ({ firstStoryStartedAtMs }) => firstStoryStartedAtMs !== null);
+        const { progress } = (await (await read({ origin: ORIGIN })).json()) as { progress: RenderProgress };
+        expect(progress).toEqual(await source.renderProgress());
+        expect(Object.keys(progress).sort()).toEqual(["finished", "firstStoryStartedAtMs", "startedAtMs", "total"]);
+
+        expect((await read({ host: "evil.example" })).status).toBe(403);
+        expect((await read({ origin: "https://evil.example" })).status).toBe(403);
+        expect((await read({ origin: `http://127.0.0.1:${STORYBOOK_PORT}` })).status).toBe(403);
+        held.open();
+        await render;
+      });
     });
   });
 

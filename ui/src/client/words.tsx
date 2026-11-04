@@ -20,7 +20,7 @@ import type { ReactNode } from "react";
 import { isDecidable } from "selfie-store";
 import type { BlockerReason, NoteState, PixelDiff, HunkKind, RenderRow, RenderState } from "../shared/api.ts";
 import { isLayoutOnly } from "../shared/hunks.ts";
-import { plural } from "./plural.ts";
+import { plural } from "../shared/plural.ts";
 import { AppLink, batchPath } from "./router.tsx";
 
 export const shortSha = (sha: string) => sha.slice(0, 10);

@@ -14,6 +14,7 @@ Source of truth: `ui/`.
 | `ui/src/shared/api.ts` | The JSON on the wire, and `ReviewSource` |
 | `ui/src/shared/hunks.ts`, exported as `selfie-ui/hunks` | Grouping a diff's hunks for showing, for the client and the CLI's document |
 | `ui/src/shared/notes.ts`, exported as `selfie-ui/notes` | Shared note validation and open-note state (`docs/specs/feedback.md`) |
+| `ui/src/shared/renderProgress.ts`, exported as `selfie-ui/render-progress` | A render's estimate and how it's said, for the client and `selfie flakes`; tests in `ui/test/renderProgress.test.ts` |
 | `selfie-ui/sync`, `selfie-ui/sync-api` | `docs/specs/sync.md` → Routes |
 | `ui/src/server/app.ts`, exported as `selfie-ui/app` | The routes under `/api`, over a `ReviewSource`, on Hono, and `sameOriginWrites` and `pageHeaders`. It re-exports the wire types |
 | `ui/src/server/storybook.ts`, exported as `selfie-ui/storybook` | A hosted Storybook's headers and kept built Storybooks, for any platform |
@@ -39,6 +40,7 @@ Source of truth: `ReviewSource` in `ui/src/shared/api.ts`.
 | `current()` | HEAD, the newest finished batch there, and whether it has only unfinished ones |
 | `storiesView()` | Every story of the hosted Storybook, each with its newest render at HEAD ([Every story](#screens)) |
 | `render(stories)` | Records a batch of those stories from the hosted Storybook, and says which |
+| `renderProgress()` | How far that render has got, or null with none in flight |
 | `batchView(batchId)` | A `BatchView` ([Recomputing](#recomputing)) |
 | `unchanged(batchId)` | The batch's unchanged rows |
 | `decide(batchId, decision, targets)` | The new `BatchView` |
@@ -59,6 +61,7 @@ Source of truth: `ui/src/server/app.ts`; tests in `cli/test/ui-*.test.ts`.
 | `GET /api/stories` | `storiesView` |
 | `GET /api/batches/:id/context` | `batchContext(id)` |
 | `POST /api/renders` | `{ stories }`, which `render` records as a batch |
+| `GET /api/renders/progress` | `{ progress }`: `{ total, finished, startedAtMs, firstStoryStartedAtMs }`, or null with no render in flight. `startedAtMs` is when the render was asked for, and `firstStoryStartedAtMs` is null until its first story starts. Both are milliseconds since the epoch, on the clock the page shares with a local server (rationale) |
 | `GET /api/batches/:id` | `batchView` |
 | `GET /api/batches/:id/unchanged` | `{ rows }` |
 | `POST /api/batches/:id/decisions` | `{ decision, renders: [{ story, imageHash }] }` |
@@ -166,6 +169,10 @@ Source of truth: `ui/src/client/`.
 - **Must list a story nothing has rendered, show it running at the project's environment's size, and offer to render it**, since it's still a real story to look at, and only rendering it says what size it declares. A note is written on an image, so starting one renders the story first, and then opens the note box. With no way to render here, it says what command does.
 - **Must offer to render again whatever story is on screen, and every story with no render or one known to be from another built Storybook, as Render the rest**, which is how a change fans out to the rest of a Storybook, **and always to render all of them**. Asking for every story records a whole batch, not a filtered one, which can say what's been removed (rationale).
 - **Must render only from the hosted Storybook as it stands, and one at a time**, refusing a second with `render-busy`. It never builds, since a page must not be able to run a shell.
+- **Must say while it renders how long that's taken, from when it was asked for, and once there's an estimate, how many stories of how many are finished and about how long is left**, as in `12 of 568 stories, 0:14 elapsed, about 3:40 left`. The page reads the progress about once a second while rendering, and the time moves by itself between reads.
+- **Must take the estimate as the stories left over the rate, where the rate is stories finished, failed or not, over the time since the first story started**, so starting a browser or downloading an image doesn't count against it (rationale).
+- **Must show no estimate until 3 seconds after the first story started and at least one story has finished, and only the time elapsed before that** (rationale).
+- **Must say the batch is being saved, not that nothing is left, once every story has finished.** Storing the images takes a while yet, with no estimate.
 - **Must never read a story a filtered batch left out as removed**, through `newestRenders` in `selfie-store`. It takes that story from an older batch, or else lists it as not rendered.
 - **Must say when a render is from uncommitted changes, or known to be from another built Storybook than the one hosted**, since a render is whichever is newest, not whichever is reliable.
 - **Must leave out a story the hosted built Storybook no longer has**, and with no built Storybook at all, list only what's been rendered, and say so.
@@ -214,6 +221,7 @@ Source of truth: `ui/src/client/*.stories.tsx`, `ui/src/client/stories/`.
 ## Accessibility
 
 - **Must never show a state by color alone:** each has a word and an icon.
+- **Must say a render's progress to a screen reader through a status of its own, which says the render has started and then changes at most every 30 seconds**, and never through the text that ticks (rationale).
 - **Must label every control, use real buttons and links, and keep focus visible**, with Primer's own focus style or `--focus-outlineColor`. Checked with axe on each screen, at the time of writing (rationale).
 
 ## Scale
@@ -238,6 +246,7 @@ Also its own guard in place of `loopbackHosts`, keeping `sameOriginWrites` and `
 
 ### Not built
 
+- Picking up a render's progress on a page opened or reloaded while it runs. `GET /api/renders/progress` would answer it, but only the page that asked shows a banner, as with the render's outcome.
 - Approving or rejecting a selection. Those are still on a whole image, until there are decisions on hunks (`docs/specs/renders.md` → Future). A note can be on one.
 - Selecting one hunk out of a group. Lowering `hunkMergeDistance` separates them.
 - A way to clear a decision. One can be replaced, and a batch can be reviewed again, but `RenderBatches.decide` has no way to remove one.

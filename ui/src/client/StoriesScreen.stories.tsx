@@ -1,14 +1,14 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import type { StoriesView } from "../shared/api.ts";
+import type { RenderProgress, StoriesView } from "../shared/api.ts";
 import { RequestError } from "./api.ts";
 import type { RenderingState } from "./hooks.ts";
 import { RenderingStatus, StoriesLayout, StoriesOverview } from "./StoriesScreen.tsx";
 import { MIXED, rendered, rendering, setupOf, unrendered, view } from "./stories/everyStory.ts";
 
-function StoriesScreen({ view: shown, search, renders }: { view: StoriesView; search: string; renders: RenderingState }) {
+function StoriesScreen({ view: shown, search, renders, progress = null, now = 0 }: { view: StoriesView; search: string; renders: RenderingState; progress?: RenderProgress | null; now?: number }) {
   return (
     <StoriesLayout view={shown} story={null} search={search}>
-      <RenderingStatus renders={renders} />
+      <RenderingStatus renders={renders} progress={progress} now={now} />
       <StoriesOverview view={shown} renders={renders} recheck={() => undefined} />
     </StoriesLayout>
   );
@@ -35,5 +35,15 @@ export const NothingRenderedWithUncommittedChanges: Story = {
 };
 export const OnlyWhatsRendered: Story = { args: { view: view([rendered("components-card--default")], { storybookUrl: null, canRender: false, setup: null }), search: "", renders: rendering({ can: false }) } };
 export const RenderingTheRest: Story = { args: { view: MIXED, search: "", renders: rendering({ rendering: 3 }) } };
+
+// A render that took 10 seconds to get to its first story, at some moment since it was asked for.
+const ASKED = 1_000_000;
+const FIRST_STORY = ASKED + 10_000;
+const renderingAll = (finished: number, firstStoryStartedAtMs: number | null, now: number): Story => ({
+  args: { view: MIXED, search: "", renders: rendering({ rendering: 568 }), progress: { total: 568, finished, startedAtMs: ASKED, firstStoryStartedAtMs }, now },
+});
+export const RenderingBeforeTheFirstStory = renderingAll(0, null, ASKED + 4_000);
+export const RenderingWithAnEstimate = renderingAll(120, FIRST_STORY, FIRST_STORY + 54_000);
+export const RenderingAndSavingTheBatch = renderingAll(568, FIRST_STORY, FIRST_STORY + 251_000);
 export const RenderFailed: Story = { args: { view: MIXED, search: "", renders: rendering({ error: FAILED }) } };
 export const Dark: Story = { args: { view: MIXED, search: "", renders: rendering() }, parameters: { colorMode: "night" } };

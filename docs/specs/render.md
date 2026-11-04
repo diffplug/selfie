@@ -61,6 +61,7 @@ Source of truth: `render/src/render.ts`, `render/src/runners.ts`, `render/src/wo
 - **Must bound every wait.** `storyTimeoutMs` (default 60 s) bounds a story from context to screenshot. The network wait alone is soft and independent of it: it records an error after 15 s and renders anyway. The worker exits on its own at a deadline derived from the story count, so a container outlives no host process.
 - **Must treat a story's failure as data.** A thrown render, Storybook's error display, or a timeout marks that story `failed` and the batch continues. A browser crash relaunches the browser for later stories. A worker crash marks the unreported stories `failed`.
 - **Must throw a `RenderError` only when no story could be attempted**, such as a missing `index.json`, a runner that can't run, or a browser that won't launch.
+- **Must call `onProgress` with `started` once, as the first story starts, and with `finished` as each story finishes, failed or not.** Each carries `finished` and `total`. Preparing the runner, pulling an image, and launching the browser all come before `started`, which the worker reports in its own event. With no stories to render it's never called, and a worker crash ends the calls early.
 - **Must clear only `manifest.json` and `stories/` in the output directory.**
 - **Must remove every container it starts**, on success, timeout, and abort. Each is `--rm` with a unique name and the label `selfie-render`.
 - **May render at most 6 stories at once by default**, or fewer if the machine has fewer CPUs. Concurrency is not part of the environment (rationale).
@@ -138,7 +139,7 @@ Source of truth: `render/src/identity.ts`; tests in `render/test/identity.test.t
 
 Source of truth: `render/src/index.ts`.
 
-`selfie-render` is a library, and `docs/specs/cli.md` is its CLI. It exports `render(options)`, `renderIdentity(options)`, `defineEnvironment(overrides)`, `environmentId(environment)`, `filterStories(stories, patterns)`, which keeps whatever it is given that has an `id`, `unmatchedPatternWarning(pattern)`, `MANIFEST_FILE`, `RenderError`, `EnvironmentError`, and the types above. `selfie-render/testing` exports what a stand-in for `render` needs in another package's tests, so that it can't drift from what `render` writes. A native runner is `defineEnvironment({ runner: { kind: "native" } })`. `render` writes human progress to its `log` option, which defaults to stderr.
+`selfie-render` is a library, and `docs/specs/cli.md` is its CLI. It exports `render(options)`, `renderIdentity(options)`, `defineEnvironment(overrides)`, `environmentId(environment)`, `filterStories(stories, patterns)`, which keeps whatever it is given that has an `id`, `unmatchedPatternWarning(pattern)`, `MANIFEST_FILE`, `RenderError`, `EnvironmentError`, and the types above, with `RenderProgressEvent` for `onProgress`. `selfie-render/testing` exports what a stand-in for `render` needs in another package's tests, so that it can't drift from what `render` writes. A native runner is `defineEnvironment({ runner: { kind: "native" } })`. `render` writes human progress to its `log` option, which defaults to stderr.
 
 ## Future
 

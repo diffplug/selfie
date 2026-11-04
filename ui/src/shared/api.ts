@@ -241,6 +241,18 @@ export interface FeedbackView {
 /** `agent` to a waiting agent, or `copy` if the person is pasting them somewhere themselves. */
 export type SendVia = "agent" | "copy";
 
+/** The render running from a page, which `render` holds to one at a time. */
+export interface RenderProgress {
+  /** Stories this render has to do. */
+  readonly total: number;
+  /** Stories finished so far, failed or not. */
+  readonly finished: number;
+  /** When the render was asked for, in milliseconds since the epoch. The page and a local server share a clock. */
+  readonly startedAtMs: number;
+  /** When its first story started, or null until then. */
+  readonly firstStoryStartedAtMs: number | null;
+}
+
 /**
  * The seam between the routes and a platform: how they reach a project's data. `cli/src/ui.ts`
  * implements it for a local repository. An error with a `code` from `ERROR_STATUS` becomes that
@@ -250,6 +262,8 @@ export interface ReviewSource {
   storiesView(): Promise<StoriesView>;
   /** Records a batch of just these stories from the hosted Storybook, one at a time. */
   render(stories: readonly string[]): Promise<{ readonly batchId: string }>;
+  /** How the render in flight is going, or null with none. */
+  renderProgress(): Promise<RenderProgress | null>;
   batchView(batchId: string): Promise<BatchView>;
   batchContext(batchId: string): Promise<BatchContext>;
   unchanged(batchId: string): Promise<readonly RenderRow[]>;

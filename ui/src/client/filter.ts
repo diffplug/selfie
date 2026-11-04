@@ -2,7 +2,7 @@
 import { isDecidable } from "selfie-store";
 import type { DecisionTarget, RenderRow } from "../shared/api.ts";
 import { isLayoutOnly } from "../shared/hunks.ts";
-import { plural } from "./plural.ts";
+import { plural } from "../shared/plural.ts";
 
 export const SHOW_OPTIONS = [
   ["all", "All differences"],

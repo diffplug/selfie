@@ -60,6 +60,8 @@ export interface RenderBatchOptions {
   readonly signal?: AbortSignal | undefined;
   /** Progress for people. Defaults to nothing. */
   readonly log?: ((line: string) => void) | undefined;
+  /** Progress for a program, if this renders. */
+  readonly onProgress?: RenderOptions["onProgress"] | undefined;
 }
 
 /** A batch to review, or else what to record one from if this built Storybook has none. */
@@ -344,7 +346,7 @@ function ownViewports({ environment, stories }: Manifest): Record<string, StoryV
 export function renderInput(
   { outDir, log }: { readonly outDir: string; readonly log: (line: string) => void },
   settings: RenderSettings,
-  options: Pick<RenderBatchOptions, "stories" | "signal">,
+  options: Pick<RenderBatchOptions, "stories" | "signal" | "onProgress">,
 ): RenderOptions {
   return {
     storybookDir: settings.storybookDir,
@@ -356,6 +358,7 @@ export function renderInput(
     ...(settings.settleMs === undefined ? {} : { settleMs: settings.settleMs }),
     ...(settings.storyTimeoutMs === undefined ? {} : { storyTimeoutMs: settings.storyTimeoutMs }),
     ...(options.signal === undefined ? {} : { signal: options.signal }),
+    ...(options.onProgress === undefined ? {} : { onProgress: options.onProgress }),
   };
 }
 

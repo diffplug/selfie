@@ -200,8 +200,8 @@ async function serveReview(
         storybook: {
           dir,
           url,
-          renderStories: async (stories) =>
-            (await renderBatch(project, { native, stories, render: context.render, log: (line) => context.stderr(`${line}\n`) })).batch.id,
+          renderStories: async (stories, onProgress) =>
+            (await renderBatch(project, { native, stories, render: context.render, log: (line) => context.stderr(`${line}\n`), onProgress })).batch.id,
         },
       }),
     port: options.port,

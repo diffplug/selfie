@@ -46,7 +46,7 @@ Source of truth: `cli/src/index.ts`; tests in `cli/test/library.test.ts`.
 | Export | Does |
 |---|---|
 | `openProject({ cwd, env })` | The repository's `Project`: its `repo`, `directory`, `renders`, `notes`, `store`, `renders`, and `close()` |
-| `renderBatch(project, options)` | Returns a `RenderBatchResult`: the `batch`, `dirtyPaths`, `warnings`, and `timings` |
+| `renderBatch(project, options)` | Returns a `RenderBatchResult`: the `batch`, `dirtyPaths`, `warnings`, and `timings`. `options.onProgress` is `render`'s (`docs/specs/render.md` → Render) |
 | `review(project, options)` | `options` is a `batch`, or what `renderBatch` takes. Returns a `ReviewResult`: the `comparison`, `given`, `dirtyPaths`, `differences`, `playErrors`, `warnings`, and `timings` |
 | `decide(project, { batchId, decision, actor, stories })` | `stories` is `"all"`, patterns, or `{ targets }`: exact stories and image hashes, for a caller that showed them, refused whole with `stale-decision` if any isn't a changed or added image the batch holds, or a removed story of it, with a null hash. Returns `decided`, `skipped`, `unmatchedPatterns`, and the `comparison` after it. It compares twice, and reads unchanged rows only for patterns |
 | `summarizeBatch(comparison)` | Returns `blockers`, `advisories`, `counts`, `undecided`, `unapproved`, `failed`, `removed`, and `notRendered` |
@@ -248,6 +248,7 @@ Source of truth: `cli/src/flakes.ts`, `cli/src/skills.ts`, `cli/skills/`; tests 
 
 - **Must record no batch and store nothing**, so it can't change a review. It keeps each render's images in `<project>/flakes/`, for looking at, until the next time it runs.
 - **Must take at least 2 renders, and 3 by default.**
+- **Must say how each render is going on stderr, at most every 10 seconds,** in the words of `describeRenderProgress` (`docs/specs/ui.md` → Screens), so stdout stays one document.
 - **Must exit 0 if nothing is reported, and 1 if anything is**, printing `{ schemaVersion, environment, renders, stories, flaky, warnings, directory }`, with `flaky` biggest pixel difference first, since what's biggest most often has one big cause.
 - **Must report a story whose images differ, or that failed in any render, or with a `timeout` or `request` error in any render, or with any other error in only some renders** (rationale).
 - **Must compare by pixels**, naming the most different pair and a picture of what differs.

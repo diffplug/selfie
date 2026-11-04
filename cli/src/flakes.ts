@@ -3,9 +3,11 @@
 import { createHash } from "node:crypto";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { render as realRender, type Manifest, type ManifestStory, type StoryError } from "selfie-render";
+import { render as realRender, type Manifest, type ManifestStory, type RenderProgressEvent, type StoryError } from "selfie-render";
 import { decodeImage } from "selfie-store";
 import { sharpCodec } from "selfie-store/adapters/sharp-codec";
+import type { RenderProgress } from "selfie-ui/app";
+import { advanceRenderProgress, describeRenderProgress } from "selfie-ui/render-progress";
 import { resolveRenderSettings } from "./config.ts";
 import { diffImages, type PixelDiff } from "./diff.ts";
 import { regularFileInside, storyDirName } from "./paths.ts";
@@ -43,6 +45,23 @@ export interface FlakeReport {
 export interface FlakeOptions extends RenderBatchOptions {
   readonly times: number;
   readonly concurrency?: number | undefined;
+}
+
+/** Often enough that a long render doesn't look stuck, and few enough to read. */
+const PROGRESS_LINE_EVERY_MS = 10_000;
+
+/** Says how one render is going, with whatever `prefix` says about which it is. */
+function progressLines(log: (line: string) => void, prefix: string): (progress: RenderProgressEvent) => void {
+  const startedAtMs = Date.now();
+  let progress: RenderProgress = { total: 0, finished: 0, startedAtMs, firstStoryStartedAtMs: null };
+  let saidAt = startedAtMs;
+  return (event) => {
+    const now = Date.now();
+    progress = advanceRenderProgress(progress, event, now);
+    if (now - saidAt < PROGRESS_LINE_EVERY_MS) return;
+    saidAt = now;
+    log(`${prefix}: ${describeRenderProgress(progress, now)}`);
+  };
 }
 
 const sha256 = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex");
@@ -113,7 +132,8 @@ export async function findFlakes(project: Project, options: FlakeOptions): Promi
   const manifests: Manifest[] = [];
   for (let at = 0; at < options.times; at++) {
     log(`Render ${at + 1} of ${options.times}`);
-    const input = renderInput({ outDir: path.join(directory, String(at)), log: () => {} }, settings, options);
+    const onProgress = progressLines(log, `Render ${at + 1} of ${options.times}`);
+    const input = renderInput({ outDir: path.join(directory, String(at)), log: () => {} }, settings, { ...options, onProgress });
     manifests.push(await render(options.concurrency === undefined ? input : { ...input, concurrency: options.concurrency }));
   }
 

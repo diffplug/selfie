@@ -5,14 +5,15 @@ import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
 import { isBuiltStorybook } from "selfie-ui/local";
 import { keptStorybookPath } from "selfie-ui/api";
-import { storybookHash, readStoriesInOrder, readStoryIndex, storiesInIndex, type StoryEntry } from "selfie-render";
-import type { DecisionTarget, FeedbackView, NewNote, ReviewSource, BatchView, RenderRow, StoriesView, StorybookLink, StorySetup } from "selfie-ui/app";
+import { storybookHash, readStoriesInOrder, readStoryIndex, storiesInIndex, type RenderProgressEvent, type StoryEntry } from "selfie-render";
+import type { DecisionTarget, FeedbackView, NewNote, RenderProgress, ReviewSource, BatchView, RenderRow, StoriesView, StorybookLink, StorySetup } from "selfie-ui/app";
 import { resolveRenderSettings, resolveHunkMergeDistance } from "./config.ts";
 import { decide } from "./decisions.ts";
 import { diffToPng, type PixelDiff } from "./diff.ts";
 import { SelfieError } from "./errors.ts";
 import { currentBranch, dirtyPaths, gitUserEmail, headMovedAt, headSha } from "./git.ts";
 import { isOpenNote } from "selfie-ui/notes";
+import { advanceRenderProgress } from "selfie-ui/render-progress";
 import { sentNotes, textForAgent } from "./notes.ts";
 import { batchesAtHead, compareAsReviewed, reachableCommits, readReviewCache, requireBatch, type Project } from "./project.ts";
 import { summarizeBatch } from "./summary.ts";
@@ -24,7 +25,7 @@ const DIFFS_KEPT = 32;
 const KEPT_INDEXES_HELD = 8;
 
 /** Records a batch from a hosted Storybook, of just these stories, or of every one, and says which batch. */
-export type RenderStories = (stories: readonly string[] | undefined) => Promise<string>;
+export type RenderStories = (stories: readonly string[] | undefined, onProgress: (progress: RenderProgressEvent) => void) => Promise<string>;
 
 export function localReviewSource(
   project: Project,
@@ -34,7 +35,7 @@ export function localReviewSource(
 
   // One at a time from a page, since two can't both be what someone is waiting on. An agent's own
   // `selfie render` isn't held to this: each render has a directory of its own.
-  let rendering = false;
+  let progress: RenderProgress | null = null;
 
   /** Hashing a whole built Storybook is too slow for every read of a page, and any change to it changes a file's time or size. */
   let knownStorybook: { readonly stamp: string; readonly hash: Promise<string | null> } | null = null;
@@ -267,21 +268,26 @@ export function localReviewSource(
       if (storybook === undefined || storybook.renderStories === undefined || !isBuiltStorybook(storybook.dir)) {
         throw new SelfieError("render-failed", "This server has no built Storybook to render a story from.");
       }
-      if (rendering) throw new SelfieError("render-busy", "A render is already running here. Try again once it's done.");
-      rendering = true;
+      if (progress !== null) throw new SelfieError("render-busy", "A render is already running here. Try again once it's done.");
+      progress = { total: new Set(stories).size, finished: 0, startedAtMs: Date.now(), firstStoryStartedAtMs: null };
+      const onProgress = (event: RenderProgressEvent) => {
+        if (progress !== null) progress = advanceRenderProgress(progress, event, Date.now());
+      };
       try {
         const index = new Set((await readStoryIndex(storybook.dir)).map(({ id }) => id));
         const unknown = stories.find((story) => !index.has(story));
         if (unknown !== undefined) throw new SelfieError("unknown-story", `The hosted Storybook has no story ${unknown}.`);
         // Every story is a whole batch, which can say what's been removed, and not a filtered one that can't.
-        return { batchId: await storybook.renderStories(new Set(stories).size === index.size ? undefined : stories) };
+        return { batchId: await storybook.renderStories(new Set(stories).size === index.size ? undefined : stories, onProgress) };
       } catch (error) {
         if (error instanceof SelfieError && error.code === "unknown-story") throw error;
         throw new SelfieError("render-failed", `That didn't render: ${(error as Error).message}`);
       } finally {
-        rendering = false;
+        progress = null;
       }
     },
+
+    renderProgress: async () => progress,
 
     async batchContext(batchId) {
       await requireBatch(project, batchId);

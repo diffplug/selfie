@@ -61,6 +61,8 @@ export interface FakeStory {
   readonly rawPng?: Uint8Array;
   /** Replaces the file with a symlink to this target. */
   readonly symlinkTo?: string;
+  /** Runs before the story renders, so a test can look at a render in flight, or move the clock. */
+  readonly beforeRendering?: () => void | Promise<void>;
 }
 
 /** Writes what `render` writes for these stories. */
@@ -76,7 +78,9 @@ export function fakeRender(
 
     await mkdir(path.join(options.outDir, STORIES_DIR), { recursive: true });
     const manifestStories: ManifestStory[] = [];
+    if (selected.length > 0) options.onProgress?.({ event: "started", finished: 0, total: selected.length });
     for (const story of selected) {
+      await story.beforeRendering?.();
       const fileName = storyFileName(story.id);
       const file = path.posix.join(STORIES_DIR, fileName);
       const width = story.width ?? 8;
@@ -114,6 +118,7 @@ export function fakeRender(
         errors: [...(story.errors ?? []), ...(story.failed === undefined ? [] : [{ source: "render" as const, message: story.failed }])],
         durationMs: 1,
       });
+      options.onProgress?.({ event: "finished", finished: manifestStories.length, total: selected.length });
     }
     const manifest: Manifest = {
       schemaVersion: 1,

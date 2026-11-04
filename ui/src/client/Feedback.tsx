@@ -3,7 +3,7 @@ import { Banner, Button, Dialog, Stack, Text } from "@primer/react";
 import { useEffect, useRef, useState } from "react";
 import { isOpenNote } from "../shared/notes.ts";
 import type { FeedbackState } from "./hooks.ts";
-import { plural } from "./plural.ts";
+import { plural } from "../shared/plural.ts";
 import { AppLink, batchPath, storyPath } from "./router.tsx";
 import { ActionFailedBanner } from "./ActionFailure.tsx";
 import { NoteLabel } from "./words.tsx";
