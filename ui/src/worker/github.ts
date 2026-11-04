@@ -1,5 +1,6 @@
 // The GitHub App, as far as a commit's status needs it: which commits a repository has, and saying
 // what a commit's snapshots read as. See docs/specs/access.md -> GitHub App.
+import { sign } from "hono/jwt";
 import type { CommitStatus } from "../shared/commit-status.ts";
 
 export interface Repository {
@@ -19,21 +20,6 @@ const STATUS_CONTEXT = "selfie";
 // They last an hour, so there's room for a request that started just before this ran out.
 const TOKEN_KEPT_MS = 50 * 60 * 1000;
 
-const base64url = (bytes: ArrayBuffer | Uint8Array) => btoa(String.fromCharCode(...new Uint8Array(bytes as ArrayBuffer))).replace(/=+$/, "").replace(/\+/g, "-").replace(/\//g, "_");
-const utf8 = (text: string) => new TextEncoder().encode(text);
-
-async function appJwt(appId: string, privateKeyPem: string): Promise<string> {
-  const der = Uint8Array.from(atob(privateKeyPem.replace(/-----[^-]+-----|\s/g, "")), (c) => c.charCodeAt(0));
-  const key = await crypto.subtle.importKey("pkcs8", der, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["sign"]);
-  const now = Math.floor(Date.now() / 1000);
-  // A little in the past, since GitHub's clock may be behind this one.
-  const body = `${base64url(utf8(JSON.stringify({ alg: "RS256", typ: "JWT" })))}.${base64url(utf8(JSON.stringify({ iat: now - 30, exp: now + 300, iss: appId })))}`;
-  return `${body}.${base64url(await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, utf8(body)))}`;
-}
-
-// Across requests, so a page's status needn't sign anything twice in the hour.
-const tokens = new Map<string, { readonly token: string; readonly until: number }>();
-
 export function githubApp({ appId, privateKey }: { readonly appId: string; readonly privateKey: string }): GitHub {
   const ask = (path: string, token: string, init: RequestInit = {}) =>
     fetch(`${API}${path}`, {
@@ -41,11 +27,15 @@ export function githubApp({ appId, privateKey }: { readonly appId: string; reado
       headers: { authorization: `Bearer ${token}`, accept: "application/vnd.github+json", "user-agent": "selfie-hackathon", "x-github-api-version": "2022-11-28" },
     });
 
+  // So that a status needn't sign anything twice in the hour.
+  const tokens = new Map<string, { readonly token: string; readonly until: number }>();
   const tokenFor = async ({ owner, name }: Repository): Promise<string> => {
     const key = `${owner}/${name}`;
     const held = tokens.get(key);
     if (held !== undefined && held.until > Date.now()) return held.token;
-    const jwt = await appJwt(appId, privateKey);
+    const now = Math.floor(Date.now() / 1000);
+    // A little in the past, since GitHub's clock may be behind this one.
+    const jwt = await sign({ iat: now - 30, exp: now + 300, iss: appId }, privateKey, "RS256");
     const installation = await ask(`/repos/${owner}/${name}/installation`, jwt);
     if (!installation.ok) throw new Error(`The GitHub App isn't installed on ${key}: ${installation.status}`);
     const { id } = (await installation.json()) as { id: number };

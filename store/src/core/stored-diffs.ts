@@ -13,11 +13,16 @@ export class StoredDiffs {
     this.#blob = blob;
   }
 
-  /** The image first, so that stats here always mean both are. */
-  async put(current: string, golden: string, statsJson: string, png: Uint8Array): Promise<void> {
+  /** Before its stats, which say that both are here. */
+  async putImage(current: string, golden: string, png: Uint8Array): Promise<void> {
     assertImageHash(current);
     assertImageHash(golden);
     await this.#blob.put(imageKey(current, golden), png);
+  }
+
+  async putStats(current: string, golden: string, statsJson: string): Promise<void> {
+    assertImageHash(current);
+    assertImageHash(golden);
     await this.#blob.put(statsKey(current, golden), new TextEncoder().encode(statsJson));
   }
 

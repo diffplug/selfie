@@ -51,7 +51,7 @@ export {
 } from "./sql.ts";
 export { BuiltStorybooks, type BuiltStorybookFile } from "./built-storybooks.ts";
 export { filterStories, storyEntriesIn, type StoryEntry } from "./stories.ts";
-export { summarizeBatch, type Attention, type BatchSummary, type BlockerReason } from "./summary.ts";
+export { exactRows, staleDecisionMessage, summarizeBatch, type Attention, type BatchSummary, type BlockerReason, type ExactTarget } from "./summary.ts";
 export { StoredDiffs } from "./stored-diffs.ts";
 export {
   ImageHashMismatchError,

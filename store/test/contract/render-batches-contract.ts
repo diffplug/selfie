@@ -233,13 +233,18 @@ export function describeBatchContract(
       expect(await batches.getBatch(clean.id)).toMatchObject({ dirty: false, storyFilter: null });
     });
 
-    it("walks what a commit reaches by the graph it was told, through every parent", async () => {
-      const [a, b, c, d, lone] = ["a", "b", "c", "d", "9"].map((digit) => digit!.repeat(40)) as [string, string, string, string, string];
-      await batches.recordCommits([{ sha: d, parents: [b, c] }, { sha: c, parents: [a] }, { sha: b, parents: [a] }, { sha: a, parents: [] }]);
-      await batches.recordCommits([{ sha: d, parents: [b, c] }]);
-      expect([...(await batches.reachableFrom(d))].sort()).toEqual([a, b, c, d]);
-      expect([...(await batches.reachableFrom(b))].sort()).toEqual([a, b]);
-      expect(await batches.reachableFrom(lone)).toEqual([]);
+    it("compares with what a commit reaches by the graph it was told, through every parent", async () => {
+      const [merged, left, right, root, unrelated] = ["a", "b", "c", "d", "9"].map((digit) => digit!.repeat(40)) as [string, string, string, string, string];
+      await batches.recordCommits([{ sha: merged, parents: [left, right] }, { sha: right, parents: [root] }, { sha: left, parents: [root] }, { sha: root, parents: [] }]);
+      await batches.recordCommits([{ sha: merged, parents: [left, right] }]);
+      const environment = "reached";
+      const batch = await batches.beginBatch({ gitSha: merged, environment, scale: 1, viewport: { width: 1200, height: 900 }, dirty: false });
+      await batches.recordRenders(batch.id, [rendered("through-a-merge", 1), rendered("elsewhere", 2), rendered("no-decision", 3)]);
+      await batches.finishBatch(batch.id, 3);
+      const decision = { decision: "approved" as const, actor: "ned", at: 1, batchId: ON.batchId };
+      await batches.mergeDecisions(environment, [{ story: "through-a-merge", imageHash: hashOf(1), gitSha: right, ...decision }, { story: "elsewhere", imageHash: hashOf(2), gitSha: unrelated, ...decision }]);
+      const { renders } = await batches.compareReached(batch.id, { includeUnchanged: true });
+      expect(renders.map(({ story, state }) => [story, state])).toEqual([["elsewhere", "added"], ["no-decision", "added"], ["through-a-merge", "unchanged"]]);
     });
 
     it("finds the newest finished batch on a branch, or anywhere", async () => {
@@ -247,9 +252,9 @@ export function describeBatchContract(
       const finishedOnTopic = await on("topic-newest");
       await batches.finishBatch(finishedOnTopic.id, 0);
       await on("topic-newest");
-      expect((await batches.newestOnBranch("topic-newest"))?.id).toBe(finishedOnTopic.id);
-      expect(await batches.newestOnBranch("no-such-branch")).toBeNull();
-      expect((await batches.newestOfAll())?.id).toBe(finishedOnTopic.id);
+      expect((await batches.newestFinished("topic-newest"))?.id).toBe(finishedOnTopic.id);
+      expect(await batches.newestFinished("no-such-branch")).toBeNull();
+      expect((await batches.newestFinished())?.id).toBe(finishedOnTopic.id);
     });
 
     it("keeps a batch's scale, whole or not", async () => {

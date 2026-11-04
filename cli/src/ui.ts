@@ -100,6 +100,32 @@ export function localReviewSource(
     return actor;
   };
 
+  const diff = (current: string, golden: string): Promise<{ diff: PixelDiff; png: Uint8Array } | null> => {
+    const key = `${current}/${golden}`;
+    const known = diffs.get(key);
+    if (known !== undefined) {
+      // Newest last, so the oldest is the one to drop.
+      diffs.delete(key);
+      diffs.set(key, known);
+      return known;
+    }
+    // Kept while it's working too, since a page asks for a diff's stats and its image at once.
+    const working = (async () => {
+      const [currentImage, goldenImage] = await Promise.all([store.getPixels(current), store.getPixels(golden)]);
+      return currentImage === null || goldenImage === null ? null : diffToPng(currentImage, goldenImage);
+    })();
+    diffs.set(key, working);
+    for (const oldest of diffs.keys()) {
+      if (diffs.size <= DIFFS_KEPT) break;
+      diffs.delete(oldest);
+    }
+    const forget = () => void diffs.delete(key);
+    working.then((result) => {
+      if (result === null) forget();
+    }, forget);
+    return working;
+  };
+
   return {
     feedback,
 
@@ -251,30 +277,7 @@ export function localReviewSource(
 
     image: (hash) => store.getImage(hash),
 
-    diff(current, golden) {
-      const key = `${current}/${golden}`;
-      const known = diffs.get(key);
-      if (known !== undefined) {
-        // Newest last, so the oldest is the one to drop.
-        diffs.delete(key);
-        diffs.set(key, known);
-        return known;
-      }
-      // Kept while it's working too, since a page asks for a diff's stats and its image at once.
-      const working = (async () => {
-        const [currentImage, goldenImage] = await Promise.all([store.getPixels(current), store.getPixels(golden)]);
-        return currentImage === null || goldenImage === null ? null : diffToPng(currentImage, goldenImage);
-      })();
-      diffs.set(key, working);
-      for (const oldest of diffs.keys()) {
-        if (diffs.size <= DIFFS_KEPT) break;
-        diffs.delete(oldest);
-      }
-      const forget = () => void diffs.delete(key);
-      working.then((result) => {
-        if (result === null) forget();
-      }, forget);
-      return working;
-    },
+    diffStats: async (current, golden) => (await diff(current, golden))?.diff ?? null,
+    diffImage: async (current, golden) => (await diff(current, golden))?.png ?? null,
   };
 }

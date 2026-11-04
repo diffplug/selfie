@@ -1,5 +1,6 @@
 // The Worker at hackathon.selfie.dev. Which projects it hosts is written down here, since there are
 // only ever going to be a few, all public, and all Ned's. See docs/specs/cloud.md.
+import type { ExecutionContext, Hono } from "hono";
 import type { D1DatabaseLike } from "selfie-store/adapters/d1-binding";
 import type { R2BucketLike } from "selfie-store/adapters/r2";
 import { createCloudApp } from "./app.ts";
@@ -18,9 +19,12 @@ interface Env {
   readonly GITHUB_APP_PRIVATE_KEY: string;
 }
 
+/** Once per Worker's life, which is what lets a project's caches and a GitHub token last between requests. */
+let app: Hono | null = null;
+
 export default {
-  fetch(request: Request, env: Env) {
-    return createCloudApp({
+  fetch(request: Request, env: Env, context: ExecutionContext) {
+    app ??= createCloudApp({
       projects: [
         { id: "1442175397", owner: "diffplug", name: "selfie-hackathon", defaultBranch: "main", db: env.DB_1442175397 },
         { id: "1445291541", owner: "diffplug", name: "selfie-sandbox", defaultBranch: "main", db: env.DB_1445291541 },
@@ -32,6 +36,7 @@ export default {
       uploadToken: env.SELFIE_UPLOAD_TOKEN,
       github: githubApp({ appId: env.GITHUB_APP_ID, privateKey: env.GITHUB_APP_PRIVATE_KEY }),
       assets: env.ASSETS,
-    }).fetch(request);
+    });
+    return app.fetch(request, env, context);
   },
 };

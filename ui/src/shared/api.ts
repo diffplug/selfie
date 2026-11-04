@@ -259,7 +259,8 @@ export interface ReviewSource {
   /** The stored bytes, or null if this store doesn't hold it. */
   image(hash: string): Promise<Uint8Array | null>;
   /** Null if the store doesn't hold both. */
-  diff(current: string, golden: string): Promise<{ diff: PixelDiff; png: Uint8Array } | null>;
+  diffStats(current: string, golden: string): Promise<PixelDiff | null>;
+  diffImage(current: string, golden: string): Promise<Uint8Array | null>;
 }
 
 /** The custom header every state-changing request needs, since a form on another site can't send one. */

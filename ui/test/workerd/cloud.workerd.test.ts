@@ -17,8 +17,7 @@ const UNPUSHED = "c".repeat(40);
 const FIRST = "11111111-1111-4111-8111-111111111111";
 const NEXT = "22222222-2222-4222-8222-222222222222";
 const fromBase64 = (text: string) => Uint8Array.from(atob(text), (c) => c.charCodeAt(0));
-const PNG_BASE64 = "iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAEElEQVR4XmM4IScHRwzEcQCxYxBBF7FZ1QAAAABJRU5ErkJggg==";
-const png = fromBase64(PNG_BASE64);
+const png = fromBase64("iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAEElEQVR4XmM4IScHRwzEcQCxYxBBF7FZ1QAAAABJRU5ErkJggg==");
 const hash = "6fc35503986a1b85896ca807408798a0bbbf1ad557fd91ee6d19f5ba0469e636";
 
 const statuses: { sha: string; status: CommitStatus; url: string }[] = [];
@@ -154,8 +153,10 @@ describe("the cloud service", () => {
   it("keeps a diff a client worked out, for showing", async () => {
     const other = "9".repeat(64);
     const stats = { hunks: [], changedPixels: 1 };
-    expect((await api("PUT", `/diffs/${hash}/${other}`, null, { stats, png: PNG_BASE64 })).status).toBe(403);
-    expect((await api("PUT", `/diffs/${hash}/${other}`, UPLOAD, { stats, png: PNG_BASE64 })).status).toBe(200);
+    expect((await api("PUT", `/diffs/${hash}/${other}/image`, null, png)).status).toBe(403);
+    expect((await api("PUT", `/diffs/${hash}/${other}`, null, stats)).status).toBe(403);
+    expect((await api("PUT", `/diffs/${hash}/${other}/image`, UPLOAD, png)).status).toBe(200);
+    expect((await api("PUT", `/diffs/${hash}/${other}`, UPLOAD, stats)).status).toBe(200);
     expect(await (await review("GET", `/diffs/${hash}/${other}`)).json()).toEqual(stats);
     expect(await (await review("GET", `/diffs/${hash}/${other}/image`)).status).toBe(200);
     expect((await review("POST", "/notes", { signedIn: true, body: { story: "a", batchId: FIRST, imageHash: hash, box: null, text: "hi" } })).status).toBe(403);

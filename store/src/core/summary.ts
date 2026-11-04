@@ -43,6 +43,22 @@ export interface BatchSummary {
   readonly notRendered: readonly ComparedRender[];
 }
 
+/** A decision on exactly these images, as a person saw them. */
+export interface ExactTarget {
+  readonly story: string;
+  /** Null for a story that's gone. */
+  readonly imageHash: string | null;
+}
+
+/** The rows these targets name, and how many of them aren't what a batch holds now, in which case none should be decided. */
+export function exactRows(renders: readonly ComparedRender[], targets: readonly ExactTarget[]): { readonly rows: readonly ComparedRender[]; readonly stale: number } {
+  const rows = new Map(renders.filter(({ state }) => isDecidable(state)).map((row) => [row.story, row]));
+  const stale = targets.filter(({ story, imageHash }) => rows.get(story)?.imageHash !== imageHash).length;
+  return { rows: stale > 0 ? [] : targets.map(({ story }) => rows.get(story)!), stale };
+}
+
+export const staleDecisionMessage = (stale: number) => `${stale} of these images aren't what this batch holds now, so nothing was decided. Look again.`;
+
 export function summarizeBatch({ batch, renders, unchangedCount }: Comparison): BatchSummary {
   const inState = (state: RenderState) => renders.filter((render) => render.state === state);
   const failed = inState("failed");

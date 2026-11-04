@@ -17,17 +17,13 @@ runs:
         echo "SELFIE_ROOT=$selfie_root" >> "$GITHUB_ENV"
         npm install --global pnpm@10.30.1
         (cd "$selfie_root" && pnpm install --frozen-lockfile --filter "selfie-cli..." --ignore-scripts)
-    - name: Build the Storybook
+    - name: Build the Storybook and render every story
       shell: bash
-      run: eval "$(node -p "require('./selfie.config.json').buildCommand")"
-    - name: Render every story
-      shell: bash
-      # A story that fails is a result, which the status says. Only a push that fails fails this job.
-      run: node "$SELFIE_ROOT/cli/src/main.ts" render || echo "selfie render exited $?"
+      # Exits 0 once a batch is recorded, even with failed stories, which the status says.
+      run: node "$SELFIE_ROOT/cli/src/main.ts" render --build
     - name: Push the batch
       shell: bash
       env:
         SELFIE_REMOTE: ${{ inputs.remote }}
         SELFIE_TOKEN: ${{ inputs.upload-token }}
-      # Every step of a push is safe to send again, so one that dies is finished by running it again.
-      run: node "$SELFIE_ROOT/cli/src/main.ts" push || (sleep 10 && node "$SELFIE_ROOT/cli/src/main.ts" push)
+      run: node "$SELFIE_ROOT/cli/src/main.ts" push

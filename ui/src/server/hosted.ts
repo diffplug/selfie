@@ -1,9 +1,9 @@
 // The review routes' window on a project in the cloud. It reads what's been pushed, and it can't render,
 // decode an image, or ask Git, so it asks the store what a commit reaches, and is given diffs by whoever
 // could work them out. See docs/specs/cloud.md.
-import { isDecidable, newestRenders, summarizeBatch, type BuiltStorybooks, type DecisionKind, type ReceivingStore, type RenderBatch, type RenderBatches, type RenderState, type StoredDiffs } from "selfie-store";
+import { exactRows, newestRenders, staleDecisionMessage, summarizeBatch, type BuiltStorybooks, type Comparison, type DecisionKind, type ReceivingStore, type RenderBatches, type RenderState, type StoredDiffs } from "selfie-store";
 import { keptStorybookPath, type BatchView, type DecisionTarget, type FeedbackView, type ListedStory, type PixelDiff, type ReviewSource, type StoriesView } from "../shared/api.ts";
-import { batchViews } from "./batch-view.ts";
+import { batchViews, type BatchViews } from "./batch-view.ts";
 
 /** Nothing in the cloud reads a project's own config, so it groups hunks as a project does by default. */
 const HUNK_MERGE_DISTANCE = 12;
@@ -21,14 +21,14 @@ export interface HostedProject {
   readonly storybookBase: string;
 }
 
-export function hostedReviewSource(project: HostedProject, { actor, decided }: { readonly actor: string | null; readonly decided: (batch: RenderBatch) => Promise<void> }): ReviewSource {
-  const { batches, storybooks, store, diffs } = project;
-
+/** What a project's pages share from one request to the next, since kept built Storybooks never change. */
+export function hostedViews(project: HostedProject): BatchViews {
+  const { batches, storybooks } = project;
   const keptStorybookUrl = async (batchId: string) => {
     const kept = await storybooks.storybookOfBatch(batchId);
     return kept === null ? null : `${project.storybookBase}${keptStorybookPath(kept)}`;
   };
-  const views = batchViews({
+  return batchViews({
     batches,
     storybooks,
     keptStorybookUrl,
@@ -39,6 +39,14 @@ export function hostedReviewSource(project: HostedProject, { actor, decided }: {
     pixelDiffs: async () => new Map<string, PixelDiff>(),
     hunkMergeDistance: async () => HUNK_MERGE_DISTANCE,
   });
+}
+
+export function hostedReviewSource(
+  project: HostedProject,
+  views: BatchViews,
+  { actor, decided }: { readonly actor: string | null; readonly decided: (comparison: Comparison) => Promise<void> },
+): ReviewSource {
+  const { batches, storybooks, store, diffs } = project;
 
   const notHere = (): never => {
     throw refusal("read-only", "Notes and rendering are only in selfie ui, on your own machine.");
@@ -59,16 +67,17 @@ export function hostedReviewSource(project: HostedProject, { actor, decided }: {
     },
     async decide(batchId: string, decision: DecisionKind, targets: readonly DecisionTarget[]) {
       if (actor === null) throw refusal("not-signed-in", "Sign in to approve or reject.");
-      const { batch, ...comparison } = await batches.compareReached(batchId);
-      const rows = new Map(summarizeBatch({ batch, ...comparison }).inFilter.filter(({ state }) => isDecidable(state)).map((row) => [row.story, row]));
-      const stale = targets.filter(({ story, imageHash }) => rows.get(story)?.imageHash !== imageHash);
-      if (stale.length > 0) throw refusal("stale-decision", `${stale.length} of these images aren't what this batch holds now, so nothing was decided. Look again.`);
+      const before = await batches.compareReached(batchId);
+      const { stale } = exactRows(summarizeBatch(before).inFilter, targets);
+      if (stale > 0) throw refusal("stale-decision", staleDecisionMessage(stale));
+      const { batch } = before;
       await batches.decide({ environment: batch.environment, decision, actor, renders: targets, on: { batchId, gitSha: batch.gitSha } });
-      await decided(batch);
-      return views.viewOf(await batches.compareReached(batchId), actor);
+      const after = await batches.compareReached(batchId);
+      await decided(after);
+      return views.viewOf(after, actor);
     },
     async storiesView(): Promise<StoriesView> {
-      const batch = (await batches.newestOnBranch(project.defaultBranch)) ?? (await batches.newestOfAll());
+      const batch = (await batches.newestFinished(project.defaultBranch)) ?? (await batches.newestFinished());
       if (batch === null) return { head: null, branch: project.defaultBranch, storybookUrl: null, viewport: { width: 1200, height: 900 }, stories: [], newestBatchId: null, canRender: false, setup: null };
       const { renders } = await batches.compareReached(batch.id, { includeUnchanged: true });
       const found = await newestRenders([batch], async () => renders);
@@ -84,7 +93,7 @@ export function hostedReviewSource(project: HostedProject, { actor, decided }: {
           render: render === undefined ? null : { batchId: batch.id, state: render.row.state as RenderState, decision: render.row.decision, renderedAt: batch.startedAt, dirty: batch.dirty, fromHostedStorybook: kept === null ? null : true },
         };
       });
-      return { head: batch.gitSha, branch: batch.branch, storybookUrl: await keptStorybookUrl(batch.id), viewport: batch.viewport, stories, newestBatchId: batch.id, canRender: false, setup: null };
+      return { head: batch.gitSha, branch: batch.branch, storybookUrl: kept === null ? null : `${project.storybookBase}${keptStorybookPath(kept)}`, viewport: batch.viewport, stories, newestBatchId: batch.id, canRender: false, setup: null };
     },
     render: async () => notHere(),
     renderProgress: async () => null,
@@ -95,9 +104,10 @@ export function hostedReviewSource(project: HostedProject, { actor, decided }: {
     resolveNote: async () => notHere(),
     sendNotes: async () => notHere(),
     image: (hash) => store.getImage(hash),
-    async diff(current, golden) {
-      const [stats, png] = await Promise.all([diffs.stats(current, golden), diffs.image(current, golden)]);
-      return stats === null || png === null ? null : { diff: JSON.parse(stats) as PixelDiff, png };
+    async diffStats(current, golden) {
+      const stats = await diffs.stats(current, golden);
+      return stats === null ? null : (JSON.parse(stats) as PixelDiff);
     },
+    diffImage: (current, golden) => diffs.image(current, golden),
   };
 }

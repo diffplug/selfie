@@ -36,7 +36,8 @@ To mount under `/api`. `GET /repositories/:owner/:name` finds a repository's pro
 | `PUT /storybooks/:hash` | `{ files }`, each `{ path, fileHash }`, once all are here, or `missing-files` | Upload |
 | `POST /batches/:id/storybook` | `{ build }`, which built Storybook rendered this batch | Upload |
 | `GET /batches/:id/diffs/needed` | `{ pairs }`, each `{ current, golden }`, the changed pairs with no diff here | Upload |
-| `PUT /diffs/:current/:golden` | `{ stats, png }`, with `png` in base64 | Upload |
+| `PUT /diffs/:current/:golden/image` | The diff image's bytes, sent first | Upload |
+| `PUT /diffs/:current/:golden` | Its `PixelDiff`, which says both are here | Upload |
 | `POST /decisions` | `{ environment, decisions }`, at most 1,000, each with its `gitSha` and `batchId` | Decide |
 | `POST /goldens` | `{ batchId, baselineSha, removed }`, answers `{ outcome, acceptedBatchId, refusal }`, where `outcome` is `accepted`, `already`, `conflict`, or `refused` | Upload, or Decide if `removed` isn't empty |
 | `GET /goldens` | `?sha&environment`, answers `{ batchId }` | View or Upload |
@@ -82,6 +83,7 @@ Reserved: a fork's render pass must not upload through this (`docs/specs/access.
 
 Source of truth: `cli/src/sync.ts`; tests in `cli/test/sync.test.ts`, between two machines on real Git and a store standing in for the cloud's.
 
+- **Must try a request up to three times if the server can't be reached, or answers 429 or 5xx**, since every step is safe to send again.
 - **Must push one batch at a time, in this order: the batch, what its commit reaches, its built Storybook if it's kept, its images, its renders, finishing it, its decisions, its goldens, and the diffs the remote asks for**, so that a refused batch costs nothing, and nothing refers to what hasn't arrived.
 - **Must make every step safe to send again**, so a push or pull that dies is finished by running it again, with nothing to clean up. A partly received batch stays `recording`, which nothing can compare or accept.
 - **Must send only the images the receiver lacks, and pull only those this store lacks, decoding each to check it's the image its hash names**, and stop with `corrupt-image` naming it if it isn't, leaving what's stored here as it was. A sender's check is the last that image gets, and a puller's is the only one that finds what another client sent wrongly.

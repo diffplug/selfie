@@ -5,7 +5,7 @@ import { Hono, type Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { assertViewport, ImageDecodeError, isGitSha, isImageHash, isBatchId, BatchError, type ReceivedDecision, type ReceivedBatch, type BuiltStorybooks, type StoredDiffs, type ReceivingStore, type RecordedRender, type RenderBatches, type StoryFilter, type Viewport } from "selfie-store";
 import { SYNC_LIMITS, type GoldensAnswer, type ProjectAccess } from "../shared/sync-api.ts";
-import { failure, imageResponse, INTERNAL_ERROR, noStoreByDefault } from "./http.ts";
+import { afterResponse, failure, imageResponse, INTERNAL_ERROR, noStoreByDefault } from "./http.ts";
 
 /** What a token may do in a project. */
 export interface SyncAccess {
@@ -202,6 +202,15 @@ export function createSyncApi(host: SyncHost): Hono {
     return project;
   };
 
+  /** Refused before reading it where its length says so, since it can't be checked without holding it. */
+  const readLimited = async (context: Context, kind: "image" | "file" = "file") => {
+    const tooLarge = () => new Refusal(413, `${kind}-too-large`, `This server takes ${kind}s of at most ${maxImageBytes} bytes.`);
+    if (Number(context.req.header("content-length") ?? 0) > maxImageBytes) throw tooLarge();
+    const bytes = new Uint8Array(await context.req.arrayBuffer());
+    if (bytes.length > maxImageBytes) throw tooLarge();
+    return bytes;
+  };
+
   api.onError((error, context) => {
     if (error instanceof Refusal) return context.json(failure(error.code, error.message), error.status);
     if (error instanceof BatchError) return context.json(failure(error.code, error.message), error.code === "unknown-batch" || error.code === "unknown-image" ? 404 : 409);
@@ -233,12 +242,7 @@ export function createSyncApi(host: SyncHost): Hono {
   api.put("/projects/:project/images/:hash", async (context) => {
     const { store } = await uploadable(context);
     const hash = readHash(context.req.param("hash"));
-    // Before reading it, since it can't be checked without holding it.
-    if (Number(context.req.header("content-length") ?? 0) > maxImageBytes) {
-      throw new Refusal(413, "image-too-large", `This server takes images of at most ${maxImageBytes} bytes.`);
-    }
-    const bytes = new Uint8Array(await context.req.arrayBuffer());
-    if (bytes.length > maxImageBytes) throw new Refusal(413, "image-too-large", `This server takes images of at most ${maxImageBytes} bytes.`);
+    const bytes = await readLimited(context, "image");
     try {
       await store.receiveImage(bytes, hash);
     } catch (error) {
@@ -281,7 +285,7 @@ export function createSyncApi(host: SyncHost): Hono {
     const project = await uploadable(context);
     const { count, finishedAt } = await bodyOf(context);
     const { status, gitSha, environment } = await project.batches.finishBatch(readBatchId(context.req.param("id")), readWhole(count, "count"), Math.min(readWhole(finishedAt, "finishedAt"), now()));
-    await project.commitChanged?.(gitSha, environment);
+    if (project.commitChanged !== undefined) await afterResponse(context, project.commitChanged(gitSha, environment));
     return context.json({ status });
   });
 
@@ -299,7 +303,9 @@ export function createSyncApi(host: SyncHost): Hono {
     const named = readText(environment, "environment");
     const received = listOf(decisions, SYNC_LIMITS.decisions, "decisions").map((decision) => receivedDecision(decision, access.decider!, at));
     await batches.mergeDecisions(named, received);
-    for (const gitSha of new Set(received.map((decision) => decision.gitSha))) await project.commitChanged?.(gitSha, named);
+    if (project.commitChanged !== undefined) {
+      await afterResponse(context, Promise.all([...new Set(received.map(({ gitSha }) => gitSha))].map((gitSha) => project.commitChanged!(gitSha, named))).then(() => undefined));
+    }
     return context.json({ merged: received.length });
   });
 
@@ -313,13 +319,6 @@ export function createSyncApi(host: SyncHost): Hono {
     return context.json({ recorded: commits.length });
   });
 
-  const readFileBytes = async (context: Context) => {
-    if (Number(context.req.header("content-length") ?? 0) > maxImageBytes) throw new Refusal(413, "file-too-large", `This server takes files of at most ${maxImageBytes} bytes.`);
-    const bytes = new Uint8Array(await context.req.arrayBuffer());
-    if (bytes.length > maxImageBytes) throw new Refusal(413, "file-too-large", `This server takes files of at most ${maxImageBytes} bytes.`);
-    return bytes;
-  };
-
   api.post("/projects/:project/storybooks/files/missing", async (context) => {
     const { storybooks } = await uploadable(context);
     const hashes = listOf((await bodyOf(context)).hashes, SYNC_LIMITS.hashes, "hashes").map(readHash);
@@ -330,7 +329,7 @@ export function createSyncApi(host: SyncHost): Hono {
     const { storybooks } = await uploadable(context);
     const hash = readHash(context.req.param("hash"));
     // Whatever a built Storybook is, a file's name is its bytes' hash, so one file can't stand in for another.
-    const kept = await storybooks.putFile(await readFileBytes(context));
+    const kept = await storybooks.putFile(await readLimited(context));
     if (kept !== hash) throw badRequest(`Those bytes hash to ${kept}, not ${hash}.`);
     return context.json({ hash });
   });
@@ -369,12 +368,17 @@ export function createSyncApi(host: SyncHost): Hono {
     return context.json({ pairs: pairs.filter((_, i) => !held[i]) });
   });
 
+  api.put("/projects/:project/diffs/:current/:golden/image", async (context) => {
+    const { diffs } = await uploadable(context);
+    const { current, golden } = context.req.param();
+    await diffs.putImage(readHash(current), readHash(golden), await readLimited(context));
+    return context.json({ stored: true });
+  });
+
   api.put("/projects/:project/diffs/:current/:golden", async (context) => {
     const { diffs } = await uploadable(context);
     const { current, golden } = context.req.param();
-    const { stats, png } = asRecord(JSON.parse(new TextDecoder().decode(await readFileBytes(context))));
-    if (typeof png !== "string") throw badRequest("png must be base64.");
-    await diffs.put(readHash(current), readHash(golden), JSON.stringify(asRecord(stats)), Uint8Array.from(atob(png), (c) => c.charCodeAt(0)));
+    await diffs.putStats(readHash(current), readHash(golden), JSON.stringify(await bodyOf(context)));
     return context.json({ stored: true });
   });
 

@@ -78,18 +78,25 @@ export function batchViews(platform: BatchViewPlatform): BatchViews {
     const { batch } = comparison;
     const summary = summarizeBatch(comparison);
     const rows = await toRows(batch.id, summary.inFilter);
+    const [storybook, storyViewports, hunkMergeDistance, storyNames, siblings] = await Promise.all([
+      platform.storybookFor(batch.id),
+      batches.storyViewportsOf(batch.id),
+      platform.hunkMergeDistance(),
+      storyNamesFor(batch, new Set(rows.flatMap(({ goldenBatchId }) => goldenBatchId ?? [])), new Set(rows.map(({ story }) => story))),
+      batches.batchesAt(batch.gitSha, batch.environment),
+    ]);
     return {
       batch,
-      storybook: await platform.storybookFor(batch.id),
-      storyViewports: await batches.storyViewportsOf(batch.id),
-      hunkMergeDistance: await platform.hunkMergeDistance(),
+      storybook,
+      storyViewports,
+      hunkMergeDistance,
       actor,
       blockers: summary.blockers,
       counts: { ...summary.counts, failed: summary.failed.length },
       rows,
-      storyNames: await storyNamesFor(batch, new Set(rows.flatMap(({ goldenBatchId }) => goldenBatchId ?? [])), new Set(rows.map(({ story }) => story))),
+      storyNames,
       outsideFilter: summary.notRendered.length,
-      siblings: (await batches.batchesAt(batch.gitSha, batch.environment)).map(({ id, startedAt, status, dirty }) => ({ id, startedAt, status, dirty })),
+      siblings: siblings.map(({ id, startedAt, status, dirty }) => ({ id, startedAt, status, dirty })),
     };
   };
 

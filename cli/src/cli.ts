@@ -9,7 +9,7 @@ import { gitUserEmail, resolveCommit } from "./git.ts";
 import { selfieHome } from "./paths.ts";
 import { compareAsReviewed, openProject, type Project } from "./project.ts";
 import { renderBatch, review, replyToNote, runBuild } from "./review.ts";
-import { summarizeBatch } from "./summary.ts";
+import { summarizeBatch } from "selfie-store";
 import { pull, push, requireRemote, type Fetch } from "./sync.ts";
 import { isNoteId, isNoteText, MAX_NOTE_CHARACTERS } from "selfie-ui/notes";
 import { awaitFeedback, notesForAgent } from "./notes.ts";

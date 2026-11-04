@@ -23,3 +23,15 @@ export const noStoreByDefault: MiddlewareHandler = async (context, next) => {
   await next();
   if (!context.res.headers.has("Cache-Control")) context.res.headers.set("Cache-Control", "no-store");
 };
+
+/** After answering where the platform can do that, so nobody waits on it, and otherwise before. */
+export async function afterResponse(context: Context, work: Promise<void>): Promise<void> {
+  let executionContext: Context["executionCtx"];
+  try {
+    executionContext = context.executionCtx;
+  } catch {
+    await work;
+    return;
+  }
+  executionContext.waitUntil(work);
+}

@@ -73,16 +73,26 @@ export const pageHeaders = (storybookOrigin?: string): MiddlewareHandler =>
  * preflight, which gets no CORS headers from here.
  */
 export function sameOriginWrites(allowedOrigin: (context: Context) => string): MiddlewareHandler {
+  const origin = sameOrigin(allowedOrigin);
+  return (context, next) =>
+    origin(context, async () => {
+      if (context.req.method !== "GET" && context.req.method !== "HEAD") {
+        const contentType = context.req.header("content-type")?.split(";")[0]?.trim();
+        if (context.req.header(REQUEST_HEADER) !== REQUEST_HEADER_VALUE || contentType !== "application/json") {
+          context.res = context.json(failure("bad-request-kind", "A change must come from the review page."), 403);
+          return;
+        }
+      }
+      await next();
+    });
+}
+
+/** Refuses a request from any origin but the one given. */
+export function sameOrigin(allowedOrigin: (context: Context) => string): MiddlewareHandler {
   return async (context, next) => {
     const origin = context.req.header("origin");
     if (origin !== undefined && origin !== allowedOrigin(context)) {
       return context.json(failure("bad-origin", "This server doesn't answer other sites."), 403);
-    }
-    if (context.req.method !== "GET" && context.req.method !== "HEAD") {
-      const contentType = context.req.header("content-type")?.split(";")[0]?.trim();
-      if (context.req.header(REQUEST_HEADER) !== REQUEST_HEADER_VALUE || contentType !== "application/json") {
-        return context.json(failure("bad-request-kind", "A change must come from the review page."), 403);
-      }
     }
     await next();
   };
@@ -142,7 +152,9 @@ function noteId(value: string): number {
 /** The routes under `/api`, which never answer with anything but JSON or an image. */
 export { failure };
 
-export function createReviewApi(source: ReviewSource): Hono {
+/** Given one source for a server's whole life, or a way to find the one a request is for. */
+export function createReviewApi(given: ReviewSource | ((context: Context) => Promise<ReviewSource>)): Hono {
+  const sourceOf = typeof given === "function" ? given : async () => given;
   const api = new Hono();
 
   api.onError((error, context) => {
@@ -155,19 +167,19 @@ export function createReviewApi(source: ReviewSource): Hono {
 
   api.use(noStoreByDefault);
 
-  api.get("/stories", async (context) => context.json(await source.storiesView()));
+  api.get("/stories", async (context) => context.json(await (await sourceOf(context)).storiesView()));
   api.post("/renders", async (context) => {
     const { stories } = await jsonBody(context);
     if (!Array.isArray(stories) || stories.length === 0 || stories.length > MAX_DECISION_TARGETS || !stories.every((story) => typeof story === "string" && story !== "")) {
       throw new BadRequest("stories must list the stories to render.");
     }
-    return context.json(await source.render(stories as string[]));
+    return context.json(await (await sourceOf(context)).render(stories as string[]));
   });
-  api.get("/renders/progress", async (context) => context.json({ progress: await source.renderProgress() }));
-  api.get("/batches/:batchId", async (context) => context.json(await source.batchView(context.req.param("batchId"))));
-  api.get("/batches/:batchId/context", async (context) => context.json(await source.batchContext(context.req.param("batchId"))));
+  api.get("/renders/progress", async (context) => context.json({ progress: await (await sourceOf(context)).renderProgress() }));
+  api.get("/batches/:batchId", async (context) => context.json(await (await sourceOf(context)).batchView(context.req.param("batchId"))));
+  api.get("/batches/:batchId/context", async (context) => context.json(await (await sourceOf(context)).batchContext(context.req.param("batchId"))));
   api.get("/batches/:batchId/unchanged", async (context) =>
-    context.json({ rows: await source.unchanged(context.req.param("batchId")) }),
+    context.json({ rows: await (await sourceOf(context)).unchanged(context.req.param("batchId")) }),
   );
 
   api.post("/batches/:batchId/decisions", async (context) => {
@@ -175,28 +187,28 @@ export function createReviewApi(source: ReviewSource): Hono {
     if (decision !== "approved" && decision !== "rejected") {
       throw new BadRequest('decision must be "approved" or "rejected".');
     }
-    return context.json(await source.decide(context.req.param("batchId"), decision, decisionTargets(renders)));
+    return context.json(await (await sourceOf(context)).decide(context.req.param("batchId"), decision, decisionTargets(renders)));
   });
 
-  api.get("/feedback", async (context) => context.json(await source.feedback()));
-  api.post("/notes", async (context) => context.json(await source.addNote(newNote(await jsonBody(context)))));
+  api.get("/feedback", async (context) => context.json(await (await sourceOf(context)).feedback()));
+  api.post("/notes", async (context) => context.json(await (await sourceOf(context)).addNote(newNote(await jsonBody(context)))));
   api.post("/notes/send", async (context) => {
     const { via } = await jsonBody(context);
     if (via !== "agent" && via !== "copy") throw new BadRequest('via must be "agent" or "copy".');
-    return context.json(await source.sendNotes(via));
+    return context.json(await (await sourceOf(context)).sendNotes(via));
   });
   api.post("/notes/:id/answers", async (context) => {
     const { text, batchId } = await jsonBody(context);
     if (typeof batchId !== "string") throw new BadRequest("batchId must name a batch.");
-    return context.json(await source.answerNote(noteId(context.req.param("id")), noteText(text), batchId));
+    return context.json(await (await sourceOf(context)).answerNote(noteId(context.req.param("id")), noteText(text), batchId));
   });
-  api.post("/notes/:id/resolve", async (context) => context.json(await source.resolveNote(noteId(context.req.param("id")))));
-  api.delete("/notes/:id", async (context) => context.json(await source.removeNote(noteId(context.req.param("id")))));
+  api.post("/notes/:id/resolve", async (context) => context.json(await (await sourceOf(context)).resolveNote(noteId(context.req.param("id")))));
+  api.delete("/notes/:id", async (context) => context.json(await (await sourceOf(context)).removeNote(noteId(context.req.param("id")))));
 
   api.get("/images/:hash", async (context) => {
     const hash = context.req.param("hash");
     if (!isImageHash(hash)) return context.json(failure("bad-image-hash", "That isn't an image hash."), 400);
-    const bytes = await source.image(hash);
+    const bytes = await (await sourceOf(context)).image(hash);
     return bytes === null ? context.json(failure("unknown-image", "This store doesn't hold that image."), 404) : imageResponse(context, bytes);
   });
 
@@ -210,17 +222,17 @@ export function createReviewApi(source: ReviewSource): Hono {
 
   api.get("/diffs/:current/:golden", async (context) => {
     const { current, golden } = context.req.param();
-    const result = await source.diff(current, golden);
-    if (result === null) return context.json(failure("unknown-image", "This store doesn't hold those images."), 404);
+    const diff = await (await sourceOf(context)).diffStats(current, golden);
+    if (diff === null) return context.json(failure("unknown-image", "This store doesn't hold those images."), 404);
     context.header("Cache-Control", CONTENT_ADDRESSED);
-    return context.json(result.diff);
+    return context.json(diff);
   });
 
   api.get("/diffs/:current/:golden/image", async (context) => {
     const { current, golden } = context.req.param();
-    const result = await source.diff(current, golden);
-    if (result === null) return context.json(failure("unknown-image", "This store doesn't hold those images."), 404);
-    return imageResponse(context, result.png);
+    const png = await (await sourceOf(context)).diffImage(current, golden);
+    if (png === null) return context.json(failure("unknown-image", "This store doesn't hold those images."), 404);
+    return imageResponse(context, png);
   });
 
   // Here rather than `notFound`, which a parent app's own routes would come before.
