@@ -814,7 +814,8 @@ describe("RenderBatches", () => {
           return plan
             .map(({ detail }) => String(detail))
             // Reading a statement's own VALUES or JSON list, or a one-row aggregate, is no table scan.
-            .filter((detail) => /\bSCAN\b/.test(detail) && !/\bSCAN (v|c|j|json_each|\d+ CONSTANT ROWS?|CONSTANT ROW)\b/.test(detail))
+            // The primary key by environment alone is every decision there, which the plan doesn't call a scan.
+            .filter((detail) => (/\bSCAN\b/.test(detail) && !/\bSCAN (v|c|j|json_each|\d+ CONSTANT ROWS?|CONSTANT ROW)\b/.test(detail)) || /USING PRIMARY KEY \(environment_key=\?\)/.test(detail))
             .map((detail) => `${detail} in ${text}`);
         });
         expect(seen.size).toBeGreaterThan(10);

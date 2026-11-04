@@ -95,6 +95,8 @@ D1's docs say a database runs one query at a time, so a batch this size holds up
 
 **Statement size.** A record statement holds 49 renders, limited by the 100 bound parameters, since each needs a story and either a hash or a failure. Its SQL is under 2,000 bytes, so the 100,000 byte limit is far off. `Sql` binds no nulls, so the column a row leaves empty is a literal in the statement.
 
+**Finding a decision by its image.** A decision's primary key starts with its commit, so a lookup by story and image needs `decisions_by_image`. With no statistics SQLite picks the primary key anyway, by environment alone, and calling that a `SEARCH` hides it from a check for scans. At 100,000 decisions a page of 500 renders took 2,080 ms that way and 0.8 ms with the index named, in one local run, and 0.7 ms at 499,800. `ANALYZE` also fixes the plan, but nothing runs it. Real D1 hasn't run `INDEXED BY`, so its plan there is unproven.
+
 **Request size.** A 10,000 render batch is 205 statements and 1.27 MB with 30 character story IDs, against the store's 2,000 statement batch (`store.rationale.md` → D1 REST adapter). 400 statements is a judgment call inside what was measured. A failure-heavy request grows with the 2,000 character limit, and at its worst, 400 statements of 49 failures at that length, would be about 39 MB. That size was not tested.
 
 **Page size.** Pages of 5,000 rows, at about 290 bytes a row and 1.44 MB a page, returned without trouble. No larger page was tested, and D1's docs state no limit on a response.

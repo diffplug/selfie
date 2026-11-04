@@ -114,9 +114,11 @@ const NAMED_BATCH_KEY = `(SELECT b.key FROM render_batches b
 
 // A story and image can have a decision per commit. What reads one without history in hand wants the
 // newest, latest first, and at the same moment a rejection, then by commit so that one row wins.
-const DECISION_ON_RENDER = `LEFT JOIN decisions d ON d.environment_key = r.environment_key AND d.story_key = rs.story_key
+// The index is named since SQLite, without statistics, picks the primary key, and so reads every decision
+// in the environment for every render: `docs/specs/renders.rationale.md` -> Finding a decision by its image.
+const DECISION_ON_RENDER = `LEFT JOIN decisions d INDEXED BY decisions_by_image ON d.environment_key = r.environment_key AND d.story_key = rs.story_key
   AND d.image_key = rs.image_key
-  AND NOT EXISTS (SELECT 1 FROM decisions n
+  AND NOT EXISTS (SELECT 1 FROM decisions n INDEXED BY decisions_by_image
     WHERE n.environment_key = d.environment_key AND n.story_key = d.story_key AND n.image_key = d.image_key
       AND (n.decided_at, n.rejected, n.commit_key) > (d.decided_at, d.rejected, d.commit_key))
 LEFT JOIN actors a ON a.key = d.actor_key`;
@@ -187,7 +189,7 @@ WHERE r.id = ?1 AND ${CAN_BE_GOLDENS}
         LEFT JOIN renders gs ON gs.batch_key = ${GOLDENS_BATCH_KEY} AND gs.story_key = rs.story_key
         WHERE rs.batch_key = r.key AND gs.image_key IS NOT rs.image_key
           AND NOT EXISTS (
-            SELECT 1 FROM decisions d
+            SELECT 1 FROM decisions d INDEXED BY decisions_by_image
             WHERE d.environment_key = r.environment_key AND d.story_key = rs.story_key
               AND d.image_key = rs.image_key AND d.rejected = 0
           )
