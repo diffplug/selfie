@@ -47,7 +47,7 @@ Source of truth: `cli/src/index.ts`; tests in `cli/test/library.test.ts`.
 |---|---|
 | `openProject({ cwd, env })` | The repository's `Project`: its `repo`, `directory`, `renders`, `notes`, `store`, `renders`, and `close()` |
 | `renderBatch(project, options)` | Returns a `RenderBatchResult`: the `batch`, `dirtyPaths`, `warnings`, and `timings` |
-| `review(project, options)` | `options` is a `batch`, or what `renderBatch` takes. Returns a `ReviewResult`: the `comparison`, `reviewed`, `given`, `dirtyPaths`, `differences`, `playErrors`, `warnings`, and `timings` |
+| `review(project, options)` | `options` is a `batch`, or what `renderBatch` takes. Returns a `ReviewResult`: the `comparison`, `given`, `dirtyPaths`, `differences`, `playErrors`, `warnings`, and `timings` |
 | `decide(project, { batchId, decision, actor, stories })` | `stories` is `"all"`, patterns, or `{ targets }`: exact stories and image hashes, for a caller that showed them, refused whole with `stale-decision` if any isn't a changed or new image the batch holds. Returns `decided`, `skipped`, `unmatchedPatterns`, and the `comparison` after it. It compares twice, and reads unchanged rows only for patterns |
 | `summarizeBatch(comparison)` | Returns `blockers`, `advisories`, `counts`, `undecided`, `unapproved`, `failed`, `removed`, and `notRendered` |
 | `isDecidable(state)` | Whether a render in this state can take a decision: `changed` or `added`. Defined in `selfie-store` |

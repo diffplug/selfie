@@ -297,7 +297,7 @@ export function DetailScreen({
         />
       )}
       {comparedWithNote ? (
-        <Banner variant="info" title="Compared with the image when noted" description="This story has no golden, so what's shown is what's changed since its newest note. Approving lets this image become its first golden." />
+        <Banner variant="info" title="Compared with the image when noted" description="Nothing has been approved for this story yet, so what's shown is what's changed since its newest note. Approving makes this image what later batches compare with." />
       ) : (
         <Notes row={row} diff={diff} renamedFrom={renames.get(row.story)} renamedTo={[...renames].find(([, from]) => from === row.story)?.[0]} />
       )}

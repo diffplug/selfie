@@ -84,7 +84,7 @@ On a hosted Storybook's own origin (`docs/specs/access.md` → Local review serv
 - **Must give a kept built Storybook's files `Cache-Control: private, max-age=31536000, immutable`**, since a kept built Storybook never changes, and the directory as it stands `no-store`, since a rebuild does.
 - **Must refuse an image hash that isn't 64 lowercase hex digits before it reaches the store.**
 - **Must give images, diff images, and diff stats `Cache-Control: private, max-age=31536000, immutable`**, since all are addressed by content (`docs/specs/access.md` → Local review server), and every other API answer `no-store`.
-- **Must decide on exactly the images a request names, or none:** the library's `decide` refuses with `stale-decision` if any named story and hash isn't a changed or new image of that batch, and takes the names exactly, never as patterns (rationale).
+- **Must decide on exactly the images a request names, or none:** the library's `decide` refuses with `stale-decision` if any named story and hash isn't a changed or added image of that batch, or a null hash a removed story of it, and takes the names exactly, never as patterns (rationale).
 - **Must refuse a bulk request no differently from a single one.** Nothing on the server knows "all": the client sends what it showed.
 - **Must compare a batch at most twice for a decision, and once for anything else**, never reading unchanged rows unless a route asks for them.
 - **Must serve any page but `/assets/*` and `/api/*` as the client's one document**, with `no-store`, and a missing asset as 404.

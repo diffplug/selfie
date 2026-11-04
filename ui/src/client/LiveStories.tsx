@@ -107,7 +107,7 @@ export function LiveStories({ row, view, open, onToggle }: { row: RenderRow; vie
       {open && (
         <>
           <Text as="p" className="selfie-muted">
-            These batch for real, so time and animation aren&apos;t frozen as they are in an image. Once you click in one, keys go to the story.
+            These run for real, so time and animation aren&apos;t frozen as they are in an image. Once you click in one, keys go to the story.
             {view.viewport === null && " This batch didn't record the size it rendered at, so these may lay out differently."}
           </Text>
           <div className="selfie-live-sides">
