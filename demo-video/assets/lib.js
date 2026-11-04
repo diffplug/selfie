@@ -8,6 +8,17 @@
     return (t) => t * k;
   }
 
+  /**
+   * When a scene's narration says a word, in seconds within the scene. nth counts repeats of it.
+   * Pass after: true for when the word ends. An unknown word is an error, so a beat can't silently come loose.
+   */
+  function say(id, word, { nth = 0, after = false } = {}) {
+    const plain = word.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const hit = window.SCENE_WORDS[id].filter(([w]) => w === plain)[nth];
+    if (!hit) throw new Error(`Scene ${id} never says "${word}"`);
+    return after ? hit[2] : hit[1];
+  }
+
   /** Seeded, so every render is identical. */
   function rand(seed) {
     let s = seed >>> 0;
@@ -249,7 +260,7 @@
   const DAMAGED = [[0, -6], [3, 8], [4, -4], [5, 7]];
   const COLD_ROBOT = { scale: 1.6, x: FORM_BUTTON.x - 347 * 1.6, y: FORM_BUTTON.y - 248 * 1.6 };
 
-  window.S = { clock, rand, html, card, photo, robot, hand, cloud, appWindow, appPos, rowPos, gridPos, place, ringAt, swing, gasp, blink, flash, ticker, FORM_BUTTON, begin, grid, rowLabels, FRAMED, framedCell, storybookFrame, camera, rocket, plane, selfiePhoto, DAMAGED, COLD_ROBOT, HAMMER, KIND_ORDER, STATES, INK, PINK, CORAL, TEAL, BLUE, ORANGE, SUN, GREY };
+  window.S = { clock, say, rand, html, card, photo, robot, hand, cloud, appWindow, appPos, rowPos, gridPos, place, ringAt, swing, gasp, blink, flash, ticker, FORM_BUTTON, begin, grid, rowLabels, FRAMED, framedCell, storybookFrame, camera, rocket, plane, selfiePhoto, DAMAGED, COLD_ROBOT, HAMMER, KIND_ORDER, STATES, INK, PINK, CORAL, TEAL, BLUE, ORANGE, SUN, GREY };
 })();
 
 (function () {

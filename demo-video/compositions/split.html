@@ -9,6 +9,7 @@
   <script>
     (() => {
       const { tl, at, stage } = S.begin("split", 6.8);
+      const w = (word, o) => S.say("split", word, o);
       const win = S.appWindow(stage, "split-window");
       const cards = S.KIND_ORDER.map((k, i) => { const c = S.card(stage, k); S.place(c, S.appPos(i)); return c; });
 
@@ -26,17 +27,17 @@
       tl.to(r.el, { y: -700, duration: 0.42, ease: "power3.in" }, at(0.1));
 
       // The window lifts off, and the pieces take their places one by one.
-      tl.to(win, { y: -950, duration: 0.55, ease: "power3.in" }, at(1.0));
+      tl.to(win, { y: -950, duration: 0.5, ease: "power3.in" }, w("took"));
       S.KIND_ORDER.forEach((k, c) => {
-        const p = S.rowPos(c), t = at(1.2 + c * 0.5);
+        const p = S.rowPos(c), t = w("every") + c * 0.34;
         tl.to(cards[c], { x: p.x, scale: p.scale, duration: 0.85, ease: "power3.inOut" }, t);
         tl.to(cards[c], { y: p.y, duration: 0.85, ease: "back.inOut(1.2)" }, t);
       });
 
       // The finished row answers with one wave.
       S.KIND_ORDER.forEach((k, c) => {
-        tl.to(cards[c], { y: S.rowPos(c).y - 26, duration: 0.16, ease: "power2.out" }, at(5.2 + c * 0.09));
-        tl.to(cards[c], { y: S.rowPos(c).y, duration: 0.3, ease: "bounce.out" }, at(5.2 + c * 0.09) + 0.16);
+        tl.to(cards[c], { y: S.rowPos(c).y - 26, duration: 0.16, ease: "power2.out" }, w("next") + c * 0.09);
+        tl.to(cards[c], { y: S.rowPos(c).y, duration: 0.3, ease: "bounce.out" }, w("next") + c * 0.09 + 0.16);
       });
       window.__timelines["split"] = tl;
     })();

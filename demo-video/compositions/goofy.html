@@ -9,6 +9,7 @@
   <script>
     (() => {
       const { tl, at, stage } = S.begin("goofy", 7.8);
+      const w = (word, o) => S.say("goofy", word, o);
       const kinds = ["chart", "form", "profile", "list", "stat", "tabs"];
       const r = S.robot(stage, { id: "goofy-robot", prop: "phone", scale: 2.2 });
       gsap.set(r.el, { x: 20, y: 130 });
@@ -47,11 +48,11 @@
       });
 
       // The numbers land last.
-      [["$0 per image", 1020, 3.2, "var(--ink)"], ["541 stories", 1020, 5.4, "var(--pink)"], ["~70 s", 1490, 6.3, "var(--pink)"]].forEach(([text, x, t, bg], i) => {
+      [["$0 per image", 1020, w("paying"), "var(--ink)"], ["541 stories", 1020, w("541"), "var(--pink)"], ["~70 s", 1490, w("70"), "var(--pink)"]].forEach(([text, x, t, bg], i) => {
         const y = i === 0 ? 610 : 730;
         const n = S.html(stage, `<div class="tag display" style="font-size:78px;padding:14px 30px 18px;background:${bg};color:${bg.includes("ink") ? "#fff" : "var(--ink)"}">${text}</div>`);
         gsap.set(n, { x, y, opacity: 0, scale: 1.2, transformOrigin: "0 50%" });
-        tl.to(n, { opacity: 1, scale: 1, duration: 0.3, ease: "expo.out" }, at(t));
+        tl.to(n, { opacity: 1, scale: 1, duration: 0.3, ease: "expo.out" }, t);
       });
       window.__timelines["goofy"] = tl;
     })();

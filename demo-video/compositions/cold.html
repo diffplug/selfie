@@ -9,6 +9,7 @@
   <script>
     (() => {
       const { tl, at, stage } = S.begin("cold", 6.4);
+      const w = (word, o) => S.say("cold", word, o);
       const cam = S.html(stage, `<div class="abs" style="width:1920px;height:1080px"></div>`);
       S.appWindow(cam, "cold-window");
       const cards = S.KIND_ORDER.map((k, i) => { const c = S.card(cam, k); S.place(c, S.appPos(i)); return c; });
@@ -17,20 +18,21 @@
       // The hand points at the button.
       const hand = S.hand(cam, "cold-hand");
       tl.fromTo(hand, { x: hit.x + 330, y: 1120 }, { x: hit.x, y: hit.y, duration: 0.8, ease: "expo.out" }, at(0.15));
-      tl.to(hand, { y: hit.y + 16, duration: 0.09, ease: "power2.in" }, at(1.05));
-      tl.to(hand, { y: hit.y, duration: 0.2, ease: "power2.out" }, at(1.14));
+      tl.to(hand, { y: hit.y + 16, duration: 0.09, ease: "power2.in" }, w("button"));
+      tl.to(hand, { y: hit.y, duration: 0.2, ease: "power2.out" }, w("button") + 0.09);
 
       // The robot drops in, and the hand gets out of the way.
       const r = S.robot(cam, { id: "cold-robot", prop: "hammer", scale: S.COLD_ROBOT.scale });
       gsap.set(r.armR, { rotation: -60 });
       const { x: rx, y: ry } = S.COLD_ROBOT;
-      tl.fromTo(r.el, { x: rx, y: -620 }, { x: rx, y: ry, duration: 0.5, ease: "power3.in" }, at(1.5));
-      tl.set(r.el, { scaleY: 0.88, transformOrigin: "50% 100%" }, at(1.5) + 0.5);
-      tl.to(r.el, { scaleY: 1, duration: 0.5, ease: "elastic.out(1, 0.45)" }, at(1.5) + 0.501);
-      tl.to(hand, { x: hit.x + 420, y: 1160, duration: 0.45, ease: "power3.in" }, at(1.9));
+      const drop = w("button") + 0.3;
+      tl.fromTo(r.el, { x: rx, y: -620 }, { x: rx, y: ry, duration: 0.5, ease: "power3.in" }, drop);
+      tl.set(r.el, { scaleY: 0.88, transformOrigin: "50% 100%" }, drop + 0.5);
+      tl.to(r.el, { scaleY: 1, duration: 0.5, ease: "elastic.out(1, 0.45)" }, drop + 0.501);
+      tl.to(hand, { x: hit.x + 420, y: 1160, duration: 0.45, ease: "power3.in" }, drop + 0.35);
 
       // Three strikes. The third reaches panels nowhere near the button.
-      const strikes = [at(2.7), at(3.15), at(3.6)];
+      const strikes = [w("unforeseen") - 0.9, w("unforeseen") - 0.45, w("unforeseen")];
       strikes.forEach((t) => {
         S.swing(tl, r.armR, t, { rest: -60 });
         S.ringAt(tl, cam, hit.x, hit.y, t, { size: 300, color: S.ORANGE, dur: 0.35 });
@@ -46,9 +48,9 @@
       });
 
       // The robot is delighted. It hasn't looked over there yet, and then it does.
-      S.blink(tl, r, at(4.6));
-      tl.to(r.head, { rotation: 16, duration: 0.3, ease: "power2.inOut" }, at(5.2));
-      S.gasp(tl, r, at(5.5));
+      S.blink(tl, r, w("consequences") - 0.1);
+      tl.to(r.head, { rotation: 16, duration: 0.3, ease: "power2.inOut" }, w("consequences") + 0.15);
+      S.gasp(tl, r, w("consequences") + 0.45);
       window.__timelines["cold"] = tl;
     })();
   </script>

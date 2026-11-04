@@ -9,6 +9,7 @@
   <script>
     (() => {
       const { tl, at, stage } = S.begin("start", 7.2);
+      const w = (word, o) => S.say("start", word, o);
       S.html(stage, `<div class="abs" style="left:0;top:800px;width:1920px;height:280px;background:#9fbd8f;border-top:7px solid var(--ink)" data-layout-ignore></div>`);
       const rk = S.rocket(stage, "start-rocket", 1.0);
       gsap.set(rk.el, { x: 1420, y: 72 });
@@ -17,11 +18,11 @@
       // The URL lands first.
       const url = S.html(stage, `<div class="abs display" style="font-size:150px">selfie.dev</div>`);
       gsap.set(url, { x: 110, y: 90, opacity: 0 });
-      tl.to(url, { opacity: 1, duration: 0.14 }, at(5.9));
-      tl.fromTo(url, { scale: 1.12, transformOrigin: "0 50%" }, { scale: 1, duration: 0.4, ease: "expo.out", immediateRender: false }, at(5.9));
+      tl.to(url, { opacity: 1, duration: 0.14 }, w("selfiedev"));
+      tl.fromTo(url, { scale: 1.12, transformOrigin: "0 50%" }, { scale: 1, duration: 0.4, ease: "expo.out", immediateRender: false }, w("selfiedev"));
       const local = S.html(stage, `<div class="tag" style="font-size:52px">works locally, right now</div>`);
       gsap.set(local, { x: 120, y: 270, opacity: 0 });
-      tl.to(local, { opacity: 1, duration: 0.16 }, at(3.4));
+      tl.to(local, { opacity: 1, duration: 0.16 }, w("locally"));
 
       // A desk, a clipboard, and robots lining up to sign.
       S.html(stage, `<div class="abs" style="left:980px;top:700px;width:240px;height:120px;background:var(--orange);border:7px solid var(--ink);border-radius:10px" data-layout-ignore></div>`);

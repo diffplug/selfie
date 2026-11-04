@@ -9,12 +9,13 @@
   <script>
     (() => {
       const { tl, at, stage } = S.begin("chromatic", 6.6);
+      const w = (word, o) => S.say("chromatic", word, o);
       const cl = S.cloud(stage, "chromatic-cloud", 1680);
       gsap.set(cl, { x: 120, y: -70, transformOrigin: "50% 50%" });
       tl.fromTo(cl, { scale: 0.86 }, { scale: 1, duration: 0.55, ease: "back.out(1.5)" }, 0);
       const title = S.html(stage, `<div class="abs display" style="font-size:96px">Chromatic</div>`);
       gsap.set(title, { x: 330, y: 330, opacity: 0 });
-      tl.fromTo(title, { filter: "blur(8px)", opacity: 0 }, { filter: "blur(0px)", opacity: 1, duration: 0.2, ease: "power4.out" }, at(0.2));
+      tl.fromTo(title, { filter: "blur(8px)", opacity: 0 }, { filter: "blur(0px)", opacity: 1, duration: 0.2, ease: "power4.out" }, w("chromatic"));
 
       const belt = S.html(stage, `<div class="abs" style="width:1920px;height:26px;background:var(--ink);border-radius:8px"></div>`);
       gsap.set(belt, { y: 754 });

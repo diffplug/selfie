@@ -9,6 +9,7 @@
   <script>
     (() => {
       const { tl, at, stage } = S.begin("reveal", 8.2);
+      const w = (word, o) => S.say("reveal", word, o);
       const flood = S.html(stage, `<div class="flash" style="opacity:1"></div>`);
       const word = S.html(stage, `<div class="abs" style="left:110px;top:150px;font-size:280px;white-space:nowrap" data-layout-allow-overlap></div>`);
       // The brand's gradient runs across the whole word, so each letter shows its own slice of it.
@@ -26,27 +27,34 @@
       const cloud = S.html(stage, `<div class="tag" style="font-size:56px;padding:12px 30px 16px;background:var(--pink);color:var(--ink)">and in the cloud</div>`);
       gsap.set(local, { x: 120, y: 540, opacity: 0 });
       gsap.set(cloud, { x: 370, y: 540, opacity: 0 });
-      tl.fromTo(local, { y: 570 }, { y: 540, duration: 0.3, ease: "expo.out" }, at(3.2));
-      tl.to(local, { opacity: 1, duration: 0.1 }, at(3.2));
-      tl.fromTo(cloud, { y: 570 }, { y: 540, duration: 0.3, ease: "expo.out" }, at(3.75));
-      tl.to(cloud, { opacity: 1, duration: 0.1 }, at(3.75));
+      tl.fromTo(local, { y: 570 }, { y: 540, duration: 0.3, ease: "expo.out", immediateRender: false }, w("locally"));
+      tl.to(local, { opacity: 1, duration: 0.1 }, w("locally"));
+      tl.fromTo(cloud, { y: 570 }, { y: 540, duration: 0.3, ease: "expo.out", immediateRender: false }, w("cloud") - 0.2);
+      tl.to(cloud, { opacity: 1, duration: 0.1 }, w("cloud") - 0.2);
 
       // The robot lifts the phone and takes its own picture.
       const r = S.robot(stage, { id: "reveal-robot", prop: "phone", scale: 2.4 });
       gsap.set(r.el, { x: 1120, y: 110 });
       gsap.set(r.armR, { rotation: -34 });
       gsap.set(r.prop, { rotation: 34 });
-      tl.to(r.armR, { rotation: -128, duration: 0.5, ease: "back.out(1.6)" }, at(4.7));
-      tl.to(r.prop, { rotation: 128, duration: 0.5, ease: "power2.out" }, at(4.7));
-      tl.to(r.head, { rotation: 10, duration: 0.3, ease: "power2.inOut" }, at(5.25));
-      S.blink(tl, r, at(5.75));
+      // It waves through the introduction, in no hurry.
+      tl.to(r.armL, { rotation: 168, duration: 0.3, ease: "back.out(2)" }, w("selfiedev") + 0.5);
+      [0, 1, 2, 3].forEach((n) => tl.to(r.armL, { rotation: n % 2 ? 168 : 148, duration: 0.2, ease: "power1.inOut" }, w("selfiedev") + 0.8 + n * 0.2));
+      tl.to(r.armL, { rotation: 0, duration: 0.3, ease: "power2.inOut" }, w("snapshot") + 0.1);
+      S.blink(tl, r, w("testing"));
+      tl.to(r.head, { rotation: -7, duration: 0.3, ease: "power2.inOut" }, w("tool") - 0.1);
+      S.blink(tl, r, w("locally") + 0.2);
+      tl.to(r.armR, { rotation: -128, duration: 0.5, ease: "back.out(1.6)" }, w("your") - 0.1);
+      tl.to(r.prop, { rotation: 128, duration: 0.5, ease: "power2.out" }, w("your") - 0.1);
+      tl.to(r.head, { rotation: 10, duration: 0.3, ease: "power2.inOut" }, w("takes") - 0.1);
+      S.blink(tl, r, w("own") - 0.05);
       const white = S.html(stage, `<div class="flash"></div>`);
-      S.flash(tl, white, at(6.05), 0.85);
+      S.flash(tl, white, w("picture"), 0.85);
 
       // There it is.
       const pic = S.selfiePhoto(stage, "form", { tilt: 10 });
       gsap.set(pic, { x: 610, y: 620, scale: 0, rotation: -24, transformOrigin: "50% 50%" });
-      tl.to(pic, { scale: 1.0, rotation: -6, duration: 0.5, ease: "back.out(1.5)" }, at(6.15));
+      tl.to(pic, { scale: 1.0, rotation: -6, duration: 0.45, ease: "back.out(1.5)" }, w("picture") + 0.08);
       gsap.set(pic, { y: 650 });
       window.__timelines["reveal"] = tl;
     })();

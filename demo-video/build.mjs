@@ -1,6 +1,9 @@
-// Generates index.html, compositions/captions.html and subtitles.srt from SCRIPT.md and scenes.json.
-// SCRIPT.md owns the words, scenes.json owns the timing, compositions/<id>.html owns the pictures.
+// Generates index.html, compositions/captions.html and the subtitle files from SCRIPT.md, scenes.json and the voiceover.
+// SCRIPT.md owns the words, the voiceover's timing file owns when they happen, compositions/<id>.html owns the pictures.
 import { readFileSync, writeFileSync } from "node:fs";
+
+const AUDIO = "assets/narration.mp3";
+const LEAD_IN = 0.08; // A scene's picture arrives just before its first word.
 
 const { scenes } = JSON.parse(readFileSync("scenes.json", "utf8"));
 const lines = readFileSync("SCRIPT.md", "utf8").split("\n").map((l) => l.trim());
@@ -9,13 +12,34 @@ if (narration.length !== scenes.length) {
   throw new Error(`SCRIPT.md has ${narration.length} paragraphs, scenes.json has ${scenes.length}`);
 }
 
-let clock = 0;
+// The timing file spells some words its own way, so compare them in a plain form.
+const plain = (w) => w.toLowerCase().replace(/[^a-z0-9]/g, "");
+const SPOKEN_AS = { storybookjs: ["storybook", "js"], 8: ["eight"] };
+const spoken = JSON.parse(readFileSync("assets/narration-timing.json", "utf8"))
+  .segments.flatMap((s) => s.words)
+  .filter((w) => w.text.trim())
+  .map((w) => ({ word: plain(w.text), start: w.start_time, end: w.end_time }));
+
+// Each word of the script takes its time from what the voice said, and a difference is an error.
+let cursor = 0;
+function timeWord(text) {
+  const expected = SPOKEN_AS[plain(text)] ?? [plain(text)];
+  const said = spoken.slice(cursor, cursor + expected.length);
+  if (said.map((w) => w.word).join(" ") !== expected.join(" ")) {
+    throw new Error(`SCRIPT.md says "${text}", but the voiceover says "${said.map((w) => w.word).join(" ")}" at ${said[0]?.start} s. Regenerate the audio, or make the script match it.`);
+  }
+  cursor += expected.length;
+  return { text, start: said[0].start, end: said.at(-1).end };
+}
+const wordsByScene = narration.map((paragraph) => paragraph.split(/\s+/).map(timeWord));
+if (cursor !== spoken.length) throw new Error(`The voiceover goes on after SCRIPT.md ends, at "${spoken[cursor].word}".`);
+
 const timed = scenes.map((s, i) => {
-  const out = { ...s, start: +clock.toFixed(3), hold: s.hold ?? 0.35, text: narration[i] };
-  clock += s.dur;
-  return out;
+  const start = i === 0 ? 0 : wordsByScene[i][0].start - LEAD_IN;
+  const end = i + 1 < scenes.length ? wordsByScene[i + 1][0].start - LEAD_IN : wordsByScene[i].at(-1).end + (s.hold ?? 0.35);
+  return { id: s.id, start: +start.toFixed(3), dur: +(end - start).toFixed(3), words: wordsByScene[i], text: narration[i] };
 });
-const total = +clock.toFixed(3);
+const total = +(timed.at(-1).start + timed.at(-1).dur).toFixed(3);
 
 const MAX_CHARS = 58;
 const MIN_CLAUSE = 24;
@@ -52,18 +76,18 @@ function groupsOf(text) {
   });
 }
 
-// Estimated timing: each group gets a share of its scene's spoken time by character count.
-const captions = timed.flatMap((s) => {
-  const groups = groupsOf(s.text);
-  const chars = groups.reduce((n, g) => n + g.length, 0);
-  const spoken = s.dur - s.hold - 0.15;
-  let at = s.start + 0.15;
-  return groups.map((text) => {
-    const duration = (spoken * text.length) / chars;
-    const c = { text, start: +at.toFixed(3), duration: +duration.toFixed(3) };
-    at += duration;
-    return c;
-  });
+// A subtitle opens on its first word and stays until the next one opens, unless the voice pauses for long.
+const MAX_LINGER = 0.5;
+const flat = timed.flatMap((s) => groupsOf(s.text).reduce((out, text) => {
+  const count = text.split(" ").length, from = out.used;
+  out.groups.push({ text, first: s.words[from], last: s.words[from + count - 1] });
+  out.used += count;
+  return out;
+}, { groups: [], used: 0 }).groups);
+const captions = flat.map((g, i) => {
+  const next = flat[i + 1]?.first.start ?? Infinity;
+  const until = Math.min(next, g.last.end + MAX_LINGER);
+  return { text: g.text, start: +g.first.start.toFixed(3), duration: +(until - g.first.start).toFixed(3) };
 });
 
 const esc = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;");
@@ -73,6 +97,8 @@ const hosts = timed
   )
   .join("\n");
 const durations = Object.fromEntries(timed.map((s) => [s.id, s.dur]));
+// What each scene's words are, at what time within the scene, so a beat can land on the word that names it.
+const spokenInScene = Object.fromEntries(timed.map((s) => [s.id, s.words.map((w) => [plain(w.text), +(w.start - s.start).toFixed(3), +(w.end - s.start).toFixed(3)])]));
 
 writeFileSync(
   "index.html",
@@ -84,13 +110,14 @@ writeFileSync(
     <meta name="viewport" content="width=1920, height=1080" />
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
     <link rel="stylesheet" href="assets/style.css" />
-    <script>window.SCENE_DURATIONS = ${JSON.stringify(durations)};</script>
+    <script>window.SCENE_DURATIONS = ${JSON.stringify(durations)}; window.SCENE_WORDS = ${JSON.stringify(spokenInScene)};</script>
     <script src="assets/lib.js"></script>
   </head>
   <body>
     <div id="root" data-composition-id="main" data-start="0" data-duration="${total}" data-width="1920" data-height="1080">
 ${hosts}
       <div id="captions" data-composition-id="captions" data-composition-src="compositions/captions.html" data-start="0" data-duration="${total}" data-track-index="2" data-track-kind="captions" data-width="1920" data-height="1080"></div>
+      <audio id="narration" src="${AUDIO}" data-start="0" data-track-index="3" data-volume="1"></audio>
     </div>
     <script>
       window.__timelines["main"] = gsap.timeline({ paused: true });
@@ -127,15 +154,15 @@ ${captions
 `,
 );
 
-const stamp = (t) => {
+const stamp = (t, sep) => {
   const ms = Math.round(t * 1000);
   const p = (n, w = 2) => String(n).padStart(w, "0");
-  return `${p(Math.floor(ms / 3600000))}:${p(Math.floor(ms / 60000) % 60)}:${p(Math.floor(ms / 1000) % 60)},${p(ms % 1000, 3)}`;
+  return `${p(Math.floor(ms / 3600000))}:${p(Math.floor(ms / 60000) % 60)}:${p(Math.floor(ms / 1000) % 60)}${sep}${p(ms % 1000, 3)}`;
 };
-writeFileSync(
-  "subtitles.srt",
-  captions.map((c, i) => `${i + 1}\n${stamp(c.start)} --> ${stamp(c.start + c.duration)}\n${c.text}\n`).join("\n"),
-);
+const cues = (sep) => captions.map((c) => `${stamp(c.start, sep)} --> ${stamp(c.start + c.duration, sep)}\n${c.text}\n`);
+writeFileSync("subtitles.srt", cues(",").map((c, i) => `${i + 1}\n${c}`).join("\n"));
+writeFileSync("subtitles.vtt", `WEBVTT\n\n${cues(".").join("\n")}`);
 
+for (const s of timed) console.log(`${s.id.padEnd(10)} ${s.start.toFixed(2).padStart(7)}  ${s.dur.toFixed(2).padStart(6)} s`);
 const words = narration.join(" ").split(/\s+/).length;
 console.log(`${scenes.length} scenes, ${captions.length} captions, ${words} words, ${total.toFixed(1)} s (${((words / total) * 60).toFixed(0)} wpm)`);

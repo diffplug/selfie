@@ -9,6 +9,7 @@
   <script>
     (() => {
       const { tl, at, stage } = S.begin("approvals", 6);
+      const w = (word, o) => S.say("approvals", word, o);
       const nodes = [[370, 760], [880, 760], [1390, 450]];
       S.html(stage, `<svg class="prop" width="1920" height="1080" viewBox="0 0 1920 1080" data-layout-ignore>
         <path d="M60 450 H1860" stroke="${S.GREY}" stroke-width="20"/><path d="M60 450 H1860" stroke="${S.INK}" stroke-width="6" stroke-dasharray="1"/>
@@ -30,14 +31,14 @@
       const above = ([x, y]) => ({ x: x - 141, y: y - 300 });
       gsap.set(pic, { ...above(nodes[0]), scale: 1 });
       gsap.set(stamp, { opacity: 0, scale: 2.2, rotation: -18, transformOrigin: "50% 50%" });
-      tl.to(stamp, { opacity: 1, scale: 1, duration: 0.16, ease: "power4.in" }, at(0.75));
-      tl.to(pic, { y: above(nodes[0]).y + 10, duration: 0.06 }, at(0.91));
-      tl.to(pic, { y: above(nodes[0]).y, duration: 0.2, ease: "power2.out" }, at(0.97));
+      tl.to(stamp, { opacity: 1, scale: 1, duration: 0.16, ease: "power4.in" }, w("follow") - 0.1);
+      tl.to(pic, { y: above(nodes[0]).y + 10, duration: 0.06 }, w("follow") + 0.06);
+      tl.to(pic, { y: above(nodes[0]).y, duration: 0.2, ease: "power2.out" }, w("follow") + 0.12);
 
       // It rides along history, and the stamp never comes off.
-      const reach = [2.75, 3.6, 4.45];
+      const reach = [w("commit"), w("rebase"), w("merge")];
       nodes.forEach(([x, y], i) => {
-        const t = at(reach[i]);
+        const t = reach[i];
         if (i) {
           tl.to(pic, { x: above(nodes[i]).x, duration: 0.6, ease: "power2.inOut" }, t - 0.5);
           tl.to(pic, { y: above(nodes[i]).y - 40, duration: 0.3, ease: "power2.out" }, t - 0.5);
