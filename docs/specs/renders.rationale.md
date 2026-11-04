@@ -24,7 +24,7 @@
 
 **A batch's facts in columns.** `selfie review` first kept whether a tree was dirty, its baseline, and its play errors in a file beside the exported images. Pruning that file lost them, and with them the rule that a dirty batch can't become goldens, so a UI, or anyone else calling `acceptBatch`, wasn't bound by it. They became columns while no store held this data, which is why this table could still change: see `docs/specs/store.md` → Open questions for the next time.
 
-**Not yet run on real D1.** The three new columns on `render_batches`, the longest statement of failures, and `firstWithGoldens` are in the contract suite, and pass on local SQLite through the same `Sql` limits. The batch on real D1 wasn't made when they went in, so their fit there is unproven, and the suite's size of about 90 requests is counted from the code rather than measured. A statement of 33 renders with both messages at their 2,000 characters binds about 132 KB, which is the case to watch.
+**Not yet run on real D1.** The three new columns on `render_batches`, the longest statement of failures, and `firstWithGoldens` are in the contract suite, and pass on local SQLite through the same `Sql` limits. The batch on real D1 wasn't made when they went in, so their fit there is unproven, and the suite's size of about 90 requests is counted from the code rather than measured. A statement of 49 failures at their 2,000 characters binds about 100 KB, which is the case to watch.
 
 **Windows in columns.** The image's size can't say what window a story laid out in, since a full-page image may be taller or wider than its window, and neither can the environment's ID, which is a hash. On the batch beside `scale`, since it's the same kind of fact. A story's own on its render, empty for nearly every row, so sync and reuse carry it with the row. This costs 2 bytes a row and replaced two tables that didn't sync, and left a cloud batch unable to size a live story.
 
@@ -93,7 +93,7 @@
 
 D1's docs say a database runs one query at a time, so a batch this size holds up others for as long as it runs. No test measured concurrent load. `acceptBatch` against a baseline also reads both sides to count removals, which this batch didn't measure.
 
-**Statement size.** A record statement holds 49 renders, limited by the 100 bound parameters, since each needs a story and either a hash or a failure. Its SQL is under 2,000 bytes, so the 100,000 byte limit is far off. `Sql` binds no nulls, so the column a row leaves empty is a literal in the statement.
+**Statement size.** A record statement holds 49 renders as one JSON parameter, which is what the 100 bound parameters allowed when each took a story and either a hash or a failure, so a request stays the size that was measured. JSON can also say null, which a bound parameter here can't, and its SQL is one constant string. At its worst, 49 failures at 2,000 characters, the parameter is about 100 KB of ASCII, and hasn't run on real D1.
 
 **Finding a decision by its image.** A decision's primary key starts with its commit, so a lookup by story and image needs `decisions_by_image`. With no statistics SQLite picks the primary key anyway, by environment alone, and calling that a `SEARCH` hides it from a check for scans. At 100,000 decisions a page of 500 renders took 2,080 ms that way and 0.8 ms with the index named, in one local run, and 0.7 ms at 499,800. `ANALYZE` also fixes the plan, but nothing runs it. Real D1 hasn't run `INDEXED BY`, so its plan there is unproven.
 

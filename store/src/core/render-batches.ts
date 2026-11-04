@@ -1,6 +1,7 @@
 import { chunks, STATEMENTS_PER_REQUEST } from "./chunks.ts";
+import { missingImages } from "./hash-keys.ts";
 import { assertImageHash } from "./image-hash.ts";
-import type { Sql, SqlParam, SqlRow, SqlStatement } from "./sql.ts";
+import type { Sql, SqlRow, SqlStatement } from "./sql.ts";
 
 /**
  * The tables behind `RenderBatches`, which `initStoreSchema` creates. Anything repeated across a great
@@ -66,13 +67,9 @@ export const CREATE_BATCH_TABLES: readonly string[] = [
 ) WITHOUT ROWID`,
 ];
 
-// These fit the limit of 100 bound parameters per statement, beside what all of a statement's
-// rows share. A recorded render takes two, one more with both an image and a failure, and two
-// more with a viewport of its own, so a statement holds 49 when none has either, and at least 19.
-const MAX_RECORD_PARAMS = 100;
-const RENDERS_PER_DECISION_STATEMENT = 47;
-// As one bound parameter, of about 200 bytes each.
-const DECISIONS_PER_MERGE_STATEMENT = 200;
+// Each as one bound parameter. Renders by what a request of them was measured at, and decisions of about 200 bytes.
+const RENDERS_PER_STATEMENT = 49;
+const DECISIONS_PER_STATEMENT = 200;
 // As one bound parameter, in a statement that gives them all keys.
 const NAMES_PER_STATEMENT = 1_000;
 // Nearest first, beside the environment.
@@ -233,9 +230,6 @@ LEFT JOIN commits c ON c.key = d.commit_key
 LEFT JOIN stories s ON s.key = rs.story_key
 ${BATCH_PAGE_TAIL}`;
 
-// What a request says for a story being gone, which `decisions` holds as an image key of 0.
-const REMOVAL = "";
-
 const READ_RENDERS_PAGE = `SELECT rs.story_key, s.id AS story, i.hash AS image_hash, rs.failure
 FROM render_batches r
 CROSS JOIN renders rs ON rs.batch_key = r.key
@@ -258,18 +252,38 @@ WHERE r.branch = ?1 AND r.environment_key = ${environmentKey("?2")} AND r.starte
 const COUNT_RENDERS = `SELECT COUNT(*) AS total FROM renders
 WHERE batch_key = (SELECT key FROM render_batches WHERE id = ?1)`;
 
+/** A statement's rows as `v`, from one JSON parameter, which holds any number of them and can say null, as a bound one can't. */
+const jsonRows = (parameter: string, columns: readonly string[]) => `v(${columns.join(", ")}) AS (
+  SELECT ${columns.map((_, i) => `json_extract(value, '$[${i}]')`).join(", ")}
+  FROM json_each(${parameter})
+)`;
+
 // A row with a hash the images table lacks, or a finished batch, matches nothing, so the
 // statement returns too few rows, which is how `recordRenders` knows.
-const recordSql = (values: string) =>
-  `WITH v(story, image_hash, failure, viewport_width, viewport_height) AS (VALUES ${values})
+const RECORD_RENDERS = `WITH ${jsonRows("?2", ["story", "image_hash", "failure", "viewport_width", "viewport_height"])}
 INSERT INTO renders(batch_key, story_key, image_key, failure, viewport_width, viewport_height)
 SELECT r.key, s.key, i.key, v.failure, v.viewport_width, v.viewport_height
-FROM render_batches r CROSS JOIN v JOIN stories s ON s.id = v.story LEFT JOIN images i ON i.hash = v.image_hash
+FROM render_batches r CROSS JOIN v CROSS JOIN stories s ON s.id = v.story LEFT JOIN images i ON i.hash = v.image_hash
 WHERE r.id = ?1 AND r.finished_at IS NULL AND (v.image_hash IS NULL OR i.key IS NOT NULL)
 ON CONFLICT(batch_key, story_key) DO UPDATE SET
   image_key = excluded.image_key, failure = excluded.failure,
   viewport_width = excluded.viewport_width, viewport_height = excluded.viewport_height
 RETURNING 1 AS written`;
+
+// A decision with no image is on a story being gone, which is held as an image key of 0.
+const UPSERT_DECISION = `WITH ${jsonRows("?2", ["story", "image_hash", "sha", "rejected", "decided_at", "actor", "batch_id"])}
+INSERT INTO decisions(environment_key, commit_key, story_key, image_key, rejected, decided_at, actor_key, batch_id)
+SELECT ${environmentKey("?1")}, c.key, s.key, COALESCE(i.key, 0), v.rejected, v.decided_at, a.key, v.batch_id
+FROM v
+CROSS JOIN commits c ON c.sha = v.sha
+CROSS JOIN stories s ON s.id = v.story
+CROSS JOIN actors a ON a.name = v.actor
+LEFT JOIN images i ON i.hash = v.image_hash
+WHERE true
+ON CONFLICT(environment_key, commit_key, story_key, image_key) DO UPDATE SET
+  rejected = excluded.rejected, decided_at = excluded.decided_at, actor_key = excluded.actor_key, batch_id = excluded.batch_id`;
+const MERGE_DECISION = `${UPSERT_DECISION}
+WHERE (excluded.decided_at, excluded.rejected) > (decisions.decided_at, decisions.rejected)`;
 
 const NAME_COLUMNS = { environments: "id", stories: "id", commits: "sha", actors: "name" } as const;
 
@@ -703,9 +717,9 @@ ORDER BY started_at DESC, key DESC`,
   }
 
   /**
-   * Records a person's or agent's decision on these renders, now. It holds for this
-   * name and this image hash, in any batch and at any Git SHA, and for no other image.
-   * Each name and hash keeps only its most recent decision.
+   * Records a person's or agent's decision on these renders, now, at the commit of the batch it's
+   * on. It holds for this name and this image hash, and for no other image. Each name, hash,
+   * and commit keeps only its most recent decision.
    */
   async decide({ environment, decision, actor, renders, on }: DecisionRequest): Promise<void> {
     assertNamePart(environment, "environment");
@@ -717,44 +731,26 @@ ORDER BY started_at DESC, key DESC`,
       assertNamePart(story, "story");
       if (imageHash !== null) assertImageHash(imageHash);
     }
-    await this.#assertImagesHeld(renders.flatMap(({ imageHash }) => imageHash ?? []));
     const at = this.#now();
-    const rejected = decision === "rejected" ? 1 : 0;
-    const statements: SqlStatement[] = [
-      ...nameStatements("environments", [environment]),
-      ...nameStatements("commits", [on.gitSha]),
-      ...nameStatements("actors", [actor]),
-      ...nameStatements("stories", renders.map(({ story }) => story)),
-      ...chunks(renders, RENDERS_PER_DECISION_STATEMENT).map((group) => {
-        const params: SqlParam[] = [environment, on.gitSha, rejected, at, actor, on.batchId];
-        const values = group.map(({ story, imageHash }) => `(?${params.push(story)}, ?${params.push(imageHash ?? REMOVAL)})`);
-        return {
-          sql: `WITH v(story, image_hash) AS (VALUES ${values.join(", ")})
-INSERT INTO decisions(environment_key, commit_key, story_key, image_key, rejected, decided_at, actor_key, batch_id)
-SELECT ${environmentKey("?1")}, ${commitKey("?2")}, s.key, COALESCE(i.key, 0), CAST(?3 AS INTEGER), CAST(?4 AS INTEGER),
-  (SELECT key FROM actors WHERE name = ?5), ?6
-FROM v JOIN stories s ON s.id = v.story LEFT JOIN images i ON i.hash = v.image_hash
-WHERE true
-ON CONFLICT(environment_key, commit_key, story_key, image_key) DO UPDATE SET
-  rejected = excluded.rejected, decided_at = excluded.decided_at, actor_key = excluded.actor_key, batch_id = excluded.batch_id`,
-          params,
-          idempotent: true,
-        };
-      }),
-    ];
-    for (const group of chunks(statements, STATEMENTS_PER_REQUEST)) await this.#sql.batch(group);
+    await this.#writeDecisions(environment, renders.map(({ story, imageHash }) => ({ story, imageHash, decision, actor, at, gitSha: on.gitSha, batchId: on.batchId })), UPSERT_DECISION);
   }
 
   /** A decision names an image held here, as a render does, so that it can hold that image's key. Refuses them all if any isn't. */
-  async #assertImagesHeld(hashes: readonly string[]): Promise<void> {
-    const statements = chunks([...new Set(hashes)], NAMES_PER_STATEMENT).map((group) => ({
-      sql: "SELECT j.value AS hash FROM json_each(?1) j LEFT JOIN images i ON i.hash = j.value WHERE i.key IS NULL",
-      params: [JSON.stringify(group)],
-      idempotent: true,
-    }));
-    if (statements.length === 0) return;
-    const missing = (await this.#sql.batch(statements)).flat().length;
-    if (missing > 0) throw new BatchError("unknown-image", `${missing} of these decisions are on images this store doesn't hold, so none were recorded`);
+  async #writeDecisions(environment: string, decisions: readonly (Omit<ReceivedDecision, "imageHash"> & { readonly imageHash: string | null })[], upsert: string): Promise<void> {
+    const missing = await missingImages(this.#sql, decisions.flatMap(({ imageHash }) => imageHash ?? []));
+    if (missing.length > 0) throw new BatchError("unknown-image", `${missing.length} of these decisions are on images this store doesn't hold, so none were recorded`);
+    const statements: SqlStatement[] = [
+      ...nameStatements("environments", [environment]),
+      ...nameStatements("commits", decisions.map(({ gitSha }) => gitSha)),
+      ...nameStatements("actors", decisions.map(({ actor }) => actor)),
+      ...nameStatements("stories", decisions.map(({ story }) => story)),
+      ...chunks(decisions, DECISIONS_PER_STATEMENT).map((group) => ({
+        sql: upsert,
+        params: [environment, JSON.stringify(group.map(({ story, imageHash, gitSha, decision, at, actor, batchId }) => [story, imageHash, gitSha, decision === "rejected" ? 1 : 0, at, actor, batchId]))],
+        idempotent: true,
+      })),
+    ];
+    for (const group of chunks(statements, STATEMENTS_PER_REQUEST)) await this.#sql.batch(group);
   }
 
   /**
@@ -827,7 +823,7 @@ ON CONFLICT(environment_key, commit_key, story_key, image_key) DO UPDATE SET
   }
 
   /**
-   * Takes decisions from another store. For one name and hash the latest wins, and at the
+   * Takes decisions from another store. For one name, hash, and commit the latest wins, and at the
    * same moment a rejection does, so two stores reach one verdict whichever order they hear
    * in. Who made it travels with it, and isn't compared, so sending a decision back to where
    * it came from can't change whose it is. Each must name an image this store holds.
@@ -842,34 +838,7 @@ ON CONFLICT(environment_key, commit_key, story_key, image_key) DO UPDATE SET
       assertBatchIdShape(batchId);
       if (actor === "") throw new RangeError("A decision must say who made it");
     }
-    await this.#assertImagesHeld(decisions.map(({ imageHash }) => imageHash));
-    const rejectedOf = ({ decision }: ReceivedDecision) => (decision === "rejected" ? 1 : 0);
-    const statements: SqlStatement[] = [
-      ...nameStatements("environments", [environment]),
-      ...nameStatements("commits", decisions.map(({ gitSha }) => gitSha)),
-      ...nameStatements("actors", decisions.map(({ actor }) => actor)),
-      ...nameStatements("stories", decisions.map(({ story }) => story)),
-      ...chunks(decisions, DECISIONS_PER_MERGE_STATEMENT).map((group) => ({
-        sql: `WITH v(story, image_hash, sha, rejected, decided_at, actor, batch_id) AS (
-  SELECT json_extract(value, '$[0]'), json_extract(value, '$[1]'), json_extract(value, '$[2]'), json_extract(value, '$[3]'), json_extract(value, '$[4]'), json_extract(value, '$[5]'), json_extract(value, '$[6]')
-  FROM json_each(?2)
-)
-INSERT INTO decisions(environment_key, commit_key, story_key, image_key, rejected, decided_at, actor_key, batch_id)
-SELECT ${environmentKey("?1")}, c.key, s.key, i.key, v.rejected, v.decided_at, a.key, v.batch_id
-FROM v
-CROSS JOIN commits c ON c.sha = v.sha
-CROSS JOIN stories s ON s.id = v.story
-CROSS JOIN images i ON i.hash = v.image_hash
-CROSS JOIN actors a ON a.name = v.actor
-WHERE true
-ON CONFLICT(environment_key, commit_key, story_key, image_key) DO UPDATE SET
-  rejected = excluded.rejected, decided_at = excluded.decided_at, actor_key = excluded.actor_key, batch_id = excluded.batch_id
-WHERE (excluded.decided_at, excluded.rejected) > (decisions.decided_at, decisions.rejected)`,
-        params: [environment, JSON.stringify(group.map((decision) => [decision.story, decision.imageHash, decision.gitSha, rejectedOf(decision), decision.at, decision.actor, decision.batchId]))],
-        idempotent: true,
-      })),
-    ];
-    for (const group of chunks(statements, STATEMENTS_PER_REQUEST)) await this.#sql.batch(group);
+    await this.#writeDecisions(environment, decisions, MERGE_DECISION);
   }
 
   /**
@@ -942,30 +911,17 @@ function recordStatements(batchId: string, renders: readonly RecordedRender[]): 
     names.add(story);
   }
 
-  const statements: RecordStatement[] = nameStatements("stories", [...names]).map((statement) => ({ statement, rows: 0 }));
-  let params: SqlParam[] = [batchId];
-  let values: string[] = [];
-  const flush = () => {
-    if (values.length === 0) return;
-    statements.push({
-      statement: { sql: recordSql(values.join(", ")), params, idempotent: true },
-      rows: values.length,
-    });
-    params = [batchId];
-    values = [];
-  };
-  for (const { story, imageHash, failure, viewport } of renders) {
-    const needed = 1 + (imageHash === undefined ? 0 : 1) + (failure === undefined ? 0 : 1) + (viewport === undefined ? 0 : 2);
-    if (params.length + needed > MAX_RECORD_PARAMS) flush();
-    const name = `?${params.push(story)}`;
-    // Sql binds no nulls, so the column a row leaves empty is a literal.
-    const image = imageHash === undefined ? "NULL" : `?${params.push(imageHash)}`;
-    const why = failure === undefined ? "NULL" : `?${params.push(cleanMessage(failure))}`;
-    const size = viewport === undefined ? "NULL, NULL" : `?${params.push(viewport.width)}, ?${params.push(viewport.height)}`;
-    values.push(`(${name}, ${image}, ${why}, ${size})`);
-  }
-  flush();
-  return statements;
+  return [
+    ...nameStatements("stories", [...names]).map((statement) => ({ statement, rows: 0 })),
+    ...chunks(renders, RENDERS_PER_STATEMENT).map((group) => ({
+      statement: {
+        sql: RECORD_RENDERS,
+        params: [batchId, JSON.stringify(group.map(({ story, imageHash, failure, viewport }) => [story, imageHash ?? null, failure === undefined ? null : cleanMessage(failure), viewport?.width ?? null, viewport?.height ?? null]))],
+        idempotent: true,
+      },
+      rows: group.length,
+    })),
+  ];
 }
 
 /** Cut by code point, so a cut never splits a surrogate pair. */

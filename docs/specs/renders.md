@@ -146,7 +146,7 @@ goldens(commit_key → commits.key, environment_key → environments.key, batch_
 
 Source of truth: `store/src/core/render-batches.ts`; `store/test/render-batches.test.ts` measures these at 10,000 renders.
 
-- **Must send at most 400 statements per request, and at most 5,000 rows per page**, so that a batch under about 18,600 renders records in one request (rationale). A request also gives its stories their keys, in a statement per 1,000. A statement holds 49 renders, or as few as 19 if each has an image, a failure, and a window of its own, since each of those needs more parameters.
+- **Must send at most 400 statements per request, and at most 5,000 rows per page**, so that a batch under about 18,600 renders records in one request (rationale). A request also gives its stories their keys, in a statement per 1,000. A statement holds 49 renders, or 200 decisions, as one JSON parameter.
 - **Must run the model's contract against every SQL adapter.** `pnpm test` runs it on local SQLite with both parameter forms. In `store/`, `pnpm test:d1:render-batches` runs it on real D1 at about 90 requests, and `pnpm test:d1` runs it after the SQL contract (`docs/specs/store.md` → D1 REST adapter).
 
 ## Future

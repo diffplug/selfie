@@ -1,4 +1,8 @@
-import type { SqlStatement } from "./sql.ts";
+import { chunks, STATEMENTS_PER_REQUEST } from "./chunks.ts";
+import type { Sql, SqlStatement } from "./sql.ts";
+
+// As one bound parameter.
+const HASHES_PER_STATEMENT = 1_000;
 
 /**
  * Gives a hash its key in `images` or `built_storybooks`: its truncated value, or if that's taken, or
@@ -21,3 +25,18 @@ RETURNING key`,
   params: [truncated, hash],
   idempotent: true,
 });
+
+/** Which of these images this store doesn't hold, each once, in the order given. */
+export async function missingImages(sql: Sql, hashes: readonly string[]): Promise<string[]> {
+  const distinct = [...new Set(hashes)];
+  const statements = chunks(distinct, HASHES_PER_STATEMENT).map((group) => ({
+    sql: "SELECT j.value AS hash FROM json_each(?1) j LEFT JOIN images i ON i.hash = j.value WHERE i.key IS NULL",
+    params: [JSON.stringify(group)],
+    idempotent: true,
+  }));
+  const missing = new Set<string>();
+  for (const request of chunks(statements, STATEMENTS_PER_REQUEST)) {
+    for (const rows of await sql.batch(request)) for (const row of rows) missing.add(row.hash as string);
+  }
+  return distinct.filter((hash) => missing.has(hash));
+}
