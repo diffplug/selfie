@@ -27,7 +27,7 @@ To mount under `/api`. `GET /repositories/:owner/:name` finds a repository's pro
 | `GET /images/:hash` | The stored bytes | View |
 | `POST /batches/:id/renders` | `{ renders }`, at most 1,000 | Upload |
 | `POST /batches/:id/finish` | `{ count, finishedAt }` | Upload |
-| `GET /batches/:id` | `?after`, where `next` said the page starts, a page of the batch in no particular order, each render, and the decision on each image, with `next` | View |
+| `POST /batches/:id/status` | Says what this batch's commit reads as, where people look (`docs/specs/cloud.md` → Commit status) | Upload |
 | `POST /commits` | `{ commits }`, at most 1,000, each `{ sha, parents }`, so a server with no Git knows what a commit reaches | Upload |
 | `GET /storybooks/:hash` | `{ kept }` | Upload |
 | `POST /storybooks/files/missing` | `{ hashes }`, at most 500, answers `{ missing }` | Upload |
@@ -37,7 +37,7 @@ To mount under `/api`. `GET /repositories/:owner/:name` finds a repository's pro
 | `GET /batches/:id/diffs/needed` | `{ pairs }`, each `{ current, golden }`, the changed pairs with no diff here | Upload |
 | `PUT /diffs/:current/:golden/image` | The diff image's bytes, sent first | Upload |
 | `PUT /diffs/:current/:golden` | Its `PixelDiff`, which says both are here | Upload |
-| `POST /decisions` | `{ environment, decisions }`, at most 1,000, each with its `gitSha` and `batchId`, and a null `imageHash` for a removal, and `commit`, if there's one whose status they may change | Decide |
+| `POST /decisions` | `{ environment, decisions }`, at most 1,000, each with its `gitSha` and `batchId`, and a null `imageHash` for a removal | Decide |
 | `POST /decisions/reached` | `{ environment, commits }`, at most 1,000, answers `{ decisions }`: what counts of those made at them, each with its `gitSha` and `batchId` | View |
 
 | Status | Code | When |
@@ -67,11 +67,11 @@ Reserved: a fork's render pass must not upload through this (`docs/specs/access.
 Source of truth: `cli/src/sync.ts`; tests in `cli/test/sync.test.ts`, between two machines on real Git and a store standing in for the cloud's.
 
 - **Must try a request up to three times if the server can't be reached, or answers 429 or 5xx**, since every step is safe to send again.
-- **Must push one batch at a time, in this order: the batch, what its commit reaches, its built Storybook if it's kept, its images, its renders, finishing it, its decisions, and the diffs the remote asks for**, so that a refused batch costs nothing, and nothing refers to what hasn't arrived.
+- **Must push one batch at a time, in this order: the batch, what its commit reaches, its built Storybook if it's kept, its images, its renders, finishing it, its decisions, saying its status, and the diffs the remote asks for**, so that a refused batch costs nothing, and nothing refers to what hasn't arrived.
 - **Must make every step safe to send again**, so a push or pull that dies is finished by running it again, with nothing to clean up. A partly received batch stays `recording`, which nothing can compare.
 - **Must send only the images the receiver lacks, and pull only those this store lacks, decoding each to check it's the image its hash names**, and stop with `corrupt-image` naming it if it isn't, leaving what's stored here as it was. A sender's check is the last that image gets, and a puller's is the only one that finds what another client sent wrongly.
 - **Must carry `reusedFromBatch`**, for `trust`. It may name a batch never pushed.
-- **Must send the decisions on the batch's own images, and the removals its commit reaches, each with the commit it counts from**, which are the ones that carry through a push (`docs/specs/system.md` → Approvals).
+- **Must send what its commit reaches, by the same rule as a pull, that's on the batch's own images or a story being gone, each with the commit it counts from**, which are the ones that carry through a push (`docs/specs/system.md` → Approvals), since the remote may hold no other image.
 - **Must ask first what the token may do, and skip what it can't, saying so**, so that CI isn't refused after uploading everything.
 - **Must pull what a commit reaches by sending its ancestors, not by the remote's graph**, so a commit that hasn't been pushed yet can still read what its history approved.
 - **Must answer a pull with only what can change what a story reads as: each story's decisions, newest first, back through its second-newest approval**, and fetch only their images, so a long history doesn't mean fetching every image it ever approved (rationale).

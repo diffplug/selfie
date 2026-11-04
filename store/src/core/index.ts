@@ -26,8 +26,6 @@ export {
   type Decision,
   type DecisionKind,
   type DecisionRequest,
-  type DecisionOn,
-  type ReceivedDecision,
   type ReceivedBatch,
   type RecordedRender,
   type Viewport,

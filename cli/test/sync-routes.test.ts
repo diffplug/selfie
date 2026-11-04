@@ -107,7 +107,7 @@ describe("who may ask", () => {
   test("someone who can do something, but not this, gets a 403", async () => {
     expect((await send("POST", "/images/missing", "reader", { hashes: [] })).status).toBe(403);
     expect((await send("POST", "/decisions", "ci", { environment: ENV, decisions: [] })).status).toBe(403);
-    expect((await send("GET", `/batches/${BATCH}`, "ci")).status).toBe(403);
+    expect((await send("POST", "/decisions/reached", "ci", { environment: ENV, commits: [SHA] })).status).toBe(403);
   });
 
   test("a token from a cookie doesn't count", async () => {
@@ -178,9 +178,9 @@ describe("images", () => {
 describe("batches", () => {
   test("keeps a batch's identity and its times, and reads it back", async () => {
     const hash = await sendBatch();
-    const page = (await (await send("GET", `/batches/${BATCH}`, "reader")).json()) as any;
+    const page = await cloud.batches.readBatch(BATCH);
     expect(page.batch).toMatchObject({ id: BATCH, gitSha: SHA, startedAt: 500, finishedAt: 600, status: "complete" });
-    expect(page.renders).toEqual([{ story: "a", imageHash: hash, decision: null }]);
+    expect(page.renders).toEqual([{ story: "a", imageHash: hash }]);
     expect(page.next).toBeNull();
   });
 
@@ -207,7 +207,7 @@ describe("batches", () => {
   test("a partly sent batch can't be read, and can be finished by sending it again", async () => {
     const { hash } = await putImage(RED);
     await send("PUT", `/batches/${BATCH}`, "writer", batchFacts());
-    expect(await (await send("GET", `/batches/${BATCH}`, "reader")).json()).toMatchObject({ error: { code: "batch-not-finished" } });
+    await expect(cloud.batches.readBatch(BATCH)).rejects.toMatchObject({ code: "batch-not-finished" });
     expect((await send("POST", `/batches/${BATCH}/finish`, "writer", { count: 1, finishedAt: 600 })).status).toBe(409);
     await send("POST", `/batches/${BATCH}/renders`, "writer", { renders: [{ story: "a", imageHash: hash }] });
     await send("POST", `/batches/${BATCH}/renders`, "writer", { renders: [{ story: "a", imageHash: hash }] });
@@ -234,8 +234,8 @@ describe("batches", () => {
     await send("PUT", `/batches/${BATCH}`, "writer", batchFacts());
     await send("POST", `/batches/${BATCH}/renders`, "writer", { renders: [{ story: "a", failure: "boom" }, { story: "b", imageHash: hash, failure: "threw" }] });
     await send("POST", `/batches/${BATCH}/finish`, "writer", { count: 2, finishedAt: 600 });
-    const page = (await (await send("GET", `/batches/${BATCH}`, "reader")).json()) as any;
-    expect(page.renders).toEqual([{ story: "a", failure: "boom", decision: null }, { story: "b", imageHash: hash, failure: "threw", decision: null }]);
+    const page = await cloud.batches.readBatch(BATCH);
+    expect(page.renders).toEqual([{ story: "a", failure: "boom" }, { story: "b", imageHash: hash, failure: "threw" }]);
   });
 
   test("keeps the window a story laid out in, if it was its own", async () => {
@@ -244,9 +244,9 @@ describe("batches", () => {
     await send("POST", `/batches/${BATCH}/renders`, "writer", { renders: [{ story: "a", imageHash: hash, viewport: { width: 414, height: 896 } }, { story: "b", imageHash: hash }] });
     expect((await send("POST", `/batches/${BATCH}/renders`, "writer", { renders: [{ story: "c", imageHash: hash, viewport: { width: 0, height: 896 } }] })).status).toBe(400);
     await send("POST", `/batches/${BATCH}/finish`, "writer", { count: 2, finishedAt: 600 });
-    const page = (await (await send("GET", `/batches/${BATCH}`, "reader")).json()) as any;
+    const page = await cloud.batches.readBatch(BATCH);
     expect(page.batch.viewport).toEqual({ width: 1200, height: 900 });
-    expect(page.renders).toEqual([{ story: "a", imageHash: hash, viewport: { width: 414, height: 896 }, decision: null }, { story: "b", imageHash: hash, decision: null }]);
+    expect(page.renders).toEqual([{ story: "a", imageHash: hash, viewport: { width: 414, height: 896 } }, { story: "b", imageHash: hash }]);
   });
 
   test("refuses what isn't a batch", async () => {
@@ -254,12 +254,16 @@ describe("batches", () => {
     expect((await send("PUT", `/batches/${BATCH}`, "writer", batchFacts({ gitSha: "nope" }))).status).toBe(400);
     expect((await send("PUT", `/batches/${BATCH}`, "writer", batchFacts({ scale: "big" }))).status).toBe(400);
     expect((await send("PUT", `/batches/${BATCH}`, "writer", batchFacts({ viewport: null }))).status).toBe(400);
-    expect((await send("GET", `/batches/${OTHER_BATCH}`, "reader")).status).toBe(404);
   });
 });
 
 describe("decisions", () => {
-  const decisionOn = async () => ((await (await send("GET", `/batches/${BATCH}`, "reader")).json()) as any).renders[0].decision;
+  const decisionOn = async () => {
+    const [newest] = await cloud.batches.decisionsAt(ENV, [SHA]);
+    if (newest === undefined) return null;
+    const { decision, actor, at, gitSha, batchId } = newest;
+    return { decision, actor, at, gitSha, batchId };
+  };
 
   test("are by whoever is pushing, whatever the client says", async () => {
     const hash = await sendBatch();
@@ -272,7 +276,7 @@ describe("decisions", () => {
     await send("POST", "/decisions", "writer", { environment: ENV, decisions: [{ story: "a", imageHash: hash, decision: "rejected", at: NOW + 999, gitSha: SHA, batchId: BATCH }] });
     expect(await decisionOn()).toEqual({ decision: "rejected", actor: "writer-login", at: NOW, gitSha: SHA, batchId: BATCH });
     await approve(hash, NOW + 1);
-    expect((await decisionOn()).decision).toBe("rejected");
+    expect((await decisionOn())?.decision).toBe("rejected");
   });
 
   test("refuses a decision on an image this project doesn't hold", async () => {

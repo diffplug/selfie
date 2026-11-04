@@ -27,7 +27,8 @@ Source of truth: `ui/`.
 - **Must keep `ui/src/server/app.ts` free of anything specific to a platform**: no Node, no file, no Git. It knows Hono, `selfie-store`'s core, and `ReviewSource`. `cli/test/ui-*.test.ts` checks what it loads.
 - **Must have `selfie-cli` depend on `selfie-ui`, never the reverse** (rationale). `docs/specs/cli.md` → ui owns how it loads it.
 - **Must define what crosses into `selfie-cli` once, in `ui/src/shared/api.ts`.** `isDecidable` and `isImageHash` are in `selfie-store`, since the client, the routes, and the CLI all need them at runtime.
-- **Must use Primer's components and tokens**, with `ui/src/client/styles.css` for layout only, and pin Primer's versions. The one exception is the list of every story, which uses Storybook's own icons and their colors ([Screens](#screens)).
+- **Must use Primer's components and tokens**, with `ui/src/client/styles.css` for layout only, and pin Primer's versions. Exceptions are the Selfie artwork in `branding/` and the list of every story, which uses Storybook's own icons and their colors ([Screens](#screens)).
+- **Must use `branding/logo-icon.svg` for the review page's home-link mark and favicon**, bundled by Vite as a content-addressed asset under `/assets/` for both local and hosted review pages.
 - **Must follow Primer's color mode from the system**, light or dark.
 - **Must keep `ui/dist/` out of Git.** `prepare` builds it on `pnpm install`, `pnpm test` in `ui/` builds it, and so does `pnpm build:ui` (rationale).
 

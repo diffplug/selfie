@@ -1,4 +1,5 @@
 import { Heading } from "@primer/react";
+import logo from "../../../branding/logo-icon.svg";
 import { useLayoutEffect, useRef, type ReactNode } from "react";
 import { fetchBatchContext } from "./api.ts";
 import { DetailScreen } from "./DetailScreen.tsx";
@@ -49,6 +50,7 @@ export function Page({ children }: { readonly children: ReactNode }) {
             <header className="selfie-header">
               <Heading as="h1" className="selfie-brand">
                 <AppLink href={storiesPath()} muted>
+                  <img src={logo} width={32} height={32} alt="" />
                   Selfie
                 </AppLink>
               </Heading>

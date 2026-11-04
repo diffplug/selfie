@@ -79,9 +79,8 @@ describe("the sync routes, in a Worker", () => {
     expect((await send("POST", "/decisions", "writer", decisions("rejected", 700))).status).toBe(200);
     expect((await send("POST", "/decisions", "writer", decisions("approved", 800))).status).toBe(200);
     expect((await send("POST", "/decisions", "writer", decisions("rejected", 750))).status).toBe(200);
-    const page = (await sendJson("GET", `/batches/${FIRST}`, "writer")) as { renders: { decision: unknown }[]; batch: unknown };
-    expect(page.renders[0]!.decision).toEqual({ decision: "approved", actor: "writer-login", at: 800, gitSha: SHA, batchId: FIRST });
-    expect(page.batch).toMatchObject({ startedAt: 500, finishedAt: 600 });
+    const reached = (await sendJson("POST", "/decisions/reached", "writer", { environment: ENV, commits: [SHA] })) as { decisions: unknown[] };
+    expect(reached.decisions).toEqual([{ story: "a", imageHash: hash, decision: "approved", actor: "writer-login", at: 800, gitSha: SHA, batchId: FIRST }]);
   });
 
   it("takes a batch from CI, and a removal from a person, on D1's own engine", async () => {

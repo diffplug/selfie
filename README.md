@@ -1,3 +1,5 @@
+<img src="branding/logo-icon.svg" alt="" width="80" height="80" />
+
 # Selfie - distributed Storybook testing (and agent control surface)
 
 Visual screenshot testing is an excellent control surface for directing coding agents. Using renders inside the coding loop can increase render counts by 100x to 1000x, which is wildly unaffordable with existing centralized render services such as Chromatic.
@@ -34,6 +36,7 @@ We previously launched [Selfie](https://lib.selfie.dev), a snapshot testing libr
 
 Pre-existing work used here:
 
+- [Selfie branding](branding/README.md) (Apache-2.0, DiffPlug): the original SVG marks and mascot illustration, reused from the earlier Selfie library.
 - [pgstencil](https://github.com/diffplug/pgstencil) (MIT, DiffPlug LLC), consumed as published npm packages to bootstrap the Postgres backend. None of its source is copied into this repo.
 
 ## Where Meta models are used
@@ -59,7 +62,7 @@ Selfie has the following commands:
 - render - always renders the Storybook, and records a batch
 - review - shows a batch's diff against what its history has approved, as one JSON document whose exit code says whether anything blocks. With no batch, it uses the one for this exact built Storybook, which takes about 0.3 s rather than 70 s on 541 stories, and records one only if there's none yet. `--baseline` compares with what a commit's history approved, or another batch, so recording twice and comparing is how to look for flakiness
 - approve, reject - decides on what a batch changed, added, or removed, on any branch, on a dirty tree if you like. A later batch whose history reaches an approval needs no repeating it, whether after a commit, a rebase, or a merge
-- push, pull - move a batch and its decisions to and from the cloud
+- push, pull - send a batch and its decisions to the cloud, and take what a commit's history approved from it
 - flakes - renders a built Storybook several times, and says what wasn't the same each time. `selfie skill fix-flakes` is a guide for a coding agent to fix what it finds
 - ui - serves a local review page in the browser, to look at a batch's images, approve, and reject. It renders only when you ask it to on the page.
 - selfie, with no command - opens every story of a built Storybook, running, to write notes on, which renders what they're on

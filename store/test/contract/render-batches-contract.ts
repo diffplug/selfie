@@ -3,6 +3,7 @@ import {
   imageInsertStatement,
   initStoreSchema,
   RenderBatches,
+  decisionsThatCount,
   Sql,
   type RecordedRender,
   type SqlAdapter,
@@ -386,7 +387,13 @@ export function describeBatchContract(
         scale: 2, viewport: { width: 1200, height: 900 },
       });
       const on = (decision: "approved" | "rejected", actor: string, at: number) => ({ story: "a", imageHash: hashOf(1), decision, actor, at, gitSha: ON.gitSha, batchId: ON.batchId });
-      const decisionsOn = async (batchId: string) => (await batches.readBatch(batchId)).renders[0]?.decision;
+      const decisionsOn = async (batchId: string) => {
+        const { environment } = (await batches.getBatch(batchId))!;
+        const [newest] = decisionsThatCount(await batches.decisionsAt(environment, [ON.gitSha, SHA_0, SHA_1]));
+        if (newest === undefined) return null;
+        const { decision, actor, at, gitSha, batchId: madeOn } = newest;
+        return { decision, actor, at, gitSha, batchId: madeOn };
+      };
       const finished = async (environment: string, items: readonly RecordedRender[] = [rendered("a", 1)], finishedAt?: number) => {
         const batch = received(environment);
         await batches.receiveBatch(batch);
@@ -409,18 +416,17 @@ export function describeBatchContract(
         await expect(batches.receiveBatch({ ...batch, viewport: { width: 1, height: 1 } })).rejects.toMatchObject({ code: "batch-conflict" });
       });
 
-      it("reads back what a batch holds, in pages, with what's been decided", async () => {
+      it("reads back what a batch holds, in pages", async () => {
         const batch = await finished("read-back", [rendered("a", 1), rendered("b", 2), { story: "c", failure: "boom" }, { ...rendered("d", 3), failure: "threw" }]);
-        await batches.mergeDecisions("read-back", [on("approved", "ned", 1_000)]);
         const first = await batches.readBatch(batch.id, "", 3);
         expect(first.renders).toEqual([
-          { story: "a", imageHash: hashOf(1), decision: { decision: "approved", actor: "ned", at: 1_000, gitSha: ON.gitSha, batchId: ON.batchId } },
-          { story: "b", imageHash: hashOf(2), decision: null },
-          { story: "c", failure: "boom", decision: null },
+          { story: "a", imageHash: hashOf(1) },
+          { story: "b", imageHash: hashOf(2) },
+          { story: "c", failure: "boom" },
         ]);
         expect(first.next).not.toBeNull();
         const second = await batches.readBatch(batch.id, first.next!, 3);
-        expect(second.renders).toEqual([{ story: "d", imageHash: hashOf(3), failure: "threw", decision: null }]);
+        expect(second.renders).toEqual([{ story: "d", imageHash: hashOf(3), failure: "threw" }]);
         expect(second.next).toBeNull();
       });
 
@@ -451,8 +457,10 @@ export function describeBatchContract(
       it("reads a rejection first at the same moment, across commits", async () => {
         const batch = await finished("tie-across-commits");
         await batches.mergeDecisions("tie-across-commits", [{ ...on("approved", "ned", 1_000), gitSha: SHA_0 }, { ...on("rejected", "bob", 1_000), gitSha: SHA_1 }]);
+        const { renders } = await batches.compareWithBatch(batch.id, batch.id, { includeUnchanged: true });
+        expect(renders.find(({ story }) => story === "a")?.decision?.decision).toBe("rejected");
         expect((await decisionsOn(batch.id))?.decision).toBe("rejected");
-      });
+});
 
       it("doesn't change whose a decision is when it's sent back", async () => {
         const batch = await finished("sent-back");
@@ -465,7 +473,7 @@ export function describeBatchContract(
         const many = Array.from({ length: 45 }, (_, i) => ({ ...on("approved", "ned", 1_000), story: `s${i}` }));
         await over(replaying).mergeDecisions("merge-many", many);
         const batch = await finished("merge-many", many.map(({ story }) => rendered(story, 1)));
-        const { renders: read } = await batches.readBatch(batch.id);
+        const { renders: read } = await batches.compareWithBatch(batch.id, batch.id, { includeUnchanged: true });
         expect(read.every(({ decision }) => decision?.decision === "approved")).toBe(true);
       });
 

@@ -127,8 +127,9 @@ describe("pushing", () => {
   test("names who pushed as a decision's author, not what the laptop says", async () => {
     const batchId = await approved();
     await laptop("writer", "push");
-    const { renders } = await cloud.batches.readBatch(batchId);
-    expect(renders.map(({ decision }) => decision?.actor)).toEqual(["writer-login", "writer-login"]);
+    const { batch } = await cloud.batches.readBatch(batchId);
+    const decisions = await cloud.batches.decisionsAt(batch.environment, [batch.gitSha]);
+    expect(decisions.map(({ actor }) => actor)).toEqual(["writer-login", "writer-login"]);
   });
 
   test("is safe to run again, and sends nothing twice", async () => {

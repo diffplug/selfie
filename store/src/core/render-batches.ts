@@ -119,15 +119,15 @@ LEFT JOIN actors a ON a.key = d.actor_key`;
 
 const DECISION_WORD = "CASE d.rejected WHEN 1 THEN 'rejected' WHEN 0 THEN 'approved' END";
 
-/** A comparison's statements, against whichever batch a key expression finds. */
-const comparisonStatements = (baselineKey: string) => ({
-  baseline: `SELECT ${baselineKey} AS batch_key`,
+/** A comparison's statements, against the finished batch named by ?2. */
+const AGAINST_BATCH = {
+  baseline: `SELECT ${NAMED_BATCH_KEY} AS batch_key`,
   // `gs` joins before the images so that a row left out never reads them.
   comparedPage: `SELECT rs.story_key, s.id AS story, i.hash AS image_hash, rs.failure,
   gi.hash AS golden_hash, ${DECISION_WORD} AS decision, a.name AS actor, d.decided_at
 FROM render_batches r
 CROSS JOIN renders rs ON rs.batch_key = r.key
-LEFT JOIN renders gs ON gs.batch_key = ${baselineKey} AND gs.story_key = rs.story_key
+LEFT JOIN renders gs ON gs.batch_key = ${NAMED_BATCH_KEY} AND gs.story_key = rs.story_key
 LEFT JOIN images i ON i.key = rs.image_key
 LEFT JOIN images gi ON gi.key = gs.image_key
 ${DECISION_ON_RENDER}
@@ -141,18 +141,16 @@ LIMIT CAST(?4 AS INTEGER)`,
 FROM renders gs
 JOIN images gi ON gi.key = gs.image_key
 JOIN stories s ON s.key = gs.story_key
-WHERE gs.batch_key = ${baselineKey} AND gs.story_key > CAST(?3 AS INTEGER)
+WHERE gs.batch_key = ${NAMED_BATCH_KEY} AND gs.story_key > CAST(?3 AS INTEGER)
   AND NOT EXISTS (SELECT 1 FROM renders rs
     WHERE rs.batch_key = ${BATCH_KEY} AND rs.story_key = gs.story_key)
 ORDER BY gs.story_key
 LIMIT CAST(?4 AS INTEGER)`,
   unchangedCount: `SELECT COUNT(*) AS total
 FROM renders rs
-JOIN renders gs ON gs.batch_key = ${baselineKey} AND gs.story_key = rs.story_key
+JOIN renders gs ON gs.batch_key = ${NAMED_BATCH_KEY} AND gs.story_key = rs.story_key
 WHERE rs.batch_key = ${BATCH_KEY} AND rs.image_key = gs.image_key AND rs.failure IS NULL`,
-});
-
-const AGAINST_BATCH = comparisonStatements(NAMED_BATCH_KEY);
+};
 
 // Counted in the statement that marks the batch, so statements that never landed can't be
 // marked finished. Running it again changes nothing, since a finished batch takes no rows.
@@ -171,13 +169,10 @@ const BATCH_PAGE_TAIL = `WHERE r.id = ?1 AND rs.story_key > CAST(?2 AS INTEGER)
 ORDER BY rs.story_key
 LIMIT CAST(?3 AS INTEGER)`;
 
-const READ_BATCH_PAGE = `SELECT rs.story_key, s.id AS story, i.hash AS image_hash, rs.failure, rs.viewport_width, rs.viewport_height,
-  ${DECISION_WORD} AS decision, a.name AS actor, d.decided_at, c.sha AS git_sha, d.batch_id
+const READ_BATCH_PAGE = `SELECT rs.story_key, s.id AS story, i.hash AS image_hash, rs.failure, rs.viewport_width, rs.viewport_height
 FROM render_batches r
 CROSS JOIN renders rs ON rs.batch_key = r.key
 LEFT JOIN images i ON i.key = rs.image_key
-${DECISION_ON_RENDER}
-LEFT JOIN commits c ON c.key = d.commit_key
 LEFT JOIN stories s ON s.key = rs.story_key
 ${BATCH_PAGE_TAIL}`;
 
@@ -189,13 +184,18 @@ LEFT JOIN stories s ON s.key = rs.story_key
 ${BATCH_PAGE_TAIL}`;
 
 // A commit at a time, each of which is a range of the primary key. A commit this store has never heard of finds nothing.
-const DECISIONS_AT = `SELECT s.id AS story, i.hash AS image_hash, ${DECISION_WORD} AS decision, a.name AS actor, d.decided_at, d.batch_id, c.sha AS git_sha
+// What `toPlacedDecision` reads, of a row of `d` and its commit `c`.
+const PLACED_DECISION = `SELECT s.id AS story, i.hash AS image_hash, ${DECISION_WORD} AS decision, a.name AS actor, d.decided_at, d.batch_id, c.sha AS git_sha`;
+const NAMES_OF_DECISION = `CROSS JOIN actors a ON a.key = d.actor_key
+CROSS JOIN stories s ON s.key = d.story_key
+LEFT JOIN images i ON i.key = d.image_key`;
+
+// A commit at a time, each of which is a range of the primary key. A commit this store has never heard of finds nothing.
+const DECISIONS_AT = `${PLACED_DECISION}
 FROM json_each(?2) j
 CROSS JOIN commits c ON c.sha = j.value
 CROSS JOIN decisions d ON d.environment_key = ${environmentKey("?1")} AND d.commit_key = c.key
-CROSS JOIN actors a ON a.key = d.actor_key
-CROSS JOIN stories s ON s.key = d.story_key
-LEFT JOIN images i ON i.key = d.image_key`;
+${NAMES_OF_DECISION}`;
 
 // What a batch's commit reaches, walked by key, so that a long history's SHAs never leave the database.
 const DECISIONS_REACHED = `WITH RECURSIVE reach(key) AS (
@@ -204,13 +204,11 @@ const DECISIONS_REACHED = `WITH RECURSIVE reach(key) AS (
   SELECT p.parent_key FROM reach r CROSS JOIN commit_parents p ON p.commit_key = r.key
   LIMIT ${MAX_REACHED_COMMITS}
 )
-SELECT s.id AS story, i.hash AS image_hash, ${DECISION_WORD} AS decision, a.name AS actor, d.decided_at, d.batch_id, c.sha AS git_sha
+${PLACED_DECISION}
 FROM reach r
 CROSS JOIN decisions d ON d.environment_key = (SELECT environment_key FROM render_batches WHERE id = ?1) AND d.commit_key = r.key
 CROSS JOIN commits c ON c.key = d.commit_key
-CROSS JOIN actors a ON a.key = d.actor_key
-CROSS JOIN stories s ON s.key = d.story_key
-LEFT JOIN images i ON i.key = d.image_key`;
+${NAMES_OF_DECISION}`;
 
 const rendersPage = (batchId: string, after: string): SqlStatement => ({ sql: READ_RENDERS_PAGE, params: [batchId, after, ROWS_PER_PAGE], idempotent: true });
 
@@ -394,23 +392,10 @@ export interface PlacedDecision extends Decision {
 /** A batch as another store holds it, which keeps its identity and its times here. */
 export type ReceivedBatch = Omit<RenderBatch, "status" | "finishedAt" | "failedCount" | "branch"> & { readonly branch?: string | null };
 
-/** A decision with the batch it was made on, and the commit it counts from. */
-export interface DecisionOn extends Decision {
-  readonly gitSha: string;
-  readonly batchId: string;
-}
-
-/** A decision as another store holds it, which keeps its time and its commit here. */
-export interface ReceivedDecision extends DecisionOn {
-  readonly story: string;
-  /** Null for a removal. */
-  readonly imageHash: string | null;
-}
-
 /** What a batch holds, as a page of a read by name. */
 export interface BatchPage {
   readonly batch: RenderBatch;
-  readonly renders: readonly (RecordedRender & { readonly decision: DecisionOn | null })[];
+  readonly renders: readonly RecordedRender[];
   /** Where the next page starts, or null if this is the last. */
   readonly next: string | null;
 }
@@ -712,7 +697,7 @@ WHERE true ON CONFLICT(commit_key, parent_key) DO NOTHING`,
   }
 
   /** A decision names an image held here, as a render does, so that it can hold that image's key. Refuses them all if any isn't. */
-  async #writeDecisions(environment: string, decisions: readonly (Omit<ReceivedDecision, "imageHash"> & { readonly imageHash: string | null })[], upsert: string): Promise<void> {
+  async #writeDecisions(environment: string, decisions: readonly PlacedDecision[], upsert: string): Promise<void> {
     const missing = await missingImages(this.#sql, decisions.flatMap(({ imageHash }) => imageHash ?? []));
     if (missing.length > 0) throw new BatchError("unknown-image", `${missing.length} of these decisions are on images this store doesn't hold, so none were recorded`);
     const statements: SqlStatement[] = [
@@ -743,7 +728,6 @@ WHERE true ON CONFLICT(commit_key, parent_key) DO NOTHING`,
         story: row.story as string,
         ...(row.viewport_width === null ? {} : { viewport: viewportOf(row) }),
         ...(row.image_hash === null ? { failure: row.failure as string } : { imageHash: row.image_hash as string, ...(row.failure === null ? {} : { failure: row.failure as string }) }),
-        decision: row.decision === null ? null : { decision: row.decision as DecisionKind, actor: row.actor as string, at: row.decided_at as number, gitSha: row.git_sha as string, batchId: row.batch_id as string },
       })),
       next: rows.length > limit ? String(page.at(-1)!.story_key) : null,
     };
@@ -755,7 +739,7 @@ WHERE true ON CONFLICT(commit_key, parent_key) DO NOTHING`,
    * in. Who made it travels with it, and isn't compared, so sending a decision back to where
    * it came from can't change whose it is. Each must name an image this store holds.
    */
-  async mergeDecisions(environment: string, decisions: readonly ReceivedDecision[]): Promise<void> {
+  async mergeDecisions(environment: string, decisions: readonly PlacedDecision[]): Promise<void> {
     assertNamePart(environment, "environment");
     if (decisions.length === 0) return;
     for (const { story, imageHash, actor, gitSha, batchId } of decisions) {
@@ -867,13 +851,23 @@ const newestFirst = (a: PlacedDecision, b: PlacedDecision) => b.at - a.at || b.d
  * is compared with. Anything older can't change what a story reads as, so its images needn't be fetched.
  */
 export function decisionsThatCount(decisions: readonly PlacedDecision[]): readonly PlacedDecision[] {
+  return [...decisionsByStory(decisions).values()].flatMap((list) => {
+    let approvals = 0;
+    const end = list.findIndex(({ decision }) => decision === "approved" && ++approvals === 2);
+    return end === -1 ? list : list.slice(0, end + 1);
+  });
+}
+
+/** Each story's decisions, newest first. */
+function decisionsByStory(decisions: readonly PlacedDecision[]): Map<string, PlacedDecision[]> {
   const byStory = new Map<string, PlacedDecision[]>();
-  for (const decision of [...decisions].sort(newestFirst)) {
+  for (const decision of decisions) {
     const list = byStory.get(decision.story);
     if (list === undefined) byStory.set(decision.story, [decision]);
-    else if (list.filter(({ decision: said }) => said === "approved").length < 2) list.push(decision);
+    else list.push(decision);
   }
-  return [...byStory.values()].flat();
+  for (const list of byStory.values()) list.sort(newestFirst);
+  return byStory;
 }
 
 /**
@@ -888,13 +882,7 @@ export function compareWithApprovals(
   decisions: readonly PlacedDecision[],
   { includeUnchanged = false }: CompareOptions = {},
 ): Comparison {
-  const decisionsOf = new Map<string, PlacedDecision[]>();
-  for (const decision of decisions) {
-    const list = decisionsOf.get(decision.story);
-    if (list === undefined) decisionsOf.set(decision.story, [decision]);
-    else list.push(decision);
-  }
-  for (const list of decisionsOf.values()) list.sort(newestFirst);
+  const decisionsOf = decisionsByStory(decisions);
 
   const referenceOf = (story: string) => decisionsOf.get(story)?.find(({ decision, batchId }) => decision === "approved" && batchId !== batch.id);
   /** What's been said about this image since the reference, if anything has. */

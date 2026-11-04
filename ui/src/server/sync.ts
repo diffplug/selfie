@@ -3,7 +3,7 @@
 // so they run on any platform, and are tested with a stand-in for it.
 import { Hono, type Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { assertViewport, decisionsThatCount, ImageDecodeError, isGitSha, isImageHash, isBatchId, BatchError, type ReceivedDecision, type ReceivedBatch, type BuiltStorybooks, type StoredDiffs, type ReceivingStore, type RecordedRender, type RenderBatches, type StoryFilter, type Viewport } from "selfie-store";
+import { assertViewport, decisionsThatCount, ImageDecodeError, isGitSha, isImageHash, isBatchId, BatchError, type PlacedDecision, type ReceivedBatch, type BuiltStorybooks, type StoredDiffs, type ReceivingStore, type RecordedRender, type RenderBatches, type StoryFilter, type Viewport } from "selfie-store";
 import { SYNC_LIMITS, type ProjectAccess } from "../shared/sync-api.ts";
 import { afterResponse, failure, imageResponse, INTERNAL_ERROR, noStoreByDefault } from "./http.ts";
 
@@ -39,7 +39,6 @@ export interface SyncHost {
   readonly now?: () => number;
 }
 
-const BATCH_PAGE = 1_000;
 const DEFAULT_MAX_IMAGE_BYTES = 64 * 1024 * 1024;
 
 class Refusal extends Error {
@@ -131,7 +130,7 @@ function receivedBatch(id: string, body: Record<string, unknown>, now: number): 
   };
 }
 
-function receivedDecision(value: unknown, decider: string, now: number): ReceivedDecision {
+function receivedDecision(value: unknown, decider: string, now: number): PlacedDecision {
   const { story, imageHash, decision, at, gitSha, batchId } = asRecord(value);
   if (decision !== "approved" && decision !== "rejected") throw badRequest('decision must be "approved" or "rejected".');
   return { story: readText(story, "story"), imageHash: imageHash === null ? null : readHash(imageHash), decision, actor: decider, at: Math.min(readWhole(at, "at"), now), gitSha: readSha(gitSha, "gitSha"), batchId: readBatchId(batchId) };
@@ -247,29 +246,29 @@ export function createSyncApi(host: SyncHost): Hono {
   });
 
   api.post("/projects/:project/batches/:id/finish", async (context) => {
-    const project = await uploadable(context);
+    const { batches } = await uploadable(context);
     const { count, finishedAt } = await bodyOf(context);
-    const { status, gitSha, environment } = await project.batches.finishBatch(readBatchId(context.req.param("id")), readWhole(count, "count"), Math.min(readWhole(finishedAt, "finishedAt"), now()));
-    if (project.commitChanged !== undefined) await afterResponse(context, project.commitChanged(gitSha, environment));
+    const { status } = await batches.finishBatch(readBatchId(context.req.param("id")), readWhole(count, "count"), Math.min(readWhole(finishedAt, "finishedAt"), now()));
     return context.json({ status });
   });
 
-  api.get("/projects/:project/batches/:id", async (context) => {
-    const { batches } = await viewable(context);
-    return context.json(await batches.readBatch(readBatchId(context.req.param("id")), context.req.query("after") ?? "", BATCH_PAGE));
+  // The last word of a push, once its decisions are there too.
+  api.post("/projects/:project/batches/:id/status", async (context) => {
+    const project = await uploadable(context);
+    const id = readBatchId(context.req.param("id"));
+    const batch = await project.batches.getBatch(id);
+    if (batch === null) throw new Refusal(404, "unknown-batch", `No batch ${id} in this project.`);
+    if (project.commitChanged !== undefined) await afterResponse(context, project.commitChanged(batch.gitSha, batch.environment));
+    return context.json({ asked: true });
   });
 
   api.post("/projects/:project/decisions", async (context) => {
-    const project = await projectOf(context);
-    const { batches, access } = project;
+    const { batches, access } = await projectOf(context);
     refuseUnless(access.decider !== null);
-    const { environment, decisions, commit } = await bodyOf(context);
+    const { environment, decisions } = await bodyOf(context);
     const at = now();
-    const named = readText(environment, "environment");
     const received = listOf(decisions, SYNC_LIMITS.decisions, "decisions").map((decision) => receivedDecision(decision, access.decider!, at));
-    await batches.mergeDecisions(named, received);
-    // Only the commit they were sent for, or every push would say again what each older commit reads as.
-    if (commit !== undefined && project.commitChanged !== undefined) await afterResponse(context, project.commitChanged(readSha(commit, "commit"), named));
+    await batches.mergeDecisions(readText(environment, "environment"), received);
     return context.json({ merged: received.length });
   });
 
