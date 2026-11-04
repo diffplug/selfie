@@ -1,6 +1,6 @@
 # RenderBatches — Rationale
 
-> Informative companion to [batches.md](renders.md): the evidence behind its rules, keyed by that spec's headings. Nothing here is normative.
+> Informative companion to [renders.md](renders.md): the evidence behind its rules, keyed by that spec's headings. Nothing here is normative.
 
 ## Render names
 
@@ -26,11 +26,11 @@
 
 **Not yet run on real D1.** The `play_error` column, the three new columns on `render_batches`, the longest statement of play errors and failures, and `firstWithGoldens` are in the contract suite, and pass on local SQLite through the same `Sql` limits. The batch on real D1 wasn't made when they went in, so their fit there is unproven, and the suite's size of about 90 requests is counted from the code rather than measured. A statement of 33 renders with both messages at their 2,000 characters binds about 132 KB, which is the case to watch.
 
-**A filter as a fact.** Whether a removed golden is really gone or only outside the batch's filter needs the patterns, so they're kept too. What's unmatched is kept alongside them, since a comparison lists too little to work it out.
+**A filter as a fact.** Whether an approved story is really gone or only outside the batch's filter needs the patterns, so they're kept too. What's unmatched is kept alongside them, since a comparison lists too little to work it out.
 
 ## Compare
 
-**Refusing a missing baseline.** Reporting everything as new would look like a first batch, and hide a wrong SHA.
+**Refusing a missing baseline.** Reporting everything as added would look like a first batch, and hide a wrong SHA.
 
 **Only differences by default.** A mostly unchanged compare fell from 3 requests and 2.9 MB of responses to 1 request and 56 KB, with 250 differences listed, or about 220 bytes each. Rows read barely moved, from 70,015 to 60,213, since finding differences still reads both sides and the count reads them again. That costs about $0.00006 at D1's listed $0.001 per million rows.
 
@@ -38,13 +38,25 @@
 
 **Keeping no history.** A log of every decision would merge cleanly, but nothing in `selfie review` or the review UI reads one.
 
-**A reappearing image.** A name and hash is exactly what the system spec asks for, and it is what stops a re-approval at push. Its cost is that A → B → A shows the second A as approved, if A was ever explicitly approved. A review could ask again by comparing times, but that needs a decision about what approval means.
+## Approvals
+
+**History, not a promoted set.** Asking someone to accept a batch on a clean default branch made them render again after a merge, to end up with what they'd already approved. Working it out from history asks nothing at a merge, since a batch there finds the approvals its branch brought.
+
+**Author time as a branch's start.** A branch name can be reused, so its old batches mustn't count forever, and the merge-base can't bound them, since a rebase moves it past the batches it's meant to find. A rebase keeps author times, so the earliest among the branch's own commits holds still. An older commit merged in only widens the window, on the same branch name.
+
+**Leaving out a batch's own approvals.** A story approved on a batch still has to be listed there, approved, or a person going through a review sees rows vanish as they decide, and can't see what they approved.
+
+**Newer than the reference.** This replaces a name and hash holding forever, whose cost was that A → B → A showed the second A as approved. Now it asks, since B was the last thing anyone said was right.
+
+**One parameter however long the history.** `json_each` takes 1,000 commits as one bound parameter, where an `IN` list would take a request per 99.
+
+**No derived table, locally.** Measured on local SQLite at Dormouse's 568 stories, reaching 1,000 commits: reading 11,360 decisions takes about 0.4 s, 113,600 about 1.7 s, and 568,000 about 4 s. Those have every story approved at every commit, which is much worse than a commit that changes a few stories. A compare reads them once, and an approval twice.
 
 ## Goldens
 
 **A pointer to a batch, not a copy of its rows.** Copying would write 10,000 rows per accepted SHA, and D1 bills per row written. A pointer writes one, and exists whole by construction, so there is no partial set to explain after a crash. What it gives up is goldens with a mix of images from several batches. A baseline must be complete to be a baseline, so nothing reads a partial set. A future sync can bring goldens in as rows of a local batch.
 
-**All or nothing per SHA.** A SHA with 3 images unapproved has no goldens yet, and `find-baseline` moves on to the next candidate. Approvals made meanwhile are kept against their hash, so once the last is made, accepting succeeds with nothing to redo.
+**All or nothing per SHA.** A SHA with 3 images unapproved has no goldens yet, and a pull's walk moves on to the next candidate. Approvals made meanwhile are kept against their hash, so once the last is made, accepting succeeds with nothing to redo.
 
 **A dirty batch in the statement.** A caller could always check `dirty` itself, and one that forgot would make goldens that misdescribe their SHA. The check is one more condition in a statement that exists to make such a rule hold.
 
@@ -54,7 +66,7 @@
 
 ## Requests
 
-**Measured on real D1, 2026-11**, from one Mac over the REST API at 10,000 renders, with the sizes in the spec. `compareBatch` is of a batch with 100 changed, 50 failed, 50 new, 50 removed, and 9,800 unchanged:
+**Measured on real D1, 2026-11**, from one Mac over the REST API at 10,000 renders, with the sizes in the spec. `compareBatch` is of a batch with 100 changed, 50 failed, 50 added, 50 removed, and 9,800 unchanged:
 
 | Operation | Time | Requests | Rows read | Rows written | Response |
 |---|---|---|---|---|---|

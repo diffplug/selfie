@@ -64,7 +64,7 @@ export function applyFilter(rows: readonly RenderRow[], { text, show }: RowFilte
 export const decidableIn = (rows: readonly RenderRow[]) => rows.filter(({ state }) => isDecidable(state));
 
 export const targetsOf = (rows: readonly RenderRow[]): DecisionTarget[] =>
-  rows.map(({ story, imageHash }) => ({ story, imageHash: imageHash! }));
+  rows.map(({ story, imageHash }) => ({ story, imageHash }));
 
 /** Where the keys go from a story, and how far along it is. */
 export interface StoryNavigation {

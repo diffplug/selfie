@@ -1,20 +1,20 @@
 import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { decodeImage } from "./support.ts";
+import { decodeImage, TEST_CONFIG, writeTestConfig } from "./support.ts";
 import { type StoriesView } from "selfie-ui/app";
 import { describe, expect, test } from "vitest";
 import { BLUE, commit, git } from "./support.ts";
-import { UNKNOWN_HASH, UNKNOWN_BATCH, h, project, review, get, decideOn, acceptBatch, viewOf, makeGoldens } from "./ui-support.ts";
+import { UNKNOWN_HASH, UNKNOWN_BATCH, h, project, review, get, decideOn, viewOf, approveAll } from "./ui-support.ts";
 
 describe("which batch", () => {
-  test("says where a batch stands against this checkout, and what its baseline is to it", async () => {
+  test("says where a batch stands against this checkout", async () => {
     h.stories = [{ id: "a" }];
     const { batchId } = (await review()).json;
     const head = git(h.repo, "rev-parse", "HEAD");
-    expect(await (await get(`/api/batches/${batchId}/context`)).json()).toEqual({ head, branch: "main", mergeBase: head, defaultBranch: "main" });
+    expect(await (await get(`/api/batches/${batchId}/context`)).json()).toEqual({ head, branch: "main" });
     git(h.repo, "checkout", "--quiet", "-b", "topic");
     const moved = await commit(h.repo, "on a branch");
-    expect(await (await get(`/api/batches/${batchId}/context`)).json()).toEqual({ head: moved, branch: "topic", mergeBase: head, defaultBranch: "main" });
+    expect(await (await get(`/api/batches/${batchId}/context`)).json()).toEqual({ head: moved, branch: "topic" });
     expect((await get(`/api/batches/${UNKNOWN_BATCH}/context`)).status).toBe(404);
   });
 
@@ -58,8 +58,7 @@ describe("which batch", () => {
       for (const response of [
         await get(`/api/batches/${batch}`),
         await get(`/api/batches/${batch}/unchanged`),
-        await get(`/api/batches/${batch}/baseline`),
-        await acceptBatch(batch),
+        await get(`/api/batches/${batch}/context`),
         await decideOn(batch, "approved", [{ story: "a", imageHash: UNKNOWN_HASH }]),
       ]) {
         expect(response.status, batch).toBe(status);
@@ -72,7 +71,7 @@ describe("which batch", () => {
 describe("the batch view", () => {
   test("gives counts, blockers, advisories, and states, and never a file path", async () => {
     h.stories = [{ id: "same" }, { id: "differs" }, { id: "gone" }, { id: "breaks" }];
-    await makeGoldens();
+    await approveAll();
     h.stories = [
       { id: "same", errors: [{ source: "play", message: "It threw" }] },
       { id: "differs", color: BLUE },
@@ -83,7 +82,7 @@ describe("the batch view", () => {
     const response = await get(`/api/batches/${json.batchId}`);
     expect(response.headers.get("cache-control")).toBe("no-store");
     const view = (await response.json()) as any;
-    expect(view.counts).toEqual({ stories: 4, unchanged: 1, changed: 1, added: 1, removed: 1, failed: 1, undecided: 2, advisories: 1 });
+    expect(view.counts).toEqual({ stories: 4, unchanged: 1, changed: 1, added: 1, removed: 1, failed: 1, undecided: 3, advisories: 1 });
     expect(view.rows.map(({ story, state }: any) => [story, state])).toEqual([
       ["breaks", "failed"],
       ["differs", "changed"],
@@ -95,8 +94,8 @@ describe("the batch view", () => {
     expect(view.advisories).toEqual([{ story: "same", reason: "play-error", detail: "It threw" }]);
     expect(view.rows.find(({ story }: any) => story === "breaks")).toMatchObject({ failure: "render: It broke", imageHash: null });
     expect(view.rows.find(({ story }: any) => story === "differs").pixelDiff).toMatchObject({ changedPixels: 64 });
-    expect(view.removals).toEqual({ stories: ["gone"], outsideFilter: 0 });
-    expect(view.batch.baselineSha).toBe(json.baseline.sha);
+    expect(view.outsideFilter).toBe(0);
+    expect(view.batch.baselineSha).toBeNull();
     expect(view.actor).toBe("tester@example.com");
     expect(view.siblings.map(({ id }: any) => id)).toContain(json.batchId);
 
@@ -107,7 +106,7 @@ describe("the batch view", () => {
 
   test("lists unchanged stories only when asked", async () => {
     h.stories = [{ id: "same" }, { id: "also-same" }];
-    const goldens = await makeGoldens();
+    const approved = await approveAll();
     const { json } = await review();
     expect((await viewOf(json.batchId)).rows).toEqual([]);
     const { rows } = (await (await get(`/api/batches/${json.batchId}/unchanged`)).json()) as any;
@@ -115,28 +114,16 @@ describe("the batch view", () => {
       ["also-same", "unchanged"],
       ["same", "unchanged"],
     ]);
-    expect(goldens).not.toBe(json.batchId);
+    expect(approved).not.toBe(json.batchId);
   });
 
-  test("explains a batch with no baseline", async () => {
+  test("says which batch each row's reference came from", async () => {
     h.stories = [{ id: "a" }];
-    const { batchId } = (await review()).json;
-    expect((await viewOf(batchId)).batch.baselineSha).toBeNull();
-    const baseline = await get(`/api/batches/${batchId}/baseline`);
-    expect(await baseline.json()).toEqual({ sha: null, message: expect.any(String) });
-    expect(baseline.headers.get("cache-control")).toBe("no-store");
-  });
-
-  test("says whose goldens a commit has, including another batch's", async () => {
-    h.stories = [{ id: "a" }];
-    const { batchId: first } = (await review()).json;
-    expect((await viewOf(first)).acceptedBatchId).toBeNull();
-    const [{ story, imageHash }] = (await viewOf(first)).rows;
-    await decideOn(first, "approved", [{ story, imageHash }]);
-    await acceptBatch(first);
-    expect((await viewOf(first)).acceptedBatchId).toBe(first);
-    const { batchId: second } = (await review()).json;
-    expect((await viewOf(second)).acceptedBatchId).toBe(first);
+    const first = await approveAll();
+    expect((await viewOf(first)).rows[0].goldenBatchId).toBeUndefined();
+    h.stories = [{ id: "a", color: BLUE }];
+    const [row] = (await viewOf((await review()).json.batchId)).rows;
+    expect(row).toMatchObject({ state: "changed", goldenBatchId: first, goldenStorybookUrl: null });
   });
 });
 
@@ -145,7 +132,7 @@ describe("a batch's scale", () => {
     h.stories = [{ id: "a--one" }];
     const standard = (await review()).json;
     expect((await viewOf(standard.batchId)).batch.scale).toBe(1);
-    await writeFile(path.join(h.repo, "selfie.config.json"), JSON.stringify({ environment: { scale: 1.5 } }));
+    await writeTestConfig(h.repo, { environment: { scale: 1.5 } });
     const scaled = (await review()).json;
     expect(scaled.environment).not.toBe(standard.environment);
     expect((await viewOf(scaled.batchId)).batch.scale).toBe(1.5);
@@ -154,13 +141,13 @@ describe("a batch's scale", () => {
 
 describe("a batch that reused an earlier render", () => {
   test("its view says which batch really rendered it, and a rendered batch's says none", async () => {
-    const build = path.join(h.scratch, "build");
+    const build = path.join(h.repo, TEST_CONFIG.storybookDir);
     await mkdir(build);
     await writeFile(path.join(build, "iframe.html"), "<html></html>");
     h.stories = [{ id: "a--one" }];
-    const rendered = (await h.cli("review", "--storybook-dir", build)).json;
+    const rendered = (await h.cli("review")).json;
     await commit(h.repo, "elsewhere");
-    const reused = (await h.cli("review", "--storybook-dir", build)).json;
+    const reused = (await h.cli("review")).json;
     expect(reused.reusedFromBatch).toBe(rendered.batchId);
     expect((await viewOf(rendered.batchId)).batch.reusedFromBatch).toBeNull();
     expect((await viewOf(reused.batchId)).batch.reusedFromBatch).toBe(rendered.batchId);
@@ -198,7 +185,7 @@ describe("images", () => {
 
   test("computes a diff on demand, and still works once the batch's directory is pruned", async () => {
     h.stories = [{ id: "a" }];
-    await makeGoldens();
+    await approveAll();
     h.stories = [{ id: "a", patch: [1, 2, 1, 1, BLUE] }];
     const { batchId } = (await review()).json;
     const batches = path.join(project.directory, "batches");
@@ -235,7 +222,7 @@ describe("images", () => {
 
   test("a diff's stats and image asked for together both answer", async () => {
     h.stories = [{ id: "a" }];
-    await makeGoldens();
+    await approveAll();
     h.stories = [{ id: "a", color: BLUE }];
     const [row] = (await viewOf((await review()).json.batchId)).rows;
     const url = `/api/diffs/${row.imageHash}/${row.goldenHash}`;
@@ -247,7 +234,7 @@ describe("images", () => {
 
   test("a different size has stats and a diff image", async () => {
     h.stories = [{ id: "a" }];
-    await makeGoldens();
+    await approveAll();
     h.stories = [{ id: "a", width: 10, height: 6 }];
     const [row] = (await viewOf((await review()).json.batchId)).rows;
     const url = `/api/diffs/${row.imageHash}/${row.goldenHash}`;

@@ -1,15 +1,15 @@
 // Arguments in, one document and an exit code out. The work is the library's.
 import { parseArgs, type ParseArgsConfig } from "node:util";
 import type { render } from "selfie-render";
-import { resolveRenderSettings, resolveStorybookDir } from "./config.ts";
-import { accept, decide } from "./decisions.ts";
-import { buildAcceptDocument, buildRenderDocument, buildReviewDocument } from "./document.ts";
+import { resolveRenderSettings } from "./config.ts";
+import { decide } from "./decisions.ts";
+import { buildRenderDocument, buildReviewDocument } from "./document.ts";
 import { SelfieError } from "./errors.ts";
 import { gitUserEmail, resolveCommit } from "./git.ts";
-import { compareAsReviewed, findBaseline, openProject, type Project } from "./project.ts";
-import { buildIfAsked, renderBatch, review, replyToNote } from "./review.ts";
+import { compareAsReviewed, openProject, type Project } from "./project.ts";
+import { renderBatch, review, replyToNote, runBuild } from "./review.ts";
 import { summarizeBatch } from "./summary.ts";
-import { findBaselineWithRemote, pull, push, requireRemote, resolveRemote, type Fetch } from "./sync.ts";
+import { pull, push, requireRemote, type Fetch } from "./sync.ts";
 import { isNoteId, isNoteText, MAX_NOTE_CHARACTERS } from "selfie-ui/notes";
 import { awaitFeedback, notesForAgent } from "./notes.ts";
 
@@ -19,7 +19,7 @@ const EXIT_COULD_NOT_RUN = 2;
 const EXIT_TIMED_OUT = 3;
 const EXIT_STOPPED = 130;
 
-const USAGE = `Usage: selfie [--port <n>] [--storybook-dir <dir>] [--native] [--no-build] [--no-open]
+const USAGE = `Usage: selfie [--port <n>] [--native] [--no-build] [--no-open]
        selfie <command>
 
   With no command, opens every story of a built Storybook, running, to look at and write notes
@@ -27,22 +27,19 @@ const USAGE = `Usage: selfie [--port <n>] [--storybook-dir <dir>] [--native] [--
   config's buildCommand, unless --no-build, and opens a browser if it's at a terminal, unless
   --no-open.
 
-  render [--storybook-dir <dir>] [--build | --build-command <cmd>] [--story <pattern>]... [--native]
+  render [--build] [--story <pattern>]... [--native]
       Always renders a built Storybook, and records a batch. Prints what it recorded, and judges
       nothing. Exits 0 once a batch is recorded, even with failed stories, or 2 if it couldn't run.
 
-  review [<batch>] [--baseline <commit-or-batch>] [--storybook-dir <dir>] [--build | --build-command <cmd>]
-         [--story <pattern>]... [--native]
-      Prints a JSON diff of a batch against its baseline. With no <batch>, uses the batch for this
+  review [<batch>] [--baseline <commit-or-batch>] [--build] [--story <pattern>]... [--native]
+      Prints a JSON diff of a batch against what history has approved. With no <batch>, uses the batch for this
       exact built Storybook, and records one only if there's none yet, so call render first to render
-      again. --baseline compares with those goldens or that batch for this review alone, and is
-      how to look for flakiness: render twice, then review the second --baseline the first.
-      If the default branch has no goldens yet, it compares with the nearest on this branch and
-      says so, which accept doesn't rely on. Exits 0 if nothing blocks it, 1 if something does or
+      again. --baseline compares with what that commit's history approved, or with that batch, for
+      this review alone, and is how to look for flakiness: render twice, then review the second
+      --baseline the first. Exits 0 if nothing blocks it, 1 if something does or
       anything differs from a --baseline, 2 if the review couldn't run. Play errors are advisories, and don't change the exit code.
 
-  flakes [--times <n>] [--concurrency <n>] [--storybook-dir <dir>] [--build | --build-command <cmd>]
-         [--story <pattern>]... [--native]
+  flakes [--times <n>] [--concurrency <n>] [--build] [--story <pattern>]... [--native]
       Renders a built Storybook --times times, 3 by default, and prints what wasn't the same each
       time, biggest difference first, with the images to look at. Records no batch and stores
       nothing. Exits 0 if every story held still, 1 if any didn't, 2 if it couldn't run.
@@ -54,17 +51,10 @@ const USAGE = `Usage: selfie [--port <n>] [--storybook-dir <dir>] [--native] [--
 
   approve <batch> (--all | --story <pattern>...) [--actor <who>]
   reject <batch> (--all | --story <pattern>...) [--actor <who>]
-      Decides on a batch's changed and added images. Works on a dirty tree.
+      Decides on what a batch changed, added, or removed. An approval counts from the batch's commit,
+      for that commit and whatever comes after it, without rendering again. Works on a dirty tree.
 
-  accept <batch> [--removed <n>]
-      Makes a batch the goldens of its Git SHA. Needs a batch recorded on a clean tree, every
-      changed or new image approved, and --removed <n> if the baseline has stories this batch
-      lacks.
-
-  find-baseline [--native]
-      Prints the nearest SHA at or before the merge-base with complete goldens, or null.
-
-  ui [<batch>] [--port <n>] [--storybook-dir <dir>] [--native]
+  ui [<batch>] [--port <n>] [--native]
       Serves the review UI on loopback until stopped, and prints its URL. Opens at this batch, or
       else every story, each with its newest render. It renders only when someone asks it to on
       the page. Opens no browser by itself. Hosts the built Storybook on a port of its own, so a
@@ -96,9 +86,10 @@ const USAGE = `Usage: selfie [--port <n>] [--storybook-dir <dir>] [--native] [--
       any here. Exits 1 if it has none.
 
 Local data lives under ~/.config/selfie/<git-origin-slugified>/, or $SELFIE_HOME instead of
-~/.config/selfie. A project configures Selfie in selfie.config.json at its Git top level:
-environment, initScript, hunkMergeDistance, storybookDir, which --storybook-dir overrides, and
-buildCommand, which only selfie alone and --build run, and which runs from that top level. A story pattern matches IDs, where * matches any batch of characters.
+~/.config/selfie. A project configures Selfie in selfie.config.json at its Git top level, and
+nowhere else. selfie alone, render, review, flakes, ui, push, and pull need one,
+holding at least storybookDir and buildCommand, which only selfie alone and --build run, from that
+top level. It may also set environment, initScript, settleMs, storyTimeoutMs, and hunkMergeDistance. A story pattern matches IDs, where * matches any batch of characters.
 `;
 
 /** What a command reaches the outside through, so tests can supply their own. */
@@ -163,8 +154,6 @@ async function withProject(context: Context, work: (project: Project) => Promise
 
 /** What says how to get a batch from a built Storybook, for `render` and for a `review` that may need one. */
 const BUILD_OPTIONS = {
-  "storybook-dir": { type: "string" },
-  "build-command": { type: "string" },
   build: { type: "boolean" },
   native: { type: "boolean" },
   story: { type: "string", multiple: true },
@@ -173,7 +162,6 @@ const BUILD_OPTIONS = {
 const SERVING_OPTIONS = {
   port: { type: "string", default: "0" },
   native: { type: "boolean" },
-  "storybook-dir": { type: "string" },
 } as const;
 
 function portFrom(value: string | undefined): number {
@@ -189,7 +177,6 @@ async function serveReview(
   options: {
     readonly port: number;
     readonly native: boolean | undefined;
-    readonly storybookDir: string | undefined;
     /** Which page to say to open. */
     readonly path: string;
     readonly batchId: string | null;
@@ -201,9 +188,9 @@ async function serveReview(
   // Only here, so that no other command loads a web server.
   const [{ isBuiltStorybook, serveReviewWithStorybook }, { localReviewSource }] = await Promise.all([import("selfie-ui/local"), import("./ui.ts")]);
   const settings = await resolveRenderSettings(project.repo, { native });
-  const dir = resolveStorybookDir(project.cwd, options.storybookDir, settings);
+  const dir = settings.storybookDir;
   if (forStories !== undefined) {
-    if (forStories.build) await buildIfAsked(settings.buildCommand, project.repo.root, context.signal, (line) => context.stderr(`${line}\n`));
+    if (forStories.build) await runBuild(project, settings, context.signal, (line) => context.stderr(`${line}\n`));
     if (!isBuiltStorybook(dir)) context.stderr(`There's no built Storybook at ${dir} yet. The page says what to do.\n`);
   }
   const servers = await serveReviewWithStorybook({
@@ -213,8 +200,8 @@ async function serveReview(
         storybook: {
           dir,
           url,
-          render: async (stories) =>
-            (await renderBatch(project, { storybookDir: dir, native, stories, render: context.render, log: (line) => context.stderr(`${line}\n`) })).batch.id,
+          renderStories: async (stories) =>
+            (await renderBatch(project, { native, stories, render: context.render, log: (line) => context.stderr(`${line}\n`) })).batch.id,
         },
       }),
     port: options.port,
@@ -243,7 +230,6 @@ function openEveryStory(args: string[], context: Context): Promise<number> {
     serveReview(context, project, {
       port,
       native: values.native,
-      storybookDir: values["storybook-dir"],
       path: "",
       batchId: null,
       forStories: { build: values["no-build"] !== true, open: values["no-open"] !== true },
@@ -251,11 +237,9 @@ function openEveryStory(args: string[], context: Context): Promise<number> {
   );
 }
 
-function renderBatchOptions(values: ReturnType<typeof parse<typeof BUILD_OPTIONS>>["values"], context: Context) {
+function batchOptionsFrom(values: ReturnType<typeof parse<typeof BUILD_OPTIONS>>["values"], context: Context) {
   return {
-    storybookDir: values["storybook-dir"],
-    buildCommand: values["build-command"],
-    buildFromConfig: values.build,
+    build: values.build,
     native: values.native,
     stories: values.story,
     render: context.render,
@@ -275,7 +259,7 @@ async function dispatch(command: string | undefined, args: string[], context: Co
       const { values, positionals } = parse(args, BUILD_OPTIONS);
       noPositionals(command, positionals);
       return withProject(context, async (project) => {
-        const result = await renderBatch(project, renderBatchOptions(values, context));
+        const result = await renderBatch(project, batchOptionsFrom(values, context));
         printTimings(context, result.timings);
         printJson(context, buildRenderDocument(result));
         return EXIT_OK;
@@ -289,7 +273,7 @@ async function dispatch(command: string | undefined, args: string[], context: Co
       const concurrency = values.concurrency === undefined ? undefined : positiveInteger("--concurrency", values.concurrency);
       return withProject(context, async (project) => {
         const { findFlakes } = await import("./flakes.ts");
-        const report = await findFlakes(project, { ...renderBatchOptions(values, context), times, concurrency });
+        const report = await findFlakes(project, { ...batchOptionsFrom(values, context), times, concurrency });
         printJson(context, { schemaVersion: 1, ...report });
         return report.flaky.length === 0 ? EXIT_OK : EXIT_NEEDS_ATTENTION;
       });
@@ -316,7 +300,7 @@ async function dispatch(command: string | undefined, args: string[], context: Co
         const baseline = values.baseline;
         const result = await review(
           project,
-          batch === undefined ? { ...renderBatchOptions(values, context), baseline } : { batch, baseline },
+          batch === undefined ? { ...batchOptionsFrom(values, context), baseline } : { batch, baseline },
         );
         printTimings(context, result.timings);
         const document = buildReviewDocument(result);
@@ -353,34 +337,6 @@ async function dispatch(command: string | undefined, args: string[], context: Co
         return result.unmatchedPatterns.length > 0 ? EXIT_NEEDS_ATTENTION : EXIT_OK;
       });
     }
-    case "accept": {
-      const { values, positionals } = parse(args, { removed: { type: "string" } });
-      const batchId = onePositional(positionals, "batch ID");
-      const { removed } = values;
-      if (removed !== undefined && !/^\d+$/.test(removed)) {
-        throw new SelfieError("usage", `--removed must be a non-negative integer, got "${removed}".`);
-      }
-      return withProject(context, async (project) => {
-        const result = await accept(project, {
-          batchId,
-          removedSeen: removed === undefined ? undefined : Number(removed),
-        });
-        const document = buildAcceptDocument(result);
-        if (document.reusedFromBatch !== null) {
-          context.stderr(`This batch's pixels came from the render of batch ${document.reusedFromBatch}.\n`);
-        }
-        if (!result.accepted) {
-          const reasons = document.refusals.map(({ message }) => `  ${message}`).join("\n");
-          context.stderr(`Not accepted:\n${reasons}\n`);
-        } else if (!result.usableAsBaseline) {
-          context.stderr(
-            `Accepted. ${document.gitSha} isn't on the default branch's first-parent history, so only later reviews on this branch will compare with these goldens.\n`,
-          );
-        }
-        printJson(context, document);
-        return result.accepted ? EXIT_OK : EXIT_NEEDS_ATTENTION;
-      });
-    }
     case "push": {
       const { values, positionals } = parse(args, { accept: { type: "boolean" }, remote: { type: "string" }, native: { type: "boolean" } });
       const [batch, ...extra] = positionals;
@@ -403,17 +359,6 @@ async function dispatch(command: string | undefined, args: string[], context: Co
         const result = await pull(project, remote, { commit: sha, native: values.native });
         printJson(context, result);
         return result.batchId === null ? EXIT_NEEDS_ATTENTION : EXIT_OK;
-      });
-    }
-    case "find-baseline": {
-      const { values, positionals } = parse(args, { native: { type: "boolean" }, remote: { type: "string" } });
-      noPositionals(command, positionals);
-      const remote = resolveRemote(values.remote, context.env, context.fetch);
-      return withProject(context, async (project) => {
-        const { environmentId } = await resolveRenderSettings(project.repo, { native: values.native });
-        const found = remote === null ? await findBaseline(project, environmentId) : await findBaselineWithRemote(project, remote, environmentId);
-        printJson(context, { ...found, environment: environmentId });
-        return EXIT_OK;
       });
     }
     case "notes": {
@@ -457,7 +402,7 @@ async function dispatch(command: string | undefined, args: string[], context: Co
       const port = portFrom(values.port);
       return withProject(context, async (project) => {
         if (batchId !== undefined) await compareAsReviewed(project, batchId);
-        return serveReview(context, project, { port, native: values.native, storybookDir: values["storybook-dir"], path: batchId === undefined ? "" : `batches/${batchId}`, batchId: batchId ?? null });
+        return serveReview(context, project, { port, native: values.native, path: batchId === undefined ? "" : `batches/${batchId}`, batchId: batchId ?? null });
       });
     }
     default:

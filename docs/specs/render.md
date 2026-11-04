@@ -22,8 +22,8 @@ A `RenderEnvironment` is a typed object:
 - **Must keep one ID format:** `container-<os>-<arch>-<hash>` or `native-<os>-<arch>-<hash>`, where the hash is 16 hex digits and the prefix is only for reading. `environmentId()` is what a render's name carries (`docs/specs/renders.md` → Render names).
 - **Must hash the image digest and platform, or the native OS, OS release, and architecture; the browser flags; viewport; scale; `recipe`; and the Playwright version.**
 - **Never hash an image's registry, the order of flags, or the order of properties**, since they can't change pixels.
-- **Never hash `settleMs` or `initScript`.** They are project input like story code, so changing them reports changed stories rather than starting new goldens. The manifest records both (rationale).
-- **Never hash a story's declared viewport.** It's project input like story code, so declaring one reports that story changed rather than starting new goldens ([A story's viewport](#a-storys-viewport)) (rationale).
+- **Never hash `settleMs` or `initScript`.** They are project input like story code, so changing them reports changed stories rather than starting over. The manifest records both (rationale).
+- **Never hash a story's declared viewport.** It's project input like story code, so declaring one reports that story changed rather than starting over ([A story's viewport](#a-storys-viewport)) (rationale).
 - **Must refuse a browser flag given twice**, since the ID sorts flags and Chromium's last duplicate wins.
 - **Must take everything else that can decide pixels from the environment's `recipe`**, which the worker reads directly, and which starts from `DEFAULT_RECIPE`:
 
@@ -38,7 +38,7 @@ A `RenderEnvironment` is a typed object:
 | `loadImages` | `true` |
 | `screenshot` | `{ animations: "disabled", caret: "hide", scale: "device", fullPage: true }` |
 
-- **Must let a project set any of those, and start new goldens by changing one**, since they're hashed like the rest (rationale).
+- **Must let a project set any of those, and start over by changing one**, since they're hashed like the rest (rationale).
 - **Must refuse a recipe setting it doesn't have, or a value it can't use**, so a typo can't quietly render the default.
 - **Never let a project set `waitSequence`, `headless`, or `serviceWorkers`.** The first says what the worker does, a container has no display, and a service worker could answer requests that the worker has to (rationale).
 - **Must bump `waitSequence` when the order of waits changes.**
@@ -51,10 +51,10 @@ A `RenderEnvironment` is a typed object:
 Source of truth: `render/src/render.ts`, `render/src/runners.ts`, `render/src/worker/worker.ts`; tests in `render/test/render.container.test.ts`, `render/test/container-args.test.ts`, with the fixture in `render/test/fixtures/storybook/`.
 
 - **Must render the `type: "story"` entries of the built Storybook's `index.json`, sorted by ID.** Docs entries are never rendered. A filter is a list of ID patterns where `*` matches any batch of characters. A pattern that matches nothing is a manifest warning.
-- **Must answer every browser request in the worker, from the built Storybook directory, on the recipe's fixed origin.** No server listens. A path outside the built Storybook or missing from it gets a 404, as does a directory with no `index.html`, since a request nobody answers holds the network wait to its bound. The wait's error names what was still in flight. The same worker batches in both runners, so the only difference between them is where it runs.
+- **Must answer every browser request in the worker, from the built Storybook directory, on the recipe's fixed origin.** No server listens. A path outside the built Storybook or missing from it gets a 404, as does a directory with no `index.html`, since a request nobody answers holds the network wait to its bound. The wait's error names what was still in flight. The same worker runs in both runners, so the only difference between them is where it runs.
 - **Must abort any request that leaves the origin, in both runners.** It is reported on the story and doesn't fail it.
 - **Must check the runner before clearing any output:** a native environment against this machine, and for a container, Docker and the image on the declared platform, pulling it once if absent. That check compares the OS and architecture `docker image inspect` reports with the declared platform (rationale), so a digest for another platform is refused, and so is a multi-platform digest unless the declared platform is the host's. **Must use a single-platform digest for any other platform.**
-- **Must run a container with no network, no capabilities, a read-only root, read-only mounts except the output directory, a non-root user, and only `HOME` in its environment.** Never pass credentials or the host's environment into it. It batches by digest with `--pull=never`, so it works offline once pulled and can't use a different image.
+- **Must run a container with no network, no capabilities, a read-only root, read-only mounts except the output directory, a non-root user, and only `HOME` in its environment.** Never pass credentials or the host's environment into it. It runs by digest with `--pull=never`, so it works offline once pulled and can't use a different image.
 - **Must give each story a fresh browser context.**
 - **Must wait, in order, for:** the page load, with the story at its viewport ([A story's viewport](#a-storys-viewport)), Storybook's render phase, no request in flight for the network quiet period; with `loadImages`, every image made eager and synchronous, the network quiet again, and every image decoded; `document.fonts.ready`, `settleMs` (default 100 ms), and two animation frames. Then it screenshots the whole page, with `animations: "disabled"`, so an image is at least the story's viewport's size and may be taller or wider (rationale). Content in an inner scroller, or a layout fixed to the viewport's height, shows only what the viewport does.
 - **Must not treat Storybook's `errored` phase as final.** A play failure passes through it on the way to `completed`, so the error display, `aborted`, and the timeout are what fail a story (rationale).

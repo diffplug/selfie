@@ -15,7 +15,7 @@ Evidence and reasoning for `docs/specs/ui.md`, keyed by its headings.
 ## Routes
 
 - **Why targets are taken exactly.** `decide` also takes patterns, where `*` matches anything, and a story's ID comes from a project's built Storybook. An ID `a*` passed as a pattern also approves `ab`, which the reviewer never saw. `cli/test/ui-*.test.ts` checks this with those two IDs.
-- **Why a request names hashes.** A decision belongs to a name and a hash, so naming them says what the reviewer saw. A later accepted batch can change a baseline's goldens, and so a batch's differences, while a page is open. `stale-decision` is the difference between a confused screen and a wrong approval.
+- **Why a request names hashes.** A decision belongs to a name and a hash, so naming them says what the reviewer saw. A newer approval can change what a batch is compared with, and so its differences, while a page is open. `stale-decision` is the difference between a confused screen and a wrong approval.
 - **Why bulk has no route of its own.** A server-side "all" would approve whatever is there at that moment, and the dialog would describe something else.
 
 ## Recomputing
@@ -32,7 +32,7 @@ Evidence and reasoning for `docs/specs/ui.md`, keyed by its headings.
 - **Why `firstChanged` is in `PixelDiff`.** The diff loop already visits every pixel, and only the server has the pixels at no extra cost. It adds one field to `selfie review`'s document.
 - **Why two kinds of size.** 1× was one CSS pixel at first, so that an image wouldn't be half the width on some screens and not others. Actual size now gives that consistent size, and a person looking for one wrong pixel needs to know what a pixel on their screen is, which only device pixels can say. A 1× image on a 2× display is half its actual width at 1×, and that's the point of choosing it.
 - **Why the layers stay stacked.** A reviewer finding a 1 px change flips between two images and watches for what moves, which only works with no shift and no flash. Each layer's key is its URL, so moving to another story can't show the last story's image while its own loads, which could otherwise get the wrong image approved.
-- **Why reuse a review's stats.** A later accepted batch could change a baseline's goldens under a batch, and then `review.json`'s stats would describe the old pair while the images show the new one. That's rare, and it only misstates numbers, against a request for every story.
+- **Why reuse a review's stats.** A newer approval could change what a batch is compared with, and then `review.json`'s stats would describe the old pair while the images show the new one. That's rare, and it only misstates numbers, against a request for every story.
 - **Why thumbnails, given they cost a read each.** They're lazy, and 30 load on opening a 512 row list. They let someone scan for the one that's different, which pixel counts don't.
 
 **Live stories.** Closed by default since a page per side is a lot to load for what most reviews don't need. They lay out at the rendered viewport and scale to fit, since a story laid out at half the width could look nothing like its image. Each side has its own size, since a story can declare one at one commit and not the other. They're a map of the few stories with a size of their own, beside the one size, rather than a field on every row, since nearly every row would hold the same thing. They aren't frozen, as a render is, so they can differ from an image without anything being wrong, which the screen says. Each story gets a new frame, since moving one frame along would add to the browser's history, and Back would walk through stories in it.
@@ -43,11 +43,11 @@ Evidence and reasoning for `docs/specs/ui.md`, keyed by its headings.
 
 **`/` is every story.** It used to go to the newest batch at HEAD, or stop at "No batches yet", which is where a first batch landed, with nothing to do there. A story is there to look at before any batch exists, so that's the place to start, and a batch is a step reached from it.
 
-**A checklist, not an error from `selfie`.** A person's first `selfie` in a repository usually has no built Storybook, and maybe no config. Stopping with an error leaves them with a sentence to act on and no page, and then they have to start it again. Each line is only ever a fact the server can read, so the same list explains a new commit with nothing rendered at it, and there's no "first batch" to remember. A built Storybook that isn't ignored by Git is worth naming: it marks every render as uncommitted, and was found by trying this on a new repository.
+**A checklist, not an error from `selfie`.** A person's first `selfie` in a repository usually has no built Storybook. Stopping with an error leaves them with a sentence to act on and no page, and then they have to start it again. Each line is only ever a fact the server can read, so the same list explains a new commit with nothing rendered at it, and there's no "first batch" to remember. A built Storybook that isn't ignored by Git is worth naming: it marks every render as uncommitted, and was found by trying this on a new repository.
 
 **What "clean" can mean.** A built Storybook may not have been made by Selfie, so nothing records what it came from. Comparing its time with when HEAD last moved, from the reflog, catches a commit or checkout since it was built, which the commit's own time wouldn't for moving to an older commit. It can't catch changes that were there during a build and then reverted, which is why it's a time and not a guarantee.
 
-**A rename is only said.** Storybook gives a story its ID from its title and name, so moving one reads as one removed and one new. An identical image is good evidence and not proof, so it changes what a person reads and not what's recorded: a golden still needs approving under its new name, and its loss still needs acknowledging. A rename that also changed pixels reads as a new and a removed, since no comparison is made across names.
+**A rename is only said.** Storybook gives a story its ID from its title and name, so moving one reads as one removed and one added. An identical image is good evidence and not proof, so it changes what a person reads and not what's recorded: a golden still needs approving under its new name, and its loss still needs acknowledging. A rename that also changed pixels reads as an added and a removed, since no comparison is made across names.
 
 **A sidebar, as in Storybook.** With the list as a page of its own, moving between stories meant going back to it, and a person who knows Storybook looks left for them. It takes the table's columns with it, so a row says only a story's state and any caveat, and a story's page says the rest.
 
@@ -66,11 +66,11 @@ Evidence and reasoning for `docs/specs/ui.md`, keyed by its headings.
 
 ## Accessibility
 
-axe-core 4.10.3 was run on the no batches, no commits, run, filtered batch, accept, side by side, stacked, and shortcuts screens in a real browser. It found one issue, a link in text told apart only by color. Primer's `inline` underlines one only under `data-a11y-link-underlines="true"`, so `ui/index.html` sets that on the body. Primer's own components passed.
+axe-core 4.10.3 was run on the no batches, no commits, batch, filtered batch, accept, side by side, stacked, and shortcuts screens in a real browser. It found one issue, a link in text told apart only by color. Primer's `inline` underlines one only under `data-a11y-link-underlines="true"`, so `ui/index.html` sets that on the body. Primer's own components passed.
 
 ## Scale
 
-Measured in headless Chromium through Playwright on a Mac, on a copy of the end-to-end store, against a batch of 541 stories with 512 listed, all new, and its batch directory pruned:
+Measured in headless Chromium through Playwright on a Mac, on a copy of the end-to-end store, against a batch of 541 stories with 512 listed, all added, and its batch directory pruned:
 
 | What | Measured |
 |---|---|

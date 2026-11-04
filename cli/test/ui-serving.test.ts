@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, test } from "vitest";
 import { runCli } from "../src/cli.ts";
 import { localReviewSource } from "../src/ui.ts";
 import { UNKNOWN_BATCH, h, project, clientDir, review } from "./ui-support.ts";
+import { TEST_CONFIG, writeTestConfig } from "./support.ts";
 
 describe("selfie ui", () => {
   const serve = async (command: string, ...argv: string[]) => {
@@ -63,13 +64,13 @@ describe("selfie ui", () => {
       await Promise.race([printed, exit]);
       return { stop, exit, json: () => JSON.parse(stdout), stderr: () => stderr };
     };
-    const dir = () => path.join(h.scratch, "a-storybook");
+    const dir = () => path.join(h.repo, TEST_CONFIG.storybookDir);
     const writeBuild = async () => {
       await mkdir(dir(), { recursive: true });
       await writeFile(path.join(dir(), "iframe.html"), "<!doctype html><title>the preview</title>");
       await writeFile(path.join(dir(), "index.json"), JSON.stringify({ entries: { a: { type: "story", id: "a" } } }));
     };
-    const config = (fields: Record<string, unknown>) => writeFile(path.join(h.repo, "selfie.config.json"), JSON.stringify(fields));
+    const config = (fields: Record<string, unknown>) => writeTestConfig(h.repo, fields);
     /** A build the config says how to run, which leaves a mark at the top level it ran from. */
     const buildScript = async () => {
       const script = path.join(h.scratch, "build.mjs");
@@ -83,7 +84,7 @@ describe("selfie ui", () => {
 
     test("opens at every story, in a browser, and says where", async () => {
       await writeBuild();
-      const { stop, exit, json, stderr } = await bare("--storybook-dir", dir());
+      const { stop, exit, json, stderr } = await bare();
       const { url, port, storybookUrl, batchId } = json();
       expect(url).toBe(`http://127.0.0.1:${port}/`);
       expect(batchId).toBeNull();
@@ -99,7 +100,7 @@ describe("selfie ui", () => {
 
     test("--no-open leaves the browser alone", async () => {
       await writeBuild();
-      const { stop, exit } = await bare("--storybook-dir", dir(), "--no-open");
+      const { stop, exit } = await bare("--no-open");
       expect(opened).toEqual([]);
       stop.abort();
       expect(await exit).toBe(0);
@@ -108,7 +109,7 @@ describe("selfie ui", () => {
     test("runs the config's build command first, from the Git top level, saying what it is", async () => {
       const command = await buildScript();
       await config({ buildCommand: command });
-      const { stop, exit, json, stderr } = await bare("--storybook-dir", dir());
+      const { stop, exit, json, stderr } = await bare();
       expect(stderr()).toContain(`Building: ${command}`);
       expect(await (await fetch(`${json().storybookUrl}iframe.html`)).text()).toBe("built");
       await expect(readdir(h.repo)).resolves.toContain("built-here");
@@ -119,7 +120,7 @@ describe("selfie ui", () => {
     test("--no-build doesn't run it", async () => {
       await writeBuild();
       await config({ buildCommand: await buildScript() });
-      const { stop, exit, stderr } = await bare("--storybook-dir", dir(), "--no-build");
+      const { stop, exit, stderr } = await bare("--no-build");
       expect(stderr()).not.toContain("Building:");
       await expect(readdir(h.repo)).resolves.not.toContain("built-here");
       stop.abort();
@@ -127,12 +128,12 @@ describe("selfie ui", () => {
     });
 
     test("with no build yet, still serves, for the page to say what to do", async () => {
-      const { stop, exit, json, stderr } = await bare("--storybook-dir", path.join(h.scratch, "nothing-here"));
+      const { stop, exit, json, stderr } = await bare();
       expect(stderr()).toContain("There's no built Storybook");
       expect(opened).toEqual([json().url]);
       const { canRender, setup } = (await (await fetch(`${json().url}api/stories`)).json()) as StoriesView;
       expect(canRender).toBe(false);
-      expect(setup?.buildCommand).toBeNull();
+      expect(setup?.buildCommand).toBe(TEST_CONFIG.buildCommand);
       stop.abort();
       expect(await exit).toBe(0);
     });
@@ -173,27 +174,21 @@ describe("selfie ui", () => {
       await writeBuild();
       await config({ buildCommand: await buildScript() });
       for (const command of ["render", "review"]) {
-        expect((await h.cli(command, "--storybook-dir", dir())).code, command).not.toBe(2);
+        expect((await h.cli(command)).code, command).not.toBe(2);
         await expect(readdir(h.repo)).resolves.not.toContain("built-here");
       }
       await rm(path.join(h.repo, "built-here"), { force: true });
-      const built = await h.cli("render", "--storybook-dir", dir(), "--build");
+      const built = await h.cli("render", "--build");
       expect(built.code).toBe(0);
       await expect(readdir(h.repo)).resolves.toContain("built-here");
     });
-
-    test("--build says so if the config has no build command", async () => {
-      const refused = await h.cli("render", "--storybook-dir", "ignored", "--build");
-      expect(refused.code).toBe(2);
-      expect(refused.json.error).toMatchObject({ code: "usage", message: expect.stringContaining("buildCommand") });
-    });
   });
 
-  test("hosts a Storybook on a port of its own, saying where, and --storybook-dir picks which", async () => {
-    const dir = path.join(h.scratch, "a-storybook");
+  test("hosts the config's Storybook on a port of its own, saying where", async () => {
+    const dir = path.join(h.repo, TEST_CONFIG.storybookDir);
     await mkdir(dir, { recursive: true });
     await writeFile(path.join(dir, "iframe.html"), "<!doctype html><title>the preview</title>");
-    const { stop, exit, json } = await start("--storybook-dir", dir);
+    const { stop, exit, json } = await start();
     const { port, storybookUrl, url } = json();
     expect(new URL(storybookUrl).port).not.toBe(String(port));
     const frame = await fetch(`${storybookUrl}iframe.html`);

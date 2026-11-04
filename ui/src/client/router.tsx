@@ -5,7 +5,6 @@ import { useSyncExternalStore, type MouseEvent } from "react";
 export type Route =
   | { readonly kind: "batch"; readonly batchId: string }
   | { readonly kind: "story"; readonly batchId: string; readonly story: string }
-  | { readonly kind: "accept"; readonly batchId: string }
   | { readonly kind: "stories" }
   | { readonly kind: "anyStory"; readonly story: string }
   | { readonly kind: "missing" };
@@ -13,7 +12,6 @@ export type Route =
 export const batchPath = (batchId: string, query = "") => `/batches/${batchId}${query}`;
 export const storyPath = (batchId: string, story: string, query = "") =>
   `/batches/${batchId}/stories/${encodeURIComponent(story)}${query}`;
-export const acceptPath = (batchId: string) => `/batches/${batchId}/accept`;
 export const storiesPath = (query = "") => `/${query}`;
 export const anyStoryPath = (story: string, query = "") => `/stories/${encodeURIComponent(story)}${query}`;
 
@@ -30,7 +28,6 @@ export function parseRoute(pathname: string): Route {
   const [, batches, batchId, section, story, ...rest] = pathname.split("/");
   if (batches !== "batches" || batchId === undefined || batchId === "" || rest.length > 0) return { kind: "missing" };
   if (section === undefined) return { kind: "batch", batchId };
-  if (section === "accept" && story === undefined) return { kind: "accept", batchId };
   if (section === "stories" && story !== undefined && story !== "") {
     try {
       return { kind: "story", batchId, story: decodeURIComponent(story) };

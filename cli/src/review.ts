@@ -28,17 +28,15 @@ import {
   type StoryFilter,
   type StoryViewport,
 } from "selfie-store";
-import { resolveRenderSettings, resolveHunkMergeDistance, resolveStorybookDir, type RenderSettings } from "./config.ts";
+import { resolveRenderSettings, resolveHunkMergeDistance, type RenderSettings } from "./config.ts";
 import { diffToPng, type PixelDiff } from "./diff.ts";
 import { SelfieError } from "./errors.ts";
-import { dirtyPaths, headSha, resolveCommit, type BaselineSearch } from "./git.ts";
+import { ancestorsOf, currentBranch, dirtyPaths, headSha, resolveCommit } from "./git.ts";
 import { isBatchId, regularFileInside, storyDirName } from "./paths.ts";
 import { encodePng } from "./png.ts";
 import {
-  branchGoldens,
   renderDirectory,
   compareAsReviewed,
-  findBaseline,
   pruneOutput,
   requireBatch,
   batchDirectory,
@@ -52,12 +50,8 @@ const IMAGES_PER_GROUP = 100;
 const MAX_CONCURRENT_DIFFS = 6;
 
 export interface RenderBatchOptions {
-  /** Relative to the project's `cwd`. Defaults to the config's, and then to `storybook-static`. */
-  readonly storybookDir?: string | undefined;
-  /** The caller's own command, run in a shell. Its stdout goes to stderr. */
-  readonly buildCommand?: string | undefined;
   /** Run the config's `buildCommand`, from the Git top level. Only ever because someone asked. */
-  readonly buildFromConfig?: boolean | undefined;
+  readonly build?: boolean | undefined;
   /** Story ID patterns. Defaults to every story. */
   readonly stories?: readonly string[] | undefined;
   readonly native?: boolean | undefined;
@@ -70,7 +64,7 @@ export interface RenderBatchOptions {
 
 /** A batch to review, or else what to record one from if this built Storybook has none. */
 export type ReviewOptions = ({ readonly batch: string } | (RenderBatchOptions & { readonly batch?: undefined })) & {
-  /** A commit with goldens, or a finished batch. It changes this review alone: `accept` still checks the batch's own. */
+  /** A commit, whose history's approvals to compare with, or a finished batch. It changes this review alone. */
   readonly baseline?: string | undefined;
 };
 
@@ -83,7 +77,7 @@ export interface Difference {
   readonly decision: Decision | null;
   readonly imageHash: string | null;
   readonly goldenHash: string | null;
-  /** Absolute paths. `current` is null if removed, `golden` if new, `diff` unless pixels could be compared. */
+  /** Absolute paths. `current` is null if removed, `golden` if added, `diff` unless pixels could be compared. */
   readonly current: string | null;
   readonly golden: string | null;
   readonly diff: string | null;
@@ -96,14 +90,8 @@ export interface ReviewResult {
   readonly comparison: Comparison;
   /** Modified, staged, and untracked paths while it rendered. Empty for a batch that was named. */
   readonly dirtyPaths: readonly string[];
-  /** The batch's own: what `accept` checks. */
-  readonly baseline: BaselineSearch;
   /** What this review compared with instead, if anything. */
   readonly given: GivenBaseline | null;
-  /** With no baseline and nothing given, the nearest goldens on this branch, which it compared with. */
-  readonly branchGoldens: string | null;
-  /** The comparison accepting checks, which says what blocks. `comparison`, unless that's against the branch's goldens. */
-  readonly reviewed: Comparison;
   /** How close hunks group here, in image pixels. */
   readonly hunkMergeDistance: number;
   /** Within the batch's filter. */
@@ -123,16 +111,11 @@ export interface ReviewResult {
   };
 }
 
-/** Builds, if someone asked to. Nothing else ever runs a shell. */
-export async function buildIfAsked(command: string | undefined, cwd: string, signal: AbortSignal | undefined, log: (line: string) => void): Promise<void> {
-  if (command === undefined) return;
+/** Runs the config's build, from the Git top level, which only someone asking leads to. Nothing else ever runs a shell. */
+export async function runBuild(project: Project, { buildCommand: command }: RenderSettings, signal: AbortSignal | undefined, log: (line: string) => void): Promise<void> {
   log(`Building: ${command}`);
-  await runBuildCommand(command, cwd, signal);
-}
-
-function runBuildCommand(command: string, cwd: string, signal: AbortSignal | undefined): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const child = spawn(command, { shell: true, cwd, stdio: ["ignore", 2, 2], ...(signal ? { signal } : {}) });
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn(command, { shell: true, cwd: project.repo.root, stdio: ["ignore", 2, 2], ...(signal ? { signal } : {}) });
     child.once("error", (error) =>
       reject(new SelfieError("build-failed", `The build command couldn't run: ${error.message}`)),
     );
@@ -269,8 +252,7 @@ async function exportDifference(project: Project, batchDir: string, render: Comp
 
 /** Exports what's needed to act on the comparison: only `changed` renders get diff work. */
 async function exportImages(project: Project, batchDir: string, comparison: Comparison) {
-  const { removed } = summarizeBatch(comparison);
-  const shown = [...comparison.renders.filter(({ state }) => isDecidable(state)), ...removed];
+  const shown = summarizeBatch(comparison).inFilter.filter(({ state }) => isDecidable(state));
   // Each of these holds whole images in memory.
   const limit = Math.min(MAX_CONCURRENT_DIFFS, availableParallelism());
   const differences = await mapConcurrently(shown, limit, (render) => exportDifference(project, batchDir, render));
@@ -329,7 +311,8 @@ async function replay(
 ): Promise<Recording | null> {
   const batchId = await project.renderKeys.find(identity);
   if (batchId === null || (await project.batches.getBatch(batchId))?.status !== "complete") return null;
-  const { renders } = await project.batches.compareBatch(batchId, null, { includeUnchanged: true });
+  // With no decisions, this is only every story it holds.
+  const { renders } = await project.batches.compareFromHistory(batchId, [], { includeUnchanged: true });
   const stories = renders.map((render) => ({ id: render.story, render }));
   const chosen = patterns === undefined ? stories : filterStories(stories, patterns).stories;
   const storyIds = chosen.map(({ id }) => id);
@@ -342,7 +325,7 @@ async function replay(
       chosen.map(({ render: { story, imageHash, playError } }) => ({ story, imageHash: imageHash!, playError })),
     storyViewports: () => project.storybooks.storyViewportsOf(batchId),
     finished: async () =>
-      log(`Reused the images of batch ${batchId}, since this exact built Storybook already rendered. selfie render renders again.`),
+      log(`Reused the images of batch ${batchId}, since this exact built Storybook already rendered. Run selfie render to render again.`),
   };
 }
 
@@ -354,15 +337,14 @@ function ownViewports({ environment, stories }: Manifest): Record<string, StoryV
   );
 }
 
-/** Renders the built Storybook. Only a render of every story can answer a later review, so only it is remembered. */
 /** What a render takes from a project's settings and a command's options. */
 export function renderInput(
-  { storybookDir, outDir, log }: { readonly storybookDir: string; readonly outDir: string; readonly log: (line: string) => void },
+  { outDir, log }: { readonly outDir: string; readonly log: (line: string) => void },
   settings: RenderSettings,
   options: Pick<RenderBatchOptions, "stories" | "signal">,
 ): RenderOptions {
   return {
-    storybookDir,
+    storybookDir: settings.storybookDir,
     outDir,
     environment: settings.environment,
     log,
@@ -374,29 +356,19 @@ export function renderInput(
   };
 }
 
-/** Whatever build was asked for, if one was: the config's from the Git top level, or a given command from here. */
-export async function buildAsAsked(project: Project, settings: RenderSettings, options: Pick<RenderBatchOptions, "buildCommand" | "buildFromConfig" | "signal">, log: (line: string) => void): Promise<void> {
-  if (options.buildFromConfig === true) {
-    if (settings.buildCommand === undefined) throw new SelfieError("usage", "--build runs the config's buildCommand, and selfie.config.json doesn't have one.");
-    await buildIfAsked(settings.buildCommand, project.repo.root, options.signal, log);
-  } else {
-    await buildIfAsked(options.buildCommand, project.cwd, options.signal, log);
-  }
-}
-
+/** Renders the built Storybook. Only a render of every story can answer a later review, so only it is remembered. */
 async function renderFresh(
   project: Project,
   renderDir: string,
   render: typeof realRender,
-  { storybookDir, identity, settings, options, log }: {
-    readonly storybookDir: string;
+  { identity, settings, options, log }: {
     readonly identity: string | null;
     readonly settings: RenderSettings;
     readonly options: RenderBatchOptions;
     readonly log: (line: string) => void;
   },
 ): Promise<Recording> {
-  const manifest = await render(renderInput({ storybookDir, outDir: renderDir, log }, settings, options));
+  const manifest = await render(renderInput({ outDir: renderDir, log }, settings, options));
   return {
     reusedFromBatch: null,
     storyIds: manifest.stories.map(({ id }) => id),
@@ -410,7 +382,7 @@ async function renderFresh(
         return;
       }
       // A built Storybook that changed while it rendered has no identity that describes these images.
-      const after = await renderIdentity({ storybookDir, environment: settings.environment, initScript: settings.initScript, settleMs: settings.settleMs });
+      const after = await renderIdentity({ storybookDir: settings.storybookDir, environment: settings.environment, initScript: settings.initScript, settleMs: settings.settleMs });
       const whyNot = after === identity ? whyNotReusable(manifest, batch) : "the built Storybook changed while it rendered";
       await project.renderKeys.remember(identity, whyNot === null ? batch.id : null);
       if (whyNot !== null) log(`This render won't be reused: ${whyNot}.`);
@@ -441,7 +413,7 @@ interface BatchFacts {
   readonly gitSha: string;
   readonly settings: RenderSettings;
   readonly dirty: boolean;
-  readonly baselineSha: string | null;
+  readonly branch: string | null;
   readonly storyFilter: StoryFilter | null;
 }
 
@@ -456,7 +428,7 @@ async function recordBatch(
     environment: fields.settings.environmentId,
     scale: fields.settings.environment.scale,
     dirty: fields.dirty,
-    baselineSha: fields.baselineSha,
+    branch: fields.branch,
     storyFilter: fields.storyFilter,
     reusedFromBatch: recording.reusedFromBatch,
   });
@@ -470,7 +442,6 @@ export interface RenderBatchResult {
   readonly batch: RenderBatch;
   /** Modified, staged, and untracked paths while it rendered. */
   readonly dirtyPaths: readonly string[];
-  readonly baseline: BaselineSearch;
   readonly warnings: readonly string[];
   readonly timings: { readonly renderMs: number; readonly storeMs: number; readonly totalMs: number };
 }
@@ -479,11 +450,11 @@ export interface RenderBatchResult {
 async function sameBatch(project: Project, renderedBy: string, fields: BatchFacts): Promise<RenderBatch | null> {
   const batches = await project.batches.batchesAt(fields.gitSha, fields.settings.environmentId);
   const same = batches.find(
-    ({ id, reusedFromBatch, status, dirty, baselineSha, storyFilter }) =>
+    ({ id, reusedFromBatch, status, dirty, branch, storyFilter }) =>
       (id === renderedBy || reusedFromBatch === renderedBy) &&
       status === "complete" &&
       dirty === fields.dirty &&
-      baselineSha === fields.baselineSha &&
+      branch === fields.branch &&
       JSON.stringify(storyFilter) === JSON.stringify(fields.storyFilter),
   );
   return same ?? null;
@@ -499,15 +470,14 @@ async function renderAndRecord(project: Project, options: RenderBatchOptions, { 
     // 1. Build. Whatever it writes is part of what this describes, so it comes first.
     // Before building, so a bad config doesn't cost a whole built Storybook to find out.
     const settings = await resolveRenderSettings(repo, { native: options.native });
-    await buildAsAsked(project, settings, options, log);
+    if (options.build === true) await runBuild(project, settings, options.signal, log);
 
     // 2. Read where we are.
     const gitSha = await headSha(repo);
     if (gitSha === null) {
       throw new SelfieError("no-commits", "This repository has no commits yet, and a batch is recorded against a Git SHA.");
     }
-    const storybookDir = resolveStorybookDir(project.cwd, options.storybookDir, settings);
-    const baseline = await findBaseline(project, settings.environmentId);
+    const { storybookDir } = settings;
     const dirtyBefore = await dirtyPaths(repo);
 
     // 3. Render, unless asked to reuse and this exact built Storybook already rendered.
@@ -515,7 +485,7 @@ async function renderAndRecord(project: Project, options: RenderBatchOptions, { 
     const buildBefore = await storybookHash(storybookDir);
     const identity = await renderIdentity({ storybookDir, environment: settings.environment, initScript: settings.initScript, settleMs: settings.settleMs });
     const replayed = identity !== null && reuse ? await replay(project, identity, options.stories, log) : null;
-    const recording = replayed ?? (await renderFresh(project, renderDir, render, { storybookDir, identity, settings, options, log }));
+    const recording = replayed ?? (await renderFresh(project, renderDir, render, { identity, settings, options, log }));
     const rendered = Date.now();
     assertStoriesRendered(recording.storyIds.length, storybookDir, options.stories);
 
@@ -531,7 +501,7 @@ async function renderAndRecord(project: Project, options: RenderBatchOptions, { 
       gitSha,
       settings,
       dirty: dirty.length > 0,
-      baselineSha: baseline.sha,
+      branch: await currentBranch(repo),
       storyFilter: storyFilterOf(options.stories, recording.storyIds),
     };
     const existing = recording.reusedFromBatch === null ? null : await sameBatch(project, recording.reusedFromBatch, fields);
@@ -544,13 +514,12 @@ async function renderAndRecord(project: Project, options: RenderBatchOptions, { 
       await project.storybooks.recordStoryViewports(batch.id, await recording.storyViewports());
       await keepStorybook(project, batch, storybookDir, buildBefore, log);
     } else {
-      log(`Batch ${batch.id} already describes this built Storybook at this commit, so nothing new was recorded. selfie render renders again.`);
+      log(`Batch ${batch.id} already describes this built Storybook at this commit, so nothing new was recorded. Run selfie render to render again.`);
     }
     await project.notes.rememberBatch(batch.id);
     return {
       batch,
       dirtyPaths: dirty,
-      baseline,
       warnings: recording.warnings,
       timings: { renderMs: rendered - renderStarted, storeMs: stored - rendered, totalMs: Date.now() - started },
     };
@@ -573,7 +542,6 @@ async function namedBatch(project: Project, batchId: string): Promise<RenderBatc
   return {
     batch,
     dirtyPaths: [],
-    baseline: { sha: batch.baselineSha, reason: null, message: null, defaultBranch: null, mergeBase: null },
     warnings: (batch.storyFilter?.unmatched ?? []).map(unmatchedPatternWarning),
     timings: { renderMs: 0, storeMs: 0, totalMs: 0 },
   };
@@ -588,7 +556,7 @@ async function resolveGiven(project: Project, given: string): Promise<GivenBasel
 }
 
 /**
- * Exports what differs from the baseline in a batch: one it's told to look at, or else the one
+ * Exports what differs from what's been approved in a batch: one it's told to look at, or else the one
  * for this built Storybook, recording it only if there's none. A story's failure is a fact in the result.
  * Throws if the review couldn't run.
  */
@@ -596,17 +564,17 @@ export async function review(project: Project, options: ReviewOptions): Promise<
   const started = Date.now();
   const recorded =
     options.batch !== undefined ? await namedBatch(project, options.batch) : await renderAndRecord(project, options, { reuse: true });
-  const { batch, baseline } = recorded;
+  const { batch } = recorded;
   const given = options.baseline === undefined ? null : await resolveGiven(project, options.baseline);
 
   // 6. Compare.
   const comparing = Date.now();
-  const onBranch = given === null ? await branchGoldens(project, batch) : null;
   const comparison =
-    given?.batch !== undefined
-      ? await project.batches.compareWithBatch(batch.id, given.batch)
-      : await project.batches.compareBatch(batch.id, given?.sha ?? onBranch ?? batch.baselineSha);
-  const reviewed = onBranch === null ? comparison : await project.batches.compareBatch(batch.id, batch.baselineSha);
+    given === null
+      ? await compareAsReviewed(project, batch.id)
+      : given.batch !== undefined
+        ? await project.batches.compareWithBatch(batch.id, given.batch)
+        : await project.batches.compareFromHistory(batch.id, await project.batches.decisionsAt(batch.environment, await ancestorsOf(project.repo, given.sha)));
   const compared = Date.now();
 
   // 7. Export, keep a cache of what was exported, and prune older batches. A given baseline answers
@@ -627,10 +595,7 @@ export async function review(project: Project, options: ReviewOptions): Promise<
   return {
     comparison,
     dirtyPaths: recorded.dirtyPaths,
-    baseline,
     given,
-    branchGoldens: onBranch,
-    reviewed,
     hunkMergeDistance: (await resolveHunkMergeDistance(project.repo)) * batch.scale,
     differences,
     playErrors,

@@ -20,7 +20,7 @@ export const rendered = (story: string, overrides: Partial<NonNullable<ListedSto
 });
 export const unrendered = (story: string): ListedStory => ({ story, ...named(story), render: null });
 
-export const setupOf = (setup: Partial<NonNullable<StoriesView["setup"]>>): NonNullable<StoriesView["setup"]> => ({ storybookDir: "storybook-static", buildCommand: null, uncommitted: [], builtBeforeHead: false, usesDocker: true, ...setup });
+export const setupOf = (setup: Partial<NonNullable<StoriesView["setup"]>>): NonNullable<StoriesView["setup"]> => ({ storybookDir: "storybook-static", buildCommand: "npm run build-storybook", uncommitted: [], builtBeforeHead: false, usesDocker: true, ...setup });
 
 export const view = (stories: readonly ListedStory[], overrides: Partial<StoriesView> = {}): StoriesView => ({
   head: SHA,

@@ -85,7 +85,7 @@ export function StoryFrame({ title, url, viewport }: { title: string; url: strin
 
 export function LiveStories({ row, view, open, onToggle }: { row: RenderRow; view: BatchView; open: boolean; onToggle: () => void }) {
   const current = row.state === "removed" ? null : (view.storybook?.url ?? null);
-  const golden = row.state === "added" ? null : view.goldenStorybookUrl;
+  const golden = row.goldenStorybookUrl;
   if (current === null && golden === null) return null;
   const side = (layer: "golden" | "current", url: string | null, missing: string, viewport: BatchView["viewport"]) => (
     <div className="selfie-live-side">
@@ -107,11 +107,11 @@ export function LiveStories({ row, view, open, onToggle }: { row: RenderRow; vie
       {open && (
         <>
           <Text as="p" className="selfie-muted">
-            These batch for real, so time and animation aren&apos;t frozen as they are in an image. Once you click in one, keys go to the story.
+            These run for real, so time and animation aren&apos;t frozen as they are in an image. Once you click in one, keys go to the story.
             {view.viewport === null && " This batch didn't record the size it rendered at, so these may lay out differently."}
           </Text>
           <div className="selfie-live-sides">
-            {side("golden", golden, row.state === "added" ? "An added story has no golden." : "The golden's built Storybook wasn't kept.", view.goldenStoryViewports[row.story] ?? view.viewport)}
+            {side("golden", golden, row.state === "added" ? "An added story has no golden." : "The golden's built Storybook wasn't kept.", row.goldenViewport ?? view.viewport)}
             {side("current", current, "A removed story isn't in this batch.", view.storyViewports[row.story] ?? view.viewport)}
           </div>
         </>

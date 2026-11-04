@@ -20,7 +20,7 @@ With the flag, 7 full batches of all 541 stories, across the settle times, quiet
 
 **Housekeeping flags.** `--use-mock-keychain --password-store=basic` stop macOS keychain prompts. The container's PNGs were byte-identical with them and without them on 30 of 30 sample stories, so they don't belong in the ID.
 
-**Settle time outside the ID.** With a project's timers frozen, settle times from 0 to 500 ms gave identical PNGs on all 541 stories, so tuning it shouldn't restart goldens. A story that does depend on it reports as changed, like any other project input.
+**Settle time outside the ID.** With a project's timers frozen, settle times from 0 to 500 ms gave identical PNGs on all 541 stories, so tuning it shouldn't start approvals over. A story that does depend on it reports as changed, like any other project input.
 
 **A declared viewport outside the ID.** It's in a story, as its code is, so it reaches the image the same way: that story reads as changed, a person looks, and every other story keeps its goldens. The order of the waits didn't change either, since a loaded story always comes before the render phase, so `waitSequence` stayed where it was.
 
@@ -117,7 +117,7 @@ The reverse was left out too, for the same complexity: retrying a story that doe
 
 **The app decides, and the renderer adapts.** Measured on this repository's 134 stories, 2026-11: `loading="lazy"` and `decoding="async"` made images below the fold differ between renders. Changing the app would have fixed them here, and left every other project with the same flake and the advice to change how its product loads images. So the renderer loads and decodes them itself, and the app kept its attributes.
 
-**Configurable, with new goldens.** A project may really want dark mode, its own locale, or its own origin. These are hashed, so changing one starts new goldens for that project alone, rather than reading as every story changing.
+**Configurable, starting over.** A project may really want dark mode, its own locale, or its own origin. These are hashed, so changing one starts approvals over for that project alone, rather than reading as every story changing.
 
 **What stays fixed.** A setting that would stop the worker answering every request, or that couldn't work in a container, isn't a choice a project can usefully make.
 

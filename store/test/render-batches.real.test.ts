@@ -1,11 +1,11 @@
 // The render contract against real D1, over the network. Opt-in through `pnpm test:d1`
-// or, on its own, `pnpm test:d1:renders` in `store/`, since it needs credentials and
+// or, on its own, `pnpm test:d1:render-batches` in `store/`, since it needs credentials and
 // spends the account's shared API rate limit. Only one batch of any real-D1 suite at a time: all of
 // them use the same database.
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { RenderBatches, Sql, type RecordedRender, type SqlStatement } from "../src/core/index.ts";
-import { describeBatchContract } from "./contract/renders-contract.ts";
+import { describeBatchContract } from "./contract/render-batches-contract.ts";
 import type { D1Harness } from "./support/d1-harness.ts";
 import { d1Harness } from "./support/real-d1.ts";
 import { hashOf } from "./support/sql-params.ts";
@@ -24,7 +24,7 @@ const NEW = 50;
 const FAILED = 50;
 const REMOVED = 50;
 
-describe.skipIf(!ENABLED)("real D1 renders (opt-in: pnpm test:d1:renders)", () => {
+describe.skipIf(!ENABLED)("real D1 renders (opt-in: pnpm test:d1:render-batches)", () => {
   let harness: D1Harness;
 
   beforeAll(async () => {

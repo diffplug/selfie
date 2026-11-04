@@ -10,6 +10,8 @@ const row = (story: string, overrides: Partial<RenderRow> = {}): RenderRow => ({
   failure: null,
   playError: null,
   decision: null,
+  goldenStorybookUrl: null,
+  goldenViewport: null,
   pixelDiff: null,
   ...overrides,
 });
@@ -28,7 +30,7 @@ const rows = [
 
 test("each option shows what it names", () => {
   const show = (value: Parameters<typeof applyFilter>[1]["show"]) => stories(applyFilter(rows, { text: "", show: value }));
-  expect(show("undecided")).toEqual(["button--large", "card--new"]);
+  expect(show("undecided")).toEqual(["button--large", "card--new", "gone"]);
   expect(show("approved")).toEqual(["button--small"]);
   expect(show("removed")).toEqual(["gone"]);
   expect(show("failed")).toEqual(["broken"]);
@@ -41,8 +43,8 @@ test("every word must appear, in any order, ignoring case", () => {
   expect(applyFilter(rows, { text: "button nothing", show: "all" })).toEqual([]);
 });
 
-test("a bulk decision targets only what has an image to decide on", () => {
-  expect(stories(decidableIn(rows))).toEqual(["button--large", "button--small", "card--new"]);
+test("a bulk decision targets only what can take a decision, which a removal can", () => {
+  expect(stories(decidableIn(rows))).toEqual(["button--large", "button--small", "card--new", "gone"]);
 });
 
 test("neighbors skip what's filtered out, and survive the current story leaving the filter", () => {
@@ -50,7 +52,8 @@ test("neighbors skip what's filtered out, and survive the current story leaving 
   expect(neighbors(rows, shown, "button--large")).toEqual({ previous: null, next: shown[1] });
   // Approved a moment ago, so no longer shown, and next still means the one after it.
   expect(neighbors(rows, shown, "button--small")).toEqual({ previous: shown[0], next: shown[1] });
-  expect(neighbors(rows, shown, "card--new")).toEqual({ previous: shown[0], next: null });
+  expect(neighbors(rows, shown, "card--new")).toEqual({ previous: shown[0], next: shown[2] });
+  expect(neighbors(rows, shown, "gone")).toEqual({ previous: shown[1], next: null });
 });
 
 test("a read keeps the objects of rows it didn't change, so only a changed row re-renders", () => {
