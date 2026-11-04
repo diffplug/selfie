@@ -112,7 +112,7 @@ describe("BuiltStorybooks", () => {
     expect(await builds.readFile(BUILD, "../index.html")).toBeNull();
     expect(await builds.readFile("nope", "index.html")).toBeNull();
     expect(await builds.readFile(BUILD, "__proto__")).toBeNull();
-    expect(() => builds.has("nope")).toThrow(RangeError);
+    await expect(builds.has("nope")).rejects.toThrow(RangeError);
   });
 
   it("knows the size an environment renders at, once a batch says", async () => {
