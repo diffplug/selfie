@@ -55,13 +55,9 @@ export function BatchLayout({
         const row = rowOf.get(name);
         if (row === undefined) return null;
         return (
-          <>
-            <span className="selfie-nav-col" data-size="wide" title={describePixels(row.pixelDiff)}>
-              {row.state === "failed" ? "No image" : describePixels(row.pixelDiff)}
-            </span>
-            <span className="selfie-nav-col">
-            </span>
-          </>
+          <span className="selfie-nav-col" data-size="wide" title={describePixels(row.pixelDiff)}>
+            {row.state === "failed" ? "No image" : describePixels(row.pixelDiff)}
+          </span>
         );
       }}
     >

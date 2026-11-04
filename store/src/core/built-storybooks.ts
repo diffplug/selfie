@@ -2,7 +2,6 @@
 // rebuilt. Files are kept by their hash, as images are, so built Storybooks that share files share bytes.
 // See docs/specs/store.md -> built Storybooks.
 import type { Blobs } from "./blob.ts";
-import { chunks, STATEMENTS_PER_REQUEST } from "./chunks.ts";
 import { insertHashKeyStatement } from "./hash-keys.ts";
 import { assertImageHash, fromHex, isImageHash, sha256, toHex, truncateHash } from "./image-hash.ts";
 import type { Sql } from "./sql.ts";
@@ -93,7 +92,7 @@ export class BuiltStorybooks {
   async recordBatchStorybook(batchId: string, build: string): Promise<void> {
     assertImageHash(build);
     const rows = await this.#sql.run({
-      sql: "UPDATE render_batches SET storybook_key = (SELECT key FROM built_storybooks WHERE hash = ?2) WHERE id = ?1 AND EXISTS (SELECT 1 FROM built_storybooks WHERE hash = ?2) RETURNING id",
+      sql: "UPDATE render_batches SET storybook_key = s.key FROM built_storybooks s WHERE s.hash = ?2 AND render_batches.id = ?1 RETURNING id",
       params: [batchId, build],
       idempotent: true,
     });

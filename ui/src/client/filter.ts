@@ -26,7 +26,6 @@ export interface RowFilter {
 
 export const NO_FILTER: RowFilter = { text: "", show: "all" };
 
-
 function inShow(row: RenderRow, show: Show): boolean {
   switch (show) {
     case "all":

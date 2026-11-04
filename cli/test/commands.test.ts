@@ -211,6 +211,18 @@ describe("a store from before a schema change", () => {
     expect(code).toBe(2);
     expect(json.error).toMatchObject({ code: "old-store", message: expect.stringContaining("delete it") });
   });
+
+  test("says so on opening one from before integer keys, which fails at making an index", async () => {
+    h.stories = [{ id: "a--one" }];
+    await review();
+    const [slug] = await readdir(h.home);
+    const db = new DatabaseSync(path.join(h.home, slug!, "store.db"));
+    db.exec("DROP INDEX batches_by_commit; ALTER TABLE render_batches RENAME COLUMN commit_key TO git_sha");
+    db.close();
+    const { code, json } = await review();
+    expect(code).toBe(2);
+    expect(json.error).toMatchObject({ code: "old-store" });
+  });
 });
 
 describe("selfie.config.json", () => {

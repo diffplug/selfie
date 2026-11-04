@@ -59,10 +59,10 @@ export type BlockerReason =
   | "removed"
   | "pattern-unmatched";
 
-export interface Attention<Reason extends string> {
+export interface Attention {
   /** Null only for `pattern-unmatched`. */
   readonly story: string | null;
-  readonly reason: Reason;
+  readonly reason: BlockerReason;
   /** The fact behind it, if there's more than its name: a message, an actor, or a pattern. */
   readonly detail: string | null;
 }
@@ -109,7 +109,7 @@ export interface BatchView {
   readonly hunkMergeDistance: number;
   /** Who a decision made here is recorded as, or null if Git doesn't say. */
   readonly actor: string | null;
-  readonly blockers: readonly Attention<BlockerReason>[];
+  readonly blockers: readonly Attention[];
   readonly counts: {
     readonly stories: number;
     readonly unchanged: number;

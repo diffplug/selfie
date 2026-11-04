@@ -14,6 +14,7 @@ export {
   isDecidable,
   isGitSha,
   isBatchId,
+  assertViewport,
   compareWithApprovals,
   newestRenders,
   RenderBatches,

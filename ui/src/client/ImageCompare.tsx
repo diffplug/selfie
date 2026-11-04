@@ -169,7 +169,7 @@ export function ImageCompare({ row, diff, scale, groups, selection, batchId, fee
   const sources = sourcesOf(row, diff !== null, notedImage, compared?.hash ?? null);
   const oneImage = sources.length === 1;
   const canFlip = sources.length > 1 && compared !== null;
-  // A failed story's one image is never its render, so it has to say which it is.
+  // A failed story's one image may be its render or its golden, so it has to say which it is.
   const captioned = !oneImage || row.state === "failed";
   // Hunks are between the current image and what it's compared with, whichever image that is.
   const hunkLayer = (on: Layer): Layer => (on === "noted" && compared?.layer === "noted" ? "golden" : on);

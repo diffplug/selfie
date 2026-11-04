@@ -5,7 +5,6 @@ import { isDecidable } from "selfie-store";
 import { fn } from "storybook/test";
 import type {
   Attention,
-  BlockerReason,
   ComparedRender,
   Note,
   RenderBatch,
@@ -98,7 +97,7 @@ export function viewOf(
   const removed = inState("removed");
   const batch = batchOf({ failedCount: failed.length, status: failed.length > 0 ? "failed" : "complete", ...batchOverrides });
 
-  const blockers: Attention<BlockerReason>[] = [
+  const blockers: Attention[] = [
     ...failed.map(({ story, failure }) => ({ story, reason: "failed" as const, detail: failure })),
     ...unapproved.map(({ story, state, decision: made }) =>
       made?.decision === "rejected"

@@ -8,7 +8,7 @@ export type { Attention, BlockerReason };
 
 export interface BatchSummary {
   /** What stops a reviewer calling this batch good. */
-  readonly blockers: readonly Attention<BlockerReason>[];
+  readonly blockers: readonly Attention[];
   readonly counts: {
     readonly stories: number;
     readonly unchanged: number;
@@ -54,7 +54,7 @@ export function summarizeBatch({ batch, renders, unchangedCount }: Comparison): 
   const unapproved = inFilter.filter(({ state, decision }) => isDecidable(state) && decision?.decision !== "approved");
   const undecided = unapproved.filter(({ decision }) => decision === null);
 
-  const blockers: Attention<BlockerReason>[] = [
+  const blockers: Attention[] = [
     ...failed.map(({ story, failure }) => ({ story, reason: "failed" as const, detail: failure })),
     ...unapproved.map(({ story, state, decision }) =>
       decision?.decision === "rejected"

@@ -10,7 +10,7 @@
 |---|---|---|
 | Images | Named by hash, so never, unless a client [lied or broke](#what-a-store-takes) | Send what's missing |
 | Finished batches | Keep their ID, and never change, so never | Send what's missing |
-| Decisions | One per name and hash, so yes | Latest wins (`docs/specs/renders.md` → Decisions) |
+| Decisions | One per name, hash, and commit, so yes | Latest wins (`docs/specs/renders.md` → Decisions) |
 | Goldens | One batch per SHA and environment, so yes | [The cloud decides](#goldens) |
 
 ## Routes

@@ -96,6 +96,7 @@ const BATCH_COLUMNS = `id, (SELECT sha FROM commits WHERE key = commit_key) AS g
 
 const SELECT_BATCH = `SELECT ${BATCH_COLUMNS} FROM render_batches WHERE id = ?1`;
 
+const BATCH_KEY = "(SELECT key FROM render_batches WHERE id = ?1)";
 const commitKey = (sha: string) => `(SELECT key FROM commits WHERE sha = ${sha})`;
 const environmentKey = (id: string) => `(SELECT key FROM environments WHERE id = ${id})`;
 
@@ -146,13 +147,13 @@ JOIN images gi ON gi.key = gs.image_key
 JOIN stories s ON s.key = gs.story_key
 WHERE gs.batch_key = ${baselineKey} AND gs.story_key > CAST(?3 AS INTEGER)
   AND NOT EXISTS (SELECT 1 FROM renders rs
-    WHERE rs.batch_key = (SELECT key FROM render_batches WHERE id = ?1) AND rs.story_key = gs.story_key)
+    WHERE rs.batch_key = ${BATCH_KEY} AND rs.story_key = gs.story_key)
 ORDER BY gs.story_key
 LIMIT CAST(?4 AS INTEGER)`,
   unchangedCount: `SELECT COUNT(*) AS total
 FROM renders rs
 JOIN renders gs ON gs.batch_key = ${baselineKey} AND gs.story_key = rs.story_key
-WHERE rs.batch_key = (SELECT key FROM render_batches WHERE id = ?1) AND rs.image_key = gs.image_key AND rs.failure IS NULL`,
+WHERE rs.batch_key = ${BATCH_KEY} AND rs.image_key = gs.image_key AND rs.failure IS NULL`,
 });
 
 const AGAINST_GOLDENS = comparisonStatements(GOLDENS_BATCH_KEY);
@@ -161,7 +162,7 @@ const AGAINST_BATCH = comparisonStatements(NAMED_BATCH_KEY);
 const COUNT_REMOVED = `(SELECT COUNT(*) FROM renders gs
   WHERE gs.batch_key = ${GOLDENS_BATCH_KEY}
     AND NOT EXISTS (SELECT 1 FROM renders rs
-      WHERE rs.batch_key = (SELECT key FROM render_batches WHERE id = ?1) AND rs.story_key = gs.story_key))`;
+      WHERE rs.batch_key = ${BATCH_KEY} AND rs.story_key = gs.story_key))`;
 
 const SELECT_REMOVED_COUNT = `SELECT ${COUNT_REMOVED} AS total`;
 
@@ -204,7 +205,7 @@ const FINISH_BATCH = `UPDATE render_batches SET
 FROM (
   SELECT COUNT(*) AS total, COALESCE(SUM(failure IS NOT NULL), 0) AS failed
   FROM renders
-  WHERE batch_key = (SELECT key FROM render_batches WHERE id = ?1)
+  WHERE batch_key = ${BATCH_KEY}
 ) AS c
 WHERE render_batches.id = ?1 AND c.total = CAST(?3 AS INTEGER)
 RETURNING ${BATCH_COLUMNS}`;
@@ -238,7 +239,7 @@ LEFT JOIN stories s ON s.key = rs.story_key
 ${BATCH_PAGE_TAIL}`;
 
 // A commit at a time, each of which is a range of the primary key. A commit this store has never heard of finds nothing.
-const DECISIONS_AT = `SELECT s.id AS story, i.hash AS image_hash, d.rejected, a.name AS actor, d.decided_at, d.batch_id
+const DECISIONS_AT = `SELECT s.id AS story, i.hash AS image_hash, ${DECISION_WORD} AS decision, a.name AS actor, d.decided_at, d.batch_id
 FROM json_each(?2) j
 CROSS JOIN commits c ON c.sha = j.value
 CROSS JOIN decisions d ON d.environment_key = ${environmentKey("?1")} AND d.commit_key = c.key
@@ -250,7 +251,7 @@ const COMMITS_OF_BRANCH = `SELECT DISTINCT c.sha AS git_sha FROM render_batches 
 WHERE r.branch = ?1 AND r.environment_key = ${environmentKey("?2")} AND r.started_at BETWEEN CAST(?3 AS INTEGER) AND CAST(?4 AS INTEGER)`;
 
 const COUNT_RENDERS = `SELECT COUNT(*) AS total FROM renders
-WHERE batch_key = (SELECT key FROM render_batches WHERE id = ?1)`;
+WHERE batch_key = ${BATCH_KEY}`;
 
 /** A statement's rows as `v`, from one JSON parameter, which holds any number of them and can say null, as a bound one can't. */
 const jsonRows = (parameter: string, columns: readonly string[]) => `v(${columns.join(", ")}) AS (
@@ -389,8 +390,8 @@ export interface ComparedRender {
 export interface Comparison {
   readonly batch: RenderBatch;
   /**
-   * In name order, the batch's differences from the baseline and anything with a play
-   * error, then the removed renders. Other unchanged ones only if asked for.
+   * In name order, the batch's differences from the baseline and anything failed, then
+   * the removed renders. Other unchanged ones only if asked for.
    */
   readonly renders: readonly ComparedRender[];
   /** How many of the batch's renders are `unchanged`, whether listed or not. */
@@ -564,7 +565,7 @@ WHERE r.id = ?1 AND rs.viewport_width IS NOT NULL`,
       params: [batchId],
       idempotent: true,
     });
-    return Object.fromEntries(rows.map((row) => [row.story as string, { width: row.viewport_width as number, height: row.viewport_height as number }]));
+    return Object.fromEntries(rows.map((row) => [row.story as string, viewportOf(row)]));
   }
 
   /**
@@ -651,7 +652,7 @@ ORDER BY started_at DESC, key DESC`,
     return rows.map((row) => ({
       story: row.story as string,
       imageHash: row.image_hash as string | null,
-      decision: row.rejected === 1 ? "rejected" : "approved",
+      decision: row.decision as DecisionKind,
       actor: row.actor as string,
       at: row.decided_at as number,
       batchId: row.batch_id as string,
@@ -793,13 +794,9 @@ ORDER BY started_at DESC, key DESC`,
 
   /** The stories a baseline's goldens have, and this batch doesn't, which accepting it would remove. */
   async removedFrom(batchId: string, baselineSha: string | null): Promise<readonly string[]> {
-    const removed: string[] = [];
-    for (let after = START; ; ) {
-      const rows = await this.#sql.run({ sql: AGAINST_GOLDENS.removedPage, params: [batchId, baselineSha ?? "", after, ROWS_PER_PAGE], idempotent: true });
-      removed.push(...rows.map(({ story }) => story as string));
-      if (rows.length < ROWS_PER_PAGE) return removed.sort();
-      after = String(rows.at(-1)!.story_key);
-    }
+    const page = (after: string): SqlStatement => ({ sql: AGAINST_GOLDENS.removedPage, params: [batchId, baselineSha ?? "", after, ROWS_PER_PAGE], idempotent: true });
+    const rows = await this.#remainingPages(await this.#sql.run(page(START)), page);
+    return rows.map(({ story }) => story as string).sort();
   }
 
   /** A page of all a batch holds, for another store to take, in no order but its own. Unlike a comparison, it needs no baseline. */
@@ -814,7 +811,7 @@ ORDER BY started_at DESC, key DESC`,
       batch,
       renders: page.map((row) => ({
         story: row.story as string,
-        ...(row.viewport_width === null ? {} : { viewport: { width: row.viewport_width as number, height: row.viewport_height as number } }),
+        ...(row.viewport_width === null ? {} : { viewport: viewportOf(row) }),
         ...(row.image_hash === null ? { failure: row.failure as string } : { imageHash: row.image_hash as string, ...(row.failure === null ? {} : { failure: row.failure as string }) }),
         decision: row.decision === null ? null : { decision: row.decision as DecisionKind, actor: row.actor as string, at: row.decided_at as number, gitSha: row.git_sha as string, batchId: row.batch_id as string },
       })),
@@ -952,6 +949,8 @@ function assertBatchIdShape(batchId: string): void {
   if (!isBatchId(batchId)) throw new RangeError(`A decision's batch must be a batch ID, got ${JSON.stringify(batchId)}`);
 }
 
+const viewportOf = (row: SqlRow): Viewport => ({ width: row.viewport_width as number, height: row.viewport_height as number });
+
 function toBatch(row: SqlRow): RenderBatch {
   const failedCount = row.failed_count as number | null;
   const finishedAt = row.finished_at as number | null;
@@ -967,12 +966,12 @@ function toBatch(row: SqlRow): RenderBatch {
     storyFilter: row.story_filter === null ? null : (JSON.parse(row.story_filter as string) as StoryFilter),
     reusedFromBatch: row.reused_from_batch as string | null,
     scale: row.scale as number,
-    viewport: { width: row.viewport_width as number, height: row.viewport_height as number },
+    viewport: viewportOf(row),
     branch: row.branch as string | null,
   };
 }
 
-// The same order as `NEWEST_DECISION` and the merge rule: latest first, then `rejected` before `approved`.
+// The same order as `DECISION_ON_RENDER` and the merge rule: latest first, then `rejected` before `approved`.
 const newestFirst = (a: PlacedDecision, b: PlacedDecision) => b.at - a.at || b.decision.localeCompare(a.decision);
 
 /**
@@ -987,18 +986,18 @@ export function compareWithApprovals(
   decisions: readonly PlacedDecision[],
   { includeUnchanged = false }: CompareOptions = {},
 ): Comparison {
-  const byStory = new Map<string, PlacedDecision[]>();
+  const decisionsOf = new Map<string, PlacedDecision[]>();
   for (const decision of decisions) {
-    const list = byStory.get(decision.story);
-    if (list === undefined) byStory.set(decision.story, [decision]);
+    const list = decisionsOf.get(decision.story);
+    if (list === undefined) decisionsOf.set(decision.story, [decision]);
     else list.push(decision);
   }
-  for (const list of byStory.values()) list.sort(newestFirst);
+  for (const list of decisionsOf.values()) list.sort(newestFirst);
 
-  const referenceOf = (story: string) => byStory.get(story)?.find(({ decision, batchId }) => decision === "approved" && batchId !== batch.id);
+  const referenceOf = (story: string) => decisionsOf.get(story)?.find(({ decision, batchId }) => decision === "approved" && batchId !== batch.id);
   /** What's been said about this image since the reference, if anything has. */
   const decisionOn = (story: string, imageHash: string | null, referenceAt: number): Decision | null => {
-    const found = byStory.get(story)?.find((decision) => decision.imageHash === imageHash && decision.at >= referenceAt);
+    const found = decisionsOf.get(story)?.find((decision) => decision.imageHash === imageHash && decision.at >= referenceAt);
     return found === undefined ? null : { decision: found.decision, actor: found.actor, at: found.at };
   };
 
@@ -1015,7 +1014,7 @@ export function compareWithApprovals(
 
   const here = new Set(rendered.map(({ story }) => story));
   const removed: ComparedRender[] = [];
-  for (const story of [...byStory.keys()].sort()) {
+  for (const story of [...decisionsOf.keys()].sort()) {
     if (here.has(story)) continue;
     const reference = referenceOf(story);
     if (reference === undefined || reference.imageHash === null) continue;
@@ -1082,8 +1081,9 @@ function assertCanBeGoldens(batch: RenderBatch): void {
   }
 }
 
-function assertViewport({ width, height }: Viewport): void {
-  if (!Number.isInteger(width) || !Number.isInteger(height) || width <= 0 || height <= 0) throw new RangeError(`A viewport must be positive whole numbers, got ${width}x${height}`);
+/** A viewport is whole and positive, whoever says so. */
+export function assertViewport({ width, height }: Viewport): void {
+  if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width <= 0 || height <= 0) throw new RangeError(`A viewport must be positive whole numbers, got ${width}x${height}`);
 }
 
 function insertBatchStatements({ id, gitSha, environment, startedAt, dirty, storyFilter, reusedFromBatch, scale, viewport, branch }: ReceivedBatch): SqlStatement[] {

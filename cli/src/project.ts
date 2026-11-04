@@ -76,8 +76,6 @@ export async function openProject({ cwd, env }: { cwd: string; env: NodeJS.Proce
   const adapter = new SqliteAdapter(path.join(directory, "store.db"));
   const sql = new Sql(adapter);
   await initStoreSchema(sql);
-  // A store's tables stay as they were made, so this says at once if it's from before the newest column.
-  await sql.run({ sql: "SELECT commit_key FROM render_batches LIMIT 0" });
   await sql.run({ sql: "CREATE TABLE IF NOT EXISTS render_keys (key TEXT PRIMARY KEY, batch_id TEXT NOT NULL) WITHOUT ROWID" });
   for (const statement of CREATE_NOTES_TABLES) await sql.run({ sql: statement });
   const blob = new Blobs(new FilesystemBlobStorage(path.join(directory, "blobs")));

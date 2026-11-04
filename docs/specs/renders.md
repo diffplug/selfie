@@ -13,7 +13,7 @@ A name is two strings: `story` and `environment`.
 
 - **Must treat both as opaque, compared exactly.** They come from the renderer. A render variant that isn't part of the environment goes in the story ID, in one canonical form its caller owns (rationale).
 - **Must refuse either being empty or holding NUL.**
-- **Must take the environment from the batch, for every render it holds.** Rows store only `story`, so a batch can't mix environments.
+- **Must take the environment from the batch, for every render it holds.** Rows hold only the story, so a batch can't mix environments.
 - **Never compare a batch with a reference or goldens, or apply a decision, from another environment.** Every such query takes its environment from the batch.
 
 ## Render batches
