@@ -7,7 +7,7 @@ import path from "node:path";
 import { defineEnvironment, renderIdentity } from "selfie-render";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { openProject } from "../src/project.ts";
-import { BLUE, commit, createHarness, git, type Harness } from "./support.ts";
+import { BLUE, commit, createHarness, git, type Harness, TEST_CONFIG } from "./support.ts";
 
 let h: Harness;
 let build: string;
@@ -16,7 +16,7 @@ let renders: number;
 /** Runs a command on the built Storybook, and says whether it rendered. */
 async function onBuild(command: "render" | "review", flags: string[]) {
   const before = renders;
-  const result = await h.cli(command, "--storybook-dir", build, ...flags);
+  const result = await h.cli(command, ...flags);
   return { ...result, rendered: renders > before };
 }
 const review = (...flags: string[]) => onBuild("review", flags);
@@ -24,14 +24,14 @@ const record = (...flags: string[]) => onBuild("render", flags);
 let commits = 0;
 /** A new commit the built Storybook doesn't hold, since a batch is per commit. */
 const newCommit = () => commit(h.repo, `elsewhere ${++commits}`);
-const writeConfig = (config: unknown) => writeFile(path.join(h.repo, "selfie.config.json"), JSON.stringify(config));
+const writeConfig = (config: unknown) => writeFile(path.join(h.repo, "selfie.config.json"), JSON.stringify({ ...TEST_CONFIG, ...(config as object) }));
 const inBuild = (file: string) => path.join(build, file);
 const reasons = (list: readonly any[]) => list.map(({ reason }) => reason);
 const pruneBatches = async () => rm(path.join(h.home, (await readdir(h.home))[0]!, "batches"), { recursive: true });
 
 beforeEach(async () => {
   h = await createHarness();
-  build = path.join(h.scratch, "build");
+  build = path.join(h.repo, TEST_CONFIG.storybookDir);
   await mkdir(path.join(build, "assets"), { recursive: true });
   await writeFile(inBuild("iframe.html"), "<html></html>");
   await writeFile(inBuild("index.json"), '{"entries":{}}');
@@ -118,9 +118,13 @@ describe("an unchanged build", () => {
   });
 
   test("runs a build command first, and hits if it wrote the same bytes", async () => {
-    await review("--build-command", `printf '.a{color:red}' > ${inBuild("assets/app.css")}`);
-    expect((await review("--build-command", `printf '.a{color:red}' > ${inBuild("assets/app.css")}`)).rendered).toBe(false);
-    expect((await review("--build-command", `printf '.a{color:tan}' > ${inBuild("assets/app.css")}`)).rendered).toBe(true);
+    const buildWriting = async (css: string) => {
+      await writeConfig({ buildCommand: `printf '${css}' > ${inBuild("assets/app.css")}` });
+      return review("--build");
+    };
+    await buildWriting(".a{color:red}");
+    expect((await buildWriting(".a{color:red}")).rendered).toBe(false);
+    expect((await buildWriting(".a{color:tan}")).rendered).toBe(true);
   });
 });
 

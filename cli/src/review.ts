@@ -27,7 +27,7 @@ import {
   type BuiltStorybookFile,
   type StoryFilter,
 } from "selfie-store";
-import { resolveRenderSettings, resolveHunkMergeDistance, resolveStorybookDir, type RenderSettings } from "./config.ts";
+import { resolveRenderSettings, resolveHunkMergeDistance, type RenderSettings } from "./config.ts";
 import { diffToPng, type PixelDiff } from "./diff.ts";
 import { SelfieError } from "./errors.ts";
 import { dirtyPaths, headSha, resolveCommit, type BaselineSearch } from "./git.ts";
@@ -51,10 +51,6 @@ const IMAGES_PER_GROUP = 100;
 const MAX_CONCURRENT_DIFFS = 6;
 
 export interface RenderBatchOptions {
-  /** Relative to the project's `cwd`. Defaults to the config's, and then to `storybook-static`. */
-  readonly storybookDir?: string | undefined;
-  /** The caller's own command, run in a shell. Its stdout goes to stderr. */
-  readonly buildCommand?: string | undefined;
   /** Run the config's `buildCommand`, from the Git top level. Only ever because someone asked. */
   readonly buildFromConfig?: boolean | undefined;
   /** Story ID patterns. Defaults to every story. */
@@ -123,8 +119,7 @@ export interface ReviewResult {
 }
 
 /** Builds, if someone asked to. Nothing else ever runs a shell. */
-export async function buildIfAsked(command: string | undefined, cwd: string, signal: AbortSignal | undefined, log: (line: string) => void): Promise<void> {
-  if (command === undefined) return;
+export async function buildIfAsked(command: string, cwd: string, signal: AbortSignal | undefined, log: (line: string) => void): Promise<void> {
   log(`Building: ${command}`);
   await runBuildCommand(command, cwd, signal);
 }
@@ -362,14 +357,9 @@ export function renderInput(
   };
 }
 
-/** Whatever build was asked for, if one was: the config's from the Git top level, or a given command from here. */
-export async function buildAsAsked(project: Project, settings: RenderSettings, options: Pick<RenderBatchOptions, "buildCommand" | "buildFromConfig" | "signal">, log: (line: string) => void): Promise<void> {
-  if (options.buildFromConfig === true) {
-    if (settings.buildCommand === undefined) throw new SelfieError("usage", "--build runs the config's buildCommand, and selfie.config.json doesn't have one.");
-    await buildIfAsked(settings.buildCommand, project.repo.root, options.signal, log);
-  } else {
-    await buildIfAsked(options.buildCommand, project.cwd, options.signal, log);
-  }
+/** The config's build, from the Git top level, if one was asked for. */
+export async function buildAsAsked(project: Project, settings: RenderSettings, options: Pick<RenderBatchOptions, "buildFromConfig" | "signal">, log: (line: string) => void): Promise<void> {
+  if (options.buildFromConfig === true) await buildIfAsked(settings.buildCommand, project.repo.root, options.signal, log);
 }
 
 async function renderFresh(
@@ -493,7 +483,7 @@ async function renderAndRecord(project: Project, options: RenderBatchOptions, { 
     if (gitSha === null) {
       throw new SelfieError("no-commits", "This repository has no commits yet, and a batch is recorded against a Git SHA.");
     }
-    const storybookDir = resolveStorybookDir(project.cwd, options.storybookDir, settings);
+    const { storybookDir } = settings;
     const baseline = await findBaseline(project, settings.environmentId);
     const dirtyBefore = await dirtyPaths(repo);
 

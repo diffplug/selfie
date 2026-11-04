@@ -4,7 +4,7 @@ import type { RenderOptions } from "selfie-render";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { runCli } from "../src/cli.ts";
 import { SKILLS } from "../src/skills.ts";
-import { BLUE, createHarness, GREEN, RED, type Harness } from "./support.ts";
+import { BLUE, createHarness, GREEN, RED, type Harness, TEST_CONFIG } from "./support.ts";
 
 let h: Harness;
 /** What each render makes, in turn. */
@@ -20,7 +20,7 @@ beforeEach(async () => {
 });
 afterEach(() => h.destroy());
 
-const flakes = async (...flags: string[]) => h.cli("flakes", "--storybook-dir", "ignored", ...flags);
+const flakes = async (...flags: string[]) => h.cli("flakes", ...flags);
 
 describe("selfie flakes", () => {
   test("exits 0 with nothing to report when every render is the same", async () => {
@@ -78,7 +78,7 @@ describe("selfie flakes", () => {
     await flakes();
     const { json } = await h.cli("find-baseline");
     expect(json.sha).toBeNull();
-    const reviewed = await h.cli("review", "--storybook-dir", "ignored");
+    const reviewed = await h.cli("review");
     expect(reviewed.json.reusedFromBatch).toBeNull();
   });
 
@@ -120,7 +120,7 @@ describe("selfie skill", () => {
 });
 
 describe("a project's recipe and timings", () => {
-  const config = (settings: unknown) => writeFile(path.join(h.repo, "selfie.config.json"), JSON.stringify(settings));
+  const config = (settings: unknown) => writeFile(path.join(h.repo, "selfie.config.json"), JSON.stringify({ ...TEST_CONFIG, ...(settings as object) }));
   const seen: RenderOptions[] = [];
 
   beforeEach(() => {
@@ -131,7 +131,7 @@ describe("a project's recipe and timings", () => {
 
   test("reach the render", async () => {
     await config({ environment: { recipe: { colorScheme: "dark" } }, settleMs: 250, storyTimeoutMs: 9000 });
-    expect((await h.cli("render", "--storybook-dir", "ignored")).code).toBe(0);
+    expect((await h.cli("render")).code).toBe(0);
     expect(seen[0]).toMatchObject({ environment: { recipe: { colorScheme: "dark", locale: "en-US" } }, settleMs: 250, storyTimeoutMs: 9000 });
   });
 
@@ -142,7 +142,7 @@ describe("a project's recipe and timings", () => {
     [{ storyTimeoutMs: "soon" }, "storyTimeoutMs"],
   ])("refuses %j as a bad config", async (settings, named) => {
     await config(settings);
-    const { code, json } = await h.cli("render", "--storybook-dir", "ignored");
+    const { code, json } = await h.cli("render");
     expect(code).toBe(2);
     expect(json.error).toMatchObject({ code: "bad-config", message: expect.stringContaining(named) });
   });

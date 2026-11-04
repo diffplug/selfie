@@ -6,7 +6,7 @@ import path from "node:path";
 import { render as realRender, type Manifest, type ManifestStory, type StoryError } from "selfie-render";
 import { decodeImage } from "selfie-store";
 import { sharpCodec } from "selfie-store/adapters/sharp-codec";
-import { resolveRenderSettings, resolveStorybookDir } from "./config.ts";
+import { resolveRenderSettings } from "./config.ts";
 import { diffImages, type PixelDiff } from "./diff.ts";
 import { regularFileInside, storyDirName } from "./paths.ts";
 import type { Project } from "./project.ts";
@@ -110,7 +110,7 @@ export async function findFlakes(project: Project, options: FlakeOptions): Promi
 
   const directory = path.join(project.directory, "flakes");
   await rm(directory, { recursive: true, force: true });
-  const storybookDir = resolveStorybookDir(project.cwd, options.storybookDir, settings);
+  const { storybookDir } = settings;
   const manifests: Manifest[] = [];
   for (let at = 0; at < options.times; at++) {
     log(`Render ${at + 1} of ${options.times}`);

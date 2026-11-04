@@ -264,7 +264,7 @@ export function localReviewSource(
             ? null
             : {
                 storybookDir: path.relative(repo.root, storybook.dir) || ".",
-                buildCommand: settings.buildCommand ?? null,
+                buildCommand: settings.buildCommand,
                 uncommitted: await dirtyPaths(repo),
                 builtBeforeHead: built && head !== null && (await builtBeforeHead(storybook.dir)),
                 usesDocker: settings.environment.runner.kind === "container",
