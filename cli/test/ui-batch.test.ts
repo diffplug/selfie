@@ -11,10 +11,10 @@ describe("which batch", () => {
     h.stories = [{ id: "a" }];
     const { batchId } = (await review()).json;
     const head = git(h.repo, "rev-parse", "HEAD");
-    expect(await (await get(`/api/batches/${batchId}/context`)).json()).toEqual({ head, branch: "main", mergeBase: head, defaultBranch: "main" });
+    expect(await (await get(`/api/batches/${batchId}/context`)).json()).toEqual({ head, branch: "main" });
     git(h.repo, "checkout", "--quiet", "-b", "topic");
     const moved = await commit(h.repo, "on a branch");
-    expect(await (await get(`/api/batches/${batchId}/context`)).json()).toEqual({ head: moved, branch: "topic", mergeBase: head, defaultBranch: "main" });
+    expect(await (await get(`/api/batches/${batchId}/context`)).json()).toEqual({ head: moved, branch: "topic" });
     expect((await get(`/api/batches/${UNKNOWN_BATCH}/context`)).status).toBe(404);
   });
 

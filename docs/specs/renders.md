@@ -70,7 +70,7 @@ Source of truth: `compareWithApprovals` and `RenderBatches.compareFromHistory`, 
 - **Must list only what isn't `unchanged`, and anything with a play error, by default, with a count of every `unchanged` render.** `includeUnchanged` lists them all (rationale).
 - **`compareWithBatch` must compare with a finished batch in the batch's environment**, whose images stand in for the reference, and refuse any other with `no-baseline-batch`. A story that batch left out by a filter reads as `added`. **Never let `acceptBatch` take a batch as its baseline.**
 - **`compareBatch`, which only sync uses, must refuse a baseline SHA that has no goldens in the batch's environment**, rather than report everything as added. A null baseline means there are none yet, and gives `added` and `failed` only.
-- **Must return the decision on exactly the batch's image for that name, or on the story being gone**, whatever the state, so `selfie review` can show what is already approved. `compareFromHistory` returns one only if it's no older than the reference's approval ([Approvals](#approvals)).
+- **Must return the decision on exactly the batch's image for that name, or on the story being gone**, whatever the state, so `selfie review` can show what is already approved. `compareFromHistory` takes the decisions from `decisionsAt`, and returns one only if it's no older than the reference's approval ([Approvals](#approvals)).
 
 ## Decisions
 
@@ -96,7 +96,7 @@ Source of truth: `compareWithApprovals` and `RenderBatches.compareFromHistory` i
 - **Must let a rejection leave the reference alone, unless it replaces the approval of that image at that commit**, which is how a person takes one back ([Decisions](#decisions)). Otherwise it only says what's blocked.
 - **Must make a removal a decision like any other.** Once approved, the story has no reference for later batches, and reads as `added` if it comes back.
 - **Never read a story that a batch's filter left out as gone.** It's for `summarizeBatch` to set these apart (`docs/specs/cli.md` → What blocks), and they take no decision.
-- **Must let a batch recorded on a dirty tree take approvals**, which count from its commit (`docs/specs/system.md` → Approvals).
+- **Must let a batch recorded on a dirty tree take approvals**, which count from its commit.
 - **Must read one commit list as one statement**, however long, so that history isn't a statement per commit (rationale).
 
 ## Goldens

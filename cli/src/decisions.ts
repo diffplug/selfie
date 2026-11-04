@@ -46,8 +46,7 @@ export async function decide(project: Project, { batchId, decision, actor, stori
   const patterns = stories === "all" || "targets" in stories ? null : stories;
   // Unchanged rows only say whether a pattern matched anything.
   const before = await compareAsReviewed(project, batchId, { includeUnchanged: patterns !== null });
-  const outside = new Set(summarizeBatch(before).notRendered);
-  const renders = before.renders.filter((render) => !outside.has(render));
+  const renders = summarizeBatch(before).inFilter;
   const matching =
     patterns === null
       ? null

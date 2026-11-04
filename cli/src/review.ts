@@ -251,8 +251,7 @@ async function exportDifference(project: Project, batchDir: string, render: Comp
 
 /** Exports what's needed to act on the comparison: only `changed` renders get diff work. */
 async function exportImages(project: Project, batchDir: string, comparison: Comparison) {
-  const outside = new Set(summarizeBatch(comparison).notRendered);
-  const shown = comparison.renders.filter((render) => isDecidable(render.state) && !outside.has(render));
+  const shown = summarizeBatch(comparison).inFilter.filter(({ state }) => isDecidable(state));
   // Each of these holds whole images in memory.
   const limit = Math.min(MAX_CONCURRENT_DIFFS, availableParallelism());
   const differences = await mapConcurrently(shown, limit, (render) => exportDifference(project, batchDir, render));
@@ -309,7 +308,8 @@ async function replay(
 ): Promise<Recording | null> {
   const batchId = await project.renderKeys.find(identity);
   if (batchId === null || (await project.batches.getBatch(batchId))?.status !== "complete") return null;
-  const { renders } = await project.batches.compareBatch(batchId, null, { includeUnchanged: true });
+  // With no decisions, this is only every story it holds.
+  const { renders } = await project.batches.compareFromHistory(batchId, [], { includeUnchanged: true });
   const stories = renders.map((render) => ({ id: render.story, render }));
   const chosen = patterns === undefined ? stories : filterStories(stories, patterns).stories;
   const storyIds = chosen.map(({ id }) => id);
@@ -415,7 +415,6 @@ async function recordBatch(
     environment: fields.settings.environmentId,
     scale: fields.settings.environment.scale,
     dirty: fields.dirty,
-    baselineSha: null,
     branch: fields.branch,
     storyFilter: fields.storyFilter,
     reusedFromBatch: recording.reusedFromBatch,
@@ -561,7 +560,7 @@ export async function review(project: Project, options: ReviewOptions): Promise<
       ? await compareAsReviewed(project, batch.id)
       : given.batch !== undefined
         ? await project.batches.compareWithBatch(batch.id, given.batch)
-        : await project.batches.compareFromHistory(batch.id, await ancestorsOf(project.repo, given.sha));
+        : await project.batches.compareFromHistory(batch.id, await project.batches.decisionsAt(batch.environment, await ancestorsOf(project.repo, given.sha)));
   const compared = Date.now();
 
   // 7. Export, keep a cache of what was exported, and prune older batches. A given baseline answers

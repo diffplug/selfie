@@ -21,6 +21,8 @@ export interface BatchSummary {
     readonly undecided: number;
     readonly advisories: number;
   };
+  /** Every render, but for what's in `notRendered`. */
+  readonly inFilter: readonly ComparedRender[];
   /** Changed, added, or removed, with no decision. */
   readonly undecided: readonly ComparedRender[];
   /** Changed, added, or removed, and not approved, which includes rejected. */
@@ -51,7 +53,8 @@ export function summarizeBatch({ batch, renders, unchangedCount }: Comparison): 
 
   // A story a filter left out says nothing about whether that story is gone, so it takes no decision.
   const outside = new Set(notRendered);
-  const unapproved = renders.filter((render) => isDecidable(render.state) && !outside.has(render) && render.decision?.decision !== "approved");
+  const inFilter = renders.filter((render) => !outside.has(render));
+  const unapproved = inFilter.filter(({ state, decision }) => isDecidable(state) && decision?.decision !== "approved");
   const undecided = unapproved.filter(({ decision }) => decision === null);
 
   const blockers: Attention<BlockerReason>[] = [
@@ -89,6 +92,7 @@ export function summarizeBatch({ batch, renders, unchangedCount }: Comparison): 
       undecided: undecided.length,
       advisories: advisories.length,
     },
+    inFilter,
     undecided,
     unapproved,
     failed,

@@ -90,7 +90,7 @@ Source of truth: `cli/src/sync.ts`; tests in `cli/test/sync.test.ts`, between tw
 | `selfie push [<batch>] [--accept] [--remote <url>] [--native]` | `batchId`, `images: { sent, alreadyThere }`, `decisions`, null if the token can't decide, and `goldens`, null if none were asked for | 0 if it all went, 1 if goldens were refused or conflict, 2 if it couldn't run |
 | `selfie pull [<commit>] [--remote <url>] [--native]` | `sha`, `environment`, `batchId`, `images: { received, alreadyHere }`, `decisions`, and `replaced` | 0 with goldens, 1 if the remote has none, 2 if it couldn't run |
 
-A push sends a batch's goldens if it's accepted locally, or `--accept` asks for them, which is what CI uses on a merge commit. It defaults to the newest finished batch from a clean tree at HEAD. A pull defaults to the nearest baseline the remote has.
+A push sends a batch's goldens if they're here, which only a pull makes them, or `--accept` asks for them, which is what CI uses on a merge commit. It defaults to the newest finished batch from a clean tree at HEAD. A pull defaults to the nearest baseline the remote has.
 
 - **Must find a repository's project from its GitHub origin**, by the owner and name there, and use the numeric ID the server answers (`docs/specs/access.md` → GitHub App).
 - **Must take the remote's address only from `--remote` or `SELFIE_REMOTE`, and the token only from `SELFIE_TOKEN`, never from `selfie.config.json`**, since a checkout must not be able to send someone's token to another server (`docs/specs/cli.md` → Commands). Signing in replaces the token with **Scope: github-access**.
@@ -109,7 +109,6 @@ A project's first push is the expensive one. Each new image takes one upload and
 - Replacing an image the cloud holds wrongly. Today a pull of it fails, naming it, every time, and a browser shows it as it is. A repair needs someone with write access, and a client that decodes.
 - Decisions on hunks (`docs/specs/renders.md` → Future), which add their own table, and travel the same way.
 - Notes (**Scope: remote-notes**, `docs/specs/feedback.md`).
-- A review using the cloud's baseline. A review's own search is still local, so for now a person runs `selfie pull` first. It also needs telling when this store's goldens at a SHA aren't the cloud's, which `source` doesn't say.
 - Pulling a batch other than a commit's goldens.
 - Replacing a SHA's goldens in the cloud, which also clears a `conflict`. It would be `POST /goldens` with `replaces`, needing Decide, which `selfie push` never sends.
 - Moving the routes out of `selfie-ui`, with `app.ts`, once **Scope: cloud-deploy** needs them without a build of the page.

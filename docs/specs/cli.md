@@ -201,7 +201,7 @@ Source of truth: `cli/src/project.ts`.
 Source of truth: `decide` in `cli/src/decisions.ts`.
 
 - **Must decide on exactly the batch's `changed`, `added`, and `removed` renders selected by `--all` or `--story`, and require exactly one of those.** Unchanged images get no decision. Failed ones have no image, and are listed under `skipped`. A story its filter left out isn't selected.
-- **Must work on a dirty tree**, so a user can approve work before committing it (`docs/specs/system.md` → Approvals).
+- **Must work on a dirty tree**, so a user can approve work before committing it (`docs/specs/renders.md` → Approvals).
 - **Must take the actor from `--actor`, or else `git config user.email`**, and fail if there's neither.
 - **Must record each decision at the batch's commit**, and compare against what history has approved (`docs/specs/renders.md` → Approvals).
 

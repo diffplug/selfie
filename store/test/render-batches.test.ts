@@ -781,7 +781,7 @@ describe("RenderBatches", () => {
       const head = await recordBatch(SHA_B, [rendered("a", 3), { story: "c", failure: "Boom" }], ENV, model);
       await model.compareBatch(head.id, SHA_A);
       await model.compareBatch(head.id, SHA_A, { includeUnchanged: true });
-      await model.compareFromHistory(head.id, [SHA_A, SHA_B]);
+      await model.compareFromHistory(head.id, await model.decisionsAt(ENV, [SHA_A, SHA_B]));
       await model.commitsOfBranch("topic", ENV, 0);
       await model.acceptBatch(head.id, SHA_A, 1).catch(() => {});
       const clean = await recordBatch(SHA_C, [rendered("a", 3)], ENV, model);

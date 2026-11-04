@@ -95,8 +95,8 @@ describe("on a store", () => {
     const first = await finished(SHAS[0], { s: 1 });
     await approve(first.batch, "s", first.hash("s"));
     const later = await finished(SHAS[1], { s: 1 });
-    expect((await batches.compareFromHistory(later.batch.id, [SHAS[1], SHAS[0]], { includeUnchanged: true })).renders[0]!.state).toBe("unchanged");
-    expect((await batches.compareFromHistory(later.batch.id, [SHAS[1]], { includeUnchanged: true })).renders[0]!.state).toBe("added");
+    expect((await batches.compareFromHistory(later.batch.id, await batches.decisionsAt(ENV, [SHAS[1], SHAS[0]]), { includeUnchanged: true })).renders[0]!.state).toBe("unchanged");
+    expect((await batches.compareFromHistory(later.batch.id, await batches.decisionsAt(ENV, [SHAS[1]]), { includeUnchanged: true })).renders[0]!.state).toBe("added");
   });
 
   it("keeps a decision per commit, so approving the same pixels elsewhere doesn't take it from here", async () => {
@@ -112,7 +112,7 @@ describe("on a store", () => {
     const first = await finished(SHAS[0], { a: 1, b: 2 });
     await approve(first.batch, "a", first.hash("a"));
     const second = await finished(SHAS[1], { a: 1, b: 3 });
-    const compared = await batches.compareFromHistory(second.batch.id, [SHAS[1], SHAS[0]]);
+    const compared = await batches.compareFromHistory(second.batch.id, await batches.decisionsAt(ENV, [SHAS[1], SHAS[0]]));
     expect(compared.renders.map(({ story, state }) => [story, state])).toEqual([["b", "added"]]);
     expect(compared.unchangedCount).toBe(1);
   });

@@ -115,7 +115,8 @@ export async function reachableCommits(project: Project, { gitSha, branch, envir
 /** A batch compared with what history has approved, which is what deciding on it and looking at it both use. */
 export async function compareAsReviewed(project: Project, batchId: string, options?: CompareOptions): Promise<Comparison> {
   const batch = await requireBatch(project, batchId);
-  return project.batches.compareFromHistory(batchId, await reachableCommits(project, batch), options);
+  const decisions = await project.batches.decisionsAt(batch.environment, await reachableCommits(project, batch));
+  return project.batches.compareFromHistory(batchId, decisions, options);
 }
 
 /** A batch someone named, which must be well formed and in this project's store. */

@@ -16,7 +16,6 @@ export interface BatchState {
   readonly clearActionError: () => void;
   /** True if the decision was recorded. */
   readonly decide: (decision: DecisionKind, targets: readonly DecisionTarget[]) => Promise<boolean>;
-  /** The refusals, or null if the request never got an answer. */
 }
 
 const asRequestError = (error: unknown) =>

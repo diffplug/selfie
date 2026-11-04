@@ -185,7 +185,7 @@ export async function push(project: Project, remote: Remote, { batch: given, acc
   if (accept === true || acceptedHere) {
     // A machine that's never pulled, such as CI, recorded no baseline, so ask which the cloud holds this to.
     const baselineSha = batch.baselineSha ?? (await remoteBaseline(project, remote, route, batch.environment)).sha;
-    goldens = await askJson<GoldensAnswer>(remote, `${route}/goldens`, "POST", { batchId, baselineSha, removed: await batches.removedFrom(batchId, batch.baselineSha) });
+    goldens = await askJson<GoldensAnswer>(remote, `${route}/goldens`, "POST", { batchId, baselineSha, removed: await batches.removedFrom(batchId, baselineSha) });
   }
   return { batchId, images: { sent, alreadyThere: total - sent }, decisions, goldens };
 }

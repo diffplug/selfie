@@ -20,7 +20,6 @@ import { HASHES, PIXEL_DIFFS } from "./images.generated.ts";
 export const BATCH_ID = "4f8c2a10-7d3e-4b6a-9c11-2e5f0a7b8c9d";
 export const OTHER_BATCH_ID = "b1d7e3f4-1a2b-4c3d-8e5f-6a7b8c9d0e1f";
 export const SHA = "c2a01c2f9d8e7b6a5c4d3e2f1a0b9c8d7e6f5a4b";
-export const BASELINE_SHA = "58bfd636768707e03943bcf08a05152f799617bb";
 
 // The renderer fixes the clock at this time, so a relative date always reads the same there.
 const NOW = Date.UTC(2026, 0, 15, 12);

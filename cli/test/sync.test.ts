@@ -315,6 +315,16 @@ describe("another machine", () => {
     }
   });
 
+  test("counts what a batch removes against the goldens the cloud holds it to", async () => {
+    await approved();
+    await laptop("writer", "push", "--accept");
+    await laptop("reader", "pull", headOf());
+    await commit(h.repo, "drops a story");
+    stories = stories.slice(1);
+    await approved();
+    expect((await laptop("writer", "push", "--accept")).json.goldens).toMatchObject({ outcome: "accepted", refusal: null });
+  });
+
   test("goldens pulled here go with their batch when it's pushed, with no need to ask", async () => {
     const batchId = await approved();
     await laptop("writer", "push", "--accept");

@@ -1,10 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { PageFactsLine, type PageFacts } from "./PageFacts.tsx";
-import { BASELINE_SHA, SHA } from "./stories/fixtures.ts";
+import { SHA } from "./stories/fixtures.ts";
 
 const SETUP = { storybookDir: "storybook-static", buildCommand: "npm run build-storybook", uncommitted: [], builtBeforeHead: false, usesDocker: true };
 const VIEW = { head: SHA, branch: "ui-selfie", storybookUrl: "http://127.0.0.1:1/", setup: SETUP };
-const CONTEXT = { head: SHA, branch: "ui-selfie", mergeBase: BASELINE_SHA, defaultBranch: "main" };
+const CONTEXT = { head: SHA, branch: "ui-selfie" };
 const BATCH = { gitSha: SHA, dirty: false };
 const diff = (overrides: Partial<Extract<PageFacts, { kind: "diff" }>> = {}): PageFacts => ({ kind: "diff", batch: BATCH, context: CONTEXT, ...overrides });
 

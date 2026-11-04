@@ -195,14 +195,16 @@ WHERE r.id = ?1 AND ${CAN_BE_GOLDENS}
 ON CONFLICT(git_sha, environment) DO UPDATE SET batch_key = excluded.batch_key
 RETURNING batch_key`;
 
+const BATCH_PAGE_TAIL = `WHERE r.id = ?1 AND rs.story > ?2
+ORDER BY rs.story
+LIMIT CAST(?3 AS INTEGER)`;
+
 const READ_BATCH_PAGE = `SELECT rs.story, i.hash AS image_hash, rs.failure, rs.play_error, d.decision, d.actor, d.decided_at
 FROM render_batches r
 CROSS JOIN renders rs ON rs.batch_key = r.key
 LEFT JOIN images i ON i.key = rs.image_key
 LEFT JOIN decisions d ON d.environment = r.environment AND d.story = rs.story AND d.image_hash = i.hash AND ${NEWEST_DECISION}
-WHERE r.id = ?1 AND rs.story > ?2
-ORDER BY rs.story
-LIMIT CAST(?3 AS INTEGER)`;
+${BATCH_PAGE_TAIL}`;
 
 // What a story's image hash is when a decision is on it being gone.
 const REMOVAL = "";
@@ -211,9 +213,7 @@ const READ_RENDERS_PAGE = `SELECT rs.story, i.hash AS image_hash, rs.failure, rs
 FROM render_batches r
 CROSS JOIN renders rs ON rs.batch_key = r.key
 LEFT JOIN images i ON i.key = rs.image_key
-WHERE r.id = ?1 AND rs.story > ?2
-ORDER BY rs.story
-LIMIT CAST(?3 AS INTEGER)`;
+${BATCH_PAGE_TAIL}`;
 
 const DECISIONS_AT = `SELECT story, image_hash, decision, actor, decided_at, batch_id FROM decisions
 WHERE environment = ?1 AND git_sha IN (SELECT value FROM json_each(?2))`;
@@ -311,7 +311,7 @@ export interface ComparedRender {
   readonly imageHash: string | null;
   /** The baseline's image. Null if `added`, and if `failed` with no golden for this name. */
   readonly goldenHash: string | null;
-  /** The batch whose image approval `goldenHash` came from, when history answered. */
+  /** The batch whose approval made `goldenHash` the reference, when it came from approvals. */
   readonly goldenBatchId?: string;
   /** Null unless `failed`. */
   readonly failure: string | null;
@@ -431,12 +431,13 @@ export class RenderBatches {
     environment: string;
     scale: number;
     dirty: boolean;
-    baselineSha: string | null;
+    /** Only sync has one. */
+    baselineSha?: string | null;
     storyFilter?: StoryFilter | null;
     reusedFromBatch?: string | null;
     branch?: string | null;
   }): Promise<RenderBatch> {
-    const batch: ReceivedBatch & { branch: string | null } = { storyFilter: null, reusedFromBatch: null, branch: null, ...options, id: crypto.randomUUID(), startedAt: this.#now() };
+    const batch: ReceivedBatch & { branch: string | null } = { baselineSha: null, storyFilter: null, reusedFromBatch: null, branch: null, ...options, id: crypto.randomUUID(), startedAt: this.#now() };
     await this.#sql.run(insertBatchStatement(batch));
     return { ...batch, status: "recording", finishedAt: null, failedCount: null };
   }
@@ -549,17 +550,16 @@ ORDER BY started_at DESC, key DESC`,
   }
 
   /**
-   * Compares a batch with what's been approved, as far as `reachable` commits go: for each story, the
-   * image of the newest approval there. Approvals made on this very batch aren't what it's compared
-   * with, or a story would read as unchanged the moment someone approved it, but later batches do
-   * see them. See `docs/specs/renders.md` -> Approvals.
+   * Compares a batch with these decisions, from `decisionsAt`: for each story, the image of the newest
+   * approval among them. Approvals made on this very batch aren't what it's compared with, or a story
+   * would read as unchanged the moment someone approved it, but later batches do see them. Taking
+   * the decisions lets a caller read them once for many batches. See `docs/specs/renders.md` -> Approvals.
    */
-  async compareFromHistory(batchId: string, reachable: readonly string[], { includeUnchanged = false }: CompareOptions = {}): Promise<Comparison> {
+  async compareFromHistory(batchId: string, decisions: readonly PlacedDecision[], { includeUnchanged = false }: CompareOptions = {}): Promise<Comparison> {
     const rendersPage = (after: string): SqlStatement => ({ sql: READ_RENDERS_PAGE, params: [batchId, after, ROWS_PER_PAGE], idempotent: true });
     const [batchRows, firstRenders] = (await this.#sql.batch([{ sql: SELECT_BATCH, params: [batchId], idempotent: true }, rendersPage(START)])) as [SqlRow[], SqlRow[]];
     const batch = finishedBatch(batchRows, batchId);
     const rows = await this.#remainingPages(firstRenders, rendersPage);
-    const decisions = await this.decisionsAt(batch.environment, reachable);
     return compareWithApprovals(batch, rows.map((row) => ({ story: row.story as string, imageHash: row.image_hash as string | null, failure: row.failure as string | null, playError: row.play_error as string | null })), decisions, { includeUnchanged });
   }
 
@@ -910,7 +910,8 @@ function toBatch(row: SqlRow): RenderBatch {
   };
 }
 
-const newestFirst = (a: PlacedDecision, b: PlacedDecision) => b.at - a.at || (a.decision === b.decision ? 0 : a.decision === "rejected" ? -1 : 1);
+// The same order as `NEWEST_DECISION` and the merge rule: latest first, then `rejected` before `approved`.
+const newestFirst = (a: PlacedDecision, b: PlacedDecision) => b.at - a.at || b.decision.localeCompare(a.decision);
 
 /**
  * A batch's renders against the approvals that history reaches. Pure, since this is the rule. A
@@ -925,7 +926,11 @@ export function compareWithApprovals(
   { includeUnchanged = false }: CompareOptions = {},
 ): Comparison {
   const byStory = new Map<string, PlacedDecision[]>();
-  for (const decision of decisions) byStory.set(decision.story, [...(byStory.get(decision.story) ?? []), decision]);
+  for (const decision of decisions) {
+    const list = byStory.get(decision.story);
+    if (list === undefined) byStory.set(decision.story, [decision]);
+    else list.push(decision);
+  }
   for (const list of byStory.values()) list.sort(newestFirst);
 
   const referenceOf = (story: string) => byStory.get(story)?.find(({ decision, batchId }) => decision === "approved" && batchId !== batch.id);
@@ -940,10 +945,10 @@ export function compareWithApprovals(
   for (const { story, imageHash, failure, playError } of rendered) {
     const reference = referenceOf(story);
     const goldenHash = reference?.imageHash ?? null;
-    const state: RenderState = imageHash === null ? "failed" : goldenHash === null ? "added" : imageHash === goldenHash ? "unchanged" : "changed";
+    const state = stateOf(imageHash, goldenHash);
     if (state === "unchanged") unchangedCount += 1;
     if (state === "unchanged" && !includeUnchanged && playError === null) continue;
-    compared.push({ story, state, imageHash, goldenHash, ...(reference === undefined ? {} : { goldenBatchId: reference.batchId }), failure, playError, decision: imageHash === null ? null : decisionOn(story, imageHash, reference?.at ?? 0) });
+    compared.push({ story, state, imageHash, goldenHash, ...(goldenHash === null ? {} : { goldenBatchId: reference!.batchId }), failure, playError, decision: imageHash === null ? null : decisionOn(story, imageHash, reference?.at ?? 0) });
   }
 
   const here = new Set(rendered.map(({ story }) => story));
@@ -957,17 +962,13 @@ export function compareWithApprovals(
   return { batch, renders: [...compared, ...removed], unchangedCount };
 }
 
+const stateOf = (imageHash: string | null, goldenHash: string | null): RenderState =>
+  imageHash === null ? "failed" : goldenHash === null ? "added" : imageHash === goldenHash ? "unchanged" : "changed";
+
 function toComparedRender(row: SqlRow): ComparedRender {
   const imageHash = row.image_hash as string | null;
   const goldenHash = row.golden_hash as string | null;
-  const state: RenderState =
-    imageHash === null
-      ? "failed"
-      : goldenHash === null
-        ? "added"
-        : imageHash === goldenHash
-          ? "unchanged"
-          : "changed";
+  const state = stateOf(imageHash, goldenHash);
   return {
     story: row.story as string,
     state,

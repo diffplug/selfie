@@ -153,7 +153,7 @@ Source of truth: `ui/src/client/`.
 - **Must explain each kind of render:** added has no reference, removed has no current and takes a decision on the story being gone, failed shows its message, and a changed size says so, and shows the images from their top left corners.
 - **Must say when a changed render is only moves and spacing, in the list, the pixel stats, and a banner, and that it still needs a decision**, and offer those as a filter of the list, so they can be approved together (rationale).
 - **Must say what the diff image's colors mean wherever it has more than one.**
-- **Must not offer a decision on what has no image to decide on.**
+- **Must not offer a decision on what `isDecidable` says can't take one.**
 
 **Every story** is the hosted Storybook's stories, nested and ordered as its own sidebar does them, and each with its newest render from the finished batches at HEAD in the project's environment, so several partial batches read as one (rationale). A story's page is that render's batch's, as it would be from that batch's own review.
 
@@ -164,7 +164,7 @@ Source of truth: `ui/src/client/`.
 - **Must nest by a story's title, keep the built Storybook's order, and use its names**: a top-level section, then a component, then each story, with Storybook's own icons and colors, so a person finds what they know from it (rationale). Only the sections start open. Moving to a story opens the way to it, and a filter opens everything.
 - **Must mark each story in the list with its state, in words for a screen reader and on hover, and with any caveat**, and give a story's decision and when it was rendered on its page.
 - **Must list a story nothing has rendered, show it running, and offer to render it**, since it's still a real story to look at. A note is written on an image, so starting one renders the story first, and then opens the note box. With no way to render here, it says what command does.
-- **Must offer to render again whatever story is on screen, and every story with no render or one known to be from another built Storybook, as Render the rest**, which is how a change fans out to the rest of a Storybook, **and always to render all of them**. Asking for every story records a whole batch, not a filtered one, which can become goldens (rationale).
+- **Must offer to render again whatever story is on screen, and every story with no render or one known to be from another built Storybook, as Render the rest**, which is how a change fans out to the rest of a Storybook, **and always to render all of them**. Asking for every story records a whole batch, not a filtered one, which can say what's been removed (rationale).
 - **Must render only from the hosted Storybook as it stands, and one at a time**, refusing a second with `render-busy`. It never builds, since a page must not be able to run a shell.
 - **Must never read a story a filtered batch left out as removed**, through `newestRenders` in `selfie-store`. It takes that story from an older batch, or else lists it as not rendered.
 - **Must say when a render is from uncommitted changes, or known to be from another built Storybook than the one hosted**, since a render is whichever is newest, not whichever is reliable.
@@ -218,7 +218,7 @@ Source of truth: `ui/src/client/*.stories.tsx`, `ui/src/client/stories/`.
 
 ## Scale
 
-- **Must not read a blob to show a list.** Row data comes from `compareBatch` and `review.json` (rationale).
+- **Must not read a blob to show a list.** Row data comes from `compareFromHistory` and `review.json` (rationale).
 - **Must not read the unchanged stories until asked.**
 - **Must not virtualize the list, or put `content-visibility` on its rows** (rationale).
 
@@ -226,9 +226,9 @@ Source of truth: `ui/src/client/*.stories.tsx`, `ui/src/client/stories/`.
 
 **Scope: cloud-deploy** is defined in `docs/specs/system.md` → Build order. What it must do first, since the local UI needs none of it:
 
-1. **Move the review rules into platform-free code, and narrow `ReviewSource` to platform facts.** `storiesView` is the newest such rule that needs moving, beyond `newestRenders` itself. `render` is for a source with something to render with, so a hosted one says `canRender: false`. A hosted source needs a branch's commits as one of those facts to offer branch goldens, or it offers none. A Worker can't load `selfie-cli`, which reaches Git, Docker, and the filesystem, and today `summarizeBatch`, `checkAccept`, and diffing live there, and `localReviewSource` applies them. `filterStories`, which `summarizeBatch` calls, has to move out of `selfie-render` for that. `isDecidable` has moved already.
+1. **Move the review rules into platform-free code, and narrow `ReviewSource` to platform facts.** `storiesView` is the newest such rule that needs moving, beyond `newestRenders` itself. `render` is for a source with something to render with, so a hosted one says `canRender: false`. A hosted source needs the commits a batch reaches as one of those facts, to compare at all (`docs/specs/renders.md` → Approvals). A Worker can't load `selfie-cli`, which reaches Git, Docker, and the filesystem, and today `summarizeBatch` and diffing live there, and `localReviewSource` applies them. `filterStories`, which `summarizeBatch` calls, has to move out of `selfie-render` for that. `isDecidable` has moved already.
 2. **Make the source a per-request factory, `(context) => ReviewSource`, with a client base path.** A hosted service has many projects and viewers, where `createLocalApp` has one project for its whole life, and a client that always asks at `/api`.
-3. **Fit the Worker's budget.** The shared D1 limit is 1,200 requests per 5 minutes. One approve-and-next is 10 requests as measured on the local adapter: 6 for the decision (read the batch, compare, write, compare, read whose goldens these are, list the commit's batches), and 4 lookups for the next story's two images and its diff. That's 120 stories per 5 minutes, for every reviewer of every project, down from 15 requests and 80 stories before the comparisons were reduced. What gets it to about 3:
+3. **Fit the Worker's budget.** The shared D1 limit is 1,200 requests per 5 minutes. One approve-and-next is 10 requests as measured on the local adapter: 6 for the decision, as measured before approvals, which read every reachable decision instead (read the batch, compare, write, compare, read whose goldens these are, list the commit's batches), and 4 lookups for the next story's two images and its diff. That's 120 stories per 5 minutes, for every reviewer of every project, down from 15 requests and 80 stories before the comparisons were reduced. What gets it to about 3:
    - no D1 lookup per image, since a content address needs none before reading R2
    - diff stats and diff PNGs stored at review time, not computed in a request, which also moves image decoding and diffing out of a Worker's request
    - answering a decision from the comparison and what the page already knows, and a version check or ETag on focus reads

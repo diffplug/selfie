@@ -361,7 +361,7 @@ function Differences({
             {isFiltered ? "Nothing matches this filter" : "Nothing differs from what's approved"}
           </Blankslate.Heading>
           <Blankslate.Description>
-            {isFiltered ? "Clear the filter to see every difference." : `All ${plural(view.counts.unchanged, "story", "stories")} rendered the same images as the baseline.`}
+            {isFiltered ? "Clear the filter to see every difference." : `All ${plural(view.counts.unchanged, "story", "stories")} rendered the same images as what's approved.`}
           </Blankslate.Description>
           {isFiltered && (
             <Stack direction="horizontal" justify="center">

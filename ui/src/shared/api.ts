@@ -86,8 +86,6 @@ export interface BatchContext {
   readonly head: string | null;
   /** The branch HEAD is on, or null if it's detached. */
   readonly branch: string | null;
-  readonly mergeBase: string | null;
-  readonly defaultBranch: string | null;
 }
 
 /** A Storybook to open a batch's stories in, on an origin of its own. */
@@ -145,7 +143,7 @@ export interface StoryRenderInfo {
 
 export interface ListedStory {
   readonly story: string;
-  /** Its path in the Storybook's sidebar, such as `Screens/Accept`, or nothing if that's not known. */
+  /** Its path in the Storybook's sidebar, such as `Pages/Batch`, or nothing if that's not known. */
   readonly title: string;
   /** What the sidebar calls it, or its ID if that's not known. */
   readonly name: string;

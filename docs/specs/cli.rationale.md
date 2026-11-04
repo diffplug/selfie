@@ -22,7 +22,7 @@
 
 **A hash after the readable slug.** Slugifying is lossy: `a/b-c` and `a-b/c` read the same. Eight hex digits keep them apart, and since a slug always ends with them and never holds a dot, nothing can equal `d1.env`.
 
-**One store across SSH and HTTPS.** Someone cloning a repository twice, once each way, is the same project with the same goldens. Dropping the port costs nothing real: two different repositories at one host and path, on two ports, is not worth a separate case.
+**One store across SSH and HTTPS.** Someone cloning a repository twice, once each way, is the same project with the same approvals. Dropping the port costs nothing real: two different repositories at one host and path, on two ports, is not worth a separate case.
 
 ## Review
 

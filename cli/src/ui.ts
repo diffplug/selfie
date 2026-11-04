@@ -1,6 +1,6 @@
 // The review UI's window on a local repository: the library, as the shape its routes want. It reads
 // what's been recorded, records decisions on it, and renders only when a page asks it to render.
-import { newestRenders, type Comparison, type DecisionKind, type RenderBatch } from "selfie-store";
+import { newestRenders, type Comparison, type DecisionKind, type PlacedDecision, type RenderBatch } from "selfie-store";
 import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
 import { isBuiltStorybook } from "selfie-ui/local";
@@ -11,7 +11,7 @@ import { resolveRenderSettings, resolveHunkMergeDistance } from "./config.ts";
 import { decide } from "./decisions.ts";
 import { diffToPng, type PixelDiff } from "./diff.ts";
 import { SelfieError } from "./errors.ts";
-import { currentBranch, defaultBranchOf, dirtyPaths, gitUserEmail, headMovedAt, headSha } from "./git.ts";
+import { currentBranch, dirtyPaths, gitUserEmail, headMovedAt, headSha } from "./git.ts";
 import { isOpenNote } from "selfie-ui/notes";
 import { sentNotes, textForAgent } from "./notes.ts";
 import { batchesAtHead, compareAsReviewed, reachableCommits, readReviewCache, requireBatch, type Project } from "./project.ts";
@@ -117,8 +117,7 @@ export function localReviewSource(
   const viewOf = async (comparison: Comparison, actor: string | null): Promise<BatchView> => {
     const { batch } = comparison;
     const summary = summarizeBatch(comparison);
-    const outside = new Set(summary.notRendered);
-    const rows = await toRows(batch.id, comparison.renders.filter((render) => !outside.has(render)));
+    const rows = await toRows(batch.id, summary.inFilter);
     return {
       batch,
       storybook: await storybookFor(batch.id),
@@ -196,11 +195,11 @@ export function localReviewSource(
       const built = storybook !== undefined && isBuiltStorybook(storybook.dir);
       const index = built ? await readStoriesInOrder(storybook.dir) : [];
 
-      // Batches at one commit on one branch reach the same commits, and finding those takes Git.
-      const reachable = new Map<string | null, Promise<readonly string[]>>();
+      // Batches at one commit on one branch see the same decisions, and a filtered render at a time can make many batches.
+      const decisions = new Map<string | null, Promise<readonly PlacedDecision[]>>();
       const rowsOf = async (batch: RenderBatch) => {
-        if (!reachable.has(batch.branch)) reachable.set(batch.branch, reachableCommits(project, batch));
-        return (await project.batches.compareFromHistory(batch.id, await reachable.get(batch.branch)!, { includeUnchanged: true })).renders;
+        if (!decisions.has(batch.branch)) decisions.set(batch.branch, reachableCommits(project, batch).then((commits) => project.batches.decisionsAt(batch.environment, commits)));
+        return (await project.batches.compareFromHistory(batch.id, await decisions.get(batch.branch)!, { includeUnchanged: true })).renders;
       };
       const renders = await newestRenders(finished, rowsOf, index.length > 0 ? new Set(index.map(({ id }) => id)) : undefined);
 
@@ -274,9 +273,9 @@ export function localReviewSource(
     },
 
     async batchContext(batchId) {
-      const batch = await requireBatch(project, batchId);
-      const [head, branch, { mergeBase, defaultBranch }] = await Promise.all([headSha(repo), currentBranch(repo), defaultBranchOf(repo, batch.gitSha)]);
-      return { head, branch, mergeBase, defaultBranch };
+      await requireBatch(project, batchId);
+      const [head, branch] = await Promise.all([headSha(repo), currentBranch(repo)]);
+      return { head, branch };
     },
 
     async unchanged(batchId) {

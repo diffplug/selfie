@@ -18,7 +18,7 @@ Source of truth: `render/src/environment.ts`, `render/src/render.ts`. `docs/spec
 
 Source of truth: `store/src/core/render-batches.ts`. `docs/specs/renders.md` → Decisions owns how they are recorded.
 
-- **Must not make a user re-approve a render change at a new Git SHA in the same store.** An approval made anywhere in a commit's history counts there, so a batch after a commit, rebase, amend, or merge finds it if the pixels are the same (`docs/specs/renders.md` → Approvals).
+- **Must not make a user re-approve a render change at a new Git SHA in the same store.** `docs/specs/renders.md` → Approvals owns what history reaches.
 
 Reserved: this is the local half of [carrying approvals through a push](#approvals-across-stores).
 

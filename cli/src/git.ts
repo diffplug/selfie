@@ -126,7 +126,7 @@ export interface BaselineSearch extends Baseline {
   readonly mergeBase: string | null;
 }
 
-/** One process however many names it tries, since every command that finds a baseline asks this. */
+/** One process however many names it tries, since this is asked often. */
 async function defaultBranchRef(repo: Repo): Promise<string | null> {
   const listed = await ask(repo.root, ["for-each-ref", "--format=%(objecttype) %(refname) %(symref)", ORIGIN_HEAD, ...DEFAULT_BRANCH_CANDIDATES]);
   const commits = new Map(
@@ -139,6 +139,8 @@ async function defaultBranchRef(repo: Repo): Promise<string | null> {
   const remoteHead = commits.get(ORIGIN_HEAD);
   return remoteHead || (DEFAULT_BRANCH_CANDIDATES.find((ref) => commits.has(ref)) ?? null);
 }
+
+const branchNameOf = (ref: string | null) => ref?.replace(/^refs\/(?:remotes|heads)\//, "") ?? null;
 
 async function firstParentHistory(repo: Repo, start: string, maxCommits: number): Promise<string[]> {
   const { code, stdout, stderr } = await git(repo.root, [
@@ -173,7 +175,7 @@ export async function walkToBaseline(
   }
 
   const ref = await defaultBranchRef(repo);
-  const defaultBranch = ref?.replace(/^refs\/(?:remotes|heads)\//, "") ?? null;
+  const defaultBranch = branchNameOf(ref);
   const mergeBase = ref === null ? head : await ask(repo.root, ["merge-base", "HEAD", ref]);
   if (mergeBase === null) {
     const found = { sha: null, defaultBranch, mergeBase: null };
@@ -217,14 +219,11 @@ export async function ancestorsOf(repo: Repo, sha: string): Promise<readonly str
   return listed === null ? [sha] : listed.split("\n");
 }
 
-/** Whether this clone's history stops early, so that older approvals can't be reached. */
-export const isShallow = async (repo: Repo): Promise<boolean> => (await ask(repo.root, ["rev-parse", "--is-shallow-repository"])) === "true";
-
 /** The default branch, by name, and where a commit left it. Each is null if Git can't say. */
 export async function defaultBranchOf(repo: Repo, sha: string): Promise<{ readonly defaultBranch: string | null; readonly mergeBase: string | null }> {
   const ref = await defaultBranchRef(repo);
   return {
-    defaultBranch: ref?.replace(/^refs\/(?:remotes|heads)\//, "") ?? null,
+    defaultBranch: branchNameOf(ref),
     mergeBase: ref === null ? null : await ask(repo.root, ["merge-base", sha, ref]),
   };
 }
