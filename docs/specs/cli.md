@@ -1,6 +1,6 @@
 # CLI
 
-> Status: built — the `selfie-cli` library and the `selfie` binary: `review`, `approve`, `reject`, and `ui`, on the local store. `docs/specs/sync.md` owns `push`, `pull`, and what a remote adds to `find-baseline`; see `## Future`.
+> Status: built — the `selfie-cli` library and the `selfie` binary: `review`, `approve`, `reject`, and `ui`, on the local store. `docs/specs/sync.md` owns `push`, `pull`, and what a remote adds; see `## Future`.
 >
 > - See `docs/specs/glossary.md` for batch, render, reference, baseline, decision, and environment.
 > - Owns local data's layout, each command's checks and exit code, and the shape of what they print and return. `docs/specs/renders.md` owns what a batch, a decision, and a golden are. `docs/specs/render.md` owns render. `docs/specs/store.md` owns images.
