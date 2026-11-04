@@ -8,11 +8,13 @@ import { chromium, type Browser, type BrowserContext, type Page, type Request, t
 import {
   PLAYWRIGHT_VERSION,
   type StoryError,
+  type Viewport,
   type WorkerEvent,
   type WorkerJob,
   type WorkerStory,
   type WorkerStoryResult,
 } from "./protocol.ts";
+import { resolveViewport, type DeclaredViewport } from "./viewport.ts";
 
 const LAUNCH_TIMEOUT_MS = 60_000;
 const CLOSE_TIMEOUT_MS = 5_000;
@@ -124,10 +126,10 @@ function watchPlayFailures(): void {
   });
 }
 
-async function prepareContext(browser: Browser, job: WorkerJob): Promise<BrowserContext> {
+async function prepareContext(browser: Browser, job: WorkerJob, viewport: Viewport): Promise<BrowserContext> {
   const { recipe } = job;
   const context = await browser.newContext({
-    viewport: job.viewport,
+    viewport,
     deviceScaleFactor: job.scale,
     locale: recipe.locale,
     timezoneId: recipe.timezoneId,
@@ -150,13 +152,18 @@ async function inEveryFrame(page: Page, work: () => void | Promise<void>): Promi
   await Promise.all(page.frames().map((frame) => frame.evaluate(work).catch(() => {})));
 }
 
-/** Waits through Storybook's loaders, render, and play function, then takes the screenshot. */
-async function screenshotStory(
+interface OpenedStory {
+  page: Page;
+  networkQuiet: ReturnType<typeof trackRequests>;
+}
+
+/** A new page on a story, with everything that goes wrong on it reported from the start. */
+async function openStory(
   context: BrowserContext,
   job: WorkerJob,
   story: WorkerStory,
   record: (error: StoryError) => void,
-): Promise<Buffer> {
+): Promise<OpenedStory> {
   const { recipe } = job;
   const page = await context.newPage();
   page.setDefaultTimeout(job.storyTimeoutMs);
@@ -172,6 +179,42 @@ async function screenshotStory(
   await page.goto(`${recipe.origin}/iframe.html?id=${encodeURIComponent(story.id)}&viewMode=story`, {
     waitUntil: "load",
   });
+  return { page, networkQuiet };
+}
+
+/**
+ * What the running story says of its viewport, as soon as Storybook has loaded it. `index.json` doesn't say.
+ * A build that never gets as far as a loaded story declares nothing, and the render phase's wait reports why.
+ */
+async function declaredViewport(page: Page): Promise<DeclaredViewport> {
+  const declared = await page.waitForFunction(() => {
+    type Render = {
+      phase?: string;
+      story?: { parameters?: { viewport?: unknown }; storyGlobals?: { viewport?: unknown } };
+      storyContext?: () => { globals?: { viewport?: unknown } };
+    };
+    const render = (window as unknown as { __STORYBOOK_PREVIEW__?: { currentRender?: Render } }).__STORYBOOK_PREVIEW__?.currentRender;
+    if (render?.story !== undefined) {
+      const globals = render.storyContext?.().globals ?? render.story.storyGlobals;
+      return { global: globals?.viewport ?? null, parameter: render.story.parameters?.viewport ?? null };
+    }
+    const { classList } = document.body ?? { classList: null };
+    const stopped =
+      classList?.contains("sb-show-errordisplay") ||
+      classList?.contains("sb-show-nopreview") ||
+      ["aborted", "completed", "finished"].includes(render?.phase ?? "");
+    return stopped ? { global: null, parameter: null } : false;
+  });
+  return (await declared.jsonValue()) as DeclaredViewport;
+}
+
+/** Waits through Storybook's loaders, render, and play function, then takes the screenshot. */
+async function screenshotStory(
+  { page, networkQuiet }: OpenedStory,
+  job: WorkerJob,
+  record: (error: StoryError) => void,
+): Promise<Buffer> {
+  const { recipe } = job;
   const state = await page.waitForFunction(() => {
     type Preview = { currentRender?: { phase?: string } };
     const body = document.body;
@@ -228,6 +271,10 @@ async function screenshotStory(
   return page.screenshot({ ...recipe.screenshot, type: "png" });
 }
 
+function closeContext(context: BrowserContext | undefined): Promise<void> {
+  return withTimeout(Promise.resolve(context?.close()), CLOSE_TIMEOUT_MS, "context close").catch(() => {});
+}
+
 async function renderStory(
   browser: () => Promise<Browser>,
   job: WorkerJob,
@@ -239,11 +286,27 @@ async function renderStory(
     if (errors.length < MAX_ERRORS_PER_STORY)
       errors.push({ source: error.source, message: error.message.slice(0, MAX_ERROR_LENGTH) });
   };
+  let viewport = job.viewport;
   let context: BrowserContext | undefined;
   try {
     const work = async () => {
-      context = await prepareContext(await browser(), job);
-      return screenshotStory(context, job, story, record);
+      context = await prepareContext(await browser(), job, viewport);
+      let opened = await openStory(context, job, story, record);
+      const declared = resolveViewport(await declaredViewport(opened.page));
+      if (declared !== null && "problem" in declared) {
+        record({ source: "viewport", message: `${declared.problem} It rendered at the environment's ${viewport.width}x${viewport.height}.` });
+      } else if (declared !== null && (declared.size.width !== viewport.width || declared.size.height !== viewport.height)) {
+        // Over from nothing rather than resized, since Storybook starts mounting the moment it can say
+        // what's declared, and a resize would land at a different point in that from one render to the next,
+        // and its play function would run at the wrong size.
+        viewport = declared.size;
+        opened.page.removeAllListeners();
+        errors.length = 0;
+        await closeContext(context);
+        context = await prepareContext(await browser(), job, viewport);
+        opened = await openStory(context, job, story, record);
+      }
+      return screenshotStory(opened, job, record);
     };
     // A fresh context per story, so no storage or cache carries over. The outer bound
     // covers what Playwright won't time out, like an evaluate on a page that never answers.
@@ -257,6 +320,7 @@ async function renderStory(
       id: story.id,
       status: "ok",
       ...pngDimensions(png),
+      viewport,
       pngSha256: createHash("sha256").update(png).digest("hex"),
       errors,
       durationMs: Date.now() - started,
@@ -273,12 +337,13 @@ async function renderStory(
       status: "failed",
       width: null,
       height: null,
+      viewport,
       pngSha256: null,
       errors,
       durationMs: Date.now() - started,
     };
   } finally {
-    await withTimeout(Promise.resolve(context?.close()), CLOSE_TIMEOUT_MS, "context close").catch(() => {});
+    await closeContext(context);
   }
 }
 
@@ -312,6 +377,7 @@ async function main(): Promise<void> {
   });
 
   const queue = [...job.stories];
+  emit({ type: "started" });
   await Promise.all(
     Array.from({ length: job.concurrency }, async () => {
       for (let story = queue.shift(); story; story = queue.shift()) {

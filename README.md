@@ -43,31 +43,29 @@ Every model Selfie calls at runtime is a Meta model.
 - **Muse Spark** (Meta Model API), in the cloud service: reads the before/after renders together with the code diff and the stated intent of the change (commit message, PR description, or agent prompt), groups the changed renders by the code change that caused them, and flags changes that weren't asked for so they can be approved or rejected in batches.
 - **Muse Code**, in the local loop: the coding agent that makes a change, runs `review`, and fixes the regressions Selfie flags. Selfie itself works with any coding agent.
 
-These parts are ordinary code, not model calls: rendering renders (Storybook), hashing and pixel-diffing images, finding baselines with git, and storing data (SQLite locally; in the cloud, Neon Postgres for accounts, a D1 database per project for render metadata, and R2 for image bytes).
+These parts are ordinary code, not model calls: rendering renders (Storybook), hashing and pixel-diffing images, walking history with git, and storing data (SQLite locally; in the cloud, Neon Postgres for accounts, a D1 database per project for render metadata, and R2 for image bytes).
 
 ## System architecture
 
 Selfie stores data in two places:
 
-- a cloud service holding golden render data, as well as batches which are pending approval before being accepted as golden
+- a cloud service holding batches and the approvals on them
 - local data stored at `~/.config/selfie/<git-origin-slugified>/`, Selfie stores locally generated renders here, and also mirrors data from the cloud service as necessary to improve performance
 
 Access follows GitHub through a GitHub App: anyone can view a public repository's renders, and a private repository's are visible only to people with access to it on GitHub.
 
 Selfie has the following commands:
 
-- find-baseline - returns the Git sha of the nearest merge-base with a complete set of goldens
-- record - always renders the Storybook, and records a batch
-- review - shows a batch's diff against its baseline, or until one exists, against the nearest goldens on its branch, as one JSON document whose exit code says whether anything blocks. With no batch, it uses the one for this exact built Storybook, which takes about 0.3 s rather than 70 s on 541 stories, and records one only if there's none yet. `--baseline` compares with a commit's goldens or another batch, so recording twice and comparing is how to look for flakiness
-- approve, reject - decides on a batch's changed renders, on a dirty tree if you like, so committing doesn't ask again
-- accept - makes a batch's renders the goldens for its Git sha, on a clean tree
-- push, pull - move a batch, its decisions, and its goldens to and from the cloud, whose goldens win
+- render - always renders the Storybook, and records a batch
+- review - shows a batch's diff against what its history has approved, as one JSON document whose exit code says whether anything blocks. With no batch, it uses the one for this exact built Storybook, which takes about 0.3 s rather than 70 s on 541 stories, and records one only if there's none yet. `--baseline` compares with what a commit's history approved, or another batch, so recording twice and comparing is how to look for flakiness
+- approve, reject - decides on what a batch changed, added, or removed, on any branch, on a dirty tree if you like. A later batch whose history reaches an approval needs no repeating it, whether after a commit, a rebase, or a merge
+- push, pull - move a batch and its decisions to and from the cloud
 - flakes - renders a built Storybook several times, and says what wasn't the same each time. `selfie skill fix-flakes` is a guide for a coding agent to fix what it finds
-- ui - serves a local review page in the browser, to look at a batch's images, approve, reject, and accept. It renders only when you ask it to on the page.
+- ui - serves a local review page in the browser, to look at a batch's images, approve, and reject. It renders only when you ask it to on the page.
 - selfie, with no command - opens every story of a built Storybook, running, to write notes on, which renders what they're on
 - notes, agent-await-feedback, reply - how a person's notes on the images reach a coding agent, and how it answers
 
-An agent's loop is `selfie review`, then look at the diff images it names, then `selfie approve <batch> --all`, commit, `selfie review`, and `selfie accept <batch>`. A project sets its environment, init script, Storybook directory, and how close changed hunks join in `selfie.config.json` at its Git top level. A person's loop is the same with `selfie ui` for the looking and deciding. To work together, a person leaves notes on any story in `selfie ui`, and either copies them into any agent, or presses Send while the agent runs `selfie agent-await-feedback`. The agent acts on them, runs `selfie render`, and answers each with `selfie reply`, and the person flips against the image they commented on, and resolves it or answers back. See `docs/specs/feedback.md`. These work on local data, and push and pull are built, but no server is deployed for them yet. See `docs/specs/cli.md` and `docs/specs/ui.md`.
+An agent's loop is `selfie review`, then look at the diff images it names, then `selfie approve <batch> --all`, commit, and `selfie review`, which has nothing left to ask. A project needs a `selfie.config.json` at its Git top level, which says where its built Storybook is and how to build it, and may also set its environment, init script, and how close changed hunks join. A person's loop is the same with `selfie ui` for the looking and deciding. To work together, a person leaves notes on any story in `selfie ui`, and either copies them into any agent, or presses Send while the agent runs `selfie agent-await-feedback`. The agent acts on them, runs `selfie render`, and answers each with `selfie reply`, and the person flips against the image they commented on, and resolves it or answers back. See `docs/specs/feedback.md`. These work on local data, and push and pull are built, but no server is deployed for them yet. See `docs/specs/cli.md` and `docs/specs/ui.md`.
 
 ## Implementation details
 

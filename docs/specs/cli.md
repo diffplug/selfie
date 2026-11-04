@@ -1,8 +1,8 @@
 # CLI
 
-> Status: built — the `selfie-cli` library and the `selfie` binary: `review`, `approve`, `reject`, `accept`, `find-baseline`, and `ui`, on the local store. `docs/specs/sync.md` owns `push`, `pull`, and what a remote adds to `find-baseline`; see `## Future`.
+> Status: built — the `selfie-cli` library and the `selfie` binary: `review`, `approve`, `reject`, and `ui`, on the local store. `docs/specs/sync.md` owns `push`, `pull`, and what a remote adds; see `## Future`.
 >
-> - See `docs/specs/glossary.md` for batch, render, golden, baseline, decision, and environment.
+> - See `docs/specs/glossary.md` for batch, render, reference, baseline, decision, and environment.
 > - Owns local data's layout, each command's checks and exit code, and the shape of what they print and return. `docs/specs/renders.md` owns what a batch, a decision, and a golden are. `docs/specs/render.md` owns render. `docs/specs/store.md` owns images.
 
 ## Commands
@@ -15,10 +15,8 @@ Source of truth: `cli/src/cli.ts`, `cli/src/document.ts`; the real binary's test
 | `selfie render` | Always renders a built Storybook and records a batch, and judges nothing |
 | `selfie flakes` | Renders a built Storybook several times, and prints what wasn't the same each time ([Flakes](#flakes)) |
 | `selfie skill <name>` | Prints a guide for a coding agent ([Flakes](#flakes)) |
-| `selfie review [<batch>]` | Prints the diff of a batch against its baseline. With no batch, uses the one for this built Storybook, and records one [only if necessary](#recording-only-if-necessary) |
+| `selfie review [<batch>]` | Prints the diff of a batch against what history has approved. With no batch, uses the one for this built Storybook, and records one [only if necessary](#recording-only-if-necessary) |
 | `selfie approve <batch>`, `selfie reject <batch>` | Records a decision on a batch's changed and added images, with `--all` or `--story <pattern>` |
-| `selfie accept <batch>` | Makes a batch the goldens of its Git SHA |
-| `selfie find-baseline` | Prints the baseline this repository and environment would use |
 | `selfie push`, `selfie pull` | Moves a batch and its goldens to and from a remote (`docs/specs/sync.md`) |
 | `selfie notes` | Prints the open notes a person has sent to an agent from this folder (`docs/specs/feedback.md`) |
 | `selfie reply <note> <text>` | Answers a note (`docs/specs/feedback.md`) |
@@ -30,9 +28,9 @@ Source of truth: `cli/src/cli.ts`, `cli/src/document.ts`; the real binary's test
 
 | Code | Meaning | Examples |
 |---|---|---|
-| 0 | Nothing blocks | A review with no blockers, a batch recorded, even with failed stories, a decision recorded, a batch accepted, any `find-baseline` result, `ui` stopped by a signal |
-| 1 | The command ran, and something blocks | A review listing anything in `blockers`, or showing any difference from a `--baseline`, `accept` refusing, a `--story` pattern on `approve` or `reject` that matched nothing |
-| 2 | The command couldn't run | Not a Git repository, no commits, no Storybook, no Docker, a failed `--build-command`, a bad flag, an unknown batch, `--story` matching no story at all, a `ui` that can't start |
+| 0 | Nothing blocks | A review with no blockers, a batch recorded, even with failed stories, a decision recorded, `ui` stopped by a signal |
+| 1 | The command ran, and something blocks | A review listing anything in `blockers`, or showing any difference from a `--baseline`, a `--story` pattern on `approve` or `reject` that matched nothing |
+| 2 | The command couldn't run | Not a Git repository, no commits, no Storybook, no Docker, no `selfie.config.json`, a failed `--build`, a bad flag, an unknown batch, `--story` matching no story at all, a `ui` that can't start |
 | 3 | Nothing yet, and it's worth asking again | `agent-await-feedback` past its `--timeout` |
 | 130 | Stopped by a signal, where stopping isn't success | `agent-await-feedback` |
 
@@ -48,22 +46,20 @@ Source of truth: `cli/src/index.ts`; tests in `cli/test/library.test.ts`.
 | Export | Does |
 |---|---|
 | `openProject({ cwd, env })` | The repository's `Project`: its `repo`, `directory`, `renders`, `notes`, `store`, `renders`, and `close()` |
-| `record(project, options)` | Returns a `RenderBatchResult`: the `batch`, `dirtyPaths`, `baseline`, `warnings`, and `timings` |
-| `review(project, options)` | `options` is a `batch`, or what `render` takes. Returns a `ReviewResult`: the `comparison`, `dirtyPaths`, `baseline`, `differences`, `playErrors`, `warnings`, and `timings` |
-| `decide(project, { batchId, decision, actor, stories })` | `stories` is `"all"`, patterns, or `{ targets }`: exact stories and image hashes, for a caller that showed them, refused whole with `stale-decision` if any isn't a changed or new image the batch holds. Returns `decided`, `skipped`, `unmatchedPatterns`, and the `comparison` after it. It compares twice, and reads unchanged rows only for patterns |
-| `accept(project, { batchId, removedSeen })` | Returns `accepted`, `refusals`, `usableAsBaseline`, and the `comparison` |
-| `checkAccept(project, comparison, removedSeen)` | What `accept` would refuse of a comparison a caller holds, changing nothing: `refusals`, `usableAsBaseline`, and `removals` |
+| `renderBatch(project, options)` | Returns a `RenderBatchResult`: the `batch`, `dirtyPaths`, `warnings`, and `timings`. `options.onProgress` is `render`'s (`docs/specs/render.md` → Render) |
+| `review(project, options)` | `options` is a `batch`, or what `renderBatch` takes. Returns a `ReviewResult`: the `comparison`, `given`, `dirtyPaths`, `differences`, `playErrors`, `warnings`, and `timings` |
+| `decide(project, { batchId, decision, actor, stories })` | `stories` is `"all"`, patterns, or `{ targets }`: exact stories and image hashes, for a caller that showed them, refused whole with `stale-decision` if any isn't a changed or added image the batch holds, or a removed story of it, with a null hash. Returns `decided`, `skipped`, `unmatchedPatterns`, and the `comparison` after it. It compares twice, and reads unchanged rows only for patterns |
 | `summarizeBatch(comparison)` | Returns `blockers`, `advisories`, `counts`, `undecided`, `unapproved`, `failed`, `removed`, and `notRendered` |
 | `isDecidable(state)` | Whether a render in this state can take a decision: `changed` or `added`. Defined in `selfie-store` |
-| `compareAsReviewed(project, batchId, options)` | A batch compared with the baseline its reviewer saw |
-| `findBaseline(project, environment)`, `resolveRenderSettings(repo, { native })`, `gitUserEmail(repo)` | What the commands use for these |
+| `compareAsReviewed(project, batchId, options)` | A batch compared with what history has approved |
+| `resolveRenderSettings(repo, { native })`, `gitUserEmail(repo)` | What the commands use for these |
 | `readReviewCache(project, batchId)` | The paths and pixel diffs a review exported, or null once pruned |
 | `SelfieError` | Has a `code`, so a caller can tell cases apart without reading its message |
 
 - **Must keep facts in results and compute verdicts.** A result never says what needs attention: `summarizeBatch` does, from a comparison, so a verdict can be recomputed after any decision.
 - **Must keep command wording out of results.** `next` steps and refusal messages are built in `cli/src/document.ts`, and a refusal holds fields such as `stories` and `outsideFilter`.
 - **Must keep printing and exit codes in `cli/src/cli.ts`.**
-- **Must take the types the review UI also reads from `selfie-ui/app`, with `import type`**, so each has one definition and nothing is loaded for them: `PixelDiff`, `AcceptRefusal`, `Attention`, and the reasons.
+- **Must take the types the review UI also reads from `selfie-ui/app`, with `import type`**, so each has one definition and nothing is loaded for them: `PixelDiff`, `Attention`, and the reasons.
 
 ## Local data
 
@@ -94,20 +90,19 @@ Source of truth: `cli/src/review.ts`, `cli/src/diff.ts`, `cli/src/hunks.ts`, `cl
 
 A review of a named batch starts at step 6. `selfie render` is steps 1 to 5, always renders, and prints what it recorded. Otherwise, in order, a review:
 
-1. Runs `--build-command`, or with `--build` the config's `buildCommand`, in a shell. Its stdout goes to stderr. **Never guess a project's build system.** **Never use a shell for anything else.**
-2. Reads HEAD and the working tree, and finds the baseline ([`find-baseline`](#find-baseline)).
-3. Unless that exact built Storybook [already rendered](#recording-only-if-necessary), renders `--storybook-dir`, or else the config's `storybookDir`, or else `storybook-static`, in a new render directory, with `--story` patterns, and the project's [init script](#configuration).
+1. With `--build`, runs the config's `buildCommand` in a shell. Its stdout goes to stderr. **Never guess a project's build system.** **Never use a shell for anything else.**
+2. Reads HEAD and the working tree.
+3. Unless that exact built Storybook [already rendered](#recording-only-if-necessary), renders the config's `storybookDir` in a new render directory, with `--story` patterns, and the project's [init script](#configuration).
 4. Checks HEAD didn't move.
-5. Unless a batch [already says all this](#recording-only-if-necessary), begins a batch recording whether the tree was dirty, the baseline, and any filter. Stores each PNG with `Store.putImages`, which keeps new ones as WebP, or takes an earlier render's rows, and records and finishes the batch with `RenderBatches`. Rows carry the failure message and the `play` error.
-6. Compares the batch with `--baseline`, or else the baseline it recorded, or else its branch goldens.
+5. Unless a batch [already says all this](#recording-only-if-necessary), begins a batch recording whether the tree was dirty, its branch, and any filter. Stores each PNG with `Store.putImages`, which keeps new ones as WebP, or takes an earlier render's rows, and records and finishes the batch with `RenderBatches`. Rows carry the failure message and the `play` error.
+6. Compares the batch with `--baseline`, or else what history has approved (`docs/specs/renders.md` → Approvals).
 7. Exports images and pixel diffs for what isn't unchanged, writes `review.json`, and prunes [output](#output-directories).
 
-- **Must take branch goldens from the batch's commit back to, not including, its merge-base, on first-parent history, and only show a batch against them, never record them** (rationale). `batch.baselineSha` stays null, so accepting still needs every image approved, including ones that match, and no `--removed` count.
-- **Must take `blockers`, `counts.undecided`, and the exit code from what accepting checks, whatever a review is shown against**, so exit 0 never comes before a refusal. Only a `--baseline` differs ([below](#review)).
+- **Must take `blockers`, `counts`, and the exit code from what this review compared with**, so a `--baseline` answers its own question, and says nothing about what history has approved.
 - **Must refuse a named batch with any flag for making a batch**, since it's already recorded.
-- **Must take `--baseline` as a batch ID, or else anything Git resolves to a commit, whose goldens it means**, and fail with exit 2 if there's no such finished batch in this environment or the commit has no goldens.
-- **Must keep `--baseline` to this one review.** It changes nothing about the batch: `selfie approve` and `selfie accept` still compare with the baseline the batch recorded, its exports go under `batches/<batch id>/against/<baseline>/`, and `review.json` isn't written. It exits 1 if anything differs, even when every image is approved, since the question was what differs (rationale).
-- **Must do diff work only on a `changed` render.** A `added` or `removed` one exports its one image, and an unchanged one nothing, unless it has an advisory.
+- **Must take `--baseline` as a batch ID, or else anything Git resolves to a commit, whose ancestors' approvals it means**, and fail with exit 2 if there's no such finished batch in this environment or no such commit.
+- **Must keep `--baseline` to this one review.** It changes nothing about the batch: `selfie approve` still compares with what history has approved, its exports go under `batches/<batch id>/against/<baseline>/`, and `review.json` isn't written. It exits 1 if anything differs, even when every image is approved, since the question was what differs (rationale).
+- **Must do diff work only on a `changed` render.** An `added` or `removed` one exports its one image, and an unchanged one nothing, unless it has an advisory.
 - **Must write every exported image as a PNG, whatever the store keeps**, so a document's paths stay what they say and any agent can open them.
 - **Must report what changed as hunks:** rectangles of each image that correspond and differ, with everything outside them matching once what's between them is lined up, found by a recursive 9-slice in `cli/src/hunks.ts` (rationale).
 - **Must make hunks depend on the two images alone**, so the same pair always gives the same hunks, and a decision or a cache can rely on it.
@@ -117,14 +112,14 @@ A review of a named batch starts at step 6. `selfie render` is steps 1 to 5, alw
 - **Must call rows spacing only if they're one color all the way across, that color is the image's background or the row just outside the hunk, and there are no more of them than the hunk's two sides differ in height by**, so a new solid banner is `changed` (rationale).
 - **Must count as changed whatever moves and spacing don't account for: any pixel that comes out different when the current side is rebuilt from what was matched, and all of what the golden had that matched nothing**, so that nothing can vanish by being called moved.
 - **Must claim a hunk's moves only if that leaves fewer pixels unexplained than comparing it in place, and must then not let any other hunk use its blocks** (rationale).
-- **Must never let `kind` change what blocks, what a decision is on, or what `accept` checks.** A render with only moves and spacing needs a decision like any other (rationale).
+- **Must never let `kind` change what blocks, or what a decision is on.** A render with only moves and spacing needs a decision like any other (rationale).
 - **Must compare a hunk in place from its top left, past spacing, and count what only one image has as changed**, whether rows or columns, so images of any two sizes have stats and a diff image.
 - **Must mark a seam for a hunk with nothing different in the current image, because something was only taken away**, one row where it was, in the color of what happened to it, so every hunk has a place in the current image.
 - **Must make the diff image from the current image, faded to light gray, with changed pixels solid `#ff0050`, what moved tinted `#0969da` both where it landed and where it left, and spacing solid `#ffd666`.**
 - **Must treat a render's unusable file as that story's failure**: a manifest path outside the render directory, a path that isn't a regular file, or a PNG the store refuses. Other stories continue.
 - **Must fail with exit 2 if HEAD moves during the render, or if no story was rendered**, since one Git SHA must describe the batch, and a typo must not pass.
 - **Must record a batch as dirty if the tree had changes either before or after the render.** Ignored files don't count, so a gitignored `storybook-static` doesn't dirty the tree, and neither does a stale one (rationale).
-- **Must not call a golden removed when `--story` left its story out.** Such goldens are counted in `filter.notRendered`, and are not in `differences`, `counts.removed`, or `blockers`. A removed story matching a pattern still is.
+- **Must not call a story removed when `--story` left it out.** Such stories are counted in `filter.notRendered`, and are not in `differences`, `counts.removed`, or `blockers`, and take no decision. A removed story matching a pattern still is.
 
 ### What blocks
 
@@ -137,30 +132,30 @@ Source of truth: `summarizeBatch` in `cli/src/summary.ts`.
 | `blockers` | `failed` | The story failed to render, or its image was unusable | The failure |
 | | `changed-unapproved`, `added-unapproved` | Its image has no decision | |
 | | `rejected` | Its image is rejected | The actor |
-| | `removed` | The baseline has its golden, and this batch doesn't have the story | |
+| | `removed` | It has a reference, this batch doesn't have the story, and that has no approval | |
 | | `pattern-unmatched` | A `--story` pattern matched nothing, while another did. `story` is null | The pattern |
 | `advisories` | `play-error` | Its `play` function threw. Its image is still recorded (`docs/specs/render.md` → Manifest) | The message |
 
-- **Must not list an approved image**: it is still in `differences`, with its `decision`. That is how an approval made earlier, at any Git SHA, needs no repeating (`docs/specs/system.md` → Approvals).
+- **Must not list what's approved**: it is still in `differences`, with its `decision`, for the batch it was approved on. A later batch finds it as the reference (`docs/specs/renders.md` → Approvals).
 - **Must list an advisory whatever its story's state**, including unchanged, and count them in `counts.advisories`.
-- **Never make an advisory a gate.** `accept` reports them, but `acceptBatch`'s checks are the only ones on an image (`docs/specs/renders.md` → Open questions).
+- **Never make an advisory a gate.**
 
 ### Recording only if necessary
 
 Source of truth: `replay` and `renderFresh` in `cli/src/review.ts`, `renderIdentity` in `render/src/identity.ts`; tests in `cli/test/reuse.test.ts`, `render/test/identity.test.ts`.
 
-A review recognizes a built Storybook that already rendered, and skips rendering and storing. Otherwise it records that render's image hashes and `play` errors in a new batch. Everything else about a review stays: the batch has this review's Git SHA, dirtiness, baseline, and filter, and it compares, exports, exits, and can be decided on and accepted like any other. Docker isn't needed for this, since nothing starts.
+A review recognizes a built Storybook that already rendered, and skips rendering and storing. Otherwise it records that render's image hashes and `play` errors in a new batch. Everything else about a review stays: the batch has this review's Git SHA, dirtiness, branch, and filter, and it compares, exports, exits, and can be decided on like any other. Docker isn't needed for this, since nothing starts.
 
-- **Must show the existing batch and record nothing when one at this commit came from that render with the same dirtiness, baseline, and filter** (rationale).
-- **Must recognize a built Storybook only by `renderIdentity` (`docs/specs/render.md` → Render identity)**, of `--storybook-dir` after any `--build-command`, with the environment and the init script.
+- **Must show the existing batch and record nothing when one at this commit came from that render with the same dirtiness, branch, and filter** (rationale).
+- **Must recognize a built Storybook only by `renderIdentity` (`docs/specs/render.md` → Render identity)**, of the config's `storybookDir` after any `--build`, with the environment and the init script.
 - **Never reuse a batch with a failed story**, including an image the store refused, however many times it fails (rationale).
-- **Never reuse a batch where any story has an error other than `play`, `console`, or `page`, or where render warned of anything** (rationale). Those three are the project's own code, and reuse keeps its `play` errors as advisories. Everything else, such as `request` and the soft `timeout`, might not happen next time.
+- **Never reuse a batch where any story has an error other than `play`, `console`, `page`, or `viewport`, or where render warned of anything** (rationale). Those are the project's own code, and reuse keeps its `play` errors as advisories. A `viewport` error always comes with a warning, which reuse wouldn't repeat. Everything else, such as `request` and the soft `timeout`, might not happen next time.
 - **Must keep only the newest real render of a built Storybook, and forget the built Storybook if that render can't be reused**, so a forced render that fails isn't hidden by an older one that passed.
 - **Must not remember a render if the built Storybook's identity changed while it rendered**, since nothing describes those images.
 - **Must always name a batch that really rendered:** a reused batch is never itself remembered, so reuse doesn't chain.
 - **Must answer a filtered review only from the built Storybook's whole batch, by the filter, and never remember a filtered render or forget one because of it.** `filter`, `warnings`, and `blockers` come out as a render's would, and a filter matching nothing still exits 2.
 - **Must always render in `selfie render`.** That render still updates what's remembered, so it is also how to replace one, and a later review shows the batch it recorded.
-- **Must make it visible:** `batch.reusedFromBatch` (`docs/specs/renders.md` → Render batches), which is `reusedFromBatch` in `review`'s and `accept`'s documents; one line on stderr from each; and the batch and accept screens (`docs/specs/ui.md` → Screens).
+- **Must make it visible:** `batch.reusedFromBatch` (`docs/specs/renders.md` → Render batches), which is `reusedFromBatch` in `review`'s document; one line on stderr; and the batch screen (`docs/specs/ui.md` → Screens).
 - **Must say why on stderr when a plain render of every story can't be reused**, naming the story and the error, since that's how a project finds out why it never hits.
 - **Must keep the built Storybook that rendered each new batch, reused or filtered or failed or not, named by `storybookHash` (`docs/specs/render.md` → Render identity), unless it changed while it rendered**, so `selfie ui` can open the very build that rendered a batch (`docs/specs/store.md` → Built Storybooks, rationale).
 - **Must keep the bytes it read for that hash**, so a built Storybook rewritten meanwhile can't be kept under another's name, **and must not fail a batch for failing to keep its built Storybook**, since the batch is sound, and only its stories' links are lost.
@@ -177,8 +172,7 @@ Every path is absolute, and names a file that exists until it is pruned.
 | `reusedFromBatch` | The batch that really rendered these images, or null if this one did ([Recording only if necessary](#recording-only-if-necessary)) |
 | `dirty` | Whether the tree had changes when the batch was recorded |
 | `dirtyPaths` | Up to 20 of those changes. Empty for a named batch, since only the fact is stored |
-| `baseline` | The batch's own: `sha`, `reason`, and `message`, as [`find-baseline`](#find-baseline) gives them |
-| `comparedWith` | What this review compared with: `source`, one of `baseline`, `given`, or `branch`, and its `sha`, or its `batch` if it's a batch |
+| `comparedWith` | What this review compared with: `source`, one of `approvals` or `given`, and with `given` its `sha`, or its `batch` if it's a batch |
 | `environment` | Its ID |
 | `filter` | `patterns` and `notRendered`, or null with no `--story` |
 | `counts` | `stories`, `unchanged`, `changed`, `added`, `removed`, `undecided`, and `advisories` |
@@ -191,13 +185,12 @@ Every path is absolute, and names a file that exists until it is pruned.
 `pixelDiff` is `{ current, golden, hunks, changedPixels, movedPixels, spacingPixels, totalPixels, boundingBox, firstChanged, maxChannelDelta }`, where `current` and `golden` are each image's `width` and `height`, each of `hunks` is `{ current, golden, kind, changedPixels, moved }`, each of whose `current` and `golden` has that image's `x`, `y`, `width`, and `height`, and each of whose `moved` is `{ current, golden }`, the box of a block that landed in this hunk and the box it was in. A hunk that only lost something to another hunk is `moved` with no `moved` entries. `totalPixels` is the larger image's, `changedPixels` includes what only the golden has, `movedPixels` counts what landed, `spacingPixels` counts both sides' spacing, `boundingBox` and `firstChanged` are of changed pixels, or of the hunks if none changed, `firstChanged` is in reading order, and `maxChannelDelta` is 0 if no pixel compared. It is null unless `changed`. `hunkGroups` is `{ current, golden, kind }`, where `kind` is the most that any of the group's hunks is: `changed`, then `moved`, then `spacing`.
 
 - **Must keep a difference's hashes**, so a UI can cache images by content.
-- **Must say, when the baseline is null and HEAD isn't the merge-base, that goldens accepted on this branch only show later reviews here what changed, and that a baseline takes accepting on the default branch**, since its merge-base may not have these stories yet.
 
 ## Output directories
 
 Source of truth: `cli/src/project.ts`.
 
-- **Must keep every fact about a batch in the store**, so that deleting a batch directory loses nothing but the exported files: a pruned batch can be decided on and accepted, and its images come from `Store.getImage`.
+- **Must keep every fact about a batch in the store**, so that deleting a batch directory loses nothing but the exported files: a pruned batch can be decided on, and its images come from `Store.getImage`.
 - **Must give each review its own render directory and batch directory, named by UUID**, so concurrent reviews can't touch each other's files.
 - **Must delete a render directory when its review ends, however it ends.** A later review deletes one over 24 hours old, left by a crash.
 - **Must keep the newest 20 batch directories, and delete older ones at the end of each review** (rationale). A batch is never deleted from the store, per `docs/specs/renders.md` → Open questions, and an image's blob stays with it.
@@ -207,63 +200,28 @@ Source of truth: `cli/src/project.ts`.
 
 Source of truth: `decide` in `cli/src/decisions.ts`.
 
-- **Must decide on exactly the batch's `changed` and `added` images selected by `--all` or `--story`, and require exactly one of those.** Unchanged images get no decision. Failed and removed ones have no image, and are listed under `skipped`.
-- **Must work on a dirty tree**, so a user can approve work before committing it (`docs/specs/system.md` → Approvals).
+- **Must decide on exactly the batch's `changed`, `added`, and `removed` renders selected by `--all` or `--story`, and require exactly one of those.** Unchanged images get no decision. Failed ones have no image, and are listed under `skipped`. A story its filter left out isn't selected.
+- **Must work on a dirty tree**, so a user can approve work before committing it (`docs/specs/renders.md` → Approvals).
 - **Must take the actor from `--actor`, or else `git config user.email`**, and fail if there's neither.
-- **Must compare against the baseline recorded on the batch**, the one its reviewer saw.
+- **Must record each decision at the batch's commit**, and compare against what history has approved (`docs/specs/renders.md` → Approvals).
 
 It prints `batchId`, `decision`, `actor`, `decided`, `skipped`, `undecided` (what still has no decision), and `unmatchedPatterns`.
 
-A first batch needs every image approved: `selfie approve <batch> --all`, then `selfie accept <batch>`.
+A first batch needs every image approved: `selfie approve <batch> --all`. That's all it needs, on any branch.
 
-## Accept
-
-Source of truth: `accept` in `cli/src/decisions.ts`.
-
-- **Must refuse, with exit 1, and report every reason at once:**
-
-| `reason` | When | Fields |
-|---|---|---|
-| `recorded-on-dirty-tree` | The batch was recorded on a dirty tree, even if it is clean now (rationale). `acceptBatch` refuses this for every caller | `gitSha` |
-| `batch-has-failures` | A story failed to render | `stories` |
-| `unapproved` | A changed or new image isn't approved | `stories` of `story`, `state`, `decision` |
-| `removed-unacknowledged` | The baseline has stories this batch lacks, and `--removed` wasn't passed | `stories`, `outsideFilter` |
-| `wrong-removed-count` | `--removed` isn't the count there is | `stories`, `outsideFilter`, `seen` |
-
-- **Must not check the tree as it is now**: only how the batch was recorded decides whether its images describe its SHA (rationale). So a batch recorded clean may be accepted while HEAD is elsewhere or the tree has moved on.
-- **Must pass `acceptBatch` the count the caller gave in `--removed`, and 0 if there are no removals.** `docs/specs/renders.md` → Goldens owns what it does with it. A filtered batch may be accepted, once acknowledged, and then drops the goldens it left out.
-- **Must report `usableAsBaseline`: whether the SHA is on the default branch's first-parent history, or HEAD's if there is none.** Accepting off it succeeds, and those goldens are only ever [branch goldens](#review).
-- **Must report the batch's advisories in its output, accepted or not.**
-
-It prints `accepted`, `batchId`, `reusedFromBatch`, `gitSha`, `environment`, `baselineSha`, `usableAsBaseline`, `removed`, `refusals[]` with each one's fields and a `message`, and `advisories`.
-
-## find-baseline
+## Git
 
 Source of truth: `cli/src/git.ts`; tests in `cli/test/git.test.ts`, on real Git repositories.
 
 - **Must run Git only by argument arrays, never through a shell.**
-- **Must choose the default branch as the first of these that exists:** `origin/HEAD`'s target, `origin/main`, `origin/master`, local `main`, local `master`. With none, it walks from HEAD and says so in `message`.
-- **Must start at the merge-base of HEAD and the default branch, and walk first-parent history, nearest first, for at most 1,000 commits, to the first SHA with complete goldens in the environment.** A branch's own goldens are never its baseline (rationale), which `selfie accept` and decisions rely on. It asks through `RenderBatches.firstWithGoldens`, about 10 queries for 1,000 commits at worst.
-- **Must exit 0 whatever it finds, and explain null** with `reason` and `message`:
-
-| `reason` | When |
-|---|---|
-| `no-commits` | The repository has none |
-| `no-merge-base` | HEAD shares no history with the default branch |
-| `shallow-history` | The clone is shallow, and history ended before an answer |
-| `limit-reached` | 1,000 commits had no goldens |
-| `no-goldens` | The whole history was checked |
-
-It prints `sha`, `reason`, `message`, `defaultBranch`, `mergeBase`, and `environment`.
-
-- **Must use local data only, unless a remote is set** (`docs/specs/sync.md` → Commands).
+- **Must choose the default branch as the first of these that exists:** `origin/HEAD`'s target, `origin/main`, `origin/master`, local `main`, local `master`.
 
 ## ui
 
 Source of truth: `cli/src/ui.ts`, and `selfie ui` in `cli/src/cli.ts`; tests in `cli/test/ui-*.test.ts`. `docs/specs/ui.md` owns what it serves.
 
 - **Must print `{ url, port, batchId, storybookUrl }` once it is listening, then keep serving until a signal**, and exit 0. `batchId` is the batch it was asked to open, or null.
-- **Must host the built Storybook the other commands would render, or `--storybook-dir`'s, and the kept built Storybooks, on a free port of its own** (`docs/specs/ui.md` → Routes), whether or not there's a built Storybook yet.
+- **Must host the built Storybook the other commands would render, and the kept built Storybooks, on a free port of its own** (`docs/specs/ui.md` → Routes), whether or not there's a built Storybook yet.
 - **Must take an optional batch**, and refuse a bad or unknown one with exit 2 before listening. With none, the page opens at every story (`docs/specs/ui.md` → Screens), in this project's environment, or `--native`'s.
 - **Must ask the system for a free port unless given `--port`**, so two projects can both be served.
 - **Never open a browser.** Whoever ran it decides what to do with the URL. [`selfie` alone](#selfie-alone) is the one that does.
@@ -290,6 +248,7 @@ Source of truth: `cli/src/flakes.ts`, `cli/src/skills.ts`, `cli/skills/`; tests 
 
 - **Must record no batch and store nothing**, so it can't change a review. It keeps each render's images in `<project>/flakes/`, for looking at, until the next time it runs.
 - **Must take at least 2 renders, and 3 by default.**
+- **Must say how each render is going on stderr, at most every 10 seconds,** in the words of `describeRenderProgress` (`docs/specs/ui.md` → Screens), so stdout stays one document.
 - **Must exit 0 if nothing is reported, and 1 if anything is**, printing `{ schemaVersion, environment, renders, stories, flaky, warnings, directory }`, with `flaky` biggest pixel difference first, since what's biggest most often has one big cause.
 - **Must report a story whose images differ, or that failed in any render, or with a `timeout` or `request` error in any render, or with any other error in only some renders** (rationale).
 - **Must compare by pixels**, naming the most different pair and a picture of what differs.
@@ -303,21 +262,23 @@ Source of truth: `cli/src/flakes.ts`, `cli/src/skills.ts`, `cli/skills/`; tests 
 
 Source of truth: `cli/src/config.ts`.
 
-`selfie.config.json` at the Git top level is the only place a project configures Selfie:
+`selfie.config.json` at the Git top level is the only place a project configures Selfie. `selfie` alone, `render`, `review`, `flakes`, `ui`, `push`, and `pull` require it:
 
 | Key | Meaning |
 |---|---|
 | `environment` | Overrides for `defineEnvironment`, including its `recipe` (`docs/specs/render.md` → Environment) |
 | `initScript` | A file inside the Git top level, used as `render`'s `initScript` |
-| `storybookDir` | A directory inside the Git top level, the built Storybook to render. `--storybook-dir` overrides it |
-| `buildCommand` | How this project builds its Storybook, run from the Git top level |
+| `storybookDir` | Required. A directory inside the Git top level, the built Storybook to render |
+| `buildCommand` | Required. How this project builds its Storybook, run from the Git top level |
 | `settleMs` | How long to wait after the network, images, and fonts, before a screenshot. Default 100. Changing it renders again |
 | `storyTimeoutMs` | The bound on one story, from opening its context to its screenshot. Default 60000 |
 | `hunkMergeDistance` | How close changed hunks group for showing, in CSS pixels, multiplied by the batch's scale. Default 12 |
 
+- **Must refuse, with exit 2, a repository with no config, or one missing a required key**, and show what to write, and that `selfie skill quickstart` is a guide for a coding agent (rationale).
 - **May let `--native` win over its `runner`.**
+- **Never take a flag or environment variable for anything about the project.** Those describe this machine or this one command, such as `--native`, `--story`, and `SELFIE_HOME`, or a server, as `--remote` does (`docs/specs/sync.md` → Commands) (rationale).
 - **Must refuse an unknown key**, so a typo can't silently render the wrong environment.
-- **Must run `buildCommand` only when a person asks: `selfie` alone, or `--build` on `render` or `review`, and never from a page or by default**, printing it first, so a checkout can only run a command on someone who asked for its built Storybook (rationale).
+- **Must run `buildCommand` only when a person asks: `selfie` alone, or `--build` on `render`, `review`, or `flakes`, and never from a page or by default**, printing it first, so a checkout can only run a command on someone who asked for its built Storybook (rationale).
 
 ## Untrusted input
 
@@ -348,9 +309,9 @@ Story IDs come from a project's built Storybook, and a manifest's paths from a d
 
 ### Rows copied by a reused batch
 
-A reused batch at a new commit writes every row again, about 450 to 670 MB of `store.db` a year at 50 hits a day on 541 stories (rationale). Two ways to fix it, neither built: a reused batch could hold no rows and read through `reused_from_batch`, which every query on a batch's rows would have to learn (`docs/specs/renders.md` → Storing only what changed is the same idea); or a review could delete the rows of an earlier reused batch at the same SHA and environment that nothing accepted or decided from, which needs `docs/specs/renders.md` → Open questions' retention rule first.
+A reused batch at a new commit writes every row again, about 450 to 670 MB of `store.db` a year at 50 hits a day on 541 stories (rationale). Two ways to fix it, neither built: a reused batch could hold no rows and read through `reused_from_batch`, which every query on a batch's rows would have to learn (`docs/specs/renders.md` → Storing only what changed is the same idea); or a review could delete the rows of an earlier reused batch at the same SHA and environment that nothing decided from, which needs `docs/specs/renders.md` → Open questions' retention rule first.
 
 ### Open questions
 
-- **A stale gitignored build.** Nothing ties a built Storybook to the commit it came from, so a clean tree with an old `storybook-static` records the old pixels against the new SHA. `--build-command` avoids it, and only a hash recorded at build time would catch it.
-- **Two Storybooks in one repository.** They share a slug and an environment, so their story IDs share names, and neither can be accepted without the other reading as removed.
+- **A stale gitignored build.** Nothing ties a built Storybook to the commit it came from, so a clean tree with an old `storybook-static` records the old pixels against the new SHA. `--build` avoids it, and only a hash recorded at build time would catch it.
+- **Two Storybooks in one repository.** They share a slug and an environment, so their story IDs share names, and neither can render without the other reading as removed.

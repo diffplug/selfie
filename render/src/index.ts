@@ -1,4 +1,4 @@
-export { render, type RenderOptions } from "./render.ts";
+export { render, type RenderOptions, type RenderProgressEvent } from "./render.ts";
 export {
   defineEnvironment,
   environmentId,

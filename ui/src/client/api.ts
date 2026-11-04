@@ -2,9 +2,7 @@
 import {
   REQUEST_HEADER,
   REQUEST_HEADER_VALUE,
-  type AcceptOutcome,
   type ApiError,
-  type BaselineNote,
   type BatchContext,
   type DecisionKind,
   type DecisionTarget,
@@ -12,6 +10,7 @@ import {
   type NewNote,
   type PixelDiff,
   type BatchView,
+  type RenderProgress,
   type SendVia,
   type RenderRow,
   type StoriesView,
@@ -51,17 +50,15 @@ const batchRoute = (batchId: string) => `/batches/${encodeURIComponent(batchId)}
 
 export const fetchBatch = (batchId: string, signal: AbortSignal) => request<BatchView>(batchRoute(batchId), { signal });
 export const fetchBatchContext = (batchId: string, signal: AbortSignal) => request<BatchContext>(`/batches/${encodeURIComponent(batchId)}/context`, { signal });
-export const fetchBaseline = (batchId: string, signal: AbortSignal) => request<BaselineNote>(`${batchRoute(batchId)}/baseline`, { signal });
 export const fetchUnchanged = async (batchId: string) => (await request<{ rows: readonly RenderRow[] }>(`${batchRoute(batchId)}/unchanged`)).rows;
 export const fetchDiff = (current: string, golden: string, signal: AbortSignal) => request<PixelDiff>(`/diffs/${current}/${golden}`, { signal });
 
 export const postDecision = (batchId: string, decision: DecisionKind, renders: readonly DecisionTarget[]) =>
   post<BatchView>(`${batchRoute(batchId)}/decisions`, { decision, renders });
-export const postAccept = (batchId: string, removedSeen: number | undefined) =>
-  post<AcceptOutcome>(`${batchRoute(batchId)}/accept`, removedSeen === undefined ? {} : { removedSeen });
 
 export const fetchStories = (signal: AbortSignal) => request<StoriesView>("/stories", { signal });
 export const postRender = (stories: readonly string[]) => post<{ readonly batchId: string }>("/renders", { stories });
+export const fetchRenderProgress = (signal: AbortSignal) => request<{ readonly progress: RenderProgress | null }>("/renders/progress", { signal });
 export const fetchFeedback = (signal: AbortSignal) => request<FeedbackView>("/feedback", { signal });
 export const postNote = (note: NewNote) => post<FeedbackView>("/notes", note);
 export const postSendNotes = (via: SendVia) => post<{ readonly feedback: FeedbackView; readonly text: string }>("/notes/send", { via });

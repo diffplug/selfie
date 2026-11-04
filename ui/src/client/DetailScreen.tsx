@@ -11,8 +11,8 @@ import { parseFilter, targetsOf, type StoryNavigation } from "./filter.ts";
 import { useFetched, useHotkeys, useHunkSelection, useTitle, type FeedbackState, type BatchState } from "./hooks.ts";
 import { imageCount, ImageCompare } from "./ImageCompare.tsx";
 import { Keys } from "./Keys.tsx";
-import { acceptPath, AppLink, navigate } from "./router.tsx";
-import { ActionFailure } from "./BatchNotes.tsx";
+import { AppLink, navigate } from "./router.tsx";
+import { ActionFailure } from "./ActionFailure.tsx";
 import { LiveStories, StorybookLinkTo } from "./LiveStories.tsx";
 import { LoadFailure, Loading } from "./Status.tsx";
 import { describeBox, groupHunks, isLayoutOnly } from "../shared/hunks.ts";
@@ -87,15 +87,15 @@ function Notes({ row, diff, renamedFrom, renamedTo }: { row: RenderRow; diff: Pi
           title="Renamed story"
           description={
             <>
-              This image is the very one <code>{renamedFrom}</code> has as its golden, and this batch doesn't have that story. Approving lets this be its first golden under this name. Accepting still asks you to acknowledge that <code>{renamedFrom}</code> is gone.
+              This image is the very one approved for <code>{renamedFrom}</code>, and this batch doesn't have that story. Approving this and the removal of that story moves the approval to its new name.
             </>
           }
         />
       )}
       {row.state === "removed" && renamedTo !== undefined && (
-        <Banner variant="info" title="Renamed story" description={<>The new story <code>{renamedTo}</code> has this very image, so it looks to have been renamed.</>} />
+        <Banner variant="info" title="Renamed story" description={<>The added story <code>{renamedTo}</code> has this very image, so it looks to have been renamed.</>} />
       )}
-      {row.state === "unchanged" && <Banner variant="info" title="Unchanged" description="This image is the same as the baseline's." />}
+      {row.state === "unchanged" && <Banner variant="info" title="Unchanged" description="This image is the same as what's approved." />}
       {diff !== null && isLayoutOnly(diff) && (
         <Banner variant="info" title="Moved and spacing only" description="Everything in this image is in the golden too, and only where it sits changed. That can still be a bug, so it needs a decision like any other." />
       )}
@@ -201,7 +201,7 @@ export function DetailScreen({
   const decide = async (decision: DecisionKind) => {
     if (row === null || state.busy) return;
     if (!isDecidable(row.state)) {
-      setMessage(row.state === "unchanged" ? "An unchanged image needs no decision." : "This story has no image to decide on.");
+      setMessage(row.state === "unchanged" ? "An unchanged image needs no decision." : "This story failed to render, so it has no image to decide on.");
       return;
     }
     const recorded = await state.decide(decision, targetsOf([row]));
@@ -273,8 +273,8 @@ export function DetailScreen({
             by {row.decision.actor}, <RelativeTime date={new Date(row.decision.at)} />.
           </Text>
         )}
-        {row.state === "added" && !comparedWithNote && renamedFrom === undefined && <Text className="selfie-muted">The baseline has no golden for it. Approving lets this image become its first golden.</Text>}
-        {row.state === "removed" && <Text className="selfie-muted">The baseline has this golden, and this batch doesn't have the story. There's no image to decide on: accepting asks you to acknowledge the removal.</Text>}
+        {row.state === "added" && !comparedWithNote && renamedFrom === undefined && <Text className="selfie-muted">Nothing has been approved for this story yet. Approving makes this image what later batches compare with.</Text>}
+        {row.state === "removed" && <Text className="selfie-muted">This story was approved, and this batch doesn't have it. Approving says it's meant to be gone, so later batches stop asking.</Text>}
         {diff !== null && <PixelStats stats={diff} />}
         {changedPair && diff === null && diffError === null && <Text className="selfie-muted">Comparing pixels…</Text>}
         {diffError !== null && <Text className="selfie-muted">The pixels couldn't be compared: {diffError.message}</Text>}
@@ -287,12 +287,8 @@ export function DetailScreen({
           title="Every image has a decision"
           description={
             <>
-              <AppLink inline href={acceptPath(view.batch.id)}>
-                Go to accepting this batch
-              </AppLink>
-              , or{" "}
               <AppLink inline href={listHref}>
-                back to the list
+                Back to the list
               </AppLink>
               .
             </>
@@ -300,7 +296,7 @@ export function DetailScreen({
         />
       )}
       {comparedWithNote ? (
-        <Banner variant="info" title="Compared with the image when noted" description="This story has no golden, so what's shown is what's changed since its newest note. Approving lets this image become its first golden." />
+        <Banner variant="info" title="Compared with the image when noted" description="Nothing has been approved for this story yet, so what's shown is what's changed since its newest note. Approving makes this image what later batches compare with." />
       ) : (
         <Notes row={row} diff={diff} renamedFrom={renamedFrom} renamedTo={[...renames].find(([, from]) => from === row.story)?.[0]} />
       )}

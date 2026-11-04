@@ -9,6 +9,7 @@
     "./app": "./src/server/app.ts",
     "./hunks": "./src/shared/hunks.ts",
     "./notes": "./src/shared/notes.ts",
+    "./render-progress": "./src/shared/renderProgress.ts",
     "./local": "./src/server/local.ts",
     "./storybook": "./src/server/storybook.ts",
     "./sync": "./src/server/sync.ts",

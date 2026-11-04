@@ -2,7 +2,7 @@ import { rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { RenderEnvironment } from "./environment.ts";
 import type { StoryEntry } from "./storybook.ts";
-import type { RenderRecipe, StoryError, WorkerRuntime, WorkerStoryResult } from "./worker/protocol.ts";
+import type { RenderRecipe, StoryError, Viewport, WorkerRuntime, WorkerStoryResult } from "./worker/protocol.ts";
 
 export const MANIFEST_FILE = "manifest.json";
 export const STORIES_DIR = "stories";
@@ -18,6 +18,8 @@ export interface ManifestStory {
   file: string | null;
   width: number | null;
   height: number | null;
+  /** The window it laid out in: what it declared, or else the environment's. Null if the worker never reported it. */
+  viewport: Viewport | null;
   /** SHA256 of the PNG file. Not the image hash, which `docs/specs/store.md` defines over pixels. */
   pngSha256: string | null;
   /** May be non-empty on an `ok` story, such as a console error that didn't stop the render. */
@@ -58,10 +60,11 @@ export function toManifestStory(
   result: WorkerStoryResult | undefined,
   crash: string | null,
 ): ManifestStory {
-  const { status, width, height, pngSha256, errors, durationMs } = result ?? {
+  const { status, width, height, viewport, pngSha256, errors, durationMs } = result ?? {
     status: "failed" as const,
     width: null,
     height: null,
+    viewport: null,
     pngSha256: null,
     errors: [{ source: "worker" as const, message: crash ?? UNREPORTED }],
     durationMs: 0,
@@ -74,6 +77,7 @@ export function toManifestStory(
     file: status === "ok" ? path.posix.join(STORIES_DIR, storyFileName(id)) : null,
     width,
     height,
+    viewport,
     pngSha256,
     errors,
     durationMs,

@@ -41,7 +41,7 @@ beforeEach(async () => {
   project = await openProject({ cwd: h.repo, env: { SELFIE_HOME: h.home } });
   app = appFor(project);
   h.stories = [{ id: "a" }];
-  ({ batchId } = (await h.cli("review", "--storybook-dir", "ignored")).json);
+  ({ batchId } = (await h.cli("review")).json);
   const view = (await (await app.request(`/api/batches/${batchId}`, { headers: { host: HOST } })).json()) as any;
   imageHash = view.rows[0].imageHash;
 });
@@ -339,7 +339,7 @@ describe("waiting for feedback", () => {
     const wait = h.cli("agent-await-feedback");
     await untilWaiting();
     await sendTo("agent");
-    expect((await wait).json.notes[0].messages).toMatchObject([{ text: "Ready", added: true }]);
+    expect((await wait).json.notes[0].messages).toMatchObject([{ text: "Ready", new: true }]);
   });
 
   test("what's been copied isn't received again, even if it was sent to an agent that died", async () => {
@@ -394,13 +394,13 @@ describe("answers", () => {
   test("says whether the image changed in that batch, so a fix that moved nothing shows at once", async () => {
     expect((await h.cli("reply", String(await noteId()), "Nothing yet", "--batch", batchId)).json.imageChanged).toBe(false);
     h.stories = [{ id: "a", color: GREEN }];
-    const newer = (await h.cli("render", "--storybook-dir", "ignored")).json.batchId;
+    const newer = (await h.cli("render")).json.batchId;
     expect((await h.cli("reply", String(await noteId()), "Fixed", "--batch", newer)).json.imageChanged).toBe(true);
   });
 
   test("uses the newest batch from this folder if it isn't told one", async () => {
     h.stories = [{ id: "a", color: GREEN }];
-    const newer = (await h.cli("render", "--storybook-dir", "ignored")).json.batchId;
+    const newer = (await h.cli("render")).json.batchId;
     const { json } = await h.cli("reply", String(await noteId()), "Fixed");
     expect(json).toMatchObject({ batchId: newer, imageChanged: true });
     expect((await feedback()).latestBatchId).toBe(newer);
@@ -441,7 +441,7 @@ describe("answers", () => {
     await answer(id, "About double");
     await project.notes.send();
     const { json } = await h.cli("agent-await-feedback");
-    expect(json.notes[0].messages.map(({ text, added: isNew }: any) => [text, isNew])).toEqual([
+    expect(json.notes[0].messages.map(({ text, new: isNew }: any) => [text, isNew])).toEqual([
       ["Make it bigger", false],
       ["How much bigger?", false],
       ["About double", true],
@@ -499,7 +499,7 @@ describe("the newest batch from a folder", () => {
   test("is what was last recorded or reviewed there, and not a batch someone named", async () => {
     expect((await feedback()).latestBatchId).toBe(batchId);
     h.stories = [{ id: "a", color: GREEN }];
-    const newer = (await h.cli("render", "--storybook-dir", "ignored")).json.batchId;
+    const newer = (await h.cli("render")).json.batchId;
     expect((await feedback()).latestBatchId).toBe(newer);
     await h.cli("review", batchId);
     expect((await feedback()).latestBatchId).toBe(newer);
@@ -507,7 +507,7 @@ describe("the newest batch from a folder", () => {
 
   test("is remembered as soon as it's recorded, even if the review after that fails", async () => {
     h.stories = [{ id: "a", color: GREEN }];
-    const { code } = await h.cli("review", "--storybook-dir", "ignored", "--baseline", "0".repeat(40));
+    const { code } = await h.cli("review", "--baseline", "0".repeat(40));
     expect(code).toBe(2);
     expect((await feedback()).latestBatchId).not.toBe(batchId);
   });

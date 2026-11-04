@@ -23,6 +23,18 @@ const RUN_OVERHEAD_MS = 90_000;
 const NATIVE_WARNING =
   "Native runner: these images won't match other machines or the container. Use them for local experiments only.";
 
+/**
+ * How a render is going. `started` comes once, as the first story starts, so getting the runner and
+ * the browser ready comes before it. `finished` comes as each story finishes, failed or not.
+ */
+export interface RenderProgressEvent {
+  readonly event: "started" | "finished";
+  /** Stories finished so far. */
+  readonly finished: number;
+  /** Stories this render has to do. */
+  readonly total: number;
+}
+
 export interface RenderOptions {
   /** A built Storybook: the directory holding `index.json` and `iframe.html`. */
   storybookDir: string;
@@ -43,6 +55,8 @@ export interface RenderOptions {
   signal?: AbortSignal;
   /** Human progress. Defaults to stderr. */
   log?: (line: string) => void;
+  /** Progress for a program. Nothing comes with no stories to render. */
+  onProgress?: (progress: RenderProgressEvent) => void;
 }
 
 /**
@@ -126,9 +140,11 @@ export async function render(options: RenderOptions): Promise<Manifest> {
     buildDir,
     outDir: storiesDir,
     signal: options.signal,
+    onStarted: () => options.onProgress?.({ event: "started", finished, total: stories.length }),
     onStory: (result) => {
       finished += 1;
       log(`render ${finished}/${stories.length} ${result.status} ${result.id}`);
+      options.onProgress?.({ event: "finished", finished, total: stories.length });
     },
     job: {
       stories: stories.map((story) => ({ id: story.id, file: storyFileName(story.id) })),
@@ -146,6 +162,10 @@ export async function render(options: RenderOptions): Promise<Manifest> {
   manifest.runtime = outcome.runtime;
   manifest.stories = stories.map((story) => toManifestStory(story, outcome.results.get(story.id), outcome.crash));
   if (outcome.crash !== null) warnings.push(`The worker stopped early: ${outcome.crash}`);
+  // A batch keeps only a story's play errors, so this is how a mistake in a declaration reaches a review.
+  for (const { id, errors } of manifest.stories) {
+    for (const { source, message } of errors) if (source === "viewport") warnings.push(`${id}: ${message}`);
+  }
   await save();
   return manifest;
 }

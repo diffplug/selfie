@@ -1,12 +1,12 @@
 // The real binary, real Chromium in the real pinned container, and the renderer's fixture
-// Storybook. vitest.config.ts decides whether these batch, and says why if they don't.
+// Storybook. vitest.config.ts decides whether these run, and says why if they don't.
 import { spawn } from "node:child_process";
 import { access, cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { decodeImage } from "./support.ts";
-import { afterAll, beforeAll, describe, expect, test } from "vitest";
+import { decodeImage, TEST_CONFIG, git, writeTestConfig } from "./support.ts";
+import { afterAll, beforeAll, describe, expect, test, beforeEach } from "vitest";
 import { openProject } from "../src/project.ts";
 import { commit, createRepo } from "./support.ts";
 
@@ -34,19 +34,21 @@ function selfie(...args: string[]): Promise<{ status: number | null; json: any; 
     child.once("close", (status) => resolve({ status, json: JSON.parse(stdout), stderr }));
   });
 }
-const review = (...args: string[]) => selfie("review", "--storybook-dir", STORYBOOK, ...args);
+const review = (...args: string[]) => selfie("review", ...args);
 
 beforeAll(async () => {
   scratch = await mkdtemp(path.join(tmpdir(), "selfie-review-test-"));
   repo = await createRepo(scratch);
   home = path.join(scratch, "home");
 });
+// A test may narrow it to the stories it wants.
+beforeEach(() => cp(STORYBOOK, path.join(repo, TEST_CONFIG.storybookDir), { recursive: true }));
 afterAll(async () => {
   await rm(scratch, { recursive: true, force: true });
 });
 
 describe.runIf(process.env.SELFIE_CLI_CONTAINER === "1")("in the pinned container", () => {
-  test("the whole loop: new, approved, accepted, unchanged, then changed with a diff", async () => {
+  test("the whole loop: added, approved, unchanged, then changed with a diff", async () => {
     const first = await review(...STORIES);
     expect(first.status).toBe(1);
     expect(first.json.counts).toMatchObject({ stories: 2, added: 2, undecided: 2 });
@@ -55,23 +57,22 @@ describe.runIf(process.env.SELFIE_CLI_CONTAINER === "1")("in the pinned containe
     expect(first.stderr).toContain("render 2/2");
 
     expect((await selfie("approve", first.json.batchId, "--all")).status).toBe(0);
-    expect((await selfie("accept", first.json.batchId)).status).toBe(0);
 
     const same = await review(...STORIES);
     expect(same.status).toBe(0);
-    expect(same.json.baseline.sha).toBe(first.json.gitSha);
+    expect(same.json.comparedWith).toEqual({ source: "approvals", sha: null, batch: null });
     expect(same.json.differences).toEqual([]);
     expect(same.json.counts.unchanged).toBe(2);
     // A filtered render is never remembered, so this one rendered again.
     expect(same.json.reusedFromBatch).toBeNull();
     expect(same.stderr).toContain("render 2/2");
 
-    // An init script is project input, so it reports a change rather than starting new goldens.
+    // An init script is project input, so it reports a change rather than starting over.
     await writeFile(
       path.join(repo, "paint.js"),
       `addEventListener("DOMContentLoaded", () => { document.documentElement.style.filter = "invert(1)"; });`,
     );
-    await writeFile(path.join(repo, "selfie.config.json"), JSON.stringify({ initScript: "paint.js" }));
+    await writeTestConfig(repo, { initScript: "paint.js" });
     const changed = await review(...STORIES);
     expect(changed.status).toBe(1);
     expect(changed.json.counts.changed).toBe(2);
@@ -86,13 +87,12 @@ describe.runIf(process.env.SELFIE_CLI_CONTAINER === "1")("in the pinned containe
 
   test("reuses a whole batch with no failures, and its images match a real render's", async () => {
     // The fixture's other stories fail on purpose, and a batch with a failure is never reused.
-    const build = path.join(scratch, "passing");
-    await cp(STORYBOOK, build, { recursive: true });
+    const build = path.join(repo, TEST_CONFIG.storybookDir);
     const index = JSON.parse(await readFile(path.join(build, "index.json"), "utf8"));
     const kept = Object.entries(index.entries).filter(([id]) => ["basic--detail", "timers--frozen-by-selfie"].includes(id));
     await writeFile(path.join(build, "index.json"), JSON.stringify({ ...index, entries: Object.fromEntries(kept) }));
-    await rm(path.join(repo, "selfie.config.json"), { force: true });
-    const reviewBuild = (...args: string[]) => selfie("review", "--storybook-dir", build, ...args);
+    git(repo, "checkout", "--", "selfie.config.json");
+    const reviewBuild = (...args: string[]) => selfie("review", ...args);
 
     const first = await reviewBuild();
     expect(first.stderr).toContain("render 2/2");
@@ -111,14 +111,16 @@ describe.runIf(process.env.SELFIE_CLI_CONTAINER === "1")("in the pinned containe
     expect(filtered.json.reusedFromBatch).toBe(first.json.batchId);
     expect(filtered.json.counts.stories).toBe(1);
 
-    const rendered = await selfie("render", "--storybook-dir", build);
+    const rendered = await selfie("render");
     expect(rendered.stderr).toContain("render 2/2");
     expect((await reviewBuild()).json.batchId).toBe(rendered.json.batchId);
 
+    // Whatever else this file ran, nothing here blocks for want of an approval.
+    await selfie("approve", first.json.batchId, "--all");
     const compared = await selfie("review", rendered.json.batchId, "--baseline", first.json.batchId);
     expect(compared.status).toBe(0);
     expect(compared.json.differences).toEqual([]);
-    // From the store, since `differences` is empty for images that match the goldens.
+    // From the store, since `differences` is empty for images that match.
     const project = await openProject({ cwd: repo, env: { SELFIE_HOME: home } });
     const images = async ({ json }: { json: any }) =>
       (await project.batches.compareBatch(json.batchId, null, { includeUnchanged: true })).renders.map(({ story, imageHash }) => [story, imageHash]);

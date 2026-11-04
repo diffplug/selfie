@@ -6,10 +6,10 @@ import { buildStoryTree, differingStories, inTreeOrder, initiallyClosed, nameFro
 const story = (title: string, name: string): ListedStory => ({ story: `${title}--${name}`.toLowerCase(), title, name, render: null });
 const labels = (nodes: ReturnType<typeof visibleRows>) => nodes.map((row) => `${" ".repeat(row.depth)}${row.kind === "folder" ? row.name : row.entry.name}`);
 
-const STORIES = [story("Screens/Accept", "Ready"), story("Screens/Accept", "Dark"), story("Screens/Run", "Empty"), story("Alone", "One"), story("A/B/C", "Deep")];
+const STORIES = [story("Screens/Accept", "Ready"), story("Screens/Accept", "Dark"), story("Screens/Batch", "Empty"), story("Alone", "One"), story("A/B/C", "Deep")];
 
 test("nests by title, keeping the Storybook's order", () => {
-  expect(labels(visibleRows(buildStoryTree(STORIES), new Set()))).toEqual(["Screens", " Accept", "  Ready", "  Dark", " Run", "  Empty", "Alone", " One", "A", " B", "  C", "   Deep"]);
+  expect(labels(visibleRows(buildStoryTree(STORIES), new Set()))).toEqual(["Screens", " Accept", "  Ready", "  Dark", " Batch", "  Empty", "Alone", " One", "A", " B", "  C", "   Deep"]);
 });
 
 test("puts a later story in the folder an earlier one made, where that folder first came", () => {
@@ -23,7 +23,7 @@ test("a story with no title sits at the top", () => {
 
 test("a closed folder hides what's inside it, however deep, and stays itself", () => {
   const tree = buildStoryTree(STORIES);
-  expect(labels(visibleRows(tree, new Set(["Screens/Accept"])))).toEqual(["Screens", " Accept", " Run", "  Empty", "Alone", " One", "A", " B", "  C", "   Deep"]);
+  expect(labels(visibleRows(tree, new Set(["Screens/Accept"])))).toEqual(["Screens", " Accept", " Batch", "  Empty", "Alone", " One", "A", " B", "  C", "   Deep"]);
   expect(labels(visibleRows(tree, new Set(["Screens"])))).toEqual(["Screens", "Alone", " One", "A", " B", "  C", "   Deep"]);
 });
 
@@ -40,8 +40,8 @@ test("only a top-level folder of folders is a section", () => {
 });
 
 test("starts with only the top-level sections open, as Storybook does", () => {
-  const tree = buildStoryTree([story("Screens/Accept", "Ready"), story("Screens/Run", "Empty"), story("Alone", "One")]);
-  expect(labels(visibleRows(tree, new Set(initiallyClosed(tree))))).toEqual(["Screens", " Accept", " Run", "Alone"]);
+  const tree = buildStoryTree([story("Screens/Accept", "Ready"), story("Screens/Batch", "Empty"), story("Alone", "One")]);
+  expect(labels(visibleRows(tree, new Set(initiallyClosed(tree))))).toEqual(["Screens", " Accept", " Batch", "Alone"]);
 });
 
 test("opens the way to a story, and leaves the rest as they were", () => {

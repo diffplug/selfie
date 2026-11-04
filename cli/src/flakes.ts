@@ -3,15 +3,16 @@
 import { createHash } from "node:crypto";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { render as realRender, type Manifest, type ManifestStory, type StoryError } from "selfie-render";
+import { render as realRender, type Manifest, type ManifestStory, type RenderProgressEvent, type StoryError } from "selfie-render";
 import { decodeImage } from "selfie-store";
 import { sharpCodec } from "selfie-store/adapters/sharp-codec";
-import { resolveRenderSettings, resolveStorybookDir } from "./config.ts";
+import { describeRenderProgress } from "selfie-ui/render-progress";
+import { resolveRenderSettings } from "./config.ts";
 import { diffImages, type PixelDiff } from "./diff.ts";
 import { regularFileInside, storyDirName } from "./paths.ts";
 import type { Project } from "./project.ts";
 import { encodePng } from "./png.ts";
-import { buildAsAsked, renderInput, type RenderBatchOptions } from "./review.ts";
+import { renderInput, runBuild, type RenderBatchOptions } from "./review.ts";
 
 /** What can vary about a story from one render to the next, or shouldn't happen in any of them. */
 export type FlakeKind = "pixels" | "failed" | "timeout" | "request" | "errors";
@@ -43,6 +44,23 @@ export interface FlakeReport {
 export interface FlakeOptions extends RenderBatchOptions {
   readonly times: number;
   readonly concurrency?: number | undefined;
+}
+
+/** Often enough that a long render doesn't look stuck, and few enough to read. */
+const PROGRESS_LINE_EVERY_MS = 10_000;
+
+/** Says how one render is going, with whatever `prefix` says about which it is. */
+function progressLines(log: (line: string) => void, prefix: string): (progress: RenderProgressEvent) => void {
+  const startedAtMs = Date.now();
+  let firstStoryStartedAtMs: number | null = null;
+  let saidAt = startedAtMs;
+  return ({ event, finished, total }) => {
+    const now = Date.now();
+    if (event === "started") firstStoryStartedAtMs = now;
+    if (now - saidAt < PROGRESS_LINE_EVERY_MS) return;
+    saidAt = now;
+    log(`${prefix}: ${describeRenderProgress({ total, finished, startedAtMs, firstStoryStartedAtMs }, now)}`);
+  };
 }
 
 const sha256 = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex");
@@ -106,15 +124,15 @@ export async function findFlakes(project: Project, options: FlakeOptions): Promi
   const log = options.log ?? (() => {});
   const render = options.render ?? realRender;
   const settings = await resolveRenderSettings(repo, { native: options.native });
-  await buildAsAsked(project, settings, options, log);
+  if (options.build === true) await runBuild(project, settings, options.signal, log);
 
   const directory = path.join(project.directory, "flakes");
   await rm(directory, { recursive: true, force: true });
-  const storybookDir = resolveStorybookDir(project.cwd, options.storybookDir, settings);
   const manifests: Manifest[] = [];
   for (let at = 0; at < options.times; at++) {
     log(`Render ${at + 1} of ${options.times}`);
-    const input = renderInput({ storybookDir, outDir: path.join(directory, String(at)), log: () => {} }, settings, options);
+    const onProgress = progressLines(log, `Render ${at + 1} of ${options.times}`);
+    const input = renderInput({ outDir: path.join(directory, String(at)), log: () => {} }, settings, { ...options, onProgress });
     manifests.push(await render(options.concurrency === undefined ? input : { ...input, concurrency: options.concurrency }));
   }
 

@@ -1,10 +1,9 @@
 // A batch's description as the server would give it, for stories. Screens are all props, so this is
-// the one thing they need. The rules for blockers and refusals really live in `summarizeBatch` and
-// `checkAccept` in `selfie-cli`, so these are only as faithful as a story needs.
+// the one thing they need. The rules for blockers really live in `summarizeBatch` in `selfie-cli`,
+// so these are only as faithful as a story needs.
 import { isDecidable } from "selfie-store";
 import { fn } from "storybook/test";
 import type {
-  AcceptRefusal,
   AdvisoryReason,
   Attention,
   BlockerReason,
@@ -21,7 +20,6 @@ import { HASHES, PIXEL_DIFFS } from "./images.generated.ts";
 export const BATCH_ID = "4f8c2a10-7d3e-4b6a-9c11-2e5f0a7b8c9d";
 export const OTHER_BATCH_ID = "b1d7e3f4-1a2b-4c3d-8e5f-6a7b8c9d0e1f";
 export const SHA = "c2a01c2f9d8e7b6a5c4d3e2f1a0b9c8d7e6f5a4b";
-export const BASELINE_SHA = "58bfd636768707e03943bcf08a05152f799617bb";
 
 // The renderer fixes the clock at this time, so a relative date always reads the same there.
 const NOW = Date.UTC(2026, 0, 15, 12);
@@ -38,6 +36,8 @@ const render = (fields: Pick<ComparedRender, "story" | "state"> & Partial<Render
   playError: null,
   decision: null,
   pixelDiff: null,
+  goldenStorybookUrl: null,
+  goldenViewport: null,
   ...fields,
 });
 
@@ -80,7 +80,8 @@ export function batchOf(overrides: Partial<RenderBatch> = {}): RenderBatch {
     finishedAt: STARTED + 90_000,
     failedCount: 0,
     dirty: false,
-    baselineSha: BASELINE_SHA,
+    baselineSha: null,
+    branch: "main",
     storyFilter: null,
     reusedFromBatch: null,
     scale: 1,
@@ -90,51 +91,36 @@ export function batchOf(overrides: Partial<RenderBatch> = {}): RenderBatch {
 
 export function viewOf(
   list: readonly RenderRow[],
-  { batch: runOverrides, unchanged = 512, ...overrides }: Partial<Omit<BatchView, "batch">> & { readonly batch?: Partial<RenderBatch>; readonly unchanged?: number } = {},
+  { batch: batchOverrides, unchanged = 512, ...overrides }: Partial<Omit<BatchView, "batch">> & { readonly batch?: Partial<RenderBatch>; readonly unchanged?: number } = {},
 ): BatchView {
   const inState = (state: RenderRow["state"]) => list.filter((row) => row.state === state);
   const undecided = list.filter((row) => isDecidable(row.state) && row.decision === null);
   const unapproved = list.filter((row) => isDecidable(row.state) && row.decision?.decision !== "approved");
   const failed = inState("failed");
   const removed = inState("removed");
-  const batch = batchOf({ failedCount: failed.length, status: failed.length > 0 ? "failed" : "complete", ...runOverrides });
+  const batch = batchOf({ failedCount: failed.length, status: failed.length > 0 ? "failed" : "complete", ...batchOverrides });
 
   const blockers: Attention<BlockerReason>[] = [
     ...failed.map(({ story, failure }) => ({ story, reason: "failed" as const, detail: failure })),
     ...unapproved.map(({ story, state, decision: made }) =>
       made?.decision === "rejected"
         ? { story, reason: "rejected" as const, detail: made.actor }
-        : { story, reason: `${state}-unapproved` as "changed-unapproved" | "added-unapproved", detail: null },
+        : state === "removed"
+          ? { story, reason: "removed" as const, detail: null }
+          : { story, reason: `${state}-unapproved` as "changed-unapproved" | "added-unapproved", detail: null },
     ),
-    ...removed.map(({ story }) => ({ story, reason: "removed" as const, detail: null })),
     ...(batch.storyFilter?.unmatched ?? []).map((pattern) => ({ story: null, reason: "pattern-unmatched" as const, detail: pattern })),
   ];
   const advisories: Attention<AdvisoryReason>[] = list.flatMap(({ story, playError }) =>
     playError === null ? [] : [{ story, reason: "play-error" as const, detail: playError }],
   );
-  const removals = overrides.removals ?? { stories: removed.map(({ story }) => story), outsideFilter: 0 };
-  const refusals: AcceptRefusal[] = [
-    ...(batch.dirty ? [{ reason: "recorded-on-dirty-tree" as const, gitSha: batch.gitSha }] : []),
-    ...(failed.length > 0 ? [{ reason: "batch-has-failures" as const, stories: failed.map(({ story }) => story) }] : []),
-    ...(unapproved.length > 0
-      ? [
-          {
-            reason: "unapproved" as const,
-            stories: unapproved.map(({ story, state, decision: made }) => ({ story, state, decision: made?.decision ?? null })),
-          },
-        ]
-      : []),
-    ...(removals.stories.length > 0 ? [{ reason: "removed-unacknowledged" as const, ...removals }] : []),
-  ];
   return {
     batch,
     storybook: null,
-    goldenStorybookUrl: null,
     viewport: { width: 1200, height: 900 },
+    storyViewports: {},
     storyNames: [],
-    branchGoldens: null,
     hunkMergeDistance: 12,
-    acceptedBatchId: null,
     actor: "ned@example.com",
     blockers,
     advisories,
@@ -149,9 +135,7 @@ export function viewOf(
       advisories: advisories.length,
     },
     rows: list,
-    refusals,
-    removals,
-    usableAsBaseline: true,
+    outsideFilter: 0,
     siblings: [{ id: batch.id, startedAt: batch.startedAt, status: batch.status, dirty: batch.dirty }],
     ...overrides,
   };
@@ -202,7 +186,6 @@ export function stateOf(view: BatchView, overrides: Partial<BatchState> = {}): B
     loadUnchanged: fn(),
     clearActionError: fn(),
     decide: fn(async () => true),
-    accept: fn(async () => ({ accepted: true, refusals: [] })),
     ...overrides,
   };
 }

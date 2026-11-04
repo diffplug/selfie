@@ -94,6 +94,22 @@ describe("BuiltStorybooks", () => {
     expect(await builds.viewportOf("env")).toEqual({ width: 1200, height: 900 });
   });
 
+  it("knows which of a batch's stories rendered at a size of their own", async () => {
+    expect(await builds.storyViewportsOf("batch")).toEqual({});
+    await builds.recordStoryViewports("batch", {});
+    await builds.recordStoryViewports("batch", { "a--phone": { width: 414, height: 896 }, "a--tablet": { width: 834, height: 1112 } });
+    await builds.recordStoryViewports("other", { "a--phone": { width: 320, height: 568 } });
+    await builds.recordStoryViewports("batch", { "a--phone": { width: 1, height: 1 } });
+    expect(await builds.storyViewportsOf("batch")).toEqual({ "a--phone": { width: 414, height: 896 }, "a--tablet": { width: 834, height: 1112 } });
+    expect(await builds.storyViewportsOf("other")).toEqual({ "a--phone": { width: 320, height: 568 } });
+  });
+
+  it("keeps every story's size, past what fits in a statement", async () => {
+    const viewports = Object.fromEntries(Array.from({ length: 100 }, (_, i) => [`story--${i}`, { width: 100 + i, height: 200 + i }]));
+    await builds.recordStoryViewports("batch", viewports);
+    expect(await builds.storyViewportsOf("batch")).toEqual(viewports);
+  });
+
   it("is safe to create twice", async () => {
     await initStoreSchema(temp.sql);
     await keep(BUILD, { "index.html": "page" });

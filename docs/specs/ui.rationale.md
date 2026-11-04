@@ -15,8 +15,11 @@ Evidence and reasoning for `docs/specs/ui.md`, keyed by its headings.
 ## Routes
 
 - **Why targets are taken exactly.** `decide` also takes patterns, where `*` matches anything, and a story's ID comes from a project's built Storybook. An ID `a*` passed as a pattern also approves `ab`, which the reviewer never saw. `cli/test/ui-*.test.ts` checks this with those two IDs.
-- **Why a request names hashes.** A decision belongs to a name and a hash, so naming them says what the reviewer saw. A later accepted batch can change a baseline's goldens, and so a batch's differences, while a page is open. `stale-decision` is the difference between a confused screen and a wrong approval.
+- **Why a request names hashes.** A decision belongs to a name and a hash, so naming them says what the reviewer saw. A newer approval can change what a batch is compared with, and so its differences, while a page is open. `stale-decision` is the difference between a confused screen and a wrong approval.
 - **Why bulk has no route of its own.** A server-side "all" would approve whatever is there at that moment, and the dialog would describe something else.
+
+- **Why a render's progress is polled.** There's one small object to read, at one render at a time, and only while a page is waiting on it, so a route costs less than a stream the server would have to hold open and tear down. An answer of `null` alone wouldn't do, since the client reads a JSON `null` as a bad response, which is why it's `{ progress }`.
+- **Why a render's progress has times, not durations.** A duration is stale by however long its answer took, so a page starting from each one would sometimes step back a second. A timestamp lets the page count on its own. The server only renders from a local page, so they share a clock, and a hosted source says `canRender: false`.
 
 ## Recomputing
 
@@ -33,10 +36,10 @@ Evidence and reasoning for `docs/specs/ui.md`, keyed by its headings.
 - **Why fit is a zoom with one image.** There's nothing to set beside it, so "side by side" and "stacked" would name things that don't exist, but seeing the whole page at once is still the first thing wanted, so that view stays and is named for what it does. It's the same state as side by side, so going on to a changed story finds it as it was.
 - **Why two kinds of size.** 1× was one CSS pixel at first, so that an image wouldn't be half the width on some screens and not others. Actual size now gives that consistent size, and a person looking for one wrong pixel needs to know what a pixel on their screen is, which only device pixels can say. A 1× image on a 2× display is half its actual width at 1×, and that's the point of choosing it.
 - **Why the layers stay stacked.** A reviewer finding a 1 px change flips between two images and watches for what moves, which only works with no shift and no flash. Each layer's key is its URL, so moving to another story can't show the last story's image while its own loads, which could otherwise get the wrong image approved.
-- **Why reuse a review's stats.** A later accepted batch could change a baseline's goldens under a batch, and then `review.json`'s stats would describe the old pair while the images show the new one. That's rare, and it only misstates numbers, against a request for every story.
+- **Why reuse a review's stats.** A newer approval could change what a batch is compared with, and then `review.json`'s stats would describe the old pair while the images show the new one. That's rare, and it only misstates numbers, against a request for every story.
 - **Why thumbnails, given they cost a read each.** They're lazy, and 30 load on opening a 512 row list. They let someone scan for the one that's different, which pixel counts don't.
 
-**Live stories.** Closed by default since a page per side is a lot to load for what most reviews don't need. They lay out at the rendered viewport and scale down, since a story laid out at half the width could look nothing like its image. They aren't frozen, as a render is, so they can differ from an image without anything being wrong, which the screen says. Each story gets a new frame, since moving one frame along would add to the browser's history, and Back would walk through stories in it.
+**Live stories.** Closed by default since a page per side is a lot to load for what most reviews don't need. They lay out at the rendered viewport and scale to fit, since a story laid out at half the width could look nothing like its image. Each side has its own size, since a story can declare one at one commit and not the other. They're a map of the few stories with a size of their own, beside the one size, rather than a field on every row, since nearly every row would hold the same thing. They aren't frozen, as a render is, so they can differ from an image without anything being wrong, which the screen says. Each story gets a new frame, since moving one frame along would add to the browser's history, and Back would walk through stories in it.
 
 **A story taking the keyboard.** Measured on Dormouse's terminal story, 2026-11: it focuses itself as it loads, so every key on the page went into the story, and pressing `m` did nothing. The page can't tell a story not to, so it takes focus back, unless the pointer is over the frame, which is what a click there means.
 
@@ -44,17 +47,21 @@ Evidence and reasoning for `docs/specs/ui.md`, keyed by its headings.
 
 **`/` is every story.** It used to go to the newest batch at HEAD, or stop at "No batches yet", which is where a first batch landed, with nothing to do there. A story is there to look at before any batch exists, so that's the place to start, and a batch is a step reached from it.
 
-**A checklist, not an error from `selfie`.** A person's first `selfie` in a repository usually has no built Storybook, and maybe no config. Stopping with an error leaves them with a sentence to act on and no page, and then they have to start it again. Each line is only ever a fact the server can read, so the same list explains a new commit with nothing rendered at it, and there's no "first batch" to remember. A built Storybook that isn't ignored by Git is worth naming: it marks every render as uncommitted, and was found by trying this on a new repository.
+**A checklist, not an error from `selfie`.** A person's first `selfie` in a repository usually has no built Storybook. Stopping with an error leaves them with a sentence to act on and no page, and then they have to start it again. Each line is only ever a fact the server can read, so the same list explains a new commit with nothing rendered at it, and there's no "first batch" to remember. A built Storybook that isn't ignored by Git is worth naming: it marks every render as uncommitted, and was found by trying this on a new repository.
 
 **What "clean" can mean.** A built Storybook may not have been made by Selfie, so nothing records what it came from. Comparing its time with when HEAD last moved, from the reflog, catches a commit or checkout since it was built, which the commit's own time wouldn't for moving to an older commit. It can't catch changes that were there during a build and then reverted, which is why it's a time and not a guarantee.
 
-**A rename is only said.** Storybook gives a story its ID from its title and name, so moving one reads as one removed and one new. An identical image is good evidence and not proof, so it changes what a person reads and not what's recorded: a golden still needs approving under its new name, and its loss still needs acknowledging. A rename that also changed pixels reads as a new and a removed, since no comparison is made across names.
+**A rename is only said.** Storybook gives a story its ID from its title and name, so moving one reads as one removed and one added. An identical image is good evidence and not proof, so it changes what a person reads and not what's recorded: a golden still needs approving under its new name, and its loss still needs acknowledging. A rename that also changed pixels reads as an added and a removed, since no comparison is made across names.
 
 **A sidebar, as in Storybook.** With the list as a page of its own, moving between stories meant going back to it, and a person who knows Storybook looks left for them. It takes the table's columns with it, so a row says only a story's state and any caveat, and a story's page says the rest.
 
 **Every story, on the same page.** Separate pages for renders and for a live Storybook would be two products to learn, and every feature would need building twice. So the list merges what's been rendered, and a story's page is simply its batch's. It reads batches newest first and stops once each story has an answer, since each costs a comparison. If a story's never been rendered, that's every batch at the commit, which is the cost to watch.
 
 **Rendering here.** Most iterating is on one story, and 1.7 s was measured for one story of Dormouse's 568 in the pinned container, 2026-11, so asking from the page is about as quick as looking away. It doesn't build, so an agent or person rebuilds, and what's rendered is whatever is hosted. A filtered batch can't become goldens, so Render the rest can't either, once it's a subset: only a whole batch from a clean build can. Every story at once is the one case worth treating as a whole batch.
+
+- **Why a render's rate starts at its first story.** What comes before it happens once, and a first render's image download can take minutes, so a rate that counted those would stay too slow for the whole render. A real render of 139 stories had 0.7 s before its first story with the image already there, and took about 30 s after it.
+- **Why no estimate for 3 seconds.** Up to 6 stories start at once, so at first either none has finished or several have together, and a rate from that says little about the rest.
+- **Why the batch being saved is said.** An estimate of `0:00 left` would stay on screen for as long as storing takes, which was about 6 s of a 36 s render of 139 stories, and would read as stuck.
 
 ## Keyboard
 
@@ -67,11 +74,13 @@ Evidence and reasoning for `docs/specs/ui.md`, keyed by its headings.
 
 ## Accessibility
 
-axe-core 4.10.3 was run on the no batches, no commits, run, filtered batch, accept, side by side, stacked, and shortcuts screens in a real browser. It found one issue, a link in text told apart only by color. Primer's `inline` underlines one only under `data-a11y-link-underlines="true"`, so `ui/index.html` sets that on the body. Primer's own components passed.
+axe-core 4.10.3 was run on the no batches, no commits, batch, filtered batch, accept, side by side, stacked, and shortcuts screens in a real browser. It found one issue, a link in text told apart only by color. Primer's `inline` underlines one only under `data-a11y-link-underlines="true"`, so `ui/index.html` sets that on the body. Primer's own components passed.
+
+**A render's progress.** A live region is read whenever it changes, so one around text that ticks every second would talk over itself and everything else. Primer's `Banner` isn't a live region, so the ticking text is there to read on request, and a hidden status says it's started, and then says the same text as it stands every 30 seconds. It's always on the page, since a status is only announced when what's in it changes.
 
 ## Scale
 
-Measured in headless Chromium through Playwright on a Mac, on a copy of the end-to-end store, against a batch of 541 stories with 512 listed, all new, and its batch directory pruned:
+Measured in headless Chromium through Playwright on a Mac, on a copy of the end-to-end store, against a batch of 541 stories with 512 listed, all added, and its batch directory pruned:
 
 | What | Measured |
 |---|---|
@@ -100,3 +109,5 @@ So locally these change what a request costs a hosted store, not what a reviewer
 
 - **Why no virtualized list.** These numbers leave nothing for one to fix, and a real table keeps find-in-page and screen readers working. It's worth revisiting at far more than 541 rows.
 - **Why no `content-visibility` on rows.** Primer's table makes each row a subgrid, and containment breaks that: in a browser, with it on `tbody tr`, every cell of every row collapsed to the first column's left edge, at 24 px. Focus return and `j` and `k` still worked, and it saved about 50 ms of main-thread time on opening 512 rows, which isn't a reason to take a table apart.
+
+**A second of a render.** The list isn't virtualized, so it can have hundreds of rows, and its rows aren't memoized components. So the progress and the clock live in a small component that holds only the banner, and the rest of the page doesn't hear of them.

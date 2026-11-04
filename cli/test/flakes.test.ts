@@ -1,10 +1,11 @@
 import { access, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { RenderOptions } from "selfie-render";
-import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { runCli } from "../src/cli.ts";
+import { openProject } from "../src/project.ts";
 import { SKILLS } from "../src/skills.ts";
-import { BLUE, createHarness, GREEN, RED, type Harness } from "./support.ts";
+import { BLUE, createHarness, GREEN, RED, type Harness, writeTestConfig } from "./support.ts";
 
 let h: Harness;
 /** What each render makes, in turn. */
@@ -20,9 +21,31 @@ beforeEach(async () => {
 });
 afterEach(() => h.destroy());
 
-const flakes = async (...flags: string[]) => h.cli("flakes", "--storybook-dir", "ignored", ...flags);
+const flakes = async (...flags: string[]) => h.cli("flakes", ...flags);
 
 describe("selfie flakes", () => {
+  test("says how a long render is going on stderr, and nothing of it on stdout", async () => {
+    const asked = Date.now();
+    const at = (ms: number) => () => void vi.setSystemTime(asked + ms);
+    vi.useFakeTimers({ toFake: ["Date"], now: asked });
+    try {
+      renders = [
+        [
+          { id: "a", beforeRendering: at(1_000) },
+          { id: "b", beforeRendering: at(21_000) },
+          { id: "c", beforeRendering: at(22_000) },
+        ],
+      ];
+      const { code, stderr, json } = await flakes("--times", "2");
+      expect(code).toBe(0);
+      expect(json.stories).toBe(3);
+      expect(stderr.split("\n")).toContain("Render 1 of 2: 2 of 3 stories, 0:21 elapsed, about 0:11 left");
+      expect(stderr.split("\n").filter((line) => line.startsWith("Render 1 of 2:"))).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   test("exits 0 with nothing to report when every render is the same", async () => {
     renders = [[{ id: "a" }, { id: "b", color: BLUE }]];
     const { code, json } = await flakes();
@@ -76,10 +99,10 @@ describe("selfie flakes", () => {
   test("records no batch", async () => {
     renders = [[{ id: "a" }]];
     await flakes();
-    const { json } = await h.cli("find-baseline");
-    expect(json.sha).toBeNull();
-    const reviewed = await h.cli("review", "--storybook-dir", "ignored");
-    expect(reviewed.json.reusedFromBatch).toBeNull();
+    const { json } = await h.cli("review");
+    const project = await openProject({ cwd: h.repo, env: { SELFIE_HOME: h.home } });
+    expect((await project.batches.batchesAt(json.gitSha, json.environment)).map(({ id }) => id)).toEqual([json.batchId]);
+    project.close();
   });
 
   test("asks for at least two renders, as a whole number", async () => {
@@ -120,7 +143,7 @@ describe("selfie skill", () => {
 });
 
 describe("a project's recipe and timings", () => {
-  const config = (settings: unknown) => writeFile(path.join(h.repo, "selfie.config.json"), JSON.stringify(settings));
+  const config = (settings: object) => writeTestConfig(h.repo, settings);
   const seen: RenderOptions[] = [];
 
   beforeEach(() => {
@@ -131,7 +154,7 @@ describe("a project's recipe and timings", () => {
 
   test("reach the render", async () => {
     await config({ environment: { recipe: { colorScheme: "dark" } }, settleMs: 250, storyTimeoutMs: 9000 });
-    expect((await h.cli("render", "--storybook-dir", "ignored")).code).toBe(0);
+    expect((await h.cli("render")).code).toBe(0);
     expect(seen[0]).toMatchObject({ environment: { recipe: { colorScheme: "dark", locale: "en-US" } }, settleMs: 250, storyTimeoutMs: 9000 });
   });
 
@@ -142,7 +165,7 @@ describe("a project's recipe and timings", () => {
     [{ storyTimeoutMs: "soon" }, "storyTimeoutMs"],
   ])("refuses %j as a bad config", async (settings, named) => {
     await config(settings);
-    const { code, json } = await h.cli("render", "--storybook-dir", "ignored");
+    const { code, json } = await h.cli("render");
     expect(code).toBe(2);
     expect(json.error).toMatchObject({ code: "bad-config", message: expect.stringContaining(named) });
   });

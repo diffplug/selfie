@@ -47,6 +47,8 @@ export interface FakeStory {
   readonly color?: Color;
   readonly width?: number;
   readonly height?: number;
+  /** The window it laid out in, which defaults to the environment's. */
+  readonly viewport?: { readonly width: number; readonly height: number };
   /** Changes one hunk of the solid color: x, y, width, height, and its color. */
   readonly patch?: readonly [number, number, number, number, Color];
   readonly failed?: string;
@@ -59,6 +61,8 @@ export interface FakeStory {
   readonly rawPng?: Uint8Array;
   /** Replaces the file with a symlink to this target. */
   readonly symlinkTo?: string;
+  /** Runs before the story renders, so a test can look at a render in flight, or move the clock. */
+  readonly beforeRendering?: () => void | Promise<void>;
 }
 
 /** Writes what `render` writes for these stories. */
@@ -74,7 +78,9 @@ export function fakeRender(
 
     await mkdir(path.join(options.outDir, STORIES_DIR), { recursive: true });
     const manifestStories: ManifestStory[] = [];
+    if (selected.length > 0) options.onProgress?.({ event: "started", finished: 0, total: selected.length });
     for (const story of selected) {
+      await story.beforeRendering?.();
       const fileName = storyFileName(story.id);
       const file = path.posix.join(STORIES_DIR, fileName);
       const width = story.width ?? 8;
@@ -107,10 +113,12 @@ export function fakeRender(
         file: story.failed === undefined ? (story.fileOverride ?? file) : null,
         width,
         height,
+        viewport: story.viewport ?? environment.viewport,
         pngSha256: null,
         errors: [...(story.errors ?? []), ...(story.failed === undefined ? [] : [{ source: "render" as const, message: story.failed }])],
         durationMs: 1,
       });
+      options.onProgress?.({ event: "finished", finished: manifestStories.length, total: selected.length });
     }
     const manifest: Manifest = {
       schemaVersion: 1,
@@ -137,6 +145,13 @@ export function fakeRender(
 export const git = (cwd: string, ...args: string[]): string =>
   execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 
+/** What every test repository starts with, committed. A test that changes it commits that, or it reads as dirty. */
+export const TEST_CONFIG = { storybookDir: "storybook-static", buildCommand: "true" };
+
+/** Byte for byte what's committed, with no overrides. */
+export const writeTestConfig = (repo: string, overrides: object = {}) =>
+  writeFile(path.join(repo, "selfie.config.json"), `${JSON.stringify({ ...TEST_CONFIG, ...overrides }, null, 2)}\n`);
+
 let repoTemplate: Promise<string> | undefined;
 
 /** Made once per test file, since nearly every test wants one, and copying it costs no Git processes. */
@@ -152,6 +167,9 @@ const templateRepo = () =>
     git(repo, "config", "commit.gpgsign", "false");
     // A commit starts this in the background, whose lock file could vanish in the middle of a copy.
     git(repo, "config", "maintenance.auto", "false");
+    await writeTestConfig(repo);
+    await writeFile(path.join(repo, ".gitignore"), `${TEST_CONFIG.storybookDir}\n`);
+    git(repo, "add", "selfie.config.json", ".gitignore");
     await commit(repo, "first");
     return repo;
   })());
@@ -175,7 +193,7 @@ export interface Harness {
   readonly scratch: string;
   readonly repo: string;
   readonly home: string;
-  /** What the next render renders. */
+  /** The stories the next render produces. */
   stories: readonly FakeStory[];
   /** Runs a command in-process. `json` is stdout parsed, which fails if it isn't one document. */
   cli: (...argv: string[]) => Promise<{ code: number; json: any; stdout: string; stderr: string }>;
