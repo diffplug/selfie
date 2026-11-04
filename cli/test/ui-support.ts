@@ -35,7 +35,7 @@ afterEach(async () => {
   await h.destroy();
 });
 
-export const review = (...flags: string[]) => h.cli("review", "--storybook-dir", "ignored", ...flags);
+export const review = (...flags: string[]) => h.cli("review", ...flags);
 
 export const get = (url: string, headers: Record<string, string> = {}) => app.request(url, { headers: { host: HOST, ...headers } });
 

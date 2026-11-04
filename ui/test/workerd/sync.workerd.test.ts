@@ -1,5 +1,5 @@
 // The sync routes inside workerd, on its local D1 and R2, as a deployed Worker would run them, but for
-// the GitHub seam and D1's REST API. Nothing crosses to Node, and no account is involved. These batch in
+// the GitHub seam and D1's REST API. Nothing crosses to Node, and no account is involved. These run in
 // order, each on what the last left. See docs/specs/sync.md.
 import { env } from "cloudflare:workers";
 import { beforeAll, describe, expect, it } from "vitest";

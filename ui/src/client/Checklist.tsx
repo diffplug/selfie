@@ -11,7 +11,6 @@ import { Sha, shortSha } from "./words.tsx";
 const RECHECK_MS = 2000;
 const UNCOMMITTED_NAMED = 3;
 const MOVES_ON = "this page moves on by itself";
-const DEFAULT_BUILD = "npx storybook build";
 
 type Mark = "done" | "warn" | "todo" | "later";
 
@@ -32,35 +31,17 @@ function Item({ mark, title, children }: { mark: Mark; title: ReactNode; childre
 }
 
 function NoBuiltStorybook({ setup: { storybookDir, buildCommand } }: { setup: StorySetup }) {
-  const config = JSON.stringify({ storybookDir, buildCommand: DEFAULT_BUILD }, null, 2);
   return (
     <Stack gap="condensed">
       <Text as="p">
         Selfie shows and renders stories from a built Storybook, and there isn't one at <code>{storybookDir}</code>.
       </Text>
-      {buildCommand !== null ? (
-        <>
-          <Text as="p">
-            This project builds it with <code>{buildCommand}</code>. Run that, and {MOVES_ON}.
-          </Text>
-          <Text as="p" className="selfie-muted">
-            If it builds somewhere else, set <code>storybookDir</code> in <code>selfie.config.json</code>, and start <code>selfie</code> again.
-          </Text>
-        </>
-      ) : (
-        <>
-          <Text as="p">
-            Build it with <code>{DEFAULT_BUILD}</code>, and {MOVES_ON}.
-          </Text>
-          <Text as="p">
-            To have <code>selfie</code> build it each time it starts, or if it builds somewhere else, put this in <code>selfie.config.json</code> at the top of your repository, and start <code>selfie</code> again:
-          </Text>
-          <pre className="selfie-checklist-file">{config}</pre>
-          <Text as="p" className="selfie-muted">
-            No Storybook in this project yet? <code>npm create storybook@latest</code> sets one up.
-          </Text>
-        </>
-      )}
+      <Text as="p">
+        This project builds it with <code>{buildCommand}</code>. Run that, and {MOVES_ON}.
+      </Text>
+      <Text as="p" className="selfie-muted">
+        If it builds somewhere else, set <code>storybookDir</code> in <code>selfie.config.json</code>, and start <code>selfie</code> again.
+      </Text>
     </Stack>
   );
 }
@@ -104,7 +85,7 @@ function StorybookItem({ view, setup }: { view: StoriesView; setup: StorySetup |
       <Item mark="todo" title="Built Storybook with no stories">
         {setup !== null && (
           <Text as="p">
-            Write a story in a <code>.stories</code> file and build it again{setup.buildCommand === null ? "" : <> with <code>{setup.buildCommand}</code></>}, and {MOVES_ON}.
+            Write a story in a <code>.stories</code> file and build it again with <code>{setup.buildCommand}</code>, and {MOVES_ON}.
           </Text>
         )}
       </Item>
@@ -118,7 +99,7 @@ function StorybookItem({ view, setup }: { view: StoriesView; setup: StorySetup |
     <Item mark="warn" title={`Built Storybook ${whatsOff}, with ${count}`}>
       {builtBeforeHead && (
         <Text as="p">
-          Build it again with <code>{setup.buildCommand ?? DEFAULT_BUILD}</code>, and {MOVES_ON}. A render now would show the older build.
+          Build it again with <code>{setup.buildCommand}</code>, and {MOVES_ON}. A render now would show the older build.
         </Text>
       )}
       {uncommitted.length > 0 && <Uncommitted head={view.head} setup={setup} />}

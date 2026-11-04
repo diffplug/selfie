@@ -20,7 +20,7 @@ const STALE_RENDER_MS = 24 * 60 * 60 * 1000;
 const CACHE_FILE = "review.json";
 
 /**
- * The newest real render of each build this machine can reuse. Local only: it's in the project's
+ * The newest real render of each built Storybook this machine can reuse. Local only: it's in the project's
  * `store.db`, and not in the store's schema, which D1 also has.
  */
 export interface RenderKeys {
@@ -56,8 +56,6 @@ ON CONFLICT(key) DO UPDATE SET batch_id = excluded.batch_id`,
 }
 
 export interface Project {
-  /** What a relative path in a request is relative to. */
-  readonly cwd: string;
   readonly repo: Repo;
   /** `<home>/<slug>` */
   readonly directory: string;
@@ -82,7 +80,6 @@ export async function openProject({ cwd, env }: { cwd: string; env: NodeJS.Proce
   for (const statement of CREATE_NOTES_TABLES) await sql.run({ sql: statement });
   const blob = new Blobs(new FilesystemBlobStorage(path.join(directory, "blobs")));
   return {
-    cwd,
     repo,
     directory,
     renderKeys: renderKeysIn(sql),

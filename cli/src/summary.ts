@@ -84,7 +84,7 @@ export function summarizeBatch({ batch, renders, unchangedCount }: Comparison): 
       stories: unchangedCount + changed + added + failed.length,
       unchanged: unchangedCount,
       changed,
-      added: added,
+      added,
       removed: removed.length,
       undecided: undecided.length,
       advisories: advisories.length,

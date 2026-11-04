@@ -64,7 +64,7 @@ The first render downloads the browser, which can take minutes, so say that befo
 Check each of these, and warn about what applies:
 
 - **Uncommitted changes:** `git status --porcelain`, which counts untracked files, and now includes `selfie.config.json`. Rendering still works, but every render is marked as uncommitted, so what it shows may not match the commit. List the files, and separate the config you just wrote from what was already there. Don't touch them: say what to commit or ignore.
-- **The build isn't ignored:** `git check-ignore <storybookDir>`. If it isn't, the build itself makes every render uncommitted. Say to add it to `.gitignore`.
+- **The built Storybook isn't ignored:** `git check-ignore <storybookDir>`. If it isn't, the built Storybook itself makes every render uncommitted. Say to add it to `.gitignore`.
 - **A shallow clone:** `git rev-parse --is-shallow-repository`. Approvals from before where its history stops can't be reached, so stories may ask again.
 - **A big Storybook:** say how many stories there are, and that rendering them all takes a while. Don't guess how long from one story.
 

@@ -17,7 +17,7 @@ Always work from a built Storybook, and rebuild after every change. `selfie flak
 selfie flakes --build --times 3
 ```
 
-Use `--storybook-dir <dir>` if `selfie.config.json` doesn't say how to build. It renders every story that many times, records no batch, and stores nothing, so it's safe to run at any time. It exits 0 if everything held still, 1 if not, and prints one JSON document:
+It renders every story that many times, records no batch, and stores nothing, so it's safe to run at any time. It exits 0 if everything held still, 1 if not, and prints one JSON document:
 
 ```json
 {

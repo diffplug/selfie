@@ -24,11 +24,11 @@ const DIFFS_KEPT = 32;
 const KEPT_INDEXES_HELD = 8;
 
 /** Records a batch from a hosted Storybook, of just these stories, or of every one, and says which batch. */
-export type StoryRenderer = (stories: readonly string[] | undefined) => Promise<string>;
+export type RenderStories = (stories: readonly string[] | undefined) => Promise<string>;
 
 export function localReviewSource(
   project: Project,
-  { native, storybook }: { readonly native?: boolean | undefined; readonly storybook?: { readonly dir: string; readonly url: string; readonly render?: StoryRenderer | undefined } | undefined } = {},
+  { native, storybook }: { readonly native?: boolean | undefined; readonly storybook?: { readonly dir: string; readonly url: string; readonly renderStories?: RenderStories | undefined } | undefined } = {},
 ): ReviewSource {
   const { batches, store, repo } = project;
 
@@ -206,10 +206,10 @@ export function localReviewSource(
 
       // Hashing a whole build isn't worth it until there's a render to compare it with.
       const hosted = built && renders.size > 0 ? await hostedStorybook(storybook.dir) : null;
-      const builds = new Map<string, string | null>();
+      const storybooks = new Map<string, string | null>();
       const buildOf = async (batchId: string) => {
-        if (!builds.has(batchId)) builds.set(batchId, await project.storybooks.storybookOfBatch(batchId));
-        return builds.get(batchId)!;
+        if (!storybooks.has(batchId)) storybooks.set(batchId, await project.storybooks.storybookOfBatch(batchId));
+        return storybooks.get(batchId)!;
       };
       const listed = index.length > 0 ? index : [...renders.keys()].sort().map((id) => ({ id, title: "", name: id }));
       return {
@@ -239,13 +239,13 @@ export function localReviewSource(
           }),
         ),
         newestBatchId: finished[0]?.id ?? null,
-        canRender: built && head !== null && storybook.render !== undefined,
+        canRender: built && head !== null && storybook.renderStories !== undefined,
         setup:
           storybook === undefined
             ? null
             : {
                 storybookDir: path.relative(repo.root, storybook.dir) || ".",
-                buildCommand: settings.buildCommand ?? null,
+                buildCommand: settings.buildCommand,
                 uncommitted: await dirtyPaths(repo),
                 builtBeforeHead: built && head !== null && (await builtBeforeHead(storybook.dir)),
                 usesDocker: settings.environment.runner.kind === "container",
@@ -254,7 +254,7 @@ export function localReviewSource(
     },
 
     async render(stories) {
-      if (storybook === undefined || storybook.render === undefined || !isBuiltStorybook(storybook.dir)) {
+      if (storybook === undefined || storybook.renderStories === undefined || !isBuiltStorybook(storybook.dir)) {
         throw new SelfieError("render-failed", "This server has no built Storybook to render a story from.");
       }
       if (rendering) throw new SelfieError("render-busy", "A render is already running here. Try again once it's done.");
@@ -264,7 +264,7 @@ export function localReviewSource(
         const unknown = stories.find((story) => !index.has(story));
         if (unknown !== undefined) throw new SelfieError("unknown-story", `The hosted Storybook has no story ${unknown}.`);
         // Every story is a whole batch, which can become goldens, and not a filtered one that can't.
-        return { batchId: await storybook.render(new Set(stories).size === index.size ? undefined : stories) };
+        return { batchId: await storybook.renderStories(new Set(stories).size === index.size ? undefined : stories) };
       } catch (error) {
         if (error instanceof SelfieError && error.code === "unknown-story") throw error;
         throw new SelfieError("render-failed", `That didn't render: ${(error as Error).message}`);

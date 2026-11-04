@@ -3,6 +3,7 @@ export type SelfieErrorCode =
   | "no-commits"
   | "git-failed"
   | "bad-config"
+  | "no-config"
   | "build-failed"
   | "no-stories"
   | "head-moved"

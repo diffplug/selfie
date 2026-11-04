@@ -28,7 +28,7 @@
 
 **A dirty batch is recorded, not refused.** Rendering uncommitted work is the point of the loop. It can be compared and approved like any other.
 
-**A gitignored built Storybook isn't dirty.** It usually is ignored, so counting it would make every review dirty. The cost is the [open question](cli.md#open-questions) about stale builds.
+**A gitignored built Storybook isn't dirty.** It usually is ignored, so counting it would make every review dirty. The cost is the [open question](cli.md#open-questions) about stale built Storybooks.
 
 **`--baseline` exits 1 on any difference.** Blockers answer "what has nobody approved", and two batches that differ can have every image approved. Someone looking for flakiness is asking what differs.
 
@@ -78,7 +78,7 @@ It takes 4 to 10 ms an image on average, 17 ms at worst, and a story's stats com
 
 **Twenty.** It is meant to outlast an agent's review, fix, review cycle within one task, and be small. Batch directories only hold what differs: the 541-story review with nothing changed left 48 KB, holding the images of the 2 stories with `play` errors, and one with 130 changed stories left 14 MB, or about 110 KB per changed story. Twenty batches each changing all 541 would hold about 1.2 GB. A render directory holds every story's PNG, so it can't outlive its review.
 
-**The store still grows.** Blobs grow only with added images, but nothing deletes either them or a batch's rows: `docs/specs/renders.md` → Open questions owns retention. After the 12 batches below and in the sample loop, holding 2,914 batch rows and 650 images, `store.db` was 512 KB and `blobs/` 25 MB.
+**The store still grows.** Blobs grow only with new images, but nothing deletes either them or a batch's rows: `docs/specs/renders.md` → Open questions owns retention. After the 12 batches below and in the sample loop, holding 2,914 batch rows and 650 images, `store.db` was 512 KB and `blobs/` 25 MB.
 
 ## Git
 
@@ -86,9 +86,11 @@ It takes 4 to 10 ms an image on average, 17 ms at worst, and a story's stats com
 
 ## Configuration
 
-**One file, in one place.** Every command that needs an environment must find the same one, or `render` and `review` disagree. `--config` and `--init-script` let them, so they went. A file at the Git top level does the job without a flag on each call. `--native` stays, for a machine trying something locally, since a checked-in file shouldn't choose that.
+**Required, and the only place.** A default directory and flags that overrode the file meant a project's setup could live in a command someone typed, an agent's guess, or a skill's fallback, and two people could render different things and not know. So there's one file, and a repository without it is told how to get one. `--native` isn't an exception to this: which browser this machine can use is about the machine, and a checked-in file shouldn't choose it for everyone.
 
-**A build command in the config, only when asked.** This was once refused, since reading a command from a file lets a checkout run a shell, and rendering is otherwise safe on an untrusted one: stories run in a container with no network. But a project's build is a fact about that project, and retyping it is the friction `selfie` alone exists to remove. So it's in the config, and runs only for someone who asked for that build, by typing `selfie` or `--build`, and it prints first. What's given up: `selfie` in a stranger's checkout runs their command. `--no-build` is the way not to, and `selfie render`, `review`, and `ui` still never do it by themselves, so CI and agents can't batch it by accident.
+**One file, in one place.** Every command that needs an environment must find the same one, or `render` and `review` disagree. `--config` and `--init-script` let them, so they went. A file at the Git top level does the job without a flag on each call.
+
+**A build command in the config, only when asked.** This was once refused, since reading a command from a file lets a checkout run a shell, and rendering is otherwise safe on an untrusted one: stories run in a container with no network. But a project's build is a fact about that project, and retyping it is the friction `selfie` alone exists to remove. So it's in the config, and runs only for someone who asked for that build, by typing `selfie` or `--build`, and it prints first. What's given up: `selfie` in a stranger's checkout runs their command. `--no-build` is the way not to, and `selfie render`, `review`, and `ui` still never do it by themselves, so CI and agents can't run it by accident.
 
 **A config can't name a file outside itself.** A checkout's config file isn't the user's choice in the way a flag is. An init script is only ever run in the browser, with no network, so this is a small precaution at the cost of one check.
 
@@ -112,9 +114,9 @@ The exit 0 row lists dormouse's 2 `play` errors as advisories. Render is most of
 
 | 541-story review | Exit | Wall | Render | Store | Diff |
 |---|---|---|---|---|---|
-| First, 541 new | 1 | 71.8 s | 62.4 s | 9.0 s | 64 ms |
+| First, 541 added | 1 | 71.8 s | 62.4 s | 9.0 s | 64 ms |
 | Rendered again with `--no-reuse`, nothing changed, twice | 0 | 70.1 s, 70.5 s | 65.7 s, 66.0 s | 4.1 s, 4.1 s | 4 ms, 3 ms |
-| Same SHA, all still new, reused, twice | 1 | 0.38 s, 0.35 s | 20 ms, 20 ms | 37 ms, 37 ms | 57 ms, 54 ms |
+| Same SHA, all still added, reused, twice | 1 | 0.38 s, 0.35 s | 20 ms, 20 ms | 37 ms, 37 ms | 57 ms, 54 ms |
 | New commit, nothing changed, reused, twice | 0 | 0.25 s, 0.25 s | 21 ms, 20 ms | 16 ms, 16 ms | 1 ms, 1 ms |
 | One byte of CSS, 80 stories changed | 1 | 70.2 s | 64.0 s | 4.8 s | 1,130 ms |
 | That built Storybook again, reused | 1 | 1.36 s | 22 ms | 15 ms | 1,086 ms |
@@ -127,14 +129,14 @@ The estimate here was about 0.5 s, and the feature came in at about 0.25 s of wa
 
 **One byte can change nothing, and that's right.** Two one-byte edits of `iframe-*.css` made invalid values (`display:flew`, `background-colox`), rendered, and reported 0 changes: those rules are also in `pocket-chrome-*.css`, so the browser used the duplicate. `.bg-transparent` from `#0000` to `#000f` is valid in the last sheet loaded, and changed 80 stories. A miss only means a render happens: what it reports is the render's own answer.
 
-**Do real builds reproduce? Yes, once two things are left out.** Measured by building each project repeatedly with no source change and comparing with `diff -r`, with `STORYBOOK_DISABLE_TELEMETRY=1`:
+**Do real built Storybooks reproduce? Yes, once two things are left out.** Measured by building each project repeatedly with no source change and comparing with `diff -r`, with `STORYBOOK_DISABLE_TELEMETRY=1`:
 
 | Project | Builds | What differed |
 |---|---|---|
 | A minimal project, Storybook 10.6.5 and Vite 7.3.7: same directory, with `node_modules/.cache` cleared, and in a second directory with its own install | 4 | `project.json`'s `generatedAt`, every time |
 | A copy of dormouse, Storybook 11.0.0-alpha.6 and Vite 8, 326 files and 546 stories, four of them with caches cleared | 6 | `project.json`'s `generatedAt`, every time. `manifests/components.html`'s `Generation took <strong>0.0s</strong>`, which read `0.1s` in some of them |
 
-Without leaving these out, every built Storybook hashed differently and the feature would never have hit on rebuilt output. With them left out, all 4 and all 6 hash the same. In the real loop, `selfie review --build-command` running a real build of that copy reused the first render on every rebuild, including with its caches cleared, in about 3 s, of which about 2.8 s is the built Storybook. A one-line change to the copy's `.storybook/preview.css` rendered again, and putting it back reused the first render. That loop was measured before `docs/specs/render.md` → Render identity took over this hash, which kept the same exclusions.
+Without leaving these out, every built Storybook hashed differently and the feature would never have hit on rebuilt output. With them left out, all 4 and all 6 hash the same. In the real loop, `selfie review --build` running a real build of that copy reused the first render on every rebuild, including with its caches cleared, in about 3 s, of which about 2.8 s is the built Storybook. A one-line change to the copy's `.storybook/preview.css` rendered again, and putting it back reused the first render. That loop was measured before `docs/specs/render.md` → Render identity took over this hash, which kept the same exclusions.
 
 **Why those two can't change pixels.** The worker only answers what the browser asks for, and no other file in either build names `project.json` or `manifests/components.html`, so no story loads them unless its own code fetches that path. So only those two exact pieces of text are left out, and the rest of both files still counts: a different `storybookVersion` in `project.json` misses, and so does the same text in any other file. If Storybook changes either format, the text stops matching and every built Storybook misses, which costs a render and nothing else.
 
@@ -153,6 +155,8 @@ Without leaving these out, every built Storybook hashed differently and the feat
 **Provenance is on the batch, and the key is local.** `reused_from_batch` is a fact about the batch, which the UI, and later `trust`, both want, so it's read with the batch, with no second lookup. `render_keys` is only what this machine rendered, which nothing in the cloud needs. It must outlive a pruned `review.json`, and in `store.db` it lives and dies with the batches it names. After 15 batches here it held 2 rows.
 
 **A column added to `render_batches`, against the rule.** `docs/specs/store.md` → Open questions allows only new tables and indexes until migrations are decided, and `CREATE TABLE IF NOT EXISTS` can't add a column. It was made anyway since no project database holds this schema yet, and a separate table was the alternative. On a copy of an older store, `selfie review` renders and then fails with exit 2, `table render_batches has no column named reused_from_batch`, and `accept` fails with `no such column: reused_from_batch`. Anyone with a store from before this has to delete it.
+
+**Renaming tables and columns, against the same rule.** Calling a run a render batch renamed `runs`, `run_snapshots`, and `run_storybooks`, and columns such as `goldens.run_key`, `render_keys.run_id`, and `note_sessions.latest_batch`. `CREATE TABLE IF NOT EXISTS` leaves an older store's tables as they were, so `selfie render` on one stops with an error such as `table note_sessions has no column named latest_batch`. Nothing was published and no project database existed, so anyone with an older store deletes it rather than this carrying a migration.
 
 **`scale`, another column on `render_batches`.** The same exception, for the same reason, and it comes in the same unmerged stack, so it breaks no store that `reused_from_batch` hadn't already. It's a fact about one batch that every viewer wants with the batch, so a separate table would only add a lookup.
 

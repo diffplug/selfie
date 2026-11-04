@@ -102,7 +102,7 @@ A push sends a batch's goldens if it's accepted locally, or `--accept` asks for 
 
 ### At scale
 
-A project's first push is the expensive one. Each new image takes one upload and one D1 request, so 10,000 added images are about 10,000 requests, or about 42 minutes of the shared limit of 1,200 per 5 minutes (`docs/specs/store.md` → D1 REST adapter), by calculation and not measurement. Before a real project pushes, **Scope: cloud-deploy** needs to pace uploads, or add them another way than through that limit.
+A project's first push is the expensive one. Each new image takes one upload and one D1 request, so 10,000 new images are about 10,000 requests, or about 42 minutes of the shared limit of 1,200 per 5 minutes (`docs/specs/store.md` → D1 REST adapter), by calculation and not measurement. Before a real project pushes, **Scope: cloud-deploy** needs to pace uploads, or add them another way than through that limit.
 
 ### Not yet
 

@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { runCli } from "../src/cli.ts";
 import { encodePng } from "../src/png.ts";
 import { openProject, type Project } from "../src/project.ts";
-import { commit, createHarness, fakeRender, git, GREEN, RED, solid, type FakeStory, type Harness } from "./support.ts";
+import { commit, createHarness, fakeRender, git, GREEN, RED, solid, type FakeStory, type Harness, writeTestConfig } from "./support.ts";
 
 const REMOTE = "http://127.0.0.1:9";
 /** What the cloud would answer, in the shape the client calls it. */
@@ -52,7 +52,7 @@ const headOf = () => git(h.repo, "rev-parse", "HEAD");
 let laptop: ReturnType<typeof machine>;
 let stories: readonly FakeStory[];
 
-const record = async (batch = laptop) => (await batch("writer", "render", "--storybook-dir", "ignored")).json.batchId as string;
+const record = async (run = laptop) => (await run("writer", "render")).json.batchId as string;
 /** A batch on the laptop with every image approved, which `push --accept` can make HEAD's goldens. */
 async function approved() {
   const batchId = await record();
@@ -172,7 +172,7 @@ describe("pushing", () => {
     const merge = await commit(h.repo, "merge");
     // Nothing here but the checkout.
     const fresh = machine(h.repo, path.join(h.scratch, "ci-home"));
-    const batchId = (await fresh("ci", "render", "--storybook-dir", "ignored")).json.batchId;
+    const batchId = (await fresh("ci", "render")).json.batchId;
     const { code, json } = await fresh("ci", "push", "--accept");
     expect(code).toBe(0);
     expect(json).toMatchObject({ batchId, decisions: null, images: { sent: 0 }, goldens: { outcome: "accepted", acceptedBatchId: batchId } });
@@ -271,7 +271,7 @@ describe("the remote", () => {
   });
 
   test("comes from no file in a checkout", async () => {
-    await writeFile(path.join(h.repo, "selfie.config.json"), JSON.stringify({ remote: "https://evil.example" }));
+    await writeTestConfig(h.repo, { remote: "https://evil.example" });
     expect(await plain({ SELFIE_TOKEN: "x" }, "push")).toBe(2);
   });
 

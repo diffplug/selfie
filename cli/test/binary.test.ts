@@ -1,5 +1,6 @@
 // The real binary as a separate process: what an agent sees on stdout, and its exit code.
 import { spawnSync } from "node:child_process";
+import { writeFileSync } from "node:fs";
 import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -40,7 +41,7 @@ describe("exit 2, with one JSON document saying why", () => {
     ["a stray argument", ["review", "extra"]],
     ["no batch", ["approve", "--all"]],
     ["no selection", ["approve", "7f0e6a2e-1234-4abc-8def-0123456789ab"]],
-    ["a missing Storybook", ["review", "--storybook-dir", "does-not-exist"]],
+    ["a missing Storybook", ["review"]],
     ["a removed flag", ["review", "--human"]],
     ["a retired command", ["accept", "7f0e6a2e-1234-4abc-8def-0123456789ab"]],
     ["another retired command", ["find-baseline"]],
@@ -68,14 +69,8 @@ describe("exit 2, with one JSON document saying why", () => {
 });
 
 test("a build command's output goes to stderr, keeping stdout one document", () => {
-  const { status, stdout, stderr } = selfie(
-    repo,
-    "review",
-    "--build-command",
-    "echo pollution-on-stdout; echo pollution-on-stderr >&2",
-    "--storybook-dir",
-    "does-not-exist",
-  );
+  writeFileSync(path.join(repo, "selfie.config.json"), JSON.stringify({ storybookDir: "does-not-exist", buildCommand: "echo pollution-on-stdout; echo pollution-on-stderr >&2" }));
+  const { status, stdout, stderr } = selfie(repo, "review", "--build");
   expect(status).toBe(2);
   expect(stdout).not.toContain("pollution");
   expect(JSON.parse(stdout).error.message).toContain("does-not-exist");

@@ -16,7 +16,7 @@ import { BLUE, createHarness, type Harness } from "./support.ts";
 
 let h: Harness;
 let project: Project;
-const options = () => ({ storybookDir: "ignored", render: h.render });
+const options = () => ({ render: h.render });
 
 beforeEach(async () => {
   h = await createHarness();

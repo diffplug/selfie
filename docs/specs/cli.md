@@ -30,7 +30,7 @@ Source of truth: `cli/src/cli.ts`, `cli/src/document.ts`; the real binary's test
 |---|---|---|
 | 0 | Nothing blocks | A review with no blockers, a batch recorded, even with failed stories, a decision recorded, `ui` stopped by a signal |
 | 1 | The command ran, and something blocks | A review listing anything in `blockers`, or showing any difference from a `--baseline`, a `--story` pattern on `approve` or `reject` that matched nothing |
-| 2 | The command couldn't run | Not a Git repository, no commits, no Storybook, no Docker, a failed `--build-command`, a bad flag, an unknown batch, `--story` matching no story at all, a `ui` that can't start |
+| 2 | The command couldn't run | Not a Git repository, no commits, no Storybook, no Docker, no `selfie.config.json`, a failed `--build`, a bad flag, an unknown batch, `--story` matching no story at all, a `ui` that can't start |
 | 3 | Nothing yet, and it's worth asking again | `agent-await-feedback` past its `--timeout` |
 | 130 | Stopped by a signal, where stopping isn't success | `agent-await-feedback` |
 
@@ -48,7 +48,7 @@ Source of truth: `cli/src/index.ts`; tests in `cli/test/library.test.ts`.
 | `openProject({ cwd, env })` | The repository's `Project`: its `repo`, `directory`, `renders`, `notes`, `store`, `renders`, and `close()` |
 | `renderBatch(project, options)` | Returns a `RenderBatchResult`: the `batch`, `dirtyPaths`, `warnings`, and `timings` |
 | `review(project, options)` | `options` is a `batch`, or what `renderBatch` takes. Returns a `ReviewResult`: the `comparison`, `given`, `dirtyPaths`, `differences`, `playErrors`, `warnings`, and `timings` |
-| `decide(project, { batchId, decision, actor, stories })` | `stories` is `"all"`, patterns, or `{ targets }`: exact stories and image hashes, for a caller that showed them, refused whole with `stale-decision` if any isn't a changed or new image the batch holds. Returns `decided`, `skipped`, `unmatchedPatterns`, and the `comparison` after it. It compares twice, and reads unchanged rows only for patterns |
+| `decide(project, { batchId, decision, actor, stories })` | `stories` is `"all"`, patterns, or `{ targets }`: exact stories and image hashes, for a caller that showed them, refused whole with `stale-decision` if any isn't a changed or added image the batch holds, or a removed story of it, with a null hash. Returns `decided`, `skipped`, `unmatchedPatterns`, and the `comparison` after it. It compares twice, and reads unchanged rows only for patterns |
 | `summarizeBatch(comparison)` | Returns `blockers`, `advisories`, `counts`, `undecided`, `unapproved`, `failed`, `removed`, and `notRendered` |
 | `isDecidable(state)` | Whether a render in this state can take a decision: `changed` or `added`. Defined in `selfie-store` |
 | `compareAsReviewed(project, batchId, options)` | A batch compared with what history has approved |
@@ -90,9 +90,9 @@ Source of truth: `cli/src/review.ts`, `cli/src/diff.ts`, `cli/src/hunks.ts`, `cl
 
 A review of a named batch starts at step 6. `selfie render` is steps 1 to 5, always renders, and prints what it recorded. Otherwise, in order, a review:
 
-1. Runs `--build-command`, or with `--build` the config's `buildCommand`, in a shell. Its stdout goes to stderr. **Never guess a project's build system.** **Never use a shell for anything else.**
+1. With `--build`, runs the config's `buildCommand` in a shell. Its stdout goes to stderr. **Never guess a project's build system.** **Never use a shell for anything else.**
 2. Reads HEAD and the working tree.
-3. Unless that exact built Storybook [already rendered](#recording-only-if-necessary), renders `--storybook-dir`, or else the config's `storybookDir`, or else `storybook-static`, in a new render directory, with `--story` patterns, and the project's [init script](#configuration).
+3. Unless that exact built Storybook [already rendered](#recording-only-if-necessary), renders the config's `storybookDir` in a new render directory, with `--story` patterns, and the project's [init script](#configuration).
 4. Checks HEAD didn't move.
 5. Unless a batch [already says all this](#recording-only-if-necessary), begins a batch recording whether the tree was dirty, its branch, and any filter. Stores each PNG with `Store.putImages`, which keeps new ones as WebP, or takes an earlier render's rows, and records and finishes the batch with `RenderBatches`. Rows carry the failure message and the `play` error.
 6. Compares the batch with `--baseline`, or else what history has approved (`docs/specs/renders.md` → Approvals).
@@ -102,7 +102,7 @@ A review of a named batch starts at step 6. `selfie render` is steps 1 to 5, alw
 - **Must refuse a named batch with any flag for making a batch**, since it's already recorded.
 - **Must take `--baseline` as a batch ID, or else anything Git resolves to a commit, whose ancestors' approvals it means**, and fail with exit 2 if there's no such finished batch in this environment or no such commit.
 - **Must keep `--baseline` to this one review.** It changes nothing about the batch: `selfie approve` still compares with what history has approved, its exports go under `batches/<batch id>/against/<baseline>/`, and `review.json` isn't written. It exits 1 if anything differs, even when every image is approved, since the question was what differs (rationale).
-- **Must do diff work only on a `changed` render.** A `added` or `removed` one exports its one image, and an unchanged one nothing, unless it has an advisory.
+- **Must do diff work only on a `changed` render.** An `added` or `removed` one exports its one image, and an unchanged one nothing, unless it has an advisory.
 - **Must write every exported image as a PNG, whatever the store keeps**, so a document's paths stay what they say and any agent can open them.
 - **Must report what changed as hunks:** rectangles of each image that correspond and differ, with everything outside them matching once what's between them is lined up, found by a recursive 9-slice in `cli/src/hunks.ts` (rationale).
 - **Must make hunks depend on the two images alone**, so the same pair always gives the same hunks, and a decision or a cache can rely on it.
@@ -147,7 +147,7 @@ Source of truth: `replay` and `renderFresh` in `cli/src/review.ts`, `renderIdent
 A review recognizes a built Storybook that already rendered, and skips rendering and storing. Otherwise it records that render's image hashes and `play` errors in a new batch. Everything else about a review stays: the batch has this review's Git SHA, dirtiness, branch, and filter, and it compares, exports, exits, and can be decided on like any other. Docker isn't needed for this, since nothing starts.
 
 - **Must show the existing batch and record nothing when one at this commit came from that render with the same dirtiness, branch, and filter** (rationale).
-- **Must recognize a built Storybook only by `renderIdentity` (`docs/specs/render.md` → Render identity)**, of `--storybook-dir` after any `--build-command`, with the environment and the init script.
+- **Must recognize a built Storybook only by `renderIdentity` (`docs/specs/render.md` → Render identity)**, of the config's `storybookDir` after any `--build`, with the environment and the init script.
 - **Never reuse a batch with a failed story**, including an image the store refused, however many times it fails (rationale).
 - **Never reuse a batch where any story has an error other than `play`, `console`, or `page`, or where render warned of anything** (rationale). Those three are the project's own code, and reuse keeps its `play` errors as advisories. Everything else, such as `request` and the soft `timeout`, might not happen next time.
 - **Must keep only the newest real render of a built Storybook, and forget the built Storybook if that render can't be reused**, so a forced render that fails isn't hidden by an older one that passed.
@@ -221,7 +221,7 @@ Source of truth: `cli/src/git.ts`; tests in `cli/test/git.test.ts`, on real Git 
 Source of truth: `cli/src/ui.ts`, and `selfie ui` in `cli/src/cli.ts`; tests in `cli/test/ui-*.test.ts`. `docs/specs/ui.md` owns what it serves.
 
 - **Must print `{ url, port, batchId, storybookUrl }` once it is listening, then keep serving until a signal**, and exit 0. `batchId` is the batch it was asked to open, or null.
-- **Must host the built Storybook the other commands would render, or `--storybook-dir`'s, and the kept built Storybooks, on a free port of its own** (`docs/specs/ui.md` → Routes), whether or not there's a built Storybook yet.
+- **Must host the built Storybook the other commands would render, and the kept built Storybooks, on a free port of its own** (`docs/specs/ui.md` → Routes), whether or not there's a built Storybook yet.
 - **Must take an optional batch**, and refuse a bad or unknown one with exit 2 before listening. With none, the page opens at every story (`docs/specs/ui.md` → Screens), in this project's environment, or `--native`'s.
 - **Must ask the system for a free port unless given `--port`**, so two projects can both be served.
 - **Never open a browser.** Whoever ran it decides what to do with the URL. [`selfie` alone](#selfie-alone) is the one that does.
@@ -261,21 +261,23 @@ Source of truth: `cli/src/flakes.ts`, `cli/src/skills.ts`, `cli/skills/`; tests 
 
 Source of truth: `cli/src/config.ts`.
 
-`selfie.config.json` at the Git top level is the only place a project configures Selfie:
+`selfie.config.json` at the Git top level is the only place a project configures Selfie. `selfie` alone, `render`, `review`, `flakes`, `ui`, `push`, and `pull` require it:
 
 | Key | Meaning |
 |---|---|
 | `environment` | Overrides for `defineEnvironment`, including its `recipe` (`docs/specs/render.md` → Environment) |
 | `initScript` | A file inside the Git top level, used as `render`'s `initScript` |
-| `storybookDir` | A directory inside the Git top level, the built Storybook to render. `--storybook-dir` overrides it |
-| `buildCommand` | How this project builds its Storybook, run from the Git top level |
+| `storybookDir` | Required. A directory inside the Git top level, the built Storybook to render |
+| `buildCommand` | Required. How this project builds its Storybook, run from the Git top level |
 | `settleMs` | How long to wait after the network, images, and fonts, before a screenshot. Default 100. Changing it renders again |
 | `storyTimeoutMs` | The bound on one story, from opening its context to its screenshot. Default 60000 |
 | `hunkMergeDistance` | How close changed hunks group for showing, in CSS pixels, multiplied by the batch's scale. Default 12 |
 
+- **Must refuse, with exit 2, a repository with no config, or one missing a required key**, and show what to write, and that `selfie skill quickstart` is a guide for a coding agent (rationale).
 - **May let `--native` win over its `runner`.**
+- **Never take a flag or environment variable for anything about the project.** Those describe this machine or this one command, such as `--native`, `--story`, and `SELFIE_HOME`, or a server, as `--remote` does (`docs/specs/sync.md` → Commands) (rationale).
 - **Must refuse an unknown key**, so a typo can't silently render the wrong environment.
-- **Must run `buildCommand` only when a person asks: `selfie` alone, or `--build` on `render` or `review`, and never from a page or by default**, printing it first, so a checkout can only run a command on someone who asked for its built Storybook (rationale).
+- **Must run `buildCommand` only when a person asks: `selfie` alone, or `--build` on `render`, `review`, or `flakes`, and never from a page or by default**, printing it first, so a checkout can only run a command on someone who asked for its built Storybook (rationale).
 
 ## Untrusted input
 
@@ -310,5 +312,5 @@ A reused batch at a new commit writes every row again, about 450 to 670 MB of `s
 
 ### Open questions
 
-- **A stale gitignored build.** Nothing ties a built Storybook to the commit it came from, so a clean tree with an old `storybook-static` records the old pixels against the new SHA. `--build-command` avoids it, and only a hash recorded at build time would catch it.
+- **A stale gitignored build.** Nothing ties a built Storybook to the commit it came from, so a clean tree with an old `storybook-static` records the old pixels against the new SHA. `--build` avoids it, and only a hash recorded at build time would catch it.
 - **Two Storybooks in one repository.** They share a slug and an environment, so their story IDs share names, and neither can render without the other reading as removed.

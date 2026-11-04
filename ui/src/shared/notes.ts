@@ -16,7 +16,7 @@ export const newestNotedImage = (notes: readonly Note[], story: string): string 
 
 /**
  * What a story's image is compared with: its golden, or with none, the image its newest open note is
- * on, so an agent's change to a new story shows as one. Only to look at: a decision is on the image.
+ * on, so an agent's change to an added story shows as one. Only to look at: a decision is on the image.
  */
 export function comparedImage(
   { imageHash, goldenHash }: { readonly imageHash: string | null; readonly goldenHash: string | null },

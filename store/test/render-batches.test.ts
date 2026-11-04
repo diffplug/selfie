@@ -17,7 +17,7 @@ import {
   failing,
   rendered,
   replaying,
-} from "./contract/renders-contract.ts";
+} from "./contract/render-batches-contract.ts";
 import { pngOf } from "./support/png-builder.ts";
 import { hashOf } from "./support/sql-params.ts";
 import { createTempStore } from "./support/temp-store.ts";

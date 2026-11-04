@@ -95,7 +95,7 @@ function Notes({ row, diff, renamedFrom, renamedTo }: { row: RenderRow; diff: Pi
           <Banner variant="info" title="Added story" description="Nothing has been approved for this story yet, so there's nothing to compare. Approving makes this image what later batches compare with." />
         ))}
       {row.state === "removed" && renamedTo !== undefined && (
-        <Banner variant="info" title="Renamed story" description={<>The new story <code>{renamedTo}</code> has this very image, so it looks to have been renamed.</>} />
+        <Banner variant="info" title="Renamed story" description={<>The added story <code>{renamedTo}</code> has this very image, so it looks to have been renamed.</>} />
       )}
       {row.state === "removed" && (
         <Banner variant="warning" title="Removed story" description="This story was approved, and this batch doesn't have it. Approving says it's meant to be gone, so later batches stop asking." />

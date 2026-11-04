@@ -31,7 +31,7 @@ export {
   type RenderBatch,
   type BatchStatus,
   type BatchErrorCode,
-  type RenderBatchesOptions,
+  type RenderBatchesPlumbing,
   type RenderState,
   type PlacedDecision,
   type StoryRender,

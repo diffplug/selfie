@@ -18,7 +18,7 @@ A name is two strings: `story` and `environment`.
 
 ## Render batches
 
-Source of truth: `store/src/core/render-batches.ts`; the contract suite is `store/test/contract/renders-contract.ts`.
+Source of truth: `store/src/core/render-batches.ts`; the contract suite is `store/test/contract/render-batches-contract.ts`.
 
 A batch is one recording of a set of renders against one full Git SHA in one environment. A SHA may have any number of batches, and each stays separate. A batch keeps its `id` and times in every store that receives it, and **must refuse with `batch-conflict` a different batch under an ID already held**, since a batch never changes.
 
@@ -130,7 +130,7 @@ goldens(git_sha, environment, batch_key)  PK (git_sha, environment)  WITHOUT ROW
 ```
 
 - **Must leave out the CLI's local table** (`docs/specs/cli.md` → Recording only if necessary): it's in a local `store.db`, not this schema, and D1 doesn't have it.
-- **Must only add what is missing:** `initStoreSchema` is one request of `CREATE ... IF NOT EXISTS`, so running it upgrades a store holding only images. It changes no existing table, and there is no version number. Any other change needs `docs/specs/store.md` → Open questions decided first. `render_batches.reused_from_batch` is the one exception, made before any project database existed (rationale): `CREATE TABLE IF NOT EXISTS` doesn't add it to an older store, whose reviews and accepts fail with exit 2 until the store is recreated.
+- **Must only add what is missing:** `initStoreSchema` is one request of `CREATE ... IF NOT EXISTS`, so running it upgrades a store holding only images. It changes no existing table, and there is no version number. Any other change needs `docs/specs/store.md` → Open questions decided first. `render_batches.reused_from_batch` and the rename of its tables and columns (`docs/specs/cli.rationale.md`) are the exceptions, made before any project database existed (rationale): `CREATE TABLE IF NOT EXISTS` doesn't add it to an older store, whose reviews and accepts fail with exit 2 until the store is recreated.
 - **Must keep `render_batches.key` and `renders.image_key` inside the store, as with image keys.** A batch's `id`, a UUID, is what leaves it.
 - **Never scan a table:** every statement reaches its rows through one of these keys. `store/test/render-batches.test.ts` checks SQLite's query plan for everything a review sends.
 
@@ -139,7 +139,7 @@ goldens(git_sha, environment, batch_key)  PK (git_sha, environment)  WITHOUT ROW
 Source of truth: `store/src/core/render-batches.ts`; `store/test/render-batches.test.ts` measures these at 10,000 renders.
 
 - **Must send at most 400 statements per request, and at most 5,000 rows per page**, so that a batch under 19,600 renders records in one request (rationale). A statement holds 49 renders, or as few as 33 if each has a play error, since each needs one more parameter.
-- **Must run the model's contract against every SQL adapter.** `pnpm test` runs it on local SQLite with both parameter forms. In `store/`, `pnpm test:d1:renders` runs it on real D1 at about 90 requests, and `pnpm test:d1` runs it after the SQL contract (`docs/specs/store.md` → D1 REST adapter).
+- **Must run the model's contract against every SQL adapter.** `pnpm test` runs it on local SQLite with both parameter forms. In `store/`, `pnpm test:d1:render-batches` runs it on real D1 at about 90 requests, and `pnpm test:d1` runs it after the SQL contract (`docs/specs/store.md` → D1 REST adapter).
 
 ## Future
 

@@ -3,7 +3,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
-import { BLUE, commit, createHarness, git, GREEN, type Harness } from "./support.ts";
+import { BLUE, commit, createHarness, git, GREEN, TEST_CONFIG, type Harness } from "./support.ts";
 
 let h: Harness;
 let build: string;
@@ -13,7 +13,7 @@ let builds = 0;
 async function review(...flags: string[]) {
   builds += 1;
   await writeFile(path.join(build, "iframe.html"), `<html>${builds}</html>`);
-  const { json } = await h.cli("render", "--storybook-dir", build, ...flags);
+  const { json } = await h.cli("render", ...flags);
   const reviewed = await h.cli("review", json.batchId);
   const states = Object.fromEntries(reviewed.json.differences.map(({ story, state }: any) => [story, state]));
   return { batchId: json.batchId as string, code: reviewed.code, json: reviewed.json, states };
@@ -21,7 +21,7 @@ async function review(...flags: string[]) {
 
 beforeEach(async () => {
   h = await createHarness();
-  build = path.join(h.scratch, "build");
+  build = path.join(h.repo, TEST_CONFIG.storybookDir);
   await mkdir(build, { recursive: true });
   h.stories = [{ id: "a--one" }, { id: "a--two" }];
 });

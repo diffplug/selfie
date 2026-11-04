@@ -55,13 +55,13 @@ All 1,623 of those images came back from `sharp` with exactly the same pixels, i
 
 **The fallback.** 16,384 on either side was refused by `sharp`, with 16,383 accepted. The tallest of those stories is 9,898, so it stays rare, but it's only a few lines since PNG decoding has to exist anyway for what Chromium writes.
 
-**Encoding in the store.** The rule was once that the store never encodes. Encoding before `Store.putImages` would encode every image of every batch, when nearly all of them are already stored, since only the store knows which are new. So it asks an injected codec, for added images only.
+**Encoding in the store.** The rule was once that the store never encodes. Encoding before `Store.putImages` would encode every image of every batch, when nearly all of them are already stored, since only the store knows which are new. So it asks an injected codec, for new images only.
 
 **`sharp`'s license.** `sharp` is Apache-2.0. Its prebuilt `@img/sharp-libvips-*` packages are LGPL-3.0-or-later, installed as separate npm packages and linked dynamically. That was read from their `package.json` files, and isn't legal advice.
 
 ## Built Storybooks
 
-**Why by file, and why one list.** Storybook names most of its files by their content, so most of a built Storybook survives a rebuild. This repository's build is 10 MB in 65 files, and Dormouse's 568 stories are 12 MB in 390 files, both measured 2026-11. Dormouse's first keep added about 3.4 s to a record. A row per file would write that many rows for every built Storybook, and take a request for every file a page loads. One list is one blob, read once.
+**Why by file, and why one list.** Storybook names most of its files by their content, so most of a built Storybook survives a rebuild. This repository's build is 10 MB in 65 files, and Dormouse's 568 stories are 12 MB in 390 files, both measured 2026-11. Dormouse's first keep added about 3.4 s to a render. A row per file would write that many rows for every built Storybook, and take a request for every file a page loads. One list is one blob, read once.
 
 **Why the first list stays.** A built Storybook's hash ignores what can't change a pixel (`docs/specs/render.md`), so two builds with one hash can differ in `project.json`. Either answer is fine, and keeping the first means a kept built Storybook never changes, which a browser's cache relies on.
 

@@ -1,6 +1,6 @@
 import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { decodeImage } from "./support.ts";
+import { decodeImage, TEST_CONFIG, writeTestConfig } from "./support.ts";
 import { type StoriesView } from "selfie-ui/app";
 import { describe, expect, test } from "vitest";
 import { BLUE, commit, git } from "./support.ts";
@@ -132,7 +132,7 @@ describe("a batch's scale", () => {
     h.stories = [{ id: "a--one" }];
     const standard = (await review()).json;
     expect((await viewOf(standard.batchId)).batch.scale).toBe(1);
-    await writeFile(path.join(h.repo, "selfie.config.json"), JSON.stringify({ environment: { scale: 1.5 } }));
+    await writeTestConfig(h.repo, { environment: { scale: 1.5 } });
     const scaled = (await review()).json;
     expect(scaled.environment).not.toBe(standard.environment);
     expect((await viewOf(scaled.batchId)).batch.scale).toBe(1.5);
@@ -141,13 +141,13 @@ describe("a batch's scale", () => {
 
 describe("a batch that reused an earlier render", () => {
   test("its view says which batch really rendered it, and a rendered batch's says none", async () => {
-    const build = path.join(h.scratch, "build");
+    const build = path.join(h.repo, TEST_CONFIG.storybookDir);
     await mkdir(build);
     await writeFile(path.join(build, "iframe.html"), "<html></html>");
     h.stories = [{ id: "a--one" }];
-    const rendered = (await h.cli("review", "--storybook-dir", build)).json;
+    const rendered = (await h.cli("review")).json;
     await commit(h.repo, "elsewhere");
-    const reused = (await h.cli("review", "--storybook-dir", build)).json;
+    const reused = (await h.cli("review")).json;
     expect(reused.reusedFromBatch).toBe(rendered.batchId);
     expect((await viewOf(rendered.batchId)).batch.reusedFromBatch).toBeNull();
     expect((await viewOf(reused.batchId)).batch.reusedFromBatch).toBe(rendered.batchId);
