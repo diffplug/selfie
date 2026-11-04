@@ -1,7 +1,7 @@
 import { access, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { RenderOptions } from "selfie-render";
-import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { runCli } from "../src/cli.ts";
 import { SKILLS } from "../src/skills.ts";
 import { BLUE, createHarness, GREEN, RED, type Harness } from "./support.ts";
@@ -23,6 +23,28 @@ afterEach(() => h.destroy());
 const flakes = async (...flags: string[]) => h.cli("flakes", "--storybook-dir", "ignored", ...flags);
 
 describe("selfie flakes", () => {
+  test("says how a long render is going on stderr, and nothing of it on stdout", async () => {
+    const asked = Date.now();
+    const at = (ms: number) => () => void vi.setSystemTime(asked + ms);
+    vi.useFakeTimers({ toFake: ["Date"], now: asked });
+    try {
+      renders = [
+        [
+          { id: "a", beforeRendering: at(1_000) },
+          { id: "b", beforeRendering: at(21_000) },
+          { id: "c", beforeRendering: at(22_000) },
+        ],
+      ];
+      const { code, stderr, json } = await flakes("--times", "2");
+      expect(code).toBe(0);
+      expect(json.stories).toBe(3);
+      expect(stderr.split("\n")).toContain("Render 1 of 2: 2 of 3 stories, 0:21 elapsed, about 0:11 left");
+      expect(stderr.split("\n").filter((line) => line.startsWith("Render 1 of 2:"))).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   test("exits 0 with nothing to report when every render is the same", async () => {
     renders = [[{ id: "a" }, { id: "b", color: BLUE }]];
     const { code, json } = await flakes();
