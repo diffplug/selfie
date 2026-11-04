@@ -78,11 +78,11 @@ Across machines at 1×, comparing image hashes: 541/541 between two GitHub arm64
 
 "Differences, no flag" compares with one earlier full batch, so it counts the partial raster variation, which is why it wanders. The adopted row is 100 ms, 100 ms, and 6 stories at a time, about 64% less time than where it started. Below that the time stops improving, since the CPUs become the limit, so 0 ms would give up the margin for nothing. Concurrency 8 is within the noise of 6, and raises the median story from 639 ms to 877 ms. The same 541 stories with stability on take 175 s, down from 459 s.
 
-**Not using the baseline to shorten settling.** Considered and left out: a batch with a baseline could screenshot early, and stop as soon as a story matches its golden. Playwright 1.63.0's `expect(page).toHaveScreenshot()` works this way, retrying at 0, 100, 250, and 500 ms, though only through `@playwright/test`, comparing pixels against a file.
+**Not using the reference to shorten settling.** Considered and left out: a batch could screenshot early, and stop as soon as a story matches its reference. Playwright 1.63.0's `expect(page).toHaveScreenshot()` works this way, retrying at 0, 100, 250, and 500 ms, though only through `@playwright/test`, comparing pixels against a file.
 
 - **It saves little.** In the table above, removing the settle entirely took 83.5 s down to 78.0 s at 4 stories at a time, and at the default of 6, 66.1 s became 71.2 s, which is within the batches' spread, since the CPUs are the limit. Stopping early can't beat a settle of 0. A project with a much longer settle would save more.
-- **It can hide a regression.** A page that briefly matches its golden, and then draws something wrong, would record as unchanged.
-- **It makes pixels depend on the baseline**, so the same built Storybook could render differently from one baseline to the next, which sits badly with reusing a render of an unchanged build.
+- **It can hide a regression.** A page that briefly matches its reference, and then draws something wrong, would record as unchanged.
+- **It makes pixels depend on the reference**, so the same built Storybook could render differently from one reference to the next, which sits badly with reusing a render of an unchanged build.
 - **Comparing costs about what it saves.** The image hash means decoding each PNG in the worker, at roughly 10 ms an image, estimated from a review's 6 s store step over 541 stories rather than measured alone. Comparing PNG hashes would be cheaper, but the store keeps WebP, so it would need a column for each golden's PNG hash.
 
 The reverse was left out too, for the same complexity: retrying a story that doesn't match, for a bounded time, to spare a slow page a false `changed`. Neither has a real project asking for it yet.

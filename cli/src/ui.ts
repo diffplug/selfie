@@ -262,7 +262,7 @@ export function localReviewSource(
         const index = new Set((await readStoryIndex(storybook.dir)).map(({ id }) => id));
         const unknown = stories.find((story) => !index.has(story));
         if (unknown !== undefined) throw new SelfieError("unknown-story", `The hosted Storybook has no story ${unknown}.`);
-        // Every story is a whole batch, which can become goldens, and not a filtered one that can't.
+        // Every story is a whole batch, which can say what's been removed, and not a filtered one that can't.
         return { batchId: await storybook.renderStories(new Set(stories).size === index.size ? undefined : stories) };
       } catch (error) {
         if (error instanceof SelfieError && error.code === "unknown-story") throw error;
