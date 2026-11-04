@@ -9,7 +9,7 @@ import { SqliteAdapter } from "selfie-store/adapters/sqlite";
 import { Blobs, initStoreSchema, RenderBatches, Sql, Store, BuiltStorybooks, type CompareOptions, type Comparison, type RenderBatch } from "selfie-store";
 import type { PixelDiff } from "./diff.ts";
 import { SelfieError } from "./errors.ts";
-import { headSha, nearestOnBranch, openRepo, walkToBaseline, type BaselineSearch, type Repo } from "./git.ts";
+import { ancestorsOf, defaultBranchOf, earliestAuthoredSince, headSha, openRepo, type Repo } from "./git.ts";
 import { CREATE_NOTES_TABLES, notesIn, type Notes } from "./notes.ts";
 import { assertBatchId, isBatchId, projectSlug, selfieHome } from "./paths.ts";
 
@@ -100,25 +100,25 @@ export async function batchesAtHead(project: Project, environment: string): Prom
   return { head, batches: head === null ? [] : await project.batches.batchesAt(head, environment) };
 }
 
-/** The baseline this project would use now, in an environment. */
-export function findBaseline(project: Project, environment: string): Promise<BaselineSearch> {
-  return walkToBaseline(project.repo, (shas) => project.batches.firstWithGoldens(shas, environment));
+/**
+ * The commits whose approvals count for a batch: its history, and on a branch every commit its
+ * batches were recorded at since its own work began, which a rebase may have left out of that
+ * history. See `docs/specs/renders.md` -> Approvals.
+ */
+export async function reachableCommits(project: Project, { gitSha, branch, environment }: Pick<RenderBatch, "gitSha" | "branch" | "environment">): Promise<readonly string[]> {
+  const ancestors = await ancestorsOf(project.repo, gitSha);
+  if (branch === null) return ancestors;
+  const { defaultBranch, mergeBase } = await defaultBranchOf(project.repo, gitSha);
+  if (branch === defaultBranch) return ancestors;
+  const began = await earliestAuthoredSince(project.repo, mergeBase, gitSha);
+  if (began === null) return ancestors;
+  return [...new Set([...ancestors, ...(await project.batches.commitsOfBranch(branch, environment, began))])];
 }
 
-/** A batch's comparison with every story in it, against what its screens show it against. */
-export async function compareAsShown(project: Project, batch: RenderBatch, against?: string | null): Promise<Comparison> {
-  const sha = against !== undefined ? against : ((await branchGoldens(project, batch)) ?? batch.baselineSha);
-  return project.batches.compareBatch(batch.id, sha, { includeUnchanged: true });
-}
-
-/** A batch compared with the baseline its reviewer saw. */
-export async function compareAsReviewed(
-  project: Project,
-  batchId: string,
-  options?: CompareOptions,
-): Promise<Comparison> {
+/** A batch compared with what history has approved, which is what deciding on it and looking at it both use. */
+export async function compareAsReviewed(project: Project, batchId: string, options?: CompareOptions): Promise<Comparison> {
   const batch = await requireBatch(project, batchId);
-  return project.batches.compareBatch(batchId, batch.baselineSha, options);
+  return project.batches.compareFromHistory(batchId, await reachableCommits(project, batch), options);
 }
 
 /** A batch someone named, which must be well formed and in this project's store. */
@@ -127,16 +127,6 @@ export async function requireBatch(project: Project, batchId: string): Promise<R
   const batch = await project.batches.getBatch(batchId);
   if (batch === null) throw new SelfieError("unknown-batch", `No batch ${batchId} in this project's local store.`);
   return batch;
-}
-
-/**
- * What a person should see a batch with no baseline against: the nearest goldens on its branch, if
- * it has any. Only to look at. They're never its baseline, so deciding and accepting use
- * `compareAsReviewed`.
- */
-export async function branchGoldens(project: Project, batch: RenderBatch): Promise<string | null> {
-  if (batch.baselineSha !== null) return null;
-  return nearestOnBranch(project.repo, batch.gitSha, (shas) => project.batches.firstWithGoldens(shas, batch.environment));
 }
 
 export const batchDirectory = (project: Project, batchId: string) => path.join(project.directory, "batches", batchId);

@@ -21,24 +21,20 @@ export interface BatchSummary {
     readonly undecided: number;
     readonly advisories: number;
   };
-  /** Changed or new, with no decision. */
+  /** Changed, added, or removed, with no decision. */
   readonly undecided: readonly ComparedRender[];
-  /** Changed or new, and not approved, which includes rejected. */
+  /** Changed, added, or removed, and not approved, which includes rejected. */
   readonly unapproved: readonly ComparedRender[];
   readonly failed: readonly ComparedRender[];
-  /** Goldens this batch lacks, which a filter asked for. */
+  /** Approved stories this batch lacks, which a filter asked for. */
   readonly removed: readonly ComparedRender[];
-  /** Goldens this batch lacks only because its filter left them out. */
+  /** Approved stories this batch lacks only because its filter left them out. */
   readonly notRendered: readonly ComparedRender[];
 }
 
 export function summarizeBatch({ batch, renders, unchangedCount }: Comparison): BatchSummary {
   const inState = (state: RenderState) => renders.filter((render) => render.state === state);
   const failed = inState("failed");
-  const unapproved = renders.filter(
-    ({ state, decision }) => isDecidable(state) && decision?.decision !== "approved",
-  );
-  const undecided = unapproved.filter(({ decision }) => decision === null);
 
   const allRemoved = inState("removed");
   const asked =
@@ -53,14 +49,20 @@ export function summarizeBatch({ batch, renders, unchangedCount }: Comparison): 
   const removed = asked === null ? allRemoved : allRemoved.filter(({ story }) => asked.has(story));
   const notRendered = asked === null ? [] : allRemoved.filter(({ story }) => !asked.has(story));
 
+  // A story a filter left out says nothing about whether that story is gone, so it takes no decision.
+  const outside = new Set(notRendered);
+  const unapproved = renders.filter((render) => isDecidable(render.state) && !outside.has(render) && render.decision?.decision !== "approved");
+  const undecided = unapproved.filter(({ decision }) => decision === null);
+
   const blockers: Attention<BlockerReason>[] = [
     ...failed.map(({ story, failure }) => ({ story, reason: "failed" as const, detail: failure })),
     ...unapproved.map(({ story, state, decision }) =>
       decision?.decision === "rejected"
         ? { story, reason: "rejected" as const, detail: decision.actor }
-        : { story, reason: `${state}-unapproved` as "changed-unapproved" | "added-unapproved", detail: null },
+        : state === "removed"
+          ? { story, reason: "removed" as const, detail: null }
+          : { story, reason: `${state}-unapproved` as "changed-unapproved" | "added-unapproved", detail: null },
     ),
-    ...removed.map(({ story }) => ({ story, reason: "removed" as const, detail: null })),
     ...(batch.storyFilter?.unmatched ?? []).map((pattern) => ({
       story: null,
       reason: "pattern-unmatched" as const,

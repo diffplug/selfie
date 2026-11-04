@@ -6,7 +6,7 @@ import { SelfieError } from "./errors.ts";
 
 const MAX_OUTPUT_BYTES = 64 * 1024 * 1024;
 
-/** The first-parent commits `find-baseline` looks at, from the merge-base. */
+/** How far back history is read, for approvals, and for a remote's goldens. */
 const MAX_COMMITS = 1000;
 
 // origin/HEAD is what a clone records. The rest are the usual names, for a repository whose
@@ -211,25 +211,31 @@ export async function walkToBaseline(
   };
 }
 
-/**
- * The nearest commit from this one back to, but not including, its merge-base with the default
- * branch, on first-parent history, for which `firstWithGoldens` answers. Null on the default branch.
- */
-export async function nearestOnBranch(
-  repo: Repo,
-  sha: string,
-  firstWithGoldens: (shas: readonly string[]) => Promise<string | null>,
-): Promise<string | null> {
-  const ref = await defaultBranchRef(repo);
-  if (ref === null) return null;
-  const mergeBase = await ask(repo.root, ["merge-base", sha, ref]);
-  if (mergeBase === null) return null;
-  const commits = await firstParentHistory(repo, `${mergeBase}..${sha}`, MAX_COMMITS);
-  return commits.length === 0 ? null : firstWithGoldens(commits);
+/** Every commit this one's history reaches, itself first, through every parent. Itself alone if this clone doesn't have it. */
+export async function ancestorsOf(repo: Repo, sha: string): Promise<readonly string[]> {
+  const listed = await ask(repo.root, ["rev-list", `--max-count=${MAX_COMMITS}`, sha]);
+  return listed === null ? [sha] : listed.split("\n");
 }
 
-/** Whether a later review could find goldens at this SHA: it is on the default branch's first-parent history. */
-export async function isOnBaselineHistory(repo: Repo, sha: string): Promise<boolean> {
-  const history = await firstParentHistory(repo, (await defaultBranchRef(repo)) ?? "HEAD", MAX_COMMITS);
-  return history.includes(sha);
+/** Whether this clone's history stops early, so that older approvals can't be reached. */
+export const isShallow = async (repo: Repo): Promise<boolean> => (await ask(repo.root, ["rev-parse", "--is-shallow-repository"])) === "true";
+
+/** The default branch, by name, and where a commit left it. Each is null if Git can't say. */
+export async function defaultBranchOf(repo: Repo, sha: string): Promise<{ readonly defaultBranch: string | null; readonly mergeBase: string | null }> {
+  const ref = await defaultBranchRef(repo);
+  return {
+    defaultBranch: ref?.replace(/^refs\/(?:remotes|heads)\//, "") ?? null,
+    mergeBase: ref === null ? null : await ask(repo.root, ["merge-base", sha, ref]),
+  };
+}
+
+/**
+ * When a branch's work began: the earliest author time of the commits it has that this base doesn't,
+ * in milliseconds. A rebase keeps author times, so this holds still however often the base moves.
+ * Null if there are no such commits.
+ */
+export async function earliestAuthoredSince(repo: Repo, base: string | null, sha: string): Promise<number | null> {
+  const listed = await ask(repo.root, ["log", "--format=%at", base === null ? sha : `${base}..${sha}`]);
+  if (listed === null || listed === "") return null;
+  return Math.min(...listed.split("\n").map(Number)) * 1000;
 }

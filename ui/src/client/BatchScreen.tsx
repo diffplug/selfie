@@ -20,8 +20,8 @@ import type { AdvisoryReason, BlockerReason, DecisionKind, BatchView, RenderRow 
 import { applyFilter, decidableIn, filterQuery, hasAdvisory, NO_FILTER, parseFilter, showQuery, SHOW_OPTIONS, targetsOf, type RowFilter, type Show } from "./filter.ts";
 import { useStoryFocusKeys, useTitle, type BatchState } from "./hooks.ts";
 import { Keys } from "./Keys.tsx";
-import { acceptPath, AppLink, AppLinkButton, navigate, batchPath, storiesPath, storyPath } from "./router.tsx";
-import { ActionFailure, BatchNotes } from "./BatchNotes.tsx";
+import { AppLink, AppLinkButton, navigate, batchPath, storiesPath, storyPath } from "./router.tsx";
+import { ActionFailure } from "./ActionFailure.tsx";
 import { StoryLinks } from "./StoryLinks.tsx";
 import { plural } from "./plural.ts";
 import { BLOCKER_WORDS, ReusedPixels, Sha, shortSha } from "./words.tsx";
@@ -38,7 +38,7 @@ function Fact({ term, children }: { term: string; children: React.ReactNode }) {
 }
 
 function Facts({ view }: { view: BatchView }) {
-  const { batch, actor, siblings, branchGoldens } = view;
+  const { batch, actor, siblings } = view;
   return (
     <dl className="selfie-facts">
       <Fact term="Commit">
@@ -53,14 +53,6 @@ function Facts({ view }: { view: BatchView }) {
         </Fact>
       )}
       <Fact term="Working tree">{batch.dirty ? "Dirty when recorded" : "Clean when recorded"}</Fact>
-      <Fact term="Baseline">
-        {batch.baselineSha === null ? "None" : <Sha sha={batch.baselineSha} />}
-      </Fact>
-      {branchGoldens !== null && (
-        <Fact term="Compared with">
-          <Sha sha={branchGoldens} />, on this branch
-        </Fact>
-      )}
       <Fact term="Environment">
         <code>{batch.environment}</code>
       </Fact>
@@ -366,7 +358,7 @@ function Differences({
       {shown.length > 0 || loadingUnchanged ? null : (
         <Blankslate border>
           <Blankslate.Heading as="h4">
-            {isFiltered ? "Nothing matches this filter" : "Nothing differs from the baseline"}
+            {isFiltered ? "Nothing matches this filter" : "Nothing differs from what's approved"}
           </Blankslate.Heading>
           <Blankslate.Description>
             {isFiltered ? "Clear the filter to see every difference." : `All ${plural(view.counts.unchanged, "story", "stories")} rendered the same images as the baseline.`}
@@ -394,7 +386,7 @@ export function BatchScreen({
   search: string;
   returningFrom: RefObject<string | null>;
 }) {
-  const { batch, counts, refusals, acceptedBatchId, removals } = view;
+  const { batch, counts, outsideFilter } = view;
   const filter = useMemo(() => parseFilter(search), [search]);
   const setFilter = (next: RowFilter, replace = false) => navigate(batchPath(batch.id, filterQuery(next)), { replace });
   const showInList = (show: Show) => {
@@ -413,9 +405,6 @@ export function BatchScreen({
 
   useTitle(`Batch at ${shortSha(batch.gitSha)}`);
   const newest = view.siblings.find(({ status }) => status !== "recording");
-  const stopsAccept = refusals.filter(({ reason }) => reason !== "removed-unacknowledged");
-  const ready = stopsAccept.length === 0 && acceptedBatchId !== batch.id;
-  const { outsideFilter } = removals;
 
   return (
     <Stack gap="normal">
@@ -424,9 +413,6 @@ export function BatchScreen({
           Batch at <Sha sha={batch.gitSha} />
         </Heading>
         <AppLink href={storiesPath()}>Every story</AppLink>
-        <AppLinkButton variant={ready ? "primary" : "default"} href={acceptPath(batch.id)}>
-          {acceptedBatchId === batch.id ? "Accepted" : ready ? "Accept this batch" : "Why can't this be accepted?"}
-        </AppLinkButton>
       </Stack>
       <ActionFailure state={state} />
       {newest !== undefined && newest.id !== batch.id && (
@@ -441,10 +427,9 @@ export function BatchScreen({
         <Banner
           variant="warning"
           title="Recorded on a dirty tree"
-          description={`The tree had uncommitted changes while this rendered, so these images don't describe ${shortSha(batch.gitSha)} and can't become its goldens. You can still decide on them. Commit, then run selfie review again: your approvals carry over.`}
+          description={`The tree had uncommitted changes while this rendered, so these images may not describe ${shortSha(batch.gitSha)}. What you approve here still counts from that commit on.`}
         />
       )}
-      <BatchNotes view={view} />
       <div className="selfie-counts">
         <Count label="Stories" count={counts.stories} onShow={showInList} />
         <Count label="Unchanged" count={counts.unchanged} show="unchanged" onShow={showInList} />
@@ -459,7 +444,7 @@ export function BatchScreen({
         <Banner
           variant="info"
           title="This batch was filtered"
-          description={`${plural(outsideFilter, "golden")} of the baseline ${outsideFilter === 1 ? "is" : "are"} outside its --story filter, so ${outsideFilter === 1 ? "it isn't" : "they aren't"} compared here. Accepting would drop ${outsideFilter === 1 ? "it" : "them"}.`}
+          description={`${plural(outsideFilter, "approved story", "approved stories")} ${outsideFilter === 1 ? "is" : "are"} outside its --story filter, so ${outsideFilter === 1 ? "it isn't" : "they aren't"} shown here, and ${outsideFilter === 1 ? "it stays" : "they stay"} approved.`}
         />
       )}
       <Blockers view={view} onShow={showInList} />

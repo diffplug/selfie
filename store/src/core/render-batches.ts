@@ -299,8 +299,8 @@ export interface Decision {
 
 export type RenderState = "unchanged" | "changed" | "added" | "removed" | "failed";
 
-/** Whether a render in this state has an image that can take a decision. */
-export const isDecidable = (state: RenderState): boolean => state === "changed" || state === "added";
+/** Whether a render in this state can take a decision: on its image, or on a story being gone. */
+export const isDecidable = (state: RenderState): boolean => state === "changed" || state === "added" || state === "removed";
 
 export interface ComparedRender {
   readonly story: string;
@@ -309,6 +309,8 @@ export interface ComparedRender {
   readonly imageHash: string | null;
   /** The baseline's image. Null if `added`, and if `failed` with no golden for this name. */
   readonly goldenHash: string | null;
+  /** The batch whose image approval `goldenHash` came from, when history answered. */
+  readonly goldenBatchId?: string;
   /** Null unless `failed`. */
   readonly failure: string | null;
   /** As recorded: null if there was none, and always null if `removed`. */
@@ -939,7 +941,7 @@ export function compareWithApprovals(
     const state: RenderState = imageHash === null ? "failed" : goldenHash === null ? "added" : imageHash === goldenHash ? "unchanged" : "changed";
     if (state === "unchanged") unchangedCount += 1;
     if (state === "unchanged" && !includeUnchanged && playError === null) continue;
-    compared.push({ story, state, imageHash, goldenHash, failure, playError, decision: imageHash === null ? null : decisionOn(story, imageHash, reference?.at ?? 0) });
+    compared.push({ story, state, imageHash, goldenHash, ...(reference === undefined ? {} : { goldenBatchId: reference.batchId }), failure, playError, decision: imageHash === null ? null : decisionOn(story, imageHash, reference?.at ?? 0) });
   }
 
   const here = new Set(rendered.map(({ story }) => story));
@@ -948,7 +950,7 @@ export function compareWithApprovals(
     if (here.has(story)) continue;
     const reference = referenceOf(story);
     if (reference === undefined || reference.imageHash === null) continue;
-    removed.push({ story, state: "removed", imageHash: null, goldenHash: reference.imageHash, failure: null, playError: null, decision: decisionOn(story, null, reference.at) });
+    removed.push({ story, state: "removed", imageHash: null, goldenHash: reference.imageHash, goldenBatchId: reference.batchId, failure: null, playError: null, decision: decisionOn(story, null, reference.at) });
   }
   return { batch, renders: [...compared, ...removed], unchangedCount };
 }

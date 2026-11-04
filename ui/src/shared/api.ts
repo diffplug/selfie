@@ -69,40 +69,11 @@ export interface Attention<Reason extends string> {
   readonly detail: string | null;
 }
 
-export type AcceptRefusal =
-  | { readonly reason: "recorded-on-dirty-tree"; readonly gitSha: string }
-  | { readonly reason: "batch-has-failures"; readonly stories: readonly string[] }
-  | {
-      readonly reason: "unapproved";
-      readonly stories: readonly {
-        readonly story: string;
-        readonly state: string;
-        readonly decision: DecisionKind | null;
-      }[];
-    }
-  | {
-      readonly reason: "removed-unacknowledged";
-      readonly stories: readonly string[];
-      /** How many of `stories` are gone only because the batch's filter left them out. */
-      readonly outsideFilter: number;
-    }
-  | {
-      readonly reason: "wrong-removed-count";
-      readonly stories: readonly string[];
-      readonly outsideFilter: number;
-      /** The count the caller gave. */
-      readonly seen: number;
-    };
-
 /** A compared render, with the pixel stats its review exported, if they're still on disk. */
 export interface RenderRow extends ComparedRender {
   readonly pixelDiff: PixelDiff | null;
-}
-
-/** The baseline a review would use, and why there's none, if that's so. */
-export interface BaselineNote {
-  readonly sha: string | null;
-  readonly message: string | null;
+  /** The kept built Storybook of the batch whose image this is compared with, or null if there's none. */
+  readonly goldenStorybookUrl: string | null;
 }
 
 export type BatchListing = Pick<RenderBatch, "id" | "startedAt" | "status" | "dirty">;
@@ -110,7 +81,7 @@ export type BatchListing = Pick<RenderBatch, "id" | "startedAt" | "status" | "di
 /** Where a kept built Storybook is, on a hosted Storybook's origin, ending in a slash. Crosses into `selfie-cli` from here. */
 export const keptStorybookPath = (build: string) => `/built-storybooks/${build}/`;
 
-/** Where a batch stands against this checkout, and where the baselines come from, for saying so. */
+/** Where a batch stands against this checkout, for saying so. */
 export interface BatchContext {
   readonly head: string | null;
   /** The branch HEAD is on, or null if it's detached. */
@@ -132,18 +103,12 @@ export interface BatchView {
   readonly batch: RenderBatch;
   /** Null if there's no built Storybook to host. */
   readonly storybook: StorybookLink | null;
-  /** The kept built Storybook of the goldens this batch is compared with, or null if there's none. */
-  readonly goldenStorybookUrl: string | null;
   /** The size this batch's stories rendered at, so a live one lays out as its image did. Null if that wasn't recorded. */
   readonly viewport: { readonly width: number; readonly height: number } | null;
   /** What its Storybook calls `rows`' stories, in the order its sidebar has them, as far as its kept built Storybooks say. */
   readonly storyNames: readonly { readonly story: string; readonly title: string; readonly name: string }[];
-  /** With no baseline, the nearest goldens on the batch's branch, which `rows` compares with. Only to look at. */
-  readonly branchGoldens: string | null;
   /** How close a diff's hunks group here, in CSS pixels. */
   readonly hunkMergeDistance: number;
-  /** The batch whose images are the goldens of this batch's Git SHA, which may be this one. */
-  readonly acceptedBatchId: string | null;
   /** Who a decision made here is recorded as, or null if Git doesn't say. */
   readonly actor: string | null;
   readonly blockers: readonly Attention<BlockerReason>[];
@@ -160,14 +125,8 @@ export interface BatchView {
   };
   /** Everything that isn't unchanged, and anything with an advisory, in name order. */
   readonly rows: readonly RenderRow[];
-  /** What `accept` would refuse now, were no removals acknowledged. */
-  readonly refusals: readonly AcceptRefusal[];
-  /**
-   * Every golden accepting would drop, and how many only the batch's filter left out, which aren't in
-   * `rows`. Acknowledging means passing the length of `stories`.
-   */
-  readonly removals: { readonly stories: readonly string[]; readonly outsideFilter: number };
-  readonly usableAsBaseline: boolean;
+  /** How many approved stories the batch's filter left out, which aren't in `rows` and say nothing about being gone. */
+  readonly outsideFilter: number;
   /** Every batch at this SHA and environment, newest first, this one included. */
   readonly siblings: readonly BatchListing[];
 }
@@ -219,19 +178,12 @@ export interface StoriesView {
   readonly viewport: { readonly width: number; readonly height: number };
   /** In the order the Storybook's sidebar shows them. */
   readonly stories: readonly ListedStory[];
-  /** The newest finished batch at HEAD, to review and accept. */
+  /** The newest finished batch at HEAD, to review. */
   readonly newestBatchId: string | null;
   /** Whether this server can render a story when asked, which takes a commit, a built Storybook, and a browser to do it with. */
   readonly canRender: boolean;
   /** Null if this server hosts no Storybook. */
   readonly setup: StorySetup | null;
-}
-
-export interface AcceptOutcome {
-  readonly accepted: boolean;
-  /** Empty if accepted. These include any about the count this request passed. */
-  readonly refusals: readonly AcceptRefusal[];
-  readonly view: BatchView;
 }
 
 export interface ApiError {
@@ -240,7 +192,8 @@ export interface ApiError {
 
 export interface DecisionTarget {
   readonly story: string;
-  readonly imageHash: string;
+  /** Null for a story that's gone. */
+  readonly imageHash: string | null;
 }
 
 /** `draft` is still the person's, `sent` is the agent's to act on, and `replied` and `resolved` are the person's to look at, or done. */
@@ -296,13 +249,10 @@ export interface ReviewSource {
   /** Records a batch of just these stories from the hosted Storybook, one at a time. */
   render(stories: readonly string[]): Promise<{ readonly batchId: string }>;
   batchView(batchId: string): Promise<BatchView>;
-  /** Why the batch has no baseline: only a screen showing that asks. */
-  baseline(batchId: string): Promise<BaselineNote>;
   batchContext(batchId: string): Promise<BatchContext>;
   unchanged(batchId: string): Promise<readonly RenderRow[]>;
   /** Decides on exactly these images, or refuses all of them if one isn't what the batch holds. */
   decide(batchId: string, decision: DecisionKind, targets: readonly DecisionTarget[]): Promise<BatchView>;
-  accept(batchId: string, removedSeen: number | undefined): Promise<AcceptOutcome>;
   feedback(): Promise<FeedbackView>;
   addNote(note: NewNote): Promise<FeedbackView>;
   removeNote(id: number): Promise<FeedbackView>;
