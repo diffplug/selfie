@@ -3,7 +3,7 @@
 // so they run on any platform, and are tested with a stand-in for it.
 import { Hono, type Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { ImageDecodeError, isGitSha, isImageHash, isRunId, BatchError, type ReceivedDecision, type ReceivedRun, type ReceivingStore, type RecordedRender, type RenderBatches, type StoryFilter } from "selfie-store";
+import { ImageDecodeError, isGitSha, isImageHash, isBatchId, BatchError, type ReceivedDecision, type ReceivedBatch, type ReceivingStore, type RecordedRender, type RenderBatches, type StoryFilter } from "selfie-store";
 import { SYNC_LIMITS, type GoldensAnswer, type ProjectAccess } from "../shared/sync-api.ts";
 import { failure, imageResponse, INTERNAL_ERROR, noStoreByDefault } from "./http.ts";
 
@@ -35,7 +35,7 @@ export interface SyncHost {
   readonly now?: () => number;
 }
 
-const RUN_PAGE = 1_000;
+const BATCH_PAGE = 1_000;
 const DEFAULT_MAX_IMAGE_BYTES = 64 * 1024 * 1024;
 
 class Refusal extends Error {
@@ -79,8 +79,8 @@ function readSha(value: unknown, what: string): string {
   return value;
 }
 
-function readRunId(value: unknown): string {
-  if (typeof value !== "string" || !isRunId(value)) throw badRequest("That isn't a run ID.");
+function readBatchId(value: unknown): string {
+  if (typeof value !== "string" || !isBatchId(value)) throw badRequest("That isn't a batch ID.");
   return value;
 }
 
@@ -100,9 +100,9 @@ function recordedRender(value: unknown): RecordedRender {
   return imageHash === null || imageHash === undefined ? { ...named, failure: readText(failed, "failure") } : { ...named, imageHash: readHash(imageHash) };
 }
 
-/** A run's facts as a sender states them, whose times can't be later than now. */
-function receivedRun(id: string, body: Record<string, unknown>, now: number): ReceivedRun {
-  const { gitSha, environment, startedAt, dirty, baselineSha, storyFilter, reusedFromRun, scale } = body;
+/** A batch's facts as a sender states them, whose times can't be later than now. */
+function receivedBatch(id: string, body: Record<string, unknown>, now: number): ReceivedBatch {
+  const { gitSha, environment, startedAt, dirty, baselineSha, storyFilter, reusedFromBatch, scale } = body;
   if (typeof dirty !== "boolean") throw badRequest("dirty must be true or false.");
   if (typeof scale !== "number") throw badRequest("scale must be a number.");
   return {
@@ -113,7 +113,7 @@ function receivedRun(id: string, body: Record<string, unknown>, now: number): Re
     dirty,
     baselineSha: orNull(baselineSha, (sha) => readSha(sha, "baselineSha")),
     storyFilter: (storyFilter ?? null) as StoryFilter | null,
-    reusedFromRun: orNull(reusedFromRun, (run) => readText(run, "reusedFromRun")),
+    reusedFromBatch: orNull(reusedFromBatch, (batch) => readText(batch, "reusedFromBatch")),
     scale,
   };
 }
@@ -127,26 +127,26 @@ function receivedDecision(value: unknown, decider: string, now: number): Receive
 /** The same stories, in any order. */
 const sameStories = (p: readonly string[], q: readonly string[]) => p.length === q.length && [...p].sort().join("\0") === [...q].sort().join("\0");
 
-const refused = (code: string, message: string): GoldensAnswer => ({ outcome: "refused", acceptedRunId: null, refusal: { code, message } });
+const refused = (code: string, message: string): GoldensAnswer => ({ outcome: "refused", acceptedBatchId: null, refusal: { code, message } });
 
 /** The cloud decides a SHA's goldens: `docs/specs/sync.md` -> Goldens. */
 async function makeGoldens({ batches }: SyncProject, id: string, baselineSha: string | null, removed: readonly string[]): Promise<GoldensAnswer> {
-  const run = await batches.getRun(id);
-  if (run === null) throw new Refusal(404, "unknown-run", `No run ${id} in this project.`);
-  const accepted = await batches.acceptedRunAt(run.gitSha, run.environment);
-  if (accepted === id) return { outcome: "already", acceptedRunId: id, refusal: null };
+  const batch = await batches.getBatch(id);
+  if (batch === null) throw new Refusal(404, "unknown-batch", `No batch ${id} in this project.`);
+  const accepted = await batches.acceptedBatchAt(batch.gitSha, batch.environment);
+  if (accepted === id) return { outcome: "already", acceptedBatchId: id, refusal: null };
   if (accepted !== null) {
-    return { outcome: "conflict", acceptedRunId: accepted, refusal: { code: "goldens-conflict", message: `Run ${accepted} is already the goldens of ${run.gitSha}, and a push never replaces them.` } };
+    return { outcome: "conflict", acceptedBatchId: accepted, refusal: { code: "goldens-conflict", message: `Batch ${accepted} is already the goldens of ${batch.gitSha}, and a push never replaces them.` } };
   }
   try {
     const found = await batches.removedFrom(id, baselineSha);
     if (!sameStories(found, removed)) {
       return refused("wrong-removed", `This would remove ${found.length} goldens here, and not the ${removed.length} you named: ${found.join(", ") || "none"}.`);
     }
-    if (!(await batches.acceptRun(id, baselineSha, found.length))) {
-      return refused("not-approved", "Some of this run's images are neither the same as the baseline's, nor approved.");
+    if (!(await batches.acceptBatch(id, baselineSha, found.length))) {
+      return refused("not-approved", "Some of this batch's images are neither the same as the baseline's, nor approved.");
     }
-    return { outcome: "accepted", acceptedRunId: id, refusal: null };
+    return { outcome: "accepted", acceptedBatchId: id, refusal: null };
   } catch (error) {
     if (error instanceof BatchError) return refused(error.code, error.message);
     throw error;
@@ -191,7 +191,7 @@ export function createSyncApi(host: SyncHost): Hono {
 
   api.onError((error, context) => {
     if (error instanceof Refusal) return context.json(failure(error.code, error.message), error.status);
-    if (error instanceof BatchError) return context.json(failure(error.code, error.message), error.code === "unknown-run" ? 404 : 409);
+    if (error instanceof BatchError) return context.json(failure(error.code, error.message), error.code === "unknown-batch" ? 404 : 409);
     if (error instanceof RangeError || error instanceof TypeError) return context.json(failure("bad-request", error.message), 400);
     console.error(error);
     return context.json(INTERNAL_ERROR, 500);
@@ -242,38 +242,38 @@ export function createSyncApi(host: SyncHost): Hono {
     return imageResponse(context, bytes);
   });
 
-  api.put("/projects/:project/runs/:id", async (context) => {
+  api.put("/projects/:project/batches/:id", async (context) => {
     const project = await uploadable(context);
     const { batches } = project;
-    const id = readRunId(context.req.param("id"));
-    const received = receivedRun(id, await bodyOf(context), now());
-    if (received.dirty) throw new Refusal(409, "run-dirty", "This run is from a dirty tree, so it may show work that's in no commit.");
-    const existing = await batches.getRun(id);
+    const id = readBatchId(context.req.param("id"));
+    const received = receivedBatch(id, await bodyOf(context), now());
+    if (received.dirty) throw new Refusal(409, "batch-dirty", "This batch is from a dirty tree, so it may show work that's in no commit.");
+    const existing = await batches.getBatch(id);
     if (existing?.gitSha !== received.gitSha && !(await project.hasCommit(received.gitSha))) {
-      throw new Refusal(409, "commit-not-pushed", `The repository doesn't have ${received.gitSha}. Push your commit, then this run.`);
+      throw new Refusal(409, "commit-not-pushed", `The repository doesn't have ${received.gitSha}. Push your commit, then this batch.`);
     }
     // A resend keeps the time it was first given, which its clock may since have passed.
-    const { status } = await batches.receiveRun(existing === null ? received : { ...received, startedAt: existing.startedAt });
+    const { status } = await batches.receiveBatch(existing === null ? received : { ...received, startedAt: existing.startedAt });
     return context.json({ status });
   });
 
-  api.post("/projects/:project/runs/:id/renders", async (context) => {
+  api.post("/projects/:project/batches/:id/renders", async (context) => {
     const { batches } = await uploadable(context);
     const items = listOf((await bodyOf(context)).renders, SYNC_LIMITS.renders, "renders").map(recordedRender);
-    await batches.recordRenders(readRunId(context.req.param("id")), items);
+    await batches.recordRenders(readBatchId(context.req.param("id")), items);
     return context.json({ recorded: items.length });
   });
 
-  api.post("/projects/:project/runs/:id/finish", async (context) => {
+  api.post("/projects/:project/batches/:id/finish", async (context) => {
     const { batches } = await uploadable(context);
     const { count, finishedAt } = await bodyOf(context);
-    const { status } = await batches.finishRun(readRunId(context.req.param("id")), readWhole(count, "count"), Math.min(readWhole(finishedAt, "finishedAt"), now()));
+    const { status } = await batches.finishBatch(readBatchId(context.req.param("id")), readWhole(count, "count"), Math.min(readWhole(finishedAt, "finishedAt"), now()));
     return context.json({ status });
   });
 
-  api.get("/projects/:project/runs/:id", async (context) => {
+  api.get("/projects/:project/batches/:id", async (context) => {
     const { batches } = await viewable(context);
-    return context.json(await batches.readRun(readRunId(context.req.param("id")), context.req.query("after") ?? "", RUN_PAGE));
+    return context.json(await batches.readBatch(readBatchId(context.req.param("id")), context.req.query("after") ?? "", BATCH_PAGE));
   });
 
   api.post("/projects/:project/decisions", async (context) => {
@@ -288,17 +288,17 @@ export function createSyncApi(host: SyncHost): Hono {
 
   api.post("/projects/:project/goldens", async (context) => {
     const project = await projectOf(context);
-    const { runId, baselineSha, removed } = await bodyOf(context);
+    const { batchId, baselineSha, removed } = await bodyOf(context);
     const named = listOf(removed ?? [], SYNC_LIMITS.renders, "removed").map((story) => readText(story, "A removed story"));
     // With nothing removed, this makes no judgment: docs/specs/sync.md -> Goldens.
     refuseUnless(project.access.decider !== null || (project.access.upload && named.length === 0));
-    return context.json(await makeGoldens(project, readRunId(runId), orNull(baselineSha, (sha) => readSha(sha, "baselineSha")), named));
+    return context.json(await makeGoldens(project, readBatchId(batchId), orNull(baselineSha, (sha) => readSha(sha, "baselineSha")), named));
   });
 
   api.get("/projects/:project/goldens", async (context) => {
     const { batches } = await knowsGoldens(context);
-    const runId = await batches.acceptedRunAt(readSha(context.req.query("sha"), "sha"), readText(context.req.query("environment"), "environment"));
-    return context.json({ runId });
+    const batchId = await batches.acceptedBatchAt(readSha(context.req.query("sha"), "sha"), readText(context.req.query("environment"), "environment"));
+    return context.json({ batchId });
   });
 
   api.post("/projects/:project/goldens/first", async (context) => {

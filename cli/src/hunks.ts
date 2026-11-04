@@ -102,7 +102,7 @@ function longestAnchor(aKeys: readonly string[], bKeys: readonly string[], aRowI
     while (i + after + 1 < aKeys.length && j + after + 1 < bKeys.length && aKeys[i + after + 1] === bKeys[j + after + 1]) after += 1;
     const length = before + after + 1;
     if (best === null || length > best.length) best = { a: i - before, b: j - before, length };
-    // Any other row in this run would find this same run.
+    // Any other row in this batch would find this same batch.
     i += after;
   }
   return best;

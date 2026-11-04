@@ -1,4 +1,4 @@
-// Deciding on and accepting a run, from what the store knows about it, whether or not its
+// Deciding on and accepting a batch, from what the store knows about it, whether or not its
 // exported images are still on disk.
 import { filterStories } from "selfie-render";
 import { BatchError, type ComparedRender, type Comparison, type DecisionKind } from "selfie-store";
@@ -6,10 +6,10 @@ import type { AcceptRefusal, DecisionTarget } from "selfie-ui/app";
 import { SelfieError } from "./errors.ts";
 import { isOnBaselineHistory } from "./git.ts";
 import { compareAsReviewed, type Project } from "./project.ts";
-import { isDecidable, summarizeRun } from "./summary.ts";
+import { isDecidable, summarizeBatch } from "./summary.ts";
 
 export interface DecideRequest {
-  readonly runId: string;
+  readonly batchId: string;
   readonly decision: DecisionKind;
   readonly actor: string;
   /**
@@ -26,7 +26,7 @@ export interface DecideResult {
   readonly skipped: readonly ComparedRender[];
   /** Patterns that matched nothing, which a caller shouldn't read as a decision made. */
   readonly unmatchedPatterns: readonly string[];
-  /** The run as it stands after this decision. */
+  /** The batch as it stands after this decision. */
   readonly comparison: Comparison;
 }
 
@@ -37,16 +37,16 @@ function exactly(renders: readonly ComparedRender[], targets: readonly DecisionT
   if (stale.length > 0) {
     throw new SelfieError(
       "stale-decision",
-      `${stale.length} of these images aren't what this run holds now, so nothing was decided. Look again.`,
+      `${stale.length} of these images aren't what this batch holds now, so nothing was decided. Look again.`,
     );
   }
   return targets.map(({ story }) => rows.get(story)!);
 }
 
-export async function decide(project: Project, { runId, decision, actor, stories }: DecideRequest): Promise<DecideResult> {
+export async function decide(project: Project, { batchId, decision, actor, stories }: DecideRequest): Promise<DecideResult> {
   const patterns = stories === "all" || "targets" in stories ? null : stories;
   // Unchanged rows only say whether a pattern matched anything.
-  const before = await compareAsReviewed(project, runId, { includeUnchanged: patterns !== null });
+  const before = await compareAsReviewed(project, batchId, { includeUnchanged: patterns !== null });
   const matching =
     patterns === null
       ? null
@@ -58,7 +58,7 @@ export async function decide(project: Project, { runId, decision, actor, stories
     stories !== "all" && "targets" in stories ? exactly(before.renders, stories.targets) : (matching?.stories ?? before.renders);
   const decided = chosen.filter(({ state }) => isDecidable(state));
   await project.batches.decide({
-    environment: before.run.environment,
+    environment: before.batch.environment,
     decision,
     actor,
     renders: decided.map(({ story, imageHash }) => ({ story, imageHash: imageHash! })),
@@ -67,24 +67,24 @@ export async function decide(project: Project, { runId, decision, actor, stories
     decided,
     skipped: chosen.filter(({ state }) => state === "failed" || state === "removed"),
     unmatchedPatterns: matching?.unmatched ?? [],
-    comparison: await project.batches.compareRun(runId, before.run.baselineSha),
+    comparison: await project.batches.compareBatch(batchId, before.batch.baselineSha),
   };
 }
 
 export type { AcceptRefusal };
 
 export interface AcceptRequest {
-  readonly runId: string;
+  readonly batchId: string;
   /** How many removed renders the reviewer saw. Needed if there are any. */
   readonly removedSeen?: number | undefined;
 }
 
 export interface AcceptCheck {
-  /** Every reason at once, so a caller doesn't fix them one run at a time. */
+  /** Every reason at once, so a caller doesn't fix them one batch at a time. */
   readonly refusals: readonly AcceptRefusal[];
-  /** Whether the run's SHA is where a later review could read goldens from. */
+  /** Whether the batch's SHA is where a later review could read goldens from. */
   readonly usableAsBaseline: boolean;
-  /** The goldens accepting would drop, and how many of them only the run's filter left out. */
+  /** The goldens accepting would drop, and how many of them only the batch's filter left out. */
   readonly removals: { readonly stories: readonly string[]; readonly outsideFilter: number };
 }
 
@@ -95,13 +95,13 @@ export interface AcceptResult extends Omit<AcceptCheck, "removals"> {
 
 /** What `accept` would refuse of a comparison a caller holds, changing nothing. */
 export async function checkAccept(project: Project, comparison: Comparison, removedSeen?: number): Promise<AcceptCheck> {
-  const { run } = comparison;
-  const { failed, unapproved, removed, notRendered } = summarizeRun(comparison);
+  const { batch } = comparison;
+  const { failed, unapproved, removed, notRendered } = summarizeBatch(comparison);
   const removals = { stories: [...removed, ...notRendered].map(({ story }) => story).sort(), outsideFilter: notRendered.length };
 
   const refusals: AcceptRefusal[] = [];
-  if (run.dirty) refusals.push({ reason: "recorded-on-dirty-tree", gitSha: run.gitSha });
-  if (failed.length > 0) refusals.push({ reason: "run-has-failures", stories: failed.map(({ story }) => story) });
+  if (batch.dirty) refusals.push({ reason: "recorded-on-dirty-tree", gitSha: batch.gitSha });
+  if (failed.length > 0) refusals.push({ reason: "batch-has-failures", stories: failed.map(({ story }) => story) });
   if (unapproved.length > 0) {
     refusals.push({
       reason: "unapproved",
@@ -118,13 +118,13 @@ export async function checkAccept(project: Project, comparison: Comparison, remo
     refusals.push({ reason: "wrong-removed-count", ...removals, seen: removedSeen });
   }
 
-  return { refusals, usableAsBaseline: await isOnBaselineHistory(project.repo, run.gitSha), removals };
+  return { refusals, usableAsBaseline: await isOnBaselineHistory(project.repo, batch.gitSha), removals };
 }
 
-export async function accept(project: Project, { runId, removedSeen }: AcceptRequest): Promise<AcceptResult> {
-  const comparison = await compareAsReviewed(project, runId);
+export async function accept(project: Project, { batchId, removedSeen }: AcceptRequest): Promise<AcceptResult> {
+  const comparison = await compareAsReviewed(project, batchId);
   const { refusals, usableAsBaseline, removals } = await checkAccept(project, comparison, removedSeen);
-  const { run } = comparison;
+  const { batch } = comparison;
   const result = (list: readonly AcceptRefusal[], accepted: boolean): AcceptResult => ({
     accepted,
     refusals: list,
@@ -135,7 +135,7 @@ export async function accept(project: Project, { runId, removedSeen }: AcceptReq
 
   // Nothing above stands in for this: the store's one statement is what makes it so.
   try {
-    const accepted = await project.batches.acceptRun(runId, run.baselineSha, removedSeen ?? 0);
+    const accepted = await project.batches.acceptBatch(batchId, batch.baselineSha, removedSeen ?? 0);
     return result(accepted ? [] : [{ reason: "unapproved", stories: [] }], accepted);
   } catch (error) {
     // Another writer can move a baseline's goldens between the check above and this.

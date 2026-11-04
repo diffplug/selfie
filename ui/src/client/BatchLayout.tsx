@@ -1,16 +1,16 @@
-// What every page of a run sits in: the tree of what differs at the left, and the top bar saying what's compared.
+// What every page of a batch sits in: the tree of what differs at the left, and the top bar saying what's compared.
 import { useMemo, type ReactNode } from "react";
-import type { RunContext, RunView, RenderRow } from "../shared/api.ts";
+import type { BatchContext, BatchView, RenderRow } from "../shared/api.ts";
 import { findRenames } from "../shared/renames.ts";
 import { applyFilter, navigationThrough, NO_FILTER, parseFilter } from "./filter.ts";
 import { usePageFacts } from "./PageFacts.tsx";
-import { runPath, storyPath } from "./router.tsx";
+import { batchPath, storyPath } from "./router.tsx";
 import { matchingStories, StoryNavLayout } from "./StoryNav.tsx";
 import { differingStories, inTreeOrder } from "./storyTree.ts";
 import { AdvisoryLabels, describePixels } from "./words.tsx";
 
 /** The tree shows what the page's Show says, and its own search does the text. Next and previous go through just that. */
-export function useRunTree(view: RunView | null, unchanged: readonly RenderRow[] | null, search: string, story: string | null) {
+export function useBatchTree(view: BatchView | null, unchanged: readonly RenderRow[] | null, search: string, story: string | null) {
   const rows = view?.rows;
   const renames = useMemo(() => findRenames(rows ?? []), [rows]);
   const { show, text } = parseFilter(search);
@@ -21,12 +21,12 @@ export function useRunTree(view: RunView | null, unchanged: readonly RenderRow[]
   const navigation = useMemo(() => {
     if (view === null || story === null) return null;
     const all = inTreeOrder(differingStories({ ...view, rows: source }, renames));
-    return navigationThrough(all, matchingStories(inTreeOrder(stories), text), story, (name) => storyPath(view.run.id, name, search), runPath(view.run.id, search));
+    return navigationThrough(all, matchingStories(inTreeOrder(stories), text), story, (name) => storyPath(view.batch.id, name, search), batchPath(view.batch.id, search));
   }, [view, source, renames, stories, text, story, search]);
   return { renames, stories, rowOf, navigation };
 }
 
-export function RunLayout({
+export function BatchLayout({
   view,
   tree: { stories, renames, rowOf },
   story,
@@ -34,20 +34,20 @@ export function RunLayout({
   context,
   children,
 }: {
-  view: RunView;
-  tree: ReturnType<typeof useRunTree>;
+  view: BatchView;
+  tree: ReturnType<typeof useBatchTree>;
   story: string | null;
   search: string;
-  context: RunContext | null;
+  context: BatchContext | null;
   children: ReactNode;
 }) {
-  usePageFacts({ kind: "diff", run: view.run, branchGoldens: view.branchGoldens, context });
+  usePageFacts({ kind: "diff", batch: view.batch, branchGoldens: view.branchGoldens, context });
   return (
     <StoryNavLayout
       stories={stories}
       story={story}
       search={search}
-      hrefOf={(name, query) => storyPath(view.run.id, name, query)}
+      hrefOf={(name, query) => storyPath(view.batch.id, name, query)}
       renames={renames}
       startOpen
       emptyWords="Nothing differs."

@@ -39,7 +39,7 @@ describe("exit 2, with one JSON document saying why", () => {
     ["an unknown flag", ["review", "--nope"]],
     ["a stray argument", ["review", "extra"]],
     ["a bad --removed", ["accept", "7f0e6a2e-1234-4abc-8def-0123456789ab", "--removed", "many"]],
-    ["no run", ["accept"]],
+    ["no batch", ["accept"]],
     ["no selection", ["approve", "7f0e6a2e-1234-4abc-8def-0123456789ab"]],
     ["a missing Storybook", ["review", "--storybook-dir", "does-not-exist"]],
     ["a removed flag", ["review", "--human"]],

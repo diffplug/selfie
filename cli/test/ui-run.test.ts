@@ -4,72 +4,72 @@ import { decodeImage } from "./support.ts";
 import { type StoriesView } from "selfie-ui/app";
 import { describe, expect, test } from "vitest";
 import { BLUE, commit, git } from "./support.ts";
-import { UNKNOWN_HASH, UNKNOWN_RUN, h, project, review, get, decideOn, acceptRun, viewOf, makeGoldens } from "./ui-support.ts";
+import { UNKNOWN_HASH, UNKNOWN_BATCH, h, project, review, get, decideOn, acceptBatch, viewOf, makeGoldens } from "./ui-support.ts";
 
-describe("which run", () => {
-  test("says where a run stands against this checkout, and what its baseline is to it", async () => {
+describe("which batch", () => {
+  test("says where a batch stands against this checkout, and what its baseline is to it", async () => {
     h.stories = [{ id: "a" }];
-    const { runId } = (await review()).json;
+    const { batchId } = (await review()).json;
     const head = git(h.repo, "rev-parse", "HEAD");
-    expect(await (await get(`/api/runs/${runId}/context`)).json()).toEqual({ head, branch: "main", mergeBase: head, defaultBranch: "main" });
+    expect(await (await get(`/api/batches/${batchId}/context`)).json()).toEqual({ head, branch: "main", mergeBase: head, defaultBranch: "main" });
     git(h.repo, "checkout", "--quiet", "-b", "topic");
     const moved = await commit(h.repo, "on a branch");
-    expect(await (await get(`/api/runs/${runId}/context`)).json()).toEqual({ head: moved, branch: "topic", mergeBase: head, defaultBranch: "main" });
-    expect((await get(`/api/runs/${UNKNOWN_RUN}/context`)).status).toBe(404);
+    expect(await (await get(`/api/batches/${batchId}/context`)).json()).toEqual({ head: moved, branch: "topic", mergeBase: head, defaultBranch: "main" });
+    expect((await get(`/api/batches/${UNKNOWN_BATCH}/context`)).status).toBe(404);
   });
 
   const newest = async () => ((await (await get("/api/stories")).json()) as StoriesView);
 
-  test("says the commit, with no run yet", async () => {
-    expect(await newest()).toMatchObject({ head: git(h.repo, "rev-parse", "HEAD"), newestRunId: null });
+  test("says the commit, with no batch yet", async () => {
+    expect(await newest()).toMatchObject({ head: git(h.repo, "rev-parse", "HEAD"), newestBatchId: null });
   });
 
   test("is the newest finished one at HEAD, in this environment", async () => {
     h.stories = [{ id: "a" }];
     const { environment } = (await review()).json;
-    const second = (await review()).json.runId;
-    expect((await newest()).newestRunId).toBe(second);
+    const second = (await review()).json.batchId;
+    expect((await newest()).newestBatchId).toBe(second);
 
     // A review still recording, or crashed, can't be compared.
-    const recording = await project.batches.beginRun({
+    const recording = await project.batches.beginBatch({
       gitSha: git(h.repo, "rev-parse", "HEAD"),
       environment,
       scale: 1,
       dirty: false,
       baselineSha: null,
     });
-    expect((await newest()).newestRunId).toBe(second);
-    const unfinished = await get(`/api/runs/${recording.id}`);
+    expect((await newest()).newestBatchId).toBe(second);
+    const unfinished = await get(`/api/batches/${recording.id}`);
     expect(unfinished.status).toBe(409);
-    expect(await unfinished.json()).toMatchObject({ error: { code: "run-not-finished" } });
+    expect(await unfinished.json()).toMatchObject({ error: { code: "batch-not-finished" } });
 
     await commit(h.repo, "moved on");
-    expect((await newest()).newestRunId).toBeNull();
-    // Though a run of an earlier commit is still there to view.
-    expect((await get(`/api/runs/${second}`)).status).toBe(200);
+    expect((await newest()).newestBatchId).toBeNull();
+    // Though a batch of an earlier commit is still there to view.
+    expect((await get(`/api/batches/${second}`)).status).toBe(200);
   });
 
-  test("refuses a bad run ID and an unknown one, with distinct answers, on every run route", async () => {
-    for (const [run, status, code] of [
-      ["not-a-run", 400, "bad-run-id"],
-      ["..%2f..", 400, "bad-run-id"],
-      [UNKNOWN_RUN, 404, "unknown-run"],
+  test("refuses a bad batch ID and an unknown one, with distinct answers, on every batch route", async () => {
+    for (const [batch, status, code] of [
+      ["not-a-batch", 400, "bad-batch-id"],
+      ["..%2f..", 400, "bad-batch-id"],
+      [UNKNOWN_BATCH, 404, "unknown-batch"],
     ] as const) {
       for (const response of [
-        await get(`/api/runs/${run}`),
-        await get(`/api/runs/${run}/unchanged`),
-        await get(`/api/runs/${run}/baseline`),
-        await acceptRun(run),
-        await decideOn(run, "approved", [{ story: "a", imageHash: UNKNOWN_HASH }]),
+        await get(`/api/batches/${batch}`),
+        await get(`/api/batches/${batch}/unchanged`),
+        await get(`/api/batches/${batch}/baseline`),
+        await acceptBatch(batch),
+        await decideOn(batch, "approved", [{ story: "a", imageHash: UNKNOWN_HASH }]),
       ]) {
-        expect(response.status, run).toBe(status);
+        expect(response.status, batch).toBe(status);
         expect(await response.json()).toMatchObject({ error: { code } });
       }
     }
   });
 });
 
-describe("the run view", () => {
+describe("the batch view", () => {
   test("gives counts, blockers, advisories, and states, and never a file path", async () => {
     h.stories = [{ id: "same" }, { id: "differs" }, { id: "gone" }, { id: "breaks" }];
     await makeGoldens();
@@ -80,7 +80,7 @@ describe("the run view", () => {
       { id: "breaks", failed: "It broke" },
     ];
     const { json } = await review();
-    const response = await get(`/api/runs/${json.runId}`);
+    const response = await get(`/api/batches/${json.batchId}`);
     expect(response.headers.get("cache-control")).toBe("no-store");
     const view = (await response.json()) as any;
     expect(view.counts).toEqual({ stories: 4, unchanged: 1, changed: 1, added: 1, removed: 1, failed: 1, undecided: 2, advisories: 1 });
@@ -96,9 +96,9 @@ describe("the run view", () => {
     expect(view.rows.find(({ story }: any) => story === "breaks")).toMatchObject({ failure: "render: It broke", imageHash: null });
     expect(view.rows.find(({ story }: any) => story === "differs").pixelDiff).toMatchObject({ changedPixels: 64 });
     expect(view.removals).toEqual({ stories: ["gone"], outsideFilter: 0 });
-    expect(view.run.baselineSha).toBe(json.baseline.sha);
+    expect(view.batch.baselineSha).toBe(json.baseline.sha);
     expect(view.actor).toBe("tester@example.com");
-    expect(view.siblings.map(({ id }: any) => id)).toContain(json.runId);
+    expect(view.siblings.map(({ id }: any) => id)).toContain(json.batchId);
 
     const text = JSON.stringify(view);
     expect(text).not.toContain(h.home);
@@ -109,51 +109,51 @@ describe("the run view", () => {
     h.stories = [{ id: "same" }, { id: "also-same" }];
     const goldens = await makeGoldens();
     const { json } = await review();
-    expect((await viewOf(json.runId)).rows).toEqual([]);
-    const { rows } = (await (await get(`/api/runs/${json.runId}/unchanged`)).json()) as any;
+    expect((await viewOf(json.batchId)).rows).toEqual([]);
+    const { rows } = (await (await get(`/api/batches/${json.batchId}/unchanged`)).json()) as any;
     expect(rows.map(({ story, state }: any) => [story, state])).toEqual([
       ["also-same", "unchanged"],
       ["same", "unchanged"],
     ]);
-    expect(goldens).not.toBe(json.runId);
+    expect(goldens).not.toBe(json.batchId);
   });
 
-  test("explains a run with no baseline", async () => {
+  test("explains a batch with no baseline", async () => {
     h.stories = [{ id: "a" }];
-    const { runId } = (await review()).json;
-    expect((await viewOf(runId)).run.baselineSha).toBeNull();
-    const baseline = await get(`/api/runs/${runId}/baseline`);
+    const { batchId } = (await review()).json;
+    expect((await viewOf(batchId)).batch.baselineSha).toBeNull();
+    const baseline = await get(`/api/batches/${batchId}/baseline`);
     expect(await baseline.json()).toEqual({ sha: null, message: expect.any(String) });
     expect(baseline.headers.get("cache-control")).toBe("no-store");
   });
 
-  test("says whose goldens a commit has, including another run's", async () => {
+  test("says whose goldens a commit has, including another batch's", async () => {
     h.stories = [{ id: "a" }];
-    const { runId: first } = (await review()).json;
-    expect((await viewOf(first)).acceptedRunId).toBeNull();
+    const { batchId: first } = (await review()).json;
+    expect((await viewOf(first)).acceptedBatchId).toBeNull();
     const [{ story, imageHash }] = (await viewOf(first)).rows;
     await decideOn(first, "approved", [{ story, imageHash }]);
-    await acceptRun(first);
-    expect((await viewOf(first)).acceptedRunId).toBe(first);
-    const { runId: second } = (await review()).json;
-    expect((await viewOf(second)).acceptedRunId).toBe(first);
+    await acceptBatch(first);
+    expect((await viewOf(first)).acceptedBatchId).toBe(first);
+    const { batchId: second } = (await review()).json;
+    expect((await viewOf(second)).acceptedBatchId).toBe(first);
   });
 });
 
-describe("a run's scale", () => {
+describe("a batch's scale", () => {
   test("comes from the project's environment and reaches the view", async () => {
     h.stories = [{ id: "a--one" }];
     const standard = (await review()).json;
-    expect((await viewOf(standard.runId)).run.scale).toBe(1);
+    expect((await viewOf(standard.batchId)).batch.scale).toBe(1);
     await writeFile(path.join(h.repo, "selfie.config.json"), JSON.stringify({ environment: { scale: 1.5 } }));
     const scaled = (await review()).json;
     expect(scaled.environment).not.toBe(standard.environment);
-    expect((await viewOf(scaled.runId)).run.scale).toBe(1.5);
+    expect((await viewOf(scaled.batchId)).batch.scale).toBe(1.5);
   });
 });
 
-describe("a run that reused an earlier render", () => {
-  test("its view says which run really rendered it, and a rendered run's says none", async () => {
+describe("a batch that reused an earlier render", () => {
+  test("its view says which batch really rendered it, and a rendered batch's says none", async () => {
     const build = path.join(h.scratch, "build");
     await mkdir(build);
     await writeFile(path.join(build, "iframe.html"), "<html></html>");
@@ -161,16 +161,16 @@ describe("a run that reused an earlier render", () => {
     const rendered = (await h.cli("review", "--storybook-dir", build)).json;
     await commit(h.repo, "elsewhere");
     const reused = (await h.cli("review", "--storybook-dir", build)).json;
-    expect(reused.reusedFromRun).toBe(rendered.runId);
-    expect((await viewOf(rendered.runId)).run.reusedFromRun).toBeNull();
-    expect((await viewOf(reused.runId)).run.reusedFromRun).toBe(rendered.runId);
+    expect(reused.reusedFromBatch).toBe(rendered.batchId);
+    expect((await viewOf(rendered.batchId)).batch.reusedFromBatch).toBeNull();
+    expect((await viewOf(reused.batchId)).batch.reusedFromBatch).toBe(rendered.batchId);
   });
 });
 
 describe("images", () => {
   test("serves a stored image, privately, by its hash", async () => {
     h.stories = [{ id: "a" }];
-    const view = await viewOf((await review()).json.runId);
+    const view = await viewOf((await review()).json.batchId);
     const [{ imageHash }] = view.rows;
     const response = await get(`/api/images/${imageHash}`);
     expect(response.status).toBe(200);
@@ -196,16 +196,16 @@ describe("images", () => {
     expect((await get(`/api/diffs/${UNKNOWN_HASH}/${UNKNOWN_HASH}/image`)).status).toBe(404);
   });
 
-  test("computes a diff on demand, and still works once the run's directory is pruned", async () => {
+  test("computes a diff on demand, and still works once the batch's directory is pruned", async () => {
     h.stories = [{ id: "a" }];
     await makeGoldens();
     h.stories = [{ id: "a", patch: [1, 2, 1, 1, BLUE] }];
-    const { runId } = (await review()).json;
-    const runs = path.join(project.directory, "runs");
-    expect(await readdir(runs)).toContain(runId);
-    await rm(path.join(runs, runId), { recursive: true });
+    const { batchId } = (await review()).json;
+    const batches = path.join(project.directory, "batches");
+    expect(await readdir(batches)).toContain(batchId);
+    await rm(path.join(batches, batchId), { recursive: true });
 
-    const [row] = (await viewOf(runId)).rows;
+    const [row] = (await viewOf(batchId)).rows;
     // Pixel stats in a list are a cache's. The detail's are computed, so they survive it.
     expect(row.pixelDiff).toBeNull();
     const url = `/api/diffs/${row.imageHash}/${row.goldenHash}`;
@@ -237,7 +237,7 @@ describe("images", () => {
     h.stories = [{ id: "a" }];
     await makeGoldens();
     h.stories = [{ id: "a", color: BLUE }];
-    const [row] = (await viewOf((await review()).json.runId)).rows;
+    const [row] = (await viewOf((await review()).json.batchId)).rows;
     const url = `/api/diffs/${row.imageHash}/${row.goldenHash}`;
     const [stats, image] = await Promise.all([get(url), get(`${url}/image`)]);
     expect([stats.status, image.status]).toEqual([200, 200]);
@@ -249,7 +249,7 @@ describe("images", () => {
     h.stories = [{ id: "a" }];
     await makeGoldens();
     h.stories = [{ id: "a", width: 10, height: 6 }];
-    const [row] = (await viewOf((await review()).json.runId)).rows;
+    const [row] = (await viewOf((await review()).json.batchId)).rows;
     const url = `/api/diffs/${row.imageHash}/${row.goldenHash}`;
     expect(await (await get(url)).json()).toMatchObject({ current: { width: 10, height: 6 }, golden: { width: 8, height: 8 } });
     expect((await get(`${url}/image`)).status).toBe(200);

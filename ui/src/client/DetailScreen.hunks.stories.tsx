@@ -3,7 +3,7 @@ import { expect, userEvent, within } from "storybook/test";
 import { useState } from "react";
 import { DetailScreen } from "./DetailScreen.tsx";
 import { feedbackOf, rows, stateOf, viewOf } from "./stories/fixtures.ts";
-import { RunFrame } from "./stories/RunFrame.tsx";
+import { BatchFrame } from "./stories/BatchFrame.tsx";
 import { SEVERAL, StoryPage, press, stackedImagesLoaded } from "./stories/storyPage.tsx";
 
 const meta = { title: "Pages/Story/Hunks", component: StoryPage } satisfies Meta<typeof StoryPage>;
@@ -54,9 +54,9 @@ function BetweenStories() {
       <button type="button" onClick={() => setStory(story === SEVERAL.story ? other.story : SEVERAL.story)}>
         Go to the other story
       </button>
-      <RunFrame view={view} state={stateOf(view)} story={story}>
+      <BatchFrame view={view} state={stateOf(view)} story={story}>
         {(navigation) => navigation !== null && <DetailScreen state={stateOf(view)} view={view} story={story} search="" feedback={feedbackOf()} navigation={navigation} />}
-      </RunFrame>
+      </BatchFrame>
     </>
   );
 }

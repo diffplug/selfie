@@ -4,7 +4,7 @@ import path from "node:path";
 import { decodeImage } from "./support.ts";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { diffImages } from "../src/diff.ts";
-import { assertRunId, normalizeOrigin, projectSlug, regularFileInside, resolveInside, selfieHome, storyDirName } from "../src/paths.ts";
+import { assertBatchId, normalizeOrigin, projectSlug, regularFileInside, resolveInside, selfieHome, storyDirName } from "../src/paths.ts";
 import { encodePng } from "../src/png.ts";
 import { BLUE, GREEN, RED, solid, type Color } from "./support.ts";
 
@@ -95,10 +95,10 @@ describe("storyDirName", () => {
   });
 });
 
-test("assertRunId accepts only a UUID", () => {
-  expect(() => assertRunId("7f0e6a2e-1234-4abc-8def-0123456789ab")).not.toThrow();
+test("assertBatchId accepts only a UUID", () => {
+  expect(() => assertBatchId("7f0e6a2e-1234-4abc-8def-0123456789ab")).not.toThrow();
   for (const bad of ["../..", "", "abc", "7f0e6a2e-1234-4abc-8def-0123456789ab/..", "7F0E6A2E-1234-4ABC-8DEF-0123456789AB"]) {
-    expect(() => assertRunId(bad)).toThrow(/isn't a run ID/);
+    expect(() => assertBatchId(bad)).toThrow(/isn't a batch ID/);
   }
 });
 

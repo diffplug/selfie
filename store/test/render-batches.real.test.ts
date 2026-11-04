@@ -1,6 +1,6 @@
 // The render contract against real D1, over the network. Opt-in through `pnpm test:d1`
 // or, on its own, `pnpm test:d1:renders` in `store/`, since it needs credentials and
-// spends the account's shared API rate limit. Only one run of any real-D1 suite at a time: all of
+// spends the account's shared API rate limit. Only one batch of any real-D1 suite at a time: all of
 // them use the same database.
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -12,13 +12,13 @@ import { hashOf } from "./support/sql-params.ts";
 
 const ENABLED = process.env.SELFIE_D1_CONTRACT === "1";
 
-// Well above a healthy run of about 90, and far below the shared limit of 1,200 per 5 minutes.
+// Well above a healthy batch of about 90, and far below the shared limit of 1,200 per 5 minutes.
 const REQUEST_BUDGET = 120;
 
-// The size a run must stay efficient at.
+// The size a batch must stay efficient at.
 const RENDERS = 10_000;
 
-// How a mostly unchanged run differs from its baseline.
+// How a mostly unchanged batch differs from its baseline.
 const CHANGED = 100;
 const NEW = 50;
 const FAILED = 50;
@@ -29,7 +29,7 @@ describe.skipIf(!ENABLED)("real D1 renders (opt-in: pnpm test:d1:renders)", () =
 
   beforeAll(async () => {
     harness = await d1Harness(REQUEST_BUDGET);
-    // A crashed run may have left tables behind.
+    // A crashed batch may have left tables behind.
     await harness.sweep();
   });
 
@@ -101,13 +101,13 @@ describe.skipIf(!ENABLED)("real D1 renders (opt-in: pnpm test:d1:renders)", () =
     }));
     const environment = "size";
     const gitSha = "3".repeat(40);
-    const run = await measure("beginRun", () => batches.beginRun({ gitSha, environment, scale: 1, dirty: false, baselineSha: null }));
-    await measure("recordRenders", () => batches.recordRenders(run.id, items));
-    await measure("finishRun", () => batches.finishRun(run.id, RENDERS));
+    const batch = await measure("beginBatch", () => batches.beginBatch({ gitSha, environment, scale: 1, dirty: false, baselineSha: null }));
+    await measure("recordRenders", () => batches.recordRenders(batch.id, items));
+    await measure("finishBatch", () => batches.finishBatch(batch.id, RENDERS));
     await measure("decide", () =>
       batches.decide({ environment, decision: "approved", actor: "real-d1-test", renders: items }),
     );
-    expect(await measure("acceptRun", () => batches.acceptRun(run.id, null, 0))).toBe(true);
+    expect(await measure("acceptBatch", () => batches.acceptBatch(batch.id, null, 0))).toBe(true);
 
     const head: RecordedRender[] = items.slice(0, RENDERS - REMOVED).map((item, i) =>
       i < CHANGED
@@ -119,11 +119,11 @@ describe.skipIf(!ENABLED)("real D1 renders (opt-in: pnpm test:d1:renders)", () =
     for (let i = 0; i < NEW; i++) {
       head.push({ story: `zz-new-${i}`, imageHash: hashes[RENDERS + CHANGED + i]! });
     }
-    const headRun = await batches.beginRun({ gitSha: "4".repeat(40), environment, scale: 1, dirty: false, baselineSha: null });
-    await batches.recordRenders(headRun.id, head);
-    await batches.finishRun(headRun.id, head.length);
-    const { renders: compared, unchangedCount } = await measure("compareRun (differences)", () =>
-      batches.compareRun(headRun.id, gitSha),
+    const headBatch = await batches.beginBatch({ gitSha: "4".repeat(40), environment, scale: 1, dirty: false, baselineSha: null });
+    await batches.recordRenders(headBatch.id, head);
+    await batches.finishBatch(headBatch.id, head.length);
+    const { renders: compared, unchangedCount } = await measure("compareBatch (differences)", () =>
+      batches.compareBatch(headBatch.id, gitSha),
     );
 
     console.log(`Real D1 at ${RENDERS} renders:`);

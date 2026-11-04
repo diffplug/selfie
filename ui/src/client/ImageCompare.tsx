@@ -129,13 +129,13 @@ interface ImageCompareProps {
   readonly scale: number;
   readonly groups: readonly HunkGroup[];
   readonly selection: HunkSelection;
-  readonly runId: string;
+  readonly batchId: string;
   readonly feedback: FeedbackState;
   /** Puts someone in the note box from the start, having just asked to write one. */
   readonly startNote?: boolean;
 }
 
-export function ImageCompare({ row, diff, scale, groups, selection, runId, feedback, startNote = false }: ImageCompareProps) {
+export function ImageCompare({ row, diff, scale, groups, selection, batchId, feedback, startNote = false }: ImageCompareProps) {
   const { story, imageHash, goldenHash } = row;
   const allNotes = feedback.view?.notes ?? [];
   const storyNotes = allNotes.filter((note) => note.story === story);
@@ -250,7 +250,7 @@ export function ImageCompare({ row, diff, scale, groups, selection, runId, feedb
   const noteTarget = drawn !== null ? `on the box you drew on ${imageWords}` : selectedBoxes.length > 0 ? `on ${plural(selectedBoxes.length, "selected hunk")} of ${imageWords}` : `on all of ${imageWords}`;
 
   const addNote = async (text: string) => {
-    const saved = await feedback.add({ story, runId, imageHash: hashOn(layer), box: noteBox, text });
+    const saved = await feedback.add({ story, batchId, imageHash: hashOn(layer), box: noteBox, text });
     if (saved) {
       clearDrawn();
       setSelected(new Set());
@@ -305,12 +305,12 @@ export function ImageCompare({ row, diff, scale, groups, selection, runId, feedb
       {groups.length > 0 && <HunkList groups={groups} selection={selection} onGo={goToHunk} outlined={outlined} onOutlined={setOutlined} />}
       <NotesPanel
         notes={storyNotes}
-        runId={runId}
+        batchId={batchId}
         currentImage={imageHash}
         target={noteTarget}
         onAdd={addNote}
         onRemove={(id) => void feedback.remove(id)}
-        onAnswer={(id, text) => feedback.answer(id, text, runId)}
+        onAnswer={(id, text) => feedback.answer(id, text, batchId)}
         onResolve={(id) => void feedback.resolve(id)}
         writing={writing}
       />

@@ -1,4 +1,4 @@
-// Runs inside workerd, since a Worker checks a file's form and stores it without decoding it.
+// Batches inside workerd, since a Worker checks a file's form and stores it without decoding it.
 
 import { afterEach, describe, expect, it } from "vitest";
 import { R2BlobStorage } from "selfie-store/adapters/r2";

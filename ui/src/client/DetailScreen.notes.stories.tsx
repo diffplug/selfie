@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, userEvent, within } from "storybook/test";
-import { note, OTHER_RUN_ID, replied, rows } from "./stories/fixtures.ts";
+import { note, OTHER_BATCH_ID, replied, rows } from "./stories/fixtures.ts";
 import { HASHES } from "./stories/images.generated.ts";
 import { BUTTON, SEVERAL, StoryPage, press, stackedImagesLoaded } from "./stories/storyPage.tsx";
 
@@ -89,13 +89,13 @@ export const AgentClaimedAFixAndNothingMoved: Story = {
     await expect(within(canvasElement).getByText(/identical to the one the note was written on/)).toBeVisible();
   },
 };
-export const AgentRepliedFromANewerRun: Story = {
+export const AgentRepliedFromANewerBatch: Story = {
   args: {
     row: FIXED,
     notes: [
       (() => {
         const answered = replied(note(25, { story: FIXED.story, imageHash: FIXED.imageHash, state: "sent", text: "Make this bigger." }), "Made it bigger.");
-        return { ...answered, messages: answered.messages.map((message) => (message.sender === "agent" ? { ...message, runId: OTHER_RUN_ID } : message)) };
+        return { ...answered, messages: answered.messages.map((message) => (message.sender === "agent" ? { ...message, batchId: OTHER_BATCH_ID } : message)) };
       })(),
     ],
   },
@@ -110,7 +110,7 @@ export const AnswerNotSentYet: Story = {
     notes: [
       (() => {
         const answered = replied(note(24, { story: FIXED.story, imageHash: FIXED.imageHash, state: "sent", text: "Make this bigger." }), "How much bigger?");
-        return { ...answered, messages: [...answered.messages, { id: 9024, sender: "person" as const, author: "ned@example.com", text: "About double.", runId: null, at: 2, sent: false }] };
+        return { ...answered, messages: [...answered.messages, { id: 9024, sender: "person" as const, author: "ned@example.com", text: "About double.", batchId: null, at: 2, sent: false }] };
       })(),
     ],
   },

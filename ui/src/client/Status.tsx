@@ -51,17 +51,17 @@ export function NotFound() {
 }
 
 export function LoadFailure({ error }: { readonly error: RequestError }) {
-  if (error.code === "unknown-run" || error.code === "bad-run-id") {
+  if (error.code === "unknown-batch" || error.code === "bad-batch-id") {
     return (
-      <Blank icon={QuestionIcon} title="This project has no such run" action={TO_EVERY_STORY}>
-        A review's JSON gives its run ID as <code>runId</code>. Runs are local to this repository's store until they're pushed.
+      <Blank icon={QuestionIcon} title="This project has no such batch" action={TO_EVERY_STORY}>
+        A review's JSON gives its batch ID as <code>batchId</code>. Batches are local to this repository's store until they're pushed.
       </Blank>
     );
   }
-  if (error.code === "run-not-finished") {
+  if (error.code === "batch-not-finished") {
     return (
-      <Blank icon={AlertIcon} title="This run never finished" action={TO_EVERY_STORY}>
-        A review is still recording it, or crashed part way through. A run that didn't finish can't be compared, so run{" "}
+      <Blank icon={AlertIcon} title="This batch never finished" action={TO_EVERY_STORY}>
+        A review is still recording it, or crashed part way through. A batch that didn't finish can't be compared, so run{" "}
         <code>selfie review</code> again if nothing is recording now.
       </Blank>
     );

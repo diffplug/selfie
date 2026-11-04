@@ -54,7 +54,7 @@ const BLOBS_AT_ONCE = 4;
 
 /** The insert statement for one image, given its hash and its truncated hash. */
 export function imageInsertStatement(hash: string, truncated: number): SqlStatement {
-  // Idempotent: a second run hits ON CONFLICT and returns the key the first assigned.
+  // Idempotent: a second batch hits ON CONFLICT and returns the key the first assigned.
   return { sql: INSERT_IMAGE, params: [truncated, hash], idempotent: true };
 }
 

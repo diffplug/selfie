@@ -7,7 +7,7 @@ export interface D1HarnessConfig {
   readonly token: string;
   /**
    * Going over Cloudflare's 1,200 requests per 5 minutes blocks all API calls for 5
-   * minutes. This stops a run that has gone wrong well before that. It doesn't protect
+   * minutes. This stops a batch that has gone wrong well before that. It doesn't protect
    * repeated runs: don't loop these suites.
    */
   readonly budget: number;
@@ -61,7 +61,7 @@ export function createD1Harness({ accountId, databaseId, token, budget }: D1Harn
       databaseId,
       token,
       fetch: wrap(counted),
-      // A real 429 here means the run is over budget, so fail rather than wait.
+      // A real 429 here means the batch is over budget, so fail rather than wait.
       retry: { maxAttempts: 2, baseDelayMs: 200 },
       ...overrides,
     });

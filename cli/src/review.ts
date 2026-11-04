@@ -23,7 +23,7 @@ import {
   type Decision,
   type RecordedRender,
   type RawImage,
-  type Run,
+  type RenderBatch,
   type BuiltStorybookFile,
   type StoryFilter,
 } from "selfie-store";
@@ -31,7 +31,7 @@ import { resolveRenderSettings, resolveHunkMergeDistance, resolveStorybookDir, t
 import { diffToPng, type PixelDiff } from "./diff.ts";
 import { SelfieError } from "./errors.ts";
 import { dirtyPaths, headSha, resolveCommit, type BaselineSearch } from "./git.ts";
-import { isRunId, regularFileInside, storyDirName } from "./paths.ts";
+import { isBatchId, regularFileInside, storyDirName } from "./paths.ts";
 import { encodePng } from "./png.ts";
 import {
   branchGoldens,
@@ -39,18 +39,18 @@ import {
   compareAsReviewed,
   findBaseline,
   pruneOutput,
-  requireRun,
-  runDirectory,
+  requireBatch,
+  batchDirectory,
   writeReviewCache,
   type Project,
 } from "./project.ts";
-import { isDecidable, summarizeRun } from "./summary.ts";
+import { isDecidable, summarizeBatch } from "./summary.ts";
 
 /** Each group is read into memory whole. */
 const IMAGES_PER_GROUP = 100;
 const MAX_CONCURRENT_DIFFS = 6;
 
-export interface RecordOptions {
+export interface RenderBatchOptions {
   /** Relative to the project's `cwd`. Defaults to the config's, and then to `storybook-static`. */
   readonly storybookDir?: string | undefined;
   /** The caller's own command, run in a shell. Its stdout goes to stderr. */
@@ -67,14 +67,14 @@ export interface RecordOptions {
   readonly log?: ((line: string) => void) | undefined;
 }
 
-/** A run to review, or else what to record one from if this built Storybook has none. */
-export type ReviewOptions = ({ readonly run: string } | (RecordOptions & { readonly run?: undefined })) & {
-  /** A commit with goldens, or a finished run. It changes this review alone: `accept` still checks the run's own. */
+/** A batch to review, or else what to record one from if this built Storybook has none. */
+export type ReviewOptions = ({ readonly batch: string } | (RenderBatchOptions & { readonly batch?: undefined })) & {
+  /** A commit with goldens, or a finished batch. It changes this review alone: `accept` still checks the batch's own. */
   readonly baseline?: string | undefined;
 };
 
 /** What `--baseline` resolved to. */
-export type GivenBaseline = { readonly sha: string; readonly run?: undefined } | { readonly run: string; readonly sha?: undefined };
+export type GivenBaseline = { readonly sha: string; readonly batch?: undefined } | { readonly batch: string; readonly sha?: undefined };
 
 export interface Difference {
   readonly story: string;
@@ -91,11 +91,11 @@ export interface Difference {
 }
 
 export interface ReviewResult {
-  /** Everything about the run, as `summarizeRun` reads it. */
+  /** Everything about the batch, as `summarizeBatch` reads it. */
   readonly comparison: Comparison;
-  /** Modified, staged, and untracked paths while it rendered. Empty for a run that was named. */
+  /** Modified, staged, and untracked paths while it rendered. Empty for a batch that was named. */
   readonly dirtyPaths: readonly string[];
-  /** The run's own: what `accept` checks. */
+  /** The batch's own: what `accept` checks. */
   readonly baseline: BaselineSearch;
   /** What this review compared with instead, if anything. */
   readonly given: GivenBaseline | null;
@@ -105,7 +105,7 @@ export interface ReviewResult {
   readonly reviewed: Comparison;
   /** How close hunks group here, in image pixels. */
   readonly hunkMergeDistance: number;
-  /** Within the run's filter. */
+  /** Within the batch's filter. */
   readonly differences: readonly Difference[];
   readonly playErrors: readonly {
     readonly story: string;
@@ -163,7 +163,7 @@ const playErrorOf = ({ errors }: ManifestStory) => {
 
 /**
  * Stores a group's PNGs as written. A file the store refuses is that story's failure, not the
- * run's: `putImages` can't say which one it was, so a refused group goes one at a time.
+ * batch's: `putImages` can't say which one it was, so a refused group goes one at a time.
  */
 async function storeGroup(
   project: Project,
@@ -232,16 +232,16 @@ async function exportImage(
   return { file, image };
 }
 
-async function storyDirectory(runDir: string, story: string): Promise<string> {
-  const directory = path.join(runDir, "stories", storyDirName(story));
+async function storyDirectory(batchDir: string, story: string): Promise<string> {
+  const directory = path.join(batchDir, "stories", storyDirName(story));
   await mkdir(directory, { recursive: true });
   return directory;
 }
 
 /** Writes one difference's files, and computes a pixel diff if it is `changed`. */
-async function exportDifference(project: Project, runDir: string, render: ComparedRender): Promise<Difference> {
+async function exportDifference(project: Project, batchDir: string, render: ComparedRender): Promise<Difference> {
   const { story, imageHash, goldenHash, decision } = render;
-  const directory = await storyDirectory(runDir, story);
+  const directory = await storyDirectory(batchDir, story);
   const current = imageHash === null ? null : await exportImage(project, directory, "current.png", imageHash);
   const golden = goldenHash === null ? null : await exportImage(project, directory, "golden.png", goldenHash);
 
@@ -267,12 +267,12 @@ async function exportDifference(project: Project, runDir: string, render: Compar
 }
 
 /** Exports what's needed to act on the comparison: only `changed` renders get diff work. */
-async function exportImages(project: Project, runDir: string, comparison: Comparison) {
-  const { removed } = summarizeRun(comparison);
+async function exportImages(project: Project, batchDir: string, comparison: Comparison) {
+  const { removed } = summarizeBatch(comparison);
   const shown = [...comparison.renders.filter(({ state }) => isDecidable(state)), ...removed];
   // Each of these holds whole images in memory.
   const limit = Math.min(MAX_CONCURRENT_DIFFS, availableParallelism());
-  const differences = await mapConcurrently(shown, limit, (render) => exportDifference(project, runDir, render));
+  const differences = await mapConcurrently(shown, limit, (render) => exportDifference(project, batchDir, render));
 
   // An unchanged story with a play error needs a look too, so these get their images here.
   const playErrors = await mapConcurrently(
@@ -282,13 +282,13 @@ async function exportImages(project: Project, runDir: string, comparison: Compar
       story,
       playError: playError!,
       current:
-        imageHash === null ? null : (await exportImage(project, await storyDirectory(runDir, story), "current.png", imageHash)).file,
+        imageHash === null ? null : (await exportImage(project, await storyDirectory(batchDir, story), "current.png", imageHash)).file,
     }),
   );
   return { differences, playErrors };
 }
 
-/** What a render says about a filter, as a fact for the run. */
+/** What a render says about a filter, as a fact for the batch. */
 function storyFilterOf(patterns: readonly string[] | undefined, stories: readonly string[]): StoryFilter | null {
   if (patterns === undefined) return null;
   return { patterns, unmatched: filterStories(stories.map((id) => ({ id })), patterns).unmatched };
@@ -296,19 +296,19 @@ function storyFilterOf(patterns: readonly string[] | undefined, stories: readonl
 
 /** What a review's later steps read, whether it rendered or found an earlier render. */
 interface Recording {
-  readonly reusedFromRun: string | null;
+  readonly reusedFromBatch: string | null;
   readonly storyIds: readonly string[];
   readonly warnings: readonly string[];
   readonly records: () => Promise<readonly RecordedRender[]>;
-  /** Called with the finished run, if a new one was recorded. */
-  readonly finished: (run: Run) => Promise<void>;
+  /** Called with the finished batch, if a new one was recorded. */
+  readonly finished: (batch: RenderBatch) => Promise<void>;
 }
 
 /** The project's own code, which the same built Storybook repeats. Anything else might not recur. */
 const REPEATABLE_ERRORS: ReadonlySet<StoryError["source"]> = new Set(["play", "console", "page"]);
 
 /** Why this render mustn't answer a later review, or null if it may. */
-function whyNotReusable({ stories, warnings }: Manifest, { status }: Run): string | null {
+function whyNotReusable({ stories, warnings }: Manifest, { status }: RenderBatch): string | null {
   if (status !== "complete") return "a story failed";
   for (const { id, errors } of stories) {
     const error = errors.find(({ source }) => !REPEATABLE_ERRORS.has(source));
@@ -324,21 +324,21 @@ async function replay(
   patterns: readonly string[] | undefined,
   log: (line: string) => void,
 ): Promise<Recording | null> {
-  const runId = await project.renderKeys.find(identity);
-  if (runId === null || (await project.batches.getRun(runId))?.status !== "complete") return null;
-  const { renders } = await project.batches.compareRun(runId, null, { includeUnchanged: true });
+  const batchId = await project.renderKeys.find(identity);
+  if (batchId === null || (await project.batches.getBatch(batchId))?.status !== "complete") return null;
+  const { renders } = await project.batches.compareBatch(batchId, null, { includeUnchanged: true });
   const stories = renders.map((render) => ({ id: render.story, render }));
   const chosen = patterns === undefined ? stories : filterStories(stories, patterns).stories;
   const storyIds = chosen.map(({ id }) => id);
   return {
-    reusedFromRun: runId,
+    reusedFromBatch: batchId,
     storyIds,
     warnings: (storyFilterOf(patterns, storyIds)?.unmatched ?? []).map(unmatchedPatternWarning),
-    // A remembered run is `complete`, so every row has an image.
+    // A remembered batch is `complete`, so every row has an image.
     records: async () =>
       chosen.map(({ render: { story, imageHash, playError } }) => ({ story, imageHash: imageHash!, playError })),
     finished: async () =>
-      log(`Reused the images of run ${runId}, since this exact built Storybook already rendered. selfie record renders again.`),
+      log(`Reused the images of batch ${batchId}, since this exact built Storybook already rendered. selfie render renders again.`),
   };
 }
 
@@ -347,7 +347,7 @@ async function replay(
 export function renderInput(
   { storybookDir, outDir, log }: { readonly storybookDir: string; readonly outDir: string; readonly log: (line: string) => void },
   settings: RenderSettings,
-  options: Pick<RecordOptions, "stories" | "signal">,
+  options: Pick<RenderBatchOptions, "stories" | "signal">,
 ): RenderOptions {
   return {
     storybookDir,
@@ -363,7 +363,7 @@ export function renderInput(
 }
 
 /** Whatever build was asked for, if one was: the config's from the Git top level, or a given command from here. */
-export async function buildAsAsked(project: Project, settings: RenderSettings, options: Pick<RecordOptions, "buildCommand" | "buildFromConfig" | "signal">, log: (line: string) => void): Promise<void> {
+export async function buildAsAsked(project: Project, settings: RenderSettings, options: Pick<RenderBatchOptions, "buildCommand" | "buildFromConfig" | "signal">, log: (line: string) => void): Promise<void> {
   if (options.buildFromConfig === true) {
     if (settings.buildCommand === undefined) throw new SelfieError("usage", "--build runs the config's buildCommand, and selfie.config.json doesn't have one.");
     await buildIfAsked(settings.buildCommand, project.repo.root, options.signal, log);
@@ -380,17 +380,17 @@ async function renderFresh(
     readonly storybookDir: string;
     readonly identity: string | null;
     readonly settings: RenderSettings;
-    readonly options: RecordOptions;
+    readonly options: RenderBatchOptions;
     readonly log: (line: string) => void;
   },
 ): Promise<Recording> {
   const manifest = await render(renderInput({ storybookDir, outDir: renderDir, log }, settings, options));
   return {
-    reusedFromRun: null,
+    reusedFromBatch: null,
     storyIds: manifest.stories.map(({ id }) => id),
     warnings: manifest.warnings,
     records: () => storeRender(project, renderDir, manifest),
-    async finished(run) {
+    async finished(batch) {
       if (options.stories !== undefined) return;
       if (identity === null) {
         log("This render won't be reused: a native environment, or a built Storybook holding a symlink, can't be recognized.");
@@ -398,33 +398,33 @@ async function renderFresh(
       }
       // A built Storybook that changed while it rendered has no identity that describes these images.
       const after = await renderIdentity({ storybookDir, environment: settings.environment, initScript: settings.initScript, settleMs: settings.settleMs });
-      const whyNot = after === identity ? whyNotReusable(manifest, run) : "the built Storybook changed while it rendered";
-      await project.renderKeys.remember(identity, whyNot === null ? run.id : null);
+      const whyNot = after === identity ? whyNotReusable(manifest, batch) : "the built Storybook changed while it rendered";
+      await project.renderKeys.remember(identity, whyNot === null ? batch.id : null);
       if (whyNot !== null) log(`This render won't be reused: ${whyNot}.`);
     },
   };
 }
 
 /**
- * Says which build rendered a run, and keeps that built Storybook so its stories can still be opened. A built Storybook
- * that changed while it rendered isn't what rendered these images, so nothing is said of it. The run
+ * Says which build rendered a batch, and keeps that built Storybook so its stories can still be opened. A built Storybook
+ * that changed while it rendered isn't what rendered these images, so nothing is said of it. The batch
  * is sound either way, so failing to keep a built Storybook only costs its stories' links.
  */
-async function keepStorybook(project: Project, run: Run, storybookDir: string, before: string | null, log: (line: string) => void): Promise<void> {
+async function keepStorybook(project: Project, batch: RenderBatch, storybookDir: string, before: string | null, log: (line: string) => void): Promise<void> {
   if (before === null) return;
   try {
     const files: BuiltStorybookFile[] = [];
     const after = await storybookHash(storybookDir, async (path, bytes) => void files.push({ path, fileHash: await project.storybooks.putFile(bytes) }));
     if (after !== before) return;
     await project.storybooks.putStorybook(before, files);
-    await project.storybooks.recordRunStorybook(run.id, before);
+    await project.storybooks.recordBatchStorybook(batch.id, before);
   } catch (error) {
-    log(`This run's Storybook wasn't kept: ${(error as Error).message}`);
+    log(`This batch's Storybook wasn't kept: ${(error as Error).message}`);
   }
 }
 
-/** What a run says about where it was recorded. */
-interface RunFacts {
+/** What a batch says about where it was recorded. */
+interface BatchFacts {
   readonly gitSha: string;
   readonly settings: RenderSettings;
   readonly dirty: boolean;
@@ -432,29 +432,29 @@ interface RunFacts {
   readonly storyFilter: StoryFilter | null;
 }
 
-async function recordRun(
+async function recordBatch(
   project: Project,
   recording: Recording,
-  fields: RunFacts,
-): Promise<Run> {
+  fields: BatchFacts,
+): Promise<RenderBatch> {
   const { batches } = project;
-  const run = await batches.beginRun({
+  const batch = await batches.beginBatch({
     gitSha: fields.gitSha,
     environment: fields.settings.environmentId,
     scale: fields.settings.environment.scale,
     dirty: fields.dirty,
     baselineSha: fields.baselineSha,
     storyFilter: fields.storyFilter,
-    reusedFromRun: recording.reusedFromRun,
+    reusedFromBatch: recording.reusedFromBatch,
   });
   const records = await recording.records();
-  await batches.recordRenders(run.id, records);
-  return batches.finishRun(run.id, records.length);
+  await batches.recordRenders(batch.id, records);
+  return batches.finishBatch(batch.id, records.length);
 }
 
-/** What recording left, for `record` to report and `review` to go on from. */
-export interface RecordResult {
-  readonly run: Run;
+/** What recording left, for `render` to report and `review` to go on from. */
+export interface RenderBatchResult {
+  readonly batch: RenderBatch;
   /** Modified, staged, and untracked paths while it rendered. */
   readonly dirtyPaths: readonly string[];
   readonly baseline: BaselineSearch;
@@ -462,12 +462,12 @@ export interface RecordResult {
   readonly timings: { readonly renderMs: number; readonly storeMs: number; readonly totalMs: number };
 }
 
-/** The run that already says all this about this built Storybook at this commit, so a review needs no new one. */
-async function sameRun(project: Project, renderedBy: string, fields: RunFacts): Promise<Run | null> {
-  const runs = await project.batches.runsAt(fields.gitSha, fields.settings.environmentId);
-  const same = runs.find(
-    ({ id, reusedFromRun, status, dirty, baselineSha, storyFilter }) =>
-      (id === renderedBy || reusedFromRun === renderedBy) &&
+/** The batch that already says all this about this built Storybook at this commit, so a review needs no new one. */
+async function sameBatch(project: Project, renderedBy: string, fields: BatchFacts): Promise<RenderBatch | null> {
+  const batches = await project.batches.batchesAt(fields.gitSha, fields.settings.environmentId);
+  const same = batches.find(
+    ({ id, reusedFromBatch, status, dirty, baselineSha, storyFilter }) =>
+      (id === renderedBy || reusedFromBatch === renderedBy) &&
       status === "complete" &&
       dirty === fields.dirty &&
       baselineSha === fields.baselineSha &&
@@ -476,7 +476,7 @@ async function sameRun(project: Project, renderedBy: string, fields: RunFacts): 
   return same ?? null;
 }
 
-async function recordBuild(project: Project, options: RecordOptions, { reuse }: { reuse: boolean }): Promise<RecordResult> {
+async function renderAndRecord(project: Project, options: RenderBatchOptions, { reuse }: { reuse: boolean }): Promise<RenderBatchResult> {
   const { repo } = project;
   const log = options.log ?? (() => {});
   const render = options.render ?? realRender;
@@ -491,7 +491,7 @@ async function recordBuild(project: Project, options: RecordOptions, { reuse }: 
     // 2. Read where we are.
     const gitSha = await headSha(repo);
     if (gitSha === null) {
-      throw new SelfieError("no-commits", "This repository has no commits yet, and a run is recorded against a Git SHA.");
+      throw new SelfieError("no-commits", "This repository has no commits yet, and a batch is recorded against a Git SHA.");
     }
     const storybookDir = resolveStorybookDir(project.cwd, options.storybookDir, settings);
     const baseline = await findBaseline(project, settings.environmentId);
@@ -513,7 +513,7 @@ async function recordBuild(project: Project, options: RecordOptions, { reuse }: 
     }
     const dirty = [...new Set([...dirtyBefore, ...(await dirtyPaths(repo))])];
 
-    // 5. Record, unless a run already says all this.
+    // 5. Record, unless a batch already says all this.
     const fields = {
       gitSha,
       settings,
@@ -521,20 +521,20 @@ async function recordBuild(project: Project, options: RecordOptions, { reuse }: 
       baselineSha: baseline.sha,
       storyFilter: storyFilterOf(options.stories, recording.storyIds),
     };
-    const existing = recording.reusedFromRun === null ? null : await sameRun(project, recording.reusedFromRun, fields);
-    const run = existing ?? (await recordRun(project, recording, fields));
+    const existing = recording.reusedFromBatch === null ? null : await sameBatch(project, recording.reusedFromBatch, fields);
+    const batch = existing ?? (await recordBatch(project, recording, fields));
     const stored = Date.now();
     if (existing === null) {
-      log(`Recorded run ${run.id}: ${recording.storyIds.length} stories.`);
-      await recording.finished(run);
-      await project.storybooks.recordViewport(run.environment, settings.environment.viewport);
-      await keepStorybook(project, run, storybookDir, buildBefore, log);
+      log(`Recorded batch ${batch.id}: ${recording.storyIds.length} stories.`);
+      await recording.finished(batch);
+      await project.storybooks.recordViewport(batch.environment, settings.environment.viewport);
+      await keepStorybook(project, batch, storybookDir, buildBefore, log);
     } else {
-      log(`Run ${run.id} already describes this built Storybook at this commit, so nothing new was recorded. selfie record renders again.`);
+      log(`Batch ${batch.id} already describes this built Storybook at this commit, so nothing new was recorded. selfie render renders again.`);
     }
-    await project.notes.rememberRun(run.id);
+    await project.notes.rememberBatch(batch.id);
     return {
-      run,
+      batch,
       dirtyPaths: dirty,
       baseline,
       warnings: recording.warnings,
@@ -546,69 +546,69 @@ async function recordBuild(project: Project, options: RecordOptions, { reuse }: 
 }
 
 /**
- * Always renders a built Storybook, and records a run. A story's failure is a fact in the result.
+ * Always renders a built Storybook, and records a batch. A story's failure is a fact in the result.
  * Throws if it couldn't run.
  */
-export function record(project: Project, options: RecordOptions): Promise<RecordResult> {
-  return recordBuild(project, options, { reuse: false });
+export function renderBatch(project: Project, options: RenderBatchOptions): Promise<RenderBatchResult> {
+  return renderAndRecord(project, options, { reuse: false });
 }
 
-/** A review of a run that's already recorded, which is what recording would have given it. */
-async function namedRun(project: Project, runId: string): Promise<RecordResult> {
-  const run = await requireRun(project, runId);
+/** A review of a batch that's already recorded, which is what recording would have given it. */
+async function namedBatch(project: Project, batchId: string): Promise<RenderBatchResult> {
+  const batch = await requireBatch(project, batchId);
   return {
-    run,
+    batch,
     dirtyPaths: [],
-    baseline: { sha: run.baselineSha, reason: null, message: null, defaultBranch: null, mergeBase: null },
-    warnings: (run.storyFilter?.unmatched ?? []).map(unmatchedPatternWarning),
+    baseline: { sha: batch.baselineSha, reason: null, message: null, defaultBranch: null, mergeBase: null },
+    warnings: (batch.storyFilter?.unmatched ?? []).map(unmatchedPatternWarning),
     timings: { renderMs: 0, storeMs: 0, totalMs: 0 },
   };
 }
 
-/** What `--baseline` means: a run by its ID, or else a commit by anything Git calls one. */
+/** What `--baseline` means: a batch by its ID, or else a commit by anything Git calls one. */
 async function resolveGiven(project: Project, given: string): Promise<GivenBaseline> {
-  if (isRunId(given)) return { run: given };
+  if (isBatchId(given)) return { batch: given };
   const sha = await resolveCommit(project.repo, given);
-  if (sha === null) throw new SelfieError("unknown-baseline", `"${given}" is neither a run ID nor a commit here.`);
+  if (sha === null) throw new SelfieError("unknown-baseline", `"${given}" is neither a batch ID nor a commit here.`);
   return { sha };
 }
 
 /**
- * Exports what differs from the baseline in a run: one it's told to look at, or else the one
+ * Exports what differs from the baseline in a batch: one it's told to look at, or else the one
  * for this built Storybook, recording it only if there's none. A story's failure is a fact in the result.
  * Throws if the review couldn't run.
  */
 export async function review(project: Project, options: ReviewOptions): Promise<ReviewResult> {
   const started = Date.now();
   const recorded =
-    options.run !== undefined ? await namedRun(project, options.run) : await recordBuild(project, options, { reuse: true });
-  const { run, baseline } = recorded;
+    options.batch !== undefined ? await namedBatch(project, options.batch) : await renderAndRecord(project, options, { reuse: true });
+  const { batch, baseline } = recorded;
   const given = options.baseline === undefined ? null : await resolveGiven(project, options.baseline);
 
   // 6. Compare.
   const comparing = Date.now();
-  const onBranch = given === null ? await branchGoldens(project, run) : null;
+  const onBranch = given === null ? await branchGoldens(project, batch) : null;
   const comparison =
-    given?.run !== undefined
-      ? await project.batches.compareWithRun(run.id, given.run)
-      : await project.batches.compareRun(run.id, given?.sha ?? onBranch ?? run.baselineSha);
-  const reviewed = onBranch === null ? comparison : await project.batches.compareRun(run.id, run.baselineSha);
+    given?.batch !== undefined
+      ? await project.batches.compareWithBatch(batch.id, given.batch)
+      : await project.batches.compareBatch(batch.id, given?.sha ?? onBranch ?? batch.baselineSha);
+  const reviewed = onBranch === null ? comparison : await project.batches.compareBatch(batch.id, batch.baselineSha);
   const compared = Date.now();
 
-  // 7. Export, keep a cache of what was exported, and prune older runs. A given baseline answers
-  // one question and changes nothing about the run, so it has its own directory and no cache.
-  const runDir = runDirectory(project, run.id);
-  const exportDir = given === null ? runDir : path.join(runDir, "against", (given.run ?? given.sha)!);
+  // 7. Export, keep a cache of what was exported, and prune older batches. A given baseline answers
+  // one question and changes nothing about the batch, so it has its own directory and no cache.
+  const batchDir = batchDirectory(project, batch.id);
+  const exportDir = given === null ? batchDir : path.join(batchDir, "against", (given.batch ?? given.sha)!);
   await mkdir(exportDir, { recursive: true });
   const { differences, playErrors } = await exportImages(project, exportDir, comparison);
   const diffed = Date.now();
   if (given === null) {
-    await writeReviewCache(project, run.id, {
+    await writeReviewCache(project, batch.id, {
       differences: differences.map(({ story, current, golden, diff, pixelDiff }) => ({ story, current, golden, diff, pixelDiff })),
       playErrors: playErrors.map(({ story, current }) => ({ story, current })),
     });
   }
-  await pruneOutput(project, run.id);
+  await pruneOutput(project, batch.id);
 
   return {
     comparison,
@@ -617,7 +617,7 @@ export async function review(project: Project, options: ReviewOptions): Promise<
     given,
     branchGoldens: onBranch,
     reviewed,
-    hunkMergeDistance: (await resolveHunkMergeDistance(project.repo)) * run.scale,
+    hunkMergeDistance: (await resolveHunkMergeDistance(project.repo)) * batch.scale,
     differences,
     playErrors,
     warnings: recorded.warnings,
@@ -632,20 +632,20 @@ export async function review(project: Project, options: ReviewOptions): Promise<
 }
 
 /**
- * An agent's answer to a note, on the newest run if it doesn't say. Says whether the note's image is
- * still what the run has, so a claimed fix that moved nothing shows at once.
+ * An agent's answer to a note, on the newest batch if it doesn't say. Says whether the note's image is
+ * still what the batch has, so a claimed fix that moved nothing shows at once.
  */
-export async function replyToNote(project: Project, id: number, text: string, givenRun: string | undefined): Promise<{ readonly note: number; readonly runId: string | null; readonly imageChanged: boolean | null }> {
+export async function replyToNote(project: Project, id: number, text: string, givenBatch: string | undefined): Promise<{ readonly note: number; readonly batchId: string | null; readonly imageChanged: boolean | null }> {
   const { notes } = project;
-  const runId = givenRun ?? (await notes.latestRun());
-  if (givenRun !== undefined) {
-    await requireRun(project, givenRun);
-    await notes.rememberRun(givenRun);
+  const batchId = givenBatch ?? (await notes.latestBatch());
+  if (givenBatch !== undefined) {
+    await requireBatch(project, givenBatch);
+    await notes.rememberBatch(givenBatch);
   }
-  await notes.reply(id, text, runId);
+  await notes.reply(id, text, batchId);
   const note = (await notes.list()).find((candidate) => candidate.id === id)!;
-  if (runId === null || note.imageHash === null) return { note: id, runId, imageChanged: null };
-  const { renders: compared } = await compareAsReviewed(project, runId, { includeUnchanged: true });
+  if (batchId === null || note.imageHash === null) return { note: id, batchId, imageChanged: null };
+  const { renders: compared } = await compareAsReviewed(project, batchId, { includeUnchanged: true });
   const now = compared.find(({ story }) => story === note.story)?.imageHash ?? null;
-  return { note: id, runId, imageChanged: now !== note.imageHash };
+  return { note: id, batchId, imageChanged: now !== note.imageHash };
 }

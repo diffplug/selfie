@@ -1,9 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, userEvent, within, waitFor } from "storybook/test";
 import type { Note } from "../shared/api.ts";
-import { FeedbackBar, NewerRunBanner } from "./Feedback.tsx";
+import { FeedbackBar, NewerBatchBanner } from "./Feedback.tsx";
 import { storyPath } from "./router.tsx";
-import { failure, feedbackOf, note, OTHER_RUN_ID, RUN_ID } from "./stories/fixtures.ts";
+import { failure, feedbackOf, note, OTHER_BATCH_ID, BATCH_ID } from "./stories/fixtures.ts";
 
 interface Args {
   readonly notes?: readonly Note[];
@@ -14,7 +14,7 @@ interface Args {
 
 function Bar({ notes = [], showList = true, failed = false, agentWaiting = false }: Args) {
   const feedback = feedbackOf(notes, failed ? { error: failure("unreachable", "Can't reach the Selfie server. Is selfie ui still running?") } : {}, agentWaiting);
-  return <FeedbackBar feedback={feedback} storyHref={(story) => storyPath(RUN_ID, story, "")} showList={showList} />;
+  return <FeedbackBar feedback={feedback} storyHref={(story) => storyPath(BATCH_ID, story, "")} showList={showList} />;
 }
 
 const meta = { title: "Parts/Feedback bar", component: Bar } satisfies Meta<typeof Bar>;
@@ -27,14 +27,14 @@ const SOME = [
 ];
 
 export const NoNotesShowsNothing: Story = { args: {} };
-export const NotesInTheRunList: Story = { args: { notes: SOME } };
+export const NotesInTheBatchList: Story = { args: { notes: SOME } };
 export const NotesOnAStorysPage: Story = { args: { notes: SOME, showList: false } };
 export const CouldNotReachTheServer: Story = { args: { notes: SOME, failed: true } };
 export const AgentWaitingWithDrafts: Story = { args: { notes: SOME, agentWaiting: true } };
 export const AgentWaitingWithNothingToSend: Story = { args: { notes: [], agentWaiting: true } };
 export const AgentWaitingWithAllSent: Story = { args: { notes: [SOME[0]!], agentWaiting: true } };
-export const ANewerRunFromThisFolder: Story = { render: () => <NewerRunBanner latestRunId={OTHER_RUN_ID} runId={RUN_ID} story={null} /> };
-export const ANewerRunWhileOnAStory: Story = { render: () => <NewerRunBanner latestRunId={OTHER_RUN_ID} runId={RUN_ID} story="components-button--primary" /> };
+export const ANewerBatchFromThisFolder: Story = { render: () => <NewerBatchBanner latestBatchId={OTHER_BATCH_ID} batchId={BATCH_ID} story={null} /> };
+export const ANewerBatchWhileOnAStory: Story = { render: () => <NewerBatchBanner latestBatchId={OTHER_BATCH_ID} batchId={BATCH_ID} story="components-button--primary" /> };
 export const ResolvedNotesDontCount: Story = { args: { notes: [note(9, { state: "resolved" }), SOME[0]!] } };
 export const CopyDialog: Story = {
   args: { notes: SOME },

@@ -4,11 +4,11 @@ import type { Sql, SqlParam, SqlRow, SqlStatement } from "./sql.ts";
 
 /**
  * The tables behind `RenderBatches`, which `initStoreSchema` creates. Rows hold the image
- * key and the run key for compactness, and both stay private to this store: everything
- * this module takes or returns names an image by its hash and a run by its `id`.
+ * key and the batch key for compactness, and both stay private to this store: everything
+ * this module takes or returns names an image by its hash and a batch by its `id`.
  */
 export const CREATE_BATCH_TABLES: readonly string[] = [
-  `CREATE TABLE IF NOT EXISTS runs (
+  `CREATE TABLE IF NOT EXISTS render_batches (
   key INTEGER PRIMARY KEY,
   id TEXT NOT NULL UNIQUE,
   git_sha TEXT NOT NULL,
@@ -19,17 +19,17 @@ export const CREATE_BATCH_TABLES: readonly string[] = [
   dirty INTEGER NOT NULL CHECK (dirty IN (0, 1)),
   baseline_sha TEXT,
   story_filter TEXT,
-  reused_from_run TEXT,
+  reused_from_batch TEXT,
   scale REAL NOT NULL
 )`,
-  "CREATE INDEX IF NOT EXISTS runs_by_sha ON runs(git_sha, environment, started_at)",
+  "CREATE INDEX IF NOT EXISTS batches_by_sha ON render_batches(git_sha, environment, started_at)",
   `CREATE TABLE IF NOT EXISTS renders (
-  run_key INTEGER NOT NULL,
+  batch_key INTEGER NOT NULL,
   story TEXT NOT NULL,
   image_key INTEGER,
   failure TEXT,
   play_error TEXT,
-  PRIMARY KEY (run_key, story),
+  PRIMARY KEY (batch_key, story),
   CHECK ((image_key IS NULL) <> (failure IS NULL))
 ) WITHOUT ROWID`,
   `CREATE TABLE IF NOT EXISTS decisions (
@@ -44,7 +44,7 @@ export const CREATE_BATCH_TABLES: readonly string[] = [
   `CREATE TABLE IF NOT EXISTS goldens (
   git_sha TEXT NOT NULL,
   environment TEXT NOT NULL,
-  run_key INTEGER NOT NULL,
+  batch_key INTEGER NOT NULL,
   PRIMARY KEY (git_sha, environment)
 ) WITHOUT ROWID`,
 ];
@@ -60,7 +60,7 @@ const DECISIONS_PER_MERGE_STATEMENT = 19;
 const SHAS_PER_GOLDENS_QUERY = 99;
 
 // Sizes measured on real D1: `docs/specs/renders.rationale.md`. A request of 400
-// statements holds 19,600 renders, so a run of up to that many costs one.
+// statements holds 19,600 renders, so a batch of up to that many costs one.
 const STATEMENTS_PER_REQUEST = 400;
 const ROWS_PER_PAGE = 5_000;
 
@@ -68,37 +68,37 @@ const ROWS_PER_PAGE = 5_000;
 const MAX_MESSAGE_CHARACTERS = 2_000;
 
 const GIT_SHA = /^[0-9a-f]{40}(?:[0-9a-f]{24})?$/;
-const RUN_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const BATCH_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 /** A full SHA-1 or SHA-256 commit ID. */
 export const isGitSha = (value: string) => GIT_SHA.test(value);
-/** What leaves a store to name a run. */
-export const isRunId = (value: string) => RUN_ID.test(value);
+/** What leaves a store to name a batch. */
+export const isBatchId = (value: string) => BATCH_ID.test(value);
 
-const RUN_COLUMNS =
-  "id, git_sha, environment, started_at, finished_at, failed_count, dirty, baseline_sha, story_filter, reused_from_run, scale";
+const BATCH_COLUMNS =
+  "id, git_sha, environment, started_at, finished_at, failed_count, dirty, baseline_sha, story_filter, reused_from_batch, scale";
 
-const SELECT_RUN = `SELECT ${RUN_COLUMNS} FROM runs WHERE id = ?1`;
+const SELECT_BATCH = `SELECT ${BATCH_COLUMNS} FROM render_batches WHERE id = ?1`;
 
-// The key of the run holding a baseline's goldens, only ever in the run's own
+// The key of the batch holding a baseline's goldens, only ever in the batch's own
 // environment. Uncorrelated, so SQLite evaluates it once. An empty ?2 means no baseline.
-const GOLDENS_RUN_KEY = `(SELECT g.run_key FROM goldens g
-  WHERE g.git_sha = ?2 AND g.environment = (SELECT environment FROM runs WHERE id = ?1))`;
+const GOLDENS_BATCH_KEY = `(SELECT g.batch_key FROM goldens g
+  WHERE g.git_sha = ?2 AND g.environment = (SELECT environment FROM render_batches WHERE id = ?1))`;
 
-// The key of a finished run named by ?2, only ever in the run's own environment.
-const NAMED_RUN_KEY = `(SELECT b.key FROM runs b
+// The key of a finished batch named by ?2, only ever in the batch's own environment.
+const NAMED_BATCH_KEY = `(SELECT b.key FROM render_batches b
   WHERE b.id = ?2 AND b.finished_at IS NOT NULL
-    AND b.environment = (SELECT environment FROM runs WHERE id = ?1))`;
+    AND b.environment = (SELECT environment FROM render_batches WHERE id = ?1))`;
 
-/** A comparison's statements, against whichever run a key expression finds. */
+/** A comparison's statements, against whichever batch a key expression finds. */
 const comparisonStatements = (baselineKey: string) => ({
-  baseline: `SELECT ${baselineKey} AS run_key`,
+  baseline: `SELECT ${baselineKey} AS batch_key`,
   // `gs` joins before the images so that a row left out never reads them.
   comparedPage: `SELECT rs.story, i.hash AS image_hash, rs.failure, rs.play_error,
   gi.hash AS golden_hash, d.decision, d.actor, d.decided_at
-FROM runs r
-CROSS JOIN renders rs ON rs.run_key = r.key
-LEFT JOIN renders gs ON gs.run_key = ${baselineKey} AND gs.story = rs.story
+FROM render_batches r
+CROSS JOIN renders rs ON rs.batch_key = r.key
+LEFT JOIN renders gs ON gs.batch_key = ${baselineKey} AND gs.story = rs.story
 LEFT JOIN images i ON i.key = rs.image_key
 LEFT JOIN images gi ON gi.key = gs.image_key
 LEFT JOIN decisions d ON d.environment = r.environment AND d.story = rs.story
@@ -111,47 +111,47 @@ LIMIT CAST(?4 AS INTEGER)`,
   removedPage: `SELECT gs.story, gi.hash AS golden_hash
 FROM renders gs
 JOIN images gi ON gi.key = gs.image_key
-WHERE gs.run_key = ${baselineKey} AND gs.story > ?3
+WHERE gs.batch_key = ${baselineKey} AND gs.story > ?3
   AND NOT EXISTS (SELECT 1 FROM renders rs
-    WHERE rs.run_key = (SELECT key FROM runs WHERE id = ?1) AND rs.story = gs.story)
+    WHERE rs.batch_key = (SELECT key FROM render_batches WHERE id = ?1) AND rs.story = gs.story)
 ORDER BY gs.story
 LIMIT CAST(?4 AS INTEGER)`,
   unchangedCount: `SELECT COUNT(*) AS total
 FROM renders rs
-JOIN renders gs ON gs.run_key = ${baselineKey} AND gs.story = rs.story
-WHERE rs.run_key = (SELECT key FROM runs WHERE id = ?1) AND rs.image_key = gs.image_key`,
+JOIN renders gs ON gs.batch_key = ${baselineKey} AND gs.story = rs.story
+WHERE rs.batch_key = (SELECT key FROM render_batches WHERE id = ?1) AND rs.image_key = gs.image_key`,
 });
 
-const AGAINST_GOLDENS = comparisonStatements(GOLDENS_RUN_KEY);
-const AGAINST_RUN = comparisonStatements(NAMED_RUN_KEY);
+const AGAINST_GOLDENS = comparisonStatements(GOLDENS_BATCH_KEY);
+const AGAINST_BATCH = comparisonStatements(NAMED_BATCH_KEY);
 
 const COUNT_REMOVED = `(SELECT COUNT(*) FROM renders gs
-  WHERE gs.run_key = ${GOLDENS_RUN_KEY}
+  WHERE gs.batch_key = ${GOLDENS_BATCH_KEY}
     AND NOT EXISTS (SELECT 1 FROM renders rs
-      WHERE rs.run_key = (SELECT key FROM runs WHERE id = ?1) AND rs.story = gs.story))`;
+      WHERE rs.batch_key = (SELECT key FROM render_batches WHERE id = ?1) AND rs.story = gs.story))`;
 
 const SELECT_REMOVED_COUNT = `SELECT ${COUNT_REMOVED} AS total`;
 
 const CAN_BE_GOLDENS = "r.finished_at IS NOT NULL AND r.failed_count = 0 AND r.dirty = 0";
 
 // The checks and the write are one statement, so nothing can change between them, and
-// the goldens of a SHA appear whole. Sent again, it must still succeed, so a run already
+// the goldens of a SHA appear whole. Sent again, it must still succeed, so a batch already
 // accepted passes without the checks: accepting a rerun over its own SHA's goldens makes
 // the baseline itself, and then nothing reads as removed.
-const ACCEPT_RUN = `INSERT INTO goldens(git_sha, environment, run_key)
+const ACCEPT_BATCH = `INSERT INTO goldens(git_sha, environment, batch_key)
 SELECT r.git_sha, r.environment, r.key
-FROM runs r
+FROM render_batches r
 WHERE r.id = ?1 AND ${CAN_BE_GOLDENS}
-  AND (?2 = '' OR ${GOLDENS_RUN_KEY} IS NOT NULL)
+  AND (?2 = '' OR ${GOLDENS_BATCH_KEY} IS NOT NULL)
   AND (
     EXISTS (SELECT 1 FROM goldens a
-      WHERE a.git_sha = r.git_sha AND a.environment = r.environment AND a.run_key = r.key)
+      WHERE a.git_sha = r.git_sha AND a.environment = r.environment AND a.batch_key = r.key)
     OR (
       ${COUNT_REMOVED} = CAST(?3 AS INTEGER)
       AND NOT EXISTS (
         SELECT 1 FROM renders rs
-        LEFT JOIN renders gs ON gs.run_key = ${GOLDENS_RUN_KEY} AND gs.story = rs.story
-        WHERE rs.run_key = r.key AND gs.image_key IS NOT rs.image_key
+        LEFT JOIN renders gs ON gs.batch_key = ${GOLDENS_BATCH_KEY} AND gs.story = rs.story
+        WHERE rs.batch_key = r.key AND gs.image_key IS NOT rs.image_key
           AND NOT EXISTS (
             SELECT 1 FROM decisions d
             WHERE d.environment = r.environment AND d.story = rs.story
@@ -161,32 +161,32 @@ WHERE r.id = ?1 AND ${CAN_BE_GOLDENS}
       )
     )
   )
-ON CONFLICT(git_sha, environment) DO UPDATE SET run_key = excluded.run_key
-RETURNING run_key`;
+ON CONFLICT(git_sha, environment) DO UPDATE SET batch_key = excluded.batch_key
+RETURNING batch_key`;
 
-// Counted in the statement that marks the run, so a batch that never landed can't be
-// marked finished. Running it again changes nothing, since a finished run takes no rows.
-const FINISH_RUN = `UPDATE runs SET
+// Counted in the statement that marks the batch, so statements that never landed can't be
+// marked finished. Running it again changes nothing, since a finished batch takes no rows.
+const FINISH_BATCH = `UPDATE render_batches SET
   finished_at = COALESCE(finished_at, CAST(?2 AS INTEGER)),
   failed_count = c.failed
 FROM (
   SELECT COUNT(*) AS total, COALESCE(SUM(image_key IS NULL), 0) AS failed
   FROM renders
-  WHERE run_key = (SELECT key FROM runs WHERE id = ?1)
+  WHERE batch_key = (SELECT key FROM render_batches WHERE id = ?1)
 ) AS c
-WHERE runs.id = ?1 AND c.total = CAST(?3 AS INTEGER)
-RETURNING ${RUN_COLUMNS}`;
+WHERE render_batches.id = ?1 AND c.total = CAST(?3 AS INTEGER)
+RETURNING ${BATCH_COLUMNS}`;
 
 // Not by the checks that accepting makes, since another store already made them.
-const ADOPT_GOLDENS = `INSERT INTO goldens(git_sha, environment, run_key)
-SELECT r.git_sha, r.environment, r.key FROM runs r
+const ADOPT_GOLDENS = `INSERT INTO goldens(git_sha, environment, batch_key)
+SELECT r.git_sha, r.environment, r.key FROM render_batches r
 WHERE r.id = ?1 AND ${CAN_BE_GOLDENS}
-ON CONFLICT(git_sha, environment) DO UPDATE SET run_key = excluded.run_key
-RETURNING run_key`;
+ON CONFLICT(git_sha, environment) DO UPDATE SET batch_key = excluded.batch_key
+RETURNING batch_key`;
 
-const READ_RUN_PAGE = `SELECT rs.story, i.hash AS image_hash, rs.failure, rs.play_error, d.decision, d.actor, d.decided_at
-FROM runs r
-CROSS JOIN renders rs ON rs.run_key = r.key
+const READ_BATCH_PAGE = `SELECT rs.story, i.hash AS image_hash, rs.failure, rs.play_error, d.decision, d.actor, d.decided_at
+FROM render_batches r
+CROSS JOIN renders rs ON rs.batch_key = r.key
 LEFT JOIN images i ON i.key = rs.image_key
 LEFT JOIN decisions d ON d.environment = r.environment AND d.story = rs.story AND d.image_hash = i.hash
 WHERE r.id = ?1 AND rs.story > ?2
@@ -194,23 +194,23 @@ ORDER BY rs.story
 LIMIT CAST(?3 AS INTEGER)`;
 
 const COUNT_RENDERS = `SELECT COUNT(*) AS total FROM renders
-WHERE run_key = (SELECT key FROM runs WHERE id = ?1)`;
+WHERE batch_key = (SELECT key FROM render_batches WHERE id = ?1)`;
 
-// A row with a hash the images table lacks, or a finished run, matches nothing, so the
+// A row with a hash the images table lacks, or a finished batch, matches nothing, so the
 // statement returns too few rows, which is how `recordRenders` knows.
 const recordSql = (values: string) =>
   `WITH v(story, image_hash, failure, play_error) AS (VALUES ${values})
-INSERT INTO renders(run_key, story, image_key, failure, play_error)
+INSERT INTO renders(batch_key, story, image_key, failure, play_error)
 SELECT r.key, v.story, i.key, v.failure, v.play_error
-FROM runs r CROSS JOIN v LEFT JOIN images i ON i.hash = v.image_hash
+FROM render_batches r CROSS JOIN v LEFT JOIN images i ON i.hash = v.image_hash
 WHERE r.id = ?1 AND r.finished_at IS NULL AND (v.image_hash IS NULL OR i.key IS NOT NULL)
-ON CONFLICT(run_key, story) DO UPDATE SET
+ON CONFLICT(batch_key, story) DO UPDATE SET
   image_key = excluded.image_key, failure = excluded.failure,
   play_error = excluded.play_error
 RETURNING 1 AS written`;
 
 /**
- * What a run recorded for one story: the stored image's hash, or why it failed.
+ * What a batch recorded for one story: the stored image's hash, or why it failed.
  * `playError` says why its play function failed, on a story that may still have rendered.
  */
 export type RecordedRender = {
@@ -224,23 +224,23 @@ export type RecordedRender = {
 
 /**
  * - `recording`: not finished. It is still being written, or its writer crashed, so it
- *   may lack renders. After a crash, start a new run.
+ *   may lack renders. After a crash, start a new batch.
  * - `complete`: finished, and every story rendered.
  * - `failed`: finished, and at least one story failed to render.
  */
-export type RunStatus = "recording" | "complete" | "failed";
+export type BatchStatus = "recording" | "complete" | "failed";
 
-/** The `--story` patterns that limited a run, and those that matched nothing. */
+/** The `--story` patterns that limited a batch, and those that matched nothing. */
 export interface StoryFilter {
   readonly patterns: readonly string[];
   readonly unmatched: readonly string[];
 }
 
-export interface Run {
+export interface RenderBatch {
   readonly id: string;
   readonly gitSha: string;
   readonly environment: string;
-  readonly status: RunStatus;
+  readonly status: BatchStatus;
   readonly startedAt: number;
   /** Null until finished, as is `failedCount`. */
   readonly finishedAt: number | null;
@@ -252,10 +252,10 @@ export interface Run {
   /** Null if every story was asked for. */
   readonly storyFilter: StoryFilter | null;
   /**
-   * The run that really rendered these images, or null if this one did. An ID only: it says where
-   * the pixels came from, and `gitSha` still says what the run was recorded against.
+   * The batch that really rendered these images, or null if this one did. An ID only: it says where
+   * the pixels came from, and `gitSha` still says what the batch was recorded against.
    */
-  readonly reusedFromRun: string | null;
+  readonly reusedFromBatch: string | null;
   /** Image pixels per CSS pixel, which the environment's ID hides inside its hash. */
   readonly scale: number;
 }
@@ -277,7 +277,7 @@ export const isDecidable = (state: RenderState): boolean => state === "changed" 
 export interface ComparedRender {
   readonly story: string;
   readonly state: RenderState;
-  /** The run's image. Null if `removed` or `failed`. */
+  /** The batch's image. Null if `removed` or `failed`. */
   readonly imageHash: string | null;
   /** The baseline's image. Null if `added`, and if `failed` with no golden for this name. */
   readonly goldenHash: string | null;
@@ -290,13 +290,13 @@ export interface ComparedRender {
 }
 
 export interface Comparison {
-  readonly run: Run;
+  readonly batch: RenderBatch;
   /**
-   * In name order, the run's differences from the baseline and anything with a play
+   * In name order, the batch's differences from the baseline and anything with a play
    * error, then the removed renders. Other unchanged ones only if asked for.
    */
   readonly renders: readonly ComparedRender[];
-  /** How many of the run's renders are `unchanged`, whether listed or not. */
+  /** How many of the batch's renders are `unchanged`, whether listed or not. */
   readonly unchangedCount: number;
 }
 
@@ -313,8 +313,8 @@ export interface DecisionRequest {
   readonly renders: readonly { readonly story: string; readonly imageHash: string }[];
 }
 
-/** A run as another store holds it, which keeps its identity and its times here. */
-export type ReceivedRun = Omit<Run, "status" | "finishedAt" | "failedCount">;
+/** A batch as another store holds it, which keeps its identity and its times here. */
+export type ReceivedBatch = Omit<RenderBatch, "status" | "finishedAt" | "failedCount">;
 
 /** A decision as another store holds it, which keeps its time here. */
 export interface ReceivedDecision extends Decision {
@@ -322,35 +322,35 @@ export interface ReceivedDecision extends Decision {
   readonly imageHash: string;
 }
 
-/** What a run holds, as a page of a read by name. */
-export interface RunPage {
-  readonly run: Run;
+/** What a batch holds, as a page of a read by name. */
+export interface BatchPage {
+  readonly batch: RenderBatch;
   readonly renders: readonly (RecordedRender & { readonly decision: Decision | null })[];
   /** Where the next page starts, or null if this is the last. */
   readonly next: string | null;
 }
 
 export type BatchErrorCode =
-  | "unknown-run"
-  /** The run takes no more renders, since it was finished. */
-  | "run-finished"
-  /** The run is still `recording`, so it can't be compared or accepted. */
-  | "run-not-finished"
-  /** The run is `failed`, so it can't become goldens. */
-  | "run-has-failures"
-  /** The run was recorded on a dirty tree, so it can't become goldens. */
-  | "run-dirty"
-  /** Finishing was asked for with a different count than the run holds. */
+  | "unknown-batch"
+  /** The batch takes no more renders, since it was finished. */
+  | "batch-finished"
+  /** The batch is still `recording`, so it can't be compared or accepted. */
+  | "batch-not-finished"
+  /** The batch is `failed`, so it can't become goldens. */
+  | "batch-has-failures"
+  /** The batch was recorded on a dirty tree, so it can't become goldens. */
+  | "batch-dirty"
+  /** Finishing was asked for with a different count than the batch holds. */
   | "wrong-render-count"
   /** Accepting was asked for with a different count of removed renders than there are. */
   | "wrong-removed-count"
   /** A render named an image that isn't stored. */
   | "unknown-image"
-  /** A run with this ID is already here, and it isn't this one. */
-  | "run-conflict"
-  /** The baseline SHA has no goldens in the run's environment. */
+  /** A batch with this ID is already here, and it isn't this one. */
+  | "batch-conflict"
+  /** The baseline SHA has no goldens in the batch's environment. */
   | "no-goldens"
-  | "no-baseline-run";
+  | "no-baseline-batch";
 
 /** The request can't apply to the data as it stands. */
 export class BatchError extends Error {
@@ -370,8 +370,8 @@ export interface RenderBatchesOptions {
 }
 
 /**
- * Runs, comparisons, decisions, and goldens, over `Sql` alone. Every statement is safe
- * to resend, and nothing relies on a batch being atomic. See `docs/specs/renders.md`.
+ * Render batches, comparisons, decisions, and goldens, over `Sql` alone. Every statement is safe
+ * to resend, and nothing relies on a set of statements being atomic. See `docs/specs/renders.md`.
  */
 export class RenderBatches {
   readonly #sql: Sql;
@@ -382,57 +382,57 @@ export class RenderBatches {
     this.#now = now;
   }
 
-  /** Starts a run, which stays `recording` until `finishRun`. */
-  async beginRun(options: {
+  /** Starts a batch, which stays `recording` until `finishBatch`. */
+  async beginBatch(options: {
     gitSha: string;
     environment: string;
     scale: number;
     dirty: boolean;
     baselineSha: string | null;
     storyFilter?: StoryFilter | null;
-    reusedFromRun?: string | null;
-  }): Promise<Run> {
-    const run: ReceivedRun = { storyFilter: null, reusedFromRun: null, ...options, id: crypto.randomUUID(), startedAt: this.#now() };
-    await this.#sql.run(insertRunStatement(run));
-    return { ...run, status: "recording", finishedAt: null, failedCount: null };
+    reusedFromBatch?: string | null;
+  }): Promise<RenderBatch> {
+    const batch: ReceivedBatch = { storyFilter: null, reusedFromBatch: null, ...options, id: crypto.randomUUID(), startedAt: this.#now() };
+    await this.#sql.run(insertBatchStatement(batch));
+    return { ...batch, status: "recording", finishedAt: null, failedCount: null };
   }
 
   /**
-   * Starts holding a run that began in another store, under its own ID and times. If it's
+   * Starts holding a batch that began in another store, under its own ID and times. If it's
    * already here, this says how far it got, so a resend can carry on: an unfinished one
    * takes its renders again, and a finished one needs nothing. Throws if that ID is here
-   * for different facts, since a run never changes.
+   * for different facts, since a batch never changes.
    */
-  async receiveRun(received: ReceivedRun): Promise<Run> {
-    const [, rows] = await this.#sql.batch([insertRunStatement(received), { sql: SELECT_RUN, params: [received.id], idempotent: true }]);
-    const run = toRun(rows![0]!);
+  async receiveBatch(received: ReceivedBatch): Promise<RenderBatch> {
+    const [, rows] = await this.#sql.batch([insertBatchStatement(received), { sql: SELECT_BATCH, params: [received.id], idempotent: true }]);
+    const batch = toBatch(rows![0]!);
     const { gitSha, environment, startedAt, dirty, baselineSha, scale } = received;
-    if (run.gitSha !== gitSha || run.environment !== environment || run.startedAt !== startedAt || run.dirty !== dirty || run.baselineSha !== baselineSha || run.scale !== scale) {
-      throw new BatchError("run-conflict", `Run ${received.id} is already here, and it isn't this one`);
+    if (batch.gitSha !== gitSha || batch.environment !== environment || batch.startedAt !== startedAt || batch.dirty !== dirty || batch.baselineSha !== baselineSha || batch.scale !== scale) {
+      throw new BatchError("batch-conflict", `Batch ${received.id} is already here, and it isn't this one`);
     }
-    return run;
+    return batch;
   }
 
   /**
-   * Adds renders to a `recording` run. A failure can leave any of them written, so
-   * after one, send them again: a name the run already holds takes the newer result.
+   * Adds renders to a `recording` batch. A failure can leave any of them written, so
+   * after one, send them again: a name the batch already holds takes the newer result.
    * Each image must already be stored, by `Store.putImages`.
    */
-  async recordRenders(runId: string, renders: readonly RecordedRender[]): Promise<void> {
-    const statements = recordStatements(runId, renders);
+  async recordRenders(batchId: string, renders: readonly RecordedRender[]): Promise<void> {
+    const statements = recordStatements(batchId, renders);
     for (const group of chunks(statements, STATEMENTS_PER_REQUEST)) {
       const results = await this.#sql.batch(group.map(({ statement }) => statement));
       const written = results.reduce((sum, rows) => sum + rows.length, 0);
       const sent = group.reduce((sum, { rows }) => sum + rows, 0);
-      if (written < sent) await this.#explainUnrecorded(runId, sent - written);
+      if (written < sent) await this.#explainUnrecorded(batchId, sent - written);
     }
   }
 
-  async #explainUnrecorded(runId: string, missing: number): Promise<never> {
-    const run = await this.getRun(runId);
-    if (run === null) throw new BatchError("unknown-run", `No run ${runId}`);
-    if (run.status !== "recording") {
-      throw new BatchError("run-finished", `Run ${runId} is finished and takes no more renders`);
+  async #explainUnrecorded(batchId: string, missing: number): Promise<never> {
+    const batch = await this.getBatch(batchId);
+    if (batch === null) throw new BatchError("unknown-batch", `No batch ${batchId}`);
+    if (batch.status !== "recording") {
+      throw new BatchError("batch-finished", `Batch ${batchId} is finished and takes no more renders`);
     }
     throw new BatchError(
       "unknown-image",
@@ -441,103 +441,103 @@ export class RenderBatches {
   }
 
   /**
-   * Ends a run, if it holds exactly `expectedCount` renders, failed ones included.
-   * If not it stays `recording` and this throws, so a batch that was lost shows here.
-   * A run from another store gives the time it finished there.
+   * Ends a batch, if it holds exactly `expectedCount` renders, failed ones included.
+   * If not it stays `recording` and this throws, so statements that were lost show here.
+   * A batch from another store gives the time it finished there.
    */
-  async finishRun(runId: string, expectedCount: number, finishedAt: number = this.#now()): Promise<Run> {
+  async finishBatch(batchId: string, expectedCount: number, finishedAt: number = this.#now()): Promise<RenderBatch> {
     const [row] = await this.#sql.run({
-      sql: FINISH_RUN,
-      params: [runId, finishedAt, expectedCount],
+      sql: FINISH_BATCH,
+      params: [batchId, finishedAt, expectedCount],
       idempotent: true,
     });
-    if (row !== undefined) return toRun(row);
+    if (row !== undefined) return toBatch(row);
 
-    const [runRows, countRows] = await this.#sql.batch([
-      { sql: SELECT_RUN, params: [runId], idempotent: true },
-      { sql: COUNT_RENDERS, params: [runId], idempotent: true },
+    const [batchRows, countRows] = await this.#sql.batch([
+      { sql: SELECT_BATCH, params: [batchId], idempotent: true },
+      { sql: COUNT_RENDERS, params: [batchId], idempotent: true },
     ]);
-    if (runRows?.[0] === undefined) throw new BatchError("unknown-run", `No run ${runId}`);
+    if (batchRows?.[0] === undefined) throw new BatchError("unknown-batch", `No batch ${batchId}`);
     throw new BatchError(
       "wrong-render-count",
-      `Run ${runId} holds ${String(countRows?.[0]?.total)} renders, not the ${expectedCount} expected`,
+      `Batch ${batchId} holds ${String(countRows?.[0]?.total)} renders, not the ${expectedCount} expected`,
     );
   }
 
-  async getRun(runId: string): Promise<Run | null> {
-    const [row] = await this.#sql.run({ sql: SELECT_RUN, params: [runId], idempotent: true });
-    return row === undefined ? null : toRun(row);
+  async getBatch(batchId: string): Promise<RenderBatch | null> {
+    const [row] = await this.#sql.run({ sql: SELECT_BATCH, params: [batchId], idempotent: true });
+    return row === undefined ? null : toBatch(row);
   }
 
-  /** Every run of this SHA in this environment, newest first, reruns and crashed ones included. */
-  async runsAt(gitSha: string, environment: string): Promise<Run[]> {
+  /** Every batch of this SHA in this environment, newest first, reruns and crashed ones included. */
+  async batchesAt(gitSha: string, environment: string): Promise<RenderBatch[]> {
     assertGitSha(gitSha);
     const rows = await this.#sql.run({
-      sql: `SELECT ${RUN_COLUMNS} FROM runs
+      sql: `SELECT ${BATCH_COLUMNS} FROM render_batches
 WHERE git_sha = ?1 AND environment = ?2
 ORDER BY started_at DESC, key DESC`,
       params: [gitSha, environment],
       idempotent: true,
     });
-    return rows.map(toRun);
+    return rows.map(toBatch);
   }
 
   /**
-   * Gives a finished run's renders their states, from image hashes alone, against the
-   * goldens of `baselineSha` in the run's own environment. A null baseline means there
+   * Gives a finished batch's renders their states, from image hashes alone, against the
+   * goldens of `baselineSha` in the batch's own environment. A null baseline means there
    * are none yet, so every rendered render is `added`. Lists only what a reviewer needs
    * unless told otherwise: see `Comparison`.
    */
-  async compareRun(runId: string, baselineSha: string | null, options?: CompareOptions): Promise<Comparison> {
+  async compareBatch(batchId: string, baselineSha: string | null, options?: CompareOptions): Promise<Comparison> {
     if (baselineSha !== null) assertGitSha(baselineSha);
-    return this.#compare(runId, baselineSha ?? "", AGAINST_GOLDENS, options, (found, run) =>
-      assertGoldensFound(baselineSha, found, run),
+    return this.#compare(batchId, baselineSha ?? "", AGAINST_GOLDENS, options, (found, batch) =>
+      assertGoldensFound(baselineSha, found, batch),
     );
   }
 
-  /** As `compareRun`, with the images of another finished run in this environment standing in for goldens. */
-  async compareWithRun(runId: string, baselineRunId: string, options?: CompareOptions): Promise<Comparison> {
-    return this.#compare(runId, baselineRunId, AGAINST_RUN, options, (found, run) => {
+  /** As `compareBatch`, with the images of another finished batch in this environment standing in for goldens. */
+  async compareWithBatch(batchId: string, baselineBatchId: string, options?: CompareOptions): Promise<Comparison> {
+    return this.#compare(batchId, baselineBatchId, AGAINST_BATCH, options, (found, batch) => {
       if (!found) {
-        throw new BatchError("no-baseline-run", `${baselineRunId} isn't a finished run in environment ${run.environment}`);
+        throw new BatchError("no-baseline-batch", `${baselineBatchId} isn't a finished batch in environment ${batch.environment}`);
       }
     });
   }
 
   async #compare(
-    runId: string,
+    batchId: string,
     baseline: string,
     statements: typeof AGAINST_GOLDENS,
     { includeUnchanged = false }: CompareOptions = {},
-    assertFound: (found: boolean, run: Run) => void,
+    assertFound: (found: boolean, batch: RenderBatch) => void,
   ): Promise<Comparison> {
     const comparedPage = (after: string): SqlStatement => ({
       sql: statements.comparedPage,
-      params: [runId, baseline, after, ROWS_PER_PAGE, includeUnchanged ? 1 : 0],
+      params: [batchId, baseline, after, ROWS_PER_PAGE, includeUnchanged ? 1 : 0],
       idempotent: true,
     });
     const removedPage = (after: string): SqlStatement => ({
       sql: statements.removedPage,
-      params: [runId, baseline, after, ROWS_PER_PAGE],
+      params: [batchId, baseline, after, ROWS_PER_PAGE],
       idempotent: true,
     });
 
     // One request, which is all a comparison shorter than a page needs.
-    const [runRows, baselineRows, unchangedRows, firstCompared, firstRemoved] =
+    const [batchRows, baselineRows, unchangedRows, firstCompared, firstRemoved] =
       (await this.#sql.batch([
-        { sql: SELECT_RUN, params: [runId], idempotent: true },
-        { sql: statements.baseline, params: [runId, baseline], idempotent: true },
-        { sql: statements.unchangedCount, params: [runId, baseline], idempotent: true },
+        { sql: SELECT_BATCH, params: [batchId], idempotent: true },
+        { sql: statements.baseline, params: [batchId, baseline], idempotent: true },
+        { sql: statements.unchangedCount, params: [batchId, baseline], idempotent: true },
         comparedPage(START),
         removedPage(START),
       ])) as [SqlRow[], SqlRow[], SqlRow[], SqlRow[], SqlRow[]];
 
-    const run = finishedRun(runRows, runId);
-    assertFound(baselineRows[0]?.run_key !== null, run);
+    const batch = finishedBatch(batchRows, batchId);
+    assertFound(baselineRows[0]?.batch_key !== null, batch);
     const compared = await this.#remainingPages(firstCompared, comparedPage);
     const removed = await this.#remainingPages(firstRemoved, removedPage);
     return {
-      run,
+      batch,
       renders: [...compared.map(toComparedRender), ...removed.map(toRemovedRender)],
       unchangedCount: unchangedRows[0]?.total as number,
     };
@@ -558,7 +558,7 @@ ORDER BY started_at DESC, key DESC`,
 
   /**
    * Records a person's or agent's decision on these renders, now. It holds for this
-   * name and this image hash, in any run and at any Git SHA, and for no other image.
+   * name and this image hash, in any batch and at any Git SHA, and for no other image.
    * Each name and hash keeps only its most recent decision.
    */
   async decide({ environment, decision, actor, renders }: DecisionRequest): Promise<void> {
@@ -586,64 +586,64 @@ ON CONFLICT(environment, story, image_hash) DO UPDATE SET
   }
 
   /**
-   * Makes a finished run's images the goldens of its Git SHA in its environment,
+   * Makes a finished batch's images the goldens of its Git SHA in its environment,
    * replacing any there, if each is the same as the baseline's or approved at exactly
-   * that hash, and `removedSeen` is how many renders the baseline has and the run
-   * lacks. If an image isn't accepted, returns false and changes nothing: `compareRun`
+   * that hash, and `removedSeen` is how many renders the baseline has and the batch
+   * lacks. If an image isn't accepted, returns false and changes nothing: `compareBatch`
    * shows which. Throws if the count is wrong, so goldens are never silently dropped by
-   * a filtered render or a discovery bug, and if the run was recorded on a dirty tree,
+   * a filtered render or a discovery bug, and if the batch was recorded on a dirty tree,
    * since a SHA's goldens must describe that commit. A null baseline means every image
    * needs an approval, and nothing can be removed.
    */
-  async acceptRun(runId: string, baselineSha: string | null, removedSeen: number): Promise<boolean> {
+  async acceptBatch(batchId: string, baselineSha: string | null, removedSeen: number): Promise<boolean> {
     if (baselineSha !== null) assertGitSha(baselineSha);
     const baseline = baselineSha ?? "";
-    const [runRows, baselineRows, accepted] = (await this.#sql.batch([
-      { sql: SELECT_RUN, params: [runId], idempotent: true },
-      { sql: AGAINST_GOLDENS.baseline, params: [runId, baseline], idempotent: true },
-      { sql: ACCEPT_RUN, params: [runId, baseline, removedSeen], idempotent: true },
+    const [batchRows, baselineRows, accepted] = (await this.#sql.batch([
+      { sql: SELECT_BATCH, params: [batchId], idempotent: true },
+      { sql: AGAINST_GOLDENS.baseline, params: [batchId, baseline], idempotent: true },
+      { sql: ACCEPT_BATCH, params: [batchId, baseline, removedSeen], idempotent: true },
     ])) as [SqlRow[], SqlRow[], SqlRow[]];
 
-    const run = finishedRun(runRows, runId);
-    assertCanBeGoldens(run);
-    assertGoldensFound(baselineSha, baselineRows[0]?.run_key !== null, run);
+    const batch = finishedBatch(batchRows, batchId);
+    assertCanBeGoldens(batch);
+    assertGoldensFound(baselineSha, baselineRows[0]?.batch_key !== null, batch);
     if (accepted.length > 0) return true;
 
     const [removed] = await this.#sql.run({
       sql: SELECT_REMOVED_COUNT,
-      params: [runId, baseline],
+      params: [batchId, baseline],
       idempotent: true,
     });
     if (removed?.total !== removedSeen) {
       throw new BatchError(
         "wrong-removed-count",
-        `Accepting run ${runId} would remove ${String(removed?.total)} goldens, not the ${removedSeen} the reviewer saw`,
+        `Accepting batch ${batchId} would remove ${String(removed?.total)} goldens, not the ${removedSeen} the reviewer saw`,
       );
     }
     return false;
   }
 
-  /** The stories a baseline's goldens have, and this run doesn't, which accepting it would remove. */
-  async removedFrom(runId: string, baselineSha: string | null): Promise<readonly string[]> {
+  /** The stories a baseline's goldens have, and this batch doesn't, which accepting it would remove. */
+  async removedFrom(batchId: string, baselineSha: string | null): Promise<readonly string[]> {
     const removed: string[] = [];
     for (let after = ""; ; ) {
-      const rows = await this.#sql.run({ sql: AGAINST_GOLDENS.removedPage, params: [runId, baselineSha ?? "", after, ROWS_PER_PAGE], idempotent: true });
+      const rows = await this.#sql.run({ sql: AGAINST_GOLDENS.removedPage, params: [batchId, baselineSha ?? "", after, ROWS_PER_PAGE], idempotent: true });
       removed.push(...rows.map(({ story }) => story as string));
       if (rows.length < ROWS_PER_PAGE) return removed;
       after = removed.at(-1)!;
     }
   }
 
-  /** A page of all a run holds, by name, for another store to take. Unlike a comparison, it needs no baseline. */
-  async readRun(runId: string, after = "", limit = ROWS_PER_PAGE): Promise<RunPage> {
-    const [runRows, rows] = (await this.#sql.batch([
-      { sql: SELECT_RUN, params: [runId], idempotent: true },
-      { sql: READ_RUN_PAGE, params: [runId, after, limit + 1], idempotent: true },
+  /** A page of all a batch holds, by name, for another store to take. Unlike a comparison, it needs no baseline. */
+  async readBatch(batchId: string, after = "", limit = ROWS_PER_PAGE): Promise<BatchPage> {
+    const [batchRows, rows] = (await this.#sql.batch([
+      { sql: SELECT_BATCH, params: [batchId], idempotent: true },
+      { sql: READ_BATCH_PAGE, params: [batchId, after, limit + 1], idempotent: true },
     ])) as [SqlRow[], SqlRow[]];
-    const run = finishedRun(runRows, runId);
+    const batch = finishedBatch(batchRows, batchId);
     const page = rows.slice(0, limit);
     return {
-      run,
+      batch,
       renders: page.map((row) => ({
         story: row.story as string,
         ...(row.image_hash === null ? { failure: row.failure as string } : { imageHash: row.image_hash as string }),
@@ -685,16 +685,16 @@ WHERE (excluded.decided_at, excluded.decision) > (decisions.decided_at, decision
   }
 
   /**
-   * Makes a finished run the goldens of its Git SHA because the store that decides them
-   * says so, replacing any here, without the checks of `acceptRun`, which that store made.
+   * Makes a finished batch the goldens of its Git SHA because the store that decides them
+   * says so, replacing any here, without the checks of `acceptBatch`, which that store made.
    * It must still be able to be goldens: complete, and from a clean tree.
    */
-  async adoptGoldens(runId: string): Promise<void> {
-    const [run, adopted] = (await this.#sql.batch([
-      { sql: SELECT_RUN, params: [runId], idempotent: true },
-      { sql: ADOPT_GOLDENS, params: [runId], idempotent: true },
+  async adoptGoldens(batchId: string): Promise<void> {
+    const [batch, adopted] = (await this.#sql.batch([
+      { sql: SELECT_BATCH, params: [batchId], idempotent: true },
+      { sql: ADOPT_GOLDENS, params: [batchId], idempotent: true },
     ])) as [SqlRow[], SqlRow[]];
-    if (adopted.length === 0) assertCanBeGoldens(finishedRun(run, runId));
+    if (adopted.length === 0) assertCanBeGoldens(finishedBatch(batch, batchId));
   }
 
   /** Whether this SHA has a complete set of goldens in this environment. */
@@ -708,11 +708,11 @@ WHERE (excluded.decided_at, excluded.decision) > (decisions.decided_at, decision
     return rows.length > 0;
   }
 
-  /** The ID of the run whose images are this SHA's goldens in this environment, or null. */
-  async acceptedRunAt(gitSha: string, environment: string): Promise<string | null> {
+  /** The ID of the batch whose images are this SHA's goldens in this environment, or null. */
+  async acceptedBatchAt(gitSha: string, environment: string): Promise<string | null> {
     assertGitSha(gitSha);
     const [row] = await this.#sql.run({
-      sql: `SELECT runs.id AS id FROM goldens JOIN runs ON runs.key = goldens.run_key
+      sql: `SELECT render_batches.id AS id FROM goldens JOIN render_batches ON render_batches.key = goldens.batch_key
 WHERE goldens.git_sha = ?1 AND goldens.environment = ?2`,
       params: [gitSha, environment],
       idempotent: true,
@@ -751,7 +751,7 @@ interface RecordStatement {
   readonly rows: number;
 }
 
-function recordStatements(runId: string, renders: readonly RecordedRender[]): RecordStatement[] {
+function recordStatements(batchId: string, renders: readonly RecordedRender[]): RecordStatement[] {
   const names = new Set<string>();
   for (const { story, imageHash } of renders) {
     assertNamePart(story, "story");
@@ -761,7 +761,7 @@ function recordStatements(runId: string, renders: readonly RecordedRender[]): Re
   }
 
   const statements: RecordStatement[] = [];
-  let params: SqlParam[] = [runId];
+  let params: SqlParam[] = [batchId];
   let values: string[] = [];
   const flush = () => {
     if (values.length === 0) return;
@@ -769,7 +769,7 @@ function recordStatements(runId: string, renders: readonly RecordedRender[]): Re
       statement: { sql: recordSql(values.join(", ")), params, idempotent: true },
       rows: values.length,
     });
-    params = [runId];
+    params = [batchId];
     values = [];
   };
   for (const { story, imageHash, failure, playError } of renders) {
@@ -793,26 +793,26 @@ function cleanMessage(message: string): string {
   return Array.from(message.replaceAll("\0", "")).slice(0, MAX_MESSAGE_CHARACTERS).join("");
 }
 
-function finishedRun(rows: readonly SqlRow[], runId: string): Run {
+function finishedBatch(rows: readonly SqlRow[], batchId: string): RenderBatch {
   const [row] = rows;
-  if (row === undefined) throw new BatchError("unknown-run", `No run ${runId}`);
-  const run = toRun(row);
-  if (run.status === "recording") {
+  if (row === undefined) throw new BatchError("unknown-batch", `No batch ${batchId}`);
+  const batch = toBatch(row);
+  if (batch.status === "recording") {
     throw new BatchError(
-      "run-not-finished",
-      `Run ${runId} is still recording, so what it lacks can't be told from what was removed`,
+      "batch-not-finished",
+      `Batch ${batchId} is still recording, so what it lacks can't be told from what was removed`,
     );
   }
-  return run;
+  return batch;
 }
 
-function assertGoldensFound(baselineSha: string | null, found: boolean, run: Run): void {
+function assertGoldensFound(baselineSha: string | null, found: boolean, batch: RenderBatch): void {
   if (baselineSha !== null && !found) {
-    throw new BatchError("no-goldens", `${baselineSha} has no goldens in environment ${run.environment}`);
+    throw new BatchError("no-goldens", `${baselineSha} has no goldens in environment ${batch.environment}`);
   }
 }
 
-function toRun(row: SqlRow): Run {
+function toBatch(row: SqlRow): RenderBatch {
   const failedCount = row.failed_count as number | null;
   const finishedAt = row.finished_at as number | null;
   return {
@@ -826,7 +826,7 @@ function toRun(row: SqlRow): Run {
     dirty: row.dirty === 1,
     baselineSha: row.baseline_sha as string | null,
     storyFilter: row.story_filter === null ? null : (JSON.parse(row.story_filter as string) as StoryFilter),
-    reusedFromRun: row.reused_from_run as string | null,
+    reusedFromBatch: row.reused_from_batch as string | null,
     scale: row.scale as number,
   };
 }
@@ -885,55 +885,55 @@ function assertNamePart(part: string, what: string): void {
   }
 }
 
-function assertCanBeGoldens(run: Run): void {
-  if (run.status === "failed") {
-    throw new BatchError("run-has-failures", `Run ${run.id} has ${run.failedCount} failed stories, so it can't become goldens`);
+function assertCanBeGoldens(batch: RenderBatch): void {
+  if (batch.status === "failed") {
+    throw new BatchError("batch-has-failures", `Batch ${batch.id} has ${batch.failedCount} failed stories, so it can't become goldens`);
   }
-  if (run.dirty) {
-    throw new BatchError("run-dirty", `Run ${run.id} was recorded on a dirty tree, so it doesn't describe ${run.gitSha}`);
+  if (batch.dirty) {
+    throw new BatchError("batch-dirty", `Batch ${batch.id} was recorded on a dirty tree, so it doesn't describe ${batch.gitSha}`);
   }
 }
 
-function insertRunStatement({ id, gitSha, environment, startedAt, dirty, baselineSha, storyFilter, reusedFromRun, scale }: ReceivedRun): SqlStatement {
+function insertBatchStatement({ id, gitSha, environment, startedAt, dirty, baselineSha, storyFilter, reusedFromBatch, scale }: ReceivedBatch): SqlStatement {
   assertGitSha(gitSha);
   assertNamePart(environment, "environment");
-  if (!Number.isFinite(scale) || scale <= 0) throw new RangeError(`A run's scale must be a positive number, got ${scale}`);
+  if (!Number.isFinite(scale) || scale <= 0) throw new RangeError(`A batch's scale must be a positive number, got ${scale}`);
   if (baselineSha !== null) assertGitSha(baselineSha);
   return {
     // Sql binds no nulls, so an empty string stands for one.
-    sql: `INSERT INTO runs(id, git_sha, environment, started_at, dirty, baseline_sha, story_filter, reused_from_run, scale)
+    sql: `INSERT INTO render_batches(id, git_sha, environment, started_at, dirty, baseline_sha, story_filter, reused_from_batch, scale)
 VALUES (?1, ?2, ?3, CAST(?4 AS INTEGER), CAST(?5 AS INTEGER), NULLIF(?6, ''), NULLIF(?7, ''), NULLIF(?8, ''), ?9)
 ON CONFLICT(id) DO NOTHING`,
-    params: [id, gitSha, environment, startedAt, dirty ? 1 : 0, baselineSha ?? "", storyFilter === null ? "" : JSON.stringify(storyFilter), reusedFromRun ?? "", scale],
+    params: [id, gitSha, environment, startedAt, dirty ? 1 : 0, baselineSha ?? "", storyFilter === null ? "" : JSON.stringify(storyFilter), reusedFromBatch ?? "", scale],
     idempotent: true,
   };
 }
 
-/** A story's newest render across some runs, and the run it's from. */
-export interface StoryRender<RunLike> {
-  readonly run: RunLike;
+/** A story's newest render across some batches, and the batch it's from. */
+export interface StoryRender<BatchLike> {
+  readonly batch: BatchLike;
   readonly row: ComparedRender;
 }
 
 /**
- * Each story's newest render, across runs given newest first, reading only until each of `stories`
- * has one, since a comparison isn't free, and most runs at a commit are partial. With no `stories`,
- * it reads them all. A run that left a story out reads as having removed it, which says nothing about
- * that story, so it's taken from an older run.
+ * Each story's newest render, across batches given newest first, reading only until each of `stories`
+ * has one, since a comparison isn't free, and most batches at a commit are partial. With no `stories`,
+ * it reads them all. A batch that left a story out reads as having removed it, which says nothing about
+ * that story, so it's taken from an older batch.
  */
-export async function newestRenders<RunLike>(
-  runs: readonly RunLike[],
-  rowsOf: (run: RunLike) => Promise<readonly ComparedRender[]>,
+export async function newestRenders<BatchLike>(
+  batches: readonly BatchLike[],
+  rowsOf: (batch: BatchLike) => Promise<readonly ComparedRender[]>,
   stories?: ReadonlySet<string>,
-): Promise<Map<string, StoryRender<RunLike>>> {
-  const renders = new Map<string, StoryRender<RunLike>>();
+): Promise<Map<string, StoryRender<BatchLike>>> {
+  const renders = new Map<string, StoryRender<BatchLike>>();
   const wanted = stories?.size ?? Number.POSITIVE_INFINITY;
   let found = 0;
-  for (const run of runs) {
+  for (const batch of batches) {
     if (found >= wanted) break;
-    for (const row of await rowsOf(run)) {
+    for (const row of await rowsOf(batch)) {
       if (row.state === "removed" || renders.has(row.story) || (stories !== undefined && !stories.has(row.story))) continue;
-      renders.set(row.story, { run, row });
+      renders.set(row.story, { batch, row });
       found += 1;
     }
   }

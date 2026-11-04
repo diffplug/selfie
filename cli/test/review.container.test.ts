@@ -1,5 +1,5 @@
 // The real binary, real Chromium in the real pinned container, and the renderer's fixture
-// Storybook. vitest.config.ts decides whether these run, and says why if they don't.
+// Storybook. vitest.config.ts decides whether these batch, and says why if they don't.
 import { spawn } from "node:child_process";
 import { access, cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -54,8 +54,8 @@ describe.runIf(process.env.SELFIE_CLI_CONTAINER === "1")("in the pinned containe
     expect(first.json.environment).toMatch(/^container-linux-arm64-/);
     expect(first.stderr).toContain("render 2/2");
 
-    expect((await selfie("approve", first.json.runId, "--all")).status).toBe(0);
-    expect((await selfie("accept", first.json.runId)).status).toBe(0);
+    expect((await selfie("approve", first.json.batchId, "--all")).status).toBe(0);
+    expect((await selfie("accept", first.json.batchId)).status).toBe(0);
 
     const same = await review(...STORIES);
     expect(same.status).toBe(0);
@@ -63,7 +63,7 @@ describe.runIf(process.env.SELFIE_CLI_CONTAINER === "1")("in the pinned containe
     expect(same.json.differences).toEqual([]);
     expect(same.json.counts.unchanged).toBe(2);
     // A filtered render is never remembered, so this one rendered again.
-    expect(same.json.reusedFromRun).toBeNull();
+    expect(same.json.reusedFromBatch).toBeNull();
     expect(same.stderr).toContain("render 2/2");
 
     // An init script is project input, so it reports a change rather than starting new goldens.
@@ -84,8 +84,8 @@ describe.runIf(process.env.SELFIE_CLI_CONTAINER === "1")("in the pinned containe
     }
   }, 120_000);
 
-  test("reuses a whole run with no failures, and its images match a real render's", async () => {
-    // The fixture's other stories fail on purpose, and a run with a failure is never reused.
+  test("reuses a whole batch with no failures, and its images match a real render's", async () => {
+    // The fixture's other stories fail on purpose, and a batch with a failure is never reused.
     const build = path.join(scratch, "passing");
     await cp(STORYBOOK, build, { recursive: true });
     const index = JSON.parse(await readFile(path.join(build, "index.json"), "utf8"));
@@ -96,32 +96,32 @@ describe.runIf(process.env.SELFIE_CLI_CONTAINER === "1")("in the pinned containe
 
     const first = await reviewBuild();
     expect(first.stderr).toContain("render 2/2");
-    expect(first.json.reusedFromRun).toBeNull();
+    expect(first.json.reusedFromBatch).toBeNull();
 
     const same = await reviewBuild();
-    expect(same.json.runId).toBe(first.json.runId);
+    expect(same.json.batchId).toBe(first.json.batchId);
     expect(same.stderr).not.toContain("render 2/2");
 
     await commit(repo, "elsewhere");
     const reused = await reviewBuild();
-    expect(reused.json.reusedFromRun).toBe(first.json.runId);
+    expect(reused.json.reusedFromBatch).toBe(first.json.batchId);
     expect(reused.stderr).not.toContain("render 2/2");
 
     const filtered = await reviewBuild("--story", "basic--detail");
-    expect(filtered.json.reusedFromRun).toBe(first.json.runId);
+    expect(filtered.json.reusedFromBatch).toBe(first.json.batchId);
     expect(filtered.json.counts.stories).toBe(1);
 
-    const rendered = await selfie("record", "--storybook-dir", build);
+    const rendered = await selfie("render", "--storybook-dir", build);
     expect(rendered.stderr).toContain("render 2/2");
-    expect((await reviewBuild()).json.runId).toBe(rendered.json.runId);
+    expect((await reviewBuild()).json.batchId).toBe(rendered.json.batchId);
 
-    const compared = await selfie("review", rendered.json.runId, "--baseline", first.json.runId);
+    const compared = await selfie("review", rendered.json.batchId, "--baseline", first.json.batchId);
     expect(compared.status).toBe(0);
     expect(compared.json.differences).toEqual([]);
     // From the store, since `differences` is empty for images that match the goldens.
     const project = await openProject({ cwd: repo, env: { SELFIE_HOME: home } });
     const images = async ({ json }: { json: any }) =>
-      (await project.batches.compareRun(json.runId, null, { includeUnchanged: true })).renders.map(({ story, imageHash }) => [story, imageHash]);
+      (await project.batches.compareBatch(json.batchId, null, { includeUnchanged: true })).renders.map(({ story, imageHash }) => [story, imageHash]);
     try {
       const firstImages = await images(first);
       expect(firstImages).toHaveLength(2);

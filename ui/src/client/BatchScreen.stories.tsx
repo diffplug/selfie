@@ -1,15 +1,15 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useRef } from "react";
 import { userEvent, within } from "storybook/test";
-import type { RunView } from "../shared/api.ts";
-import type { RunState } from "./hooks.ts";
-import { RunFrame } from "./stories/RunFrame.tsx";
-import { RunScreen } from "./RunScreen.tsx";
-import { approved, BASELINE_SHA, failure, OTHER_RUN_ID, rejected, rows, runOf, stateOf, viewOf } from "./stories/fixtures.ts";
+import type { BatchView } from "../shared/api.ts";
+import type { BatchState } from "./hooks.ts";
+import { BatchFrame } from "./stories/BatchFrame.tsx";
+import { BatchScreen } from "./BatchScreen.tsx";
+import { approved, BASELINE_SHA, failure, OTHER_BATCH_ID, rejected, rows, batchOf, stateOf, viewOf } from "./stories/fixtures.ts";
 
 interface Args {
-  readonly view: RunView;
-  readonly state?: Partial<RunState>;
+  readonly view: BatchView;
+  readonly state?: Partial<BatchState>;
   readonly search?: string;
 }
 
@@ -17,13 +17,13 @@ function Screen({ view, state, search = "" }: Args) {
   const returningFrom = useRef<string | null>(null);
   const shown = stateOf(view, state);
   return (
-    <RunFrame view={view} state={shown} search={search}>
-      {() => <RunScreen state={shown} view={view} search={search} returningFrom={returningFrom} />}
-    </RunFrame>
+    <BatchFrame view={view} state={shown} search={search}>
+      {() => <BatchScreen state={shown} view={view} search={search} returningFrom={returningFrom} />}
+    </BatchFrame>
   );
 }
 
-const meta = { title: "Pages/Run", component: Screen } satisfies Meta<typeof Screen>;
+const meta = { title: "Pages/Batch", component: Screen } satisfies Meta<typeof Screen>;
 export default meta;
 type Story = StoryObj<typeof meta>;
 
@@ -35,11 +35,11 @@ const SOME_CHANGES = [
 ];
 
 export const NothingDiffers: Story = { args: { view: viewOf([], { unchanged: 541 }) } };
-export const FirstRunAllNew: Story = {
+export const FirstBatchAllNew: Story = {
   args: {
     view: viewOf(
       ["a--one", "a--two", "a--three", "b--one", "b--two"].map((story) => rows.fresh(story)),
-      { unchanged: 0, run: { baselineSha: null } },
+      { unchanged: 0, batch: { baselineSha: null } },
     ),
   },
 };
@@ -74,37 +74,37 @@ export const PlayErrors: Story = {
     ]),
   },
 };
-export const RecordedDirty: Story = { args: { view: viewOf(SOME_CHANGES, { run: { dirty: true } }) } };
-export const ReusedPixels: Story = { args: { view: viewOf(SOME_CHANGES, { run: { reusedFromRun: OTHER_RUN_ID } }) } };
+export const RecordedDirty: Story = { args: { view: viewOf(SOME_CHANGES, { batch: { dirty: true } }) } };
+export const ReusedPixels: Story = { args: { view: viewOf(SOME_CHANGES, { batch: { reusedFromBatch: OTHER_BATCH_ID } }) } };
 export const Filtered: Story = {
   args: {
     view: viewOf(SOME_CHANGES, {
-      run: { storyFilter: { patterns: ["components-*", "nope--*"], unmatched: ["nope--*"] } },
+      batch: { storyFilter: { patterns: ["components-*", "nope--*"], unmatched: ["nope--*"] } },
     }),
   },
 };
 export const ShowingOnlyWhatChanged: Story = { args: { view: viewOf(SOME_CHANGES), search: "?show=changed" } };
-export const NewerRunExists: Story = {
+export const NewerBatchExists: Story = {
   args: {
     view: viewOf(SOME_CHANGES, {
       siblings: [
-        { id: OTHER_RUN_ID, startedAt: runOf().startedAt + 3_600_000, status: "complete", dirty: false },
-        { id: runOf().id, startedAt: runOf().startedAt, status: "complete", dirty: false },
+        { id: OTHER_BATCH_ID, startedAt: batchOf().startedAt + 3_600_000, status: "complete", dirty: false },
+        { id: batchOf().id, startedAt: batchOf().startedAt, status: "complete", dirty: false },
       ],
     }),
   },
 };
 export const NoBaselineOffHistory: Story = {
-  args: { view: viewOf(SOME_CHANGES, { run: { baselineSha: null }, usableAsBaseline: false }) },
+  args: { view: viewOf(SOME_CHANGES, { batch: { baselineSha: null }, usableAsBaseline: false }) },
 };
 export const ComparedOnBranch: Story = {
-  args: { view: viewOf(SOME_CHANGES, { run: { baselineSha: null }, branchGoldens: BASELINE_SHA, usableAsBaseline: false }) },
+  args: { view: viewOf(SOME_CHANGES, { batch: { baselineSha: null }, branchGoldens: BASELINE_SHA, usableAsBaseline: false }) },
 };
 export const AcceptedHere: Story = {
   args: {
     view: viewOf(
       [rows.changed("components-button--primary", approved())],
-      { acceptedRunId: runOf().id },
+      { acceptedBatchId: batchOf().id },
     ),
   },
 };
@@ -115,8 +115,8 @@ export const ActionFailed: Story = {
   },
 };
 export const Dark: Story = { args: { view: viewOf(SOME_CHANGES) }, parameters: { colorMode: "night" } };
-export const ScaledRun: Story = {
-  args: { view: viewOf([rows.double("components-button--primary")], { run: { scale: 2 } }) },
+export const ScaledBatch: Story = {
+  args: { view: viewOf([rows.double("components-button--primary")], { batch: { scale: 2 } }) },
 };
 export const ConfirmApproveAll: Story = {
   args: {

@@ -12,7 +12,7 @@ import { REQUEST_HEADER, REQUEST_HEADER_VALUE, type BoundingBox, type DecisionTa
 export type * from "../shared/api.ts";
 export { REQUEST_HEADER_VALUE };
 
-/** Far beyond any run measured, at about 110 bytes a story. */
+/** Far beyond any batch measured, at about 110 bytes a story. */
 const MAX_DECISION_TARGETS = 100_000;
 
 /**
@@ -20,10 +20,10 @@ const MAX_DECISION_TARGETS = 100_000;
  * message stays in the server's log.
  */
 const ERROR_STATUS: Readonly<Record<string, ContentfulStatusCode>> = {
-  "bad-run-id": 400,
+  "bad-batch-id": 400,
   "bad-request": 400,
   "bad-config": 500,
-  "unknown-run": 404,
+  "unknown-batch": 404,
   "unknown-note": 404,
   "unknown-story": 404,
   "render-busy": 409,
@@ -31,10 +31,10 @@ const ERROR_STATUS: Readonly<Record<string, ContentfulStatusCode>> = {
   "no-agent-waiting": 409,
   "stale-decision": 409,
   "no-actor": 409,
-  "run-not-finished": 409,
+  "batch-not-finished": 409,
   "no-goldens": 409,
-  "run-dirty": 409,
-  "run-has-failures": 409,
+  "batch-dirty": 409,
+  "batch-has-failures": 409,
   "wrong-removed-count": 409,
 };
 
@@ -124,11 +124,11 @@ function noteText(text: unknown): string {
   return text;
 }
 
-function newNote({ story, runId, imageHash, box, text }: Record<string, unknown>): NewNote {
+function newNote({ story, batchId, imageHash, box, text }: Record<string, unknown>): NewNote {
   if (typeof story !== "string" || story === "") throw new BadRequest("story must name a story.");
-  if (typeof runId !== "string") throw new BadRequest("runId must name a run.");
+  if (typeof batchId !== "string") throw new BadRequest("batchId must name a batch.");
   if (imageHash !== null && (typeof imageHash !== "string" || !isImageHash(imageHash))) throw new BadRequest("imageHash must be an image hash, or null.");
-  return { story, runId, imageHash, box: noteBox(box), text: noteText(text) };
+  return { story, batchId, imageHash, box: noteBox(box), text: noteText(text) };
 }
 
 function noteId(value: string): number {
@@ -161,27 +161,27 @@ export function createReviewApi(source: ReviewSource): Hono {
     }
     return context.json(await source.render(stories as string[]));
   });
-  api.get("/runs/:runId", async (context) => context.json(await source.runView(context.req.param("runId"))));
-  api.get("/runs/:runId/context", async (context) => context.json(await source.runContext(context.req.param("runId"))));
-  api.get("/runs/:runId/baseline", async (context) => context.json(await source.baseline(context.req.param("runId"))));
-  api.get("/runs/:runId/unchanged", async (context) =>
-    context.json({ rows: await source.unchanged(context.req.param("runId")) }),
+  api.get("/batches/:batchId", async (context) => context.json(await source.batchView(context.req.param("batchId"))));
+  api.get("/batches/:batchId/context", async (context) => context.json(await source.batchContext(context.req.param("batchId"))));
+  api.get("/batches/:batchId/baseline", async (context) => context.json(await source.baseline(context.req.param("batchId"))));
+  api.get("/batches/:batchId/unchanged", async (context) =>
+    context.json({ rows: await source.unchanged(context.req.param("batchId")) }),
   );
 
-  api.post("/runs/:runId/decisions", async (context) => {
+  api.post("/batches/:batchId/decisions", async (context) => {
     const { decision, renders } = await jsonBody(context);
     if (decision !== "approved" && decision !== "rejected") {
       throw new BadRequest('decision must be "approved" or "rejected".');
     }
-    return context.json(await source.decide(context.req.param("runId"), decision, decisionTargets(renders)));
+    return context.json(await source.decide(context.req.param("batchId"), decision, decisionTargets(renders)));
   });
 
-  api.post("/runs/:runId/accept", async (context) => {
+  api.post("/batches/:batchId/accept", async (context) => {
     const { removedSeen } = await jsonBody(context);
     if (removedSeen !== undefined && !(Number.isSafeInteger(removedSeen) && (removedSeen as number) >= 0)) {
       throw new BadRequest("removedSeen must be a non-negative integer.");
     }
-    return context.json(await source.accept(context.req.param("runId"), removedSeen as number | undefined));
+    return context.json(await source.accept(context.req.param("batchId"), removedSeen as number | undefined));
   });
 
   api.get("/feedback", async (context) => context.json(await source.feedback()));
@@ -192,9 +192,9 @@ export function createReviewApi(source: ReviewSource): Hono {
     return context.json(await source.sendNotes(via));
   });
   api.post("/notes/:id/answers", async (context) => {
-    const { text, runId } = await jsonBody(context);
-    if (typeof runId !== "string") throw new BadRequest("runId must name a run.");
-    return context.json(await source.answerNote(noteId(context.req.param("id")), noteText(text), runId));
+    const { text, batchId } = await jsonBody(context);
+    if (typeof batchId !== "string") throw new BadRequest("batchId must name a batch.");
+    return context.json(await source.answerNote(noteId(context.req.param("id")), noteText(text), batchId));
   });
   api.post("/notes/:id/resolve", async (context) => context.json(await source.resolveNote(noteId(context.req.param("id")))));
   api.delete("/notes/:id", async (context) => context.json(await source.removeNote(noteId(context.req.param("id")))));

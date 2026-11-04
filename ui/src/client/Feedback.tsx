@@ -1,11 +1,11 @@
-// What's on its way to an agent, on every screen of a run: how many notes, and how to hand them over.
+// What's on its way to an agent, on every screen of a batch: how many notes, and how to hand them over.
 import { Banner, Button, Dialog, Stack, Text } from "@primer/react";
 import { useEffect, useRef, useState } from "react";
 import { isOpenNote } from "../shared/notes.ts";
 import type { FeedbackState } from "./hooks.ts";
 import { plural } from "./plural.ts";
-import { AppLink, runPath, storyPath } from "./router.tsx";
-import { ActionFailedBanner } from "./RunNotes.tsx";
+import { AppLink, batchPath, storyPath } from "./router.tsx";
+import { ActionFailedBanner } from "./BatchNotes.tsx";
 import { NoteLabel } from "./words.tsx";
 
 function CopyDialog({ text, onClose }: { readonly text: string; readonly onClose: () => void }) {
@@ -46,15 +46,15 @@ function CopyDialog({ text, onClose }: { readonly text: string; readonly onClose
  * When something's been recorded from this folder since. It offers to go there, and never goes by
  * itself, so an image can't change while someone is looking at it.
  */
-export function NewerRunBanner({ latestRunId, runId, story }: { readonly latestRunId: string | null | undefined; readonly runId: string; readonly story: string | null }) {
-  if (latestRunId === null || latestRunId === undefined || latestRunId === runId) return null;
+export function NewerBatchBanner({ latestBatchId, batchId, story }: { readonly latestBatchId: string | null | undefined; readonly batchId: string; readonly story: string | null }) {
+  if (latestBatchId === null || latestBatchId === undefined || latestBatchId === batchId) return null;
   return (
-    <div className="selfie-newer-run">
+    <div className="selfie-newer-batch">
       <Banner
         variant="info"
-        title="This isn't the newest run from this folder"
+        title="This isn't the newest batch from this folder"
         description={
-          <AppLink inline href={story === null ? runPath(latestRunId) : storyPath(latestRunId, story, "")}>
+          <AppLink inline href={story === null ? batchPath(latestBatchId) : storyPath(latestBatchId, story, "")}>
             Go to the newest{story === null ? "" : ", on this story"}
           </AppLink>
         }

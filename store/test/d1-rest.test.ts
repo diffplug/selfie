@@ -395,17 +395,17 @@ describe("D1RestAdapter replay against a real SQL engine", () => {
     const batches = new RenderBatches({ sql });
     const environment = "env";
     const gitSha = "a".repeat(40);
-    const run = await batches.beginRun({ gitSha, environment, scale: 1, dirty: false, baselineSha: null });
-    await batches.recordRenders(run.id, [{ story: "a", imageHash: hashOf(1) }]);
-    expect(await batches.finishRun(run.id, 1)).toMatchObject({ status: "complete" });
+    const batch = await batches.beginBatch({ gitSha, environment, scale: 1, dirty: false, baselineSha: null });
+    await batches.recordRenders(batch.id, [{ story: "a", imageHash: hashOf(1) }]);
+    expect(await batches.finishBatch(batch.id, 1)).toMatchObject({ status: "complete" });
     await batches.decide({
       environment,
       decision: "approved",
       actor: "ned",
       renders: [{ story: "a", imageHash: hashOf(1) }],
     });
-    expect(await batches.acceptRun(run.id, null, 0)).toBe(true);
-    expect(await batches.compareRun(run.id, gitSha, { includeUnchanged: true })).toMatchObject({
+    expect(await batches.acceptBatch(batch.id, null, 0)).toBe(true);
+    expect(await batches.compareBatch(batch.id, gitSha, { includeUnchanged: true })).toMatchObject({
       renders: [{ story: "a", state: "unchanged" }],
     });
     expect(await batches.hasCompleteGoldens(gitSha, environment)).toBe(true);

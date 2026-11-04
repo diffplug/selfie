@@ -2,7 +2,7 @@
 import type { ListedStory, StoriesView } from "../../shared/api.ts";
 import type { RenderingState } from "../hooks.ts";
 import { nameFromId } from "../storyTree.ts";
-import { approved, OTHER_RUN_ID, RUN_ID, SHA } from "./fixtures.ts";
+import { approved, OTHER_BATCH_ID, BATCH_ID, SHA } from "./fixtures.ts";
 
 // The renderer fixes the clock, so a relative date always reads the same there.
 const RENDERED_AT = Date.UTC(2026, 0, 15, 11);
@@ -16,7 +16,7 @@ const named = (story: string) => {
 export const rendered = (story: string, overrides: Partial<NonNullable<ListedStory["render"]>> = {}): ListedStory => ({
   story,
   ...named(story),
-  render: { runId: RUN_ID, state: "unchanged", decision: null, renderedAt: RENDERED_AT, dirty: false, fromHostedStorybook: true, ...overrides },
+  render: { batchId: BATCH_ID, state: "unchanged", decision: null, renderedAt: RENDERED_AT, dirty: false, fromHostedStorybook: true, ...overrides },
 });
 export const unrendered = (story: string): ListedStory => ({ story, ...named(story), render: null });
 
@@ -28,14 +28,14 @@ export const view = (stories: readonly ListedStory[], overrides: Partial<Stories
   storybookUrl: "./live-story/current/",
   viewport: { width: 1200, height: 900 },
   stories,
-  newestRunId: RUN_ID,
+  newestBatchId: BATCH_ID,
   canRender: true,
   setup: setupOf({}),
   ...overrides,
 });
 
 export const MIXED = view([
-  rendered("components-badge--new", { state: "added", runId: OTHER_RUN_ID, dirty: true }),
+  rendered("components-badge--new", { state: "added", batchId: OTHER_BATCH_ID, dirty: true }),
   rendered("components-button--primary", { state: "changed", decision: approved().decision }),
   rendered("components-card--default"),
   rendered("components-list--broken", { state: "failed" }),

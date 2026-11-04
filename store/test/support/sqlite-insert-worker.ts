@@ -1,4 +1,4 @@
-// Runs inserts on its own thread and its own connection, for tests of real overlap
+// Batches inserts on its own thread and its own connection, for tests of real overlap
 // between connections. Loaded by runInsertWorkers, not by vitest.
 
 import { parentPort, workerData } from "node:worker_threads";

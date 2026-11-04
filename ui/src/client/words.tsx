@@ -21,19 +21,19 @@ import { isDecidable } from "selfie-store";
 import type { BlockerReason, NoteState, PixelDiff, HunkKind, RenderRow, RenderState } from "../shared/api.ts";
 import { isLayoutOnly } from "../shared/hunks.ts";
 import { plural } from "./plural.ts";
-import { AppLink, runPath } from "./router.tsx";
+import { AppLink, batchPath } from "./router.tsx";
 
 export const shortSha = (sha: string) => sha.slice(0, 10);
 
 /** A commit, short, with the whole of it on hover. */
 export const Sha = ({ sha }: { readonly sha: string }) => <code title={sha}>{shortSha(sha)}</code>;
 
-/** A run that didn't render: where its pixels came from, which every place that offers a decision on them must say. */
+/** A batch that didn't render: where its pixels came from, which every place that offers a decision on them must say. */
 export function ReusedPixels({ from }: { readonly from: string }) {
   return (
     <>
-      These pixels were rendered earlier, by run{" "}
-      <AppLink inline href={runPath(from)}>
+      These pixels were rendered earlier, by batch{" "}
+      <AppLink inline href={batchPath(from)}>
         <code>{from}</code>
       </AppLink>
       .
@@ -163,6 +163,6 @@ export const BLOCKER_WORDS: Readonly<Record<BlockerReason, (count: number) => st
   "changed-unapproved": (count) => `${plural(count, "changed image")} with no decision`,
   "added-unapproved": (count) => `${plural(count, "added image")} with no decision`,
   rejected: (count) => `${plural(count, "image")} rejected`,
-  removed: (count) => `${plural(count, "golden")} this run doesn't have, which must be acknowledged to accept`,
+  removed: (count) => `${plural(count, "golden")} this batch doesn't have, which must be acknowledged to accept`,
   "pattern-unmatched": (count) => `${plural(count, "--story pattern")} that matched nothing`,
 };

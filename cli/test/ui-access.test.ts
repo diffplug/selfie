@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { beforeEach, describe, expect, test } from "vitest";
-import { PORT, HOST, ORIGIN, UNKNOWN_HASH, UNKNOWN_RUN, h, app, review, get, change, viewOf } from "./ui-support.ts";
+import { PORT, HOST, ORIGIN, UNKNOWN_HASH, UNKNOWN_BATCH, h, app, review, get, change, viewOf } from "./ui-support.ts";
 
 describe("who may ask", () => {
   test("refuses any Host but its own loopback address and port, on every route", async () => {
@@ -20,20 +20,20 @@ describe("who may ask", () => {
   });
 
   describe("a change from another site", () => {
-    let runId: string;
+    let batchId: string;
     let target: { story: string; imageHash: string };
     beforeEach(async () => {
       h.stories = [{ id: "a" }];
-      ({ runId } = (await review()).json);
-      const [{ story, imageHash }] = (await viewOf(runId)).rows;
+      ({ batchId } = (await review()).json);
+      const [{ story, imageHash }] = (await viewOf(batchId)).rows;
       target = { story, imageHash };
     });
     const body = () => ({ decision: "approved", renders: [target] });
-    const nothingDecided = async () => expect((await viewOf(runId)).counts.undecided).toBe(1);
+    const nothingDecided = async () => expect((await viewOf(batchId)).counts.undecided).toBe(1);
 
     test("is refused for a foreign Origin, even with the header and the type", async () => {
       for (const origin of ["https://evil.example", "null", `http://localhost:${PORT}`, "http://127.0.0.1:1"]) {
-        const response = await change(`/api/runs/${runId}/decisions`, body(), { origin });
+        const response = await change(`/api/batches/${batchId}/decisions`, body(), { origin });
         expect(response.status, origin).toBe(403);
       }
       await nothingDecided();
@@ -41,7 +41,7 @@ describe("who may ask", () => {
 
     test("is refused as a form could send it", async () => {
       for (const contentType of ["application/x-www-form-urlencoded", "multipart/form-data", "text/plain"]) {
-        const response = await app.request(`/api/runs/${runId}/decisions`, {
+        const response = await app.request(`/api/batches/${batchId}/decisions`, {
           method: "POST",
           body: JSON.stringify(body()),
           headers: { host: HOST, "content-type": contentType },
@@ -52,21 +52,21 @@ describe("who may ask", () => {
     });
 
     test("is refused without the custom header, or with the wrong type, whatever the Origin", async () => {
-      const noHeader = await app.request(`/api/runs/${runId}/decisions`, {
+      const noHeader = await app.request(`/api/batches/${batchId}/decisions`, {
         method: "POST",
         body: JSON.stringify(body()),
         headers: { host: HOST, origin: ORIGIN, "content-type": "application/json" },
       });
       expect(noHeader.status).toBe(403);
-      const wrongType = await change(`/api/runs/${runId}/decisions`, body(), { "content-type": "text/plain" });
+      const wrongType = await change(`/api/batches/${batchId}/decisions`, body(), { "content-type": "text/plain" });
       expect(wrongType.status).toBe(403);
-      const accepting = await app.request(`/api/runs/${runId}/accept`, { method: "POST", body: "{}", headers: { host: HOST } });
+      const accepting = await app.request(`/api/batches/${batchId}/accept`, { method: "POST", body: "{}", headers: { host: HOST } });
       expect(accepting.status).toBe(403);
       await nothingDecided();
     });
 
     test("gets no CORS answer to a preflight", async () => {
-      const response = await app.request(`/api/runs/${runId}/decisions`, {
+      const response = await app.request(`/api/batches/${batchId}/decisions`, {
         method: "OPTIONS",
         headers: {
           host: HOST,
@@ -95,8 +95,8 @@ describe("who may ask", () => {
     });
 
     test("succeeds from the page itself, by either name", async () => {
-      expect((await change(`/api/runs/${runId}/decisions`, body())).status).toBe(200);
-      const fromLocalhost = await change(`/api/runs/${runId}/decisions`, body(), {
+      expect((await change(`/api/batches/${batchId}/decisions`, body())).status).toBe(200);
+      const fromLocalhost = await change(`/api/batches/${batchId}/decisions`, body(), {
         host: `localhost:${PORT}`,
         origin: `http://localhost:${PORT}`,
       });
@@ -107,7 +107,7 @@ describe("who may ask", () => {
 
 describe("pages", () => {
   test("any page is the client's one document, and an unknown API route isn't", async () => {
-    for (const url of ["/", `/runs/${UNKNOWN_RUN}`, `/runs/${UNKNOWN_RUN}/accept`, `/runs/${UNKNOWN_RUN}/stories/a%20story%2Fone`]) {
+    for (const url of ["/", `/batches/${UNKNOWN_BATCH}`, `/batches/${UNKNOWN_BATCH}/accept`, `/batches/${UNKNOWN_BATCH}/stories/a%20story%2Fone`]) {
       const response = await get(url);
       expect(await response.text(), url).toContain("the client");
       expect(response.headers.get("cache-control")).toBe("no-store");

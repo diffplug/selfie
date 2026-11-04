@@ -21,7 +21,7 @@ export const CREATE_NOTES_TABLES: readonly string[] = [
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   session TEXT NOT NULL,
   story TEXT NOT NULL,
-  run_id TEXT NOT NULL,
+  batch_id TEXT NOT NULL,
   image_hash TEXT,
   box TEXT,
   resolved_at INTEGER
@@ -33,7 +33,7 @@ export const CREATE_NOTES_TABLES: readonly string[] = [
   sender TEXT NOT NULL,
   author TEXT NOT NULL,
   text TEXT NOT NULL,
-  run_id TEXT,
+  batch_id TEXT,
   at INTEGER NOT NULL,
   sent_at INTEGER,
   delivered_at INTEGER
@@ -41,7 +41,7 @@ export const CREATE_NOTES_TABLES: readonly string[] = [
   "CREATE INDEX IF NOT EXISTS note_messages_by_note ON note_messages(note_id, id)",
   `CREATE TABLE IF NOT EXISTS note_sessions (
   session TEXT PRIMARY KEY,
-  latest_run TEXT NOT NULL
+  latest_batch TEXT NOT NULL
 ) WITHOUT ROWID`,
   `CREATE TABLE IF NOT EXISTS note_waiters (
   session TEXT PRIMARY KEY,
@@ -66,13 +66,13 @@ export interface Notes {
   /** Sends every draft. */
   send(): Promise<void>;
   /** A person's answer, which is a draft until it's sent, and which reopens a resolved note. */
-  answer(id: number, text: string, author: string, runId: string | null): Promise<void>;
+  answer(id: number, text: string, author: string, batchId: string | null): Promise<void>;
   /** An agent's answer. It's already been read by whoever wrote it, so it's never new to an agent. */
-  reply(id: number, text: string, runId: string | null): Promise<void>;
+  reply(id: number, text: string, batchId: string | null): Promise<void>;
   resolve(id: number): Promise<void>;
-  /** The newest run recorded from this folder, which is the one to show. */
-  latestRun(): Promise<string | null>;
-  rememberRun(runId: string): Promise<void>;
+  /** The newest batch recorded from this folder, which is the one to show. */
+  latestBatch(): Promise<string | null>;
+  rememberBatch(batchId: string): Promise<void>;
   /** Is an agent waiting in this session now? */
   isWaiting(): Promise<boolean>;
   /** True if this token is the one waiting now, whether it just took over or already was. False if another is alive. */
@@ -97,13 +97,13 @@ function requireFound(rows: readonly SqlRow[], id: number): void {
 
 export function notesIn(sql: Sql, session: string): Notes {
   /** Adds a message, or says this session has no such note. */
-  const addMessage = async (id: number, sender: NoteMessage["sender"], author: string, text: string, runId: string | null, sentAt: number) => {
+  const addMessage = async (id: number, sender: NoteMessage["sender"], author: string, text: string, batchId: string | null, sentAt: number) => {
     const at = Date.now();
     const added = await sql.run({
       // A parameter can't be null, so nothing is an empty string or zero on its way in.
-      sql: `INSERT INTO note_messages(note_id, sender, author, text, run_id, at, sent_at, delivered_at)
+      sql: `INSERT INTO note_messages(note_id, sender, author, text, batch_id, at, sent_at, delivered_at)
 SELECT id, ?3, ?4, ?5, NULLIF(?6, ''), ?7, NULLIF(?8, 0), NULLIF(?8, 0) FROM notes WHERE session = ?1 AND id = ?2 RETURNING id`,
-      params: [session, id, sender, author, text, runId ?? "", at, sentAt],
+      params: [session, id, sender, author, text, batchId ?? "", at, sentAt],
     });
     requireFound(added, id);
   };
@@ -111,9 +111,9 @@ SELECT id, ?3, ?4, ?5, NULLIF(?6, ''), ?7, NULLIF(?8, 0), NULLIF(?8, 0) FROM not
   return {
     async list() {
       const [notes, messages] = await Promise.all([
-        sql.run({ sql: "SELECT id, story, run_id, image_hash, box, resolved_at FROM notes WHERE session = ?1 ORDER BY id", params: [session], idempotent: true }),
+        sql.run({ sql: "SELECT id, story, batch_id, image_hash, box, resolved_at FROM notes WHERE session = ?1 ORDER BY id", params: [session], idempotent: true }),
         sql.run({
-          sql: `SELECT m.id, m.note_id, m.sender, m.author, m.text, m.run_id, m.at, m.sent_at FROM note_messages m
+          sql: `SELECT m.id, m.note_id, m.sender, m.author, m.text, m.batch_id, m.at, m.sent_at FROM note_messages m
 JOIN notes n ON n.id = m.note_id WHERE n.session = ?1 ORDER BY m.id`,
           params: [session],
           idempotent: true,
@@ -130,17 +130,17 @@ JOIN notes n ON n.id = m.note_id WHERE n.session = ?1 ORDER BY m.id`,
         return said === undefined ? [] : [toNote(row, said)];
       });
     },
-    async add({ story, runId, imageHash, box, text }, author) {
+    async add({ story, batchId, imageHash, box, text }, author) {
       const at = Date.now();
       await sql.batch([
         {
           // A parameter can't be null, so nothing is an empty string on its way in.
-          sql: "INSERT INTO notes(session, story, run_id, image_hash, box) VALUES (?1, ?2, ?3, NULLIF(?4, ''), NULLIF(?5, ''))",
-          params: [session, story, runId, imageHash ?? "", box === null ? "" : JSON.stringify(box)],
+          sql: "INSERT INTO notes(session, story, batch_id, image_hash, box) VALUES (?1, ?2, ?3, NULLIF(?4, ''), NULLIF(?5, ''))",
+          params: [session, story, batchId, imageHash ?? "", box === null ? "" : JSON.stringify(box)],
         },
         {
-          sql: "INSERT INTO note_messages(note_id, sender, author, text, run_id, at) VALUES (last_insert_rowid(), 'person', ?1, ?2, ?3, ?4)",
-          params: [author, text, runId, at],
+          sql: "INSERT INTO note_messages(note_id, sender, author, text, batch_id, at) VALUES (last_insert_rowid(), 'person', ?1, ?2, ?3, ?4)",
+          params: [author, text, batchId, at],
         },
       ]);
     },
@@ -165,24 +165,24 @@ JOIN notes n ON n.id = m.note_id WHERE n.session = ?1 ORDER BY m.id`,
         params: [session, Date.now()],
       });
     },
-    async answer(id, text, author, runId) {
-      await addMessage(id, "person", author, text, runId, 0);
+    async answer(id, text, author, batchId) {
+      await addMessage(id, "person", author, text, batchId, 0);
       await sql.run({ sql: "UPDATE notes SET resolved_at = NULL WHERE session = ?1 AND id = ?2", params: [session, id] });
     },
-    reply: (id, text, runId) => addMessage(id, "agent", "agent", text, runId, Date.now()),
+    reply: (id, text, batchId) => addMessage(id, "agent", "agent", text, batchId, Date.now()),
     async resolve(id) {
       const resolved = await sql.run({ sql: "UPDATE notes SET resolved_at = ?3 WHERE session = ?1 AND id = ?2 RETURNING id", params: [session, id, Date.now()] });
       requireFound(resolved, id);
     },
-    async latestRun() {
-      const [row] = await sql.run({ sql: "SELECT latest_run FROM note_sessions WHERE session = ?1", params: [session], idempotent: true });
-      return (row?.latest_run as string | undefined) ?? null;
+    async latestBatch() {
+      const [row] = await sql.run({ sql: "SELECT latest_batch FROM note_sessions WHERE session = ?1", params: [session], idempotent: true });
+      return (row?.latest_batch as string | undefined) ?? null;
     },
-    async rememberRun(runId) {
+    async rememberBatch(batchId) {
       await sql.run({
-        sql: `INSERT INTO note_sessions(session, latest_run) VALUES (?1, ?2)
-ON CONFLICT(session) DO UPDATE SET latest_run = excluded.latest_run`,
-        params: [session, runId],
+        sql: `INSERT INTO note_sessions(session, latest_batch) VALUES (?1, ?2)
+ON CONFLICT(session) DO UPDATE SET latest_batch = excluded.latest_batch`,
+        params: [session, batchId],
         idempotent: true,
       });
     },
@@ -229,7 +229,7 @@ const toMessage = (row: SqlRow): NoteMessage => ({
   sender: row.sender as NoteMessage["sender"],
   author: row.author as string,
   text: row.text as string,
-  runId: row.run_id as string | null,
+  batchId: row.batch_id as string | null,
   at: row.at as number,
   sent: row.sent_at !== null,
 });
@@ -237,7 +237,7 @@ const toMessage = (row: SqlRow): NoteMessage => ({
 const toNote = (row: SqlRow, messages: readonly NoteMessage[]): Note => ({
   id: row.id as number,
   story: row.story as string,
-  runId: row.run_id as string,
+  batchId: row.batch_id as string,
   imageHash: row.image_hash as string | null,
   box: row.box === null ? null : (JSON.parse(row.box as string) as BoundingBox),
   state: stateOf(messages, row.resolved_at !== null),
@@ -254,7 +254,7 @@ export const sentNotes = (notes: readonly Note[]): readonly Note[] =>
 
 /** The hunk to paste into any coding agent. Never names a file, since it crosses the review server. */
 export function textForAgent(notes: readonly Note[], folder: string): string {
-  const header = `Feedback on the Storybook stories in the folder \`${folder}\`, as ${notes.length === 1 ? "1 note" : `${notes.length} notes`}. Run \`selfie notes\` there for the details of each, with a picture of what it's about. When you've acted on them, run \`selfie record\`, then \`selfie reply <note> "what you did"\` for each.`;
+  const header = `Feedback on the Storybook stories in the folder \`${folder}\`, as ${notes.length === 1 ? "1 note" : `${notes.length} notes`}. Run \`selfie notes\` there for the details of each, with a picture of what it's about. When you've acted on them, run \`selfie render\`, then \`selfie reply <note> "what you did"\` for each.`;
   const bodies = notes.map(({ id, story, box, messages }) => {
     const said = messages.map(({ sender, text }) => (messages.length === 1 ? text : `${sender === "agent" ? "Agent" : "Person"}: ${text}`)).join("\n\n");
     return `Note ${id}, on ${story}${box === null ? "" : `, in the box ${describeBox(box)}`}:\n${said}`;

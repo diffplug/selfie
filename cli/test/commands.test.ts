@@ -27,8 +27,8 @@ const projectDirectory = async () => path.join(h.home, (await readdir(h.home)).f
 /** Reviews, approves all, and accepts, so `h.stories` become the goldens of HEAD. */
 async function makeGoldens(): Promise<string> {
   const { json } = await review();
-  expect((await h.cli("approve", json.runId, "--all")).code).toBe(0);
-  const accepted = await h.cli("accept", json.runId);
+  expect((await h.cli("approve", json.batchId, "--all")).code).toBe(0);
+  const accepted = await h.cli("accept", json.batchId);
   expect(accepted.code).toBe(0);
   return json.gitSha;
 }
@@ -43,7 +43,7 @@ describe("a first review, with no baseline", () => {
     expect(code).toBe(1);
     expect(json.schemaVersion).toBe(1);
     expect(json.baseline).toEqual({ sha: null, reason: "no-goldens", message: expect.any(String) });
-    expect(json.comparedWith).toEqual({ source: "baseline", sha: null, run: null });
+    expect(json.comparedWith).toEqual({ source: "baseline", sha: null, batch: null });
     expect(json.gitSha).toBe(git(h.repo, "rev-parse", "HEAD"));
     expect(json.dirtyPaths).toEqual([]);
     expect(json.environment).toMatch(/^container-linux-arm64-/);
@@ -58,7 +58,7 @@ describe("a first review, with no baseline", () => {
       expect(difference.imageHash).toMatch(/^[0-9a-f]{64}$/);
       expect((await decodeImage(await readFile(difference.current))).width).toBe(8);
     }
-    expect(stderr).toContain("Recorded run");
+    expect(stderr).toContain("Recorded batch");
     expect(stderr).toMatch(/Timings: render \d+ ms, store \d+ ms, compare \d+ ms, diff \d+ ms, total \d+ ms/);
   });
 
@@ -71,15 +71,15 @@ describe("a first review, with no baseline", () => {
 
   test("becomes goldens with approve --all and accept, and then has nothing to report", async () => {
     const first = await review();
-    expect((await h.cli("accept", first.json.runId)).code).toBe(1);
+    expect((await h.cli("accept", first.json.batchId)).code).toBe(1);
 
-    const approved = await h.cli("approve", first.json.runId, "--all");
+    const approved = await h.cli("approve", first.json.batchId, "--all");
     expect(approved.code).toBe(0);
     expect(approved.json.actor).toBe("tester@example.com");
     expect(approved.json.decided.map(({ story }: any) => story)).toEqual(["a--one", "a--two"]);
     expect(approved.json.undecided).toEqual([]);
 
-    const accepted = await h.cli("accept", first.json.runId);
+    const accepted = await h.cli("accept", first.json.batchId);
     expect(accepted.code).toBe(0);
     expect(accepted.json).toMatchObject({
       accepted: true,
@@ -105,7 +105,7 @@ describe("a first review, with no baseline", () => {
 
   test("at the merge-base, the next step is to accept here", async () => {
     const { json } = await review();
-    expect(json.next.join(" ")).toContain(`selfie accept ${json.runId}`);
+    expect(json.next.join(" ")).toContain(`selfie accept ${json.batchId}`);
     expect(json.next.join(" ")).not.toContain("merge-base");
   });
 
@@ -116,15 +116,15 @@ describe("a first review, with no baseline", () => {
     const next = json.next.join(" ");
     expect(next).toContain("accept on main");
     expect(next).toContain("only show later reviews here what changed");
-    expect(next).toContain("selfie accept " + json.runId);
+    expect(next).toContain("selfie accept " + json.batchId);
   });
 
   test("accept says a feature branch's goldens are only for later reviews there", async () => {
     git(h.repo, "switch", "--quiet", "-c", "feature");
     await commit(h.repo, "on feature");
     const { json } = await review();
-    await h.cli("approve", json.runId, "--all");
-    const accepted = await h.cli("accept", json.runId);
+    await h.cli("approve", json.batchId, "--all");
+    const accepted = await h.cli("accept", json.batchId);
     expect(accepted.code).toBe(0);
     expect(accepted.json).toMatchObject({ accepted: true, usableAsBaseline: false });
     expect(accepted.stderr).toContain("only later reviews on this branch will compare with these goldens");
@@ -198,7 +198,7 @@ describe("comparing with a baseline", () => {
     expect(await exists(json.differences[0].golden)).toBe(true);
     expect(json.counts.removed).toBe(1);
 
-    const unacknowledged = await h.cli("accept", json.runId);
+    const unacknowledged = await h.cli("accept", json.batchId);
     expect(unacknowledged.code).toBe(1);
     expect(unacknowledged.json.accepted).toBe(false);
     expect(unacknowledged.json.removed).toEqual(["b--three"]);
@@ -209,11 +209,11 @@ describe("comparing with a baseline", () => {
     });
     expect(unacknowledged.json.refusals[0].message).toContain("--removed 1");
 
-    const wrong = await h.cli("accept", json.runId, "--removed", "2");
+    const wrong = await h.cli("accept", json.batchId, "--removed", "2");
     expect(wrong.code).toBe(1);
     expect(wrong.json.refusals[0]).toMatchObject({ reason: "wrong-removed-count", seen: 2 });
 
-    const right = await h.cli("accept", json.runId, "--removed", "1");
+    const right = await h.cli("accept", json.batchId, "--removed", "1");
     expect(right.code).toBe(0);
     expect(right.json.removed).toEqual(["b--three"]);
     expect((await review()).json.differences).toEqual([]);
@@ -222,7 +222,7 @@ describe("comparing with a baseline", () => {
   test("--removed is checked even when nothing is removed", async () => {
     await commit(h.repo, "second");
     const { json } = await review();
-    const wrong = await h.cli("accept", json.runId, "--removed", "1");
+    const wrong = await h.cli("accept", json.batchId, "--removed", "1");
     expect(wrong.code).toBe(1);
     expect(wrong.json.refusals[0]).toMatchObject({ reason: "wrong-removed-count", stories: [], seen: 1 });
   });
@@ -235,10 +235,10 @@ describe("comparing with a baseline", () => {
     expect(json.differences).toEqual([]);
 
     // Accepting it would still drop that golden, so that needs the acknowledgment.
-    const refused = await h.cli("accept", json.runId);
+    const refused = await h.cli("accept", json.batchId);
     expect(refused.code).toBe(1);
     expect(refused.json.refusals[0]).toMatchObject({ reason: "removed-unacknowledged", outsideFilter: 1 });
-    expect(refused.json.refusals[0].message).toContain("outside this run's --story filter");
+    expect(refused.json.refusals[0].message).toContain("outside this batch's --story filter");
   });
 
   test("a filter still reports a matching story that's gone", async () => {
@@ -326,12 +326,12 @@ describe("decisions", () => {
 
   test("a pattern decides only what it matches", async () => {
     const { json } = await review();
-    const approved = await h.cli("approve", json.runId, "--story", "a--*");
+    const approved = await h.cli("approve", json.batchId, "--story", "a--*");
     expect(approved.code).toBe(0);
     expect(approved.json.decided.map(({ story }: any) => story)).toEqual(["a--one", "a--two"]);
     expect(approved.json.undecided).toEqual([{ story: "b--three", state: "changed" }]);
 
-    const refused = await h.cli("accept", json.runId);
+    const refused = await h.cli("accept", json.batchId);
     expect(refused.code).toBe(1);
     expect(refused.json.refusals[0]).toMatchObject({
       reason: "unapproved",
@@ -339,13 +339,13 @@ describe("decisions", () => {
     });
     expect(refused.json.refusals[0].message).toContain("b--three");
 
-    expect((await h.cli("approve", json.runId, "--story", "b--*")).code).toBe(0);
-    expect((await h.cli("accept", json.runId)).code).toBe(0);
+    expect((await h.cli("approve", json.batchId, "--story", "b--*")).code).toBe(0);
+    expect((await h.cli("accept", json.batchId)).code).toBe(0);
   });
 
   test("a rejection blocks, and blocks accepting until it's changed", async () => {
     const { json } = await review();
-    const rejected = await h.cli("reject", json.runId, "--all", "--actor", "agent-7");
+    const rejected = await h.cli("reject", json.batchId, "--all", "--actor", "agent-7");
     expect(rejected.code).toBe(0);
     expect(rejected.json).toMatchObject({ decision: "rejected", actor: "agent-7" });
 
@@ -355,17 +355,17 @@ describe("decisions", () => {
     expect(next.json.differences[0].decision).toMatchObject({ decision: "rejected", actor: "agent-7" });
     expect(next.json.counts.undecided).toBe(0);
 
-    const refused = await h.cli("accept", next.json.runId);
+    const refused = await h.cli("accept", next.json.batchId);
     expect(refused.code).toBe(1);
     expect(refused.json.refusals[0].stories[0]).toEqual({ story: "a--one", state: "changed", decision: "rejected" });
 
-    await h.cli("approve", next.json.runId, "--all");
-    expect((await h.cli("accept", next.json.runId)).code).toBe(0);
+    await h.cli("approve", next.json.batchId, "--all");
+    expect((await h.cli("accept", next.json.batchId)).code).toBe(0);
   });
 
   test("a decision holds for that image only", async () => {
     const { json } = await review();
-    await h.cli("approve", json.runId, "--all");
+    await h.cli("approve", json.batchId, "--all");
     h.stories = [{ id: "a--one", color: GREEN }, { id: "a--two", color: BLUE }, { id: "b--three", color: GREEN }];
     const next = await review();
     expect(next.code).toBe(1);
@@ -374,7 +374,7 @@ describe("decisions", () => {
 
   test("a typo in a pattern exits 1, and decides nothing", async () => {
     const { json } = await review();
-    const typo = await h.cli("approve", json.runId, "--story", "c--*");
+    const typo = await h.cli("approve", json.batchId, "--story", "c--*");
     expect(typo.code).toBe(1);
     expect(typo.json.unmatchedPatterns).toEqual(["c--*"]);
     expect(typo.json.decided).toEqual([]);
@@ -382,18 +382,18 @@ describe("decisions", () => {
 
   test("needs --all or a pattern, and refuses both", async () => {
     const { json } = await review();
-    expect((await h.cli("approve", json.runId)).json.error.code).toBe("usage");
-    expect((await h.cli("approve", json.runId, "--all", "--story", "a*")).code).toBe(2);
+    expect((await h.cli("approve", json.batchId)).json.error.code).toBe("usage");
+    expect((await h.cli("approve", json.batchId, "--all", "--story", "a*")).code).toBe(2);
   });
 
-  test("refuses what isn't a run ID before it reaches a path, and reports an unknown one", async () => {
+  test("refuses what isn't a batch ID before it reaches a path, and reports an unknown one", async () => {
     const traversal = await h.cli("approve", "../../..", "--all");
     expect(traversal.code).toBe(2);
-    expect(traversal.json.error.code).toBe("bad-run-id");
-    expect((await h.cli("accept", "../../..")).json.error.code).toBe("bad-run-id");
+    expect(traversal.json.error.code).toBe("bad-batch-id");
+    expect((await h.cli("accept", "../../..")).json.error.code).toBe("bad-batch-id");
     const unknown = await h.cli("accept", "00000000-0000-4000-8000-000000000000");
     expect(unknown.code).toBe(2);
-    expect(unknown.json.error.code).toBe("unknown-run");
+    expect(unknown.json.error.code).toBe("unknown-batch");
   });
 });
 
@@ -409,7 +409,7 @@ describe("dirty trees", () => {
     const dirty = await review();
     expect(dirty.code).toBe(1);
     expect(dirty.json.dirtyPaths).toEqual(["file.txt"]);
-    expect((await h.cli("approve", dirty.json.runId, "--all")).code).toBe(0);
+    expect((await h.cli("approve", dirty.json.batchId, "--all")).code).toBe(0);
 
     const sha = await commit(h.repo, "edited");
     const after = await review();
@@ -421,41 +421,41 @@ describe("dirty trees", () => {
     expect(after.json.counts).toMatchObject({ undecided: 0 });
     expect(after.json.blockers).toEqual([]);
 
-    expect((await h.cli("accept", after.json.runId)).code).toBe(0);
+    expect((await h.cli("accept", after.json.batchId)).code).toBe(0);
     const final = await review();
     expect(final.json.baseline.sha).toBe(sha);
     expect(final.json.differences).toEqual([]);
   });
 
-  test("accept refuses a run recorded on a dirty tree, even once the tree is clean", async () => {
+  test("accept refuses a batch recorded on a dirty tree, even once the tree is clean", async () => {
     await writeFile(path.join(h.repo, "file.txt"), "edited\n");
     const { json } = await review();
-    await h.cli("approve", json.runId, "--all");
+    await h.cli("approve", json.batchId, "--all");
     git(h.repo, "checkout", "--", "file.txt");
 
-    const refused = await h.cli("accept", json.runId);
+    const refused = await h.cli("accept", json.batchId);
     expect(refused.code).toBe(1);
     expect(reasons(refused.json.refusals)).toEqual(["recorded-on-dirty-tree"]);
     expect(refused.json.refusals[0].message).toContain("approvals carry over");
     expect(refused.stderr).toContain("Not accepted");
   });
 
-  test("accept takes a run recorded clean, whatever the tree holds now", async () => {
+  test("accept takes a batch recorded clean, whatever the tree holds now", async () => {
     const sha = await commit(h.repo, "second");
     const { json } = await review();
-    await h.cli("approve", json.runId, "--all");
+    await h.cli("approve", json.batchId, "--all");
     await writeFile(path.join(h.repo, "untracked.txt"), "x");
-    const accepted = await h.cli("accept", json.runId);
+    const accepted = await h.cli("accept", json.batchId);
     expect(accepted.code).toBe(0);
     expect(accepted.json.gitSha).toBe(sha);
   });
 
-  test("accept takes a run recorded clean at an earlier commit, for that commit", async () => {
+  test("accept takes a batch recorded clean at an earlier commit, for that commit", async () => {
     const earlier = await commit(h.repo, "second");
     const { json } = await review();
-    await h.cli("approve", json.runId, "--all");
+    await h.cli("approve", json.batchId, "--all");
     await commit(h.repo, "third");
-    const accepted = await h.cli("accept", json.runId);
+    const accepted = await h.cli("accept", json.batchId);
     expect(accepted.code).toBe(0);
     expect(accepted.json.gitSha).toBe(earlier);
     expect((await h.cli("find-baseline")).json.sha).toBe(earlier);
@@ -479,11 +479,11 @@ describe("blockers and advisories", () => {
     expect(code).toBe(1);
     expect(json.blockers).toContainEqual({ story: "a--two", reason: "failed", detail: "render: boom" });
 
-    const approved = await h.cli("approve", json.runId, "--all");
+    const approved = await h.cli("approve", json.batchId, "--all");
     expect(approved.json.skipped).toEqual([{ story: "a--two", state: "failed" }]);
-    const refused = await h.cli("accept", json.runId);
+    const refused = await h.cli("accept", json.batchId);
     expect(refused.code).toBe(1);
-    expect(refused.json.refusals[0]).toMatchObject({ reason: "run-has-failures", stories: ["a--two"] });
+    expect(refused.json.refusals[0]).toMatchObject({ reason: "batch-has-failures", stories: ["a--two"] });
   });
 
   test("play errors alone exit 0, and stay plainly visible", async () => {
@@ -501,8 +501,8 @@ describe("blockers and advisories", () => {
     expect(first.json.playErrors[0]).toMatchObject({ story: "a--play", playError: "the play failed" });
     expect(await exists(first.json.playErrors[0].current)).toBe(true);
 
-    await h.cli("approve", first.json.runId, "--all");
-    const accepted = await h.cli("accept", first.json.runId);
+    await h.cli("approve", first.json.batchId, "--all");
+    const accepted = await h.cli("accept", first.json.batchId);
     expect(accepted.code).toBe(0);
     expect(reasons(accepted.json.advisories)).toEqual(["play-error"]);
 
@@ -527,7 +527,7 @@ describe("blockers and advisories", () => {
   });
 });
 
-describe("a run pruned from disk", () => {
+describe("a batch pruned from disk", () => {
   test("can still be decided on and accepted, since its facts are in the store", async () => {
     h.stories = [{ id: "a--one" }, { id: "a--two" }];
     await makeGoldens();
@@ -535,20 +535,20 @@ describe("a run pruned from disk", () => {
     await commit(h.repo, "second");
     const { json } = await review();
     const [difference] = json.differences;
-    const runDir = path.join(await projectDirectory(), "runs", json.runId);
-    expect(await exists(path.join(runDir, "review.json"))).toBe(true);
-    await rm(runDir, { recursive: true });
+    const batchDir = path.join(await projectDirectory(), "batches", json.batchId);
+    expect(await exists(path.join(batchDir, "review.json"))).toBe(true);
+    await rm(batchDir, { recursive: true });
 
     // The reviewer's baseline, the removal count, and the decisions all survive.
-    const refused = await h.cli("accept", json.runId);
+    const refused = await h.cli("accept", json.batchId);
     expect(refused.code).toBe(1);
     expect(refused.json.baselineSha).toBe(json.baseline.sha);
     expect(reasons(refused.json.refusals)).toEqual(["unapproved", "removed-unacknowledged"]);
 
-    const approved = await h.cli("approve", json.runId, "--all");
+    const approved = await h.cli("approve", json.batchId, "--all");
     expect(approved.code).toBe(0);
     expect(approved.json.decided[0].imageHash).toBe(difference.imageHash);
-    expect((await h.cli("accept", json.runId, "--removed", "1")).code).toBe(0);
+    expect((await h.cli("accept", json.batchId, "--removed", "1")).code).toBe(0);
     expect((await h.cli("find-baseline")).json.sha).toBe(json.gitSha);
   });
 
@@ -556,10 +556,10 @@ describe("a run pruned from disk", () => {
     h.stories = [{ id: "a--one" }];
     await writeFile(path.join(h.repo, "file.txt"), "edited\n");
     const { json } = await review();
-    await h.cli("approve", json.runId, "--all");
+    await h.cli("approve", json.batchId, "--all");
     git(h.repo, "checkout", "--", "file.txt");
-    await rm(path.join(await projectDirectory(), "runs", json.runId), { recursive: true });
-    const refused = await h.cli("accept", json.runId);
+    await rm(path.join(await projectDirectory(), "batches", json.batchId), { recursive: true });
+    const refused = await h.cli("accept", json.batchId);
     expect(reasons(refused.json.refusals)).toEqual(["recorded-on-dirty-tree"]);
   });
 
@@ -567,8 +567,8 @@ describe("a run pruned from disk", () => {
     h.stories = [{ id: "a--one" }, { id: "b--two" }];
     await makeGoldens();
     const { json } = await review("--story", "a--*");
-    await rm(path.join(await projectDirectory(), "runs", json.runId), { recursive: true });
-    const refused = await h.cli("accept", json.runId);
+    await rm(path.join(await projectDirectory(), "batches", json.batchId), { recursive: true });
+    const refused = await h.cli("accept", json.batchId);
     expect(refused.json.refusals[0]).toMatchObject({ reason: "removed-unacknowledged", outsideFilter: 1 });
   });
 });
@@ -577,7 +577,7 @@ describe("untrusted names", () => {
   const isInside = (root: string, file: string) => path.resolve(file).startsWith(`${path.resolve(root)}${path.sep}`);
 
   test.each(["../../../../escape", "..", "a/b/../../c", "x\\y", ".hidden", `${"z".repeat(400)}--long`, "%2e%2e%2fup", "Same", "same"])(
-    "story ID %j lands inside the run's directory",
+    "story ID %j lands inside the batch's directory",
     async (id) => {
       h.stories = [{ id: "plain", color: BLUE }];
       const baselineStories = [{ id, color: RED }];
@@ -587,10 +587,10 @@ describe("untrusted names", () => {
       // can't come from the renderer either, since it would be a failed story there.
       if (encodeURIComponent(id).length > 240) h.stories = [{ id: "plain", color: BLUE }, { id, failed: "too long" }];
       const { json } = await review();
-      const runsRoot = path.join(await projectDirectory(), "runs", json.runId);
+      const batchesRoot = path.join(await projectDirectory(), "batches", json.batchId);
       for (const { current, golden, diff } of json.differences) {
         for (const file of [current, golden, diff]) {
-          if (file !== null) expect(isInside(runsRoot, file)).toBe(true);
+          if (file !== null) expect(isInside(batchesRoot, file)).toBe(true);
         }
       }
       expect(await readdir(h.scratch)).toEqual(expect.arrayContaining(["home", "repo"]));
@@ -643,21 +643,21 @@ describe("local data", () => {
     expect(entries.sort()).toEqual(["d1.env", expect.stringMatching(/^local-[0-9a-f]{16}$/)]);
   });
 
-  test("keeps the newest 20 run directories, and leaves no render directory behind", async () => {
+  test("keeps the newest 20 batch directories, and leaves no render directory behind", async () => {
     h.stories = [{ id: "a--one" }];
     const first = await review();
     let last = first;
     for (let i = 0; i < 21; i++) last = await review();
     const projectDir = await projectDirectory();
-    const runs = await readdir(path.join(projectDir, "runs"));
-    expect(runs).toHaveLength(20);
-    expect(runs).toContain(last.json.runId);
-    expect(runs).not.toContain(first.json.runId);
+    const batches = await readdir(path.join(projectDir, "batches"));
+    expect(batches).toHaveLength(20);
+    expect(batches).toContain(last.json.batchId);
+    expect(batches).not.toContain(first.json.batchId);
     expect(await readdir(path.join(projectDir, "render"))).toEqual([]);
 
     // The oldest was pruned, and can still be acted on.
-    expect((await h.cli("approve", first.json.runId, "--all")).code).toBe(0);
-    expect((await h.cli("accept", first.json.runId)).code).toBe(0);
+    expect((await h.cli("approve", first.json.batchId, "--all")).code).toBe(0);
+    expect((await h.cli("accept", first.json.batchId)).code).toBe(0);
   });
 
   test("leaves no render directory behind when the render fails", async () => {

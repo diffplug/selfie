@@ -7,7 +7,7 @@ import type { RawImage } from "selfie-store";
 const SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
 const BIT_DEPTH = 8;
 const COLOR_TYPE_RGB = 2;
-// Diff images are mostly flat and are thrown away within a few runs, so speed wins.
+// Diff images are mostly flat and are thrown away within a few batches, so speed wins.
 const DEFLATE_LEVEL = 3;
 
 const deflateAsync = promisify(deflate);

@@ -1,11 +1,11 @@
 // What the top bar says this page is looking at. Screens below it know, so they tell it.
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import type { Run, RunContext, StoriesView } from "../shared/api.ts";
+import type { RenderBatch, BatchContext, StoriesView } from "../shared/api.ts";
 import { Sha } from "./words.tsx";
 
 export type PageFacts =
   | { readonly kind: "view"; readonly view: Pick<StoriesView, "head" | "branch" | "storybookUrl" | "setup"> }
-  | { readonly kind: "diff"; readonly run: Pick<Run, "gitSha" | "dirty" | "baselineSha">; readonly branchGoldens: string | null; readonly context: RunContext | null };
+  | { readonly kind: "diff"; readonly batch: Pick<RenderBatch, "gitSha" | "dirty" | "baselineSha">; readonly branchGoldens: string | null; readonly context: BatchContext | null };
 
 function ofHead(branch: string | null): ReactNode {
   return branch === null ? ", HEAD" : <>, HEAD of <code>{branch}</code></>;
@@ -28,7 +28,7 @@ function ViewFacts({ view: { head, branch, storybookUrl, setup } }: { view: Extr
   );
 }
 
-function Against({ sha, branchGoldens, context }: { sha: string; branchGoldens: string | null; context: RunContext | null }) {
+function Against({ sha, branchGoldens, context }: { sha: string; branchGoldens: string | null; context: BatchContext | null }) {
   const relation =
     branchGoldens !== null ? (
       "the nearest goldens on its branch"
@@ -49,13 +49,13 @@ function Against({ sha, branchGoldens, context }: { sha: string; branchGoldens: 
 
 export function PageFactsLine({ facts }: { facts: PageFacts }) {
   if (facts.kind === "view") return <ViewFacts view={facts.view} />;
-  const { run, branchGoldens, context } = facts;
-  const against = branchGoldens ?? run.baselineSha;
+  const { batch, branchGoldens, context } = facts;
+  const against = branchGoldens ?? batch.baselineSha;
   return (
     <>
-      {against === null ? "Built Storybook for" : "Built Storybook diff between"} <Sha sha={run.gitSha} />
-      {context?.head === run.gitSha && ofHead(context.branch)}
-      {run.dirty && ", with uncommitted changes"}
+      {against === null ? "Built Storybook for" : "Built Storybook diff between"} <Sha sha={batch.gitSha} />
+      {context?.head === batch.gitSha && ofHead(context.branch)}
+      {batch.dirty && ", with uncommitted changes"}
       {against === null ? ", with no goldens to compare with" : <Against sha={against} branchGoldens={branchGoldens} context={context} />}
     </>
   );

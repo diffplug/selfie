@@ -38,9 +38,9 @@ GitHub decides. Selfie keeps no member list of its own.
 
 | Action | Public repository | Private repository |
 |---|---|---|
-| View images, runs, and reviews | Anyone, with no login | Anyone with read access on GitHub |
+| View images, batches, and reviews | Anyone, with no login | Anyone with read access on GitHub |
 | Approve or reject changes | Write access | Write access |
-| Upload runs | Write access | Write access |
+| Upload batches | Write access | Write access |
 
 - **Must decide from the repository's `permissions` and `private` fields as GitHub reports them**, using the user's token for a signed-in user and an installation token for an anonymous viewer (rationale).
 - **Never let an anonymous viewer change anything.**
@@ -78,7 +78,7 @@ GitHub decides. Selfie keeps no member list of its own.
 
 ### Open questions
 
-A run isn't uploaded until GitHub has its commit (`docs/specs/sync.md` → What goes), so anonymous viewers see no unpushed work.
+A batch isn't uploaded until GitHub has its commit (`docs/specs/sync.md` → What goes), so anonymous viewers see no unpushed work.
 
-- **Running an approved render pass.** Decide how a maintainer approves it and how it runs, since it executes the fork's code and needs a token to upload. GitHub's docs don't say whether a fork's `pull_request` run can get an OIDC token, and `pull_request_target` runs with write access even from a public fork, so both need testing. The fork's code could forge its screenshots, so its run must stay subject to normal approval. It would also be the one uploader without write access, so it must not reach the project's images through the route that takes a client's hash on trust: it could plant a false picture under the hash of an image that hasn't been rendered yet.
+- **Running an approved render pass.** Decide how a maintainer approves it and how it runs, since it executes the fork's code and needs a token to upload. GitHub's docs don't say whether a fork's `pull_request` batch can get an OIDC token, and `pull_request_target` runs with write access even from a public fork, so both need testing. The fork's code could forge its screenshots, so its batch must stay subject to normal approval. It would also be the one uploader without write access, so it must not reach the project's images through the route that takes a client's hash on trust: it could plant a false picture under the hash of an image that hasn't been rendered yet.
 - **Reading code for `change-grouping`.** That scope sends code diffs to a Meta model, which needs more app permissions and means private code leaves GitHub. Decide how a repository owner consents.

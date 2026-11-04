@@ -113,7 +113,7 @@ export async function resolveRenderSettings(
   };
 }
 
-/** How close changed hunks group, in CSS pixels. A view multiplies it by its run's scale. */
+/** How close changed hunks group, in CSS pixels. A view multiplies it by its batch's scale. */
 export async function resolveHunkMergeDistance(repo: Repo): Promise<number> {
   const distance = (await loadConfig(repo)).hunkMergeDistance ?? 12;
   if (typeof distance !== "number" || !Number.isFinite(distance) || distance < 0) {

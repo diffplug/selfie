@@ -123,7 +123,7 @@ export function neighbors<Row extends { readonly story: string }>(
 
 /**
  * Keeps the objects of rows that haven't changed, so a screen memoizing by row re-renders only what
- * did. A run's images never change, so its hashes and its decision are all that can.
+ * did. A batch's images never change, so its hashes and its decision are all that can.
  */
 export function reuseRows(previous: readonly RenderRow[], next: readonly RenderRow[]): readonly RenderRow[] {
   const known = new Map(previous.map((row) => [row.story, row]));

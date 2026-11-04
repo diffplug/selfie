@@ -78,7 +78,7 @@ interface Failure {
 }
 
 /**
- * SQL through the D1 REST API, using only Web-standard APIs so it runs in a
+ * SQL through the D1 REST API, using only Web-standard APIs so it batches in a
  * Worker and in Node. One `execute` is one REST request, retries aside. What it
  * resends, and when, is in `docs/specs/store.md` -> "D1 REST adapter".
  */

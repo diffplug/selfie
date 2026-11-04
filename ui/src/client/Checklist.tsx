@@ -5,7 +5,7 @@ import { useEffect, type ReactNode } from "react";
 import type { ListedStory, StoriesView, StorySetup } from "../shared/api.ts";
 import type { RenderingState } from "./hooks.ts";
 import { plural } from "./plural.ts";
-import { anyStoryPath, AppLink, navigate, runPath } from "./router.tsx";
+import { anyStoryPath, AppLink, navigate, batchPath } from "./router.tsx";
 import { Sha, shortSha } from "./words.tsx";
 
 const RECHECK_MS = 2000;
@@ -140,7 +140,7 @@ function RendersItem({ view, setup, renders }: { view: StoriesView; setup: Story
   const renderFirst = async () => {
     if (await renders.render([first.story])) navigate(anyStoryPath(first.story));
   };
-  // The rest alone records a filtered run, and this records a whole one.
+  // The rest alone records a filtered batch, and this records a whole one.
   const renderAll = (
     <Button disabled={renders.rendering > 0} onClick={() => void renders.render(view.stories.map(({ story }) => story))}>
       Render all {view.stories.length.toLocaleString()}
@@ -163,7 +163,7 @@ function RendersItem({ view, setup, renders }: { view: StoriesView; setup: Story
           </Stack>
         ) : (
           <Text as="p">
-            <code>selfie record</code> renders them all.
+            <code>selfie render</code> renders them all.
           </Text>
         )}
       </Item>
@@ -181,7 +181,7 @@ function RendersItem({ view, setup, renders }: { view: StoriesView; setup: Story
           </Button>
         )}
         {renders.can && renderAll}
-        {view.newestRunId !== null && <AppLink href={runPath(view.newestRunId)}>Review the newest run</AppLink>}
+        {view.newestBatchId !== null && <AppLink href={batchPath(view.newestBatchId)}>Review the newest batch</AppLink>}
       </Stack>
     </Item>
   );

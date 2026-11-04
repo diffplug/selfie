@@ -52,7 +52,7 @@ describe("selfie flakes", () => {
 
   test("says when a story fails only sometimes", async () => {
     renders = [[{ id: "a" }], [{ id: "a", failed: "boom" }]];
-    const { code, json } = await flakes("--runs", "2");
+    const { code, json } = await flakes("--times", "2");
     expect(code).toBe(1);
     expect(json.flaky[0].kinds).toContain("failed");
   });
@@ -60,7 +60,7 @@ describe("selfie flakes", () => {
   test("says when the project's own error comes and goes, but not when it always happens", async () => {
     const error = { source: "play" as const, message: "not visible" };
     renders = [[{ id: "always", errors: [error] }, { id: "sometimes", errors: [error] }], [{ id: "always", errors: [error] }, { id: "sometimes" }]];
-    const { json } = await flakes("--runs", "2");
+    const { json } = await flakes("--times", "2");
     expect(json.flaky).toHaveLength(1);
     expect(json.flaky[0]).toMatchObject({ story: "sometimes", kinds: ["errors"], errors: [{ source: "play", message: "not visible", renders: 1 }] });
   });
@@ -68,25 +68,25 @@ describe("selfie flakes", () => {
   test("always says when a story waited on the network, since that's what makes a render unreliable", async () => {
     const error = { source: "timeout" as const, message: "network not quiet" };
     renders = [[{ id: "a", errors: [error] }]];
-    const { code, json } = await flakes("--runs", "2");
+    const { code, json } = await flakes("--times", "2");
     expect(code).toBe(1);
     expect(json.flaky[0]).toMatchObject({ story: "a", kinds: ["timeout"], distinctImages: 1, worst: null, images: null, errors: [{ renders: 2 }] });
   });
 
-  test("records no run", async () => {
+  test("records no batch", async () => {
     renders = [[{ id: "a" }]];
     await flakes();
     const { json } = await h.cli("find-baseline");
     expect(json.sha).toBeNull();
     const reviewed = await h.cli("review", "--storybook-dir", "ignored");
-    expect(reviewed.json.reusedFromRun).toBeNull();
+    expect(reviewed.json.reusedFromBatch).toBeNull();
   });
 
   test("asks for at least two renders, as a whole number", async () => {
     renders = [[{ id: "a" }]];
-    for (const runs of ["1", "many", "2.5"]) {
-      const { code, json } = await flakes("--runs", runs);
-      expect(code, runs).toBe(2);
+    for (const times of ["1", "many", "2.5"]) {
+      const { code, json } = await flakes("--times", times);
+      expect(code, times).toBe(2);
       expect(json.error.code).toBe("usage");
     }
   });
@@ -99,7 +99,7 @@ describe("selfie flakes", () => {
       asked.push([options.stories, options.concurrency]);
       seen?.(options);
     };
-    await flakes("--runs", "2", "--story", "a*", "--concurrency", "1");
+    await flakes("--times", "2", "--story", "a*", "--concurrency", "1");
     expect(asked).toEqual([[["a*"], 1], [["a*"], 1]]);
   });
 });
@@ -131,7 +131,7 @@ describe("a project's recipe and timings", () => {
 
   test("reach the render", async () => {
     await config({ environment: { recipe: { colorScheme: "dark" } }, settleMs: 250, storyTimeoutMs: 9000 });
-    expect((await h.cli("record", "--storybook-dir", "ignored")).code).toBe(0);
+    expect((await h.cli("render", "--storybook-dir", "ignored")).code).toBe(0);
     expect(seen[0]).toMatchObject({ environment: { recipe: { colorScheme: "dark", locale: "en-US" } }, settleMs: 250, storyTimeoutMs: 9000 });
   });
 
@@ -142,7 +142,7 @@ describe("a project's recipe and timings", () => {
     [{ storyTimeoutMs: "soon" }, "storyTimeoutMs"],
   ])("refuses %j as a bad config", async (settings, named) => {
     await config(settings);
-    const { code, json } = await h.cli("record", "--storybook-dir", "ignored");
+    const { code, json } = await h.cli("render", "--storybook-dir", "ignored");
     expect(code).toBe(2);
     expect(json.error).toMatchObject({ code: "bad-config", message: expect.stringContaining(named) });
   });

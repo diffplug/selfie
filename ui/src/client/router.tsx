@@ -3,17 +3,17 @@ import { Link, LinkButton, type LinkButtonProps, type LinkProps } from "@primer/
 import { useSyncExternalStore, type MouseEvent } from "react";
 
 export type Route =
-  | { readonly kind: "run"; readonly runId: string }
-  | { readonly kind: "story"; readonly runId: string; readonly story: string }
-  | { readonly kind: "accept"; readonly runId: string }
+  | { readonly kind: "batch"; readonly batchId: string }
+  | { readonly kind: "story"; readonly batchId: string; readonly story: string }
+  | { readonly kind: "accept"; readonly batchId: string }
   | { readonly kind: "stories" }
   | { readonly kind: "anyStory"; readonly story: string }
   | { readonly kind: "missing" };
 
-export const runPath = (runId: string, query = "") => `/runs/${runId}${query}`;
-export const storyPath = (runId: string, story: string, query = "") =>
-  `/runs/${runId}/stories/${encodeURIComponent(story)}${query}`;
-export const acceptPath = (runId: string) => `/runs/${runId}/accept`;
+export const batchPath = (batchId: string, query = "") => `/batches/${batchId}${query}`;
+export const storyPath = (batchId: string, story: string, query = "") =>
+  `/batches/${batchId}/stories/${encodeURIComponent(story)}${query}`;
+export const acceptPath = (batchId: string) => `/batches/${batchId}/accept`;
 export const storiesPath = (query = "") => `/${query}`;
 export const anyStoryPath = (story: string, query = "") => `/stories/${encodeURIComponent(story)}${query}`;
 
@@ -27,13 +27,13 @@ export function parseRoute(pathname: string): Route {
       return { kind: "missing" };
     }
   }
-  const [, runs, runId, section, story, ...rest] = pathname.split("/");
-  if (runs !== "runs" || runId === undefined || runId === "" || rest.length > 0) return { kind: "missing" };
-  if (section === undefined) return { kind: "run", runId };
-  if (section === "accept" && story === undefined) return { kind: "accept", runId };
+  const [, batches, batchId, section, story, ...rest] = pathname.split("/");
+  if (batches !== "batches" || batchId === undefined || batchId === "" || rest.length > 0) return { kind: "missing" };
+  if (section === undefined) return { kind: "batch", batchId };
+  if (section === "accept" && story === undefined) return { kind: "accept", batchId };
   if (section === "stories" && story !== undefined && story !== "") {
     try {
-      return { kind: "story", runId, story: decodeURIComponent(story) };
+      return { kind: "story", batchId, story: decodeURIComponent(story) };
     } catch {
       return { kind: "missing" };
     }

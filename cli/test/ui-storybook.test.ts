@@ -4,7 +4,7 @@ import path from "node:path";
 import { createLocalApp, createStorybookApp, serveLocal, serveStorybook } from "selfie-ui/local";
 import { beforeEach, describe, expect, test } from "vitest";
 import { openProject } from "../src/project.ts";
-import { localReviewSource, type StoryRecorder } from "../src/ui.ts";
+import { localReviewSource, type StoryRenderer } from "../src/ui.ts";
 import { commit, git } from "./support.ts";
 import { PORT, HOST, ORIGIN, h, project, clientDir, app, review, get, change } from "./ui-support.ts";
 
@@ -137,34 +137,34 @@ describe("the hosted Storybook", () => {
       await built();
       await writeFile(path.join(dir, "index.json"), JSON.stringify({ entries: Object.fromEntries(ids.map((id) => [id, { type: "story", id, title: "T", name: id }])) }));
     };
-    const recorded = async (...flags: string[]) => (await h.cli("record", "--storybook-dir", dir, ...flags)).json.runId as string;
+    const recorded = async (...flags: string[]) => (await h.cli("render", "--storybook-dir", dir, ...flags)).json.batchId as string;
     const rendersOf = async () => Object.fromEntries((await live()).stories.map(({ story, render }) => [story, render]));
 
     beforeEach(() => {
       h.stories = [{ id: "a" }, { id: "b" }, { id: "c" }];
     });
 
-    test("lists what no run has rendered, with nothing to say of it", async () => {
+    test("lists what no batch has rendered, with nothing to say of it", async () => {
       await withStories("a", "b");
       const view = await live();
       expect(view.stories).toEqual([
         { story: "a", title: "T", name: "a", render: null },
         { story: "b", title: "T", name: "b", render: null },
       ]);
-      expect(view.newestRunId).toBeNull();
+      expect(view.newestBatchId).toBeNull();
       expect(view.storybookUrl).toBe(hostedAt);
       expect(view.viewport).toEqual({ width: 1200, height: 900 });
     });
 
-    test("merges partial runs, each story from the newest that has it, and never reads a left-out story as removed", async () => {
+    test("merges partial batches, each story from the newest that has it, and never reads a left-out story as removed", async () => {
       await withStories("a", "b", "c");
       const whole = await recorded();
       const partial = await recorded("--story", "b");
       const renders = await rendersOf();
-      expect(renders.a).toMatchObject({ runId: whole, state: "added" });
-      expect(renders.b).toMatchObject({ runId: partial, state: "added", fromHostedStorybook: true, dirty: false });
-      expect(renders.c).toMatchObject({ runId: whole });
-      expect((await live()).newestRunId).toBe(partial);
+      expect(renders.a).toMatchObject({ batchId: whole, state: "added" });
+      expect(renders.b).toMatchObject({ batchId: partial, state: "added", fromHostedStorybook: true, dirty: false });
+      expect(renders.c).toMatchObject({ batchId: whole });
+      expect((await live()).newestBatchId).toBe(partial);
     });
 
     test("keeps the order the build lists them in, and what it calls them", async () => {
@@ -183,16 +183,16 @@ describe("the hosted Storybook", () => {
       expect(renders.d).toBeNull();
     });
 
-    test("keeps looking through older runs for a story, even with one rendered that's gone from the build", async () => {
+    test("keeps looking through older batches for a story, even with one rendered that's gone from the build", async () => {
       await withStories("a", "b", "c");
       const whole = await recorded();
       h.stories = [{ id: "gone" }, { id: "a" }];
       const newer = await recorded();
       await withStories("a", "b", "c");
       const renders = await rendersOf();
-      expect(renders.a).toMatchObject({ runId: newer });
-      expect(renders.b).toMatchObject({ runId: whole });
-      expect(renders.c).toMatchObject({ runId: whole });
+      expect(renders.a).toMatchObject({ batchId: newer });
+      expect(renders.b).toMatchObject({ batchId: whole });
+      expect(renders.c).toMatchObject({ batchId: whole });
     });
 
     test("doesn't say a render without a recorded build came from another", async () => {
@@ -222,11 +222,11 @@ describe("the hosted Storybook", () => {
       expect((await rendersOf()).a).toMatchObject({ fromHostedStorybook: true, dirty: true });
     });
 
-    test("carries a decision on the image, which can go with it into a clean run", async () => {
+    test("carries a decision on the image, which can go with it into a clean batch", async () => {
       await withStories("a");
-      const runId = await recorded();
+      const batchId = await recorded();
       expect((await rendersOf()).a).toMatchObject({ decision: null });
-      await h.cli("approve", runId, "--all");
+      await h.cli("approve", batchId, "--all");
       expect((await rendersOf()).a).toMatchObject({ decision: { decision: "approved" } });
     });
 
@@ -262,11 +262,11 @@ describe("the hosted Storybook", () => {
       expect((await localReviewSource(project).storiesView()).setup).toBeNull();
       await withStories("a");
       const record = async () => "r";
-      expect((await localReviewSource(project, { storybook: { dir, url: hostedAt, record } }).storiesView()).canRender).toBe(true);
+      expect((await localReviewSource(project, { storybook: { dir, url: hostedAt, render: record } }).storiesView()).canRender).toBe(true);
       const empty = path.join(h.scratch, "no-commits");
       git(h.scratch, "init", "--quiet", "--initial-branch=main", empty);
       const uncommitted = await openProject({ cwd: empty, env: { SELFIE_HOME: h.home } });
-      const view = await localReviewSource(uncommitted, { storybook: { dir, url: hostedAt, record } }).storiesView();
+      const view = await localReviewSource(uncommitted, { storybook: { dir, url: hostedAt, render: record } }).storiesView();
       expect(view).toMatchObject({ head: null, canRender: false });
     });
 
@@ -283,27 +283,27 @@ describe("the hosted Storybook", () => {
       await writeFile(path.join(dir, "index.json"), JSON.stringify({ entries: Object.fromEntries(ids.map((id) => [id, { type: "story", id }])) }));
     };
     const asked: (readonly string[] | undefined)[] = [];
-    const sourceRecording = (record: StoryRecorder) => localReviewSource(project, { storybook: { dir, url: hostedAt, record } });
+    const sourceRendering = (record: StoryRenderer) => localReviewSource(project, { storybook: { dir, url: hostedAt, render: record } });
 
     beforeEach(() => {
       asked.length = 0;
     });
 
-    test("records just those stories, and says which run", async () => {
+    test("records just those stories, and says which batch", async () => {
       await withStories("a", "b", "c");
-      const source = sourceRecording(async (stories) => {
+      const source = sourceRendering(async (stories) => {
         asked.push(stories);
-        return "the-run";
+        return "the-batch";
       });
-      expect(await source.render(["a", "b"])).toEqual({ runId: "the-run" });
+      expect(await source.render(["a", "b"])).toEqual({ batchId: "the-batch" });
       expect(asked).toEqual([["a", "b"]]);
     });
 
-    test("asking for every story is a whole run, which can become goldens", async () => {
+    test("asking for every story is a whole batch, which can become goldens", async () => {
       await withStories("a", "b");
-      const source = sourceRecording(async (stories) => {
+      const source = sourceRendering(async (stories) => {
         asked.push(stories);
-        return "the-run";
+        return "the-batch";
       });
       await source.render(["b", "a"]);
       expect(asked).toEqual([undefined]);
@@ -315,36 +315,36 @@ describe("the hosted Storybook", () => {
       const blocked = new Promise<void>((resolve) => {
         finish = resolve;
       });
-      const source = sourceRecording(async () => {
+      const source = sourceRendering(async () => {
         await blocked;
-        return "the-run";
+        return "the-batch";
       });
       await expect(source.render(["nope"])).rejects.toMatchObject({ code: "unknown-story" });
       const first = source.render(["a"]);
       await new Promise((resolve) => setTimeout(resolve, 5));
       await expect(source.render(["a"])).rejects.toMatchObject({ code: "render-busy" });
       finish();
-      await expect(first).resolves.toEqual({ runId: "the-run" });
-      await expect(source.render(["a"])).resolves.toEqual({ runId: "the-run" });
+      await expect(first).resolves.toEqual({ batchId: "the-batch" });
+      await expect(source.render(["a"])).resolves.toEqual({ batchId: "the-batch" });
     });
 
     test("says why it failed, and can render again after", async () => {
       await withStories("a");
       let failing = true;
-      const source = sourceRecording(async () => {
+      const source = sourceRendering(async () => {
         if (failing) throw new Error("Docker is unavailable");
-        return "the-run";
+        return "the-batch";
       });
       await expect(source.render(["a"])).rejects.toMatchObject({ code: "render-failed", message: expect.stringContaining("Docker is unavailable") });
       failing = false;
-      await expect(source.render(["a"])).resolves.toEqual({ runId: "the-run" });
+      await expect(source.render(["a"])).resolves.toEqual({ batchId: "the-batch" });
     });
 
     test("isn't offered with no build, or nothing to record with", async () => {
-      expect((await localReviewSource(project, { storybook: { dir, url: hostedAt, record: async () => "r" } }).storiesView()).canRender).toBe(false);
+      expect((await localReviewSource(project, { storybook: { dir, url: hostedAt, render: async () => "r" } }).storiesView()).canRender).toBe(false);
       await withStories("a");
       expect((await localReviewSource(project, { storybook: { dir, url: hostedAt } }).storiesView()).canRender).toBe(false);
-      expect((await sourceRecording(async () => "r").storiesView()).canRender).toBe(true);
+      expect((await sourceRendering(async () => "r").storiesView()).canRender).toBe(true);
       await expect(localReviewSource(project).render(["a"])).rejects.toMatchObject({ code: "render-failed" });
     });
 
@@ -358,40 +358,40 @@ describe("the hosted Storybook", () => {
     });
   });
 
-  describe("what a run links to", () => {
+  describe("what a batch links to", () => {
     const hosted = () => localReviewSource(project, { storybook: { dir, url: hostedAt } });
-    const reviewedBuild = async (...flags: string[]) => (await h.cli("review", "--storybook-dir", dir, ...flags)).json.runId as string;
-    const linkOf = async (runId: string) => (await hosted().runView(runId)).storybook;
+    const reviewedBuild = async (...flags: string[]) => (await h.cli("review", "--storybook-dir", dir, ...flags)).json.batchId as string;
+    const linkOf = async (batchId: string) => (await hosted().batchView(batchId)).storybook;
 
     beforeEach(() => {
       h.stories = [{ id: "a" }, { id: "b" }];
     });
 
     test("nothing, with no build, or nothing hosted", async () => {
-      const runId = (await review()).json.runId as string;
-      expect(await linkOf(runId)).toBeNull();
+      const batchId = (await review()).json.batchId as string;
+      expect(await linkOf(batchId)).toBeNull();
       await built();
-      expect((await localReviewSource(project).runView(runId)).storybook).toBeNull();
+      expect((await localReviewSource(project).batchView(batchId)).storybook).toBeNull();
     });
 
-    test("the directory, and that it may not match, for a run whose own build wasn't kept", async () => {
-      const runId = (await review()).json.runId as string;
+    test("the directory, and that it may not match, for a batch whose own build wasn't kept", async () => {
+      const batchId = (await review()).json.batchId as string;
       await built();
-      expect(await linkOf(runId)).toEqual({ url: hostedAt, exactStorybook: false });
+      expect(await linkOf(batchId)).toEqual({ url: hostedAt, exactStorybook: false });
     });
 
     test("the very build that rendered it, wherever the directory has gone since", async () => {
       await built();
-      const runId = await reviewedBuild();
-      const link = await linkOf(runId);
+      const batchId = await reviewedBuild();
+      const link = await linkOf(batchId);
       expect(link).toMatchObject({ exactStorybook: true, url: expect.stringContaining(`${hostedAt}built-storybooks/`) });
       await writeFile(path.join(dir, "index.html"), "<!doctype html><title>the next build</title>");
-      expect(await linkOf(runId)).toEqual(link);
+      expect(await linkOf(batchId)).toEqual(link);
       expect(await (await read(new URL(link!.url).pathname)).text()).toContain("the manager");
       expect(await (await read("/")).text()).toContain("the next build");
     });
 
-    test("the same for a run that reused an earlier render, a filtered one, and one where a story failed", async () => {
+    test("the same for a batch that reused an earlier render, a filtered one, and one where a story failed", async () => {
       await built();
       const first = await reviewedBuild();
       await commit(h.repo, "something that doesn't change the build");
@@ -403,17 +403,17 @@ describe("the hosted Storybook", () => {
       expect((await linkOf(await reviewedBuild()))?.exactStorybook).toBe(true);
     });
 
-    test("the goldens' own build too, if it's kept, once a later run is compared with them", async () => {
+    test("the goldens' own build too, if it's kept, once a later batch is compared with them", async () => {
       await built();
       const first = await reviewedBuild();
-      expect((await hosted().runView(first)).goldenStorybookUrl).toBeNull();
+      expect((await hosted().batchView(first)).goldenStorybookUrl).toBeNull();
       expect((await h.cli("approve", first, "--all")).code).toBe(0);
       expect((await h.cli("accept", first)).code).toBe(0);
       const goldens = (await linkOf(first))!.url;
 
       await commit(h.repo, "the next change");
       await writeFile(path.join(dir, "index.html"), "<!doctype html><title>the next build</title>");
-      const view = await hosted().runView(await reviewedBuild());
+      const view = await hosted().batchView(await reviewedBuild());
       expect(view.goldenStorybookUrl).toBe(goldens);
       expect(view.storybook?.url).not.toBe(goldens);
     });
@@ -421,9 +421,9 @@ describe("the hosted Storybook", () => {
     test("the size its environment rendered at, whatever the config says now", async () => {
       await built();
       const before = await reviewedBuild();
-      expect((await hosted().runView(before)).viewport).toEqual({ width: 1200, height: 900 });
+      expect((await hosted().batchView(before)).viewport).toEqual({ width: 1200, height: 900 });
       await writeFile(path.join(h.repo, "selfie.config.json"), JSON.stringify({ environment: { viewport: { width: 640, height: 480 } } }));
-      expect((await hosted().runView(before)).viewport).toEqual({ width: 1200, height: 900 });
+      expect((await hosted().batchView(before)).viewport).toEqual({ width: 1200, height: 900 });
     });
 
     test("not a build that changed while it rendered", async () => {

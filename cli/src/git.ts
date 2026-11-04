@@ -59,7 +59,7 @@ export async function openRepo(cwd: string): Promise<Repo> {
   if (!root || !commonDir) {
     throw new SelfieError(
       "not-a-repository",
-      `${cwd} isn't inside a Git working tree, and Selfie records every run against a Git SHA.`,
+      `${cwd} isn't inside a Git working tree, and Selfie records every batch against a Git SHA.`,
     );
   }
   return {

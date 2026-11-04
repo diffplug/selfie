@@ -24,20 +24,20 @@ export {
   type ReviewCache,
 } from "./project.ts";
 export {
-  record,
+  renderBatch,
   review,
   type Difference,
-  type RecordOptions,
-  type RecordResult,
+  type RenderBatchOptions,
+  type RenderBatchResult,
   type GivenBaseline,
   type ReviewOptions,
   type ReviewResult,
 } from "./review.ts";
 export {
   isDecidable,
-  summarizeRun,
+  summarizeBatch,
   type AdvisoryReason,
   type Attention,
   type BlockerReason,
-  type RunSummary,
+  type BatchSummary,
 } from "./summary.ts";

@@ -1,8 +1,8 @@
 // What crosses between a store's client and the sync routes. Types only, so the CLI can use them
 // without loading the server. See docs/specs/sync.md.
-import type { Decision, RecordedRender, Run, RunPage } from "selfie-store";
+import type { Decision, RecordedRender, RenderBatch, BatchPage } from "selfie-store";
 
-export type { RunPage };
+export type { BatchPage };
 
 export interface ProjectAccess {
   readonly view: boolean;
@@ -10,8 +10,8 @@ export interface ProjectAccess {
   readonly decide: boolean;
 }
 
-/** A run's facts, as a sender states them. */
-export type SentRun = Omit<Run, "id" | "status" | "finishedAt" | "failedCount">;
+/** A batch's facts, as a sender states them. */
+export type SentBatch = Omit<RenderBatch, "id" | "status" | "finishedAt" | "failedCount">;
 
 export type SentRender = RecordedRender;
 
@@ -25,8 +25,8 @@ export type GoldensOutcome = "accepted" | "already" | "conflict" | "refused";
 
 export interface GoldensAnswer {
   readonly outcome: GoldensOutcome;
-  /** The run that's now the commit's goldens, if any. */
-  readonly acceptedRunId: string | null;
+  /** The batch that's now the commit's goldens, if any. */
+  readonly acceptedBatchId: string | null;
   readonly refusal: { readonly code: string; readonly message: string } | null;
 }
 

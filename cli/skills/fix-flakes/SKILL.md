@@ -14,10 +14,10 @@ Always work from a built Storybook, and rebuild after every change. `selfie flak
 ## 1. Measure
 
 ```sh
-selfie flakes --build --runs 3
+selfie flakes --build --times 3
 ```
 
-Use `--storybook-dir <dir>` if `selfie.config.json` doesn't say how to build. It renders every story that many times, records no run, and stores nothing, so it's safe to run at any time. It exits 0 if everything held still, 1 if not, and prints one JSON document:
+Use `--storybook-dir <dir>` if `selfie.config.json` doesn't say how to build. It renders every story that many times, records no batch, and stores nothing, so it's safe to run at any time. It exits 0 if everything held still, 1 if not, and prints one JSON document:
 
 ```json
 {
@@ -68,13 +68,13 @@ If a symptom points at Selfie's renderer rather than the project, such as a requ
 Rebuild, and measure the same stories with more renders:
 
 ```sh
-selfie flakes --build --runs 8 --story 'pages-home--*'
+selfie flakes --build --times 8 --story 'pages-home--*'
 ```
 
 Then, once a group looks fixed, measure the whole Storybook:
 
 ```sh
-selfie flakes --build --runs 5
+selfie flakes --build --times 5
 ```
 
 Done means exit 0. It doesn't prove there's no flake left, only that none showed in that many renders, so say how many you ran. A flake seen in 1 of 5 renders would slip past 5 clean renders about a third of the time, so use more renders for a rare one.

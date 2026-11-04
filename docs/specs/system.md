@@ -11,14 +11,14 @@ Source of truth: `render/src/environment.ts`, `render/src/render.ts`. `docs/spec
 
 - **Must make the rendering environment configurable, and record it with every render.** An environment is what decides the pixels apart from the project's own input: the container image digest or other runner, its CPU architecture, the browser and its flags, the viewport and scale, and the fixed render recipe. Project input, such as story code, a settle time, or an init script, is not part of it (`docs/specs/render.md` → Environment).
 - **Must default to one pinned Linux arm64 container image**, the only setup measured to match across machines (rationale).
-- **Must make the environment part of a render's name**, so images from different environments are never compared, and changing the environment starts new goldens rather than reporting every story as changed. `docs/specs/renders.md` → Render names owns how, and a run records its environment.
+- **Must make the environment part of a render's name**, so images from different environments are never compared, and changing the environment starts new goldens rather than reporting every story as changed. `docs/specs/renders.md` → Render names owns how, and a batch records its environment.
 - **Must let a project freeze its own timers**, since browser options alone don't stop a blinking cursor (rationale).
 
 ## Approvals
 
 Source of truth: `store/src/core/render-batches.ts`. `docs/specs/renders.md` → Decisions owns how they are recorded.
 
-- **Must not make a user re-approve a render change at a new Git SHA in the same store.** An approval holds for a render's name and image hash, so a run after a commit, rebase, or amend finds it if the pixels are the same.
+- **Must not make a user re-approve a render change at a new Git SHA in the same store.** An approval holds for a render's name and image hash, so a batch after a commit, rebase, or amend finds it if the pixels are the same.
 
 Reserved: this is the local half of [carrying approvals through a push](#approvals-across-stores).
 
@@ -26,14 +26,14 @@ Reserved: this is the local half of [carrying approvals through a push](#approva
 
 Source of truth: `cli/src/`. `docs/specs/cli.md` owns how it works.
 
-- **Must let an agent use the loop without a UI:** `selfie review` records renders locally and outputs JSON with image paths, and `selfie approve`, `reject`, and `accept` act on the run it names. Its exit codes tell an agent whether anything blocks. The same logic is a library, for the review UI.
+- **Must let an agent use the loop without a UI:** `selfie review` records renders locally and outputs JSON with image paths, and `selfie approve`, `reject`, and `accept` act on the batch it names. Its exit codes tell an agent whether anything blocks. The same logic is a library, for the review UI.
 - **Must keep local data under `~/.config/selfie/<git-origin-slugified>/`.**
 
 ## Local review
 
 Source of truth: `ui/src/`, `cli/src/ui.ts`. `docs/specs/ui.md` owns how it works, and `docs/specs/access.md` → Local review server who may reach it.
 
-- **Must let a person review a run in a browser, on their own machine:** `selfie ui` serves a Hono app using GitHub Primer, with approve, reject, and accept.
+- **Must let a person review a batch in a browser, on their own machine:** `selfie ui` serves a Hono app using GitHub Primer, with approve, reject, and accept.
 - **Must keep what's specific to a platform behind one seam**, so [`cloud-deploy`](#build-order) can serve the same routes and screens from a Worker.
 - **Never render from the UI.** A person runs `selfie review` and looks at what it recorded.
 

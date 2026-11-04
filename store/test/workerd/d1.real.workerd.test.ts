@@ -1,8 +1,8 @@
 // The D1 REST adapter inside workerd, through the runtime's real `fetch`, against real
 // D1, and then the production combination: the whole `Store` over it and R2. Opt-in
 // through `pnpm test:d1:workerd`, since it needs credentials and spends the account's
-// shared API rate limit. A run reports the requests it sent and stops
-// at its budget. Only one run of any real-D1 suite at a time: all of them use the same database.
+// shared API rate limit. A batch reports the requests it sent and stops
+// at its budget. Only one batch of any real-D1 suite at a time: all of them use the same database.
 
 import { env } from "cloudflare:workers";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -16,7 +16,7 @@ import { emptyBucket, objectKeys } from "./bucket.ts";
 
 const { D1_ACCOUNT_ID: accountId, D1_DATABASE_ID: databaseId, D1_TOKEN: token } = env;
 
-// Well above a healthy run, and far below the shared limit of 1,200 per 5 minutes.
+// Well above a healthy batch, and far below the shared limit of 1,200 per 5 minutes.
 const REQUEST_BUDGET = 30;
 
 describe.skipIf(token === undefined)("real D1 inside workerd (opt-in: pnpm test:d1:workerd)", () => {
@@ -42,7 +42,7 @@ describe.skipIf(token === undefined)("real D1 inside workerd (opt-in: pnpm test:
       token: token!,
       budget: REQUEST_BUDGET,
     });
-    // A crashed run may have left tables behind.
+    // A crashed batch may have left tables behind.
     await harness.sweep();
   });
 

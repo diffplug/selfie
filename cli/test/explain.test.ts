@@ -169,7 +169,7 @@ describe("spacing", () => {
 });
 
 describe("what moved and spacing can't hide", () => {
-  /** The same small pages every run, since a failure here should be one anyone can reproduce. */
+  /** The same small pages every batch, since a failure here should be one anyone can reproduce. */
   function random(seed: number) {
     let state = seed;
     return (below: number) => {

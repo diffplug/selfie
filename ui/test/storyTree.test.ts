@@ -55,10 +55,10 @@ test("names a story from its ID when nothing else says", () => {
   expect(nameFromId("plain")).toEqual({ title: "", name: "Plain" });
 });
 
-describe("a run's differences", () => {
+describe("a batch's differences", () => {
   const row = (story: string, state: string) => ({ story, state, decision: null }) as never;
-  const run = { id: "r", startedAt: 1 } as never;
-  const stories = (rows: never[], storyNames: never[] = [], renames: ReadonlyMap<string, string> = new Map()) => differingStories({ run, rows, storyNames }, renames).map(({ story }) => story);
+  const batch = { id: "r", startedAt: 1 } as never;
+  const stories = (rows: never[], storyNames: never[] = [], renames: ReadonlyMap<string, string> = new Map()) => differingStories({ batch, rows, storyNames }, renames).map(({ story }) => story);
 
   test("are in the Storybook's order, then by ID where it doesn't say", () => {
     const named = [{ story: "z", title: "Z", name: "Z" }, { story: "m", title: "M", name: "M" }] as never[];

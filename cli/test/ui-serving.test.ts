@@ -7,7 +7,7 @@ import { serveLocal, type LocalServer } from "selfie-ui/local";
 import { beforeEach, describe, expect, test } from "vitest";
 import { runCli } from "../src/cli.ts";
 import { localReviewSource } from "../src/ui.ts";
-import { UNKNOWN_RUN, h, project, clientDir, review } from "./ui-support.ts";
+import { UNKNOWN_BATCH, h, project, clientDir, review } from "./ui-support.ts";
 
 describe("selfie ui", () => {
   const serve = async (command: string, ...argv: string[]) => {
@@ -84,9 +84,9 @@ describe("selfie ui", () => {
     test("opens at every story, in a browser, and says where", async () => {
       await writeBuild();
       const { stop, exit, json, stderr } = await bare("--storybook-dir", dir());
-      const { url, port, storybookUrl, runId } = json();
+      const { url, port, storybookUrl, batchId } = json();
       expect(url).toBe(`http://127.0.0.1:${port}/`);
-      expect(runId).toBeNull();
+      expect(batchId).toBeNull();
       expect(stderr()).toContain(url);
       expect(opened).toEqual([url]);
       const { stories, canRender } = (await (await fetch(`http://127.0.0.1:${port}/api/stories`)).json()) as StoriesView;
@@ -172,18 +172,18 @@ describe("selfie ui", () => {
       h.stories = [{ id: "a" }];
       await writeBuild();
       await config({ buildCommand: await buildScript() });
-      for (const command of ["record", "review"]) {
+      for (const command of ["render", "review"]) {
         expect((await h.cli(command, "--storybook-dir", dir())).code, command).not.toBe(2);
         await expect(readdir(h.repo)).resolves.not.toContain("built-here");
       }
       await rm(path.join(h.repo, "built-here"), { force: true });
-      const built = await h.cli("record", "--storybook-dir", dir(), "--build");
+      const built = await h.cli("render", "--storybook-dir", dir(), "--build");
       expect(built.code).toBe(0);
       await expect(readdir(h.repo)).resolves.toContain("built-here");
     });
 
     test("--build says so if the config has no build command", async () => {
-      const refused = await h.cli("record", "--storybook-dir", "ignored", "--build");
+      const refused = await h.cli("render", "--storybook-dir", "ignored", "--build");
       expect(refused.code).toBe(2);
       expect(refused.json.error).toMatchObject({ code: "usage", message: expect.stringContaining("buildCommand") });
     });
@@ -208,9 +208,9 @@ describe("selfie ui", () => {
 
   test("prints one document with its URL, serves on it, and stops when told", async () => {
     const { stop, exit, json, stderr } = await start();
-    const { url, port, runId } = json();
+    const { url, port, batchId } = json();
     expect(url).toBe(`http://127.0.0.1:${port}/`);
-    expect(runId).toBeNull();
+    expect(batchId).toBeNull();
     expect(stderr()).toContain("Serving");
     const page = await fetch(url);
     expect(await page.text()).toContain("the client");
@@ -220,27 +220,27 @@ describe("selfie ui", () => {
     await expect(fetch(url)).rejects.toThrow();
   });
 
-  test("opens at a run if it's given one, and refuses one it doesn't know", async () => {
+  test("opens at a batch if it's given one, and refuses one it doesn't know", async () => {
     h.stories = [{ id: "a" }];
-    const { runId } = (await review()).json;
-    const { stop, exit, json } = await start(runId);
-    expect(json().url).toMatch(new RegExp(`/runs/${runId}$`));
-    expect(json().runId).toBe(runId);
+    const { batchId } = (await review()).json;
+    const { stop, exit, json } = await start(batchId);
+    expect(json().url).toMatch(new RegExp(`/batches/${batchId}$`));
+    expect(json().batchId).toBe(batchId);
     stop.abort();
     expect(await exit).toBe(0);
 
-    for (const [run, code] of [
-      [UNKNOWN_RUN, "unknown-run"],
-      ["nope", "bad-run-id"],
+    for (const [batch, code] of [
+      [UNKNOWN_BATCH, "unknown-batch"],
+      ["nope", "bad-batch-id"],
     ] as const) {
-      const refused = await start(run);
+      const refused = await start(batch);
       expect(await refused.exit).toBe(2);
       expect(refused.json().error.code).toBe(code);
     }
   });
 
   test("refuses a bad port or extra arguments", async () => {
-    for (const argv of [["--port", "99999"], ["--port", "http"], [UNKNOWN_RUN, UNKNOWN_RUN]]) {
+    for (const argv of [["--port", "99999"], ["--port", "http"], [UNKNOWN_BATCH, UNKNOWN_BATCH]]) {
       const refused = await start(...argv);
       expect(await refused.exit, argv.join(" ")).toBe(2);
       expect(refused.json().error.code).toBe("usage");

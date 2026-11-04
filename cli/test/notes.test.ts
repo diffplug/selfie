@@ -19,7 +19,7 @@ const ORIGIN = `http://${HOST}`;
 let h: Harness;
 let project: Project;
 let app: ReturnType<typeof createLocalApp>;
-let runId: string;
+let batchId: string;
 let imageHash: string;
 
 const appFor = (forProject: Project) => createLocalApp({ source: localReviewSource(forProject), port: () => PORT, clientDir: h.scratch });
@@ -34,15 +34,15 @@ function send(onApp: typeof app, method: string, url: string, body?: unknown) {
 
 const feedback = async (onApp = app) => (await (await onApp.request("/api/feedback", { headers: { host: HOST } })).json()) as any;
 const writeNote = (overrides: Record<string, unknown> = {}, onApp = app) =>
-  send(onApp, "POST", "/api/notes", { story: "a", runId, imageHash, box: null, text: "Too quiet", ...overrides });
+  send(onApp, "POST", "/api/notes", { story: "a", batchId, imageHash, box: null, text: "Too quiet", ...overrides });
 
 beforeEach(async () => {
   h = await createHarness();
   project = await openProject({ cwd: h.repo, env: { SELFIE_HOME: h.home } });
   app = appFor(project);
   h.stories = [{ id: "a" }];
-  ({ runId } = (await h.cli("review", "--storybook-dir", "ignored")).json);
-  const view = (await (await app.request(`/api/runs/${runId}`, { headers: { host: HOST } })).json()) as any;
+  ({ batchId } = (await h.cli("review", "--storybook-dir", "ignored")).json);
+  const view = (await (await app.request(`/api/batches/${batchId}`, { headers: { host: HOST } })).json()) as any;
   imageHash = view.rows[0].imageHash;
 });
 afterEach(async () => {
@@ -59,7 +59,7 @@ describe("writing a note", () => {
     expect(notes).toMatchObject([
       {
         story: "a",
-        runId,
+        batchId,
         imageHash,
         box: { x: 1, y: 2, width: 3, height: 4 },
         state: "draft",
@@ -87,14 +87,14 @@ describe("writing a note", () => {
     expect((await feedback()).notes).toEqual([]);
   });
 
-  test("refuses a run that isn't in the store", async () => {
-    expect((await writeNote({ runId: "00000000-0000-4000-8000-000000000000" })).status).toBe(404);
+  test("refuses a batch that isn't in the store", async () => {
+    expect((await writeNote({ batchId: "00000000-0000-4000-8000-000000000000" })).status).toBe(404);
   });
 
   test("a change from another site is refused, like any other", async () => {
     const response = await app.request("/api/notes", {
       method: "POST",
-      body: JSON.stringify({ story: "a", runId, imageHash, box: null, text: "Hi" }),
+      body: JSON.stringify({ story: "a", batchId, imageHash, box: null, text: "Hi" }),
       headers: { host: HOST, origin: "https://evil.example", "content-type": "application/json", "x-selfie-request": REQUEST_HEADER_VALUE },
     });
     expect(response.status).toBe(403);
@@ -146,7 +146,7 @@ describe("copying for an agent", () => {
   });
 
   test("says one note, not one notes", () => {
-    const one = { id: 1, story: "a", runId, imageHash: null, box: null, state: "sent", messages: [] } as const;
+    const one = { id: 1, story: "a", batchId, imageHash: null, box: null, state: "sent", messages: [] } as const;
     expect(textForAgent([one], "repo")).toContain("as 1 note.");
     expect(textForAgent([one, { ...one, id: 2 }], "repo")).toContain("as 2 notes.");
   });
@@ -375,7 +375,7 @@ describe("waiting for feedback", () => {
 
 describe("answers", () => {
   const sendAll = () => send(app, "POST", "/api/notes/send", { via: "copy" });
-  const answer = (id: number, text: string) => send(app, "POST", `/api/notes/${id}/answers`, { text, runId });
+  const answer = (id: number, text: string) => send(app, "POST", `/api/notes/${id}/answers`, { text, batchId });
   const onlyNote = async () => (await feedback()).notes[0];
   const noteId = async () => (await onlyNote()).id as number;
 
@@ -385,25 +385,25 @@ describe("answers", () => {
   });
 
   test("an agent's reply shows on the note, and leaves it open", async () => {
-    const { code, json } = await h.cli("reply", String(await noteId()), "Made it bigger", "--run", runId);
+    const { code, json } = await h.cli("reply", String(await noteId()), "Made it bigger", "--batch", batchId);
     expect(code).toBe(0);
-    expect(json).toMatchObject({ note: await noteId(), runId });
-    expect(await onlyNote()).toMatchObject({ state: "replied", messages: [{ sender: "person" }, { sender: "agent", text: "Made it bigger", runId, sent: true }] });
+    expect(json).toMatchObject({ note: await noteId(), batchId });
+    expect(await onlyNote()).toMatchObject({ state: "replied", messages: [{ sender: "person" }, { sender: "agent", text: "Made it bigger", batchId, sent: true }] });
   });
 
-  test("says whether the image changed in that run, so a fix that moved nothing shows at once", async () => {
-    expect((await h.cli("reply", String(await noteId()), "Nothing yet", "--run", runId)).json.imageChanged).toBe(false);
+  test("says whether the image changed in that batch, so a fix that moved nothing shows at once", async () => {
+    expect((await h.cli("reply", String(await noteId()), "Nothing yet", "--batch", batchId)).json.imageChanged).toBe(false);
     h.stories = [{ id: "a", color: GREEN }];
-    const newer = (await h.cli("record", "--storybook-dir", "ignored")).json.runId;
-    expect((await h.cli("reply", String(await noteId()), "Fixed", "--run", newer)).json.imageChanged).toBe(true);
+    const newer = (await h.cli("render", "--storybook-dir", "ignored")).json.batchId;
+    expect((await h.cli("reply", String(await noteId()), "Fixed", "--batch", newer)).json.imageChanged).toBe(true);
   });
 
-  test("uses the newest run from this folder if it isn't told one", async () => {
+  test("uses the newest batch from this folder if it isn't told one", async () => {
     h.stories = [{ id: "a", color: GREEN }];
-    const newer = (await h.cli("record", "--storybook-dir", "ignored")).json.runId;
+    const newer = (await h.cli("render", "--storybook-dir", "ignored")).json.batchId;
     const { json } = await h.cli("reply", String(await noteId()), "Fixed");
-    expect(json).toMatchObject({ runId: newer, imageChanged: true });
-    expect((await feedback()).latestRunId).toBe(newer);
+    expect(json).toMatchObject({ batchId: newer, imageChanged: true });
+    expect((await feedback()).latestBatchId).toBe(newer);
   });
 
   test("refuses a note this folder doesn't have, and a bad way of asking", async () => {
@@ -419,14 +419,14 @@ describe("answers", () => {
     expect((await onlyNote()).messages).toHaveLength(1);
   });
 
-  test("refuses a run that isn't in the store", async () => {
-    expect((await h.cli("reply", String(await noteId()), "Hello", "--run", "00000000-0000-4000-8000-000000000000")).code).toBe(2);
+  test("refuses a batch that isn't in the store", async () => {
+    expect((await h.cli("reply", String(await noteId()), "Hello", "--batch", "00000000-0000-4000-8000-000000000000")).code).toBe(2);
     expect((await onlyNote()).messages).toHaveLength(1);
   });
 
   test("a person's answer is a draft, which an agent can't see until it's sent", async () => {
     const id = await noteId();
-    await h.cli("reply", String(id), "How much bigger?", "--run", runId);
+    await h.cli("reply", String(id), "How much bigger?", "--batch", batchId);
     expect((await answer(id, "About double")).status).toBe(200);
     expect(await onlyNote()).toMatchObject({ state: "replied", messages: [{}, {}, { sender: "person", sent: false }] });
     expect((await h.cli("notes")).json.notes[0].messages).toHaveLength(2);
@@ -437,7 +437,7 @@ describe("answers", () => {
 
   test("a waiting agent gets a person's answer with the whole conversation, and what's new marked", async () => {
     const id = await noteId();
-    await h.cli("reply", String(id), "How much bigger?", "--run", runId);
+    await h.cli("reply", String(id), "How much bigger?", "--batch", batchId);
     await answer(id, "About double");
     await project.notes.send();
     const { json } = await h.cli("agent-await-feedback");
@@ -457,7 +457,7 @@ describe("answers", () => {
 
   test("the text to paste says what to do, and has the whole conversation", async () => {
     const id = await noteId();
-    await h.cli("reply", String(id), "How much bigger?", "--run", runId);
+    await h.cli("reply", String(id), "How much bigger?", "--batch", batchId);
     const { text } = (await (await sendAll()).json()) as any;
     expect(text).toContain("Person: Make it bigger");
     expect(text).toContain("Agent: How much bigger?");
@@ -484,7 +484,7 @@ describe("answers", () => {
     test("an agent can't resolve one, only say what it did", async () => {
       const id = await noteId();
       await send(app, "POST", `/api/notes/${id}/resolve`, {});
-      await h.cli("reply", String(id), "Sorry, also this", "--run", runId);
+      await h.cli("reply", String(id), "Sorry, also this", "--batch", batchId);
       expect((await onlyNote()).state).toBe("resolved");
     });
 
@@ -495,21 +495,21 @@ describe("answers", () => {
   });
 });
 
-describe("the newest run from a folder", () => {
-  test("is what was last recorded or reviewed there, and not a run someone named", async () => {
-    expect((await feedback()).latestRunId).toBe(runId);
+describe("the newest batch from a folder", () => {
+  test("is what was last recorded or reviewed there, and not a batch someone named", async () => {
+    expect((await feedback()).latestBatchId).toBe(batchId);
     h.stories = [{ id: "a", color: GREEN }];
-    const newer = (await h.cli("record", "--storybook-dir", "ignored")).json.runId;
-    expect((await feedback()).latestRunId).toBe(newer);
-    await h.cli("review", runId);
-    expect((await feedback()).latestRunId).toBe(newer);
+    const newer = (await h.cli("render", "--storybook-dir", "ignored")).json.batchId;
+    expect((await feedback()).latestBatchId).toBe(newer);
+    await h.cli("review", batchId);
+    expect((await feedback()).latestBatchId).toBe(newer);
   });
 
   test("is remembered as soon as it's recorded, even if the review after that fails", async () => {
     h.stories = [{ id: "a", color: GREEN }];
     const { code } = await h.cli("review", "--storybook-dir", "ignored", "--baseline", "0".repeat(40));
     expect(code).toBe(2);
-    expect((await feedback()).latestRunId).not.toBe(runId);
+    expect((await feedback()).latestBatchId).not.toBe(batchId);
   });
 
   test("is each folder's own", async () => {
@@ -517,7 +517,7 @@ describe("the newest run from a folder", () => {
     execFileSync("git", ["worktree", "add", "-q", "-b", "elsewhere", other], { cwd: h.repo });
     const otherProject = await openProject({ cwd: other, env: { SELFIE_HOME: h.home } });
     try {
-      expect((await feedback(appFor(otherProject))).latestRunId).toBeNull();
+      expect((await feedback(appFor(otherProject))).latestBatchId).toBeNull();
     } finally {
       otherProject.close();
     }

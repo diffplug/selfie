@@ -62,12 +62,12 @@ function Writing({
   );
 }
 
-type NoteActions = Pick<NotesPanelProps, "runId" | "currentImage" | "onRemove" | "onAnswer" | "onResolve">;
+type NoteActions = Pick<NotesPanelProps, "batchId" | "currentImage" | "onRemove" | "onAnswer" | "onResolve">;
 
-function NoteItem({ note, runId, currentImage, onRemove, onAnswer, onResolve }: NoteActions & { readonly note: Note }) {
+function NoteItem({ note, batchId, currentImage, onRemove, onAnswer, onResolve }: NoteActions & { readonly note: Note }) {
   const hasDraft = note.messages.some(({ sent }) => !sent);
-  // Only on the run the agent answered from: on an older one, it's simply where the note was written.
-  const answeredHere = note.messages.findLast(({ sender }) => sender === "agent")?.runId === runId;
+  // Only on the batch the agent answered from: on an older one, it's simply where the note was written.
+  const answeredHere = note.messages.findLast(({ sender }) => sender === "agent")?.batchId === batchId;
   const unmoved = note.state === "replied" && answeredHere && note.imageHash !== null && note.imageHash === currentImage;
   return (
     <li data-state={note.state}>
@@ -100,8 +100,8 @@ function NoteItem({ note, runId, currentImage, onRemove, onAnswer, onResolve }: 
 
 interface NotesPanelProps {
   readonly notes: readonly Note[];
-  /** The run being looked at, and the image this story has in it. */
-  readonly runId: string;
+  /** The batch being looked at, and the image this story has in it. */
+  readonly batchId: string;
   readonly currentImage: string | null;
   /** What a note written now would be about, in words. */
   readonly target: string;
