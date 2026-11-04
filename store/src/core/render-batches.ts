@@ -20,7 +20,8 @@ export const CREATE_BATCH_TABLES: readonly string[] = [
   story_filter TEXT,
   reused_from_batch TEXT,
   scale REAL NOT NULL,
-  branch TEXT
+  branch TEXT,
+  storybook_key INTEGER REFERENCES built_storybooks(key)
 )`,
   "CREATE INDEX IF NOT EXISTS batches_by_sha ON render_batches(git_sha, environment, started_at)",
   "CREATE INDEX IF NOT EXISTS batches_by_branch ON render_batches(branch, environment, started_at)",

@@ -10,6 +10,7 @@ import {
   type HashFunction,
 } from "./image-hash.ts";
 import { checkImageFile, decodeImage, webpToKeep, type ImageCodec } from "./image-file.ts";
+import { insertHashKeyStatement } from "./hash-keys.ts";
 import { encodePam, type RawImage } from "./pam.ts";
 import { CREATE_BATCH_TABLES } from "./render-batches.ts";
 import { CREATE_BUILT_STORYBOOK_TABLES } from "./built-storybooks.ts";
@@ -19,22 +20,6 @@ const CREATE_IMAGES_TABLE = `CREATE TABLE IF NOT EXISTS images (
   key INTEGER PRIMARY KEY,
   hash TEXT NOT NULL UNIQUE
 )`;
-
-// One statement, so concurrent inserts of the same or colliding images cannot
-// interleave. The CASTs make a string parameter behave like a number: without
-// them a string '0' gets key 0.
-//
-// Numbered parameters because D1 does not support named ones.
-//
-// A future delete must handle this: the next negative key is derived from the
-// lowest key present, so deleting the row holding it would let that key be reused.
-const INSERT_IMAGE = `INSERT INTO images(key, hash)
-SELECT CASE WHEN CAST(?1 AS INTEGER) = 0 OR EXISTS(SELECT 1 FROM images WHERE key = CAST(?1 AS INTEGER))
-            THEN (SELECT MIN(COALESCE(MIN(key), 0), 0) - 1 FROM images)
-            ELSE CAST(?1 AS INTEGER) END, ?2
-WHERE true
-ON CONFLICT(hash) DO UPDATE SET hash = excluded.hash
-RETURNING key`;
 
 const SELECT_IMAGE_KEY = "SELECT key FROM images WHERE hash = ?1";
 
@@ -54,8 +39,7 @@ const BLOBS_AT_ONCE = 4;
 
 /** The insert statement for one image, given its hash and its truncated hash. */
 export function imageInsertStatement(hash: string, truncated: number): SqlStatement {
-  // Idempotent: a second batch hits ON CONFLICT and returns the key the first assigned.
-  return { sql: INSERT_IMAGE, params: [truncated, hash], idempotent: true };
+  return insertHashKeyStatement("images", hash, truncated);
 }
 
 /**

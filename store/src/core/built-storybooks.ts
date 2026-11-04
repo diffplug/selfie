@@ -3,11 +3,16 @@
 // See docs/specs/store.md -> built Storybooks.
 import type { Blobs } from "./blob.ts";
 import { chunks, STATEMENTS_PER_REQUEST } from "./chunks.ts";
-import { assertImageHash, isImageHash, sha256, toHex } from "./image-hash.ts";
+import { insertHashKeyStatement } from "./hash-keys.ts";
+import { assertImageHash, fromHex, isImageHash, sha256, toHex, truncateHash } from "./image-hash.ts";
 import type { Sql } from "./sql.ts";
 
 export const CREATE_BUILT_STORYBOOK_TABLES: readonly string[] = [
-  "CREATE TABLE IF NOT EXISTS batch_storybooks (batch_id TEXT PRIMARY KEY REFERENCES render_batches(id), storybook TEXT NOT NULL) WITHOUT ROWID",
+  // A row says every file is kept, since it's written last. Its key works as an image's does.
+  `CREATE TABLE IF NOT EXISTS built_storybooks (
+  key INTEGER PRIMARY KEY,
+  hash TEXT NOT NULL UNIQUE
+)`,
   // By environment, whose ID already covers it, so a batch's story can lay out as it was rendered.
   "CREATE TABLE IF NOT EXISTS environment_viewports (environment TEXT PRIMARY KEY, width INTEGER NOT NULL, height INTEGER NOT NULL) WITHOUT ROWID",
   // Only a story that declared a size other than its environment's, so nearly every batch has no rows here.
@@ -46,10 +51,11 @@ export class BuiltStorybooks {
     this.#blob = blob;
   }
 
-  /** Whether every file of this built Storybook is here. Never true of one that's only partly written. */
-  has(build: string): Promise<boolean> {
+  /** Whether every file of this built Storybook is here, from the table alone. Never true of one that's only partly written. */
+  async has(build: string): Promise<boolean> {
     assertImageHash(build);
-    return this.#blob.has(manifestBlobKey(build));
+    const rows = await this.#sql.run({ sql: "SELECT 1 AS found FROM built_storybooks WHERE hash = ?1", params: [build], idempotent: true });
+    return rows.length > 0;
   }
 
   /** Keeps a file's bytes, if they aren't here already, and says what to call them. */
@@ -63,8 +69,12 @@ export class BuiltStorybooks {
   /** Says which files make up a built Storybook, once all their bytes are here. The first answer stays. */
   async putStorybook(build: string, files: readonly BuiltStorybookFile[]): Promise<void> {
     if (await this.has(build)) return;
-    const manifest: StorybookManifest = Object.fromEntries(files.map(({ path, fileHash }) => [path, fileHash]));
-    await this.#blob.put(manifestBlobKey(build), new TextEncoder().encode(JSON.stringify(manifest)));
+    // Left by a crash before the row, it's still this build's first answer.
+    if (!(await this.#blob.has(manifestBlobKey(build)))) {
+      const manifest: StorybookManifest = Object.fromEntries(files.map(({ path, fileHash }) => [path, fileHash]));
+      await this.#blob.put(manifestBlobKey(build), new TextEncoder().encode(JSON.stringify(manifest)));
+    }
+    await this.#sql.run(insertHashKeyStatement("built_storybooks", build, truncateHash(fromHex(build))));
   }
 
   /**
@@ -89,14 +99,15 @@ export class BuiltStorybooks {
     return manifest;
   }
 
-  /** Says which build rendered a batch, which may be one that isn't kept here. */
+  /** Says which kept built Storybook rendered a batch. Refuses a batch or a built Storybook this store doesn't hold. */
   async recordBatchStorybook(batchId: string, build: string): Promise<void> {
     assertImageHash(build);
-    await this.#sql.run({
-      sql: "INSERT INTO batch_storybooks(batch_id, storybook) VALUES (?1, ?2) ON CONFLICT(batch_id) DO UPDATE SET storybook = excluded.storybook",
+    const rows = await this.#sql.run({
+      sql: "UPDATE render_batches SET storybook_key = (SELECT key FROM built_storybooks WHERE hash = ?2) WHERE id = ?1 AND EXISTS (SELECT 1 FROM built_storybooks WHERE hash = ?2) RETURNING id",
       params: [batchId, build],
       idempotent: true,
     });
+    if (rows.length === 0) throw new RangeError(`This store doesn't hold both batch ${batchId} and built Storybook ${build}`);
   }
 
   /** Says what size an environment renders at, which can't change, since its ID covers it. */
@@ -130,15 +141,13 @@ export class BuiltStorybooks {
     return Object.fromEntries(rows.map(({ story, width, height }) => [story as string, { width: width as number, height: height as number }]));
   }
 
-  /** The built Storybook that rendered a batch, if that's known. */
+  /** The kept built Storybook that rendered a batch, if there is one. */
   async storybookOfBatch(batchId: string): Promise<string | null> {
-    const [row] = await this.#sql.run({ sql: "SELECT storybook FROM batch_storybooks WHERE batch_id = ?1", params: [batchId], idempotent: true });
-    return (row?.storybook as string | undefined) ?? null;
-  }
-
-  /** The built Storybook that rendered a batch, if that's known and kept here. */
-  async keptStorybookOfBatch(batchId: string): Promise<string | null> {
-    const build = await this.storybookOfBatch(batchId);
-    return build !== null && (await this.has(build)) ? build : null;
+    const [row] = await this.#sql.run({
+      sql: "SELECT s.hash FROM render_batches r JOIN built_storybooks s ON s.key = r.storybook_key WHERE r.id = ?1",
+      params: [batchId],
+      idempotent: true,
+    });
+    return (row?.hash as string | undefined) ?? null;
   }
 }

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { Blobs, initStoreSchema, BuiltStorybooks, RenderBatches, type BlobStorage } from "../src/core/index.ts";
+import { Blobs, initStoreSchema, BuiltStorybooks, RenderBatches, truncateHash, type BlobStorage } from "../src/core/index.ts";
+import { fromHex } from "../src/core/image-hash.ts";
 import { createTempStore } from "./support/temp-store.ts";
 
 const BUILD = "a".repeat(64);
@@ -72,12 +73,32 @@ describe("BuiltStorybooks", () => {
     expect(await builds.readFile(BUILD, "index.html")).toEqual(text("first"));
   });
 
-  it("knows a batch's build only once it's kept", async () => {
-    expect(await builds.keptStorybookOfBatch(batch)).toBeNull();
-    await builds.recordBatchStorybook(batch, BUILD);
-    expect(await builds.keptStorybookOfBatch(batch)).toBeNull();
+  it("says which kept built Storybook rendered a batch", async () => {
+    expect(await builds.storybookOfBatch(batch)).toBeNull();
     await keep(BUILD, { "index.html": "page" });
-    expect(await builds.keptStorybookOfBatch(batch)).toBe(BUILD);
+    await builds.recordBatchStorybook(batch, BUILD);
+    expect(await builds.storybookOfBatch(batch)).toBe(BUILD);
+    expect(await builds.storybookOfBatch(otherBatch)).toBeNull();
+  });
+
+  it("says a built Storybook is here from the table alone, and only once it's whole", async () => {
+    expect(await builds.has(BUILD)).toBe(false);
+    await temp.blob.put(`built-storybooks/${BUILD}`, text("{}"));
+    expect(await builds.has(BUILD)).toBe(false);
+    await keep(BUILD, { "index.html": "page" });
+    expect(await builds.has(BUILD)).toBe(true);
+  });
+
+  it("gives a built Storybook its key as an image's, and the next negative one on a collision", async () => {
+    const keyOf = async (hash: string) => (await temp.sql.run({ sql: "SELECT key FROM built_storybooks WHERE hash = ?1", params: [hash] }))[0]?.key;
+    const first = "0123456789abcd" + "0".repeat(50);
+    const colliding = "0123456789abcd" + "1".repeat(50);
+    await keep(first, { "index.html": "one" });
+    await keep(colliding, { "index.html": "two" });
+    expect(await keyOf(first)).toBe(truncateHash(fromHex(first)));
+    expect(await keyOf(colliding)).toBe(-1);
+    await keep(first, { "index.html": "again" });
+    expect(await keyOf(first)).toBe(truncateHash(fromHex(first)));
   });
 
   it("reads files of more builds than it holds file lists for", async () => {
@@ -118,7 +139,9 @@ describe("BuiltStorybooks", () => {
   });
 
   it("takes nothing for a batch this store doesn't hold", async () => {
-    await expect(builds.recordBatchStorybook("00000000-0000-4000-8000-000000000009", BUILD)).rejects.toThrow(/FOREIGN KEY/);
+    await keep(BUILD, { "index.html": "page" });
+    await expect(builds.recordBatchStorybook("00000000-0000-4000-8000-000000000009", BUILD)).rejects.toThrow(/doesn't hold/);
+    await expect(builds.recordBatchStorybook(batch, OTHER)).rejects.toThrow(/doesn't hold/);
     await expect(builds.recordStoryViewports("00000000-0000-4000-8000-000000000009", { a: { width: 1, height: 1 } })).rejects.toThrow(/FOREIGN KEY/);
   });
 

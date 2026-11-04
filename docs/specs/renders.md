@@ -34,7 +34,7 @@ A batch is one recording of a set of renders against one full Git SHA in one env
 - **Must record a story that failed to render as a row with its failure message**, never leave it absent, so only a `recording` batch can lack a story. A message is cut to 2,000 characters.
 - **Must record a story's play error as a message, cut the same way, whether or not it also has an image.** It changes no state and no acceptance ([Open questions](#open-questions)).
 - **Must refuse a render whose image isn't stored**, so a row always has an image. Rows hold image keys, and the API only takes and returns image hashes, per `docs/specs/store.md` → Image identity.
-- **Must let a batch's newest result for a name replace the older one until it is finished**, and refuse any change after that, since a finished batch may hold goldens.
+- **Must let a batch's newest result for a name replace the older one until it is finished**, and refuse any change after that, since a finished batch may hold goldens. **May set `storybook_key` after that**, since it's only known once a built Storybook is kept, and changes nothing a comparison reads.
 - **Must mark a batch finished only in a statement that counts its rows against the number the caller expected.** A batch that never landed fails that count, and the batch stays `recording`.
 - **Must refuse to compare a `recording` batch**, since a render it doesn't hold yet would read as removed.
 
@@ -120,7 +120,7 @@ Goldens are per Git SHA and environment, and are the images of the one batch acc
 Source of truth: `CREATE_BATCH_TABLES` in `store/src/core/render-batches.ts`, `initStoreSchema` in `store/src/core/store.ts`.
 
 ```sql
-render_batches(key PK, id UNIQUE, git_sha, environment, started_at, finished_at, failed_count, dirty, story_filter, reused_from_batch, scale, branch)
+render_batches(key PK, id UNIQUE, git_sha, environment, started_at, finished_at, failed_count, dirty, story_filter, reused_from_batch, scale, branch, storybook_key → built_storybooks.key)
   INDEX batches_by_sha(git_sha, environment, started_at)
   INDEX batches_by_branch(branch, environment, started_at)
 renders(batch_key → render_batches.key, story, image_key → images.key, failure, play_error)  PK (batch_key, story)  WITHOUT ROWID
@@ -131,7 +131,7 @@ goldens(git_sha, environment, batch_key → render_batches.key)  PK (git_sha, en
 
 - **Must leave out the CLI's local table** (`docs/specs/cli.md` → Recording only if necessary): it's in a local `store.db`, not this schema, and D1 doesn't have it.
 - **Must only add what is missing:** `initStoreSchema` is one request of `CREATE ... IF NOT EXISTS`, so running it upgrades a store holding only images. It changes no existing table, and there is no version number. Any other change needs `docs/specs/store.md` → Open questions decided first. `render_batches.reused_from_batch`, the rename of its tables and columns (`docs/specs/cli.rationale.md`), and its foreign keys are the exceptions, made before any project database existed (rationale): `CREATE TABLE IF NOT EXISTS` doesn't add it to an older store, whose reviews and accepts fail with exit 2 until the store is recreated.
-- **Must declare a foreign key wherever a row's parent is always written first and held here**, as `→` shows above, and as `docs/specs/store.md` → Built Storybooks has for `batch_id`, so a store refuses an orphan instead of holding one (rationale).
+- **Must declare a foreign key wherever a row's parent is always written first and held here**, as `→` shows above, and as `docs/specs/store.md` → Built Storybooks has for `story_viewports`, so a store refuses an orphan instead of holding one (rationale).
 - **Never declare one on `decisions` or `reused_from_batch`**, since a decision may name an image or batch this store doesn't hold, and sync may move a batch without the one it was reused from.
 - **Must keep `render_batches.key` and `renders.image_key` inside the store, as with image keys.** A batch's `id`, a UUID, is what leaves it.
 - **Never scan a table:** every statement reaches its rows through one of these keys. `store/test/render-batches.test.ts` checks SQLite's query plan for everything a review sends.

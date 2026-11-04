@@ -59,7 +59,7 @@ export function localReviewSource(
   };
 
   const keptStorybookUrl = async (batchId: string): Promise<string | null> => {
-    const kept = storybook === undefined ? null : await project.storybooks.keptStorybookOfBatch(batchId);
+    const kept = storybook === undefined ? null : await project.storybooks.storybookOfBatch(batchId);
     return kept === null ? null : new URL(keptStorybookPath(kept), storybook!.url).href;
   };
 
@@ -89,7 +89,7 @@ export function localReviewSource(
 
   /** What the batch's own Storybook calls its stories, then what the batches behind its approvals called those it no longer has. */
   const storyNamesFor = async (batch: RenderBatch, approvedIn: ReadonlySet<string>, stories: ReadonlySet<string>) => {
-    const kept = await Promise.all([batch.id, ...approvedIn].map((id) => project.storybooks.keptStorybookOfBatch(id)));
+    const kept = await Promise.all([batch.id, ...approvedIn].map((id) => project.storybooks.storybookOfBatch(id)));
     const entries = (await Promise.all(kept.map((hash) => (hash === null ? [] : storiesOfKept(hash))))).flat();
     const named = new Map<string, StoryEntry>();
     for (const entry of entries) if (stories.has(entry.id) && !named.has(entry.id)) named.set(entry.id, entry);
