@@ -136,6 +136,10 @@ export interface BatchView {
   readonly goldenStorybookUrl: string | null;
   /** The size this batch's stories rendered at, so a live one lays out as its image did. Null if that wasn't recorded. */
   readonly viewport: { readonly width: number; readonly height: number } | null;
+  /** The stories that declared a size of their own, and rendered at that instead of `viewport`. */
+  readonly storyViewports: Readonly<Record<string, { readonly width: number; readonly height: number }>>;
+  /** The same of the goldens' batch, whose image of a story is the golden side's to match. */
+  readonly goldenStoryViewports: Readonly<Record<string, { readonly width: number; readonly height: number }>>;
   /** What its Storybook calls `rows`' stories, in the order its sidebar has them, as far as its kept built Storybooks say. */
   readonly storyNames: readonly { readonly story: string; readonly title: string; readonly name: string }[];
   /** With no baseline, the nearest goldens on the batch's branch, which `rows` compares with. Only to look at. */
@@ -215,7 +219,7 @@ export interface StoriesView {
   readonly branch: string | null;
   /** The hosted Storybook as it stands, or null if there's no built Storybook there. */
   readonly storybookUrl: string | null;
-  /** The size a story renders at here now. */
+  /** The size a story renders at here now, unless it declares its own, which only rendering it says. */
   readonly viewport: { readonly width: number; readonly height: number };
   /** In the order the Storybook's sidebar shows them. */
   readonly stories: readonly ListedStory[];

@@ -71,12 +71,6 @@ export function localReviewSource(
     return storybook !== undefined && isBuiltStorybook(storybook.dir) ? { url: storybook.url, exactStorybook: false } : null;
   };
 
-  /** The kept built Storybook of the goldens a batch is compared with. Never the directory, which wouldn't be them. */
-  const goldenStorybookFor = async ({ environment }: RenderBatch, sha: string | null): Promise<string | null> => {
-    const goldens = sha === null ? null : await batches.acceptedBatchAt(sha, environment);
-    return goldens === null ? null : keptStorybookUrl(goldens);
-  };
-
   /** A kept built Storybook's stories, which never change, or nothing if it can't say. */
   const keptIndexes = new Map<string, Promise<readonly StoryEntry[]>>();
   const storiesOfKept = (hash: string) => {
@@ -133,11 +127,16 @@ export function localReviewSource(
       batch.id,
       comparison.renders.filter(({ story }) => !notRendered.has(story)),
     );
+    const goldensSha = onBranch ?? batch.baselineSha;
+    const goldens = goldensSha === null ? null : await batches.acceptedBatchAt(goldensSha, batch.environment);
     return {
       batch,
       storybook: await storybookFor(batch.id),
-      goldenStorybookUrl: await goldenStorybookFor(batch, onBranch ?? batch.baselineSha),
+      // Never the directory, which wouldn't be the goldens'.
+      goldenStorybookUrl: goldens === null ? null : await keptStorybookUrl(goldens),
       viewport: await project.storybooks.viewportOf(batch.environment),
+      storyViewports: await project.storybooks.storyViewportsOf(batch.id),
+      goldenStoryViewports: goldens === null ? {} : await project.storybooks.storyViewportsOf(goldens),
       branchGoldens: onBranch,
       hunkMergeDistance: await resolveHunkMergeDistance(repo),
       acceptedBatchId: await batches.acceptedBatchAt(batch.gitSha, batch.environment),
@@ -146,7 +145,7 @@ export function localReviewSource(
       advisories: summary.advisories,
       counts: { ...summary.counts, undecided: checked.counts.undecided, failed: summary.failed.length },
       rows,
-      storyNames: await storyNamesFor(batch, onBranch ?? batch.baselineSha, new Set(rows.map(({ story }) => story))),
+      storyNames: await storyNamesFor(batch, goldensSha, new Set(rows.map(({ story }) => story))),
       refusals,
       removals,
       usableAsBaseline,

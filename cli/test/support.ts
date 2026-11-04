@@ -47,6 +47,8 @@ export interface FakeStory {
   readonly color?: Color;
   readonly width?: number;
   readonly height?: number;
+  /** The window it laid out in, which defaults to the environment's. */
+  readonly viewport?: { readonly width: number; readonly height: number };
   /** Changes one hunk of the solid color: x, y, width, height, and its color. */
   readonly patch?: readonly [number, number, number, number, Color];
   readonly failed?: string;
@@ -107,6 +109,7 @@ export function fakeRender(
         file: story.failed === undefined ? (story.fileOverride ?? file) : null,
         width,
         height,
+        viewport: story.viewport ?? environment.viewport,
         pngSha256: null,
         errors: [...(story.errors ?? []), ...(story.failed === undefined ? [] : [{ source: "render" as const, message: story.failed }])],
         durationMs: 1,

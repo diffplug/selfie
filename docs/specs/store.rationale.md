@@ -65,6 +65,8 @@ All 1,623 of those images came back from `sharp` with exactly the same pixels, i
 
 **Why the first list stays.** A built Storybook's hash ignores what can't change a pixel (`docs/specs/render.md`), so two builds with one hash can differ in `project.json`. Either answer is fine, and keeping the first means a kept built Storybook never changes, which a browser's cache relies on.
 
+**A story's own size, by batch.** The image's size can't give it: a full-page image may be taller or wider than the window it was taken in. Nor can the environment, since it's project input, and nor can a built Storybook's files without running them. A new table rather than a column on `renders`, since a store only ever gains tables (`docs/specs/renders.md` → Schema). By batch, not by built Storybook and environment, since a batch whose built Storybook couldn't be named still has renders. Only the sizes that differ, so nearly every batch adds no rows, and every batch from before this reads correctly as its environment's size.
+
 ## Adapters
 
 **Statement size limit.** Measured on real D1, 2026-11: a 100,000 byte statement runs, and 100,001 fails with `SQLITE_TOOBIG`. Nothing checked this locally before, so an oversized query would only have failed in the cloud.
