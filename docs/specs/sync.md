@@ -1,6 +1,6 @@
 # Sync
 
-> Status: built, between a client and any server that mounts the routes. Nothing deployed mounts them yet. They've run on local stores, and inside workerd on its local D1 and R2, always with a stand-in for GitHub. See `## Future`.
+> Status: built, and mounted by the Worker at `hackathon.selfie.dev` (`docs/specs/cloud.md`). `selfie push` runs against it from CI. See `## Future`.
 >
 > - Owns moving batches, images, decisions, and goldens between stores, and the routes and commands that do it. `docs/specs/renders.md` owns what each store does with them, `docs/specs/access.md` who may ask, and `docs/specs/system.md` where cloud data lives.
 
@@ -29,6 +29,14 @@ To mount under `/api`. `GET /repositories/:owner/:name` finds a repository's pro
 | `POST /batches/:id/renders` | `{ renders }`, at most 1,000 | Upload |
 | `POST /batches/:id/finish` | `{ count, finishedAt }` | Upload |
 | `GET /batches/:id` | `?after`, where `next` said the page starts, a page of the batch in no particular order, each render, and the decision on each image, with `next` | View |
+| `POST /commits` | `{ commits }`, at most 1,000, each `{ sha, parents }`, so a server with no Git knows what a commit reaches | Upload |
+| `GET /storybooks/:hash` | `{ kept }` | Upload |
+| `POST /storybooks/files/missing` | `{ hashes }`, at most 500, answers `{ missing }` | Upload |
+| `PUT /storybooks/files/:hash` | A file's bytes, which must hash to that | Upload |
+| `PUT /storybooks/:hash` | `{ files }`, each `{ path, fileHash }`, once all are here, or `missing-files` | Upload |
+| `POST /batches/:id/storybook` | `{ build }`, which built Storybook rendered this batch | Upload |
+| `GET /batches/:id/diffs/needed` | `{ pairs }`, each `{ current, golden }`, the changed pairs with no diff here | Upload |
+| `PUT /diffs/:current/:golden` | `{ stats, png }`, with `png` in base64 | Upload |
 | `POST /decisions` | `{ environment, decisions }`, at most 1,000, each with its `gitSha` and `batchId` | Decide |
 | `POST /goldens` | `{ batchId, baselineSha, removed }`, answers `{ outcome, acceptedBatchId, refusal }`, where `outcome` is `accepted`, `already`, `conflict`, or `refused` | Upload, or Decide if `removed` isn't empty |
 | `GET /goldens` | `?sha&environment`, answers `{ batchId }` | View or Upload |
@@ -74,7 +82,7 @@ Reserved: a fork's render pass must not upload through this (`docs/specs/access.
 
 Source of truth: `cli/src/sync.ts`; tests in `cli/test/sync.test.ts`, between two machines on real Git and a store standing in for the cloud's.
 
-- **Must push one batch at a time, in this order: the batch, its images, its renders, finishing it, its decisions, and its goldens**, so that a refused batch costs nothing, and nothing refers to what hasn't arrived.
+- **Must push one batch at a time, in this order: the batch, what its commit reaches, its built Storybook if it's kept, its images, its renders, finishing it, its decisions, its goldens, and the diffs the remote asks for**, so that a refused batch costs nothing, and nothing refers to what hasn't arrived.
 - **Must make every step safe to send again**, so a push or pull that dies is finished by running it again, with nothing to clean up. A partly received batch stays `recording`, which nothing can compare or accept.
 - **Must send only the images the receiver lacks, and pull only those this store lacks, decoding each to check it's the image its hash names**, and stop with `corrupt-image` naming it if it isn't, leaving what's stored here as it was. A sender's check is the last that image gets, and a puller's is the only one that finds what another client sent wrongly.
 - **Must carry `reusedFromBatch`**, for `trust`. It may name a batch never pushed.
@@ -98,7 +106,7 @@ A push sends a batch's goldens if they're here, which only a pull makes them, or
 
 ## Future
 
-**Scope: cloud-deploy** mounts the routes, and **Scope: github-access** answers the seam, both defined in `docs/specs/system.md` → Build order.
+`docs/specs/cloud.md` mounts the routes. **Scope: github-access** will answer the seam from GitHub, both defined in `docs/specs/system.md` → Build order.
 
 ### At scale
 

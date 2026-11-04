@@ -1,6 +1,6 @@
 # System
 
-> Status: partly built — rendering environments are built in `docs/specs/render.md`, local approvals in `docs/specs/renders.md`, the local CLI in `docs/specs/cli.md`, and the local review UI in `docs/specs/ui.md`; everything under `## Future` is design.
+> Status: partly built — rendering environments are built in `docs/specs/render.md`, local approvals in `docs/specs/renders.md`, the local CLI in `docs/specs/cli.md`, the local review UI in `docs/specs/ui.md`, and a Worker for one writer's public projects in `docs/specs/cloud.md`; everything under `## Future` is design.
 >
 > - See `docs/specs/glossary.md` for vocabulary.
 > - Owns the staged build order and the behavior spanning the local app and the cloud. Image storage belongs to `docs/specs/store.md`.
@@ -65,9 +65,9 @@ Selfie is for fully opaque images, and transparency is never allowed: `docs/spec
 
 **Scope: store** — `docs/specs/store.md`.
 
-**Scope: cloud-deploy** — The same Hono app ([Local review](#local-review)) deployed at `hackathon.selfie.dev`, with accounts in Neon through pgstencil and Hyperdrive, per-project D1, and R2 ([Cloud data](#cloud-data)). Serves no image before `github-access`.
+**Scope: cloud-deploy** — The same Hono app ([Local review](#local-review)) deployed at `hackathon.selfie.dev`, with per-project D1 and R2, is built for a few public repositories and one writer (`docs/specs/cloud.md`). What's left is accounts in Neon through pgstencil and Hyperdrive ([Cloud data](#cloud-data)), and private repositories, which wait for `github-access`.
 
-**Scope: github-access** — The GitHub App, sign-in, and access checks (`docs/specs/access.md`). Ships with `cloud-deploy`, since a deployed service needs them before it holds anyone's images.
+**Scope: github-access** — Sign-in through GitHub, and access checks from what GitHub reports (`docs/specs/access.md` → Future), before the service holds anyone else's images.
 
 **Scope: trust** — The cloud accepts local results without re-rendering.
 

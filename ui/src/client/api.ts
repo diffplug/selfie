@@ -15,7 +15,7 @@ import {
   type RenderRow,
   type StoriesView,
 } from "../shared/api.ts";
-import { BASE } from "./base.ts";
+import { BASE, isHosted } from "./base.ts";
 
 /** What went wrong, in words a screen can show. `code` tells the cases apart. */
 export class RequestError extends Error {
@@ -33,7 +33,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     response = await fetch(`${BASE}/api${path}`, init);
   } catch (error) {
     if (init?.signal?.aborted) throw error;
-    throw new RequestError("unreachable", "Can't reach the Selfie server. Is selfie ui still running?");
+    throw new RequestError("unreachable", isHosted ? "Can't reach Selfie. Check your connection, and try again." : "Can't reach the Selfie server. Is selfie ui still running?");
   }
   const body = (await response.json().catch(() => null)) as T | ApiError | null;
   if (!response.ok || body === null) {

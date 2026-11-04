@@ -1,6 +1,6 @@
 # Access
 
-> Status: partly built — the [local review server](#local-review-server) is built; everything under `## Future` is design.
+> Status: partly built — the [local review server](#local-review-server) and [one writer's public projects](#who-can-do-what) are built; everything under `## Future` is design.
 >
 > - See `docs/specs/glossary.md` for project, image, and store.
 > - Owns the GitHub App, who can see and change a project, and how images are served. Where account data lives belongs to `docs/specs/system.md` → Cloud data; how bytes are stored belongs to `docs/specs/store.md`.
@@ -19,9 +19,28 @@ There's no login on this server, since anyone who can reach loopback on the mach
 - **Must let the review page frame only the hosted Storybook's origin, and sandbox every frame, without `allow-top-navigation`**, so a story can't steer the review page, and can't read it, being another origin (rationale).
 - **Must serve an image only through the app, by a validated hash, with `Cache-Control: private`**, and never name a file path in a response. Reserved: [Serving images](#serving-images) holds the same for the cloud.
 
+## Who can do what
+
+Source of truth: `ui/src/worker/auth.ts`, `accessOf` in `ui/src/worker/app.ts`, `ui/src/worker/github.ts`; tests in `ui/test/workerd/cloud.workerd.test.ts`. `docs/specs/cloud.md` says what the Worker hosts.
+
+Every project here is public, and one person writes (rationale).
+
+| Who | How they're known | View | Upload | Approve or reject |
+|---|---|---|---|---|
+| Anyone | Nothing | Yes | No | No |
+| CI | `SELFIE_UPLOAD_TOKEN`, a repository secret and a Worker secret, as a bearer token | Yes | Yes | No |
+| The writer, `nedtwigg` | `SELFIE_WRITER_PASSWORD`, a Worker secret: as a bearer token, or through `/sign-in` for a cookie | Yes | Yes | Yes |
+
+- **Must keep the password and the upload token only in Worker secrets, and compare them by digest**, so how long a comparison takes says nothing of a guess.
+- **Must sign a session cookie with the password, so that changing it signs everyone out, and name it `__Host-` with `HttpOnly`, `Secure`, and `SameSite=Strict`**, for 30 days.
+- **Must refuse a sign-in from another site, and send a person only to a path on this site after signing in.**
+- **Must keep `sameOriginWrites` and `pageHeaders` on the review routes.** The sync routes answer only to a bearer token, and never read the cookie.
+- **Must use one GitHub App, Selfie Hackathon, with only `statuses: write` and `contents: read`, and no webhook**, to say whether a repository has a commit and to post a commit's status. **Its private key stays in Worker secrets.**
+- **Must refuse a commit GitHub doesn't have**, as `docs/specs/sync.md` → What goes says, and treat any other answer from GitHub as an error.
+
 ## Future
 
-**Scope: github-access**
+**Scope: github-access** replaces the password with what follows, for a service with other people or private repositories on it.
 
 ### GitHub App
 

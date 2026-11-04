@@ -25,3 +25,9 @@
 - **Why a Storybook gets its own origin.** A page's scripts can send everything `sameOriginWrites` asks for from that origin, custom header included, so only a different origin keeps a story away from Approve. A port is enough: the browser refuses the review API's responses to any other, and the server refuses its `Origin`. It can't be held to the review page's CSP instead, since Storybook runs inline scripts.
 - **Why frames are safe here.** A frame on another origin can't read the page or call the review API as it, and the sandbox stops it navigating the page away. `allow-same-origin` only keeps it on its own origin, where Storybook's preview needs its storage, and it can't lift the sandbox from there, since it isn't the page's origin.
 - **Why refuse framing.** Without it, a site could put the page in an invisible frame and steer a click onto Approve, and every check above would pass.
+
+## Who can do what
+
+**One writer, by password.** The service holds only public repositories, and only their owner reviews them, so sign-in through GitHub would be a client secret, a callback, and a token store to say what's already known. It's also what lets a writer sign in without the service ever holding a GitHub token. **Scope: github-access** is what it takes for that to stop being true.
+
+**An upload token rather than OIDC.** It's a secret a repository has to hold, which OIDC avoids, and it costs a rotation if it leaks. A leak lets someone upload to a public project, which can't approve anything, and can only add batches at commits GitHub has.

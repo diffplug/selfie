@@ -12,6 +12,7 @@ A spec is the accurate reference for the current code: it states the invariants 
 - **`docs/specs/renders.md`** — Render batches, render states, decisions, and approvals: the data layer `selfie review` and the review UI use.
 - **`docs/specs/store.md`** — Image storage: image identity, decoding, keys, hash collisions, kept built Storybooks, and the SQL and blob adapters.
 - **`docs/specs/sync.md`** — Moving batches, images, decisions, and goldens between stores.
+- **`docs/specs/cloud.md`** — The Worker at `hackathon.selfie.dev`: its projects, origins, pages, and a commit's status.
 - **`docs/specs/feedback.md`** — Notes: how a person tells a coding agent what they see, and how the agent answers.
 - **`docs/specs/render.md`** — The renderer: rendering a built Storybook into PNGs in a pinned environment, the environment ID, and the manifest.
 - **`docs/specs/cli.md`** — The `selfie` CLI: `review`, `approve`, `reject`, and `ui`, their exit codes and JSON, and local data's layout.
