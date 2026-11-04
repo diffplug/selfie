@@ -18,6 +18,9 @@ Evidence and reasoning for `docs/specs/ui.md`, keyed by its headings.
 - **Why a request names hashes.** A decision belongs to a name and a hash, so naming them says what the reviewer saw. A later accepted batch can change a baseline's goldens, and so a batch's differences, while a page is open. `stale-decision` is the difference between a confused screen and a wrong approval.
 - **Why bulk has no route of its own.** A server-side "all" would approve whatever is there at that moment, and the dialog would describe something else.
 
+- **Why a render's progress is polled.** There's one small object to read, at one render at a time, and only while a page is waiting on it, so a route costs less than a stream the server would have to hold open and tear down. An answer of `null` alone wouldn't do, since the client reads a JSON `null` as a bad response, which is why it's `{ progress }`.
+- **Why a render's progress has times, not durations.** A duration is stale by however long its answer took, so a page starting from each one would sometimes step back a second. A timestamp lets the page count on its own. The server only renders from a local page, so they share a clock, and a hosted source says `canRender: false`.
+
 ## Recomputing
 
 - **Why only `focus`.** Returning to a tab fired both `visibilitychange` and `focus`, which was two reads each time, measured in a browser. `focus` alone fires for a tab and for a window.
@@ -55,6 +58,10 @@ Evidence and reasoning for `docs/specs/ui.md`, keyed by its headings.
 
 **Rendering here.** Most iterating is on one story, and 1.7 s was measured for one story of Dormouse's 568 in the pinned container, 2026-11, so asking from the page is about as quick as looking away. It doesn't build, so an agent or person rebuilds, and what's rendered is whatever is hosted. A filtered batch can't become goldens, so Render the rest can't either, once it's a subset: only a whole batch from a clean build can. Every story at once is the one case worth treating as a whole batch.
 
+- **Why a render's rate starts at its first story.** What comes before it happens once, and a first render's image download can take minutes, so a rate that counted those would stay too slow for the whole render. A real render of 139 stories had 0.7 s before its first story with the image already there, and took about 30 s after it.
+- **Why no estimate for 3 seconds.** Up to 6 stories start at once, so at first either none has finished or several have together, and a rate from that says little about the rest.
+- **Why the batch being saved is said.** An estimate of `0:00 left` would stay on screen for as long as storing takes, which was about 6 s of a 36 s render of 139 stories, and would read as stuck.
+
 ## Keyboard
 
 - **Why ignore repeats.** With `a` moving on to the next story, a held key would approve one image every few milliseconds. `j` and `k` lose little by it.
@@ -67,6 +74,8 @@ Evidence and reasoning for `docs/specs/ui.md`, keyed by its headings.
 ## Accessibility
 
 axe-core 4.10.3 was run on the no batches, no commits, run, filtered batch, accept, side by side, stacked, and shortcuts screens in a real browser. It found one issue, a link in text told apart only by color. Primer's `inline` underlines one only under `data-a11y-link-underlines="true"`, so `ui/index.html` sets that on the body. Primer's own components passed.
+
+**A render's progress.** A live region is read whenever it changes, so one around text that ticks every second would talk over itself and everything else. Primer's `Banner` isn't a live region, so the ticking text is there to read on request, and a hidden status says it's started, and then says the same text as it stands every 30 seconds. It's always on the page, since a status is only announced when what's in it changes.
 
 ## Scale
 
@@ -99,3 +108,5 @@ So locally these change what a request costs a hosted store, not what a reviewer
 
 - **Why no virtualized list.** These numbers leave nothing for one to fix, and a real table keeps find-in-page and screen readers working. It's worth revisiting at far more than 541 rows.
 - **Why no `content-visibility` on rows.** Primer's table makes each row a subgrid, and containment breaks that: in a browser, with it on `tbody tr`, every cell of every row collapsed to the first column's left edge, at 24 px. Focus return and `j` and `k` still worked, and it saved about 50 ms of main-thread time on opening 512 rows, which isn't a reason to take a table apart.
+
+**A second of a render.** The list isn't virtualized, so it can have hundreds of rows, and nothing in the tree above it is memoized. So the progress and the clock live in a small component that holds only the banner, and the rest of the page doesn't hear of them.
