@@ -87,7 +87,7 @@ export function LiveStories({ row, view, open, onToggle }: { row: RenderRow; vie
   const current = row.state === "removed" ? null : (view.storybook?.url ?? null);
   const golden = row.goldenStorybookUrl;
   if (current === null && golden === null) return null;
-  const side = (layer: "golden" | "current", url: string | null, missing: string) => (
+  const side = (layer: "golden" | "current", url: string | null, missing: string, viewport: BatchView["viewport"]) => (
     <div className="selfie-live-side">
       <Heading as="h3" variant="small">
         {LAYER_WORDS[layer]}
@@ -95,7 +95,7 @@ export function LiveStories({ row, view, open, onToggle }: { row: RenderRow; vie
       {url === null ? (
         <Text className="selfie-muted">{missing}</Text>
       ) : (
-        <StoryFrame title={`${row.story}, ${layer}, running`} url={storyFrameUrl(url, row.story)} viewport={view.viewport} />
+        <StoryFrame title={`${row.story}, ${layer}, running`} url={storyFrameUrl(url, row.story)} viewport={viewport} />
       )}
     </div>
   );
@@ -111,8 +111,8 @@ export function LiveStories({ row, view, open, onToggle }: { row: RenderRow; vie
             {view.viewport === null && " This batch didn't record the size it rendered at, so these may lay out differently."}
           </Text>
           <div className="selfie-live-sides">
-            {side("golden", golden, row.state === "added" ? "An added story has no golden." : "The golden's built Storybook wasn't kept.")}
-            {side("current", current, "A removed story isn't in this batch.")}
+            {side("golden", golden, row.state === "added" ? "An added story has no golden." : "The golden's built Storybook wasn't kept.", row.goldenViewport ?? view.viewport)}
+            {side("current", current, "A removed story isn't in this batch.", view.storyViewports[row.story] ?? view.viewport)}
           </div>
         </>
       )}

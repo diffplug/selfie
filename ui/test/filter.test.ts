@@ -11,6 +11,7 @@ const row = (story: string, overrides: Partial<RenderRow> = {}): RenderRow => ({
   playError: null,
   decision: null,
   goldenStorybookUrl: null,
+  goldenViewport: null,
   pixelDiff: null,
   ...overrides,
 });

@@ -1,4 +1,4 @@
-import { chunks } from "./chunks.ts";
+import { chunks, STATEMENTS_PER_REQUEST } from "./chunks.ts";
 import { assertImageHash } from "./image-hash.ts";
 import type { Sql, SqlParam, SqlRow, SqlStatement } from "./sql.ts";
 
@@ -64,9 +64,7 @@ const DECISIONS_PER_MERGE_STATEMENT = 19;
 // Nearest first, beside the environment.
 const SHAS_PER_GOLDENS_QUERY = 99;
 
-// Sizes measured on real D1: `docs/specs/renders.rationale.md`. A request of 400
-// statements holds 19,600 renders, so a batch of up to that many costs one.
-const STATEMENTS_PER_REQUEST = 400;
+// Sizes measured on real D1: `docs/specs/renders.rationale.md`.
 const ROWS_PER_PAGE = 5_000;
 
 // Enough to read, and it bounds how large one request can grow.

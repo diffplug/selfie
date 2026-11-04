@@ -215,6 +215,17 @@ describe("a render that isn't reusable", () => {
     expect((await review()).rendered).toBe(true);
   });
 
+  test("a declared viewport that can't be resolved, so that its warning comes back on every review", async () => {
+    const message = `Its viewport "nope" isn't one of its options. It rendered at the environment's 1200x900.`;
+    h.stories = [{ id: "a--one", errors: [{ source: "viewport", message }], warning: `a--one: ${message}` }];
+    const { stderr, json } = await review();
+    expect(stderr).toContain(`won't be reused: the render warned: a--one: ${message}`);
+    expect(json.warnings).toEqual([`a--one: ${message}`]);
+    const again = await review();
+    expect(again.rendered).toBe(true);
+    expect(again.json.warnings).toEqual([`a--one: ${message}`]);
+  });
+
   test("a later render's failure forgets the earlier good one", async () => {
     await review();
     h.stories = [{ id: "a--one", failed: "It really does fail" }];

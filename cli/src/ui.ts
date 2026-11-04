@@ -105,12 +105,22 @@ export function localReviewSource(
 
   const toRows = async (batchId: string, compared: Comparison["renders"]): Promise<RenderRow[]> => {
     const pixelDiffs = await cachedDiffs(batchId);
-    const urls = new Map(await Promise.all([...new Set(compared.flatMap(({ goldenBatchId }) => goldenBatchId ?? []))].map(async (id) => [id, await keptStorybookUrl(id)] as const)));
-    return compared.map((render) => ({
-      ...render,
-      pixelDiff: pixelDiffs.get(render.story) ?? null,
-      goldenStorybookUrl: render.goldenBatchId === undefined ? null : (urls.get(render.goldenBatchId) ?? null),
-    }));
+    const references = new Map(
+      await Promise.all(
+        [...new Set(compared.flatMap(({ goldenBatchId }) => goldenBatchId ?? []))].map(
+          async (id) => [id, { url: await keptStorybookUrl(id), viewports: await project.storybooks.storyViewportsOf(id) }] as const,
+        ),
+      ),
+    );
+    return compared.map((render) => {
+      const reference = render.goldenBatchId === undefined ? undefined : references.get(render.goldenBatchId);
+      return {
+        ...render,
+        pixelDiff: pixelDiffs.get(render.story) ?? null,
+        goldenStorybookUrl: reference?.url ?? null,
+        goldenViewport: reference?.viewports[render.story] ?? null,
+      };
+    });
   };
 
   /** Everything recomputed from what deciding compares with, which the caller already has. */
@@ -122,6 +132,7 @@ export function localReviewSource(
       batch,
       storybook: await storybookFor(batch.id),
       viewport: await project.storybooks.viewportOf(batch.environment),
+      storyViewports: await project.storybooks.storyViewportsOf(batch.id),
       hunkMergeDistance: await resolveHunkMergeDistance(repo),
       actor,
       blockers: summary.blockers,

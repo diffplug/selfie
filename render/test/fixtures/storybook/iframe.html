@@ -1,6 +1,6 @@
 <!doctype html>
 <!-- Speaks just enough of Storybook's preview protocol for the render worker: the render
-     phase on window.__STORYBOOK_PREVIEW__, and the error classes on body. -->
+     phase and the loaded story on window.__STORYBOOK_PREVIEW__, and the error classes on body. -->
 <html lang="en">
   <head>
     <meta charset="utf-8" />
@@ -139,6 +139,36 @@
           await new Promise((resolve) => setTimeout(resolve, 300));
           console.error(new Error("this play function fails"));
         },
+        // These throw unless the window was already the size declared in `declarations` when they mount.
+        "viewport--named"() {
+          mountedAt(414, 896);
+        },
+        "viewport--rotated"() {
+          mountedAt(568, 320);
+        },
+        "viewport--typed"() {
+          mountedAt(500, 700);
+        },
+        "viewport--own-option"() {
+          mountedAt(640, 480);
+        },
+        "viewport--old-storybook"() {
+          mountedAt(480, 320);
+        },
+        "viewport--tall"() {
+          mountedAt(414, 896);
+          root.style.padding = "0";
+          root.innerHTML = '<div style="height: 2000px; background: teal"></div>';
+        },
+        "viewport--unknown-name"() {
+          mountedAt(1200, 900);
+        },
+        "viewport--percent"() {
+          mountedAt(1200, 900);
+        },
+        "viewport--percent-option"() {
+          mountedAt(1200, 900);
+        },
         "broken--throws"() {
           throw new Error("this story always throws");
         },
@@ -152,6 +182,33 @@
         },
       };
 
+      function mountedAt(width, height) {
+        if (window.innerWidth !== width || window.innerHeight !== height)
+          throw new Error(`mounted at ${window.innerWidth}x${window.innerHeight}, expected ${width}x${height}`);
+        root.textContent = `${width}x${height}`;
+      }
+
+      // What each story declares, as a real build's annotations would say.
+      const declarations = {
+        "viewport--named": { globals: { viewport: { value: "mobile2", isRotated: false } } },
+        "viewport--rotated": { globals: { viewport: { value: "mobile1", isRotated: true } } },
+        "viewport--typed": { globals: { viewport: { value: "500-700" } } },
+        "viewport--own-option": {
+          globals: { viewport: "kiosk" },
+          parameters: { viewport: { options: { kiosk: { name: "Kiosk", styles: { width: "640px", height: "480px" } } } } },
+        },
+        "viewport--old-storybook": {
+          parameters: { viewport: { defaultViewport: "small", defaultOrientation: "landscape", viewports: { small: { styles: { width: "320px", height: "480px" } } } } },
+        },
+        "viewport--tall": { globals: { viewport: { value: "mobile2" } } },
+        "viewport--unknown-name": { globals: { viewport: { value: "no-such-size" } } },
+        "viewport--percent": { globals: { viewport: { value: "50pct-100pct" } } },
+        "viewport--percent-option": {
+          globals: { viewport: { value: "stretchy" } },
+          parameters: { viewport: { options: { stretchy: { styles: { width: "100%", height: "100%" } } } } },
+        },
+      };
+
       const listeners = new Map();
       const channel = {
         on: (event, listener) => listeners.set(event, [...(listeners.get(event) ?? []), listener]),
@@ -159,10 +216,16 @@
       };
       globalThis.__STORYBOOK_ADDONS_CHANNEL__ = channel;
 
-      const render = { phase: "rendering" };
+      const id = new URLSearchParams(location.search).get("id");
+      const { globals = {}, parameters = {} } = declarations[id] ?? {};
+      const render = {
+        phase: "rendering",
+        story: { parameters, storyGlobals: globals },
+        storyContext: () => ({ globals: { viewport: { isRotated: false }, ...globals }, parameters }),
+      };
       window.__STORYBOOK_PREVIEW__ = { currentRender: render };
       try {
-        await stories[new URLSearchParams(location.search).get("id")]();
+        await stories[id]();
         render.phase = "completed";
       } catch (error) {
         document.getElementById("error-message").textContent = error.message;

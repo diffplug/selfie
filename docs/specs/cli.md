@@ -149,7 +149,7 @@ A review recognizes a built Storybook that already rendered, and skips rendering
 - **Must show the existing batch and record nothing when one at this commit came from that render with the same dirtiness, branch, and filter** (rationale).
 - **Must recognize a built Storybook only by `renderIdentity` (`docs/specs/render.md` → Render identity)**, of the config's `storybookDir` after any `--build`, with the environment and the init script.
 - **Never reuse a batch with a failed story**, including an image the store refused, however many times it fails (rationale).
-- **Never reuse a batch where any story has an error other than `play`, `console`, or `page`, or where render warned of anything** (rationale). Those three are the project's own code, and reuse keeps its `play` errors as advisories. Everything else, such as `request` and the soft `timeout`, might not happen next time.
+- **Never reuse a batch where any story has an error other than `play`, `console`, `page`, or `viewport`, or where render warned of anything** (rationale). Those are the project's own code, and reuse keeps its `play` errors as advisories. A `viewport` error always comes with a warning, which reuse wouldn't repeat. Everything else, such as `request` and the soft `timeout`, might not happen next time.
 - **Must keep only the newest real render of a built Storybook, and forget the built Storybook if that render can't be reused**, so a forced render that fails isn't hidden by an older one that passed.
 - **Must not remember a render if the built Storybook's identity changed while it rendered**, since nothing describes those images.
 - **Must always name a batch that really rendered:** a reused batch is never itself remembered, so reuse doesn't chain.

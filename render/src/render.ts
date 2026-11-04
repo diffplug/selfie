@@ -146,6 +146,10 @@ export async function render(options: RenderOptions): Promise<Manifest> {
   manifest.runtime = outcome.runtime;
   manifest.stories = stories.map((story) => toManifestStory(story, outcome.results.get(story.id), outcome.crash));
   if (outcome.crash !== null) warnings.push(`The worker stopped early: ${outcome.crash}`);
+  // A batch keeps only a story's play errors, so this is how a mistake in a declaration reaches a review.
+  for (const { id, errors } of manifest.stories) {
+    for (const { source, message } of errors) if (source === "viewport") warnings.push(`${id}: ${message}`);
+  }
   await save();
   return manifest;
 }

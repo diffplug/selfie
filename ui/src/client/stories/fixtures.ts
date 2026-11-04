@@ -37,6 +37,7 @@ const render = (fields: Pick<ComparedRender, "story" | "state"> & Partial<Render
   decision: null,
   pixelDiff: null,
   goldenStorybookUrl: null,
+  goldenViewport: null,
   ...fields,
 });
 
@@ -117,6 +118,7 @@ export function viewOf(
     batch,
     storybook: null,
     viewport: { width: 1200, height: 900 },
+    storyViewports: {},
     storyNames: [],
     hunkMergeDistance: 12,
     actor: "ned@example.com",

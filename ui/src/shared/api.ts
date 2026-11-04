@@ -1,7 +1,7 @@
 // What crosses between the browser and the server, and what the server needs from its platform.
 // Types only, so the client's bundle holds none of the server, and the server none of the client.
 // `selfie-cli` takes its own result types from here, so each has one definition.
-import type { ComparedRender, DecisionKind, RenderBatch } from "selfie-store";
+import type { ComparedRender, DecisionKind, RenderBatch, StoryViewport } from "selfie-store";
 
 export type { ComparedRender, DecisionKind, RenderBatch, RenderState } from "selfie-store";
 
@@ -74,6 +74,8 @@ export interface RenderRow extends ComparedRender {
   readonly pixelDiff: PixelDiff | null;
   /** The kept built Storybook of the batch whose image this is compared with, or null if there's none. */
   readonly goldenStorybookUrl: string | null;
+  /** The size of its own that story declared in that batch, or null if it declared none. */
+  readonly goldenViewport: StoryViewport | null;
 }
 
 export type BatchListing = Pick<RenderBatch, "id" | "startedAt" | "status" | "dirty">;
@@ -102,7 +104,9 @@ export interface BatchView {
   /** Null if there's no built Storybook to host. */
   readonly storybook: StorybookLink | null;
   /** The size this batch's stories rendered at, so a live one lays out as its image did. Null if that wasn't recorded. */
-  readonly viewport: { readonly width: number; readonly height: number } | null;
+  readonly viewport: StoryViewport | null;
+  /** The stories that declared a size of their own, and rendered at that instead of `viewport`. */
+  readonly storyViewports: Readonly<Record<string, StoryViewport>>;
   /** What its Storybook calls `rows`' stories, in the order its sidebar has them, as far as its kept built Storybooks say. */
   readonly storyNames: readonly { readonly story: string; readonly title: string; readonly name: string }[];
   /** How close a diff's hunks group here, in CSS pixels. */
@@ -172,7 +176,7 @@ export interface StoriesView {
   readonly branch: string | null;
   /** The hosted Storybook as it stands, or null if there's no built Storybook there. */
   readonly storybookUrl: string | null;
-  /** The size a story renders at here now. */
+  /** The size a story renders at here now, unless it declares its own, which only rendering it says. */
   readonly viewport: { readonly width: number; readonly height: number };
   /** In the order the Storybook's sidebar shows them. */
   readonly stories: readonly ListedStory[];

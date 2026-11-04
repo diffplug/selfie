@@ -42,4 +42,15 @@ export const KeepsTheKeyboard: Story = {
     await waitFor(() => expect(within(context.canvasElement).queryByTitle(/running/)).toBeNull());
   },
 };
+/** A phone-sized story, whose golden was still at the environment's size, lays out on each side as its image did. */
+export const SizeOfItsOwn: Story = {
+  args: { row: kept(BUTTON), view: liveView(kept(BUTTON), { storyViewports: { [BUTTON.story]: { width: 414, height: 896 } } }) },
+  play: async (context) => {
+    await liveLoaded(context);
+    const [golden, current] = within(context.canvasElement).getAllByTitle<HTMLIFrameElement>(/running/);
+    await expect(golden!.style.width).toBe("1200px");
+    await expect(current!.style.width).toBe("414px");
+    await expect(current!.style.height).toBe("896px");
+  },
+};
 export const SizeUnknown: Story = { args: { row: BUTTON, view: liveView(BUTTON, { viewport: null }) }, play: liveLoaded };

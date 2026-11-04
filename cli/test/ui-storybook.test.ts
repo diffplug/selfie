@@ -428,6 +428,45 @@ describe("the hosted Storybook", () => {
       expect((await hosted().batchView(before)).viewport).toEqual({ width: 1200, height: 900 });
     });
 
+    describe("a story that declared a size of its own", () => {
+      const PHONE = { width: 414, height: 896 };
+
+      test("is the only one with a size of its own, and one declaring the environment's isn't", async () => {
+        await built();
+        h.stories = [{ id: "a", viewport: PHONE }, { id: "b" }, { id: "c", viewport: { width: 1200, height: 900 } }];
+        const view = await hosted().batchView(await reviewedBuild());
+        expect(view.storyViewports).toEqual({ a: PHONE });
+        expect(view.viewport).toEqual({ width: 1200, height: 900 });
+      });
+
+      test("keeps it through a batch that reuses its images", async () => {
+        await built();
+        h.stories = [{ id: "a", viewport: PHONE }, { id: "b" }];
+        const first = await reviewedBuild();
+        await commit(h.repo, "something that doesn't change the build");
+        const reused = await reviewedBuild();
+        expect(reused).not.toBe(first);
+        expect((await project.batches.getBatch(reused))?.reusedFromBatch).toBe(first);
+        expect((await hosted().batchView(reused)).storyViewports).toEqual({ a: PHONE });
+      });
+
+      test("lays out each side as its own image did, once the story declares one where its reference didn't", async () => {
+        await built();
+        h.stories = [{ id: "a" }, { id: "b", viewport: PHONE }];
+        const first = await reviewedBuild();
+        expect((await h.cli("approve", first, "--all")).code).toBe(0);
+
+        await commit(h.repo, "the next change");
+        await writeFile(path.join(dir, "index.html"), "<!doctype html><title>the next build</title>");
+        h.stories = [{ id: "a", viewport: PHONE }, { id: "b" }];
+        const next = await reviewedBuild();
+        expect((await hosted().batchView(next)).storyViewports).toEqual({ a: PHONE });
+        // A fake render's images don't change with the size, so these are the unchanged ones, which is where a size alone would be lost.
+        const rows = await hosted().unchanged(next);
+        expect(Object.fromEntries(rows.map(({ story, goldenViewport }) => [story, goldenViewport]))).toEqual({ a: null, b: PHONE });
+      });
+    });
+
     test("not a built Storybook that changed while it rendered", async () => {
       await built();
       h.onRender = () => writeFileSync(path.join(dir, "index.json"), '{"changed":true}');
