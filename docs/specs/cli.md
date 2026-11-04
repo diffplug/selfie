@@ -294,7 +294,7 @@ Source of truth: `cli/src/flakes.ts`, `cli/src/skills.ts`, `cli/skills/`; tests 
 - **Must report a story whose images differ, or that failed in any render, or with a `timeout` or `request` error in any render, or with any other error in only some renders** (rationale).
 - **Must compare by pixels**, naming the most different pair and a picture of what differs.
 
-`selfie skill` prints a guide for a coding agent, in the format of an agent skill, so it works for a project that only has the CLI. `selfie skill fix-flakes` is how to use the above. This repository links the same file from `.claude/skills/`.
+`selfie skill` prints a guide for a coding agent, in the format of an agent skill, so it works for a project that only has the CLI. `selfie skill quickstart` sets Selfie up in a repository, and `selfie skill fix-flakes` is how to use the above. This repository links the same file from `.claude/skills/`.
 
 - **Must keep a skill's text in `cli/skills/<name>/SKILL.md`, as the one copy.**
 - **Must say only what's been seen to work:** a row in a skill's table comes from a real case (rationale).

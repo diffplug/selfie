@@ -3,6 +3,7 @@ import path from "node:path";
 import type { RenderOptions } from "selfie-render";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { runCli } from "../src/cli.ts";
+import { SKILLS } from "../src/skills.ts";
 import { BLUE, createHarness, GREEN, RED, type Harness } from "./support.ts";
 
 let h: Harness;
@@ -104,11 +105,11 @@ describe("selfie flakes", () => {
 });
 
 describe("selfie skill", () => {
-  test("prints a skill, in an agent skill's format", async () => {
+  test.each(SKILLS)("prints %s, in an agent skill's format", async (name) => {
     const lines: string[] = [];
-    const code = await runCli(["skill", "fix-flakes"], { cwd: h.repo, env: {}, stdout: (text) => lines.push(text), stderr: () => {} });
+    const code = await runCli(["skill", name], { cwd: h.repo, env: {}, stdout: (text) => lines.push(text), stderr: () => {} });
     expect(code).toBe(0);
-    expect(lines.join("")).toMatch(/^---\nname: fix-flakes\n/);
+    expect(lines.join("")).toMatch(new RegExp(`^---\\nname: ${name}\\n`));
   });
 
   test("refuses one it doesn't have", async () => {

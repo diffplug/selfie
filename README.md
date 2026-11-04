@@ -12,6 +12,22 @@ Selfie is piloting with StorybookJS, but PRs to support other testing models are
 
 A hosted instance runs at [hackathon.selfie.dev](https://hackathon.selfie.dev).
 
+## Quickstart
+
+Paste this into your coding agent, in your project:
+
+```text
+Set up Selfie in this repository. If you don't have a checkout of it, clone
+https://github.com/diffplug/selfie-hackathon outside this repository, and run
+pnpm install there. Then run this, and follow what it prints:
+
+node --disable-warning=ExperimentalWarning <checkout>/cli/src/main.ts skill quickstart
+```
+
+It works out how your Storybook builds, writes `selfie.config.json`, proves that a story really renders, and warns you about anything in your way, such as uncommitted changes. It won't commit anything without asking. You'll get a URL to open, and what to do next.
+
+You'll need Node 26 or later, pnpm, and Docker. Selfie isn't on npm yet, which is why this starts from a checkout.
+
 ## Built for the Meta Global AI Developer Hackathon
 
 We previously launched [Selfie](https://lib.selfie.dev), a snapshot testing library focused on data rather than screenshots with no cloud or agent integrations. We are backgrounding it to focus on this completely new and unrelated service, which shares the same general theme and name but none of its code. Everything in this repo was built from November 1, 2026 onward for the [Meta Global AI Developer Hackathon](https://cerebralvalley.ai/e/meta-ai-developer-hackathon/details).
