@@ -8,7 +8,6 @@ const row = (story: string, overrides: Partial<RenderRow> = {}): RenderRow => ({
   imageHash: "a".repeat(64),
   goldenHash: "b".repeat(64),
   failure: null,
-  playError: null,
   decision: null,
   goldenStorybookUrl: null,
   goldenViewport: null,
@@ -25,7 +24,6 @@ const rows = [
   row("card--new", { state: "added", goldenHash: null }),
   row("gone", { state: "removed", imageHash: null }),
   row("broken", { state: "failed", imageHash: null, goldenHash: null, failure: "boom" }),
-  row("calm", { state: "unchanged", playError: "threw" }),
 ];
 
 test("each option shows what it names", () => {
@@ -34,7 +32,6 @@ test("each option shows what it names", () => {
   expect(show("approved")).toEqual(["button--small"]);
   expect(show("removed")).toEqual(["gone"]);
   expect(show("failed")).toEqual(["broken"]);
-  expect(show("advisory")).toEqual(["calm"]);
   expect(show("all")).toHaveLength(rows.length);
 });
 

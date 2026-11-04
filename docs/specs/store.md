@@ -39,6 +39,7 @@ Source of truth: `store/src/core/store.ts`.
 
 - **Must assign the image's positive key when its hash truncated to the safe positive integer range is unclaimed.** The range is 1 to 2^53 − 1, and the truncated value is the hash's first 53 bits, read big-endian.
 - **Must assign the next monotonic negative key, starting at −1, when the truncated value is claimed by a different image or is 0.** A negative key is what marks a collision; there is no separate collision table.
+- **Never give an image the key 0**, which `decisions.image_key` holds for a story being gone.
 - **Must return the existing key when the same image is inserted again**, including an image holding a negative key.
 - **Must compare the full image hash on every lookup**, so a colliding image never resolves to another image's key.
 - **Never reuse or reassign an image key within a store.** The store has no delete. The next negative key derives from the lowest key present, so a delete must not let that key be reused.
@@ -72,10 +73,10 @@ Source of truth: `store/src/core/store.ts`, `store/src/core/image-file.ts`; test
 Source of truth: `store/src/core/built-storybooks.ts`; tests in `store/test/built-storybooks.test.ts`. A built Storybook is named by `storybookHash` (`docs/specs/render.md` → Render identity).
 
 - **Must keep a built Storybook's files by the hash of their exact bytes**, at `built-storybook-files/<sha256>`, so builds that share a file share its bytes, and a rebuilt directory costs only what changed (rationale).
-- **Must write a built Storybook's files, then one blob listing them, at `built-storybooks/<hash>`**, so a built Storybook with that blob is whole, and nothing serves one that's only partly written (`BuiltStorybooks.has`). **The first list stays** (rationale).
+- **Must write a built Storybook's files, then one blob listing them, at `built-storybooks/<hash>`, then its row in `built_storybooks(key, hash)`**, so a built Storybook with that row is whole, and nothing serves one that's only partly written. `BuiltStorybooks.has` reads the table alone, and never blob storage (rationale). **The first list stays** (rationale).
+- **Must give a built Storybook its key by the rules of [Image keys](#image-keys)**, with one statement shared by both tables.
 - **Must look up a file only by its whole path within a built Storybook**, never reaching a file system, so nothing in a path can climb out of it.
-- **Must say which built Storybook rendered a batch, in `batch_storybooks(batch_id, storybook)`, what size each environment renders at, in `environment_viewports`, and which of a batch's stories rendered at a size other than its environment's, in `story_viewports(batch_id, story, width, height)`**, since these are facts about what was rendered, and nothing about a batch may depend on a file outside the store. Reserved: all three are in the store rather than the CLI's local tables for **Scope: cloud-deploy** (`docs/specs/ui.md` → Not built).
-- **Must hold a `story_viewports` row only for a size other than the environment's, in CSS pixels**, so a story with no row rendered at its environment's size, as every story did before a story could declare one (`docs/specs/render.md` → A story's viewport). **A batch reusing another's images must hold its rows too**, and **a batch's first answer for a story stays** (rationale).
+- **Must say which kept built Storybook rendered a batch, in `render_batches.storybook_key`, set once it's kept, and null if it never was**, since that's a fact about what was rendered, and nothing about a batch may depend on a file outside the store. Reserved: it's in the store rather than the CLI's local tables for **Scope: cloud-deploy** (`docs/specs/ui.md` → Not built).
 
 ## Adapters
 
@@ -96,6 +97,7 @@ The store core runs unchanged locally and in the cloud, the way Hono does for HT
 - **Must enforce the 100,000 byte statement limit in the SQL interface for every adapter**, for the same reason (rationale).
 - **Must use only numbered or anonymous parameters, never named ones**, since D1 does not support named parameters.
 - **Must bind exactly the parameters a statement uses, each a string or a finite number**, since SQLite silently binds a missing parameter to NULL.
+- **Must have every SQL adapter enforce foreign keys**, as D1 always does, so that local SQLite refuses what D1 would. The SQLite adapter sets `PRAGMA foreign_keys = ON` on each connection.
 - **Must run one statement at a time**, since `node:sqlite` silently ignores everything after the first.
 - **Never allow a comment after a statement's closing semicolon**, since real D1 fails on it where local SQLite runs it (rationale). A comment before the semicolon is fine on both.
 - **Must mark a statement idempotent only if running it again, after it may already have run, returns the same rows and changes nothing further.** An adapter may resend a statement after a failure that leaves its outcome unknown only if it is so marked. Everything the store sends is: the image insert returns the key the first batch assigned, per [Image keys](#image-keys).

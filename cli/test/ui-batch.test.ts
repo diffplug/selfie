@@ -6,6 +6,8 @@ import { describe, expect, test } from "vitest";
 import { BLUE, commit, git } from "./support.ts";
 import { UNKNOWN_HASH, UNKNOWN_BATCH, h, project, review, get, decideOn, viewOf, approveAll } from "./ui-support.ts";
 
+const ON = { batchId: "00000000-0000-4000-8000-000000000001", gitSha: "e".repeat(40) };
+
 describe("which batch", () => {
   test("says where a batch stands against this checkout", async () => {
     h.stories = [{ id: "a" }];
@@ -35,8 +37,8 @@ describe("which batch", () => {
       gitSha: git(h.repo, "rev-parse", "HEAD"),
       environment,
       scale: 1,
+      viewport: { width: 1200, height: 900 },
       dirty: false,
-      baselineSha: null,
     });
     expect((await newest()).newestBatchId).toBe(second);
     const unfinished = await get(`/api/batches/${recording.id}`);
@@ -69,7 +71,7 @@ describe("which batch", () => {
 });
 
 describe("the batch view", () => {
-  test("gives counts, blockers, advisories, and states, and never a file path", async () => {
+  test("gives counts, blockers, and states, and never a file path", async () => {
     h.stories = [{ id: "same" }, { id: "differs" }, { id: "gone" }, { id: "breaks" }];
     await approveAll();
     h.stories = [
@@ -82,20 +84,19 @@ describe("the batch view", () => {
     const response = await get(`/api/batches/${json.batchId}`);
     expect(response.headers.get("cache-control")).toBe("no-store");
     const view = (await response.json()) as any;
-    expect(view.counts).toEqual({ stories: 4, unchanged: 1, changed: 1, added: 1, removed: 1, failed: 1, undecided: 3, advisories: 1 });
+    expect(view.counts).toEqual({ stories: 4, unchanged: 0, changed: 1, added: 1, removed: 1, failed: 2, undecided: 3 });
     expect(view.rows.map(({ story, state }: any) => [story, state])).toEqual([
       ["breaks", "failed"],
       ["differs", "changed"],
       ["fresh", "added"],
-      ["same", "unchanged"],
+      ["same", "failed"],
       ["gone", "removed"],
     ]);
-    expect(view.blockers.map(({ reason }: any) => reason).sort()).toEqual(["added-unapproved", "changed-unapproved", "failed", "removed"]);
-    expect(view.advisories).toEqual([{ story: "same", reason: "play-error", detail: "It threw" }]);
+    expect(view.blockers.map(({ reason }: any) => reason).sort()).toEqual(["added-unapproved", "changed-unapproved", "failed", "failed", "removed"]);
+    expect(view.rows.find(({ story }: any) => story === "same")).toMatchObject({ failure: "play: It threw", imageHash: expect.any(String) });
     expect(view.rows.find(({ story }: any) => story === "breaks")).toMatchObject({ failure: "render: It broke", imageHash: null });
     expect(view.rows.find(({ story }: any) => story === "differs").pixelDiff).toMatchObject({ changedPixels: 64 });
     expect(view.outsideFilter).toBe(0);
-    expect(view.batch.baselineSha).toBeNull();
     expect(view.actor).toBe("tester@example.com");
     expect(view.siblings.map(({ id }: any) => id)).toContain(json.batchId);
 

@@ -135,14 +135,15 @@ describe.runIf(process.env.SELFIE_CLI_CONTAINER === "1")("in the pinned containe
     }
   }, 120_000);
 
-  test("failures block, and play errors are advisories", async () => {
+  test("failures block, and a play function that throws is a failure that keeps its image", async () => {
     const { status, json } = await review("--story", "broken--throws", "--story", "play--fails");
     expect(status).toBe(1);
     expect(json.blockers.filter(({ reason }: any) => reason === "failed").map(({ story }: any) => story)).toEqual([
       "broken--throws",
+      "play--fails",
     ]);
-    expect(json.playErrors.map(({ story }: any) => story)).toEqual(["play--fails"]);
-    expect(json.advisories.map(({ reason }: any) => reason)).toEqual(["play-error"]);
-    expect(json.counts.advisories).toBe(1);
+    const played = json.failures.find(({ story }: any) => story === "play--fails");
+    expect(played.failure).toContain("play: ");
+    expect(played.current).toEqual(expect.any(String));
   }, 120_000);
 });

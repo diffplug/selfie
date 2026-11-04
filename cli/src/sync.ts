@@ -173,7 +173,7 @@ export async function push(project: Project, remote: Remote, { batch: given, acc
 
   let decisions: number | null = null;
   if (access.decide) {
-    const decided = decidedIn(held).map(({ story, imageHash, decision, at }): SentDecision => ({ story, imageHash, decision, at }));
+    const decided = decidedIn(held).map(({ actor: _, ...decision }): SentDecision => decision);
     for (const group of chunks(decided, SYNC_LIMITS.decisions)) {
       await askJson(remote, `${route}/decisions`, "POST", { environment: batch.environment, decisions: group });
     }
@@ -183,8 +183,8 @@ export async function push(project: Project, remote: Remote, { batch: given, acc
   const acceptedHere = (await batches.acceptedBatchAt(batch.gitSha, batch.environment)) === batchId;
   let goldens: GoldensAnswer | null = null;
   if (accept === true || acceptedHere) {
-    // A machine that's never pulled, such as CI, recorded no baseline, so ask which the cloud holds this to.
-    const baselineSha = batch.baselineSha ?? (await remoteBaseline(project, remote, route, batch.environment)).sha;
+    // No machine records a baseline, so ask which the cloud holds this to.
+    const baselineSha = (await remoteBaseline(project, remote, route, batch.environment)).sha;
     goldens = await askJson<GoldensAnswer>(remote, `${route}/goldens`, "POST", { batchId, baselineSha, removed: await batches.removedFrom(batchId, baselineSha) });
   }
   return { batchId, images: { sent, alreadyThere: total - sent }, decisions, goldens };

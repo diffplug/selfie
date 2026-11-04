@@ -4,9 +4,7 @@
 import { isDecidable } from "selfie-store";
 import { fn } from "storybook/test";
 import type {
-  AdvisoryReason,
   Attention,
-  BlockerReason,
   ComparedRender,
   Note,
   RenderBatch,
@@ -27,13 +25,12 @@ const STARTED = NOW - 2 * 60 * 60 * 1000;
 
 const decision = (kind: "approved" | "rejected", actor = "ned@example.com") => ({ decision: kind, actor, at: NOW - 60 * 60 * 1000 });
 
-type Extras = Partial<Pick<RenderRow, "decision" | "playError">>;
+type Extras = Partial<Pick<RenderRow, "decision">>;
 
 const render = (fields: Pick<ComparedRender, "story" | "state"> & Partial<RenderRow>): RenderRow => ({
   imageHash: null,
   goldenHash: null,
   failure: null,
-  playError: null,
   decision: null,
   pixelDiff: null,
   goldenStorybookUrl: null,
@@ -63,8 +60,8 @@ export const rows = {
   removed: (story: string) => render({ story, state: "removed", goldenHash: HASHES.gone }),
   failed: (story: string) =>
     render({ story, state: "failed", goldenHash: HASHES.golden, failure: "Render threw: Cannot read properties of undefined (reading 'name')" }),
-  unchangedWithPlayError: (story: string) =>
-    render({ story, state: "unchanged", imageHash: HASHES.golden, goldenHash: HASHES.golden, playError: "expected a dialog to open" }),
+  playFailed: (story: string) =>
+    render({ story, state: "failed", imageHash: HASHES.fresh, goldenHash: HASHES.golden, failure: "play: expected a dialog to open" }),
 };
 
 export const approved = (actor?: string) => ({ decision: decision("approved", actor) });
@@ -80,11 +77,11 @@ export function batchOf(overrides: Partial<RenderBatch> = {}): RenderBatch {
     finishedAt: STARTED + 90_000,
     failedCount: 0,
     dirty: false,
-    baselineSha: null,
     branch: "main",
     storyFilter: null,
     reusedFromBatch: null,
     scale: 1,
+    viewport: { width: 1200, height: 900 },
     ...overrides,
   };
 }
@@ -100,7 +97,7 @@ export function viewOf(
   const removed = inState("removed");
   const batch = batchOf({ failedCount: failed.length, status: failed.length > 0 ? "failed" : "complete", ...batchOverrides });
 
-  const blockers: Attention<BlockerReason>[] = [
+  const blockers: Attention[] = [
     ...failed.map(({ story, failure }) => ({ story, reason: "failed" as const, detail: failure })),
     ...unapproved.map(({ story, state, decision: made }) =>
       made?.decision === "rejected"
@@ -111,19 +108,14 @@ export function viewOf(
     ),
     ...(batch.storyFilter?.unmatched ?? []).map((pattern) => ({ story: null, reason: "pattern-unmatched" as const, detail: pattern })),
   ];
-  const advisories: Attention<AdvisoryReason>[] = list.flatMap(({ story, playError }) =>
-    playError === null ? [] : [{ story, reason: "play-error" as const, detail: playError }],
-  );
   return {
     batch,
     storybook: null,
-    viewport: { width: 1200, height: 900 },
     storyViewports: {},
     storyNames: [],
     hunkMergeDistance: 12,
     actor: "ned@example.com",
     blockers,
-    advisories,
     counts: {
       stories: unchanged + list.filter(({ state }) => state !== "removed" && state !== "unchanged").length,
       unchanged,
@@ -132,7 +124,6 @@ export function viewOf(
       removed: removed.length,
       failed: failed.length,
       undecided: undecided.length,
-      advisories: advisories.length,
     },
     rows: list,
     outsideFilter: 0,

@@ -8,7 +8,7 @@ const OTHER = "22222222-2222-4222-8222-222222222222";
 const batch = { id: THIS } as RenderBatch;
 const [A, B, C] = [hashOf(1), hashOf(2), hashOf(3)];
 
-const render = (story: string, imageHash: string | null) => ({ story, imageHash, failure: imageHash === null ? "broke" : null, playError: null });
+const render = (story: string, imageHash: string | null) => ({ story, imageHash, failure: imageHash === null ? "broke" : null });
 const approved = (story: string, imageHash: string | null, at: number, batchId = OTHER): PlacedDecision => ({ story, imageHash, decision: "approved", actor: "a", at, batchId });
 const rejected = (story: string, imageHash: string, at: number, batchId = OTHER): PlacedDecision => ({ story, imageHash, decision: "rejected", actor: "a", at, batchId });
 
@@ -83,7 +83,7 @@ describe("on a store", () => {
     const entries = Object.entries(stories);
     const hashes = entries.map(([, image]) => hashOf(image));
     await temp.sql.batch(entries.map(([, image]) => imageInsertStatement(hashOf(image), image)));
-    const batch = await batches.beginBatch({ gitSha, environment: ENV, scale: 1, dirty: false, baselineSha: null, branch: "topic" });
+    const batch = await batches.beginBatch({ gitSha, environment: ENV, scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, branch: "topic" });
     await batches.recordRenders(batch.id, entries.map(([story], at) => ({ story, imageHash: hashes[at]! })));
     await batches.finishBatch(batch.id, entries.length);
     return { batch, hash: (story: string) => hashes[entries.findIndex(([name]) => name === story)]! };
@@ -119,8 +119,8 @@ describe("on a store", () => {
 
   it("finds a branch's commits since a time, for a rebase's sake", async () => {
     const { batch } = await finished(SHAS[0], { a: 1 });
-    expect(await batches.commitsOfBranch("topic", ENV, 0)).toEqual([SHAS[0]]);
-    expect(await batches.commitsOfBranch("other", ENV, 0)).toEqual([]);
-    expect(await batches.commitsOfBranch("topic", ENV, batch.startedAt + 1)).toEqual([]);
+    expect(await batches.commitsOfBranch("topic", ENV, 0, Number.MAX_SAFE_INTEGER)).toEqual([SHAS[0]]);
+    expect(await batches.commitsOfBranch("other", ENV, 0, Number.MAX_SAFE_INTEGER)).toEqual([]);
+    expect(await batches.commitsOfBranch("topic", ENV, batch.startedAt + 1, Number.MAX_SAFE_INTEGER)).toEqual([]);
   });
 });

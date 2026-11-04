@@ -63,9 +63,9 @@ All 1,623 of those images came back from `sharp` with exactly the same pixels, i
 
 **Why by file, and why one list.** Storybook names most of its files by their content, so most of a built Storybook survives a rebuild. This repository's build is 10 MB in 65 files, and Dormouse's 568 stories are 12 MB in 390 files, both measured 2026-11. Dormouse's first keep added about 3.4 s to a render. A row per file would write that many rows for every built Storybook, and take a request for every file a page loads. One list is one blob, read once.
 
-**Why the first list stays.** A built Storybook's hash ignores what can't change a pixel (`docs/specs/render.md`), so two builds with one hash can differ in `project.json`. Either answer is fine, and keeping the first means a kept built Storybook never changes, which a browser's cache relies on.
+**Why a table says what's kept.** Asking blob storage costs a request to R2 for each check, and a sender deciding whether to upload a built Storybook shouldn't need one. A row in a table answers in the same place as everything else about a batch. It works as `images` does, so a batch holds an integer rather than a 64-character hash, and a built Storybook rendered many times is one row.
 
-**A story's own size, by batch.** The image's size can't give it: a full-page image may be taller or wider than the window it was taken in. Nor can the environment, since it's project input, and nor can a built Storybook's files without running them. A new table rather than a column on `renders`, since a store only ever gains tables (`docs/specs/renders.md` → Schema). By batch, not by built Storybook and environment, since a batch whose built Storybook couldn't be named still has renders. Only the sizes that differ, so nearly every batch adds no rows, and every batch from before this reads correctly as its environment's size.
+**Why the first list stays.** A built Storybook's hash ignores what can't change a pixel (`docs/specs/render.md`), so two builds with one hash can differ in `project.json`. Either answer is fine, and keeping the first means a kept built Storybook never changes, which a browser's cache relies on.
 
 ## Adapters
 

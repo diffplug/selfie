@@ -325,6 +325,15 @@ describe("another machine", () => {
     expect((await laptop("writer", "push", "--accept")).json.goldens).toMatchObject({ outcome: "accepted", refusal: null });
   });
 
+  test("a decision pulled here counts from its commit, so a later commit asks nothing", async () => {
+    await approved();
+    await laptop("writer", "push", "--accept");
+    await desktop("reader", "pull", headOf());
+    await commit(desktopRepo, "more");
+    const { json: reviewed } = await desktop(null, "review");
+    expect(reviewed.counts).toMatchObject({ unchanged: 2, changed: 0, added: 0 });
+  });
+
   test("goldens pulled here go with their batch when it's pushed, with no need to ask", async () => {
     const batchId = await approved();
     await laptop("writer", "push", "--accept");

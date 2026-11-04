@@ -3,7 +3,7 @@
 // so they run on any platform, and are tested with a stand-in for it.
 import { Hono, type Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { ImageDecodeError, isGitSha, isImageHash, isBatchId, BatchError, type ReceivedDecision, type ReceivedBatch, type ReceivingStore, type RecordedRender, type RenderBatches, type StoryFilter } from "selfie-store";
+import { assertViewport, ImageDecodeError, isGitSha, isImageHash, isBatchId, BatchError, type ReceivedDecision, type ReceivedBatch, type ReceivingStore, type RecordedRender, type RenderBatches, type StoryFilter, type Viewport } from "selfie-store";
 import { SYNC_LIMITS, type GoldensAnswer, type ProjectAccess } from "../shared/sync-api.ts";
 import { failure, imageResponse, INTERNAL_ERROR, noStoreByDefault } from "./http.ts";
 
@@ -94,15 +94,23 @@ function readHash(value: unknown): string {
   return value;
 }
 
+function readViewport(value: unknown): Viewport {
+  const { width, height } = asRecord(value);
+  const viewport = { width: width as number, height: height as number };
+  assertViewport(viewport);
+  return viewport;
+}
+
 function recordedRender(value: unknown): RecordedRender {
-  const { story, imageHash, failure: failed, playError } = asRecord(value);
-  const named = { story: readText(story, "story"), playError: orNull(playError, (error) => readText(error, "playError")) };
-  return imageHash === null || imageHash === undefined ? { ...named, failure: readText(failed, "failure") } : { ...named, imageHash: readHash(imageHash) };
+  const { story, imageHash, failure, viewport } = asRecord(value);
+  const named = { story: readText(story, "story"), viewport: orNull(viewport, readViewport) ?? undefined };
+  if (imageHash === null || imageHash === undefined) return { ...named, failure: readText(failure, "failure") };
+  return { ...named, imageHash: readHash(imageHash), failure: orNull(failure, (present) => readText(present, "failure")) ?? undefined };
 }
 
 /** A batch's facts as a sender states them, whose times can't be later than now. */
 function receivedBatch(id: string, body: Record<string, unknown>, now: number): ReceivedBatch {
-  const { gitSha, environment, startedAt, dirty, baselineSha, storyFilter, reusedFromBatch, scale } = body;
+  const { gitSha, environment, startedAt, dirty, storyFilter, reusedFromBatch, scale, viewport } = body;
   if (typeof dirty !== "boolean") throw badRequest("dirty must be true or false.");
   if (typeof scale !== "number") throw badRequest("scale must be a number.");
   return {
@@ -111,17 +119,17 @@ function receivedBatch(id: string, body: Record<string, unknown>, now: number): 
     environment: readText(environment, "environment"),
     startedAt: Math.min(readWhole(startedAt, "startedAt"), now),
     dirty,
-    baselineSha: orNull(baselineSha, (sha) => readSha(sha, "baselineSha")),
     storyFilter: (storyFilter ?? null) as StoryFilter | null,
     reusedFromBatch: orNull(reusedFromBatch, (batch) => readText(batch, "reusedFromBatch")),
     scale,
+    viewport: readViewport(viewport),
   };
 }
 
 function receivedDecision(value: unknown, decider: string, now: number): ReceivedDecision {
-  const { story, imageHash, decision, at } = asRecord(value);
+  const { story, imageHash, decision, at, gitSha, batchId } = asRecord(value);
   if (decision !== "approved" && decision !== "rejected") throw badRequest('decision must be "approved" or "rejected".');
-  return { story: readText(story, "story"), imageHash: readHash(imageHash), decision, actor: decider, at: Math.min(readWhole(at, "at"), now) };
+  return { story: readText(story, "story"), imageHash: readHash(imageHash), decision, actor: decider, at: Math.min(readWhole(at, "at"), now), gitSha: readSha(gitSha, "gitSha"), batchId: readBatchId(batchId) };
 }
 
 /** The same stories, in any order. */
@@ -191,7 +199,7 @@ export function createSyncApi(host: SyncHost): Hono {
 
   api.onError((error, context) => {
     if (error instanceof Refusal) return context.json(failure(error.code, error.message), error.status);
-    if (error instanceof BatchError) return context.json(failure(error.code, error.message), error.code === "unknown-batch" ? 404 : 409);
+    if (error instanceof BatchError) return context.json(failure(error.code, error.message), error.code === "unknown-batch" || error.code === "unknown-image" ? 404 : 409);
     if (error instanceof RangeError || error instanceof TypeError) return context.json(failure("bad-request", error.message), 400);
     console.error(error);
     return context.json(INTERNAL_ERROR, 500);

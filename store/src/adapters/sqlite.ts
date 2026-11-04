@@ -20,6 +20,8 @@ export class SqliteAdapter implements SqlAdapter {
     // Most commits need no fsync. A power cut can lose recent rows, which only
     // orphans their bytes, and can't corrupt the database.
     this.#db.exec("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL");
+    // SQLite leaves foreign keys off by default, and D1 always enforces them, so this is as D1 does.
+    this.#db.exec("PRAGMA foreign_keys = ON");
   }
 
   async execute(statements: readonly SqlStatement[]): Promise<SqlRow[][]> {

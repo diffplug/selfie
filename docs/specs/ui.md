@@ -119,13 +119,13 @@ Source of truth: `ui/src/client/`.
 
 **The top bar** says what a page is looking at: on every story, the built Storybook, its commit and branch, and whether it's clean; on a batch's pages, the diff, between the batch's commit and what it's compared with, and how that relates to the merge base with the default branch.
 
-**A batch's pages** have the same list at their left, of what differs, which is what's changed, added, removed, or failed, narrowed by what Show says, and showing what's unchanged only if that's what Show asks for, or if it has an advisory. Next and previous go down that list, as far as it's narrowed. The list is where a batch's stories are: there's no table of them on the right.
+**A batch's pages** have the same list at their left, of what differs, which is what's changed, added, removed, or failed, narrowed by what Show says, and showing what's unchanged only if that's what Show asks for. Next and previous go down that list, as far as it's narrowed. The list is where a batch's stories are: there's no table of them on the right.
 
-- **Must say more of each story as the list is dragged wider:** its state and decision, then its pixels and advisories on a batch's pages, or when it was rendered on every story.
+- **Must say more of each story as the list is dragged wider:** its state and decision, then its pixels on a batch's pages, or when it was rendered on every story.
 
 - **Must say a story is renamed if it's added and a removed story's reference is its very image**, one to one, and the closest names first where several share an image (rationale). The list has it once, under its new name. This is only to look at: to decisions they're still one added and one removed.
 
-**The batch** shows, in order: its commit, batch ID, whether its pixels were rendered earlier and by which batch, dirty state, environment, and decision actor; a warning if it was recorded dirty; the counts; blockers; advisories; and the differences.
+**The batch** shows, in order: its commit, batch ID, whether its pixels were rendered earlier and by which batch, dirty state, environment, and decision actor; a warning if it was recorded dirty; the counts; blockers; and the differences.
 
 - **Must group blockers by reason, in words, and offer each as a filter of the list.**
 - **Must keep the filter, text and state, in the URL, and nowhere else**, so back, reload, and next and previous all follow it.
@@ -133,7 +133,7 @@ Source of truth: `ui/src/client/`.
 
 **Bulk decisions:** approve or reject all, or all the current filter shows.
 
-- **Must confirm every bulk decision in a dialog, with the count, how many are changed and added, how many are already decided, how many have an advisory, and which stories.** Focus starts on Cancel.
+- **Must confirm every bulk decision in a dialog, with the count, how many are changed and added, how many are already decided, and which stories.** Focus starts on Cancel.
 - **Must hold the rows in the dialog from when it opens, and send those**, so what it listed is what's sent, whatever a filter or a read does meanwhile.
 
 **One render** shows its state and decision, pixel stats, and images.
@@ -149,7 +149,7 @@ Source of truth: `ui/src/client/`.
 - **Must let someone select any set of hunks, from the list, from an outline, or with a key, and keep that only while they stay on the story.** Clicking a stacked hunk's outline selects it, and side by side only its number does, since clicking an image there stacks it.
 - **Must keep the hunk being looked at still when flipping between images**, since it can be somewhere else in the other one (rationale).
 - **Must link a render to its story in the very built Storybook that rendered its batch, if that's kept, or else the directory `selfie ui` hosts, and then say it may not match** (`BatchView.storybook`). A removed story has no link.
-- **Must offer the live stories, closed and loading nothing until opened, and stay open or closed from story to story**: the kept built Storybook of the batch behind its reference, beside the batch's own, in frames (`docs/specs/access.md` → Local review server), each at the size its own image rendered at, which is the story's own (`BatchView.storyViewports`, `RenderRow.goldenViewport`) or else its environment's (`BatchView.viewport`), and scaled to fit, or else saying that size wasn't recorded, each saying why if it has none (rationale).
+- **Must offer the live stories, closed and loading nothing until opened, and stay open or closed from story to story**: the kept built Storybook of the batch behind its reference, beside the batch's own, in frames (`docs/specs/access.md` → Local review server), each at the size its own image rendered at, which is the story's own (`BatchView.storyViewports`, `RenderRow.goldenViewport`) or else its batch's (`RenderBatch.viewport`), and scaled to fit, each saying why if it has none (rationale).
 - **Must give a live story the keyboard only when it's clicked in**, taking focus back from one that focuses itself as it loads, so this page's keys keep working (rationale).
 - **Must leave the browser's history alone when moving a live story along**, so Back leaves the screen as it does anywhere else (rationale).
 - **Must keep how someone is looking when moving between stories**, and must never show one story's image under another's name while it loads.

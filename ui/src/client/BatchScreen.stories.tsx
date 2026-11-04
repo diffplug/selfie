@@ -39,7 +39,7 @@ export const FirstBatchAllNew: Story = {
   args: {
     view: viewOf(
       ["a--one", "a--two", "a--three", "b--one", "b--two"].map((story) => rows.fresh(story)),
-      { unchanged: 0, batch: { baselineSha: null } },
+      { unchanged: 0 },
     ),
   },
 };
@@ -69,8 +69,8 @@ export const FailedAndRemoved: Story = {
 export const PlayErrors: Story = {
   args: {
     view: viewOf([
-      rows.unchangedWithPlayError("components-menu--opens"),
-      rows.changed("components-tooltip--hover", { playError: "expected the tooltip to be visible" }),
+      rows.playFailed("components-menu--opens"),
+      rows.playFailed("components-tooltip--hover"),
     ]),
   },
 };
@@ -109,7 +109,7 @@ export const ConfirmApproveAll: Story = {
     view: viewOf([
       rows.changed("components-button--primary"),
       rows.fresh("components-badge--new", approved()),
-      rows.tall("pages-settings--account", { playError: "expected a dialog to open" }),
+      rows.tall("pages-settings--account"),
     ]),
   },
   play: async ({ canvasElement }) => {

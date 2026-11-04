@@ -10,7 +10,7 @@
 |---|---|---|
 | Images | Named by hash, so never, unless a client [lied or broke](#what-a-store-takes) | Send what's missing |
 | Finished batches | Keep their ID, and never change, so never | Send what's missing |
-| Decisions | One per name and hash, so yes | Latest wins (`docs/specs/renders.md` → Decisions) |
+| Decisions | One per name, hash, and commit, so yes | Latest wins (`docs/specs/renders.md` → Decisions) |
 | Goldens | One batch per SHA and environment, so yes | [The cloud decides](#goldens) |
 
 ## Routes
@@ -28,8 +28,8 @@ To mount under `/api`. `GET /repositories/:owner/:name` finds a repository's pro
 | `GET /images/:hash` | The stored bytes | View |
 | `POST /batches/:id/renders` | `{ renders }`, at most 1,000 | Upload |
 | `POST /batches/:id/finish` | `{ count, finishedAt }` | Upload |
-| `GET /batches/:id` | `?after`, a page of the batch, each render, and the decision on each image, with `next` | View |
-| `POST /decisions` | `{ environment, decisions }`, at most 1,000 | Decide |
+| `GET /batches/:id` | `?after`, where `next` said the page starts, a page of the batch in no particular order, each render, and the decision on each image, with `next` | View |
+| `POST /decisions` | `{ environment, decisions }`, at most 1,000, each with its `gitSha` and `batchId` | Decide |
 | `POST /goldens` | `{ batchId, baselineSha, removed }`, answers `{ outcome, acceptedBatchId, refusal }`, where `outcome` is `accepted`, `already`, `conflict`, or `refused` | Upload, or Decide if `removed` isn't empty |
 | `GET /goldens` | `?sha&environment`, answers `{ batchId }` | View or Upload |
 | `POST /goldens/first` | `{ shas, environment }`, at most 1,000, answers `{ sha }`, the first with goldens | View or Upload |
@@ -65,7 +65,7 @@ Reserved: a fork's render pass must not upload through this (`docs/specs/access.
 
 - **Must run goldens through `acceptBatch` on the server**, against what it now holds, so nothing is taken on trust. `trust` is a separate scope. A refusal is an answer, and leaves the batch there.
 - **Must let CI make goldens, with Upload alone, if the batch removes nothing**, since accepting then adds no judgment: each image already matches the baseline, or was approved by someone who may decide. This is how a merge commit gets goldens without a person re-rendering it (rationale).
-- **Must hold a batch to the baseline the sender names, which must have goldens here**, since a machine that has never pulled recorded none, and CI on a private repository can't pull. CI's sequence is `selfie render`, then `selfie push --accept` (rationale).
+- **Must hold a batch to the baseline the sender names, which must have goldens here**, since no batch records one, and CI on a private repository can't pull. CI's sequence is `selfie render`, then `selfie push --accept` (rationale).
 - **Must need Decide for goldens that remove anything, have the sender name what it counted as removed, and refuse with `wrong-removed` if that isn't what the server finds**, in place of a count, since the local count isn't kept, and the two stores' baselines could differ.
 - **Must never replace a SHA's goldens this way.** If the cloud has a different batch there, it answers `conflict` with that batch's ID. Nothing can replace them yet ([Not yet](#not-yet)).
 - **Must refuse goldens whose baseline's goldens aren't here with `no-goldens`**. Nothing reaches back through history.
@@ -78,7 +78,7 @@ Source of truth: `cli/src/sync.ts`; tests in `cli/test/sync.test.ts`, between tw
 - **Must make every step safe to send again**, so a push or pull that dies is finished by running it again, with nothing to clean up. A partly received batch stays `recording`, which nothing can compare or accept.
 - **Must send only the images the receiver lacks, and pull only those this store lacks, decoding each to check it's the image its hash names**, and stop with `corrupt-image` naming it if it isn't, leaving what's stored here as it was. A sender's check is the last that image gets, and a puller's is the only one that finds what another client sent wrongly.
 - **Must carry `reusedFromBatch`**, for `trust`. It may name a batch never pushed.
-- **Must send only the decisions on the batch's own images**, which are the ones that carry through a push (`docs/specs/system.md` → Approvals across stores).
+- **Must send only the decisions on the batch's own images, each with the commit it counts from**, which are the ones that carry through a push (`docs/specs/system.md` → Approvals across stores).
 - **Must ask first what the token may do, and skip what it can't, saying so**, so that CI isn't refused after uploading everything.
 - **Must let a pull replace a SHA's local goldens with the cloud's, and say so**, through `adoptGoldens`. Its decisions merge, so a later one here stands.
 - **Must read nothing more once a SHA's goldens here are already the cloud's**, since a shared limit pays for every pull CI makes.

@@ -26,7 +26,7 @@ import {
   type RenderBatch,
   type BuiltStorybookFile,
   type StoryFilter,
-  type StoryViewport,
+  type Viewport,
 } from "selfie-store";
 import { resolveRenderSettings, resolveHunkMergeDistance, type RenderSettings } from "./config.ts";
 import { diffToPng, type PixelDiff } from "./diff.ts";
@@ -98,9 +98,10 @@ export interface ReviewResult {
   readonly hunkMergeDistance: number;
   /** Within the batch's filter. */
   readonly differences: readonly Difference[];
-  readonly playErrors: readonly {
+  /** Every story that failed, with the image it left, if it rendered that far. */
+  readonly failures: readonly {
     readonly story: string;
-    readonly playError: string;
+    readonly failure: string;
     readonly current: string | null;
   }[];
   readonly warnings: readonly string[];
@@ -142,9 +143,10 @@ function assertStoriesRendered(count: number, storybookDir: string, stories: rea
 const describeErrors = (errors: readonly StoryError[]) =>
   errors.map(({ source, message }) => `${source}: ${message}`).join("; ") || "The story failed to render.";
 
-const playErrorOf = ({ errors }: ManifestStory) => {
+/** Why a story that rendered still failed, if it did: its play function threw. */
+const playFailureOf = ({ errors }: ManifestStory) => {
   const play = errors.filter(({ source }) => source === "play");
-  return play.length === 0 ? null : play.map(({ message }) => message).join("; ");
+  return play.length === 0 ? undefined : describeErrors(play);
 };
 
 /**
@@ -174,6 +176,11 @@ async function storeGroup(
   return { hashes, refused };
 }
 
+/** The window a story laid out in, if that isn't its environment's. */
+function ownViewport({ viewport }: Manifest["stories"][number], { width, height }: Viewport): Viewport | undefined {
+  return viewport === null || (viewport.width === width && viewport.height === height) ? undefined : viewport;
+}
+
 /** Puts the render's images in the store, and returns one row per story. */
 async function storeRender(project: Project, renderDir: string, manifest: Manifest): Promise<RecordedRender[]> {
   const records: RecordedRender[] = [];
@@ -193,12 +200,8 @@ async function storeRender(project: Project, renderDir: string, manifest: Manife
     for (const [story, message] of stored.refused) failures.set(story, `The store refused its image: ${message}`);
     for (const story of group) {
       const imageHash = stored.hashes.get(story.id);
-      const shared = { story: story.id, playError: playErrorOf(story) };
-      records.push(
-        imageHash !== undefined
-          ? { ...shared, imageHash }
-          : { ...shared, failure: failures.get(story.id)! },
-      );
+      const viewport = ownViewport(story, manifest.environment.viewport);
+      records.push(imageHash !== undefined ? { story: story.id, viewport, imageHash, failure: playFailureOf(story) } : { story: story.id, viewport, failure: failures.get(story.id)! });
     }
   }
   return records;
@@ -259,18 +262,18 @@ async function exportImages(project: Project, batchDir: string, comparison: Comp
   const limit = Math.min(MAX_CONCURRENT_DIFFS, availableParallelism());
   const differences = await mapConcurrently(shown, limit, (render) => exportDifference(project, batchDir, render));
 
-  // An unchanged story with a play error needs a look too, so these get their images here.
-  const playErrors = await mapConcurrently(
-    comparison.renders.filter(({ playError }) => playError !== null),
+  // What a story looked like when it failed is how to work out why.
+  const failures = await mapConcurrently(
+    comparison.renders.filter(({ state }) => state === "failed"),
     limit,
-    async ({ story, playError, imageHash }) => ({
+    async ({ story, failure, imageHash }) => ({
       story,
-      playError: playError!,
+      failure: failure!,
       current:
         imageHash === null ? null : (await exportImage(project, await storyDirectory(batchDir, story), "current.png", imageHash)).file,
     }),
   );
-  return { differences, playErrors };
+  return { differences, failures };
 }
 
 /** What a render says about a filter, as a fact for the batch. */
@@ -285,8 +288,6 @@ interface Recording {
   readonly storyIds: readonly string[];
   readonly warnings: readonly string[];
   readonly records: () => Promise<readonly RecordedRender[]>;
-  /** The stories that rendered at a size other than their environment's. */
-  readonly storyViewports: () => Promise<Readonly<Record<string, StoryViewport>>>;
   /** Called with the finished batch, if a new one was recorded. */
   readonly finished: (batch: RenderBatch) => Promise<void>;
 }
@@ -295,8 +296,9 @@ interface Recording {
 const REPEATABLE_ERRORS: ReadonlySet<StoryError["source"]> = new Set(["play", "console", "page", "viewport"]);
 
 /** Why this render mustn't answer a later review, or null if it may. */
-function whyNotReusable({ stories, warnings }: Manifest, { status }: RenderBatch): string | null {
-  if (status !== "complete") return "a story failed";
+function whyNotReusable({ stories, warnings }: Manifest, records: readonly RecordedRender[]): string | null {
+  // One that rendered and then failed will fail the same way, and rendering again wouldn't help.
+  if (records.some(({ imageHash }) => imageHash === undefined)) return "a story failed to render";
   for (const { id, errors } of stories) {
     const error = errors.find(({ source }) => !REPEATABLE_ERRORS.has(source));
     if (error !== undefined) return `${id} had a ${error.source} error, which might not recur: ${error.message.split("\n")[0]}`;
@@ -312,9 +314,12 @@ async function replay(
   log: (line: string) => void,
 ): Promise<Recording | null> {
   const batchId = await project.renderKeys.find(identity);
-  if (batchId === null || (await project.batches.getBatch(batchId))?.status !== "complete") return null;
+  if (batchId === null) return null;
+  const remembered = await project.batches.getBatch(batchId);
+  if (remembered === null || remembered.status === "recording") return null;
   // With no decisions, this is only every story it holds.
   const { renders } = await project.batches.compareFromHistory(batchId, [], { includeUnchanged: true });
+  if (renders.some(({ imageHash }) => imageHash === null)) return null;
   const stories = renders.map((render) => ({ id: render.story, render }));
   const chosen = patterns === undefined ? stories : filterStories(stories, patterns).stories;
   const storyIds = chosen.map(({ id }) => id);
@@ -322,24 +327,13 @@ async function replay(
     reusedFromBatch: batchId,
     storyIds,
     warnings: (storyFilterOf(patterns, storyIds)?.unmatched ?? []).map(unmatchedPatternWarning),
-    // A remembered batch is `complete`, so every row has an image.
-    records: async () =>
-      chosen.map(({ render: { story, imageHash, playError } }) => ({ story, imageHash: imageHash!, playError })),
-    storyViewports: async () => {
-      const kept = new Set(storyIds);
-      return Object.fromEntries(Object.entries(await project.storybooks.storyViewportsOf(batchId)).filter(([story]) => kept.has(story)));
+    records: async () => {
+      const viewports = await project.batches.storyViewportsOf(batchId);
+      return chosen.map(({ render: { story, imageHash, failure } }) => ({ story, imageHash: imageHash!, viewport: viewports[story], ...(failure === null ? {} : { failure }) }));
     },
     finished: async () =>
       log(`Reused the images of batch ${batchId}, since this exact built Storybook already rendered. Run selfie render to render again.`),
   };
-}
-
-/** The stories in a manifest that laid out at a size other than its environment's. */
-function ownViewports({ environment, stories }: Manifest): Record<string, StoryViewport> {
-  const { width, height } = environment.viewport;
-  return Object.fromEntries(
-    stories.flatMap(({ id, viewport }) => (viewport === null || (viewport.width === width && viewport.height === height) ? [] : [[id, viewport]])),
-  );
 }
 
 /** What a render takes from a project's settings and a command's options. */
@@ -375,12 +369,12 @@ async function renderFresh(
   },
 ): Promise<Recording> {
   const manifest = await render(renderInput({ outDir: renderDir, log }, settings, options));
+  let stored: readonly RecordedRender[] = [];
   return {
     reusedFromBatch: null,
     storyIds: manifest.stories.map(({ id }) => id),
     warnings: manifest.warnings,
-    records: () => storeRender(project, renderDir, manifest),
-    storyViewports: async () => ownViewports(manifest),
+    records: async () => (stored = await storeRender(project, renderDir, manifest)),
     async finished(batch) {
       if (options.stories !== undefined) return;
       if (identity === null) {
@@ -389,7 +383,7 @@ async function renderFresh(
       }
       // A built Storybook that changed while it rendered has no identity that describes these images.
       const after = await renderIdentity({ storybookDir: settings.storybookDir, environment: settings.environment, initScript: settings.initScript, settleMs: settings.settleMs });
-      const whyNot = after === identity ? whyNotReusable(manifest, batch) : "the built Storybook changed while it rendered";
+      const whyNot = after === identity ? whyNotReusable(manifest, stored) : "the built Storybook changed while it rendered";
       await project.renderKeys.remember(identity, whyNot === null ? batch.id : null);
       if (whyNot !== null) log(`This render won't be reused: ${whyNot}.`);
     },
@@ -433,6 +427,7 @@ async function recordBatch(
     gitSha: fields.gitSha,
     environment: fields.settings.environmentId,
     scale: fields.settings.environment.scale,
+    viewport: fields.settings.environment.viewport,
     dirty: fields.dirty,
     branch: fields.branch,
     storyFilter: fields.storyFilter,
@@ -458,7 +453,7 @@ async function sameBatch(project: Project, renderedBy: string, fields: BatchFact
   const same = batches.find(
     ({ id, reusedFromBatch, status, dirty, branch, storyFilter }) =>
       (id === renderedBy || reusedFromBatch === renderedBy) &&
-      status === "complete" &&
+      status !== "recording" &&
       dirty === fields.dirty &&
       branch === fields.branch &&
       JSON.stringify(storyFilter) === JSON.stringify(fields.storyFilter),
@@ -516,8 +511,6 @@ async function renderAndRecord(project: Project, options: RenderBatchOptions, { 
     if (existing === null) {
       log(`Recorded batch ${batch.id}: ${recording.storyIds.length} stories.`);
       await recording.finished(batch);
-      await project.storybooks.recordViewport(batch.environment, settings.environment.viewport);
-      await project.storybooks.recordStoryViewports(batch.id, await recording.storyViewports());
       await keepStorybook(project, batch, storybookDir, buildBefore, log);
     } else {
       log(`Batch ${batch.id} already describes this built Storybook at this commit, so nothing new was recorded. Run selfie render to render again.`);
@@ -588,12 +581,12 @@ export async function review(project: Project, options: ReviewOptions): Promise<
   const batchDir = batchDirectory(project, batch.id);
   const exportDir = given === null ? batchDir : path.join(batchDir, "against", (given.batch ?? given.sha)!);
   await mkdir(exportDir, { recursive: true });
-  const { differences, playErrors } = await exportImages(project, exportDir, comparison);
+  const { differences, failures } = await exportImages(project, exportDir, comparison);
   const diffed = Date.now();
   if (given === null) {
     await writeReviewCache(project, batch.id, {
       differences: differences.map(({ story, current, golden, diff, pixelDiff }) => ({ story, current, golden, diff, pixelDiff })),
-      playErrors: playErrors.map(({ story, current }) => ({ story, current })),
+      failures: failures.map(({ story, current }) => ({ story, current })),
     });
   }
   await pruneOutput(project, batch.id);
@@ -604,7 +597,7 @@ export async function review(project: Project, options: ReviewOptions): Promise<
     given,
     hunkMergeDistance: (await resolveHunkMergeDistance(project.repo)) * batch.scale,
     differences,
-    playErrors,
+    failures,
     warnings: recorded.warnings,
     timings: {
       renderMs: recorded.timings.renderMs,

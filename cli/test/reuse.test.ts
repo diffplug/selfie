@@ -264,8 +264,8 @@ describe("a render that isn't reusable", () => {
   });
 });
 
-describe("play errors", () => {
-  test("are project facts, so they're reused and still listed", async () => {
+describe("a play function that throws", () => {
+  test("fails the same way every time, so its render is still reused", async () => {
     h.stories = [
       {
         id: "a--one",
@@ -280,11 +280,10 @@ describe("play errors", () => {
     await newCommit();
     const second = await review();
     expect(second.json.reusedFromBatch).toBe(first.json.batchId);
-    expect(second.json.playErrors).toEqual([
-      { story: "a--one", playError: "expected a dialog", current: expect.any(String) },
-    ]);
-    await stat(second.json.playErrors[0].current);
-    expect(reasons(second.json.advisories)).toEqual(["play-error"]);
+    expect(second.json.failures).toEqual([{ story: "a--one", failure: "play: expected a dialog", current: expect.any(String) }]);
+    await stat(second.json.failures[0].current);
+    expect(reasons(second.json.blockers)).toEqual(["failed"]);
+    expect(second.code).toBe(1);
   });
 });
 

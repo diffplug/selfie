@@ -7,6 +7,8 @@ import { Blobs, initStoreSchema, ReceivingStore, RenderBatches, Sql, type SqlAda
 import { R2BlobStorage, type R2BucketLike } from "selfie-store/adapters/r2";
 import { createSyncApi, type SyncAccess } from "../../src/server/sync.ts";
 
+const ON = { batchId: "00000000-0000-4000-8000-000000000001", gitSha: "e".repeat(40) };
+
 const SHA = "a".repeat(40);
 const NEXT_SHA = "b".repeat(40);
 const ENV = "container-linux-arm64-0123456789abcdef";
@@ -44,7 +46,7 @@ const send = (method: string, route: string, token: string, body?: unknown) =>
 
 const sendJson = async (method: string, route: string, token: string, body?: unknown) => (await send(method, route, token, body)).json();
 
-const batchFacts = (gitSha: string) => ({ gitSha, environment: ENV, startedAt: 500, dirty: false, baselineSha: null, storyFilter: null, reusedFromBatch: null, scale: 1 });
+const batchFacts = (gitSha: string) => ({ gitSha, environment: ENV, startedAt: 500, dirty: false, storyFilter: null, reusedFromBatch: null, scale: 1, viewport: { width: 1200, height: 900 } });
 
 beforeAll(async () => {
   const sql = new Sql(d1Binding(env.DB));
@@ -77,12 +79,12 @@ describe("the sync routes, in a Worker", () => {
   });
 
   it("merges decisions by latest wins, in any order, on D1's own engine", async () => {
-    const decisions = (decision: string, at: number) => ({ environment: ENV, decisions: [{ story: "a", imageHash: hash, decision, at }] });
+    const decisions = (decision: string, at: number) => ({ environment: ENV, decisions: [{ story: "a", imageHash: hash, decision, at, gitSha: SHA, batchId: FIRST }] });
     expect((await send("POST", "/decisions", "writer", decisions("rejected", 700))).status).toBe(200);
     expect((await send("POST", "/decisions", "writer", decisions("approved", 800))).status).toBe(200);
     expect((await send("POST", "/decisions", "writer", decisions("rejected", 750))).status).toBe(200);
     const page = (await sendJson("GET", `/batches/${FIRST}`, "writer")) as { renders: { decision: unknown }[]; batch: unknown };
-    expect(page.renders[0]!.decision).toEqual({ decision: "approved", actor: "writer-login", at: 800 });
+    expect(page.renders[0]!.decision).toEqual({ decision: "approved", actor: "writer-login", at: 800, gitSha: SHA, batchId: FIRST });
     expect(page.batch).toMatchObject({ startedAt: 500, finishedAt: 600 });
   });
 

@@ -14,6 +14,8 @@ import {
 } from "selfie-cli";
 import { BLUE, createHarness, type Harness } from "./support.ts";
 
+const ON = { batchId: "00000000-0000-4000-8000-000000000001", gitSha: "e".repeat(40) };
+
 let h: Harness;
 let project: Project;
 const options = () => ({ render: h.render });
@@ -61,7 +63,7 @@ describe("review", () => {
     h.stories = [{ id: "a" }, { id: "b" }];
     const reviewed = await review(project, options());
     const { id: batchId } = reviewed.comparison.batch;
-    expect(reviewed.comparison.batch).toMatchObject({ dirty: false, baselineSha: null, storyFilter: null });
+    expect(reviewed.comparison.batch).toMatchObject({ dirty: false, storyFilter: null });
     expect(reviewed.dirtyPaths).toEqual([]);
     expect(reviewed.timings.totalMs).toBeGreaterThanOrEqual(0);
     expect(summarizeBatch(reviewed.comparison).blockers.map(({ reason }) => reason)).toEqual([

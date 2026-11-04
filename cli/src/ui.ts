@@ -59,7 +59,7 @@ export function localReviewSource(
   };
 
   const keptStorybookUrl = async (batchId: string): Promise<string | null> => {
-    const kept = storybook === undefined ? null : await project.storybooks.keptStorybookOfBatch(batchId);
+    const kept = storybook === undefined ? null : await project.storybooks.storybookOfBatch(batchId);
     return kept === null ? null : new URL(keptStorybookPath(kept), storybook!.url).href;
   };
 
@@ -89,7 +89,7 @@ export function localReviewSource(
 
   /** What the batch's own Storybook calls its stories, then what the batches behind its approvals called those it no longer has. */
   const storyNamesFor = async (batch: RenderBatch, approvedIn: ReadonlySet<string>, stories: ReadonlySet<string>) => {
-    const kept = await Promise.all([batch.id, ...approvedIn].map((id) => project.storybooks.keptStorybookOfBatch(id)));
+    const kept = await Promise.all([batch.id, ...approvedIn].map((id) => project.storybooks.storybookOfBatch(id)));
     const entries = (await Promise.all(kept.map((hash) => (hash === null ? [] : storiesOfKept(hash))))).flat();
     const named = new Map<string, StoryEntry>();
     for (const entry of entries) if (stories.has(entry.id) && !named.has(entry.id)) named.set(entry.id, entry);
@@ -109,7 +109,7 @@ export function localReviewSource(
     const references = new Map(
       await Promise.all(
         [...new Set(compared.flatMap(({ goldenBatchId }) => goldenBatchId ?? []))].map(
-          async (id) => [id, { url: await keptStorybookUrl(id), viewports: await project.storybooks.storyViewportsOf(id) }] as const,
+          async (id) => [id, { url: await keptStorybookUrl(id), viewports: await project.batches.storyViewportsOf(id) }] as const,
         ),
       ),
     );
@@ -132,12 +132,10 @@ export function localReviewSource(
     return {
       batch,
       storybook: await storybookFor(batch.id),
-      viewport: await project.storybooks.viewportOf(batch.environment),
-      storyViewports: await project.storybooks.storyViewportsOf(batch.id),
+      storyViewports: await project.batches.storyViewportsOf(batch.id),
       hunkMergeDistance: await resolveHunkMergeDistance(repo),
       actor,
       blockers: summary.blockers,
-      advisories: summary.advisories,
       counts: { ...summary.counts, failed: summary.failed.length },
       rows,
       storyNames: await storyNamesFor(batch, new Set(rows.flatMap(({ goldenBatchId }) => goldenBatchId ?? [])), new Set(rows.map(({ story }) => story))),
@@ -207,11 +205,13 @@ export function localReviewSource(
       const built = storybook !== undefined && isBuiltStorybook(storybook.dir);
       const index = built ? await readStoriesInOrder(storybook.dir) : [];
 
-      // Batches at one commit on one branch see the same decisions, and a filtered render at a time can make many batches.
-      const decisions = new Map<string | null, Promise<readonly PlacedDecision[]>>();
+      // Batches that reach the same commits see the same decisions, and a filtered render at a time can make many batches.
+      const decisions = new Map<string, Promise<readonly PlacedDecision[]>>();
       const rowsOf = async (batch: RenderBatch) => {
-        if (!decisions.has(batch.branch)) decisions.set(batch.branch, reachableCommits(project, batch).then((commits) => project.batches.decisionsAt(batch.environment, commits)));
-        return (await project.batches.compareFromHistory(batch.id, await decisions.get(batch.branch)!, { includeUnchanged: true })).renders;
+        const commits = await reachableCommits(project, batch);
+        const reach = commits.join();
+        if (!decisions.has(reach)) decisions.set(reach, project.batches.decisionsAt(batch.environment, commits));
+        return (await project.batches.compareFromHistory(batch.id, await decisions.get(reach)!, { includeUnchanged: true })).renders;
       };
       const renders = await newestRenders(finished, rowsOf, index.length > 0 ? new Set(index.map(({ id }) => id)) : undefined);
 

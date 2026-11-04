@@ -29,7 +29,6 @@ export {
 export {
   isDecidable,
   summarizeBatch,
-  type AdvisoryReason,
   type Attention,
   type BlockerReason,
   type BatchSummary,

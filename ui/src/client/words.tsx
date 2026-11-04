@@ -114,6 +114,7 @@ export function StateLabel({ state }: { readonly state: RenderState }) {
 }
 
 export function DecisionLabel({ row }: { readonly row: Pick<RenderRow, "state" | "decision"> }) {
+  if (row.state === "failed") return <span className="selfie-muted">Can't be approved until it's fixed</span>;
   if (!isDecidable(row.state)) return <span className="selfie-muted">No decision needed</span>;
   if (row.decision?.decision === "approved") {
     return (
@@ -136,18 +137,6 @@ export function DecisionLabel({ row }: { readonly row: Pick<RenderRow, "state" |
   );
 }
 
-export function AdvisoryLabels({ row }: { readonly row: RenderRow }) {
-  return (
-    <>
-      {row.playError !== null && (
-        <IconLabel variant="attention" icon={<AlertIcon size={12} />}>
-          Play error
-        </IconLabel>
-      )}
-    </>
-  );
-}
-
 export const sizeChanged = ({ current, golden }: PixelDiff) => current.width !== golden.width || current.height !== golden.height;
 
 export function describePixels(diff: PixelDiff | null): string {
@@ -159,7 +148,7 @@ export function describePixels(diff: PixelDiff | null): string {
 }
 
 export const BLOCKER_WORDS: Readonly<Record<BlockerReason, (count: number) => string>> = {
-  failed: (count) => `${plural(count, "story", "stories")} failed to render`,
+  failed: (count) => `${plural(count, "story", "stories")} failed`,
   "changed-unapproved": (count) => `${plural(count, "changed image")} with no decision`,
   "added-unapproved": (count) => `${plural(count, "added image")} with no decision`,
   rejected: (count) => `${plural(count, "image")} rejected`,

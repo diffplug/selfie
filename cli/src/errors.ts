@@ -4,6 +4,7 @@ export type SelfieErrorCode =
   | "git-failed"
   | "bad-config"
   | "no-config"
+  | "old-store"
   | "build-failed"
   | "no-stories"
   | "head-moved"

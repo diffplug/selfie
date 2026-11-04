@@ -14,6 +14,7 @@ export {
   isDecidable,
   isGitSha,
   isBatchId,
+  assertViewport,
   compareWithApprovals,
   newestRenders,
   RenderBatches,
@@ -24,9 +25,11 @@ export {
   type Decision,
   type DecisionKind,
   type DecisionRequest,
+  type DecisionOn,
   type ReceivedDecision,
   type ReceivedBatch,
   type RecordedRender,
+  type Viewport,
   type BatchPage,
   type RenderBatch,
   type BatchStatus,
@@ -46,7 +49,7 @@ export {
   type SqlStatement,
   type SqlValue,
 } from "./sql.ts";
-export { BuiltStorybooks, type StoryViewport, type BuiltStorybookFile } from "./built-storybooks.ts";
+export { BuiltStorybooks, type BuiltStorybookFile } from "./built-storybooks.ts";
 export {
   ImageHashMismatchError,
   imageInsertStatement,

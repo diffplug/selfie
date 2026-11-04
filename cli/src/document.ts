@@ -21,7 +21,7 @@ function nextSteps({ comparison, given }: ReviewResult, checked: BatchSummary): 
 
 /** The one document `selfie review` prints. */
 export function buildReviewDocument(result: ReviewResult) {
-  const { comparison, given, hunkMergeDistance, dirtyPaths, differences, playErrors, warnings } = result;
+  const { comparison, given, hunkMergeDistance, dirtyPaths, differences, failures, warnings } = result;
   const { batch } = comparison;
   const shown = summarizeBatch(comparison);
   return {
@@ -39,7 +39,6 @@ export function buildReviewDocument(result: ReviewResult) {
         : { patterns: batch.storyFilter.patterns, notRendered: shown.notRendered.length },
     counts: shown.counts,
     blockers: shown.blockers,
-    advisories: shown.advisories,
     differences: differences.map((difference) => ({
       ...difference,
       hunkGroups:
@@ -47,7 +46,7 @@ export function buildReviewDocument(result: ReviewResult) {
           ? null
           : groupHunks(difference.pixelDiff.hunks, hunkMergeDistance).map(({ current, golden, kind }) => ({ current, golden, kind })),
     })),
-    playErrors,
+    failures,
     warnings,
     next: nextSteps(result, shown),
   };

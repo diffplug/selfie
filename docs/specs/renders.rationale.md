@@ -6,9 +6,9 @@
 
 **No separate settings.** Nothing produces render settings outside the environment today: the renderer's viewport and scale are in it. A caller with a variant can put it in the opaque story ID, so a column would only add a parameter per row and a second cursor field. No store holds this data yet, so this was the cheap time to drop it, and adding one later would need a migration.
 
-**The environment is on the batch, not each row.** With IDs like `container-linux-arm64-<16 hex>` that saves about 40 bytes per row, and it makes a mixed-environment batch impossible to store. Decisions keep the environment in their key, since they outlive any batch.
+**The environment is on the batch, not each row.** It makes a mixed-environment batch impossible to store. Decisions keep the environment in their key, since they outlive any batch.
 
-**Not interning names.** A table of names with integer keys would make each row much smaller, by estimate rather than measurement. It also costs a second statement per group and a lookup per name. Worth revisiting with [storing only what changed](renders.md#storing-only-what-changed).
+**Names as integers.** Measured on local SQLite, 2026-11, with 10,000 stories: a render went from 60 bytes to 21, and across 499,800 decisions from 20,000 clicks over 20,000 commits, a decision went from 479 bytes to about 87, with reading those at the newest 1,000 commits going from 54 ms to about 38. Each write costs a statement that gives its names keys, which writes nothing for a name already held, and each read joins them back. Real D1 hasn't run these numbers.
 
 ## Render batches
 
@@ -24,7 +24,9 @@
 
 **A batch's facts in columns.** `selfie review` first kept whether a tree was dirty, its baseline, and its play errors in a file beside the exported images. Pruning that file lost them, and with them the rule that a dirty batch can't become goldens, so a UI, or anyone else calling `acceptBatch`, wasn't bound by it. They became columns while no store held this data, which is why this table could still change: see `docs/specs/store.md` → Open questions for the next time.
 
-**Not yet run on real D1.** The `play_error` column, the three new columns on `render_batches`, the longest statement of play errors and failures, and `firstWithGoldens` are in the contract suite, and pass on local SQLite through the same `Sql` limits. The batch on real D1 wasn't made when they went in, so their fit there is unproven, and the suite's size of about 90 requests is counted from the code rather than measured. A statement of 33 renders with both messages at their 2,000 characters binds about 132 KB, which is the case to watch.
+**Not yet run on real D1.** The three new columns on `render_batches`, the longest statement of failures, and `firstWithGoldens` are in the contract suite, and pass on local SQLite through the same `Sql` limits. The batch on real D1 wasn't made when they went in, so their fit there is unproven, and the suite's size of about 90 requests is counted from the code rather than measured. A statement of 49 failures at their 2,000 characters binds about 100 KB, which is the case to watch.
+
+**Windows in columns.** The image's size can't say what window a story laid out in, since a full-page image may be taller or wider than its window, and neither can the environment's ID, which is a hash. On the batch beside `scale`, since it's the same kind of fact. A story's own on its render, empty for nearly every row, so sync and reuse carry it with the row. This costs 2 bytes a row and replaced two tables that didn't sync, and left a cloud batch unable to size a live story.
 
 **A filter as a fact.** Whether an approved story is really gone or only outside the batch's filter needs the patterns, so they're kept too. What's unmatched is kept alongside them, since a comparison lists too little to work it out.
 
@@ -36,11 +38,19 @@
 
 ## Decisions
 
+**No table of clicks.** Approving 500 stories makes 500 decisions with one verdict, time, actor, and batch, so those could be held once. Measured with the numbers above, that takes a decision from about 87 bytes to about 48, which on that whole history is 20 MB, or about 2 cents a month, for a table, a unique key, a join on every read, and rows left behind when a decision is replaced. A decision's batch stays an ID, since it can name a batch that never came here.
+
+**By commit first.** History is read a commit at a time, so the primary key makes that a range, and the index that remains is the one for finding a decision on an image.
+
+**Refusing a decision on an image that isn't here.** A decision used to hold its image's hash, so it could arrive first. Holding the key means the image must be here, and nothing lost by that: sync sends a batch's images, then its renders, then decisions on those same images.
+
 **Keeping no history.** A log of every decision would merge cleanly, but nothing in `selfie review` or the review UI reads one.
 
 ## Approvals
 
 **History, not a promoted set.** Asking someone to accept a batch on a clean default branch made them render again after a merge, to end up with what they'd already approved. Working it out from history asks nothing at a merge, since a batch there finds the approvals its branch brought.
+
+**Up to the batch asking.** A batch looked at again later shouldn't change what it reads as because of work done since, or an earlier batch on a branch would compare with a later commit's approvals.
 
 **Author time as a branch's start.** A branch name can be reused, so its old batches mustn't count forever, and the merge-base can't bound them, since a rebase moves it past the batches it's meant to find. A rebase keeps author times, so the earliest among the branch's own commits holds still. An older commit merged in only widens the window, on the same branch name.
 
@@ -64,6 +74,10 @@
 
 **Counting removals.** Every image in a filtered render is unchanged, so the image gate alone would accept it and drop every story it missed from that SHA's goldens. A test does exactly this with 500. The count is asked for rather than a list because the batch and its baseline already fix which renders are removed.
 
+## Schema
+
+**Foreign keys, before there's data.** Nothing in the store deletes yet, and every write already goes through a path that writes parents first, so these catch only bugs for now. What they're for is retention: once a batch can be deleted, they're what stop one going while something points at it. SQLite can't add a foreign key to an existing table, so waiting would mean rebuilding tables in a migration, where today it's an edit to their `CREATE` statements. Inserting 10,000 renders took 9 ms with checks and 8 ms without, in one local run. They haven't run on real D1, only on its engine in the Worker tests.
+
 ## Requests
 
 **Measured on real D1, 2026-11**, from one Mac over the REST API at 10,000 renders, with the sizes in the spec. `compareBatch` is of a batch with 100 changed, 50 failed, 50 added, 50 removed, and 9,800 unchanged:
@@ -79,7 +93,9 @@
 
 D1's docs say a database runs one query at a time, so a batch this size holds up others for as long as it runs. No test measured concurrent load. `acceptBatch` against a baseline also reads both sides to count removals, which this batch didn't measure.
 
-**Statement size.** A record statement holds 49 renders, limited by the 100 bound parameters, since each needs a story and either a hash or a failure. Its SQL is under 2,000 bytes, so the 100,000 byte limit is far off. `Sql` binds no nulls, so the column a row leaves empty is a literal in the statement.
+**Statement size.** A record statement holds 49 renders as one JSON parameter, which is what the 100 bound parameters allowed when each took a story and either a hash or a failure, so a request stays the size that was measured. JSON can also say null, which a bound parameter here can't, and its SQL is one constant string. At its worst, 49 failures at 2,000 characters, the parameter is about 100 KB of ASCII, and hasn't run on real D1.
+
+**Finding a decision by its image.** A decision's primary key starts with its commit, so a lookup by story and image needs `decisions_by_image`. With no statistics SQLite picks the primary key anyway, by environment alone, and calling that a `SEARCH` hides it from a check for scans. At 100,000 decisions a page of 500 renders took 2,080 ms that way and 0.8 ms with the index named, in one local run, and 0.7 ms at 499,800. `ANALYZE` also fixes the plan, but nothing runs it. Real D1 hasn't run `INDEXED BY`, so its plan there is unproven.
 
 **Request size.** A 10,000 render batch is 205 statements and 1.27 MB with 30 character story IDs, against the store's 2,000 statement batch (`store.rationale.md` → D1 REST adapter). 400 statements is a judgment call inside what was measured. A failure-heavy request grows with the 2,000 character limit, and at its worst, 400 statements of 49 failures at that length, would be about 39 MB. That size was not tested.
 
