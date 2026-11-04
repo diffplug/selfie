@@ -109,4 +109,4 @@ So locally these change what a request costs a hosted store, not what a reviewer
 - **Why no virtualized list.** These numbers leave nothing for one to fix, and a real table keeps find-in-page and screen readers working. It's worth revisiting at far more than 541 rows.
 - **Why no `content-visibility` on rows.** Primer's table makes each row a subgrid, and containment breaks that: in a browser, with it on `tbody tr`, every cell of every row collapsed to the first column's left edge, at 24 px. Focus return and `j` and `k` still worked, and it saved about 50 ms of main-thread time on opening 512 rows, which isn't a reason to take a table apart.
 
-**A second of a render.** The list isn't virtualized, so it can have hundreds of rows, and nothing in the tree above it is memoized. So the progress and the clock live in a small component that holds only the banner, and the rest of the page doesn't hear of them.
+**A second of a render.** The list isn't virtualized, so it can have hundreds of rows, and its rows aren't memoized components. So the progress and the clock live in a small component that holds only the banner, and the rest of the page doesn't hear of them.
