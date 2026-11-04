@@ -95,8 +95,6 @@ export interface ReviewResult {
   readonly dirtyPaths: readonly string[];
   /** What this review compared with instead, if anything. */
   readonly given: GivenBaseline | null;
-  /** The comparison with what history has approved, which says what blocks. `comparison`, unless something was given. */
-  readonly reviewed: Comparison;
   /** How close hunks group here, in image pixels. */
   readonly hunkMergeDistance: number;
   /** Within the batch's filter. */
@@ -578,10 +576,9 @@ export async function review(project: Project, options: ReviewOptions): Promise<
 
   // 6. Compare.
   const comparing = Date.now();
-  const reviewed = await compareAsReviewed(project, batch.id);
   const comparison =
     given === null
-      ? reviewed
+      ? await compareAsReviewed(project, batch.id)
       : given.batch !== undefined
         ? await project.batches.compareWithBatch(batch.id, given.batch)
         : await project.batches.compareFromHistory(batch.id, await ancestorsOf(project.repo, given.sha));
@@ -606,7 +603,6 @@ export async function review(project: Project, options: ReviewOptions): Promise<
     comparison,
     dirtyPaths: recorded.dirtyPaths,
     given,
-    reviewed,
     hunkMergeDistance: (await resolveHunkMergeDistance(project.repo)) * batch.scale,
     differences,
     playErrors,

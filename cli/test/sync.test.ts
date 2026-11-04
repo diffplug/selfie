@@ -53,11 +53,10 @@ let laptop: ReturnType<typeof machine>;
 let stories: readonly FakeStory[];
 
 const record = async (batch = laptop) => (await batch("writer", "render", "--storybook-dir", "ignored")).json.batchId as string;
-/** A batch on the laptop, approved, and accepted as HEAD's goldens. */
-async function accepted() {
+/** A batch on the laptop with every image approved, which `push --accept` can make HEAD's goldens. */
+async function approved() {
   const batchId = await record();
   await laptop(null, "approve", batchId, "--all");
-  expect((await laptop(null, "accept", batchId)).code).toBe(0);
   return batchId;
 }
 
@@ -94,9 +93,9 @@ afterEach(async () => {
 });
 
 describe("pushing", () => {
-  test("sends a batch, its images, its decisions, and its goldens", async () => {
-    const batchId = await accepted();
-    const { code, json } = await laptop("writer", "push");
+  test("sends a batch, its images, its decisions, and with --accept its goldens", async () => {
+    const batchId = await approved();
+    const { code, json } = await laptop("writer", "push", "--accept");
     expect(code).toBe(0);
     expect(json).toMatchObject({ batchId, images: { sent: 2, alreadyThere: 0 }, decisions: 2, goldens: { outcome: "accepted", acceptedBatchId: batchId } });
     const head = headOf();
@@ -106,27 +105,27 @@ describe("pushing", () => {
   });
 
   test("names who pushed as a decision's author, not what the laptop says", async () => {
-    const batchId = await accepted();
+    const batchId = await approved();
     await laptop("writer", "push");
     const { renders } = await cloud.batches.readBatch(batchId);
     expect(renders.map(({ decision }) => decision?.actor)).toEqual(["writer-login", "writer-login"]);
   });
 
   test("is safe to run again, and sends nothing twice", async () => {
-    await accepted();
-    await laptop("writer", "push");
-    expect((await laptop("writer", "push")).json).toMatchObject({ images: { sent: 0, alreadyThere: 2 }, goldens: { outcome: "already" } });
+    await approved();
+    await laptop("writer", "push", "--accept");
+    expect((await laptop("writer", "push", "--accept")).json).toMatchObject({ images: { sent: 0, alreadyThere: 2 }, goldens: { outcome: "already" } });
   });
 
-  test("a batch that isn't accepted here goes with no goldens", async () => {
-    await record();
+  test("a batch goes with no goldens unless asked", async () => {
+    await approved();
     const { code, json } = await laptop("writer", "push");
     expect(code).toBe(0);
-    expect(json).toMatchObject({ decisions: 0, goldens: null });
+    expect(json).toMatchObject({ decisions: 2, goldens: null });
   });
 
   test("sends only the images the cloud lacks", async () => {
-    await accepted();
+    await approved();
     await laptop("writer", "push");
     await commit(h.repo, "second");
     stories = [{ id: "a", color: RED }, { id: "b", color: [1, 2, 3] }];
@@ -136,7 +135,7 @@ describe("pushing", () => {
 
   test("a commit GitHub doesn't have costs nothing", async () => {
     pushedCommits = new Set();
-    const batchId = await accepted();
+    const batchId = await approved();
     const { code, json } = await laptop("writer", "push");
     expect(code).toBe(2);
     expect(json.error.code).toBe("commit-not-pushed");
@@ -168,10 +167,10 @@ describe("pushing", () => {
   });
 
   test("CI on a fresh machine, which has never pulled and can't, holds an unchanged batch to the cloud's goldens", async () => {
-    await accepted();
-    await laptop("writer", "push");
+    await approved();
+    await laptop("writer", "push", "--accept");
     const merge = await commit(h.repo, "merge");
-    // Nothing here but the checkout, so this batch records no baseline.
+    // Nothing here but the checkout.
     const fresh = machine(h.repo, path.join(h.scratch, "ci-home"));
     const batchId = (await fresh("ci", "render", "--storybook-dir", "ignored")).json.batchId;
     const { code, json } = await fresh("ci", "push", "--accept");
@@ -192,7 +191,7 @@ describe("pushing", () => {
     ["another image", (other: Uint8Array) => other],
     ["bytes that don't decode", (other: Uint8Array) => other.subarray(0, other.length - 1)],
   ])("won't send a copy holding %s, and says which", async (_, damage) => {
-    const batchId = await accepted();
+    const batchId = await approved();
     const [hash, other] = await imagesOf(batchId);
     const local = await openProject({ cwd: h.repo, env: { SELFIE_HOME: h.home } });
     const blobs = path.join(local.directory, "blobs", "images");
@@ -215,25 +214,25 @@ describe("pushing", () => {
   });
 
   test("a push that dies partway is finished by pushing again", async () => {
-    const batchId = await accepted();
+    const batchId = await approved();
     let imagesLeft = 1;
     const flaky = machine(h.repo, h.home, () => (async (url: string, init?: RequestInit) => {
       if (init?.method === "PUT" && url.includes("/images/") && imagesLeft-- <= 0) throw new Error("connection lost");
       return toCloud(url, init);
     }) as typeof fetch);
-    expect((await flaky("writer", "push")).code).toBe(2);
+    expect((await flaky("writer", "push", "--accept")).code).toBe(2);
     expect((await cloud.batches.getBatch(batchId))?.status).toBe("recording");
-    const { code, json } = await laptop("writer", "push");
+    const { code, json } = await laptop("writer", "push", "--accept");
     expect(code).toBe(0);
     expect(json).toMatchObject({ images: { sent: 1, alreadyThere: 1 }, goldens: { outcome: "accepted" } });
   });
 
   test("a different batch never replaces the cloud's goldens", async () => {
-    const first = await accepted();
-    await laptop("writer", "push");
+    const first = await approved();
+    await laptop("writer", "push", "--accept");
     stories = [{ id: "a", color: GREEN }, { id: "b", color: GREEN }];
-    await accepted();
-    const { code, json } = await laptop("writer", "push");
+    await approved();
+    const { code, json } = await laptop("writer", "push", "--accept");
     expect(code).toBe(1);
     expect(json.goldens).toMatchObject({ outcome: "conflict", acceptedBatchId: first });
   });
@@ -298,9 +297,9 @@ describe("another machine", () => {
     desktop = machine(desktopRepo, desktopHome);
   });
 
-  test("pulls goldens, and then a review has a baseline", async () => {
-    const batchId = await accepted();
-    await laptop("writer", "push");
+  test("pulls a commit's goldens, with their batch, images, and decisions", async () => {
+    const batchId = await approved();
+    await laptop("writer", "push", "--accept");
     const head = headOf();
     const { code, json } = await desktop("reader", "pull", head);
     expect(code).toBe(0);
@@ -314,22 +313,25 @@ describe("another machine", () => {
     } finally {
       local.close();
     }
-    // The same images here are unchanged against what was pulled.
-    await commit(desktopRepo, "more");
-    const { json: reviewed } = await desktop(null, "review", "--storybook-dir", "ignored");
-    expect(reviewed.counts).toMatchObject({ unchanged: 2, changed: 0, added: 0 });
+  });
+
+  test("goldens pulled here go with their batch when it's pushed, with no need to ask", async () => {
+    const batchId = await approved();
+    await laptop("writer", "push", "--accept");
+    await desktop("reader", "pull", headOf());
+    expect((await desktop("writer", "push", batchId)).json).toMatchObject({ goldens: { outcome: "already", acceptedBatchId: batchId } });
   });
 
   test("finds the nearest baseline in the cloud, if it isn't told a commit", async () => {
-    const batchId = await accepted();
-    await laptop("writer", "push");
+    const batchId = await approved();
+    await laptop("writer", "push", "--accept");
     const { json } = await desktop("reader", "pull");
     expect(json).toMatchObject({ batchId });
   });
 
   test("is safe to run again", async () => {
-    await accepted();
-    await laptop("writer", "push");
+    await approved();
+    await laptop("writer", "push", "--accept");
     const head = headOf();
     await desktop("reader", "pull", head);
     // Reading nothing, since a shared limit pays for every pull CI makes.
@@ -343,20 +345,22 @@ describe("another machine", () => {
   });
 
   test("the cloud's goldens replace different ones here, and it says so", async () => {
-    const batchId = await accepted();
-    await laptop("writer", "push");
+    const batchId = await approved();
+    await laptop("writer", "push", "--accept");
     const head = headOf();
     stories = [{ id: "a", color: GREEN }, { id: "b", color: GREEN }];
     const own = await record(desktop);
     await desktop(null, "approve", own, "--all");
-    await desktop(null, "accept", own);
+    const here = await openProject({ cwd: desktopRepo, env: { SELFIE_HOME: desktopHome } });
+    expect(await here.batches.acceptBatch(own, null, 0)).toBe(true);
+    here.close();
     const { json } = await desktop("reader", "pull", head);
     expect(json).toMatchObject({ batchId, replaced: own });
   });
 
   test("a pull that dies partway is finished by pulling again", async () => {
-    const batchId = await accepted();
-    await laptop("writer", "push");
+    const batchId = await approved();
+    await laptop("writer", "push", "--accept");
     const head = headOf();
     let imagesLeft = 1;
     const flaky = machine(desktopRepo, desktopHome, () => (async (url: string, init?: RequestInit) => {
@@ -379,11 +383,11 @@ describe("another machine", () => {
       return png;
     }],
   ])("the cloud holding %s under a hash stops a pull, by name, and keeps nothing here", async (_, bytes) => {
-    const batchId = await accepted();
+    const batchId = await approved();
     const [hash] = await imagesOf(batchId);
     // A client took it on trust from someone else, and the first bytes stay, so the push doesn't correct it.
     await cloud.store.receiveImage(await bytes(), hash!);
-    expect((await laptop("writer", "push")).json.images).toEqual({ sent: 1, alreadyThere: 1 });
+    expect((await laptop("writer", "push", "--accept")).json.images).toEqual({ sent: 1, alreadyThere: 1 });
 
     for (let attempt = 0; attempt < 2; attempt++) {
       const { code, json } = await desktop("reader", "pull", headOf());
@@ -397,8 +401,8 @@ describe("another machine", () => {
   });
 
   test("a later decision here isn't undone by an older one pulled", async () => {
-    const batchId = await accepted();
-    await laptop("writer", "push");
+    const batchId = await approved();
+    await laptop("writer", "push", "--accept");
     const head = headOf();
     await desktop("reader", "pull", head);
     await desktop(null, "reject", batchId, "--all");
@@ -425,8 +429,8 @@ describe("another machine", () => {
   });
 
   test("CI can't pull a private project", async () => {
-    await accepted();
-    await laptop("writer", "push");
+    await approved();
+    await laptop("writer", "push", "--accept");
     const head = headOf();
     const { code, json } = await desktop("ci", "pull", head);
     expect(code).toBe(2);
@@ -434,62 +438,8 @@ describe("another machine", () => {
   });
 });
 
-describe("find-baseline with a remote", () => {
-  test("finds goldens only the cloud has", async () => {
-    await accepted();
-    const head = headOf();
-    await laptop("writer", "push");
-    const otherHome = path.join(h.scratch, "other-home");
-    const fresh = machine(h.repo, otherHome);
-    expect((await fresh("reader", "find-baseline")).json).toMatchObject({ sha: head, source: "remote", remoteError: null });
-  });
-
-  test("prefers what's nearest, and says it was local", async () => {
-    await accepted();
-    const head = headOf();
-    expect((await laptop("reader", "find-baseline")).json).toMatchObject({ sha: head, source: "local", remoteError: null });
-  });
-
-  test("answers from local data if the cloud can't be reached, and says so", async () => {
-    await accepted();
-    const offline = machine(h.repo, h.home, () => (async () => {
-      throw new Error("no network");
-    }) as typeof fetch);
-    const { code, json } = await offline(null, "find-baseline");
-    expect(code).toBe(0);
-    expect(json).toMatchObject({ sha: headOf(), source: "local", remoteError: expect.stringContaining("no network") });
-  });
-
-  test("answers from local data if a proxy answers in its place, and says so", async () => {
-    await accepted();
-    const portal = machine(h.repo, h.home, () => (async () => new Response("<html>Sign in to this network</html>")) as typeof fetch);
-    const { code, json } = await portal(null, "find-baseline");
-    expect(code).toBe(0);
-    expect(json).toMatchObject({ sha: headOf(), source: "local", remoteError: expect.stringContaining("didn't answer") });
-  });
-
-  test("answers from local data in a repository that isn't on GitHub, with a remote set for others", async () => {
-    // First, since a store goes by its origin.
-    git(h.repo, "remote", "set-url", "origin", "https://gitlab.com/diffplug/selfie.git");
-    await accepted();
-    const { code, json } = await laptop(null, "find-baseline");
-    expect(code).toBe(0);
-    expect(json).toMatchObject({ sha: headOf(), source: "local", remoteError: expect.stringContaining("GitHub") });
-  });
-
-  test("has no source if nothing has goldens", async () => {
-    expect((await laptop("reader", "find-baseline")).json).toMatchObject({ sha: null, source: null });
-  });
-
-  test("with no remote set, it's as it was", async () => {
-    await accepted();
-    const { json } = await h.cli("find-baseline");
-    expect(json.source).toBeUndefined();
-  });
-});
-
 test("over a real socket, with the mount a deployment would use", async () => {
-  await accepted();
+  await approved();
   // Node's own server, since this package has no web framework of its own, in front of the routes.
   const server: Server = createServer(async (request, response) => {
     const chunks: Buffer[] = [];
@@ -507,7 +457,7 @@ test("over a real socket, with the mount a deployment would use", async () => {
   try {
     const address = server.address() as { port: number };
     let stdout = "";
-    const code = await runCli(["push"], {
+    const code = await runCli(["push", "--accept"], {
       cwd: h.repo,
       env: { SELFIE_HOME: h.home, SELFIE_REMOTE: `http://127.0.0.1:${address.port}/`, SELFIE_TOKEN: "writer" },
       stdout: (text) => void (stdout += text),

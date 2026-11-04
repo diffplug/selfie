@@ -53,15 +53,13 @@ export const change = (url: string, body: unknown, headers: Record<string, strin
   });
 
 export const decideOn = (batchId: string, decision: string, renders: unknown) => change(`/api/batches/${batchId}/decisions`, { decision, renders });
-export const acceptBatch = (batchId: string, body: unknown = {}) => change(`/api/batches/${batchId}/accept`, body);
 export const viewOf = async (batchId: string) => (await (await get(`/api/batches/${batchId}`)).json()) as any;
 
-/** `h.stories` as the goldens of HEAD. */
-export async function makeGoldens() {
+/** Reviews and approves all, through the page, so `h.stories` are what a later batch compares with. */
+export async function approveAll() {
   const { json } = await review();
   const view = await viewOf(json.batchId);
   const targets = view.rows.map(({ story, imageHash }: any) => ({ story, imageHash }));
   expect((await decideOn(json.batchId, "approved", targets)).status).toBe(200);
-  expect((await acceptBatch(json.batchId)).status).toBe(200);
   return json.batchId as string;
 }

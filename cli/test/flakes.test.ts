@@ -3,6 +3,7 @@ import path from "node:path";
 import type { RenderOptions } from "selfie-render";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { runCli } from "../src/cli.ts";
+import { openProject } from "../src/project.ts";
 import { SKILLS } from "../src/skills.ts";
 import { BLUE, createHarness, GREEN, RED, type Harness } from "./support.ts";
 
@@ -76,10 +77,10 @@ describe("selfie flakes", () => {
   test("records no batch", async () => {
     renders = [[{ id: "a" }]];
     await flakes();
-    const { json } = await h.cli("find-baseline");
-    expect(json.sha).toBeNull();
-    const reviewed = await h.cli("review", "--storybook-dir", "ignored");
-    expect(reviewed.json.reusedFromBatch).toBeNull();
+    const { json } = await h.cli("review", "--storybook-dir", "ignored");
+    const project = await openProject({ cwd: h.repo, env: { SELFIE_HOME: h.home } });
+    expect((await project.batches.batchesAt(json.gitSha, json.environment)).map(({ id }) => id)).toEqual([json.batchId]);
+    project.close();
   });
 
   test("asks for at least two renders, as a whole number", async () => {

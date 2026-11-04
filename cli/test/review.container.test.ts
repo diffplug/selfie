@@ -46,7 +46,7 @@ afterAll(async () => {
 });
 
 describe.runIf(process.env.SELFIE_CLI_CONTAINER === "1")("in the pinned container", () => {
-  test("the whole loop: new, approved, accepted, unchanged, then changed with a diff", async () => {
+  test("the whole loop: new, approved, unchanged, then changed with a diff", async () => {
     const first = await review(...STORIES);
     expect(first.status).toBe(1);
     expect(first.json.counts).toMatchObject({ stories: 2, added: 2, undecided: 2 });
@@ -55,18 +55,17 @@ describe.runIf(process.env.SELFIE_CLI_CONTAINER === "1")("in the pinned containe
     expect(first.stderr).toContain("render 2/2");
 
     expect((await selfie("approve", first.json.batchId, "--all")).status).toBe(0);
-    expect((await selfie("accept", first.json.batchId)).status).toBe(0);
 
     const same = await review(...STORIES);
     expect(same.status).toBe(0);
-    expect(same.json.baseline.sha).toBe(first.json.gitSha);
+    expect(same.json.comparedWith).toEqual({ source: "approvals", sha: null, batch: null });
     expect(same.json.differences).toEqual([]);
     expect(same.json.counts.unchanged).toBe(2);
     // A filtered render is never remembered, so this one rendered again.
     expect(same.json.reusedFromBatch).toBeNull();
     expect(same.stderr).toContain("render 2/2");
 
-    // An init script is project input, so it reports a change rather than starting new goldens.
+    // An init script is project input, so it reports a change rather than starting over.
     await writeFile(
       path.join(repo, "paint.js"),
       `addEventListener("DOMContentLoaded", () => { document.documentElement.style.filter = "invert(1)"; });`,
@@ -115,10 +114,12 @@ describe.runIf(process.env.SELFIE_CLI_CONTAINER === "1")("in the pinned containe
     expect(rendered.stderr).toContain("render 2/2");
     expect((await reviewBuild()).json.batchId).toBe(rendered.json.batchId);
 
+    // Whatever else this file ran, nothing here blocks for want of an approval.
+    await selfie("approve", first.json.batchId, "--all");
     const compared = await selfie("review", rendered.json.batchId, "--baseline", first.json.batchId);
     expect(compared.status).toBe(0);
     expect(compared.json.differences).toEqual([]);
-    // From the store, since `differences` is empty for images that match the goldens.
+    // From the store, since `differences` is empty for images that match.
     const project = await openProject({ cwd: repo, env: { SELFIE_HOME: home } });
     const images = async ({ json }: { json: any }) =>
       (await project.batches.compareBatch(json.batchId, null, { includeUnchanged: true })).renders.map(({ story, imageHash }) => [story, imageHash]);

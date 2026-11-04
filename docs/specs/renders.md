@@ -93,7 +93,7 @@ Source of truth: `compareWithApprovals` and `RenderBatches.compareFromHistory` i
 - **Must leave Git to the caller.** The store is told which commits are reachable, and runs no Git.
 - **Must leave out approvals made on the batch being compared**, or a story would read as unchanged the moment someone approved it, and vanish from its review. Later batches see them, including later ones at the same commit (rationale).
 - **Must count an image's decision only if it's no older than the reference's approval**, so a bug that brings back an image approved long ago asks again, and a rejection of an older image doesn't stick to a newer reference (rationale).
-- **Must let a rejection change nothing about the reference.** It only says what's blocked.
+- **Must let a rejection leave the reference alone, unless it replaces the approval of that image at that commit**, which is how a person takes one back ([Decisions](#decisions)). Otherwise it only says what's blocked.
 - **Must make a removal a decision like any other.** Once approved, the story has no reference for later batches, and reads as `added` if it comes back.
 - **Never read a story that a batch's filter left out as gone.** It's for `summarizeBatch` to set these apart (`docs/specs/cli.md` → What blocks), and they take no decision.
 - **Must let a batch recorded on a dirty tree take approvals**, which count from its commit (`docs/specs/system.md` → Approvals).
@@ -122,6 +122,7 @@ Source of truth: `CREATE_BATCH_TABLES` in `store/src/core/render-batches.ts`, `i
 ```sql
 render_batches(key PK, id UNIQUE, git_sha, environment, started_at, finished_at, failed_count, dirty, baseline_sha, story_filter, reused_from_batch, scale, branch)
   INDEX batches_by_sha(git_sha, environment, started_at)
+  INDEX batches_by_branch(branch, environment, started_at)
 renders(batch_key, story, image_key, failure, play_error)  PK (batch_key, story)  WITHOUT ROWID
 decisions(environment, story, image_hash, decision, actor, decided_at, git_sha, batch_id)  PK (environment, story, image_hash, git_sha)  WITHOUT ROWID
   INDEX decisions_by_commit(environment, git_sha)

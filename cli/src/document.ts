@@ -21,11 +21,9 @@ function nextSteps({ comparison, given }: ReviewResult, checked: BatchSummary): 
 
 /** The one document `selfie review` prints. */
 export function buildReviewDocument(result: ReviewResult) {
-  const { comparison, reviewed, given, hunkMergeDistance, dirtyPaths, differences, playErrors, warnings } = result;
+  const { comparison, given, hunkMergeDistance, dirtyPaths, differences, playErrors, warnings } = result;
   const { batch } = comparison;
   const shown = summarizeBatch(comparison);
-  // What blocks comes from what's approved, whatever this was compared with.
-  const checked = reviewed === comparison ? shown : summarizeBatch(reviewed);
   return {
     schemaVersion: 1,
     batchId: batch.id,
@@ -39,8 +37,8 @@ export function buildReviewDocument(result: ReviewResult) {
       batch.storyFilter === null
         ? null
         : { patterns: batch.storyFilter.patterns, notRendered: shown.notRendered.length },
-    counts: { ...shown.counts, undecided: checked.counts.undecided },
-    blockers: checked.blockers,
+    counts: shown.counts,
+    blockers: shown.blockers,
     advisories: shown.advisories,
     differences: differences.map((difference) => ({
       ...difference,
@@ -51,7 +49,7 @@ export function buildReviewDocument(result: ReviewResult) {
     })),
     playErrors,
     warnings,
-    next: nextSteps(result, checked),
+    next: nextSteps(result, shown),
   };
 }
 

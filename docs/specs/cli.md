@@ -98,7 +98,7 @@ A review of a named batch starts at step 6. `selfie render` is steps 1 to 5, alw
 6. Compares the batch with `--baseline`, or else what history has approved (`docs/specs/renders.md` → Approvals).
 7. Exports images and pixel diffs for what isn't unchanged, writes `review.json`, and prunes [output](#output-directories).
 
-- **Must take `blockers`, `counts.undecided`, and the exit code from what history has approved, whatever a review is shown against.** Only a `--baseline` differs ([below](#review)).
+- **Must take `blockers`, `counts`, and the exit code from what this review compared with**, so a `--baseline` answers its own question, and says nothing about what history has approved.
 - **Must refuse a named batch with any flag for making a batch**, since it's already recorded.
 - **Must take `--baseline` as a batch ID, or else anything Git resolves to a commit, whose ancestors' approvals it means**, and fail with exit 2 if there's no such finished batch in this environment or no such commit.
 - **Must keep `--baseline` to this one review.** It changes nothing about the batch: `selfie approve` still compares with what history has approved, its exports go under `batches/<batch id>/against/<baseline>/`, and `review.json` isn't written. It exits 1 if anything differs, even when every image is approved, since the question was what differs (rationale).
@@ -144,7 +144,7 @@ Source of truth: `summarizeBatch` in `cli/src/summary.ts`.
 
 Source of truth: `replay` and `renderFresh` in `cli/src/review.ts`, `renderIdentity` in `render/src/identity.ts`; tests in `cli/test/reuse.test.ts`, `render/test/identity.test.ts`.
 
-A review recognizes a built Storybook that already rendered, and skips rendering and storing. Otherwise it records that render's image hashes and `play` errors in a new batch. Everything else about a review stays: the batch has this review's Git SHA, dirtiness, baseline, and filter, and it compares, exports, exits, and can be decided on and accepted like any other. Docker isn't needed for this, since nothing starts.
+A review recognizes a built Storybook that already rendered, and skips rendering and storing. Otherwise it records that render's image hashes and `play` errors in a new batch. Everything else about a review stays: the batch has this review's Git SHA, dirtiness, branch, and filter, and it compares, exports, exits, and can be decided on like any other. Docker isn't needed for this, since nothing starts.
 
 - **Must show the existing batch and record nothing when one at this commit came from that render with the same dirtiness, branch, and filter** (rationale).
 - **Must recognize a built Storybook only by `renderIdentity` (`docs/specs/render.md` → Render identity)**, of `--storybook-dir` after any `--build-command`, with the environment and the init script.

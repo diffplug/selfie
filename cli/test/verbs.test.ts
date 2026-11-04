@@ -31,7 +31,8 @@ describe("selfie render", () => {
   test("says what it recorded, and judges nothing", async () => {
     const { code, json } = await record();
     expect(code).toBe(0);
-    expect(json).toMatchObject({ dirty: false, status: "complete", failedCount: 0, baseline: { sha: null } });
+    expect(json).toMatchObject({ dirty: false, status: "complete", failedCount: 0 });
+    expect(json).not.toHaveProperty("baseline");
     expect(json).not.toHaveProperty("differences");
     expect(json).not.toHaveProperty("blockers");
     expect(json.next.join()).toContain(`selfie review ${json.batchId}`);
@@ -57,10 +58,9 @@ describe("selfie render", () => {
 });
 
 describe("selfie review <batch>", () => {
-  test("never renders, and compares with the baseline the batch recorded", async () => {
+  test("never renders, and compares with what's approved", async () => {
     const first = await reviewBuild();
     await h.cli("approve", first.json.batchId, "--all");
-    await h.cli("accept", first.json.batchId);
     await commit(h.repo, "moves on");
     h.stories = [{ id: "a--one", color: BLUE }, { id: "a--two" }];
     await writeFile(path.join(build, "iframe.html"), "<html>changed</html>");
@@ -70,7 +70,7 @@ describe("selfie review <batch>", () => {
     const reviewed = await h.cli("review", head.json.batchId);
     expect(renders).toBe(2);
     expect(reviewed.code).toBe(1);
-    expect(reviewed.json).toMatchObject({ batchId: head.json.batchId, comparedWith: { source: "baseline", sha: first.json.gitSha } });
+    expect(reviewed.json).toMatchObject({ batchId: head.json.batchId, comparedWith: { source: "approvals", sha: null, batch: null } });
     expect(reviewed.json.differences.map(({ story }: any) => story)).toEqual(["a--one"]);
     await readFile(reviewed.json.differences[0].diff);
   });
@@ -80,7 +80,6 @@ describe("selfie review <batch>", () => {
     const { json } = await record();
     const { json: reviewed } = await h.cli("review", json.batchId);
     expect(reviewed).toMatchObject({ dirty: true, dirtyPaths: [] });
-    expect(reviewed.next.join()).toContain("dirty");
   });
 
   test.each([
@@ -112,109 +111,21 @@ describe("selfie review <batch>", () => {
   });
 });
 
-describe("a branch when the default branch has no goldens", () => {
-  /** Goldens at a commit on a feature branch. */
-  async function goldensOnBranch() {
-    git(h.repo, "switch", "--quiet", "-c", "feature");
-    await commit(h.repo, "on feature");
+describe("an approval someone takes back", () => {
+  test("no longer counts, so its image blocks until approved again", async () => {
     const first = await reviewBuild();
     await h.cli("approve", first.json.batchId, "--all");
-    expect((await h.cli("accept", first.json.batchId)).code).toBe(0);
-    return first.json;
-  }
-  /** And a new commit after them. */
-  async function acceptedOnBranch() {
-    const first = await goldensOnBranch();
-    await commit(h.repo, "more on feature");
-    return first;
-  }
-  const changeTheBuild = () => writeFile(path.join(build, "iframe.html"), `<html>${Math.random()}</html>`);
+    await commit(h.repo, "moves on");
+    await h.cli("reject", first.json.batchId, "--story", "a--one");
+    await writeFile(path.join(build, "iframe.html"), "<html>changed</html>");
 
-  test("compares with the nearest goldens there, and says so", async () => {
-    const first = await acceptedOnBranch();
-    h.stories = [{ id: "a--one", color: BLUE }, { id: "a--two" }];
-    await changeTheBuild();
     const { code, json } = await reviewBuild();
     expect(code).toBe(1);
-    expect(json.comparedWith).toEqual({ source: "branch", sha: first.gitSha, batch: null });
-    expect(json.baseline).toMatchObject({ sha: null, reason: "no-goldens" });
-    expect(json.counts).toMatchObject({ unchanged: 1, changed: 1, added: 0, undecided: 1 });
-    expect(json.differences.map(({ story, state }: any) => [story, state])).toEqual([["a--one", "changed"]]);
-    expect(json.differences[0].pixelDiff.changedPixels).toBeGreaterThan(0);
-    expect(json.next.join()).toContain("only to look at");
-  });
-
-  test("is only to look at: the batch records no baseline, and accepting needs each image approved", async () => {
-    await acceptedOnBranch();
-    h.stories = [{ id: "a--one", color: BLUE }, { id: "a--two" }];
-    await changeTheBuild();
-    const { json } = await reviewBuild();
-
-    const refused = await h.cli("accept", json.batchId);
-    expect(refused.code).toBe(1);
-    expect(refused.json.baselineSha).toBeNull();
-    expect(refused.json.refusals.flatMap(({ stories }: any) => stories.map(({ story }: any) => story))).toEqual(["a--one"]);
+    expect(json.blockers).toEqual([{ story: "a--one", reason: "rejected", detail: "tester@example.com" }]);
+    expect(json.differences.map(({ story, state }: any) => [story, state])).toEqual([["a--one", "added"]]);
 
     await h.cli("approve", json.batchId, "--story", "a--one");
-    expect((await h.cli("accept", json.batchId)).code).toBe(0);
-  });
-
-  test("won't let an image pass for matching a golden someone has since rejected", async () => {
-    const first = await acceptedOnBranch();
-    await h.cli("reject", first.batchId, "--story", "a--one");
-    await changeTheBuild();
-    const { json } = await reviewBuild();
-    expect(json.counts).toMatchObject({ unchanged: 2, changed: 0 });
-    // What it blocks on is what accepting would refuse, whatever it shows.
-    expect(json.blockers).toEqual([{ story: "a--one", reason: "rejected", detail: expect.any(String) }]);
-
-    const refused = await h.cli("accept", json.batchId);
-    expect(refused.code).toBe(1);
-    expect(refused.json.refusals[0].stories).toEqual([{ story: "a--one", state: "added", decision: "rejected" }]);
-    expect((await h.cli("approve", json.batchId, "--story", "a--one")).code).toBe(0);
-    expect((await h.cli("accept", json.batchId)).code).toBe(0);
-  });
-
-  test("a story gone since those goldens needs no count to accept", async () => {
-    await acceptedOnBranch();
-    h.stories = [{ id: "a--two" }];
-    await changeTheBuild();
-    const { json } = await reviewBuild();
-    expect(json.counts.removed).toBe(1);
-    expect(json.next.join()).toContain(`selfie accept ${json.batchId}`);
-    expect(json.next.join()).not.toContain("--removed");
-    expect(json.blockers).toEqual([]);
-    expect((await h.cli("accept", json.batchId)).code).toBe(0);
-  });
-
-  test("a review at the commit with the goldens shows nothing differing", async () => {
-    await goldensOnBranch();
-    const again = await reviewBuild();
-    expect(again.code).toBe(0);
-    expect(again.json.comparedWith.source).toBe("branch");
-    expect(again.json.differences).toEqual([]);
-  });
-
-  test("never applies on the default branch, or once it has goldens", async () => {
-    const onMain = await reviewBuild();
-    expect(onMain.json.comparedWith).toMatchObject({ source: "baseline", sha: null });
-
-    await h.cli("approve", onMain.json.batchId, "--all");
-    await h.cli("accept", onMain.json.batchId);
-    git(h.repo, "switch", "--quiet", "-c", "feature");
-    await commit(h.repo, "on feature");
-    const one = await reviewBuild();
-    await h.cli("accept", one.json.batchId);
-    await commit(h.repo, "more on feature");
-    const two = await reviewBuild();
-    expect(two.json.comparedWith).toEqual({ source: "baseline", sha: onMain.json.gitSha, batch: null });
-  });
-
-  test("--baseline wins over it", async () => {
-    const first = await acceptedOnBranch();
-    const { json } = await reviewBuild();
-    const given = await h.cli("review", json.batchId, "--baseline", first.batchId);
-    expect(given.json.comparedWith).toEqual({ source: "given", sha: null, batch: first.batchId });
+    expect((await h.cli("review", json.batchId)).code).toBe(0);
   });
 });
 
@@ -296,11 +207,12 @@ describe("hunkMergeDistance", () => {
 
 describe("selfie review --baseline", () => {
   describe("with a batch, which is how to look for flakiness", () => {
-    test("exits 0 when two renders match", async () => {
+    test("exits 0 when two renders match, with nothing approved", async () => {
       const [one, two] = [await record(), await record()];
       const { code, json } = await h.cli("review", two.json.batchId, "--baseline", one.json.batchId);
       expect(code).toBe(0);
       expect(json.differences).toEqual([]);
+      expect(json.blockers).toEqual([]);
       expect(json.comparedWith).toEqual({ source: "given", sha: null, batch: one.json.batchId });
     });
 
@@ -319,7 +231,7 @@ describe("selfie review --baseline", () => {
       expect(json.next.join()).toContain("for this review alone");
     });
 
-    test("changes nothing about the batch: its exports, its comparison, or what accept checks", async () => {
+    test("changes nothing about the batch: its exports, its comparison, or what blocks it", async () => {
       const one = await reviewBuild();
       h.stories = [{ id: "a--one", color: GREEN }, { id: "a--two" }];
       const two = await record();
@@ -330,20 +242,19 @@ describe("selfie review --baseline", () => {
       const against = await h.cli("review", two.json.batchId, "--baseline", one.json.batchId);
       expect(against.json.differences[0].current).toContain(path.join("against", one.json.batchId));
       expect(await readFile(cache, "utf8")).toBe(before);
-      expect((await h.cli("review", two.json.batchId)).json.comparedWith).toMatchObject({ source: "baseline", sha: null });
+      expect((await h.cli("review", two.json.batchId)).json.comparedWith).toEqual({ source: "approvals", sha: null, batch: null });
 
       // Nothing is approved, and comparing with a batch holding the same image doesn't change that.
       const same = await h.cli("review", two.json.batchId, "--baseline", two.json.batchId);
-      expect(same.code).toBe(0);
-      expect((await h.cli("accept", two.json.batchId)).code).toBe(1);
+      expect(same.json.differences).toEqual([]);
+      expect((await h.cli("review", two.json.batchId)).code).toBe(1);
     });
   });
 
   describe("with a commit", () => {
-    test("compares with its goldens, by anything Git calls it", async () => {
+    test("compares with what its history approved, by anything Git calls it", async () => {
       const one = await reviewBuild();
       await h.cli("approve", one.json.batchId, "--all");
-      await h.cli("accept", one.json.batchId);
       await commit(h.repo, "moves on");
       h.stories = [{ id: "a--one", color: BLUE }, { id: "a--two" }];
       const two = await record();
@@ -354,11 +265,12 @@ describe("selfie review --baseline", () => {
       expect(json.differences.map(({ story }: any) => story)).toEqual(["a--one"]);
     });
 
-    test("exits 2 if it has no goldens", async () => {
+    test("with nothing approved in its history, everything is added", async () => {
       const { json } = await record();
-      const refused = await h.cli("review", json.batchId, "--baseline", "HEAD");
-      expect(refused.code).toBe(2);
-      expect(refused.json.error.code).toBe("no-goldens");
+      const { code, json: against } = await h.cli("review", json.batchId, "--baseline", "HEAD");
+      expect(code).toBe(1);
+      expect(against.comparedWith).toEqual({ source: "given", sha: json.gitSha, batch: null });
+      expect(against.differences.map(({ state }: any) => state)).toEqual(["added", "added"]);
     });
   });
 
@@ -380,9 +292,9 @@ describe("selfie review --baseline", () => {
 
   test("works with no batch too, on the batch for this build", async () => {
     const one = await record();
-    const { code, json } = await reviewBuild("--baseline", one.json.batchId);
-    expect(code).toBe(0);
+    const { json } = await reviewBuild("--baseline", one.json.batchId);
     expect(json.batchId).toBe(one.json.batchId);
+    expect(json.differences).toEqual([]);
     expect(renders).toBe(1);
   });
 });

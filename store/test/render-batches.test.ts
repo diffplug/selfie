@@ -781,6 +781,8 @@ describe("RenderBatches", () => {
       const head = await recordBatch(SHA_B, [rendered("a", 3), { story: "c", failure: "Boom" }], ENV, model);
       await model.compareBatch(head.id, SHA_A);
       await model.compareBatch(head.id, SHA_A, { includeUnchanged: true });
+      await model.compareFromHistory(head.id, [SHA_A, SHA_B]);
+      await model.commitsOfBranch("topic", ENV, 0);
       await model.acceptBatch(head.id, SHA_A, 1).catch(() => {});
       const clean = await recordBatch(SHA_C, [rendered("a", 3)], ENV, model);
       await model.acceptBatch(clean.id, SHA_A, 0).catch(() => {});
@@ -804,8 +806,8 @@ describe("RenderBatches", () => {
           const plan = db.prepare(`EXPLAIN QUERY PLAN ${text}`).all(...params);
           return plan
             .map(({ detail }) => String(detail))
-            // Reading a statement's own VALUES, or a one-row aggregate, is no table scan.
-            .filter((detail) => /\bSCAN\b/.test(detail) && !/\bSCAN (v|c|\d+ CONSTANT ROWS?|CONSTANT ROW)\b/.test(detail))
+            // Reading a statement's own VALUES or JSON list, or a one-row aggregate, is no table scan.
+            .filter((detail) => /\bSCAN\b/.test(detail) && !/\bSCAN (v|c|json_each|\d+ CONSTANT ROWS?|CONSTANT ROW)\b/.test(detail))
             .map((detail) => `${detail} in ${text}`);
         });
         expect(seen.size).toBeGreaterThan(10);

@@ -156,7 +156,7 @@ Without leaving these out, every built Storybook hashed differently and the feat
 
 **`scale`, another column on `render_batches`.** The same exception, for the same reason, and it comes in the same unmerged stack, so it breaks no store that `reused_from_batch` hadn't already. It's a fact about one batch that every viewer wants with the batch, so a separate table would only add a lookup.
 
-**A batch at this commit needs no copy.** A review repeated at one commit used to copy every row into a new batch, for nothing. A new commit still needs its own batch, since goldens are per SHA, and so does a tree that became dirty or a baseline that moved, since a batch records both.
+**A batch at this commit needs no copy.** A review repeated at one commit used to copy every row into a new batch, for nothing. A new commit still needs its own batch, since approvals are per commit, and so does a tree that became dirty or a change of branch, since a batch records both.
 
 **The newest real render wins.** Pointing a key at the newest reused batch would let `reusedFromBatch` name a batch that rendered nothing, so reuse never chains. Forgetting a key after a bad render means `--no-reuse` can't uncover a deterministic failure only to have the next review hide it behind an older pass.
 

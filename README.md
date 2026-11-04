@@ -57,7 +57,7 @@ Access follows GitHub through a GitHub App: anyone can view a public repository'
 Selfie has the following commands:
 
 - render - always renders the Storybook, and records a batch
-- review - shows a batch's diff against what its history has approved, as one JSON document whose exit code says whether anything blocks. With no batch, it uses the one for this exact built Storybook, which takes about 0.3 s rather than 70 s on 541 stories, and records one only if there's none yet. `--baseline` compares with a commit's goldens or another batch, so recording twice and comparing is how to look for flakiness
+- review - shows a batch's diff against what its history has approved, as one JSON document whose exit code says whether anything blocks. With no batch, it uses the one for this exact built Storybook, which takes about 0.3 s rather than 70 s on 541 stories, and records one only if there's none yet. `--baseline` compares with what a commit's history approved, or another batch, so recording twice and comparing is how to look for flakiness
 - approve, reject - decides on what a batch changed, added, or removed, on any branch, on a dirty tree if you like. A later batch whose history reaches an approval needs no repeating it, whether after a commit, a rebase, or a merge
 - push, pull - move a batch and its decisions to and from the cloud
 - flakes - renders a built Storybook several times, and says what wasn't the same each time. `selfie skill fix-flakes` is a guide for a coding agent to fix what it finds
