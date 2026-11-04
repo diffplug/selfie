@@ -16,8 +16,8 @@ import {
 } from "@primer/react";
 import { Blankslate, ScrollableRegion } from "@primer/react/experimental";
 import { useEffect, useMemo, useState, type ComponentProps, type RefObject } from "react";
-import type { AdvisoryReason, BlockerReason, DecisionKind, BatchView, RenderRow } from "../shared/api.ts";
-import { applyFilter, decidableIn, filterQuery, hasAdvisory, NO_FILTER, parseFilter, showQuery, SHOW_OPTIONS, targetsOf, type RowFilter, type Show } from "./filter.ts";
+import type { BlockerReason, DecisionKind, BatchView, RenderRow } from "../shared/api.ts";
+import { applyFilter, decidableIn, filterQuery, NO_FILTER, parseFilter, showQuery, SHOW_OPTIONS, targetsOf, type RowFilter, type Show } from "./filter.ts";
 import { useStoryFocusKeys, useTitle, type BatchState } from "./hooks.ts";
 import { Keys } from "./Keys.tsx";
 import { AppLink, AppLinkButton, navigate, batchPath, storiesPath, storyPath } from "./router.tsx";
@@ -173,38 +173,6 @@ function Blockers({ view, onShow }: { view: BatchView; onShow: (show: Show) => v
   );
 }
 
-const ADVISORIES: readonly { readonly reason: AdvisoryReason; readonly words: string }[] = [
-  { reason: "play-error", words: "whose play function threw" },
-];
-
-function Advisories({ view }: { view: BatchView }) {
-  if (view.advisories.length === 0) return null;
-  return (
-    <Stack as="section" aria-labelledby="advisories-heading" gap="condensed">
-      <Heading as="h3" id="advisories-heading" variant="small">
-        Advisories <CounterLabel>{view.advisories.length}</CounterLabel>
-      </Heading>
-      <Text as="p" className="selfie-muted">
-        These don't stop anything, but their images may not mean what they seem to.
-      </Text>
-      <ul className="selfie-attention">
-        {ADVISORIES.map(({ reason, words }) => {
-          const entries = view.advisories.filter((advisory) => advisory.reason === reason);
-          if (entries.length === 0) return null;
-          return (
-            <li key={reason}>
-              <Text weight="semibold">
-                {plural(entries.length, "story", "stories")} {words}
-              </Text>
-              <StoryList batchId={view.batch.id} show="advisory" stories={entries.map(({ story, detail }) => ({ story: story!, detail }))} />
-            </li>
-          );
-        })}
-      </ul>
-    </Stack>
-  );
-}
-
 interface PendingBulk {
   readonly decision: DecisionKind;
   /** Each decidable, as they were when the dialog opened, which is exactly what gets sent. */
@@ -222,7 +190,6 @@ function BulkDialog({ pending, onClose }: { pending: PendingBulk; onClose: (conf
     [count(({ state }) => state === "added"), "added"],
     [count(({ decision: made }) => made?.decision === "approved"), "already approved"],
     [count(({ decision: made }) => made?.decision === "rejected"), "already rejected"],
-    [count(hasAdvisory), "with an advisory"],
   ] as const;
   return (
     <ConfirmationDialog
@@ -438,7 +405,6 @@ export function BatchScreen({
         <Count label="Removed" count={counts.removed} show="removed" onShow={showInList} />
         <Count label="Failed" count={counts.failed} show="failed" onShow={showInList} />
         <Count label="Undecided" count={counts.undecided} show="undecided" onShow={showInList} />
-        <Count label="Advisories" count={counts.advisories} show="advisory" onShow={showInList} />
       </div>
       {outsideFilter > 0 && (
         <Banner
@@ -448,7 +414,6 @@ export function BatchScreen({
         />
       )}
       <Blockers view={view} onShow={showInList} />
-      <Advisories view={view} />
       <Differences state={state} view={view} filter={filter} setFilter={setFilter} />
     </Stack>
   );

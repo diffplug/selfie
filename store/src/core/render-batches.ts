@@ -30,9 +30,8 @@ export const CREATE_BATCH_TABLES: readonly string[] = [
   story TEXT NOT NULL,
   image_key INTEGER REFERENCES images(key),
   failure TEXT,
-  play_error TEXT,
   PRIMARY KEY (batch_key, story),
-  CHECK ((image_key IS NULL) <> (failure IS NULL))
+  CHECK (image_key IS NOT NULL OR failure IS NOT NULL)
 ) WITHOUT ROWID`,
   `CREATE TABLE IF NOT EXISTS decisions (
   environment TEXT NOT NULL,
@@ -55,8 +54,8 @@ export const CREATE_BATCH_TABLES: readonly string[] = [
 ];
 
 // These fit the limit of 100 bound parameters per statement, beside what all of a
-// statement's rows share. A recorded render takes two, or three with a play error,
-// so a statement holds 49 when none has one, and at least 33.
+// statement's rows share. A recorded render takes two, or three with both an image and a
+// failure, so a statement holds 49 when none has both, and at least 33.
 const MAX_RECORD_PARAMS = 100;
 const RENDERS_PER_DECISION_STATEMENT = 47;
 // Beside the environment, a merged decision takes seven.
@@ -103,7 +102,7 @@ const NEWEST_DECISION = `NOT EXISTS (SELECT 1 FROM decisions n
 const comparisonStatements = (baselineKey: string) => ({
   baseline: `SELECT ${baselineKey} AS batch_key`,
   // `gs` joins before the images so that a row left out never reads them.
-  comparedPage: `SELECT rs.story, i.hash AS image_hash, rs.failure, rs.play_error,
+  comparedPage: `SELECT rs.story, i.hash AS image_hash, rs.failure,
   gi.hash AS golden_hash, d.decision, d.actor, d.decided_at
 FROM render_batches r
 CROSS JOIN renders rs ON rs.batch_key = r.key
@@ -113,8 +112,8 @@ LEFT JOIN images gi ON gi.key = gs.image_key
 LEFT JOIN decisions d ON d.environment = r.environment AND d.story = rs.story
   AND d.image_hash = i.hash AND ${NEWEST_DECISION}
 WHERE r.id = ?1 AND rs.story > ?3
-  AND (CAST(?5 AS INTEGER) = 1 OR rs.image_key IS NULL
-    OR rs.image_key IS NOT gs.image_key OR rs.play_error IS NOT NULL)
+  AND (CAST(?5 AS INTEGER) = 1 OR rs.failure IS NOT NULL
+    OR rs.image_key IS NOT gs.image_key)
 ORDER BY rs.story
 LIMIT CAST(?4 AS INTEGER)`,
   removedPage: `SELECT gs.story, gi.hash AS golden_hash
@@ -128,7 +127,7 @@ LIMIT CAST(?4 AS INTEGER)`,
   unchangedCount: `SELECT COUNT(*) AS total
 FROM renders rs
 JOIN renders gs ON gs.batch_key = ${baselineKey} AND gs.story = rs.story
-WHERE rs.batch_key = (SELECT key FROM render_batches WHERE id = ?1) AND rs.image_key = gs.image_key`,
+WHERE rs.batch_key = (SELECT key FROM render_batches WHERE id = ?1) AND rs.image_key = gs.image_key AND rs.failure IS NULL`,
 });
 
 const AGAINST_GOLDENS = comparisonStatements(GOLDENS_BATCH_KEY);
@@ -179,7 +178,7 @@ const FINISH_BATCH = `UPDATE render_batches SET
   finished_at = COALESCE(finished_at, CAST(?2 AS INTEGER)),
   failed_count = c.failed
 FROM (
-  SELECT COUNT(*) AS total, COALESCE(SUM(image_key IS NULL), 0) AS failed
+  SELECT COUNT(*) AS total, COALESCE(SUM(failure IS NOT NULL), 0) AS failed
   FROM renders
   WHERE batch_key = (SELECT key FROM render_batches WHERE id = ?1)
 ) AS c
@@ -197,7 +196,7 @@ const BATCH_PAGE_TAIL = `WHERE r.id = ?1 AND rs.story > ?2
 ORDER BY rs.story
 LIMIT CAST(?3 AS INTEGER)`;
 
-const READ_BATCH_PAGE = `SELECT rs.story, i.hash AS image_hash, rs.failure, rs.play_error, d.decision, d.actor, d.decided_at, d.git_sha, d.batch_id
+const READ_BATCH_PAGE = `SELECT rs.story, i.hash AS image_hash, rs.failure, d.decision, d.actor, d.decided_at, d.git_sha, d.batch_id
 FROM render_batches r
 CROSS JOIN renders rs ON rs.batch_key = r.key
 LEFT JOIN images i ON i.key = rs.image_key
@@ -207,7 +206,7 @@ ${BATCH_PAGE_TAIL}`;
 // What a story's image hash is when a decision is on it being gone.
 const REMOVAL = "";
 
-const READ_RENDERS_PAGE = `SELECT rs.story, i.hash AS image_hash, rs.failure, rs.play_error
+const READ_RENDERS_PAGE = `SELECT rs.story, i.hash AS image_hash, rs.failure
 FROM render_batches r
 CROSS JOIN renders rs ON rs.batch_key = r.key
 LEFT JOIN images i ON i.key = rs.image_key
@@ -225,26 +224,24 @@ WHERE batch_key = (SELECT key FROM render_batches WHERE id = ?1)`;
 // A row with a hash the images table lacks, or a finished batch, matches nothing, so the
 // statement returns too few rows, which is how `recordRenders` knows.
 const recordSql = (values: string) =>
-  `WITH v(story, image_hash, failure, play_error) AS (VALUES ${values})
-INSERT INTO renders(batch_key, story, image_key, failure, play_error)
-SELECT r.key, v.story, i.key, v.failure, v.play_error
+  `WITH v(story, image_hash, failure) AS (VALUES ${values})
+INSERT INTO renders(batch_key, story, image_key, failure)
+SELECT r.key, v.story, i.key, v.failure
 FROM render_batches r CROSS JOIN v LEFT JOIN images i ON i.hash = v.image_hash
 WHERE r.id = ?1 AND r.finished_at IS NULL AND (v.image_hash IS NULL OR i.key IS NOT NULL)
 ON CONFLICT(batch_key, story) DO UPDATE SET
-  image_key = excluded.image_key, failure = excluded.failure,
-  play_error = excluded.play_error
+  image_key = excluded.image_key, failure = excluded.failure
 RETURNING 1 AS written`;
 
 /**
- * What a batch recorded for one story: the stored image's hash, or why it failed.
- * `playError` says why its play function failed, on a story that may still have rendered.
+ * What a batch recorded for one story: the stored image's hash, why it failed, or both, for a story
+ * that rendered and then failed, such as by its play function throwing.
  */
 export type RecordedRender = {
   /** The story ID, with any render variant in it. Opaque here. */
   readonly story: string;
-  readonly playError?: string | null;
 } & (
-  | { readonly imageHash: string; readonly failure?: undefined }
+  | { readonly imageHash: string; readonly failure?: string | undefined }
   | { readonly failure: string; readonly imageHash?: undefined }
 );
 
@@ -303,16 +300,14 @@ export const isDecidable = (state: RenderState): boolean => state === "changed" 
 export interface ComparedRender {
   readonly story: string;
   readonly state: RenderState;
-  /** The batch's image. Null if `removed` or `failed`. */
+  /** The batch's image. Null if `removed`, and if `failed` with nothing rendered. */
   readonly imageHash: string | null;
   /** The baseline's image. Null if `added`, and if `failed` with no golden for this name. */
   readonly goldenHash: string | null;
   /** The batch whose approval made `goldenHash` the reference, when it came from approvals. */
   readonly goldenBatchId?: string;
-  /** Null unless `failed`. */
+  /** Why it failed, or null unless `failed`. */
   readonly failure: string | null;
-  /** As recorded: null if there was none, and always null if `removed`. */
-  readonly playError: string | null;
   /** The decision on exactly `imageHash` for this name, if there is one. */
   readonly decision: Decision | null;
 }
@@ -560,7 +555,7 @@ ORDER BY started_at DESC, key DESC`,
     const [batchRows, firstRenders] = (await this.#sql.batch([{ sql: SELECT_BATCH, params: [batchId], idempotent: true }, rendersPage(START)])) as [SqlRow[], SqlRow[]];
     const batch = finishedBatch(batchRows, batchId);
     const rows = await this.#remainingPages(firstRenders, rendersPage);
-    return compareWithApprovals(batch, rows.map((row) => ({ story: row.story as string, imageHash: row.image_hash as string | null, failure: row.failure as string | null, playError: row.play_error as string | null })), decisions, { includeUnchanged });
+    return compareWithApprovals(batch, rows.map((row) => ({ story: row.story as string, imageHash: row.image_hash as string | null, failure: row.failure as string | null })), decisions, { includeUnchanged });
   }
 
   /** Every decision made at these commits. One parameter however many, so a long history is one statement. */
@@ -726,8 +721,7 @@ ON CONFLICT(environment, story, image_hash, git_sha) DO UPDATE SET
       batch,
       renders: page.map((row) => ({
         story: row.story as string,
-        ...(row.image_hash === null ? { failure: row.failure as string } : { imageHash: row.image_hash as string }),
-        ...(row.play_error === null ? {} : { playError: row.play_error as string }),
+        ...(row.image_hash === null ? { failure: row.failure as string } : { imageHash: row.image_hash as string, ...(row.failure === null ? {} : { failure: row.failure as string }) }),
         decision: row.decision === null ? null : { decision: row.decision as DecisionKind, actor: row.actor as string, at: row.decided_at as number, gitSha: row.git_sha as string, batchId: row.batch_id as string },
       })),
       next: rows.length > limit ? (page.at(-1)!.story as string) : null,
@@ -843,17 +837,14 @@ function recordStatements(batchId: string, renders: readonly RecordedRender[]): 
     params = [batchId];
     values = [];
   };
-  for (const { story, imageHash, failure, playError } of renders) {
-    const needed = playError == null ? 2 : 3;
+  for (const { story, imageHash, failure } of renders) {
+    const needed = imageHash !== undefined && failure !== undefined ? 3 : 2;
     if (params.length + needed > MAX_RECORD_PARAMS) flush();
     const name = `?${params.push(story)}`;
     // Sql binds no nulls, so the column a row leaves empty is a literal.
-    const result =
-      imageHash !== undefined
-        ? `?${params.push(imageHash)}, NULL`
-        : `NULL, ?${params.push(cleanMessage(failure))}`;
-    const play = playError == null ? "NULL" : `?${params.push(cleanMessage(playError))}`;
-    values.push(`(${name}, ${result}, ${play})`);
+    const image = imageHash === undefined ? "NULL" : `?${params.push(imageHash)}`;
+    const why = failure === undefined ? "NULL" : `?${params.push(cleanMessage(failure))}`;
+    values.push(`(${name}, ${image}, ${why})`);
   }
   flush();
   return statements;
@@ -917,7 +908,7 @@ const newestFirst = (a: PlacedDecision, b: PlacedDecision) => b.at - a.at || b.d
  */
 export function compareWithApprovals(
   batch: RenderBatch,
-  rendered: readonly { readonly story: string; readonly imageHash: string | null; readonly failure: string | null; readonly playError: string | null }[],
+  rendered: readonly { readonly story: string; readonly imageHash: string | null; readonly failure: string | null }[],
   decisions: readonly PlacedDecision[],
   { includeUnchanged = false }: CompareOptions = {},
 ): Comparison {
@@ -938,13 +929,13 @@ export function compareWithApprovals(
 
   const compared: ComparedRender[] = [];
   let unchangedCount = 0;
-  for (const { story, imageHash, failure, playError } of rendered) {
+  for (const { story, imageHash, failure } of rendered) {
     const reference = referenceOf(story);
     const goldenHash = reference?.imageHash ?? null;
-    const state = stateOf(imageHash, goldenHash);
+    const state = stateOf(imageHash, goldenHash, failure);
     if (state === "unchanged") unchangedCount += 1;
-    if (state === "unchanged" && !includeUnchanged && playError === null) continue;
-    compared.push({ story, state, imageHash, goldenHash, ...(goldenHash === null ? {} : { goldenBatchId: reference!.batchId }), failure, playError, decision: imageHash === null ? null : decisionOn(story, imageHash, reference?.at ?? 0) });
+    if (state === "unchanged" && !includeUnchanged) continue;
+    compared.push({ story, state, imageHash, goldenHash, ...(goldenHash === null ? {} : { goldenBatchId: reference!.batchId }), failure, decision: state === "failed" ? null : decisionOn(story, imageHash, reference?.at ?? 0) });
   }
 
   const here = new Set(rendered.map(({ story }) => story));
@@ -953,27 +944,27 @@ export function compareWithApprovals(
     if (here.has(story)) continue;
     const reference = referenceOf(story);
     if (reference === undefined || reference.imageHash === null) continue;
-    removed.push({ story, state: "removed", imageHash: null, goldenHash: reference.imageHash, goldenBatchId: reference.batchId, failure: null, playError: null, decision: decisionOn(story, null, reference.at) });
+    removed.push({ story, state: "removed", imageHash: null, goldenHash: reference.imageHash, goldenBatchId: reference.batchId, failure: null, decision: decisionOn(story, null, reference.at) });
   }
   return { batch, renders: [...compared, ...removed], unchangedCount };
 }
 
-const stateOf = (imageHash: string | null, goldenHash: string | null): RenderState =>
-  imageHash === null ? "failed" : goldenHash === null ? "added" : imageHash === goldenHash ? "unchanged" : "changed";
+const stateOf = (imageHash: string | null, goldenHash: string | null, failure: string | null): RenderState =>
+  failure !== null || imageHash === null ? "failed" : goldenHash === null ? "added" : imageHash === goldenHash ? "unchanged" : "changed";
 
 function toComparedRender(row: SqlRow): ComparedRender {
   const imageHash = row.image_hash as string | null;
   const goldenHash = row.golden_hash as string | null;
-  const state = stateOf(imageHash, goldenHash);
+  const failure = row.failure as string | null;
+  const state = stateOf(imageHash, goldenHash, failure);
   return {
     story: row.story as string,
     state,
     imageHash,
     goldenHash,
-    failure: row.failure as string | null,
-    playError: row.play_error as string | null,
+    failure,
     decision:
-      row.decision === null
+      row.decision === null || state === "failed"
         ? null
         : {
             decision: row.decision as DecisionKind,
@@ -990,7 +981,6 @@ function toRemovedRender(row: SqlRow): ComparedRender {
     imageHash: null,
     goldenHash: row.golden_hash as string,
     failure: null,
-    playError: null,
     decision: null,
   };
 }

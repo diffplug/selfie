@@ -38,7 +38,7 @@ const USAGE = `Usage: selfie [--port <n>] [--native] [--no-build] [--no-open]
       again. --baseline compares with what that commit's history approved, or with that batch, for
       this review alone, and is how to look for flakiness: render twice, then review the second
       --baseline the first. Exits 0 if nothing blocks it, 1 if something does or
-      anything differs from a --baseline, 2 if the review couldn't run. Play errors are advisories, and don't change the exit code.
+      anything differs from a --baseline, 2 if the review couldn't run.
 
   flakes [--times <n>] [--concurrency <n>] [--build] [--story <pattern>]... [--native]
       Renders a built Storybook --times times, 3 by default, and prints what wasn't the same each

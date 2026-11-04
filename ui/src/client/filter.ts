@@ -14,7 +14,6 @@ export const SHOW_OPTIONS = [
   ["failed", "Failed"],
   ["approved", "Approved"],
   ["rejected", "Rejected"],
-  ["advisory", "Has an advisory"],
   ["unchanged", "Unchanged"],
 ] as const;
 
@@ -27,19 +26,16 @@ export interface RowFilter {
 
 export const NO_FILTER: RowFilter = { text: "", show: "all" };
 
-export const hasAdvisory = ({ playError }: RenderRow) => playError !== null;
 
 function inShow(row: RenderRow, show: Show): boolean {
   switch (show) {
     case "all":
-      return row.state !== "unchanged" || hasAdvisory(row);
+      return row.state !== "unchanged";
     case "undecided":
       return isDecidable(row.state) && row.decision === null;
     case "approved":
     case "rejected":
       return isDecidable(row.state) && row.decision?.decision === show;
-    case "advisory":
-      return hasAdvisory(row);
     case "layout":
       return row.state === "changed" && row.pixelDiff !== null && isLayoutOnly(row.pixelDiff);
     default:

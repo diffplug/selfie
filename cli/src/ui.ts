@@ -137,7 +137,6 @@ export function localReviewSource(
       hunkMergeDistance: await resolveHunkMergeDistance(repo),
       actor,
       blockers: summary.blockers,
-      advisories: summary.advisories,
       counts: { ...summary.counts, failed: summary.failed.length },
       rows,
       storyNames: await storyNamesFor(batch, new Set(rows.flatMap(({ goldenBatchId }) => goldenBatchId ?? [])), new Set(rows.map(({ story }) => story))),

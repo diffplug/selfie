@@ -17,7 +17,7 @@ import { LiveStories, StorybookLinkTo } from "./LiveStories.tsx";
 import { LoadFailure, Loading } from "./Status.tsx";
 import { describeBox, groupHunks, isLayoutOnly } from "../shared/hunks.ts";
 import { comparedImage, newestNotedImage } from "../shared/notes.ts";
-import { AdvisoryLabels, DecisionLabel, describePixels, sizeChanged, StateLabel } from "./words.tsx";
+import { DecisionLabel, describePixels, sizeChanged, StateLabel } from "./words.tsx";
 
 /** Each key, what it does, and how many images it takes for it to do anything. */
 const SHORTCUTS: readonly (readonly [string, string, number])[] = [
@@ -79,7 +79,7 @@ function Notes({ row, diff, renamedFrom, renamedTo }: { row: RenderRow; diff: Pi
   return (
     <>
       {row.state === "failed" && (
-        <Banner variant="critical" title="This story failed to render" description={<code className="selfie-pre">{row.failure ?? "No message was recorded."}</code>} />
+        <Banner variant="critical" title="This story failed" description={<code className="selfie-pre">{row.failure ?? "No message was recorded."}</code>} />
       )}
       {row.state === "added" && renamedFrom !== undefined && (
         <Banner
@@ -101,9 +101,6 @@ function Notes({ row, diff, renamedFrom, renamedTo }: { row: RenderRow; diff: Pi
       )}
       {diff !== null && sizeChanged(diff) && (
         <Banner variant="warning" title="The size changed" description="The images are different sizes, and they're shown from their top left corners, so what's below the change won't line up when flipping." />
-      )}
-      {row.playError !== null && (
-        <Banner variant="warning" title="Its play function threw" description={<code className="selfie-pre">{row.playError}</code>} />
       )}
     </>
   );
@@ -201,7 +198,7 @@ export function DetailScreen({
   const decide = async (decision: DecisionKind) => {
     if (row === null || state.busy) return;
     if (!isDecidable(row.state)) {
-      setMessage(row.state === "unchanged" ? "An unchanged image needs no decision." : "This story failed to render, so it has no image to decide on.");
+      setMessage(row.state === "unchanged" ? "An unchanged image needs no decision." : "This story failed, so it takes no decision. Fix it and render again.");
       return;
     }
     const recorded = await state.decide(decision, targetsOf([row]));
@@ -267,7 +264,6 @@ export function DetailScreen({
       <Stack direction="horizontal" align="center" gap="condensed" wrap="wrap">
         <StateLabel state={row.state} />
         <DecisionLabel row={row} />
-        <AdvisoryLabels row={row} />
         {decidable && row.decision !== null && (
           <Text className="selfie-muted">
             by {row.decision.actor}, <RelativeTime date={new Date(row.decision.at)} />.

@@ -1,16 +1,14 @@
 // Verdicts, computed from a comparison's facts, so a caller can recompute them after any decision.
 import { filterStories } from "selfie-render";
 import { isDecidable, type ComparedRender, type Comparison, type RenderState } from "selfie-store";
-import type { AdvisoryReason, Attention, BlockerReason } from "selfie-ui/app";
+import type { Attention, BlockerReason } from "selfie-ui/app";
 
 export { isDecidable };
-export type { AdvisoryReason, Attention, BlockerReason };
+export type { Attention, BlockerReason };
 
 export interface BatchSummary {
   /** What stops a reviewer calling this batch good. */
   readonly blockers: readonly Attention<BlockerReason>[];
-  /** What a reviewer should look at, but which stops nothing. */
-  readonly advisories: readonly Attention<AdvisoryReason>[];
   readonly counts: {
     readonly stories: number;
     readonly unchanged: number;
@@ -19,7 +17,6 @@ export interface BatchSummary {
     /** Those within the batch's filter. */
     readonly removed: number;
     readonly undecided: number;
-    readonly advisories: number;
   };
   /** Every render, but for what's in `notRendered`. */
   readonly inFilter: readonly ComparedRender[];
@@ -72,17 +69,11 @@ export function summarizeBatch({ batch, renders, unchangedCount }: Comparison): 
       detail: pattern,
     })),
   ];
-  const advisories: Attention<AdvisoryReason>[] = [
-    ...renders.flatMap(({ story, playError }) =>
-      playError === null ? [] : [{ story, reason: "play-error" as const, detail: playError }],
-    ),
-  ];
 
   const changed = inState("changed").length;
   const added = inState("added").length;
   return {
     blockers,
-    advisories,
     counts: {
       stories: unchangedCount + changed + added + failed.length,
       unchanged: unchangedCount,
@@ -90,7 +81,6 @@ export function summarizeBatch({ batch, renders, unchangedCount }: Comparison): 
       added,
       removed: removed.length,
       undecided: undecided.length,
-      advisories: advisories.length,
     },
     inFilter,
     undecided,

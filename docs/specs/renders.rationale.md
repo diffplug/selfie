@@ -24,7 +24,7 @@
 
 **A batch's facts in columns.** `selfie review` first kept whether a tree was dirty, its baseline, and its play errors in a file beside the exported images. Pruning that file lost them, and with them the rule that a dirty batch can't become goldens, so a UI, or anyone else calling `acceptBatch`, wasn't bound by it. They became columns while no store held this data, which is why this table could still change: see `docs/specs/store.md` → Open questions for the next time.
 
-**Not yet run on real D1.** The `play_error` column, the three new columns on `render_batches`, the longest statement of play errors and failures, and `firstWithGoldens` are in the contract suite, and pass on local SQLite through the same `Sql` limits. The batch on real D1 wasn't made when they went in, so their fit there is unproven, and the suite's size of about 90 requests is counted from the code rather than measured. A statement of 33 renders with both messages at their 2,000 characters binds about 132 KB, which is the case to watch.
+**Not yet run on real D1.** The three new columns on `render_batches`, the longest statement of failures, and `firstWithGoldens` are in the contract suite, and pass on local SQLite through the same `Sql` limits. The batch on real D1 wasn't made when they went in, so their fit there is unproven, and the suite's size of about 90 requests is counted from the code rather than measured. A statement of 33 renders with both messages at their 2,000 characters binds about 132 KB, which is the case to watch.
 
 **A filter as a fact.** Whether an approved story is really gone or only outside the batch's filter needs the patterns, so they're kept too. What's unmatched is kept alongside them, since a comparison lists too little to work it out.
 

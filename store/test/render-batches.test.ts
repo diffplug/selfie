@@ -134,24 +134,21 @@ describe("RenderBatches", () => {
     });
   });
 
-  describe("recording a play error", () => {
-    it("cuts it as a failure is cut, by code point", async () => {
+  describe("recording a failure", () => {
+    it("cuts it by code point", async () => {
       const batch = await batches.beginBatch({ gitSha: SHA_A, environment: ENV, scale: 1, dirty: false, });
-      await batches.recordRenders(batch.id, [{ story: "a", failure: "boom", playError: `${"x".repeat(1999)}😀😀\0` }]);
+      await batches.recordRenders(batch.id, [{ story: "a", failure: `${"x".repeat(1999)}😀😀\0` }]);
       await batches.finishBatch(batch.id, 1);
       const { renders: compared } = await batches.compareBatch(batch.id, null);
-      expect(compared[0]!.playError).toBe(`${"x".repeat(1999)}😀`);
+      expect(compared[0]!.failure).toBe(`${"x".repeat(1999)}😀`);
     });
 
-    it("keeps a statement inside the parameter limit when only some rows have one", async () => {
+    it("keeps a statement inside the parameter limit when only some rows have both an image and a failure", async () => {
+      await recordBatch(SHA_B, [rendered("holds-the-image", 9)]);
       const { sent, adapter: counted } = counting(adapter);
       const model = new RenderBatches({ sql: new Sql(counted) });
       const batch = await batches.beginBatch({ gitSha: SHA_A, environment: ENV, scale: 1, dirty: false, });
-      const rows = Array.from({ length: 200 }, (_, i) => ({
-        story: `s${i}`,
-        failure: "boom",
-        ...(i % 2 === 0 ? { playError: "play" } : {}),
-      }));
+      const rows = Array.from({ length: 200 }, (_, i) => (i % 2 === 0 ? { ...rendered(`s${i}`, 9), failure: "boom" } : { story: `s${i}`, failure: "boom" }));
       await model.recordRenders(batch.id, rows);
       for (const { params = [] } of sent.flat()) expect(params.length).toBeLessThanOrEqual(100);
       await expect(model.finishBatch(batch.id, 200)).resolves.toMatchObject({ failedCount: 200 });
@@ -576,25 +573,25 @@ describe("RenderBatches", () => {
   });
 
   describe("compare", () => {
-    it("lists only differences and any play error, unless asked for everything", async () => {
+    it("lists only differences and failures, unless asked for everything", async () => {
       await goldensAt(SHA_A, [rendered("same", 1), rendered("played", 2), rendered("calm", 3)]);
       const batch = await recordBatch(SHA_B, [
         rendered("same", 1),
-        { ...rendered("played", 2), playError: "Boom" },
+        { ...rendered("played", 2), failure: "play: Boom" },
         rendered("calm", 3),
         { story: "broken", failure: "Boom" },
       ]);
 
       const differences = await batches.compareBatch(batch.id, SHA_A);
-      expect(differences.renders.map(({ story, state, playError }) => [story, state, playError])).toEqual([
-        ["broken", "failed", null],
-        ["played", "unchanged", "Boom"],
+      expect(differences.renders.map(({ story, state, failure }) => [story, state, failure])).toEqual([
+        ["broken", "failed", "Boom"],
+        ["played", "failed", "play: Boom"],
       ]);
-      expect(differences.unchangedCount).toBe(3);
+      expect(differences.unchangedCount).toBe(2);
 
       const everything = await batches.compareBatch(batch.id, SHA_A, { includeUnchanged: true });
       expect(everything.renders.map(({ story }) => story)).toEqual(["broken", "calm", "played", "same"]);
-      expect(everything.unchangedCount).toBe(3);
+      expect(everything.unchangedCount).toBe(2);
     });
 
     it("lists a failure that has no golden, with or without a baseline", async () => {
@@ -828,7 +825,7 @@ describe("RenderBatches", () => {
 });
 
 describe("newestRenders", () => {
-  const row = (story: string, state: ComparedRender["state"] = "unchanged"): ComparedRender => ({ story, state, imageHash: null, goldenHash: null, failure: null, playError: null, decision: null });
+  const row = (story: string, state: ComparedRender["state"] = "unchanged"): ComparedRender => ({ story, state, imageHash: null, goldenHash: null, failure: null, decision: null });
 
   it("takes each story from the first batch that has it, and stops once each wanted one has an answer", async () => {
     const read: string[] = [];

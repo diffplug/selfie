@@ -25,15 +25,15 @@ A batch is one recording of a set of renders against one full Git SHA in one env
 | Status | Meaning | Compare | Accept |
 |---|---|---|---|
 | `recording` | Not finished: still being written, or its writer crashed | Refused | Refused |
-| `failed` | Finished, and at least one story failed to render | Yes | Refused |
+| `failed` | Finished, and at least one story failed | Yes | Refused |
 | `complete` | Finished, and every story rendered | Yes | If approved and not `dirty` |
 
 - **Must be told when it begins whether the working tree was dirty, and which branch HEAD was on, or null if detached**, and may be told any story filter, as `patterns` and the `unmatched` among them, and which batch really rendered its images, as `reusedFromBatch` (`docs/specs/cli.md` → Recording only if necessary). A batch keeps these for good, so nothing about it depends on a file outside the store.
 - **Must be told its environment's scale when it begins**, as image pixels per CSS pixel, a positive number that need not be whole. The environment's ID is a hash, and the batch's images hold only pixels, so this is the only place the store or a viewer can read it. It changes no state, comparison, or acceptance, since the ID already separates scales. **Must keep one image at its real pixels, and never a copy at another size**: a viewer calculates every size from the image and this.
 - **Must treat `reusedFromBatch` as a fact about where the pixels came from, and nothing more.** It changes no state, comparison, or acceptance, and it's an ID, not a reference, since sync may move a batch without the one it names.
 - **Must record a story that failed to render as a row with its failure message**, never leave it absent, so only a `recording` batch can lack a story. A message is cut to 2,000 characters.
-- **Must record a story's play error as a message, cut the same way, whether or not it also has an image.** It changes no state and no acceptance ([Open questions](#open-questions)).
-- **Must refuse a render whose image isn't stored**, so a row always has an image. Rows hold image keys, and the API only takes and returns image hashes, per `docs/specs/store.md` → Image identity.
+- **Must record a story that rendered and then failed, such as by its play function throwing, with both its image and its failure**, so what it looked like is there to work out why. It's `failed` like any other, and `failure` is what says a story failed (`docs/specs/cli.md` → What blocks).
+- **Must refuse a render whose image isn't stored**, so a row's image is always here. A `CHECK` requires a row to have an image, a failure, or both. Rows hold image keys, and the API only takes and returns image hashes, per `docs/specs/store.md` → Image identity.
 - **Must let a batch's newest result for a name replace the older one until it is finished**, and refuse any change after that, since a finished batch may hold goldens. **May set `storybook_key` after that**, since it's only known once a built Storybook is kept, and changes nothing a comparison reads.
 - **Must mark a batch finished only in a statement that counts its rows against the number the caller expected.** A batch that never landed fails that count, and the batch stays `recording`.
 - **Must refuse to compare a `recording` batch**, since a render it doesn't hold yet would read as removed.
@@ -64,10 +64,10 @@ Source of truth: `compareWithApprovals` and `RenderBatches.compareFromHistory`, 
 | `unchanged` | This image | This image |
 | `changed` | This image | Another image |
 | `added` | This image | Nothing |
-| `failed` | A failure | Anything |
+| `failed` | A failure, and maybe an image | Anything |
 | `removed` | Nothing | An image |
 
-- **Must list only what isn't `unchanged`, and anything with a play error, by default, with a count of every `unchanged` render.** `includeUnchanged` lists them all (rationale).
+- **Must list only what isn't `unchanged`, by default, with a count of every `unchanged` render.** `includeUnchanged` lists them all (rationale).
 - **`compareWithBatch` must compare with a finished batch in the batch's environment**, whose images stand in for the reference, and refuse any other with `no-baseline-batch`. A story that batch left out by a filter reads as `added`. **Never let `acceptBatch` take a batch as its baseline.**
 - **`compareBatch`, which only sync uses, must refuse a baseline SHA that has no goldens in the batch's environment**, rather than report everything as added. A null baseline means there are none yet, and gives `added` and `failed` only.
 - **Must return the decision on exactly the batch's image for that name, or on the story being gone**, whatever the state, so `selfie review` can show what is already approved. `compareFromHistory` takes the decisions from `decisionsAt`, and returns one only if it's no older than the reference's approval ([Approvals](#approvals)).
@@ -123,7 +123,7 @@ Source of truth: `CREATE_BATCH_TABLES` in `store/src/core/render-batches.ts`, `i
 render_batches(key PK, id UNIQUE, git_sha, environment, started_at, finished_at, failed_count, dirty, story_filter, reused_from_batch, scale, branch, storybook_key → built_storybooks.key)
   INDEX batches_by_sha(git_sha, environment, started_at)
   INDEX batches_by_branch(branch, environment, started_at)
-renders(batch_key → render_batches.key, story, image_key → images.key, failure, play_error)  PK (batch_key, story)  WITHOUT ROWID
+renders(batch_key → render_batches.key, story, image_key → images.key, failure)  PK (batch_key, story)  WITHOUT ROWID
 decisions(environment, story, image_hash, decision, actor, decided_at, git_sha, batch_id)  PK (environment, story, image_hash, git_sha)  WITHOUT ROWID
   INDEX decisions_by_commit(environment, git_sha)
 goldens(git_sha, environment, batch_key → render_batches.key)  PK (git_sha, environment)  WITHOUT ROWID
@@ -140,7 +140,7 @@ goldens(git_sha, environment, batch_key → render_batches.key)  PK (git_sha, en
 
 Source of truth: `store/src/core/render-batches.ts`; `store/test/render-batches.test.ts` measures these at 10,000 renders.
 
-- **Must send at most 400 statements per request, and at most 5,000 rows per page**, so that a batch under 19,600 renders records in one request (rationale). A statement holds 49 renders, or as few as 33 if each has a play error, since each needs one more parameter.
+- **Must send at most 400 statements per request, and at most 5,000 rows per page**, so that a batch under 19,600 renders records in one request (rationale). A statement holds 49 renders, or as few as 33 if each has both an image and a failure, since each needs one more parameter.
 - **Must run the model's contract against every SQL adapter.** `pnpm test` runs it on local SQLite with both parameter forms. In `store/`, `pnpm test:d1:render-batches` runs it on real D1 at about 90 requests, and `pnpm test:d1` runs it after the SQL contract (`docs/specs/store.md` → D1 REST adapter).
 
 ## Future
@@ -179,4 +179,3 @@ Every batch writes every row. At 10,000 renders a batch and an assumed 100 batch
 ### Open questions
 
 - **Retention.** Every batch keeps its rows, and nothing deletes one. Deleting needs to keep any batch a golden points at, and `docs/specs/store.md` → Image keys forbids reusing a key, so `render_batches` would need a rule of its own.
-- **Play errors and approvals.** A story whose play function failed still has its image, which can be approved. `selfie review` reports it as an advisory (`docs/specs/cli.md` → What blocks).

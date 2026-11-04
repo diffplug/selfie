@@ -59,8 +59,6 @@ export type BlockerReason =
   | "removed"
   | "pattern-unmatched";
 
-export type AdvisoryReason = "play-error";
-
 export interface Attention<Reason extends string> {
   /** Null only for `pattern-unmatched`. */
   readonly story: string | null;
@@ -114,7 +112,6 @@ export interface BatchView {
   /** Who a decision made here is recorded as, or null if Git doesn't say. */
   readonly actor: string | null;
   readonly blockers: readonly Attention<BlockerReason>[];
-  readonly advisories: readonly Attention<AdvisoryReason>[];
   readonly counts: {
     readonly stories: number;
     readonly unchanged: number;
@@ -123,9 +120,8 @@ export interface BatchView {
     readonly removed: number;
     readonly failed: number;
     readonly undecided: number;
-    readonly advisories: number;
   };
-  /** Everything that isn't unchanged, and anything with an advisory, in name order. */
+  /** Everything that isn't unchanged, in name order. */
   readonly rows: readonly RenderRow[];
   /** How many approved stories the batch's filter left out, which aren't in `rows` and say nothing about being gone. */
   readonly outsideFilter: number;

@@ -95,9 +95,10 @@ function readHash(value: unknown): string {
 }
 
 function recordedRender(value: unknown): RecordedRender {
-  const { story, imageHash, failure: failed, playError } = asRecord(value);
-  const named = { story: readText(story, "story"), playError: orNull(playError, (error) => readText(error, "playError")) };
-  return imageHash === null || imageHash === undefined ? { ...named, failure: readText(failed, "failure") } : { ...named, imageHash: readHash(imageHash) };
+  const { story, imageHash, failure } = asRecord(value);
+  const named = readText(story, "story");
+  if (imageHash === null || imageHash === undefined) return { story: named, failure: readText(failure, "failure") };
+  return { story: named, imageHash: readHash(imageHash), ...(failure === null || failure === undefined ? {} : { failure: readText(failure, "failure") }) };
 }
 
 /** A batch's facts as a sender states them, whose times can't be later than now. */

@@ -70,7 +70,7 @@ describe("which batch", () => {
 });
 
 describe("the batch view", () => {
-  test("gives counts, blockers, advisories, and states, and never a file path", async () => {
+  test("gives counts, blockers, and states, and never a file path", async () => {
     h.stories = [{ id: "same" }, { id: "differs" }, { id: "gone" }, { id: "breaks" }];
     await approveAll();
     h.stories = [
@@ -83,16 +83,16 @@ describe("the batch view", () => {
     const response = await get(`/api/batches/${json.batchId}`);
     expect(response.headers.get("cache-control")).toBe("no-store");
     const view = (await response.json()) as any;
-    expect(view.counts).toEqual({ stories: 4, unchanged: 1, changed: 1, added: 1, removed: 1, failed: 1, undecided: 3, advisories: 1 });
+    expect(view.counts).toEqual({ stories: 4, unchanged: 0, changed: 1, added: 1, removed: 1, failed: 2, undecided: 3 });
     expect(view.rows.map(({ story, state }: any) => [story, state])).toEqual([
       ["breaks", "failed"],
       ["differs", "changed"],
       ["fresh", "added"],
-      ["same", "unchanged"],
+      ["same", "failed"],
       ["gone", "removed"],
     ]);
-    expect(view.blockers.map(({ reason }: any) => reason).sort()).toEqual(["added-unapproved", "changed-unapproved", "failed", "removed"]);
-    expect(view.advisories).toEqual([{ story: "same", reason: "play-error", detail: "It threw" }]);
+    expect(view.blockers.map(({ reason }: any) => reason).sort()).toEqual(["added-unapproved", "changed-unapproved", "failed", "failed", "removed"]);
+    expect(view.rows.find(({ story }: any) => story === "same")).toMatchObject({ failure: "play: It threw", imageHash: expect.any(String) });
     expect(view.rows.find(({ story }: any) => story === "breaks")).toMatchObject({ failure: "render: It broke", imageHash: null });
     expect(view.rows.find(({ story }: any) => story === "differs").pixelDiff).toMatchObject({ changedPixels: 64 });
     expect(view.outsideFilter).toBe(0);

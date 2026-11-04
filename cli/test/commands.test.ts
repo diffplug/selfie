@@ -46,9 +46,8 @@ describe("a first review, with nothing approved", () => {
     expect(json.gitSha).toBe(git(h.repo, "rev-parse", "HEAD"));
     expect(json.dirtyPaths).toEqual([]);
     expect(json.environment).toMatch(/^container-linux-arm64-/);
-    expect(json.counts).toEqual({ stories: 2, unchanged: 0, changed: 0, added: 2, removed: 0, undecided: 2, advisories: 0 });
+    expect(json.counts).toEqual({ stories: 2, unchanged: 0, changed: 0, added: 2, removed: 0, undecided: 2 });
     expect(reasons(json.blockers)).toEqual(["added-unapproved", "added-unapproved"]);
-    expect(json.advisories).toEqual([]);
     for (const difference of json.differences) {
       expect(difference.state).toBe("added");
       expect(await exists(difference.current)).toBe(true);
@@ -63,7 +62,7 @@ describe("a first review, with nothing approved", () => {
 
   test("leaves out what the document no longer carries", async () => {
     const { json } = await review();
-    for (const key of ["failures", "status", "storybookDir", "outputDir", "initScriptSha256", "timings", "baseline", "baselineSha", "needsAttention"]) {
+    for (const key of ["status", "storybookDir", "outputDir", "initScriptSha256", "timings", "baseline", "baselineSha", "needsAttention"]) {
       expect(json).not.toHaveProperty(key);
     }
   });
@@ -396,7 +395,7 @@ describe("dirty trees", () => {
   });
 });
 
-describe("blockers and advisories", () => {
+describe("what blocks", () => {
   test("a failed story blocks, and approving everything skips it", async () => {
     h.stories = [{ id: "a--one" }, { id: "a--two", failed: "boom" }];
     const { code, json } = await review();
@@ -410,30 +409,29 @@ describe("blockers and advisories", () => {
     expect(after.json.blockers).toEqual([{ story: "a--two", reason: "failed", detail: "render: boom" }]);
   });
 
-  test("play errors alone exit 0, and stay plainly visible", async () => {
+  test("a play function that throws blocks, can't be approved, and keeps what it left to look at", async () => {
     h.stories = [
       { id: "a--play", errors: [{ source: "play", message: "the play failed" }, { source: "console", message: "noise" }] },
       { id: "a--fine" },
     ];
     const first = await review();
-    expect(first.code).toBe(1); // Everything is added, which does block.
-    expect(reasons(first.json.blockers)).toEqual(["added-unapproved", "added-unapproved"]);
-    expect(first.json.advisories).toEqual([
-      { story: "a--play", reason: "play-error", detail: "the play failed" },
-    ]);
-    expect(first.json.counts.advisories).toBe(1);
-    expect(first.json.playErrors[0]).toMatchObject({ story: "a--play", playError: "the play failed" });
-    expect(await exists(first.json.playErrors[0].current)).toBe(true);
+    expect(first.code).toBe(1);
+    expect(first.json.blockers).toContainEqual({ story: "a--play", reason: "failed", detail: "play: the play failed" });
+    expect(first.json.failures[0]).toMatchObject({ story: "a--play", failure: "play: the play failed" });
+    expect(await exists(first.json.failures[0].current)).toBe(true);
 
-    await h.cli("approve", first.json.batchId, "--all");
+    const approved = await h.cli("approve", first.json.batchId, "--all");
+    expect(approved.json.skipped).toEqual([{ story: "a--play", state: "failed" }]);
+    const after = await h.cli("review", first.json.batchId);
+    expect(after.code).toBe(1);
+    expect(after.json.blockers).toEqual([{ story: "a--play", reason: "failed", detail: "play: the play failed" }]);
 
-    // Unchanged, so nothing blocks, and they're still reported.
-    const next = await review();
-    expect(next.code).toBe(0);
-    expect(next.json.blockers).toEqual([]);
-    expect(next.json.differences).toEqual([]);
-    expect(next.json.counts.advisories).toBe(1);
-    expect(next.json.playErrors[0].story).toBe("a--play");
+    // Once it's fixed, it's the one thing left to look at.
+    await commit(h.repo, "fixes the play function");
+    h.stories = [{ id: "a--play" }, { id: "a--fine" }];
+    const fixed = await review();
+    expect(fixed.json.counts).toMatchObject({ unchanged: 1, added: 1 });
+    expect(fixed.json.differences.map(({ story, state }: any) => [story, state])).toEqual([["a--play", "added"]]);
   });
 
   test("a PNG the store refuses fails that story alone", async () => {

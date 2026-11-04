@@ -8,7 +8,7 @@ const OTHER = "22222222-2222-4222-8222-222222222222";
 const batch = { id: THIS } as RenderBatch;
 const [A, B, C] = [hashOf(1), hashOf(2), hashOf(3)];
 
-const render = (story: string, imageHash: string | null) => ({ story, imageHash, failure: imageHash === null ? "broke" : null, playError: null });
+const render = (story: string, imageHash: string | null) => ({ story, imageHash, failure: imageHash === null ? "broke" : null });
 const approved = (story: string, imageHash: string | null, at: number, batchId = OTHER): PlacedDecision => ({ story, imageHash, decision: "approved", actor: "a", at, batchId });
 const rejected = (story: string, imageHash: string, at: number, batchId = OTHER): PlacedDecision => ({ story, imageHash, decision: "rejected", actor: "a", at, batchId });
 

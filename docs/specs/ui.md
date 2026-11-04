@@ -119,13 +119,13 @@ Source of truth: `ui/src/client/`.
 
 **The top bar** says what a page is looking at: on every story, the built Storybook, its commit and branch, and whether it's clean; on a batch's pages, the diff, between the batch's commit and what it's compared with, and how that relates to the merge base with the default branch.
 
-**A batch's pages** have the same list at their left, of what differs, which is what's changed, added, removed, or failed, narrowed by what Show says, and showing what's unchanged only if that's what Show asks for, or if it has an advisory. Next and previous go down that list, as far as it's narrowed. The list is where a batch's stories are: there's no table of them on the right.
+**A batch's pages** have the same list at their left, of what differs, which is what's changed, added, removed, or failed, narrowed by what Show says, and showing what's unchanged only if that's what Show asks for. Next and previous go down that list, as far as it's narrowed. The list is where a batch's stories are: there's no table of them on the right.
 
-- **Must say more of each story as the list is dragged wider:** its state and decision, then its pixels and advisories on a batch's pages, or when it was rendered on every story.
+- **Must say more of each story as the list is dragged wider:** its state and decision, then its pixels on a batch's pages, or when it was rendered on every story.
 
 - **Must say a story is renamed if it's added and a removed story's reference is its very image**, one to one, and the closest names first where several share an image (rationale). The list has it once, under its new name. This is only to look at: to decisions they're still one added and one removed.
 
-**The batch** shows, in order: its commit, batch ID, whether its pixels were rendered earlier and by which batch, dirty state, environment, and decision actor; a warning if it was recorded dirty; the counts; blockers; advisories; and the differences.
+**The batch** shows, in order: its commit, batch ID, whether its pixels were rendered earlier and by which batch, dirty state, environment, and decision actor; a warning if it was recorded dirty; the counts; blockers; and the differences.
 
 - **Must group blockers by reason, in words, and offer each as a filter of the list.**
 - **Must keep the filter, text and state, in the URL, and nowhere else**, so back, reload, and next and previous all follow it.
@@ -133,7 +133,7 @@ Source of truth: `ui/src/client/`.
 
 **Bulk decisions:** approve or reject all, or all the current filter shows.
 
-- **Must confirm every bulk decision in a dialog, with the count, how many are changed and added, how many are already decided, how many have an advisory, and which stories.** Focus starts on Cancel.
+- **Must confirm every bulk decision in a dialog, with the count, how many are changed and added, how many are already decided, and which stories.** Focus starts on Cancel.
 - **Must hold the rows in the dialog from when it opens, and send those**, so what it listed is what's sent, whatever a filter or a read does meanwhile.
 
 **One render** shows its state and decision, pixel stats, and images.

@@ -111,7 +111,7 @@ export function describeBatchContract(
       await batches.recordRenders(rerun, [
         rendered("a", 1),
         rendered("b", 7),
-        { ...rendered("c", 3), playError: "Played badly" },
+        rendered("c", 3),
         rendered("e", 6),
       ]);
       await batches.finishBatch(rerun, 4);
@@ -126,10 +126,10 @@ export function describeBatchContract(
       expect(batch).toMatchObject({ status: "failed", failedCount: 1 });
       expect(unchangedCount).toBe(1);
       expect(compared).toEqual([
-        { story: "b", state: "changed", imageHash: hashOf(5), goldenHash: hashOf(2), failure: null, playError: null, decision: null },
-        { story: "c", state: "failed", imageHash: null, goldenHash: hashOf(3), failure: "Render threw", playError: null, decision: null },
-        { story: "e", state: "added", imageHash: hashOf(6), goldenHash: null, failure: null, playError: null, decision: null },
-        { story: "d", state: "removed", imageHash: null, goldenHash: hashOf(4), failure: null, playError: null, decision: null },
+        { story: "b", state: "changed", imageHash: hashOf(5), goldenHash: hashOf(2), failure: null, decision: null },
+        { story: "c", state: "failed", imageHash: null, goldenHash: hashOf(3), failure: "Render threw", decision: null },
+        { story: "e", state: "added", imageHash: hashOf(6), goldenHash: null, failure: null, decision: null },
+        { story: "d", state: "removed", imageHash: null, goldenHash: hashOf(4), failure: null, decision: null },
       ]);
     });
 
@@ -157,7 +157,6 @@ export function describeBatchContract(
       });
       expect(again.unchangedCount).toBe(2);
       expect(again.renders[1]).toMatchObject({ imageHash: hashOf(7), decision: null });
-      expect(again.renders.map(({ playError }) => playError)).toEqual([null, null, "Played badly", null, null]);
     });
 
     it("never compares across environments", async () => {
@@ -291,21 +290,21 @@ export function describeBatchContract(
       expect((await batches.compareBatch(reused.id, null)).batch.reusedFromBatch).toBe(rendered_.id);
     });
 
-    it("keeps a play error, and lists its render even when unchanged", async () => {
+    it("keeps the image of a story that failed after rendering, and lists it as failed", async () => {
       const environment = "play";
       const batch = await batches.beginBatch({ gitSha: SHA_0, environment, scale: 1, dirty: false, });
       const played = [
-        { ...rendered("a", 10), playError: "play threw" },
+        { ...rendered("a", 10), failure: "play: threw" },
         rendered("b", 11),
-        { story: "c", failure: "Render threw", playError: "play threw too" },
+        { story: "c", failure: "Render threw" },
       ];
       await batches.recordRenders(batch.id, played);
       await batches.finishBatch(batch.id, 3);
       const first = await batches.compareBatch(batch.id, null);
-      expect(first.renders.map(({ story, playError }) => [story, playError])).toEqual([
-        ["a", "play threw"],
-        ["b", null],
-        ["c", "play threw too"],
+      expect(first.renders.map(({ story, state, imageHash, failure }) => [story, state, imageHash, failure])).toEqual([
+        ["a", "failed", hashOf(10), "play: threw"],
+        ["b", "added", hashOf(11), null],
+        ["c", "failed", null, "Render threw"],
       ]);
 
       const golden = await batches.beginBatch({ gitSha: SHA_1, environment, scale: 1, dirty: false, });
@@ -324,23 +323,23 @@ export function describeBatchContract(
       await batches.recordRenders(next.id, [played[0]!, played[1]!]);
       await batches.finishBatch(next.id, 2);
       const compared = await batches.compareBatch(next.id, SHA_1);
-      expect(compared.unchangedCount).toBe(2);
-      expect(compared.renders.map(({ story, state }) => [story, state])).toEqual([["a", "unchanged"]]);
+      expect(compared.unchangedCount).toBe(1);
+      expect(compared.renders.map(({ story, state }) => [story, state])).toEqual([["a", "failed"]]);
     });
 
-    it("fits a whole statement of the longest play errors and failures", async () => {
+    it("fits a whole statement of the longest failures", async () => {
       const environment = "long-play";
       const batch = await batches.beginBatch({ gitSha: SHA_0, environment, scale: 1, dirty: false, });
       const count = 100;
       const long = "x".repeat(2_000);
       await batches.recordRenders(
         batch.id,
-        Array.from({ length: count }, (_, i) => ({ story: `s${i}`, failure: long, playError: long })),
+        Array.from({ length: count }, (_, i) => ({ story: `s${i}`, failure: long })),
       );
       expect(await batches.finishBatch(batch.id, count)).toMatchObject({ status: "failed", failedCount: count });
       const { renders: compared } = await batches.compareBatch(batch.id, null);
       expect(compared).toHaveLength(count);
-      expect(compared[0]).toMatchObject({ failure: long, playError: long });
+      expect(compared[0]).toMatchObject({ failure: long });
     });
 
     it("finds the nearest SHA with goldens, in the order asked, across query groups", async () => {
@@ -387,7 +386,7 @@ export function describeBatchContract(
       });
 
       it("reads back what a batch holds, in pages, with what's been decided", async () => {
-        const batch = await finished("read-back", [rendered("a", 1), rendered("b", 2), { story: "c", failure: "boom" }, { ...rendered("d", 3), playError: "threw" }]);
+        const batch = await finished("read-back", [rendered("a", 1), rendered("b", 2), { story: "c", failure: "boom" }, { ...rendered("d", 3), failure: "threw" }]);
         await batches.mergeDecisions("read-back", [on("approved", "ned", 1_000)]);
         const first = await batches.readBatch(batch.id, "", 3);
         expect(first.renders).toEqual([
@@ -397,7 +396,7 @@ export function describeBatchContract(
         ]);
         expect(first.next).toBe("c");
         const second = await batches.readBatch(batch.id, first.next!, 3);
-        expect(second.renders).toEqual([{ story: "d", imageHash: hashOf(3), playError: "threw", decision: null }]);
+        expect(second.renders).toEqual([{ story: "d", imageHash: hashOf(3), failure: "threw", decision: null }]);
         expect(second.next).toBeNull();
       });
 

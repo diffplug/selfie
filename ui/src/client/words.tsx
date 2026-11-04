@@ -136,18 +136,6 @@ export function DecisionLabel({ row }: { readonly row: Pick<RenderRow, "state" |
   );
 }
 
-export function AdvisoryLabels({ row }: { readonly row: RenderRow }) {
-  return (
-    <>
-      {row.playError !== null && (
-        <IconLabel variant="attention" icon={<AlertIcon size={12} />}>
-          Play error
-        </IconLabel>
-      )}
-    </>
-  );
-}
-
 export const sizeChanged = ({ current, golden }: PixelDiff) => current.width !== golden.width || current.height !== golden.height;
 
 export function describePixels(diff: PixelDiff | null): string {
@@ -159,7 +147,7 @@ export function describePixels(diff: PixelDiff | null): string {
 }
 
 export const BLOCKER_WORDS: Readonly<Record<BlockerReason, (count: number) => string>> = {
-  failed: (count) => `${plural(count, "story", "stories")} failed to render`,
+  failed: (count) => `${plural(count, "story", "stories")} failed`,
   "changed-unapproved": (count) => `${plural(count, "changed image")} with no decision`,
   "added-unapproved": (count) => `${plural(count, "added image")} with no decision`,
   rejected: (count) => `${plural(count, "image")} rejected`,

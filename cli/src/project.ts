@@ -143,7 +143,7 @@ export interface ReviewCache {
     readonly diff: string | null;
     readonly pixelDiff: PixelDiff | null;
   }[];
-  readonly playErrors: readonly { readonly story: string; readonly current: string | null }[];
+  readonly failures: readonly { readonly story: string; readonly current: string | null }[];
 }
 
 /** Atomic, so a reader never sees half of one. */

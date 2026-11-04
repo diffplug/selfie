@@ -4,7 +4,7 @@
 
 ## Commands
 
-**Blockers and advisories.** Dormouse has two stories with real `play` errors, so with every attention item counted, every review of it exited 1 forever, and 1 stopped meaning anything: an agent learns to ignore it, or can't tell the two errors it knew about from a new one. So `play` errors became advisories, which leave the exit code alone. The cost is the one the spec names, that a new `play` failure doesn't change the exit code. A blocker must be something accepting would refuse or a reviewer must decide, and a `play` error is neither. The user hasn't reviewed this.
+**A play function that throws blocks.** It's a test that failed, and the image doesn't show the state the story was meant to reach, so a person looking at it is wasting their time. It used to be an advisory, which left the exit code alone, because Dormouse has two stories with real `play` errors and every review of it would have exited 1. Nobody working on Dormouse knew those errors existed, which is the argument against advisories: what stops nothing gets ignored, and could be approved into what later batches compare with. The image is kept, because it's how to work out why.
 
 **Exit 2 and a typo.** A pattern that matches nothing at all is 2, while one typo beside a good pattern is 1: the second batch did render something, and would otherwise read as a pass.
 
@@ -14,7 +14,7 @@
 
 ## Library
 
-**Facts and verdicts apart.** The local review UI is the next caller. It approves images one at a time, and must show what's left after each without re-rendering, so whatever computes a verdict must take only what `compareBatch` returns. `summarizeBatch` does, and the CLI's `blockers`, `advisories`, `undecided`, and a refusal's lists all come from it, so they can't disagree.
+**Facts and verdicts apart.** The local review UI is the next caller. It approves images one at a time, and must show what's left after each without re-rendering, so whatever computes a verdict must take only what `compareBatch` returns. `summarizeBatch` does, and the CLI's `blockers` and `undecided` both come from it, so they can't disagree.
 
 **Coded errors.** A UI wanting to tell "no such batch" from "not a repository" would otherwise be reading message text.
 
@@ -104,7 +104,7 @@ It takes 4 to 10 ms an image on average, 17 ms at worst, and a story's stats com
 | Nothing changed, twice | 0 | 68.6 s, 70.1 s | 64.2 s, 65.7 s | 4.2 s, 4.1 s | 1 ms, 1 ms | 3 ms, 3 ms |
 | 130 changed by a CSS color | 1 | 73.9 s | 66.6 s | 5.3 s | 1 ms | 1,656 ms |
 
-The exit 0 row lists dormouse's 2 `play` errors as advisories. Render is most of the time, as `docs/specs/render.rationale.md` found. Storing costs about 7.6 ms per image to decode and hash when it's already stored, and about 17 ms when it's new. A diff costs about 13 ms per changed story, for decoding two images, comparing 1.08 million pixels, and encoding. `approve` and `accept` take about 0.2 s on the same store, including on a batch of 541 whose directory had been deleted.
+The exit 0 row is from when dormouse's 2 `play` errors were advisories, which didn't change the exit code. Render is most of the time, as `docs/specs/render.rationale.md` found. Storing costs about 7.6 ms per image to decode and hash when it's already stored, and about 17 ms when it's new. A diff costs about 13 ms per changed story, for decoding two images, comparing 1.08 million pixels, and encoding. `approve` and `accept` take about 0.2 s on the same store, including on a batch of 541 whose directory had been deleted.
 
 **The loop on the 30-story sample** takes about 4.8 s, of which render is about 4.3 s, storing about 280 ms, and comparing about 1 ms. A CSS color change touching 10 of the 30 added about 175 ms of diff work.
 
@@ -146,7 +146,7 @@ Without leaving these out, every built Storybook hashed differently and the feat
 
 **A failure is never replayed.** A story that timed out under load would otherwise fail forever on a built Storybook nobody changed, and the only way out would be a flag the agent has no reason to try. Only one more render is at stake.
 
-**Which errors may be reused.** On dormouse's 541 stories, a real render's only errors were 2 `play` and the 2 `console` lines those same failures log. `play`, `console`, and `page` come from the project's own code, the same built Storybook repeats them, and none of them fails a story. `request` and the soft network `timeout` aren't reused: both can come from load, and neither is visible afterward, since a row doesn't record them. An allowed list means a new source starts out unreusable. The cost is that a project whose page always makes a failing off-origin request never reuses, and stderr names the story and the error. A `play` failure that depends on load is replayed too, which is a real gap: it stays listed as an advisory, and `--no-reuse` measures it again.
+**Which errors may be reused.** On dormouse's 541 stories, a real render's only errors were 2 `play` and the 2 `console` lines those same failures log. `play`, `console`, and `page` come from the project's own code, and the same built Storybook repeats them. A `play` error fails its story, and leaves an image, so rendering again wouldn't help, and Dormouse would otherwise pay a whole render on every review until it's fixed. `request` and the soft network `timeout` aren't reused: both can come from load, and neither is visible afterward, since a row doesn't record them. An allowed list means a new source starts out unreusable. The cost is that a project whose page always makes a failing off-origin request never reuses, and stderr names the story and the error. A `play` failure that depends on load is replayed too, which is a real gap: it stays a failure until `selfie render` renders again.
 
 **A filter is answered only from a whole batch.** A whole batch holds every answer, and a filtered render is at most a few seconds, so it isn't worth a second key to remember one. On the 30-story sample a hit takes 0.25 s against 5.3 s, once a whole batch of that built Storybook exists.
 

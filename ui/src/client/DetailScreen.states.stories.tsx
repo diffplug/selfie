@@ -59,7 +59,7 @@ export const FailedWithNoImage: Story = { args: { row: { ...rows.failed("compone
 export const Approved: Story = { args: { row: rows.changed("components-button--primary", approved()) } };
 export const Rejected: Story = { args: { row: rows.changed("components-button--primary", rejected("reviewer@example.com")) } };
 export const PlayError: Story = {
-  args: { row: rows.changed("components-tooltip--hover", { playError: "expected the tooltip to be visible" }) },
+  args: { row: rows.playFailed("components-tooltip--hover") },
 };
 export const RenderedAtTwoTimes: Story = {
   args: {

@@ -7,7 +7,7 @@ import { usePageFacts } from "./PageFacts.tsx";
 import { batchPath, storyPath } from "./router.tsx";
 import { matchingStories, StoryNavLayout } from "./StoryNav.tsx";
 import { differingStories, inTreeOrder } from "./storyTree.ts";
-import { AdvisoryLabels, describePixels } from "./words.tsx";
+import { describePixels } from "./words.tsx";
 
 /** The tree shows what the page's Show says, and its own search does the text. Next and previous go through just that. */
 export function useBatchTree(view: BatchView | null, unchanged: readonly RenderRow[] | null, search: string, story: string | null) {
@@ -60,7 +60,6 @@ export function BatchLayout({
               {row.state === "failed" ? "No image" : describePixels(row.pixelDiff)}
             </span>
             <span className="selfie-nav-col">
-              <AdvisoryLabels row={row} />
             </span>
           </>
         );

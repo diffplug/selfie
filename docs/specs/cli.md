@@ -34,7 +34,6 @@ Source of truth: `cli/src/cli.ts`, `cli/src/document.ts`; the real binary's test
 | 3 | Nothing yet, and it's worth asking again | `agent-await-feedback` past its `--timeout` |
 | 130 | Stopped by a signal, where stopping isn't success | `agent-await-feedback` |
 
-- **Decision for the user to review: advisories don't change the exit code.** A project with two known `play` errors can reach exit 0, so 1 keeps its meaning of "something here stops you". It also means **an agent checking only the exit code won't see a `play` failure**: it has to read `advisories`, which is why the document always carries the list and its count ([What blocks](#what-blocks)) (rationale).
 - **Must take a story pattern as `docs/specs/render.md` → Render defines it:** an ID, where `*` matches any batch of characters.
 
 ## Library
@@ -47,9 +46,9 @@ Source of truth: `cli/src/index.ts`; tests in `cli/test/library.test.ts`.
 |---|---|
 | `openProject({ cwd, env })` | The repository's `Project`: its `repo`, `directory`, `renders`, `notes`, `store`, `renders`, and `close()` |
 | `renderBatch(project, options)` | Returns a `RenderBatchResult`: the `batch`, `dirtyPaths`, `warnings`, and `timings`. `options.onProgress` is `render`'s (`docs/specs/render.md` → Render) |
-| `review(project, options)` | `options` is a `batch`, or what `renderBatch` takes. Returns a `ReviewResult`: the `comparison`, `given`, `dirtyPaths`, `differences`, `playErrors`, `warnings`, and `timings` |
+| `review(project, options)` | `options` is a `batch`, or what `renderBatch` takes. Returns a `ReviewResult`: the `comparison`, `given`, `dirtyPaths`, `differences`, `failures`, `warnings`, and `timings` |
 | `decide(project, { batchId, decision, actor, stories })` | `stories` is `"all"`, patterns, or `{ targets }`: exact stories and image hashes, for a caller that showed them, refused whole with `stale-decision` if any isn't a changed or added image the batch holds, or a removed story of it, with a null hash. Returns `decided`, `skipped`, `unmatchedPatterns`, and the `comparison` after it. It compares twice, and reads unchanged rows only for patterns |
-| `summarizeBatch(comparison)` | Returns `blockers`, `advisories`, `counts`, `undecided`, `unapproved`, `failed`, `removed`, and `notRendered` |
+| `summarizeBatch(comparison)` | Returns `blockers`, `counts`, `inFilter`, `undecided`, `unapproved`, `failed`, `removed`, and `notRendered` |
 | `isDecidable(state)` | Whether a render in this state can take a decision: `changed` or `added`. Defined in `selfie-store` |
 | `compareAsReviewed(project, batchId, options)` | A batch compared with what history has approved |
 | `resolveRenderSettings(repo, { native })`, `gitUserEmail(repo)` | What the commands use for these |
@@ -102,7 +101,7 @@ A review of a named batch starts at step 6. `selfie render` is steps 1 to 5, alw
 - **Must refuse a named batch with any flag for making a batch**, since it's already recorded.
 - **Must take `--baseline` as a batch ID, or else anything Git resolves to a commit, whose ancestors' approvals it means**, and fail with exit 2 if there's no such finished batch in this environment or no such commit.
 - **Must keep `--baseline` to this one review.** It changes nothing about the batch: `selfie approve` still compares with what history has approved, its exports go under `batches/<batch id>/against/<baseline>/`, and `review.json` isn't written. It exits 1 if anything differs, even when every image is approved, since the question was what differs (rationale).
-- **Must do diff work only on a `changed` render.** An `added` or `removed` one exports its one image, and an unchanged one nothing, unless it has an advisory.
+- **Must do diff work only on a `changed` render.** An `added` or `removed` one exports its one image, and an unchanged one nothing. A failed one exports the image it left, if it rendered that far.
 - **Must write every exported image as a PNG, whatever the store keeps**, so a document's paths stay what they say and any agent can open them.
 - **Must report what changed as hunks:** rectangles of each image that correspond and differ, with everything outside them matching once what's between them is lined up, found by a recursive 9-slice in `cli/src/hunks.ts` (rationale).
 - **Must make hunks depend on the two images alone**, so the same pair always gives the same hunks, and a decision or a cache can rely on it.
@@ -125,20 +124,17 @@ A review of a named batch starts at step 6. `selfie render` is steps 1 to 5, alw
 
 Source of truth: `summarizeBatch` in `cli/src/summary.ts`.
 
-- **Must exit 1 if `blockers` isn't empty, and never because of `advisories`.** Each entry has a `story`, a `reason`, and a `detail` holding the fact behind it, if there is one:
+- **Must exit 1 if `blockers` isn't empty.** Each entry has a `story`, a `reason`, and a `detail` holding the fact behind it, if there is one:
 
 | List | `reason` | When | `detail` |
 |---|---|---|---|
-| `blockers` | `failed` | The story failed to render, or its image was unusable | The failure |
+| `blockers` | `failed` | The story failed to render, its image was unusable, or its `play` function threw (rationale) | The failure, such as `play: …` |
 | | `changed-unapproved`, `added-unapproved` | Its image has no decision | |
 | | `rejected` | Its image is rejected | The actor |
 | | `removed` | It has a reference, this batch doesn't have the story, and that has no approval | |
 | | `pattern-unmatched` | A `--story` pattern matched nothing, while another did. `story` is null | The pattern |
-| `advisories` | `play-error` | Its `play` function threw. Its image is still recorded (`docs/specs/render.md` → Manifest) | The message |
 
 - **Must not list what's approved**: it is still in `differences`, with its `decision`, for the batch it was approved on. A later batch finds it as the reference (`docs/specs/renders.md` → Approvals).
-- **Must list an advisory whatever its story's state**, including unchanged, and count them in `counts.advisories`.
-- **Never make an advisory a gate.**
 
 ### Recording only if necessary
 
@@ -148,8 +144,8 @@ A review recognizes a built Storybook that already rendered, and skips rendering
 
 - **Must show the existing batch and record nothing when one at this commit came from that render with the same dirtiness, branch, and filter** (rationale).
 - **Must recognize a built Storybook only by `renderIdentity` (`docs/specs/render.md` → Render identity)**, of the config's `storybookDir` after any `--build`, with the environment and the init script.
-- **Never reuse a batch with a failed story**, including an image the store refused, however many times it fails (rationale).
-- **Never reuse a batch where any story has an error other than `play`, `console`, `page`, or `viewport`, or where render warned of anything** (rationale). Those are the project's own code, and reuse keeps its `play` errors as advisories. A `viewport` error always comes with a warning, which reuse wouldn't repeat. Everything else, such as `request` and the soft `timeout`, might not happen next time.
+- **Never reuse a batch where a story has no image**, including an image the store refused, however many times it fails (rationale).
+- **Never reuse a batch where any story has an error other than `play`, `console`, `page`, or `viewport`, or where render warned of anything** (rationale). Those are the project's own code, so the same built Storybook repeats them, and reuse keeps a `play` failure as a failure. A `viewport` error always comes with a warning, which reuse wouldn't repeat. Everything else, such as `request` and the soft `timeout`, might not happen next time.
 - **Must keep only the newest real render of a built Storybook, and forget the built Storybook if that render can't be reused**, so a forced render that fails isn't hidden by an older one that passed.
 - **Must not remember a render if the built Storybook's identity changed while it rendered**, since nothing describes those images.
 - **Must always name a batch that really rendered:** a reused batch is never itself remembered, so reuse doesn't chain.
@@ -175,10 +171,10 @@ Every path is absolute, and names a file that exists until it is pruned.
 | `comparedWith` | What this review compared with: `source`, one of `approvals` or `given`, and with `given` its `sha`, or its `batch` if it's a batch |
 | `environment` | Its ID |
 | `filter` | `patterns` and `notRendered`, or null with no `--story` |
-| `counts` | `stories`, `unchanged`, `changed`, `added`, `removed`, `undecided`, and `advisories` |
-| `blockers[]`, `advisories[]` | `story`, `reason`, `detail` |
+| `counts` | `stories`, `unchanged`, `changed`, `added`, `removed`, and `undecided` |
+| `blockers[]` | `story`, `reason`, `detail` |
 | `differences[]` | `story`, `state`, `decision`, `imageHash`, `goldenHash`, `current`, `golden`, `diff`, `pixelDiff`, `hunkGroups` |
-| `playErrors[]` | `story`, `playError`, `current` |
+| `failures[]` | `story`, `failure`, and `current`, the image it left, or null |
 | `warnings[]` | The manifest's |
 | `next[]` | What to do next, in words and commands |
 

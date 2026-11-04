@@ -228,13 +228,13 @@ describe("batches", () => {
     expect(await response.json()).toMatchObject({ error: { code: "unknown-image" } });
   });
 
-  test("keeps failures and play errors", async () => {
+  test("keeps a failure with or without an image", async () => {
     const { hash } = await putImage(RED);
     await send("PUT", `/batches/${BATCH}`, "writer", batchFacts());
-    await send("POST", `/batches/${BATCH}/renders`, "writer", { renders: [{ story: "a", failure: "boom" }, { story: "b", imageHash: hash, playError: "threw" }] });
+    await send("POST", `/batches/${BATCH}/renders`, "writer", { renders: [{ story: "a", failure: "boom" }, { story: "b", imageHash: hash, failure: "threw" }] });
     await send("POST", `/batches/${BATCH}/finish`, "writer", { count: 2, finishedAt: 600 });
     const page = (await (await send("GET", `/batches/${BATCH}`, "reader")).json()) as any;
-    expect(page.renders).toEqual([{ story: "a", failure: "boom", decision: null }, { story: "b", imageHash: hash, playError: "threw", decision: null }]);
+    expect(page.renders).toEqual([{ story: "a", failure: "boom", decision: null }, { story: "b", imageHash: hash, failure: "threw", decision: null }]);
   });
 
   test("refuses what isn't a batch", async () => {
