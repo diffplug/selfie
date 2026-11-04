@@ -39,6 +39,7 @@ Source of truth: `store/src/core/store.ts`.
 
 - **Must assign the image's positive key when its hash truncated to the safe positive integer range is unclaimed.** The range is 1 to 2^53 − 1, and the truncated value is the hash's first 53 bits, read big-endian.
 - **Must assign the next monotonic negative key, starting at −1, when the truncated value is claimed by a different image or is 0.** A negative key is what marks a collision; there is no separate collision table.
+- **Never give an image the key 0**, which `decisions.image_key` holds for a story being gone.
 - **Must return the existing key when the same image is inserted again**, including an image holding a negative key.
 - **Must compare the full image hash on every lookup**, so a colliding image never resolves to another image's key.
 - **Never reuse or reassign an image key within a store.** The store has no delete. The next negative key derives from the lowest key present, so a delete must not let that key be reused.

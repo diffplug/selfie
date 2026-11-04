@@ -6,9 +6,9 @@
 
 **No separate settings.** Nothing produces render settings outside the environment today: the renderer's viewport and scale are in it. A caller with a variant can put it in the opaque story ID, so a column would only add a parameter per row and a second cursor field. No store holds this data yet, so this was the cheap time to drop it, and adding one later would need a migration.
 
-**The environment is on the batch, not each row.** With IDs like `container-linux-arm64-<16 hex>` that saves about 40 bytes per row, and it makes a mixed-environment batch impossible to store. Decisions keep the environment in their key, since they outlive any batch.
+**The environment is on the batch, not each row.** It makes a mixed-environment batch impossible to store. Decisions keep the environment in their key, since they outlive any batch.
 
-**Not interning names.** A table of names with integer keys would make each row much smaller, by estimate rather than measurement. It also costs a second statement per group and a lookup per name. Worth revisiting with [storing only what changed](renders.md#storing-only-what-changed).
+**Names as integers.** Measured on local SQLite, 2026-11, with 10,000 stories: a render went from 60 bytes to 21, and across 499,800 decisions from 20,000 clicks over 20,000 commits, a decision went from 479 bytes to about 50, with reading those at the newest 1,000 commits going from 54 ms to about 40. Each write costs a statement that gives its names keys, which writes nothing for a name already held, and each read joins them back. Real D1 hasn't run these numbers.
 
 ## Render batches
 
@@ -37,6 +37,12 @@
 **Only differences by default.** A mostly unchanged compare fell from 3 requests and 2.9 MB of responses to 1 request and 56 KB, with 250 differences listed, or about 220 bytes each. Rows read barely moved, from 70,015 to 60,213, since finding differences still reads both sides and the count reads them again. That costs about $0.00006 at D1's listed $0.001 per million rows.
 
 ## Decisions
+
+**One row per click.** A person approving 500 stories makes 500 decisions with one verdict, time, actor, and batch. Held once, the batch's 36-character ID stops repeating, and it can't simply be an integer, since a decision can name a batch that never came here. Those four facts are unique because a resend has to find the row it already wrote.
+
+**By commit first.** History is read a commit at a time, so the primary key makes that a range, and the index that remains is the one for finding a decision on an image.
+
+**Refusing a decision on an image that isn't here.** A decision used to hold its image's hash, so it could arrive first. Holding the key means the image must be here, and nothing lost by that: sync sends a batch's images, then its renders, then decisions on those same images.
 
 **Keeping no history.** A log of every decision would merge cleanly, but nothing in `selfie review` or the review UI reads one.
 

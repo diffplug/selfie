@@ -413,7 +413,7 @@ export function describeBatchContract(
           { story: "b", imageHash: hashOf(2), decision: null },
           { story: "c", failure: "boom", decision: null },
         ]);
-        expect(first.next).toBe("c");
+        expect(first.next).not.toBeNull();
         const second = await batches.readBatch(batch.id, first.next!, 3);
         expect(second.renders).toEqual([{ story: "d", imageHash: hashOf(3), failure: "threw", decision: null }]);
         expect(second.next).toBeNull();
@@ -449,6 +449,12 @@ export function describeBatchContract(
           for (const decision of order) await batches.mergeDecisions(environment, [decision]);
           expect((await decisionsOn(batch.id))?.decision).toBe("rejected");
         }
+      });
+
+      it("reads a rejection first at the same moment, across commits", async () => {
+        const batch = await finished("tie-across-commits");
+        await batches.mergeDecisions("tie-across-commits", [{ ...on("approved", "ned", 1_000), gitSha: SHA_0 }, { ...on("rejected", "bob", 1_000), gitSha: SHA_1 }]);
+        expect((await decisionsOn(batch.id))?.decision).toBe("rejected");
       });
 
       it("doesn't change whose a decision is when it's sent back", async () => {

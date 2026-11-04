@@ -211,7 +211,7 @@ describe("RenderBatches", () => {
       expect(await statesOf(batch.id, null)).toEqual({ a: "failed" });
     });
 
-    it("records a mix of results in one statement", async () => {
+    it("records a mix of results in one statement, beside the one that gives stories their keys", async () => {
       const { adapter: counted, sent } = counting(adapter);
       const model = new RenderBatches({ sql: new Sql(counted) });
       const batch = await model.beginBatch({ gitSha: SHA_A, environment: ENV, scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, });
@@ -223,7 +223,7 @@ describe("RenderBatches", () => {
         rendered("d", 3),
         { story: "e", failure: "Second failure" },
       ]);
-      expect(sent.flat()).toHaveLength(1);
+      expect(sent.flat()).toHaveLength(2);
       await model.finishBatch(batch.id, 5);
       expect(await heldBy(batch.id)).toMatchObject([
         { story: "a", state: "added" },
@@ -301,12 +301,12 @@ describe("RenderBatches", () => {
       const batch = await model.beginBatch({ gitSha: SHA_A, environment: ENV, scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, });
       sent.length = 0;
       await model.recordRenders(batch.id, items);
-      expect(sent.map((statements) => statements.length)).toEqual([400, 9]);
+      expect(sent.map((statements) => statements.length)).toEqual([400, 29]);
     });
 
     it.each([
-      ["nothing landed", 0, 19_600],
-      ["its statements landed in part", 5, 19_600 + 5 * 49],
+      ["nothing landed", 0, 18_620],
+      ["its statements landed in part", 5, 18_620 + 5 * 49],
     ])("leaves a batch that says so when its statements die and %s", async (_, ran, stored) => {
       const batch = await batches.beginBatch({ gitSha: SHA_A, environment: ENV, scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, });
       let requests = 0;
@@ -429,17 +429,25 @@ describe("RenderBatches", () => {
       expect(await batches.acceptBatch(pushed.id, SHA_A, 0)).toBe(true);
     });
 
-    it("may be recorded before the image reaches this store", async () => {
-      const hash = hashOf(9_999);
-      await batches.decide({ on: ON,
-        environment: ENV,
-        decision: "approved",
-        actor: "ned",
-        renders: [{ story: "a", imageHash: hash }],
-      });
-      await sql.run(imageInsertStatement(hash, 9_999));
-      const batch = await recordBatch(SHA_A, [{ story: "a", imageHash: hash }]);
-      expect(await batches.acceptBatch(batch.id, null, 0)).toBe(true);
+    it("are refused, all of them, for an image this store doesn't hold", async () => {
+      const held = { story: "held", imageHash: hashOf(1) };
+      const missing = { story: "missing", imageHash: hashOf(9_999) };
+      await expect(batches.decide({ on: ON, environment: ENV, decision: "approved", actor: "ned", renders: [held, missing] })).rejects.toMatchObject({ code: "unknown-image" });
+      const decision = { decision: "approved" as const, actor: "ned", at: 1, gitSha: ON.gitSha, batchId: ON.batchId };
+      await expect(batches.mergeDecisions(ENV, [{ ...held, ...decision }, { ...missing, ...decision }])).rejects.toMatchObject({ code: "unknown-image" });
+      expect(await batches.decisionsAt(ENV, [ON.gitSha])).toEqual([]);
+    });
+
+    it("keeps one row for a click, however many stories it decided, and finds it again when it's resent", async () => {
+      const renders = [{ story: "a", imageHash: hashOf(1) }, { story: "b", imageHash: hashOf(2) }, { story: "c", imageHash: null }];
+      await batches.decide({ on: ON, environment: "one-click", decision: "approved", actor: "ned", renders });
+      const [{ total: after }] = (await sql.run({ sql: "SELECT COUNT(*) AS total FROM decision_events" })) as [{ total: number }];
+      const decided = await batches.decisionsAt("one-click", [ON.gitSha]);
+      expect(decided.map(({ story, imageHash }) => [story, imageHash]).sort()).toEqual([["a", hashOf(1)], ["b", hashOf(2)], ["c", null]]);
+      const at = decided[0]!.at;
+      await batches.mergeDecisions("one-click", [{ story: "a", imageHash: hashOf(1), decision: "approved", actor: "ned", at, gitSha: ON.gitSha, batchId: ON.batchId }]);
+      const [{ total }] = (await sql.run({ sql: "SELECT COUNT(*) AS total FROM decision_events" })) as [{ total: number }];
+      expect(total).toBe(after);
     });
 
     it("refuses a malformed hash, and a decision by nobody", async () => {
@@ -672,7 +680,7 @@ describe("RenderBatches", () => {
       const elsewhere = await createTempStore();
       try {
         await elsewhere.sql.batch(
-          ["render_batches", "renders", "decisions", "goldens"].map((table) => ({
+          ["goldens", "decisions", "decision_events", "renders", "render_batches", "actors", "commits", "stories", "environments"].map((table) => ({
             sql: `DROP TABLE ${table}`,
           })),
         );
@@ -761,7 +769,8 @@ describe("RenderBatches", () => {
       console.table(report);
 
       expect(report.recordRenders!.requests).toBe(1);
-      expect(report["decide (all)"]!.requests).toBe(1);
+      // One that checks the images are here, and one that writes.
+      expect(report["decide (all)"]!.requests).toBe(2);
       expect(report["acceptBatch (all approved)"]!.requests).toBe(1);
       expect(report["compareBatch (differences)"]!.requests).toBe(1);
       // 10,000 rows at 5,000 per page, and one more that finds none.
@@ -770,11 +779,13 @@ describe("RenderBatches", () => {
 
     it("refuses a row whose batch or image isn't here, as D1 does", async () => {
       const sql = new Sql(adapter);
-      await expect(sql.run({ sql: "INSERT INTO renders(batch_key, story, failure) VALUES (424242, 'a', 'boom')" })).rejects.toThrow(/FOREIGN KEY/);
-      await expect(sql.run({ sql: "INSERT INTO goldens(git_sha, environment, batch_key) VALUES ('x', 'y', 424242)" })).rejects.toThrow(/FOREIGN KEY/);
+      await expect(sql.run({ sql: "INSERT INTO renders(batch_key, story_key, failure) VALUES (424242, 424242, 'boom')" })).rejects.toThrow(/FOREIGN KEY/);
+      await expect(sql.run({ sql: "INSERT INTO goldens(commit_key, environment_key, batch_key) VALUES (424242, 424242, 424242)" })).rejects.toThrow(/FOREIGN KEY/);
+      await expect(sql.run({ sql: "INSERT INTO decisions(environment_key, commit_key, story_key, image_key, event_key) VALUES (424242, 424242, 424242, 0, 424242)" })).rejects.toThrow(/FOREIGN KEY/);
       const batch = await recordBatch(SHA_A, [rendered("a", 1)]);
       const [{ key }] = (await sql.run({ sql: "SELECT key FROM render_batches WHERE id = ?1", params: [batch.id] })) as [{ key: number }];
-      await expect(sql.run({ sql: "INSERT INTO renders(batch_key, story, image_key) VALUES (CAST(?1 AS INTEGER), 'b', 424242)", params: [key] })).rejects.toThrow(/FOREIGN KEY/);
+      await sql.run({ sql: "INSERT INTO stories(id) VALUES ('never-rendered')" });
+      await expect(sql.run({ sql: "INSERT INTO renders(batch_key, story_key, image_key) VALUES (CAST(?1 AS INTEGER), (SELECT key FROM stories WHERE id = 'never-rendered'), 424242)", params: [key] })).rejects.toThrow(/FOREIGN KEY/);
     });
 
     it("never scans a table, for anything a review or a sync sends", async () => {
@@ -808,11 +819,14 @@ describe("RenderBatches", () => {
         const seen = new Set<string>();
         const scans = sent.flat().flatMap(({ sql: text, params = [] }) => {
           seen.add(text);
+          // A new name may fix a foreign key that's pending, so its plan lists every table that refers to it. SQLite skips
+          // those while none is pending, and none ever is, since every statement here writes a parent first.
+          if (/^INSERT INTO (environments|stories|commits|actors|decision_events)\b/.test(text)) return [];
           const plan = db.prepare(`EXPLAIN QUERY PLAN ${text}`).all(...params);
           return plan
             .map(({ detail }) => String(detail))
             // Reading a statement's own VALUES or JSON list, or a one-row aggregate, is no table scan.
-            .filter((detail) => /\bSCAN\b/.test(detail) && !/\bSCAN (v|c|json_each|\d+ CONSTANT ROWS?|CONSTANT ROW)\b/.test(detail))
+            .filter((detail) => /\bSCAN\b/.test(detail) && !/\bSCAN (v|c|j|json_each|\d+ CONSTANT ROWS?|CONSTANT ROW)\b/.test(detail))
             .map((detail) => `${detail} in ${text}`);
         });
         expect(seen.size).toBeGreaterThan(10);

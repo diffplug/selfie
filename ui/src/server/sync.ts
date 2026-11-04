@@ -198,7 +198,7 @@ export function createSyncApi(host: SyncHost): Hono {
 
   api.onError((error, context) => {
     if (error instanceof Refusal) return context.json(failure(error.code, error.message), error.status);
-    if (error instanceof BatchError) return context.json(failure(error.code, error.message), error.code === "unknown-batch" ? 404 : 409);
+    if (error instanceof BatchError) return context.json(failure(error.code, error.message), error.code === "unknown-batch" || error.code === "unknown-image" ? 404 : 409);
     if (error instanceof RangeError || error instanceof TypeError) return context.json(failure("bad-request", error.message), 400);
     console.error(error);
     return context.json(INTERNAL_ERROR, 500);

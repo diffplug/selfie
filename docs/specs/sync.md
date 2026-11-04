@@ -28,7 +28,7 @@ To mount under `/api`. `GET /repositories/:owner/:name` finds a repository's pro
 | `GET /images/:hash` | The stored bytes | View |
 | `POST /batches/:id/renders` | `{ renders }`, at most 1,000 | Upload |
 | `POST /batches/:id/finish` | `{ count, finishedAt }` | Upload |
-| `GET /batches/:id` | `?after`, a page of the batch, each render, and the decision on each image, with `next` | View |
+| `GET /batches/:id` | `?after`, where `next` said the page starts, a page of the batch in no particular order, each render, and the decision on each image, with `next` | View |
 | `POST /decisions` | `{ environment, decisions }`, at most 1,000, each with its `gitSha` and `batchId` | Decide |
 | `POST /goldens` | `{ batchId, baselineSha, removed }`, answers `{ outcome, acceptedBatchId, refusal }`, where `outcome` is `accepted`, `already`, `conflict`, or `refused` | Upload, or Decide if `removed` isn't empty |
 | `GET /goldens` | `?sha&environment`, answers `{ batchId }` | View or Upload |

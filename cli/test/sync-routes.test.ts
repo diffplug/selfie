@@ -275,6 +275,13 @@ describe("decisions", () => {
     expect((await decisionOn()).decision).toBe("rejected");
   });
 
+  test("refuses a decision on an image this project doesn't hold", async () => {
+    const decision = { story: "a", imageHash: "f".repeat(64), decision: "approved", at: 1, gitSha: SHA, batchId: BATCH };
+    const response = await send("POST", "/decisions", "writer", { environment: ENV, decisions: [decision] });
+    expect(response.status).toBe(404);
+    expect(((await response.json()) as any).error.code).toBe("unknown-image");
+  });
+
   test("refuses what isn't a decision", async () => {
     expect((await send("POST", "/decisions", "writer", { environment: ENV, decisions: [{ story: "a", imageHash: "nope", decision: "approved", at: 1, gitSha: SHA, batchId: BATCH }] })).status).toBe(400);
     expect((await send("POST", "/decisions", "writer", { environment: ENV, decisions: [{ story: "a", imageHash: UNKNOWN_HASH, decision: "maybe", at: 1, gitSha: SHA, batchId: BATCH }] })).status).toBe(400);
