@@ -68,6 +68,19 @@ describe("on a feature branch, with nothing ever done on the default branch", ()
     expect(third.json.counts).toMatchObject({ unchanged: 1, changed: 1, undecided: 1 });
   });
 
+  test("a batch compares with what came before it, not later work on its branch", async () => {
+    await commit(h.repo, "the first change");
+    const first = await review();
+    await h.cli("approve", first.batchId, "--all");
+    await commit(h.repo, "the second change");
+    h.stories = [{ id: "a--one", color: BLUE }, { id: "a--two" }];
+    const second = await review();
+    await h.cli("approve", second.batchId, "--all");
+
+    const again = await h.cli("review", first.batchId);
+    expect(again.json.differences.map(({ state }: any) => state)).toEqual(["added", "added"]);
+  });
+
   test("a batch at the same commit sees what was approved on another", async () => {
     const first = await review();
     await h.cli("approve", first.batchId, "--all");

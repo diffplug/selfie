@@ -30,7 +30,7 @@ Source of truth: `cli/src/cli.ts`, `cli/src/document.ts`; the real binary's test
 |---|---|---|
 | 0 | Nothing blocks | A review with no blockers, a batch recorded, even with failed stories, a decision recorded, `ui` stopped by a signal |
 | 1 | The command ran, and something blocks | A review listing anything in `blockers`, or showing any difference from a `--baseline`, a `--story` pattern on `approve` or `reject` that matched nothing |
-| 2 | The command couldn't run | Not a Git repository, no commits, no Storybook, no Docker, no `selfie.config.json`, a failed `--build`, a bad flag, an unknown batch, `--story` matching no story at all, a `ui` that can't start |
+| 2 | The command couldn't run | Not a Git repository, no commits, no Storybook, no Docker, no `selfie.config.json`, a store from before a schema change, a failed `--build`, a bad flag, an unknown batch, `--story` matching no story at all, a `ui` that can't start |
 | 3 | Nothing yet, and it's worth asking again | `agent-await-feedback` past its `--timeout` |
 | 130 | Stopped by a signal, where stopping isn't success | `agent-await-feedback` |
 

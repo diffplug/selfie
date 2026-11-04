@@ -42,6 +42,8 @@
 
 **History, not a promoted set.** Asking someone to accept a batch on a clean default branch made them render again after a merge, to end up with what they'd already approved. Working it out from history asks nothing at a merge, since a batch there finds the approvals its branch brought.
 
+**Up to the batch asking.** A batch looked at again later shouldn't change what it reads as because of work done since, or an earlier batch on a branch would compare with a later commit's approvals.
+
 **Author time as a branch's start.** A branch name can be reused, so its old batches mustn't count forever, and the merge-base can't bound them, since a rebase moves it past the batches it's meant to find. A rebase keeps author times, so the earliest among the branch's own commits holds still. An older commit merged in only widens the window, on the same branch name.
 
 **Leaving out a batch's own approvals.** A story approved on a batch still has to be listed there, approved, or a person going through a review sees rows vanish as they decide, and can't see what they approved.

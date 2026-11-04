@@ -8,6 +8,8 @@ import { createSyncApi, type SyncAccess } from "selfie-ui/sync";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { createHarness, RED, GREEN, BLUE, solid, type Color, type Harness } from "./support.ts";
 
+const ON = { batchId: "00000000-0000-4000-8000-000000000001", gitSha: "e".repeat(40) };
+
 const NOW = 1_000_000;
 const SHA = "a".repeat(40);
 const OTHER_SHA = "b".repeat(40);
@@ -49,7 +51,6 @@ const batchFacts = (overrides: Record<string, unknown> = {}) => ({
   environment: ENV,
   startedAt: 500,
   dirty: false,
-  baselineSha: null,
   storyFilter: null,
   reusedFromBatch: null,
   scale: 1,
@@ -65,7 +66,7 @@ async function sendBatch(id = BATCH, color: Color = RED, overrides: Record<strin
   return hash;
 }
 
-const approve = (hash: string, at = 700) => send("POST", "/decisions", "writer", { environment: ENV, decisions: [{ story: "a", imageHash: hash, decision: "approved", at }] });
+const approve = (hash: string, at = 700) => send("POST", "/decisions", "writer", { environment: ENV, decisions: [{ story: "a", imageHash: hash, decision: "approved", at, gitSha: SHA, batchId: BATCH }] });
 const goldens = (body: unknown, token = "writer") => send("POST", "/goldens", token, body);
 
 beforeEach(async () => {
@@ -249,21 +250,21 @@ describe("decisions", () => {
 
   test("are by whoever is pushing, whatever the client says", async () => {
     const hash = await sendBatch();
-    await send("POST", "/decisions", "writer", { environment: ENV, decisions: [{ story: "a", imageHash: hash, decision: "approved", actor: "someone-else", at: 700 }] });
-    expect(await decisionOn()).toEqual({ decision: "approved", actor: "writer-login", at: 700 });
+    await send("POST", "/decisions", "writer", { environment: ENV, decisions: [{ story: "a", imageHash: hash, decision: "approved", actor: "someone-else", at: 700, gitSha: SHA, batchId: BATCH }] });
+    expect(await decisionOn()).toEqual({ decision: "approved", actor: "writer-login", at: 700, gitSha: SHA, batchId: BATCH });
   });
 
   test("the latest wins, and a later one can't be later than now", async () => {
     const hash = await sendBatch();
-    await send("POST", "/decisions", "writer", { environment: ENV, decisions: [{ story: "a", imageHash: hash, decision: "rejected", at: NOW + 999 }] });
-    expect(await decisionOn()).toEqual({ decision: "rejected", actor: "writer-login", at: NOW });
+    await send("POST", "/decisions", "writer", { environment: ENV, decisions: [{ story: "a", imageHash: hash, decision: "rejected", at: NOW + 999, gitSha: SHA, batchId: BATCH }] });
+    expect(await decisionOn()).toEqual({ decision: "rejected", actor: "writer-login", at: NOW, gitSha: SHA, batchId: BATCH });
     await approve(hash, NOW + 1);
     expect((await decisionOn()).decision).toBe("rejected");
   });
 
   test("refuses what isn't a decision", async () => {
-    expect((await send("POST", "/decisions", "writer", { environment: ENV, decisions: [{ story: "a", imageHash: "nope", decision: "approved", at: 1 }] })).status).toBe(400);
-    expect((await send("POST", "/decisions", "writer", { environment: ENV, decisions: [{ story: "a", imageHash: UNKNOWN_HASH, decision: "maybe", at: 1 }] })).status).toBe(400);
+    expect((await send("POST", "/decisions", "writer", { environment: ENV, decisions: [{ story: "a", imageHash: "nope", decision: "approved", at: 1, gitSha: SHA, batchId: BATCH }] })).status).toBe(400);
+    expect((await send("POST", "/decisions", "writer", { environment: ENV, decisions: [{ story: "a", imageHash: UNKNOWN_HASH, decision: "maybe", at: 1, gitSha: SHA, batchId: BATCH }] })).status).toBe(400);
   });
 });
 
@@ -303,9 +304,9 @@ describe("goldens", () => {
       await send("PUT", `/batches/${BATCH}`, "writer", batchFacts());
       await send("POST", `/batches/${BATCH}/renders`, "writer", { renders: [{ story: "a", imageHash: a }, { story: "b", imageHash: b }] });
       await send("POST", `/batches/${BATCH}/finish`, "writer", { count: 2, finishedAt: 600 });
-      await send("POST", "/decisions", "writer", { environment: ENV, decisions: [{ story: "a", imageHash: a, decision: "approved", at: 700 }, { story: "b", imageHash: b, decision: "approved", at: 700 }] });
+      await send("POST", "/decisions", "writer", { environment: ENV, decisions: [{ story: "a", imageHash: a, decision: "approved", at: 700, gitSha: SHA, batchId: BATCH }, { story: "b", imageHash: b, decision: "approved", at: 700, gitSha: SHA, batchId: BATCH }] });
       await goldens({ batchId: BATCH, baselineSha: null, removed: [] });
-      await send("PUT", `/batches/${OTHER_BATCH}`, "writer", batchFacts({ gitSha: OTHER_SHA, baselineSha: SHA }));
+      await send("PUT", `/batches/${OTHER_BATCH}`, "writer", batchFacts({ gitSha: OTHER_SHA }));
       await send("POST", `/batches/${OTHER_BATCH}/renders`, "writer", { renders: [{ story: "a", imageHash: a }] });
       await send("POST", `/batches/${OTHER_BATCH}/finish`, "writer", { count: 1, finishedAt: 800 });
     });
@@ -328,7 +329,7 @@ describe("goldens", () => {
   });
 
   test("whose baseline isn't here are refused, saying so", async () => {
-    const hash = await sendBatch(BATCH, RED, { baselineSha: OTHER_SHA });
+    const hash = await sendBatch(BATCH, RED);
     await approve(hash);
     expect(await (await goldens({ batchId: BATCH, baselineSha: OTHER_SHA, removed: [] })).json()).toMatchObject({ outcome: "refused", refusal: { code: "no-goldens" } });
   });

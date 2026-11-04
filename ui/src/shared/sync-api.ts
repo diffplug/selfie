@@ -1,6 +1,6 @@
 // What crosses between a store's client and the sync routes. Types only, so the CLI can use them
 // without loading the server. See docs/specs/sync.md.
-import type { Decision, RecordedRender, RenderBatch, BatchPage } from "selfie-store";
+import type { DecisionOn, RecordedRender, RenderBatch, BatchPage } from "selfie-store";
 
 export type { BatchPage };
 
@@ -16,7 +16,7 @@ export type SentBatch = Omit<RenderBatch, "id" | "status" | "finishedAt" | "fail
 export type SentRender = RecordedRender;
 
 /** A decision as a sender states it, which the server says who it's by. */
-export interface SentDecision extends Omit<Decision, "actor"> {
+export interface SentDecision extends Omit<DecisionOn, "actor"> {
   readonly story: string;
   readonly imageHash: string;
 }

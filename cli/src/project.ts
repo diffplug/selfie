@@ -99,17 +99,17 @@ export async function batchesAtHead(project: Project, environment: string): Prom
 
 /**
  * The commits whose approvals count for a batch: its history, and on a branch every commit its
- * batches were recorded at since its own work began, which a rebase may have left out of that
- * history. See `docs/specs/renders.md` -> Approvals.
+ * earlier batches were recorded at since its own work began, which a rebase may have left out of
+ * that history. See `docs/specs/renders.md` -> Approvals.
  */
-export async function reachableCommits(project: Project, { gitSha, branch, environment }: Pick<RenderBatch, "gitSha" | "branch" | "environment">): Promise<readonly string[]> {
+export async function reachableCommits(project: Project, { gitSha, branch, environment, startedAt }: Pick<RenderBatch, "gitSha" | "branch" | "environment" | "startedAt">): Promise<readonly string[]> {
   const ancestors = await ancestorsOf(project.repo, gitSha);
   if (branch === null) return ancestors;
   const { defaultBranch, mergeBase } = await defaultBranchOf(project.repo, gitSha);
   if (branch === defaultBranch) return ancestors;
   const began = await earliestAuthoredSince(project.repo, mergeBase, gitSha);
   if (began === null) return ancestors;
-  return [...new Set([...ancestors, ...(await project.batches.commitsOfBranch(branch, environment, began))])];
+  return [...new Set([...ancestors, ...(await project.batches.commitsOfBranch(branch, environment, began, startedAt))])];
 }
 
 /** A batch compared with what history has approved, which is what deciding on it and looking at it both use. */

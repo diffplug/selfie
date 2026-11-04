@@ -80,7 +80,6 @@ export function batchOf(overrides: Partial<RenderBatch> = {}): RenderBatch {
     finishedAt: STARTED + 90_000,
     failedCount: 0,
     dirty: false,
-    baselineSha: null,
     branch: "main",
     storyFilter: null,
     reusedFromBatch: null,

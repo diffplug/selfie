@@ -1,10 +1,13 @@
 // The commands against real Git, a real store, and real files, with only the browser replaced.
 import { access, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { decodeImage, TEST_CONFIG, writeTestConfig } from "./support.ts";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { encodePng } from "../src/png.ts";
 import { BLUE, commit, createHarness, git, GREEN, RED, solid, type Harness } from "./support.ts";
+
+const ON = { batchId: "00000000-0000-4000-8000-000000000001", gitSha: "e".repeat(40) };
 
 let h: Harness;
 beforeEach(async () => {
@@ -194,6 +197,20 @@ describe("comparing with what's approved", () => {
 
     await writeTestConfig(h.repo);
     expect((await review()).json.counts).toMatchObject({ added: 0, unchanged: 3 });
+  });
+});
+
+describe("a store from before a schema change", () => {
+  test("says to delete it, rather than only that a column is missing", async () => {
+    h.stories = [{ id: "a--one" }];
+    await review();
+    const [slug] = await readdir(h.home);
+    const db = new DatabaseSync(path.join(h.home, slug!, "store.db"));
+    db.exec("ALTER TABLE note_sessions RENAME COLUMN latest_batch TO latest_run");
+    db.close();
+    const { code, json } = await review();
+    expect(code).toBe(2);
+    expect(json.error).toMatchObject({ code: "old-store", message: expect.stringContaining("delete it") });
   });
 });
 

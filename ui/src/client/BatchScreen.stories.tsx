@@ -39,7 +39,7 @@ export const FirstBatchAllNew: Story = {
   args: {
     view: viewOf(
       ["a--one", "a--two", "a--three", "b--one", "b--two"].map((story) => rows.fresh(story)),
-      { unchanged: 0, batch: { baselineSha: null } },
+      { unchanged: 0 },
     ),
   },
 };

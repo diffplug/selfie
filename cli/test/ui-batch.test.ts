@@ -6,6 +6,8 @@ import { describe, expect, test } from "vitest";
 import { BLUE, commit, git } from "./support.ts";
 import { UNKNOWN_HASH, UNKNOWN_BATCH, h, project, review, get, decideOn, viewOf, approveAll } from "./ui-support.ts";
 
+const ON = { batchId: "00000000-0000-4000-8000-000000000001", gitSha: "e".repeat(40) };
+
 describe("which batch", () => {
   test("says where a batch stands against this checkout", async () => {
     h.stories = [{ id: "a" }];
@@ -36,7 +38,6 @@ describe("which batch", () => {
       environment,
       scale: 1,
       dirty: false,
-      baselineSha: null,
     });
     expect((await newest()).newestBatchId).toBe(second);
     const unfinished = await get(`/api/batches/${recording.id}`);
@@ -95,7 +96,6 @@ describe("the batch view", () => {
     expect(view.rows.find(({ story }: any) => story === "breaks")).toMatchObject({ failure: "render: It broke", imageHash: null });
     expect(view.rows.find(({ story }: any) => story === "differs").pixelDiff).toMatchObject({ changedPixels: 64 });
     expect(view.outsideFilter).toBe(0);
-    expect(view.batch.baselineSha).toBeNull();
     expect(view.actor).toBe("tester@example.com");
     expect(view.siblings.map(({ id }: any) => id)).toContain(json.batchId);
 

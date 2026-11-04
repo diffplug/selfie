@@ -6,6 +6,7 @@ import { decide } from "./decisions.ts";
 import { buildRenderDocument, buildReviewDocument } from "./document.ts";
 import { SelfieError } from "./errors.ts";
 import { gitUserEmail, resolveCommit } from "./git.ts";
+import { selfieHome } from "./paths.ts";
 import { compareAsReviewed, openProject, type Project } from "./project.ts";
 import { renderBatch, review, replyToNote, runBuild } from "./review.ts";
 import { summarizeBatch } from "./summary.ts";
@@ -144,11 +145,19 @@ function onePositional(positionals: readonly string[], what: string): string {
 }
 
 async function withProject(context: Context, work: (project: Project) => Promise<number>): Promise<number> {
-  const project = await openProject({ cwd: context.cwd, env: context.env });
   try {
-    return await work(project);
-  } finally {
-    project.close();
+    const project = await openProject({ cwd: context.cwd, env: context.env });
+    try {
+      return await work(project);
+    } finally {
+      project.close();
+    }
+  } catch (error) {
+    // Nothing migrates a store yet: docs/specs/store.md -> Open questions.
+    if (/no such column|has no column named/.test((error as Error).message)) {
+      throw new SelfieError("old-store", `This project's store.db under ${selfieHome(context.env)} is from an older Selfie, and nothing migrates it yet, so delete it and render again. (${(error as Error).message})`);
+    }
+    throw error;
   }
 }
 

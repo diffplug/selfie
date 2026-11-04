@@ -102,7 +102,7 @@ function recordedRender(value: unknown): RecordedRender {
 
 /** A batch's facts as a sender states them, whose times can't be later than now. */
 function receivedBatch(id: string, body: Record<string, unknown>, now: number): ReceivedBatch {
-  const { gitSha, environment, startedAt, dirty, baselineSha, storyFilter, reusedFromBatch, scale } = body;
+  const { gitSha, environment, startedAt, dirty, storyFilter, reusedFromBatch, scale } = body;
   if (typeof dirty !== "boolean") throw badRequest("dirty must be true or false.");
   if (typeof scale !== "number") throw badRequest("scale must be a number.");
   return {
@@ -111,7 +111,6 @@ function receivedBatch(id: string, body: Record<string, unknown>, now: number): 
     environment: readText(environment, "environment"),
     startedAt: Math.min(readWhole(startedAt, "startedAt"), now),
     dirty,
-    baselineSha: orNull(baselineSha, (sha) => readSha(sha, "baselineSha")),
     storyFilter: (storyFilter ?? null) as StoryFilter | null,
     reusedFromBatch: orNull(reusedFromBatch, (batch) => readText(batch, "reusedFromBatch")),
     scale,
@@ -119,9 +118,9 @@ function receivedBatch(id: string, body: Record<string, unknown>, now: number): 
 }
 
 function receivedDecision(value: unknown, decider: string, now: number): ReceivedDecision {
-  const { story, imageHash, decision, at } = asRecord(value);
+  const { story, imageHash, decision, at, gitSha, batchId } = asRecord(value);
   if (decision !== "approved" && decision !== "rejected") throw badRequest('decision must be "approved" or "rejected".');
-  return { story: readText(story, "story"), imageHash: readHash(imageHash), decision, actor: decider, at: Math.min(readWhole(at, "at"), now) };
+  return { story: readText(story, "story"), imageHash: readHash(imageHash), decision, actor: decider, at: Math.min(readWhole(at, "at"), now), gitSha: readSha(gitSha, "gitSha"), batchId: readBatchId(batchId) };
 }
 
 /** The same stories, in any order. */

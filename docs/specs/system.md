@@ -49,7 +49,7 @@ Selfie is for fully opaque images, and transparency is never allowed: `docs/spec
 
 ### Approvals across stores
 
-- **Must not make a user re-approve at push a render change they already approved locally.** A user can approve changes on an unpushed PR, and those approvals carry through the push. The record is built ([Approvals](#approvals)). `docs/specs/sync.md` moves decisions, but not yet the commit each counts from: **Scope: approvals-sync** (`docs/specs/renders.md` → Future).
+- **Must not make a user re-approve at push a render change they already approved locally.** A user can approve changes on an unpushed PR, and those approvals carry through the push. The record is built ([Approvals](#approvals)). `docs/specs/sync.md` moves decisions with the commit each counts from, and what's left is **Scope: approvals-sync** (`docs/specs/renders.md` → Future).
 
 ### Cloud data
 

@@ -16,6 +16,8 @@ import { hashOf } from "./support/sql-params.ts";
 import { createTempStore } from "./support/temp-store.ts";
 import { sharpCodec } from "../src/adapters/sharp-codec.ts";
 
+const ON = { batchId: "00000000-0000-4000-8000-000000000001", gitSha: "e".repeat(40) };
+
 const TOKEN = "test-token-abc123";
 
 type Step = Response | Error;
@@ -395,10 +397,10 @@ describe("D1RestAdapter replay against a real SQL engine", () => {
     const batches = new RenderBatches({ sql });
     const environment = "env";
     const gitSha = "a".repeat(40);
-    const batch = await batches.beginBatch({ gitSha, environment, scale: 1, dirty: false, baselineSha: null });
+    const batch = await batches.beginBatch({ gitSha, environment, scale: 1, dirty: false, });
     await batches.recordRenders(batch.id, [{ story: "a", imageHash: hashOf(1) }]);
     expect(await batches.finishBatch(batch.id, 1)).toMatchObject({ status: "complete" });
-    await batches.decide({
+    await batches.decide({ on: ON,
       environment,
       decision: "approved",
       actor: "ned",
@@ -408,6 +410,6 @@ describe("D1RestAdapter replay against a real SQL engine", () => {
     expect(await batches.compareBatch(batch.id, gitSha, { includeUnchanged: true })).toMatchObject({
       renders: [{ story: "a", state: "unchanged" }],
     });
-    expect(await batches.hasCompleteGoldens(gitSha, environment)).toBe(true);
+    expect(await batches.acceptedBatchAt(gitSha, environment)).not.toBeNull();
   });
 });

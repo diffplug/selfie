@@ -4,6 +4,8 @@ import { beforeEach, describe, expect, test } from "vitest";
 import { BLUE, commit, git, GREEN, RED } from "./support.ts";
 import { UNKNOWN_HASH, h, project, review, get, change, decideOn, viewOf, approveAll } from "./ui-support.ts";
 
+const ON = { batchId: "00000000-0000-4000-8000-000000000001", gitSha: "e".repeat(40) };
+
 describe("approve and reject", () => {
   let batchId: string;
   let rows: any[];
@@ -180,7 +182,6 @@ describe("what approving on the page leaves", () => {
     h.stories = [{ id: "a", color: BLUE }, { id: "b" }];
     const { batchId } = (await review()).json;
     const view = await viewOf(batchId);
-    expect(view.batch.baselineSha).toBeNull();
     expect(view.rows.map(({ story, state, goldenBatchId }: any) => [story, state, goldenBatchId])).toEqual([["a", "changed", first.batchId]]);
     expect(view.counts).toMatchObject({ unchanged: 1, changed: 1 });
     expect(view.blockers).toEqual([{ story: "a", reason: "changed-unapproved", detail: null }]);

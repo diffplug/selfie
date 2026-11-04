@@ -28,7 +28,7 @@ A batch is one recording of a set of renders against one full Git SHA in one env
 | `failed` | Finished, and at least one story failed to render | Yes | Refused |
 | `complete` | Finished, and every story rendered | Yes | If approved and not `dirty` |
 
-- **Must be told when it begins whether the working tree was dirty, and which branch HEAD was on, or null if detached**, and the baseline if a caller has one, which only sync does, and may be told any story filter, as `patterns` and the `unmatched` among them, and which batch really rendered its images, as `reusedFromBatch` (`docs/specs/cli.md` → Recording only if necessary). A batch keeps these for good, so nothing about it depends on a file outside the store.
+- **Must be told when it begins whether the working tree was dirty, and which branch HEAD was on, or null if detached**, and may be told any story filter, as `patterns` and the `unmatched` among them, and which batch really rendered its images, as `reusedFromBatch` (`docs/specs/cli.md` → Recording only if necessary). A batch keeps these for good, so nothing about it depends on a file outside the store.
 - **Must be told its environment's scale when it begins**, as image pixels per CSS pixel, a positive number that need not be whole. The environment's ID is a hash, and the batch's images hold only pixels, so this is the only place the store or a viewer can read it. It changes no state, comparison, or acceptance, since the ID already separates scales. **Must keep one image at its real pixels, and never a copy at another size**: a viewer calculates every size from the image and this.
 - **Must treat `reusedFromBatch` as a fact about where the pixels came from, and nothing more.** It changes no state, comparison, or acceptance, and it's an ID, not a reference, since sync may move a batch without the one it names.
 - **Must record a story that failed to render as a row with its failure message**, never leave it absent, so only a `recording` batch can lack a story. A message is cut to 2,000 characters.
@@ -80,7 +80,7 @@ A decision is an approval or a rejection, by an actor, at the time it is recorde
 
 - **Must record a decision against a render's name, an image hash or a removal, and the commit and batch it was made on.** A removal is a decision with no image, stored as an empty image hash.
 - **Must keep one decision per name, hash, and commit, the one most recently recorded.** There is no history of replaced decisions.
-- **Must merge a decision from another store by its own time, latest first, then `rejected` before `approved`, and never by who made it**, so two stores reach one verdict whichever order they hear in, a person changing their mind still works, and sending a decision twice changes nothing. A decision received through sync has no commit, so history can't reach it until [sync carries approvals](#future).
+- **Must merge a decision from another store by its own time, latest first, then `rejected` before `approved`, and never by who made it**, so two stores reach one verdict whichever order they hear in, a person changing their mind still works, and sending a decision twice changes nothing. It keeps its commit and batch there, so history reaches it as it would here.
 - **May name an image this store doesn't hold yet.**
 
 ## Approvals
@@ -89,7 +89,7 @@ Source of truth: `compareWithApprovals` and `RenderBatches.compareFromHistory` i
 
 **A story's reference at a commit is the image of its newest approval that commit's history reaches.** Nothing has to be accepted, promoted, or rendered again on the default branch.
 
-- **Must reach, from a batch: its commit's ancestors through every parent, up to 1,000 commits, and if it's on a branch other than the default, every commit its branch's batches were recorded at since the earliest author time of the commits that branch has and the default doesn't** (rationale). A branch with no commits of its own reaches only its ancestors. A detached batch reaches only its ancestors. A commit this clone doesn't have reaches only itself.
+- **Must reach, from a batch: its commit's ancestors through every parent, up to 1,000 commits, and if it's on a branch other than the default, every commit its branch's batches were recorded at, from the earliest author time of the commits that branch has and the default doesn't, up to when this batch started** (rationale). A branch with no commits of its own reaches only its ancestors. A detached batch reaches only its ancestors. A commit this clone doesn't have reaches only itself.
 - **Must leave Git to the caller.** The store is told which commits are reachable, and runs no Git.
 - **Must leave out approvals made on the batch being compared**, or a story would read as unchanged the moment someone approved it, and vanish from its review. Later batches see them, including later ones at the same commit (rationale).
 - **Must count an image's decision only if it's no older than the reference's approval**, so a bug that brings back an image approved long ago asks again, and a rejection of an older image doesn't stick to a newer reference (rationale).
@@ -101,11 +101,11 @@ Source of truth: `compareWithApprovals` and `RenderBatches.compareFromHistory` i
 
 ## Goldens
 
-Source of truth: `RenderBatches.acceptBatch`, `hasCompleteGoldens`, `acceptedBatchAt`, and `firstWithGoldens` in `store/src/core/render-batches.ts`.
+Source of truth: `RenderBatches.acceptBatch`, `acceptedBatchAt`, and `firstWithGoldens` in `store/src/core/render-batches.ts`.
 
 Goldens are per Git SHA and environment, and are the images of the one batch accepted there. Only `docs/specs/sync.md` still uses them: nothing local makes or reads them but `selfie pull`, and it reads no comparison from them. A reader finds them as `goldenHash` in `compareBatch`.
 
-- **Must make a SHA's goldens exist whole or not at all**, so `hasCompleteGoldens` only asks whether a batch was accepted there. A SHA with no accepted batch has no goldens, however many of its images are approved (rationale).
+- **Must make a SHA's goldens exist whole or not at all**, so `acceptedBatchAt` only asks whether a batch was accepted there. A SHA with no accepted batch has no goldens, however many of its images are approved (rationale).
 - **Must accept only a `complete` batch whose every image either matches the baseline's for that name or is approved at exactly that hash.** `acceptBatch` otherwise returns false and changes nothing, and `compareBatch` shows which. A null baseline means every image needs an approval.
 - **Must refuse a batch recorded on a dirty tree with `batch-dirty`**, since a SHA's goldens must describe that commit, and this holds for every caller (rationale).
 - **Must be told how many removed renders the reviewer saw, and must refuse a different number with `wrong-removed-count`**, so a filtered render or a discovery bug can't silently drop goldens. A removed render needs no decision of its own, since no image is being accepted (rationale).
@@ -120,7 +120,7 @@ Goldens are per Git SHA and environment, and are the images of the one batch acc
 Source of truth: `CREATE_BATCH_TABLES` in `store/src/core/render-batches.ts`, `initStoreSchema` in `store/src/core/store.ts`.
 
 ```sql
-render_batches(key PK, id UNIQUE, git_sha, environment, started_at, finished_at, failed_count, dirty, baseline_sha, story_filter, reused_from_batch, scale, branch)
+render_batches(key PK, id UNIQUE, git_sha, environment, started_at, finished_at, failed_count, dirty, story_filter, reused_from_batch, scale, branch)
   INDEX batches_by_sha(git_sha, environment, started_at)
   INDEX batches_by_branch(branch, environment, started_at)
 renders(batch_key, story, image_key, failure, play_error)  PK (batch_key, story)  WITHOUT ROWID
@@ -148,9 +148,9 @@ Source of truth: `store/src/core/render-batches.ts`; `store/test/render-batches.
 **Scope: approvals-sync** — The local half is built ([Approvals](#approvals)). What's left, which replaces the goldens above:
 
 - A commit's history also reaches the commits of any pull request merged at one of its ancestors, whatever they were, since a squash, a rebase, or a force-push leaves them out of Git's history. Before a merge, it reaches its own pull request's commits. A pull request ties a branch to its merge commit when it merges.
-- A decision's commit and batch go across sync, which today sends neither.
+- A removal's decision goes across sync, which only sends decisions on a batch's images.
 - A pull request's check is red if a story failed, yellow if anything's undecided, and green if every story matches its reference.
-- Then these go: `POST /goldens`, the goldens table, `acceptBatch`, `compareBatch`, `adoptGoldens`, `firstWithGoldens`, and `baseline_sha`.
+- Then these go: `POST /goldens`, the goldens table, `acceptBatch`, `compareBatch`, `adoptGoldens`, and `firstWithGoldens`.
 
 Open:
 
