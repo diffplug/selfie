@@ -771,6 +771,15 @@ describe("RenderBatches", () => {
       expect(report["compareBatch (includeUnchanged)"]!.requests).toBe(3);
     });
 
+    it("refuses a row whose batch or image isn't here, as D1 does", async () => {
+      const sql = new Sql(adapter);
+      await expect(sql.run({ sql: "INSERT INTO renders(batch_key, story, failure) VALUES (424242, 'a', 'boom')" })).rejects.toThrow(/FOREIGN KEY/);
+      await expect(sql.run({ sql: "INSERT INTO goldens(git_sha, environment, batch_key) VALUES ('x', 'y', 424242)" })).rejects.toThrow(/FOREIGN KEY/);
+      const batch = await recordBatch(SHA_A, [rendered("a", 1)]);
+      const [{ key }] = (await sql.run({ sql: "SELECT key FROM render_batches WHERE id = ?1", params: [batch.id] })) as [{ key: number }];
+      await expect(sql.run({ sql: "INSERT INTO renders(batch_key, story, image_key) VALUES (CAST(?1 AS INTEGER), 'b', 424242)", params: [key] })).rejects.toThrow(/FOREIGN KEY/);
+    });
+
     it("never scans a table, for anything a review or a sync sends", async () => {
       const { adapter: counted, sent } = counting(adapter);
       const model = new RenderBatches({ sql: new Sql(counted) });

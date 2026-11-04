@@ -123,14 +123,16 @@ Source of truth: `CREATE_BATCH_TABLES` in `store/src/core/render-batches.ts`, `i
 render_batches(key PK, id UNIQUE, git_sha, environment, started_at, finished_at, failed_count, dirty, story_filter, reused_from_batch, scale, branch)
   INDEX batches_by_sha(git_sha, environment, started_at)
   INDEX batches_by_branch(branch, environment, started_at)
-renders(batch_key, story, image_key, failure, play_error)  PK (batch_key, story)  WITHOUT ROWID
+renders(batch_key → render_batches.key, story, image_key → images.key, failure, play_error)  PK (batch_key, story)  WITHOUT ROWID
 decisions(environment, story, image_hash, decision, actor, decided_at, git_sha, batch_id)  PK (environment, story, image_hash, git_sha)  WITHOUT ROWID
   INDEX decisions_by_commit(environment, git_sha)
-goldens(git_sha, environment, batch_key)  PK (git_sha, environment)  WITHOUT ROWID
+goldens(git_sha, environment, batch_key → render_batches.key)  PK (git_sha, environment)  WITHOUT ROWID
 ```
 
 - **Must leave out the CLI's local table** (`docs/specs/cli.md` → Recording only if necessary): it's in a local `store.db`, not this schema, and D1 doesn't have it.
-- **Must only add what is missing:** `initStoreSchema` is one request of `CREATE ... IF NOT EXISTS`, so running it upgrades a store holding only images. It changes no existing table, and there is no version number. Any other change needs `docs/specs/store.md` → Open questions decided first. `render_batches.reused_from_batch` and the rename of its tables and columns (`docs/specs/cli.rationale.md`) are the exceptions, made before any project database existed (rationale): `CREATE TABLE IF NOT EXISTS` doesn't add it to an older store, whose reviews and accepts fail with exit 2 until the store is recreated.
+- **Must only add what is missing:** `initStoreSchema` is one request of `CREATE ... IF NOT EXISTS`, so running it upgrades a store holding only images. It changes no existing table, and there is no version number. Any other change needs `docs/specs/store.md` → Open questions decided first. `render_batches.reused_from_batch`, the rename of its tables and columns (`docs/specs/cli.rationale.md`), and its foreign keys are the exceptions, made before any project database existed (rationale): `CREATE TABLE IF NOT EXISTS` doesn't add it to an older store, whose reviews and accepts fail with exit 2 until the store is recreated.
+- **Must declare a foreign key wherever a row's parent is always written first and held here**, as `→` shows above, and as `docs/specs/store.md` → Built Storybooks has for `batch_id`, so a store refuses an orphan instead of holding one (rationale).
+- **Never declare one on `decisions` or `reused_from_batch`**, since a decision may name an image or batch this store doesn't hold, and sync may move a batch without the one it was reused from.
 - **Must keep `render_batches.key` and `renders.image_key` inside the store, as with image keys.** A batch's `id`, a UUID, is what leaves it.
 - **Never scan a table:** every statement reaches its rows through one of these keys. `store/test/render-batches.test.ts` checks SQLite's query plan for everything a review sends.
 

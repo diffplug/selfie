@@ -29,7 +29,7 @@ export const CREATE_NOTES_TABLES: readonly string[] = [
   "CREATE INDEX IF NOT EXISTS notes_by_session ON notes(session, id)",
   `CREATE TABLE IF NOT EXISTS note_messages (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  note_id INTEGER NOT NULL,
+  note_id INTEGER NOT NULL REFERENCES notes(id),
   sender TEXT NOT NULL,
   author TEXT NOT NULL,
   text TEXT NOT NULL,

@@ -25,9 +25,9 @@ export const CREATE_BATCH_TABLES: readonly string[] = [
   "CREATE INDEX IF NOT EXISTS batches_by_sha ON render_batches(git_sha, environment, started_at)",
   "CREATE INDEX IF NOT EXISTS batches_by_branch ON render_batches(branch, environment, started_at)",
   `CREATE TABLE IF NOT EXISTS renders (
-  batch_key INTEGER NOT NULL,
+  batch_key INTEGER NOT NULL REFERENCES render_batches(key),
   story TEXT NOT NULL,
-  image_key INTEGER,
+  image_key INTEGER REFERENCES images(key),
   failure TEXT,
   play_error TEXT,
   PRIMARY KEY (batch_key, story),
@@ -48,7 +48,7 @@ export const CREATE_BATCH_TABLES: readonly string[] = [
   `CREATE TABLE IF NOT EXISTS goldens (
   git_sha TEXT NOT NULL,
   environment TEXT NOT NULL,
-  batch_key INTEGER NOT NULL,
+  batch_key INTEGER NOT NULL REFERENCES render_batches(key),
   PRIMARY KEY (git_sha, environment)
 ) WITHOUT ROWID`,
 ];

@@ -7,11 +7,11 @@ import { assertImageHash, isImageHash, sha256, toHex } from "./image-hash.ts";
 import type { Sql } from "./sql.ts";
 
 export const CREATE_BUILT_STORYBOOK_TABLES: readonly string[] = [
-  "CREATE TABLE IF NOT EXISTS batch_storybooks (batch_id TEXT PRIMARY KEY, storybook TEXT NOT NULL) WITHOUT ROWID",
+  "CREATE TABLE IF NOT EXISTS batch_storybooks (batch_id TEXT PRIMARY KEY REFERENCES render_batches(id), storybook TEXT NOT NULL) WITHOUT ROWID",
   // By environment, whose ID already covers it, so a batch's story can lay out as it was rendered.
   "CREATE TABLE IF NOT EXISTS environment_viewports (environment TEXT PRIMARY KEY, width INTEGER NOT NULL, height INTEGER NOT NULL) WITHOUT ROWID",
   // Only a story that declared a size other than its environment's, so nearly every batch has no rows here.
-  "CREATE TABLE IF NOT EXISTS story_viewports (batch_id TEXT NOT NULL, story TEXT NOT NULL, width INTEGER NOT NULL, height INTEGER NOT NULL, PRIMARY KEY (batch_id, story)) WITHOUT ROWID",
+  "CREATE TABLE IF NOT EXISTS story_viewports (batch_id TEXT NOT NULL REFERENCES render_batches(id), story TEXT NOT NULL, width INTEGER NOT NULL, height INTEGER NOT NULL, PRIMARY KEY (batch_id, story)) WITHOUT ROWID",
 ];
 
 

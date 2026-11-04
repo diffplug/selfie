@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { Blobs, initStoreSchema, BuiltStorybooks, type BlobStorage } from "../src/core/index.ts";
+import { Blobs, initStoreSchema, BuiltStorybooks, RenderBatches, type BlobStorage } from "../src/core/index.ts";
 import { createTempStore } from "./support/temp-store.ts";
 
 const BUILD = "a".repeat(64);
@@ -10,9 +10,16 @@ describe("BuiltStorybooks", () => {
   let temp: Awaited<ReturnType<typeof createTempStore>>;
   let builds: BuiltStorybooks;
 
+  let batch: string;
+  let otherBatch: string;
+
   beforeEach(async () => {
     temp = await createTempStore();
     builds = new BuiltStorybooks({ sql: temp.sql, blob: temp.blob });
+    const batches = new RenderBatches({ sql: temp.sql });
+    const begin = async () => (await batches.beginBatch({ gitSha: "c".repeat(40), environment: "env", scale: 1, dirty: false })).id;
+    batch = await begin();
+    otherBatch = await begin();
   });
   afterEach(() => temp.destroy());
 
@@ -66,11 +73,11 @@ describe("BuiltStorybooks", () => {
   });
 
   it("knows a batch's build only once it's kept", async () => {
-    expect(await builds.keptStorybookOfBatch("batch")).toBeNull();
-    await builds.recordBatchStorybook("batch", BUILD);
-    expect(await builds.keptStorybookOfBatch("batch")).toBeNull();
+    expect(await builds.keptStorybookOfBatch(batch)).toBeNull();
+    await builds.recordBatchStorybook(batch, BUILD);
+    expect(await builds.keptStorybookOfBatch(batch)).toBeNull();
     await keep(BUILD, { "index.html": "page" });
-    expect(await builds.keptStorybookOfBatch("batch")).toBe(BUILD);
+    expect(await builds.keptStorybookOfBatch(batch)).toBe(BUILD);
   });
 
   it("reads files of more builds than it holds file lists for", async () => {
@@ -95,19 +102,24 @@ describe("BuiltStorybooks", () => {
   });
 
   it("knows which of a batch's stories rendered at a size of their own", async () => {
-    expect(await builds.storyViewportsOf("batch")).toEqual({});
-    await builds.recordStoryViewports("batch", {});
-    await builds.recordStoryViewports("batch", { "a--phone": { width: 414, height: 896 }, "a--tablet": { width: 834, height: 1112 } });
-    await builds.recordStoryViewports("other", { "a--phone": { width: 320, height: 568 } });
-    await builds.recordStoryViewports("batch", { "a--phone": { width: 1, height: 1 } });
-    expect(await builds.storyViewportsOf("batch")).toEqual({ "a--phone": { width: 414, height: 896 }, "a--tablet": { width: 834, height: 1112 } });
-    expect(await builds.storyViewportsOf("other")).toEqual({ "a--phone": { width: 320, height: 568 } });
+    expect(await builds.storyViewportsOf(batch)).toEqual({});
+    await builds.recordStoryViewports(batch, {});
+    await builds.recordStoryViewports(batch, { "a--phone": { width: 414, height: 896 }, "a--tablet": { width: 834, height: 1112 } });
+    await builds.recordStoryViewports(otherBatch, { "a--phone": { width: 320, height: 568 } });
+    await builds.recordStoryViewports(batch, { "a--phone": { width: 1, height: 1 } });
+    expect(await builds.storyViewportsOf(batch)).toEqual({ "a--phone": { width: 414, height: 896 }, "a--tablet": { width: 834, height: 1112 } });
+    expect(await builds.storyViewportsOf(otherBatch)).toEqual({ "a--phone": { width: 320, height: 568 } });
   });
 
   it("keeps every story's size, past what fits in a statement", async () => {
     const viewports = Object.fromEntries(Array.from({ length: 100 }, (_, i) => [`story--${i}`, { width: 100 + i, height: 200 + i }]));
-    await builds.recordStoryViewports("batch", viewports);
-    expect(await builds.storyViewportsOf("batch")).toEqual(viewports);
+    await builds.recordStoryViewports(batch, viewports);
+    expect(await builds.storyViewportsOf(batch)).toEqual(viewports);
+  });
+
+  it("takes nothing for a batch this store doesn't hold", async () => {
+    await expect(builds.recordBatchStorybook("00000000-0000-4000-8000-000000000009", BUILD)).rejects.toThrow(/FOREIGN KEY/);
+    await expect(builds.recordStoryViewports("00000000-0000-4000-8000-000000000009", { a: { width: 1, height: 1 } })).rejects.toThrow(/FOREIGN KEY/);
   });
 
   it("is safe to create twice", async () => {
