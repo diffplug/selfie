@@ -18,7 +18,9 @@ import { useDrawnBox } from "./useDrawnBox.ts";
 /** `"size"` is the size the page really was. A number is how many device pixels show one image pixel. */
 const ZOOMS = ["size", 1, 2, 4, 8] as const;
 type Zoom = (typeof ZOOMS)[number];
-const zoomWords = (zoom: Zoom) => (zoom === "size" ? "Actual size" : `${zoom}×`);
+/** With one image there's nothing to set beside it, so fitting its width is just another zoom. */
+type ZoomOption = Zoom | "fit";
+const zoomWords = (zoom: ZoomOption) => (zoom === "fit" ? "Fit" : zoom === "size" ? "Actual size" : `${zoom}×`);
 type Layer = "current" | "golden" | "diff" | "noted";
 
 export const LAYER_WORDS: Readonly<Record<Layer, string>> = { current: "Current", golden: "Golden", diff: "Diff", noted: "When noted" };
@@ -36,11 +38,15 @@ interface Source {
 function sourcesOf({ imageHash, goldenHash }: RenderRow, hasDiffImage: boolean, noted: string | null, compared: string | null): readonly Source[] {
   const sources: Source[] = [];
   if (noted !== null && noted !== imageHash && noted !== goldenHash) sources.push({ name: "noted", src: imageUrl(noted), hash: noted });
-  if (goldenHash !== null) sources.push({ name: "golden", src: imageUrl(goldenHash), hash: goldenHash });
+  // The same image twice is still one image to look at, as an unchanged story's are.
+  if (goldenHash !== null && goldenHash !== imageHash) sources.push({ name: "golden", src: imageUrl(goldenHash), hash: goldenHash });
   if (imageHash !== null) sources.push({ name: "current", src: imageUrl(imageHash), hash: imageHash });
   if (hasDiffImage && imageHash !== null && compared !== null) sources.push({ name: "diff", src: diffImageUrl(imageHash, compared), hash: imageHash });
   return sources;
 }
+
+/** How many images a story has to look at, and so whether there's anything to compare. */
+export const imageCount = (row: RenderRow, noted: string | null) => sourcesOf(row, false, noted, null).length;
 
 /**
  * Where a hunk is in whichever image is showing, where the diff is drawn on the current one. A
@@ -109,12 +115,30 @@ function NoteBoxes({ notes, drawn, size }: { notes: readonly Note[]; drawn: Boun
   );
 }
 
-function Pane({ layer, src, story, onOpen, onLoad, children }: { layer: Layer; src: string; story: string; onOpen: () => void; onLoad: ReactEventHandler<HTMLImageElement>; children: ReactNode }) {
+function Pane({
+  layer,
+  src,
+  story,
+  captioned,
+  openLabel,
+  onOpen,
+  onLoad,
+  children,
+}: {
+  layer: Layer;
+  src: string;
+  story: string;
+  captioned: boolean;
+  openLabel: string;
+  onOpen: () => void;
+  onLoad: ReactEventHandler<HTMLImageElement>;
+  children: ReactNode;
+}) {
   return (
     <figure className="selfie-pane">
-      <figcaption>{LAYER_WORDS[layer]}</figcaption>
+      {captioned && <figcaption>{LAYER_WORDS[layer]}</figcaption>}
       <div className="selfie-pane-image">
-        <button type="button" className="selfie-pane-button" onClick={onOpen} aria-label={`Show the ${layer} image stacked`}>
+        <button type="button" className="selfie-pane-button" onClick={onOpen} aria-label={openLabel}>
           <img src={src} alt={`${LAYER_WORDS[layer]} image of ${story}`} loading="lazy" decoding="async" onLoad={onLoad} />
         </button>
         {children}
@@ -143,7 +167,10 @@ export function ImageCompare({ row, diff, scale, groups, selection, batchId, fee
   const notedImage = newestNotedImage(allNotes, story);
   const compared = comparedImage(row, notedImage);
   const sources = sourcesOf(row, diff !== null, notedImage, compared?.hash ?? null);
-  const canFlip = compared !== null;
+  const oneImage = sources.length === 1;
+  const canFlip = sources.length > 1 && compared !== null;
+  // A failed story's one image is never its render, so it has to say which it is.
+  const captioned = !oneImage || row.state === "failed";
   // Hunks are between the current image and what it's compared with, whichever image that is.
   const hunkLayer = (on: Layer): Layer => (on === "noted" && compared?.layer === "noted" ? "golden" : on);
   const box = diff?.boundingBox ?? null;
@@ -155,6 +182,12 @@ export function ImageCompare({ row, diff, scale, groups, selection, batchId, fee
   const shown = sources.find(({ name }) => name === wantedLayer) ?? sources.find(({ name }) => name === "current") ?? sources[0];
   const layer = shown?.name ?? "current";
   const [zoom, setZoom] = useState<Zoom>("size");
+  const zoomOptions: readonly ZoomOption[] = oneImage ? ["fit", ...ZOOMS] : ZOOMS;
+  const zoomShown: ZoomOption = mode === "side" ? "fit" : zoom;
+  const pickZoom = (option: ZoomOption) => {
+    setMode(option === "fit" ? "side" : "flip");
+    setZoom(option === "fit" ? "size" : option);
+  };
   const deviceRatio = useDevicePixelRatio();
   const devicePixels = zoom === "size" ? deviceRatio / scale : zoom;
   // CSS pixels per image pixel, which everything drawn over or scrolled to is measured in.
@@ -262,10 +295,13 @@ export function ImageCompare({ row, diff, scale, groups, selection, batchId, fee
   const hasNotedLayer = sources.some(({ name }) => name === "noted");
 
   useHotkeys({
-    s: () => setMode("side"),
+    s: () => {
+      if (canFlip) setMode("side");
+    },
     f: () => {
+      if (!canFlip) return;
       if (mode === "side") setMode("flip");
-      else if (compared !== null) setLayer(layer === "current" ? compared.layer : "current");
+      else setLayer(layer === "current" ? compared!.layer : "current");
     },
     d: () => {
       if (!hasDiffLayer) return;
@@ -273,8 +309,8 @@ export function ImageCompare({ row, diff, scale, groups, selection, batchId, fee
       setLayer("diff");
     },
     z: () => {
-      setMode("flip");
-      setZoom((value) => ZOOMS[(ZOOMS.indexOf(value) + 1) % ZOOMS.length]!);
+      if (sources.length === 0) return;
+      pickZoom(zoomOptions[(zoomOptions.indexOf(oneImage ? zoomShown : zoom) + 1) % zoomOptions.length]!);
     },
     c: center,
     m: () => writing.current?.focus(),
@@ -313,13 +349,16 @@ export function ImageCompare({ row, diff, scale, groups, selection, batchId, fee
         onAnswer={(id, text) => feedback.answer(id, text, batchId)}
         onResolve={(id) => void feedback.resolve(id)}
         writing={writing}
+        drawsOn={oneImage ? "a zoomed image" : "a stacked image"}
       />
       <Stack direction="horizontal" wrap="wrap" align="end" gap="normal">
-        <SegmentedControl aria-label="How to compare the images" onChange={(index) => setMode(index === 0 ? "side" : "flip")}>
-          <SegmentedControl.Button selected={mode === "side"}>Side by side</SegmentedControl.Button>
-          <SegmentedControl.Button selected={mode === "flip"}>Stacked</SegmentedControl.Button>
-        </SegmentedControl>
-        {mode === "flip" && (
+        {!oneImage && (
+          <SegmentedControl aria-label="How to compare the images" onChange={(index) => setMode(index === 0 ? "side" : "flip")}>
+            <SegmentedControl.Button selected={mode === "side"}>Side by side</SegmentedControl.Button>
+            <SegmentedControl.Button selected={mode === "flip"}>Stacked</SegmentedControl.Button>
+          </SegmentedControl>
+        )}
+        {(mode === "flip" || oneImage) && (
           <>
             {sources.length > 1 && (
               <SegmentedControl aria-label="Which image to show" onChange={(index) => setLayer(sources[index]!.name)}>
@@ -330,9 +369,9 @@ export function ImageCompare({ row, diff, scale, groups, selection, batchId, fee
                 ))}
               </SegmentedControl>
             )}
-            <SegmentedControl aria-label="Zoom" onChange={(index) => setZoom(ZOOMS[index]!)}>
-              {ZOOMS.map((value) => (
-                <SegmentedControl.Button key={value} selected={zoom === value}>
+            <SegmentedControl aria-label="Zoom" onChange={(index) => pickZoom(zoomOptions[index]!)}>
+              {zoomOptions.map((value) => (
+                <SegmentedControl.Button key={value} selected={zoomShown === value}>
                   {zoomWords(value)}
                 </SegmentedControl.Button>
               ))}
@@ -348,7 +387,7 @@ export function ImageCompare({ row, diff, scale, groups, selection, batchId, fee
       <Text as="p" className="selfie-muted selfie-small">
         {mode === "flip" ? (
           <>
-            Showing <strong>{LAYER_WORDS[layer].toLowerCase()}</strong>
+            Showing {captioned ? <strong>{LAYER_WORDS[layer].toLowerCase()}</strong> : "the image"}
             {shownSize === undefined ? "" : `, ${shownSize.width}×${shownSize.height}`} rendered at {scale}×,{" "}
             {zoom === "size" ? "at its actual size." : `with one image pixel ${zoom} device ${zoom === 1 ? "pixel" : "pixels"} wide.`}{" "}
             {canFlip && (
@@ -366,7 +405,17 @@ export function ImageCompare({ row, diff, scale, groups, selection, batchId, fee
                 <Keys keys="w" /> shows the image when noted.{" "}
               </>
             )}
-            <Keys keys="z" /> zooms. <Keys keys="s" /> goes back.
+            <Keys keys="z" /> zooms.
+            {canFlip && (
+              <>
+                {" "}
+                <Keys keys="s" /> goes back.
+              </>
+            )}
+          </>
+        ) : oneImage ? (
+          <>
+            Scaled to fit. Pick the image, or press <Keys keys="z" />, to zoom.
           </>
         ) : (
           <>
@@ -383,9 +432,15 @@ export function ImageCompare({ row, diff, scale, groups, selection, batchId, fee
               layer={name}
               src={src}
               story={story}
+              captioned={captioned}
+              openLabel={oneImage ? "Show the image at its actual size" : `Show the ${name} image stacked`}
               onOpen={() => {
-                setLayer(name);
-                setMode("flip");
+                if (oneImage) {
+                  pickZoom("size");
+                } else {
+                  setLayer(name);
+                  setMode("flip");
+                }
               }}
               onLoad={rememberSize(src)}
             >

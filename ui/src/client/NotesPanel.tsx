@@ -105,6 +105,8 @@ interface NotesPanelProps {
   readonly currentImage: string | null;
   /** What a note written now would be about, in words. */
   readonly target: string;
+  /** Which image dragging draws a box on, in words. */
+  readonly drawsOn: string;
   /** True if the note was saved. */
   readonly onAdd: (text: string) => Promise<boolean>;
   readonly onRemove: (id: number) => void;
@@ -113,7 +115,7 @@ interface NotesPanelProps {
   readonly writing: RefObject<HTMLTextAreaElement | null>;
 }
 
-export function NotesPanel({ notes, target, onAdd, writing, ...actions }: NotesPanelProps) {
+export function NotesPanel({ notes, target, drawsOn, onAdd, writing, ...actions }: NotesPanelProps) {
   return (
     <section className="selfie-notes" aria-label="Notes">
       {notes.length > 0 && (
@@ -130,7 +132,7 @@ export function NotesPanel({ notes, target, onAdd, writing, ...actions }: NotesP
         onSave={onAdd}
         label={
           <>
-            Note for your agent, <strong>{target}</strong>. <Keys keys="m" /> starts one, and dragging on a stacked image draws a box.
+            Note for your agent, <strong>{target}</strong>. <Keys keys="m" /> starts one, and dragging on {drawsOn} draws a box.
           </>
         }
       />

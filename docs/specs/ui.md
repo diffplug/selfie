@@ -138,7 +138,8 @@ Source of truth: `ui/src/client/`.
 
 **One render** shows its state and decision, pixel stats, and images.
 
-- **Must always offer the images side by side and stacked.** Stacked, switching layers costs no scroll, and the zoom starts at actual size: the image's width divided by `batch.scale`, in CSS pixels, so it's the size the page really was on every display.
+- **Must offer the images side by side and stacked whenever a story has more than one to look at**, as an added story does with a note on an older image. Stacked, switching layers costs no scroll, and the zoom starts at actual size: the image's width divided by `batch.scale`, in CSS pixels, so it's the size the page really was on every display.
+- **Must show a story's only image alone, under its state, and offer only zoom** (rationale), which includes an unchanged story's, whose render and reference are one image: nothing side by side or stacked, no choice of layer, and no word of them. Fit, which is its width as side by side, comes first among the zooms. It has no caption unless the story failed, since then it isn't that story's render.
 - **Must fit an image's width side by side, and scroll all of them as one**, so a tall page's images stay level.
 - **Must also offer zoom at 1×, 2×, 4×, and 8×, where 1× is one image pixel to one device pixel** (rationale), following the display's `devicePixelRatio`.
 - **Must draw nearest-neighbor only at a whole number of device pixels per image pixel, and smooth anything else**, as with a 2× image on a 1× display or a 1.5× image on a 2× display at actual size, since uneven blocks would look like changes.
@@ -203,6 +204,7 @@ Source of truth: `useHotkeys` in `ui/src/client/hooks.ts`.
 | `?` | A render | Lists these |
 
 - **Must show each key on screen beside what it does.**
+- **Must leave a key out of `?`, and have it do nothing, when there's nothing for it to act on:** with one image `s`, `f`, `d`, `c`, `w`, `n`, `p`, and `x`, and with none `z` and `m` too. With one image, `z` starts from fit.
 - **Must ignore a key while someone is typing, a dialog is open, or a modifier is held, and ignore a held key's repeats**, so holding `a` can't approve one image after another unseen (rationale). A focused checkbox isn't typing.
 
 ## Stories

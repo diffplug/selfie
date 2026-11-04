@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useLayoutEffect } from "react";
 import type { DecisionKind, DecisionTarget, FeedbackView, StoriesView, NewNote, BatchView, SendVia, RenderProgress, RenderRow } from "../shared/api.ts";
 import { deleteNote, fetchFeedback, fetchRenderProgress, fetchStories, fetchBatch, fetchUnchanged, postAnswer, postRender, postDecision, postNote, postResolve, postSendNotes, RequestError } from "./api.ts";
 import { reuseRows } from "./filter.ts";
@@ -99,7 +99,8 @@ export function useBatch(batchId: string): BatchState {
 export function useHotkeys(keys: Readonly<Record<string, () => void>>): void {
   const current = useRef(keys);
   current.current = keys;
-  useEffect(() => {
+  // As the page commits, so that a key pressed as soon as it's up isn't lost.
+  useLayoutEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       // Never a held key, which would approve one image after another with nobody looking.
       if (event.metaKey || event.ctrlKey || event.altKey || event.defaultPrevented || event.repeat) return;

@@ -36,7 +36,7 @@ A note is where something is. Its messages are the conversation about it.
 | `sent` | Whether it's the agent's yet |
 
 - **Must let a note be on any story with any state**, not only on one that changed, since most feedback is that something looks wrong (rationale).
-- **Must take a note's box from what someone drew on a stacked image, or else the box around the hunks they selected, or else all of the image**, on whichever image is showing, where the diff image counts as the current one.
+- **Must take a note's box from what someone drew on a stacked image, or a zoomed one where it's the story's only image, or else the box around the hunks they selected, or else all of the image**, on whichever image is showing, where the diff image counts as the current one.
 - **Must draw a note's box on the image it's about, and on no other**, since a box is only meaningful on the pixels it was drawn on.
 - **Must never let a note approve, reject, or block anything.** What blocks doesn't know notes exist (rationale).
 - **Must keep whether something's been sent on the message, and not on the note**, so an answer to a note that's already been read can be a draft (rationale).
