@@ -29,4 +29,5 @@ runs:
       env:
         SELFIE_REMOTE: ${{ inputs.remote }}
         SELFIE_TOKEN: ${{ inputs.upload-token }}
-      run: node "$SELFIE_ROOT/cli/src/main.ts" push
+      # Every step of a push is safe to send again, so one that dies is finished by running it again.
+      run: node "$SELFIE_ROOT/cli/src/main.ts" push || (sleep 10 && node "$SELFIE_ROOT/cli/src/main.ts" push)
