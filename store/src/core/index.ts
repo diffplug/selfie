@@ -14,6 +14,7 @@ export {
   isDecidable,
   isGitSha,
   isBatchId,
+  compareWithApprovals,
   newestRenders,
   RenderBatches,
   BatchError,
@@ -32,6 +33,7 @@ export {
   type BatchErrorCode,
   type RenderBatchesOptions,
   type RenderState,
+  type PlacedDecision,
   type StoryRender,
   type StoryFilter,
 } from "./render-batches.ts";
