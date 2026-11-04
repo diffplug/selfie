@@ -22,6 +22,8 @@ With the flag, 7 full batches of all 541 stories, across the settle times, quiet
 
 **Settle time outside the ID.** With a project's timers frozen, settle times from 0 to 500 ms gave identical PNGs on all 541 stories, so tuning it shouldn't restart goldens. A story that does depend on it reports as changed, like any other project input.
 
+**A declared viewport outside the ID.** It's in a story, as its code is, so it reaches the image the same way: that story reads as changed, a person looks, and every other story keeps its goldens. The order of the waits didn't change either, since a loaded story always comes before the render phase, so `waitSequence` stayed where it was.
+
 ## Render
 
 **The whole page.** All 541 of dormouse's stories, in the default container, each story rendered twice, on one Mac, 2026-11. Encoding uses `sharp` lossless WebP at effort 4, outside the container.
@@ -90,6 +92,16 @@ The reverse was left out too, for the same complexity: retrying a story that doe
 **An unread response.** With the fixture's `basic--serving` story not reading its `fetch` bodies, its requests stayed in flight in the container, under both `networkidle` and the request count. A plain Playwright script against `route.fulfill` or a real server didn't reproduce it, and the cause wasn't found. The wait is soft, so such a story is rendered late with a `timeout` error. No dormouse story did this.
 
 **Play failures.** Storybook 11's bundle sets `throwPlayFunctionExceptions: false`. On a play failure it then runs the `errored` phase, logs the error, and continues to `completed`, so an `errored` check depends on when it polls. 2 of dormouse's 541 stories do this, and both report `play` errors.
+
+## A story's viewport
+
+**A new load, not a resize.** Polling every 1 ms on Dormouse's Storybook 11.0.0-alpha.8, 2026-11, the loaded story first appeared with the phase already `rendering`, so a resize can't get ahead of the mount, and would land at a different point in it from one render to the next. Resizing once the story finished would be steady, but its play function would have run at the wrong size, and whatever read the window as it mounted would keep what it read. It costs one more page load, only for a story that declares a size. A new context as well as a new page, since the first load can be stopped anywhere in writing to storage.
+
+**The first load's errors go.** They're about a window this story's image wasn't taken in, and a story that throws at the wrong size is reporting nothing about the right one.
+
+**A warning as well as an error.** A batch keeps only a story's `play` errors, so a `viewport` error alone would end with the manifest, and nobody reviewing would learn their phone story was rendered at desktop width. A warning also stops the render being reused (`docs/specs/cli.md` → Recording only if necessary), which is what keeps the warning coming: reuse wouldn't repeat it.
+
+**Not the manager's fallback.** With options and an unknown name, the manager shows the first option, which reads as the story having asked for that. A wrong image that looks deliberate is the thing to avoid, and the environment's size is what the story would get with no declaration at all.
 
 ## Freezing timers
 

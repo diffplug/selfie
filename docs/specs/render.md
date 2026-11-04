@@ -15,7 +15,7 @@ A `RenderEnvironment` is a typed object:
 |---|---|
 | `runner` | `{ kind: "container", image: "mcr.microsoft.com/playwright@sha256:a0f4…7bd5717", platform: "linux/arm64" }`, or `{ kind: "native", os, osRelease, arch }` |
 | `browserFlags` | `--disable-lcd-text`, `--font-render-hinting=none`, `--disable-partial-raster` (rationale) |
-| `viewport` | 1200×900 |
+| `viewport` | 1200×900, for a story that declares no viewport of its own |
 | `scale` | 1 |
 
 - **Must refuse a container image that isn't exactly `name@sha256:<digest>`**, including one that also has a tag.
@@ -23,6 +23,7 @@ A `RenderEnvironment` is a typed object:
 - **Must hash the image digest and platform, or the native OS, OS release, and architecture; the browser flags; viewport; scale; `recipe`; and the Playwright version.**
 - **Never hash an image's registry, the order of flags, or the order of properties**, since they can't change pixels.
 - **Never hash `settleMs` or `initScript`.** They are project input like story code, so changing them reports changed stories rather than starting new goldens. The manifest records both (rationale).
+- **Never hash a story's declared viewport.** It's project input like story code, so declaring one reports that story changed rather than starting new goldens ([A story's viewport](#a-storys-viewport)) (rationale).
 - **Must refuse a browser flag given twice**, since the ID sorts flags and Chromium's last duplicate wins.
 - **Must take everything else that can decide pixels from the environment's `recipe`**, which the worker reads directly, and which starts from `DEFAULT_RECIPE`:
 
@@ -55,7 +56,7 @@ Source of truth: `render/src/render.ts`, `render/src/runners.ts`, `render/src/wo
 - **Must check the runner before clearing any output:** a native environment against this machine, and for a container, Docker and the image on the declared platform, pulling it once if absent. That check compares the OS and architecture `docker image inspect` reports with the declared platform (rationale), so a digest for another platform is refused, and so is a multi-platform digest unless the declared platform is the host's. **Must use a single-platform digest for any other platform.**
 - **Must run a container with no network, no capabilities, a read-only root, read-only mounts except the output directory, a non-root user, and only `HOME` in its environment.** Never pass credentials or the host's environment into it. It batches by digest with `--pull=never`, so it works offline once pulled and can't use a different image.
 - **Must give each story a fresh browser context.**
-- **Must wait, in order, for:** the page load, Storybook's render phase, no request in flight for the network quiet period; with `loadImages`, every image made eager and synchronous, the network quiet again, and every image decoded; `document.fonts.ready`, `settleMs` (default 100 ms), and two animation frames. Then it screenshots the whole page, with `animations: "disabled"`, so an image is at least the viewport's size and may be taller or wider (rationale). Content in an inner scroller, or a layout fixed to the viewport's height, shows only what the viewport does.
+- **Must wait, in order, for:** the page load, with the story at its viewport ([A story's viewport](#a-storys-viewport)), Storybook's render phase, no request in flight for the network quiet period; with `loadImages`, every image made eager and synchronous, the network quiet again, and every image decoded; `document.fonts.ready`, `settleMs` (default 100 ms), and two animation frames. Then it screenshots the whole page, with `animations: "disabled"`, so an image is at least the story's viewport's size and may be taller or wider (rationale). Content in an inner scroller, or a layout fixed to the viewport's height, shows only what the viewport does.
 - **Must not treat Storybook's `errored` phase as final.** A play failure passes through it on the way to `completed`, so the error display, `aborted`, and the timeout are what fail a story (rationale).
 - **Must bound every wait.** `storyTimeoutMs` (default 60 s) bounds a story from context to screenshot. The network wait alone is soft and independent of it: it records an error after 15 s and renders anyway. The worker exits on its own at a deadline derived from the story count, so a container outlives no host process.
 - **Must treat a story's failure as data.** A thrown render, Storybook's error display, or a timeout marks that story `failed` and the batch continues. A browser crash relaunches the browser for later stories. A worker crash marks the unreported stories `failed`.
@@ -63,6 +64,18 @@ Source of truth: `render/src/render.ts`, `render/src/runners.ts`, `render/src/wo
 - **Must clear only `manifest.json` and `stories/` in the output directory.**
 - **Must remove every container it starts**, on success, timeout, and abort. Each is `--rm` with a unique name and the label `selfie-render`.
 - **May render at most 6 stories at once by default**, or fewer if the machine has fewer CPUs. Concurrency is not part of the environment (rationale).
+
+## A story's viewport
+
+Source of truth: `render/src/worker/viewport.ts`, `declaredViewport` and `renderStory` in `render/src/worker/worker.ts`; tests in `render/test/viewport.test.ts`, `render/test/render.container.test.ts`.
+
+A story lays out at the viewport it declares, which Storybook's manager would apply by resizing its iframe. Selfie opens `iframe.html` itself, so the worker does the manager's part. `index.json` doesn't say what a story declares.
+
+- **Must read a story's declaration from the running story, as soon as Storybook has loaded it:** `globals.viewport` from `currentRender.storyContext()`, which holds what the story, its component, and the project's `initialGlobals` say, as `{ value, isRotated }` or a bare name. With no value there, `parameters.viewport.defaultViewport` and `defaultOrientation`, as an older Storybook has them.
+- **Must find a size as Storybook's manager does, in this order:** a value of the toolbar's form, like `390-844` or `390px-844px`, each side at least 40; then a name in `parameters.viewport.options`, or else `viewports`, which Storybook has already merged from the project and the story; and with neither of those, Storybook's own `mobile1`, `mobile2`, `tablet`, and `desktop`. `isRotated` swaps the sides.
+- **Must render a story that declares a size other than the environment's in a new context of that size, from a new page load**, discarding the first load and what it reported, so the story mounts and plays at that size, and nothing it stored comes along (rationale). A story that doesn't is rendered by the load it began with.
+- **Must keep the environment's scale and full-page screenshot at a declared size**, so a tall story still grows past it.
+- **Must render at the environment's size, and report a value it can't turn into whole pixels**, such as a percentage or an unknown name, as that story's `viewport` error and a manifest warning naming the story, rather than do as the manager does and fall back to its first option. It changes no status (rationale).
 
 ## Freezing timers
 
@@ -87,13 +100,14 @@ Source of truth: `render/src/manifest.ts`; tests in `render/test/manifest.test.t
 | `runtime` | What ran: browser, Playwright, Node, OS, and architecture. Null if no story needed a browser |
 | `startedAt`, `durationMs`, `warnings` | About the batch |
 | `totals` | Counts of `stories` and `failed` |
-| `stories[]` | `id`, `title`, `name`, `status`, `file`, `width`, `height`, `pngSha256`, `errors`, `durationMs` |
+| `stories[]` | `id`, `title`, `name`, `status`, `file`, `width`, `height`, `viewport`, `pngSha256`, `errors`, `durationMs` |
 
 - **Must write file paths relative to the manifest.** `file` is null on a failed story.
+- **Must say in a story's `viewport` the window it laid out in, in CSS pixels:** what it declared, or else the environment's. It's null only if the worker never reported that story. `width` and `height` are its image's, which full-page and the scale make different.
 - **Must name a story's file `encodeURIComponent(id) + ".png"`**, since an ID comes from the built Storybook and may hold `/`.
 - **`pngSha256` is not the image hash**, which `docs/specs/store.md` → Image identity defines over decoded pixels.
 - **Must report a play function failure under the source `play`, from Storybook's `playFunctionThrewException` channel event, and keep `status: "ok"`**, since the story still rendered and has an image. The console error it also logs stays under `console`. `selfie review` lists the story as needing attention (`docs/specs/cli.md` → What blocks).
-- **May report other `errors` on an `ok` story:** console errors, page errors, and failed requests that didn't stop the render. Each has a `source`: `render`, `timeout`, `play`, `page`, `console`, `request`, or `worker`. A story keeps at most 20, each cut to 400 characters.
+- **May report other `errors` on an `ok` story:** console errors, page errors, and failed requests that didn't stop the render. Each has a `source`: `render`, `timeout`, `play`, `page`, `console`, `request`, `viewport`, or `worker`. A story keeps at most 20, each cut to 400 characters.
 
 ## Render identity
 
@@ -130,5 +144,5 @@ Source of truth: `render/src/index.ts`.
 
 ### Possible later work
 
-- **Named environments.** A project holds one environment, so one review can't render both `desktop` at 1200×900 1× and `phone` at 390×844 2×, which a phone layout would want. Each story would then be rendered and approved once per environment. Batches and render names already carry the environment, so this adds to the config and to `selfie review`, and leaves the store alone.
+- **Named environments.** A project holds one environment, so one review can't render both `desktop` at 1200×900 1× and `phone` at 390×844 2×, which a phone layout would want, past what a story's own viewport does at the project's one scale. Each story would then be rendered and approved once per environment. Batches and render names already carry the environment, so this adds to the config and to `selfie review`, and leaves the store alone.
 - **Other images.** Only arm64 has a default. An x86-64 project today names its own digest and platform, and gets a different ID.
