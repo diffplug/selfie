@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, userEvent, within } from "storybook/test";
-import { note, OTHER_RUN_ID, replied, rows } from "./stories/fixtures.ts";
+import { note, OTHER_BATCH_ID, replied, rows } from "./stories/fixtures.ts";
 import { HASHES } from "./stories/images.generated.ts";
 import { BUTTON, SEVERAL, StoryPage, press, stackedImagesLoaded } from "./stories/storyPage.tsx";
 
@@ -8,8 +8,8 @@ const meta = { title: "Pages/Story/Notes", component: StoryPage } satisfies Meta
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** The agent's change to a new story, which has no golden: what's compared is the image the note is on. */
-const SINCE_NOTED = { ...BUTTON, state: "new" as const, goldenHash: null, pixelDiff: null };
+/** The agent's change to an added story, which has no golden: what's compared is the image the note is on. */
+const SINCE_NOTED = { ...BUTTON, state: "added" as const, goldenHash: null, pixelDiff: null };
 export const NewStoryComparedWithItsNote: Story = {
   args: { row: SINCE_NOTED, notes: [note(1, { story: BUTTON.story, imageHash: BUTTON.goldenHash })] },
 };
@@ -38,11 +38,11 @@ export const WritingANote: Story = {
     await userEvent.keyboard("This label is too quiet");
   },
 };
-export const WritingANoteOnSelectedRegions: Story = {
+export const WritingANoteOnSelectedHunks: Story = {
   args: { row: SEVERAL },
   play: async ({ canvasElement }) => {
     await press("x", "m")();
-    await expect(within(canvasElement).getByText(/on 1 selected region of the current image/)).toBeVisible();
+    await expect(within(canvasElement).getByText(/on 1 selected hunk of the current image/)).toBeVisible();
   },
 };
 export const DrawingABox: Story = {
@@ -74,13 +74,13 @@ export const WhenNotedLayer: Story = {
     await expect(canvasElement.querySelector(".selfie-note-box")).not.toBeNull();
   },
 };
-export const SelectedRegionsMeanNothingOnTheImageWhenNoted: Story = {
+export const SelectedHunksMeanNothingOnTheImageWhenNoted: Story = {
   args: { row: FIXED, notes: [replied(ON_THE_OLD_IMAGE, "Made it green, in `Button.tsx`.")] },
   play: async ({ canvasElement }) => {
     await press("x", "w")();
     await stackedImagesLoaded(canvasElement);
     await expect(within(canvasElement).getByText(/on all of the image when noted/)).toBeVisible();
-    await expect(canvasElement.querySelector(".selfie-stack .selfie-region")).toBeNull();
+    await expect(canvasElement.querySelector(".selfie-stack .selfie-hunk")).toBeNull();
   },
 };
 export const AgentClaimedAFixAndNothingMoved: Story = {
@@ -89,13 +89,13 @@ export const AgentClaimedAFixAndNothingMoved: Story = {
     await expect(within(canvasElement).getByText(/identical to the one the note was written on/)).toBeVisible();
   },
 };
-export const AgentRepliedFromANewerRun: Story = {
+export const AgentRepliedFromANewerBatch: Story = {
   args: {
     row: FIXED,
     notes: [
       (() => {
         const answered = replied(note(25, { story: FIXED.story, imageHash: FIXED.imageHash, state: "sent", text: "Make this bigger." }), "Made it bigger.");
-        return { ...answered, messages: answered.messages.map((message) => (message.sender === "agent" ? { ...message, runId: OTHER_RUN_ID } : message)) };
+        return { ...answered, messages: answered.messages.map((message) => (message.sender === "agent" ? { ...message, batchId: OTHER_BATCH_ID } : message)) };
       })(),
     ],
   },
@@ -110,7 +110,7 @@ export const AnswerNotSentYet: Story = {
     notes: [
       (() => {
         const answered = replied(note(24, { story: FIXED.story, imageHash: FIXED.imageHash, state: "sent", text: "Make this bigger." }), "How much bigger?");
-        return { ...answered, messages: [...answered.messages, { id: 9024, sender: "person" as const, author: "ned@example.com", text: "About double.", runId: null, at: 2, sent: false }] };
+        return { ...answered, messages: [...answered.messages, { id: 9024, sender: "person" as const, author: "ned@example.com", text: "About double.", batchId: null, at: 2, sent: false }] };
       })(),
     ],
   },

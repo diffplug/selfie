@@ -1,9 +1,9 @@
-import type { ComparedSnapshot } from "./api.ts";
+import type { ComparedRender } from "./api.ts";
 
 // A story that's gone and a new one with the very same image read as one story renamed. Only for
 // saying so: to the store they're still one removed and one new, which accepting treats as ever.
 
-type ComparedRow = Pick<ComparedSnapshot, "story" | "state" | "imageHash" | "goldenHash">;
+type ComparedRow = Pick<ComparedRender, "story" | "state" | "imageHash" | "goldenHash">;
 
 const wordsOf = (story: string) => new Set(story.split(/-+/));
 
@@ -13,14 +13,14 @@ function closeness(a: string, b: string): number {
   return [...wordsOf(a)].filter((word) => theirs.has(word)).length;
 }
 
-/** Each new story that took over from a removed one, with what it was, one to one. */
+/** Each added story that took over from a removed one, with what it was, one to one. */
 export function findRenames(rows: readonly ComparedRow[]): ReadonlyMap<string, string> {
   const removedByImage = new Map<string, string[]>();
   for (const { state, story, goldenHash } of rows) {
     if (state === "removed" && goldenHash !== null) removedByImage.set(goldenHash, [...(removedByImage.get(goldenHash) ?? []), story]);
   }
   const candidates = rows.flatMap(({ state, story, imageHash }) =>
-    state !== "new" || imageHash === null ? [] : (removedByImage.get(imageHash) ?? []).map((from) => ({ to: story, from, closeness: closeness(story, from) })),
+    state !== "added" || imageHash === null ? [] : (removedByImage.get(imageHash) ?? []).map((from) => ({ to: story, from, closeness: closeness(story, from) })),
   );
   // Closest first, then by name, so the same rows always pair the same way.
   candidates.sort((a, b) => b.closeness - a.closeness || a.to.localeCompare(b.to) || a.from.localeCompare(b.from));

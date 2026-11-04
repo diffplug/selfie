@@ -1,44 +1,44 @@
 import { Heading } from "@primer/react";
 import { useLayoutEffect, useRef, type ReactNode } from "react";
-import { fetchRunContext } from "./api.ts";
+import { fetchBatchContext } from "./api.ts";
 import { AcceptScreen } from "./AcceptScreen.tsx";
 import { DetailScreen } from "./DetailScreen.tsx";
-import { FeedbackBar, NewerRunBanner } from "./Feedback.tsx";
-import { useFeedback, useFetched, useRun } from "./hooks.ts";
+import { FeedbackBar, NewerBatchBanner } from "./Feedback.tsx";
+import { useFeedback, useFetched, useBatch } from "./hooks.ts";
 import { StoriesRoutes } from "./StoriesScreen.tsx";
 import { AppLink, parseRoute, storyPath, useLocation, type Route } from "./router.tsx";
 import { PageFactsLine, PageFactsProvider } from "./PageFacts.tsx";
-import { RunLayout, useRunTree } from "./RunLayout.tsx";
-import { RunScreen } from "./RunScreen.tsx";
+import { BatchLayout, useBatchTree } from "./BatchLayout.tsx";
+import { BatchScreen } from "./BatchScreen.tsx";
 import { LoadFailure, Loading, NotFound } from "./Status.tsx";
 
-/** Holds the run across its screens, so moving between them doesn't read it again. */
-function RunRoutes({ runId, route, search }: { runId: string; route: Route; search: string }) {
-  const state = useRun(runId);
+/** Holds the batch across its screens, so moving between them doesn't read it again. */
+function BatchRoutes({ batchId, route, search }: { batchId: string; route: Route; search: string }) {
+  const state = useBatch(batchId);
   const feedback = useFeedback();
-  const { data: context } = useFetched(runId, (signal) => fetchRunContext(runId, signal));
-  const tree = useRunTree(state.view, state.unchanged, search, route.kind === "story" ? route.story : null);
+  const { data: context } = useFetched(batchId, (signal) => fetchBatchContext(batchId, signal));
+  const tree = useBatchTree(state.view, state.unchanged, search, route.kind === "story" ? route.story : null);
   // Where to put focus on coming back to the list.
   const lastStory = useRef<string | null>(null);
   if (state.view === null) {
-    return state.loadError !== null ? <LoadFailure error={state.loadError} /> : <Loading label="Reading this run" />;
+    return state.loadError !== null ? <LoadFailure error={state.loadError} /> : <Loading label="Reading this batch" />;
   }
   if (route.kind === "story") lastStory.current = route.story;
   return (
-    <RunLayout view={state.view} tree={tree} story={route.kind === "story" ? route.story : null} search={search} context={context}>
-      {/* The run's screen has its own banner for the newest at its commit, so this one isn't said twice. */}
-      {(route.kind !== "run" || feedback.view?.latestRunId !== state.view.siblings.find(({ status }) => status !== "recording")?.id) && (
-        <NewerRunBanner latestRunId={feedback.view?.latestRunId} runId={runId} story={route.kind === "story" ? route.story : null} />
+    <BatchLayout view={state.view} tree={tree} story={route.kind === "story" ? route.story : null} search={search} context={context}>
+      {/* The batch's screen has its own banner for the newest at its commit, so this one isn't said twice. */}
+      {(route.kind !== "batch" || feedback.view?.latestBatchId !== state.view.siblings.find(({ status }) => status !== "recording")?.id) && (
+        <NewerBatchBanner latestBatchId={feedback.view?.latestBatchId} batchId={batchId} story={route.kind === "story" ? route.story : null} />
       )}
-      <FeedbackBar feedback={feedback} storyHref={(story) => storyPath(runId, story, "")} showList={route.kind === "run"} />
+      <FeedbackBar feedback={feedback} storyHref={(story) => storyPath(batchId, story, "")} showList={route.kind === "batch"} />
       {route.kind === "story" && tree.navigation !== null ? (
         <DetailScreen state={state} view={state.view} story={route.story} search={search} feedback={feedback} navigation={tree.navigation} />
       ) : route.kind === "accept" ? (
         <AcceptScreen state={state} view={state.view} />
       ) : (
-        <RunScreen state={state} view={state.view} search={search} returningFrom={lastStory} />
+        <BatchScreen state={state} view={state.view} search={search} returningFrom={lastStory} />
       )}
-    </RunLayout>
+    </BatchLayout>
   );
 }
 
@@ -81,8 +81,8 @@ export function App() {
     <Page>
       {route.kind === "missing" && <NotFound />}
       {(route.kind === "stories" || route.kind === "anyStory") && <StoriesRoutes story={route.kind === "anyStory" ? route.story : null} search={search} />}
-      {(route.kind === "run" || route.kind === "story" || route.kind === "accept") && (
-        <RunRoutes key={route.runId} runId={route.runId} route={route} search={search} />
+      {(route.kind === "batch" || route.kind === "story" || route.kind === "accept") && (
+        <BatchRoutes key={route.batchId} batchId={route.batchId} route={route} search={search} />
       )}
     </Page>
   );

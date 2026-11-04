@@ -5,15 +5,15 @@ import {
   type AcceptOutcome,
   type ApiError,
   type BaselineNote,
-  type RunContext,
+  type BatchContext,
   type DecisionKind,
   type DecisionTarget,
   type FeedbackView,
   type NewNote,
   type PixelDiff,
-  type RunView,
+  type BatchView,
   type SendVia,
-  type SnapshotRow,
+  type RenderRow,
   type StoriesView,
 } from "../shared/api.ts";
 
@@ -47,25 +47,25 @@ const WRITE_HEADERS = { "Content-Type": "application/json", [REQUEST_HEADER]: RE
 
 const post = <T>(path: string, body: unknown) => request<T>(path, { method: "POST", headers: WRITE_HEADERS, body: JSON.stringify(body) });
 
-const runRoute = (runId: string) => `/runs/${encodeURIComponent(runId)}`;
+const batchRoute = (batchId: string) => `/batches/${encodeURIComponent(batchId)}`;
 
-export const fetchRun = (runId: string, signal: AbortSignal) => request<RunView>(runRoute(runId), { signal });
-export const fetchRunContext = (runId: string, signal: AbortSignal) => request<RunContext>(`/runs/${encodeURIComponent(runId)}/context`, { signal });
-export const fetchBaseline = (runId: string, signal: AbortSignal) => request<BaselineNote>(`${runRoute(runId)}/baseline`, { signal });
-export const fetchUnchanged = async (runId: string) => (await request<{ rows: readonly SnapshotRow[] }>(`${runRoute(runId)}/unchanged`)).rows;
+export const fetchBatch = (batchId: string, signal: AbortSignal) => request<BatchView>(batchRoute(batchId), { signal });
+export const fetchBatchContext = (batchId: string, signal: AbortSignal) => request<BatchContext>(`/batches/${encodeURIComponent(batchId)}/context`, { signal });
+export const fetchBaseline = (batchId: string, signal: AbortSignal) => request<BaselineNote>(`${batchRoute(batchId)}/baseline`, { signal });
+export const fetchUnchanged = async (batchId: string) => (await request<{ rows: readonly RenderRow[] }>(`${batchRoute(batchId)}/unchanged`)).rows;
 export const fetchDiff = (current: string, golden: string, signal: AbortSignal) => request<PixelDiff>(`/diffs/${current}/${golden}`, { signal });
 
-export const postDecision = (runId: string, decision: DecisionKind, snapshots: readonly DecisionTarget[]) =>
-  post<RunView>(`${runRoute(runId)}/decisions`, { decision, snapshots });
-export const postAccept = (runId: string, removedSeen: number | undefined) =>
-  post<AcceptOutcome>(`${runRoute(runId)}/accept`, removedSeen === undefined ? {} : { removedSeen });
+export const postDecision = (batchId: string, decision: DecisionKind, renders: readonly DecisionTarget[]) =>
+  post<BatchView>(`${batchRoute(batchId)}/decisions`, { decision, renders });
+export const postAccept = (batchId: string, removedSeen: number | undefined) =>
+  post<AcceptOutcome>(`${batchRoute(batchId)}/accept`, removedSeen === undefined ? {} : { removedSeen });
 
 export const fetchStories = (signal: AbortSignal) => request<StoriesView>("/stories", { signal });
-export const postRender = (stories: readonly string[]) => post<{ readonly runId: string }>("/renders", { stories });
+export const postRender = (stories: readonly string[]) => post<{ readonly batchId: string }>("/renders", { stories });
 export const fetchFeedback = (signal: AbortSignal) => request<FeedbackView>("/feedback", { signal });
 export const postNote = (note: NewNote) => post<FeedbackView>("/notes", note);
 export const postSendNotes = (via: SendVia) => post<{ readonly feedback: FeedbackView; readonly text: string }>("/notes/send", { via });
-export const postAnswer = (id: number, text: string, runId: string) => post<FeedbackView>(`/notes/${id}/answers`, { text, runId });
+export const postAnswer = (id: number, text: string, batchId: string) => post<FeedbackView>(`/notes/${id}/answers`, { text, batchId });
 export const postResolve = (id: number) => post<FeedbackView>(`/notes/${id}/resolve`, {});
 export const deleteNote = (id: number) => request<FeedbackView>(`/notes/${id}`, { method: "DELETE", headers: WRITE_HEADERS });
 

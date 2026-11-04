@@ -11,7 +11,7 @@ import { diffImages, type PixelDiff } from "./diff.ts";
 import { regularFileInside, storyDirName } from "./paths.ts";
 import type { Project } from "./project.ts";
 import { encodePng } from "./png.ts";
-import { buildAsAsked, renderInput, type RecordOptions } from "./review.ts";
+import { buildAsAsked, renderInput, type RenderBatchOptions } from "./review.ts";
 
 /** What can vary about a story from one render to the next, or shouldn't happen in any of them. */
 export type FlakeKind = "pixels" | "failed" | "timeout" | "request" | "errors";
@@ -21,8 +21,8 @@ export interface FlakyStory {
   readonly kinds: readonly FlakeKind[];
   /** How many different images the renders made. */
   readonly distinctImages: number;
-  /** The biggest difference from the first render, without its regions. */
-  readonly worst: Omit<PixelDiff, "regions"> | null;
+  /** The biggest difference from the first render, without its hunks. */
+  readonly worst: Omit<PixelDiff, "hunks"> | null;
   /** That pair, and a picture of what differs. */
   readonly images: { readonly first: string; readonly other: string; readonly diff: string } | null;
   /** Each different error, and in how many of the renders. */
@@ -36,12 +36,12 @@ export interface FlakeReport {
   /** Biggest pixel difference first, so what most likely has one big cause comes first. */
   readonly flaky: readonly FlakyStory[];
   readonly warnings: readonly string[];
-  /** Holds every render's images until the next time this runs. */
+  /** Holds every render's images until the next time this batches. */
   readonly directory: string;
 }
 
-export interface FlakeOptions extends RecordOptions {
-  readonly runs: number;
+export interface FlakeOptions extends RenderBatchOptions {
+  readonly times: number;
   readonly concurrency?: number | undefined;
 }
 
@@ -97,7 +97,7 @@ async function compare(
   const diffFile = path.join(directory, "diffs", `${storyDirName(id)}.png`);
   await mkdir(path.dirname(diffFile), { recursive: true });
   await writeFile(diffFile, await encodePng(worst!.highlighted));
-  const { regions: _regions, ...summary } = worst!.diff;
+  const { hunks: _hunks, ...summary } = worst!.diff;
   return { distinctImages: distinct.length, worst: summary, images: { first: first.file, other: worst!.other, diff: diffFile } };
 }
 
@@ -112,8 +112,8 @@ export async function findFlakes(project: Project, options: FlakeOptions): Promi
   await rm(directory, { recursive: true, force: true });
   const storybookDir = resolveStorybookDir(project.cwd, options.storybookDir, settings);
   const manifests: Manifest[] = [];
-  for (let at = 0; at < options.runs; at++) {
-    log(`Render ${at + 1} of ${options.runs}`);
+  for (let at = 0; at < options.times; at++) {
+    log(`Render ${at + 1} of ${options.times}`);
     const input = renderInput({ storybookDir, outDir: path.join(directory, String(at)), log: () => {} }, settings, options);
     manifests.push(await render(options.concurrency === undefined ? input : { ...input, concurrency: options.concurrency }));
   }
@@ -131,7 +131,7 @@ export async function findFlakes(project: Project, options: FlakeOptions): Promi
   flaky.sort((a, b) => (b.worst?.changedPixels ?? 0) - (a.worst?.changedPixels ?? 0) || a.story.localeCompare(b.story));
   return {
     environment: settings.environmentId,
-    renders: options.runs,
+    renders: options.times,
     stories: ids.size,
     flaky,
     warnings: [...new Set(manifests.flatMap(({ warnings }) => warnings))],

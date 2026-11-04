@@ -18,22 +18,22 @@ import {
 import { Label, Stack, VisuallyHidden, type LabelProps } from "@primer/react";
 import type { ReactNode } from "react";
 import { isDecidable } from "selfie-store";
-import type { BlockerReason, NoteState, PixelDiff, RegionKind, SnapshotRow, SnapshotState } from "../shared/api.ts";
-import { isLayoutOnly } from "../shared/regions.ts";
+import type { BlockerReason, NoteState, PixelDiff, HunkKind, RenderRow, RenderState } from "../shared/api.ts";
+import { isLayoutOnly } from "../shared/hunks.ts";
 import { plural } from "./plural.ts";
-import { AppLink, runPath } from "./router.tsx";
+import { AppLink, batchPath } from "./router.tsx";
 
 export const shortSha = (sha: string) => sha.slice(0, 10);
 
 /** A commit, short, with the whole of it on hover. */
 export const Sha = ({ sha }: { readonly sha: string }) => <code title={sha}>{shortSha(sha)}</code>;
 
-/** A run that didn't render: where its pixels came from, which every place that offers a decision on them must say. */
+/** A batch that didn't render: where its pixels came from, which every place that offers a decision on them must say. */
 export function ReusedPixels({ from }: { readonly from: string }) {
   return (
     <>
-      These pixels were rendered earlier, by run{" "}
-      <AppLink inline href={runPath(from)}>
+      These pixels were rendered earlier, by batch{" "}
+      <AppLink inline href={batchPath(from)}>
         <code>{from}</code>
       </AppLink>
       .
@@ -52,9 +52,9 @@ function IconLabel({ variant, icon, children }: { variant: LabelProps["variant"]
   );
 }
 
-const STATE_LABELS: Readonly<Record<SnapshotState, { variant: LabelProps["variant"]; icon: ReactNode; words: string }>> = {
+const STATE_LABELS: Readonly<Record<RenderState, { variant: LabelProps["variant"]; icon: ReactNode; words: string }>> = {
   changed: { variant: "attention", icon: <DiffModifiedIcon size={12} />, words: "Changed" },
-  new: { variant: "accent", icon: <DiffAddedIcon size={12} />, words: "New" },
+  added: { variant: "accent", icon: <DiffAddedIcon size={12} />, words: "Added" },
   removed: { variant: "severe", icon: <DiffRemovedIcon size={12} />, words: "Removed" },
   failed: { variant: "danger", icon: <StopIcon size={12} />, words: "Failed" },
   unchanged: { variant: "secondary", icon: <DotIcon size={12} />, words: "Unchanged" },
@@ -63,7 +63,7 @@ const STATE_LABELS: Readonly<Record<SnapshotState, { variant: LabelProps["varian
 export const renamedWords = (from: string) => `Renamed from ${from}`;
 
 /** A state's icon and words, small enough for a list's row. */
-export function StateMark({ state, renamedFrom }: { readonly state: SnapshotState; readonly renamedFrom?: string | undefined }) {
+export function StateMark({ state, renamedFrom }: { readonly state: RenderState; readonly renamedFrom?: string | undefined }) {
   const { icon, words } = renamedFrom === undefined ? STATE_LABELS[state] : { icon: <ArrowSwitchIcon size={12} />, words: renamedWords(renamedFrom) };
   return (
     <span className="selfie-state-mark" data-state={renamedFrom === undefined ? state : "renamed"} title={words}>
@@ -73,7 +73,7 @@ export function StateMark({ state, renamedFrom }: { readonly state: SnapshotStat
   );
 }
 
-const KIND_LABELS: Readonly<Record<RegionKind, { variant: LabelProps["variant"]; icon: ReactNode; words: string }>> = {
+const KIND_LABELS: Readonly<Record<HunkKind, { variant: LabelProps["variant"]; icon: ReactNode; words: string }>> = {
   changed: { variant: "danger", icon: <DiffModifiedIcon size={12} />, words: "Changed" },
   moved: { variant: "accent", icon: <ArrowSwitchIcon size={12} />, words: "Moved" },
   spacing: { variant: "attention", icon: <UnfoldIcon size={12} />, words: "Spacing" },
@@ -95,7 +95,7 @@ export function NoteLabel({ state }: { readonly state: NoteState }) {
   );
 }
 
-export function KindLabel({ kind }: { readonly kind: RegionKind }) {
+export function KindLabel({ kind }: { readonly kind: HunkKind }) {
   const { variant, icon, words } = KIND_LABELS[kind];
   return (
     <IconLabel variant={variant} icon={icon}>
@@ -104,7 +104,7 @@ export function KindLabel({ kind }: { readonly kind: RegionKind }) {
   );
 }
 
-export function StateLabel({ state }: { readonly state: SnapshotState }) {
+export function StateLabel({ state }: { readonly state: RenderState }) {
   const { variant, icon, words } = STATE_LABELS[state];
   return (
     <IconLabel variant={variant} icon={icon}>
@@ -113,7 +113,7 @@ export function StateLabel({ state }: { readonly state: SnapshotState }) {
   );
 }
 
-export function DecisionLabel({ row }: { readonly row: Pick<SnapshotRow, "state" | "decision"> }) {
+export function DecisionLabel({ row }: { readonly row: Pick<RenderRow, "state" | "decision"> }) {
   if (!isDecidable(row.state)) return <span className="selfie-muted">No decision needed</span>;
   if (row.decision?.decision === "approved") {
     return (
@@ -136,7 +136,7 @@ export function DecisionLabel({ row }: { readonly row: Pick<SnapshotRow, "state"
   );
 }
 
-export function AdvisoryLabels({ row }: { readonly row: SnapshotRow }) {
+export function AdvisoryLabels({ row }: { readonly row: RenderRow }) {
   return (
     <>
       {row.playError !== null && (
@@ -161,8 +161,8 @@ export function describePixels(diff: PixelDiff | null): string {
 export const BLOCKER_WORDS: Readonly<Record<BlockerReason, (count: number) => string>> = {
   failed: (count) => `${plural(count, "story", "stories")} failed to render`,
   "changed-unapproved": (count) => `${plural(count, "changed image")} with no decision`,
-  "new-unapproved": (count) => `${plural(count, "new image")} with no decision`,
+  "added-unapproved": (count) => `${plural(count, "added image")} with no decision`,
   rejected: (count) => `${plural(count, "image")} rejected`,
-  removed: (count) => `${plural(count, "golden")} this run doesn't have, which must be acknowledged to accept`,
+  removed: (count) => `${plural(count, "golden")} this batch doesn't have, which must be acknowledged to accept`,
   "pattern-unmatched": (count) => `${plural(count, "--story pattern")} that matched nothing`,
 };

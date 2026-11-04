@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { lstat } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
-import { isRunId } from "selfie-store";
+import { isBatchId } from "selfie-store";
 import { SelfieError } from "./errors.ts";
 import type { Repo } from "./git.ts";
 
@@ -70,11 +70,11 @@ export function storyDirName(story: string): string {
   return `${readable === "" ? "story" : readable}-${shortHash(story, 10)}`;
 }
 
-export { isRunId };
+export { isBatchId };
 
-/** Refuses anything but a run ID before it reaches a path. */
-export function assertRunId(run: string): void {
-  if (!isRunId(run)) throw new SelfieError("bad-run-id", `"${run}" isn't a run ID. A review's JSON gives it as runId.`);
+/** Refuses anything but a batch ID before it reaches a path. */
+export function assertBatchId(batch: string): void {
+  if (!isBatchId(batch)) throw new SelfieError("bad-batch-id", `"${batch}" isn't a batch ID. A review's JSON gives it as batchId.`);
 }
 
 /** `relative` under `root`, or null if it would land anywhere else. */

@@ -7,7 +7,7 @@ import { resolveInside } from "./paths.ts";
 
 /** At the Git top level. It's the only place a project configures Selfie. */
 const CONFIG_FILE = "selfie.config.json";
-const KNOWN_KEYS = new Set(["environment", "initScript", "storybookDir", "buildCommand", "regionMergeDistance", "settleMs", "storyTimeoutMs"]);
+const KNOWN_KEYS = new Set(["environment", "initScript", "storybookDir", "buildCommand", "hunkMergeDistance", "settleMs", "storyTimeoutMs"]);
 
 // Never a build command: docs/specs/cli.md → Configuration.
 interface ProjectConfig {
@@ -20,7 +20,7 @@ interface ProjectConfig {
   readonly settleMs?: number;
   readonly storyTimeoutMs?: number;
   /** In CSS pixels. Only groups what's shown. */
-  readonly regionMergeDistance?: number;
+  readonly hunkMergeDistance?: number;
 }
 
 async function loadConfig(repo: Repo): Promise<ProjectConfig> {
@@ -113,11 +113,11 @@ export async function resolveRenderSettings(
   };
 }
 
-/** How close changed regions group, in CSS pixels. A view multiplies it by its run's scale. */
-export async function resolveRegionMergeDistance(repo: Repo): Promise<number> {
-  const distance = (await loadConfig(repo)).regionMergeDistance ?? 12;
+/** How close changed hunks group, in CSS pixels. A view multiplies it by its batch's scale. */
+export async function resolveHunkMergeDistance(repo: Repo): Promise<number> {
+  const distance = (await loadConfig(repo)).hunkMergeDistance ?? 12;
   if (typeof distance !== "number" || !Number.isFinite(distance) || distance < 0) {
-    throw new SelfieError("bad-config", `The config's regionMergeDistance must be a non-negative number, got ${distance}.`);
+    throw new SelfieError("bad-config", `The config's hunkMergeDistance must be a non-negative number, got ${distance}.`);
   }
   return distance;
 }

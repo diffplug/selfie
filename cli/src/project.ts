@@ -1,53 +1,53 @@
-// One project's local data: `<home>/<slug>/`, which holds its store, the per-run directories
-// reviews write, and the scratch directories renders use. Every fact about a run is in the
-// store: a run directory is only a disposable cache of what was exported for it.
+// One project's local data: `<home>/<slug>/`, which holds its store, the per-batch directories
+// reviews write, and the scratch directories renders use. Every fact about a batch is in the
+// store: a batch directory is only a disposable cache of what was exported for it.
 import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { FilesystemBlobStorage } from "selfie-store/adapters/filesystem-blob";
 import { sharpCodec } from "selfie-store/adapters/sharp-codec";
 import { SqliteAdapter } from "selfie-store/adapters/sqlite";
-import { Blobs, initStoreSchema, Snapshots, Sql, Store, BuiltStorybooks, type CompareOptions, type Comparison, type Run } from "selfie-store";
+import { Blobs, initStoreSchema, RenderBatches, Sql, Store, BuiltStorybooks, type CompareOptions, type Comparison, type RenderBatch } from "selfie-store";
 import type { PixelDiff } from "./diff.ts";
 import { SelfieError } from "./errors.ts";
 import { headSha, nearestOnBranch, openRepo, walkToBaseline, type BaselineSearch, type Repo } from "./git.ts";
 import { CREATE_NOTES_TABLES, notesIn, type Notes } from "./notes.ts";
-import { assertRunId, isRunId, projectSlug, selfieHome } from "./paths.ts";
+import { assertBatchId, isBatchId, projectSlug, selfieHome } from "./paths.ts";
 
-/** How many runs keep their exported images. Older ones are deleted by the next review. */
-const RUN_DIRECTORIES_KEPT = 20;
+/** How many batches keep their exported images. Older ones are deleted by the next review. */
+const BATCH_DIRECTORIES_KEPT = 20;
 /** A render directory this old belongs to a process that crashed. */
 const STALE_RENDER_MS = 24 * 60 * 60 * 1000;
 const CACHE_FILE = "review.json";
 
 /**
- * The newest real render of each build this machine can reuse. Local only: it's in the project's
+ * The newest real render of each built Storybook this machine can reuse. Local only: it's in the project's
  * `store.db`, and not in the store's schema, which D1 also has.
  */
-export interface Renders {
-  /** The run remembered for a render identity, or null. */
+export interface RenderKeys {
+  /** The batch remembered for a render identity, or null. */
   readonly find: (identity: string) => Promise<string | null>;
-  /** Remembers a run for it, or with null forgets what was. */
-  readonly remember: (identity: string, runId: string | null) => Promise<void>;
+  /** Remembers a batch for it, or with null forgets what was. */
+  readonly remember: (identity: string, batchId: string | null) => Promise<void>;
 }
 
-function rendersIn(sql: Sql): Renders {
+function renderKeysIn(sql: Sql): RenderKeys {
   return {
     async find(identity) {
       const [row] = await sql.run({
-        sql: "SELECT run_id FROM render_keys WHERE key = ?1",
+        sql: "SELECT batch_id FROM render_keys WHERE key = ?1",
         params: [identity],
         idempotent: true,
       });
-      return (row?.run_id as string | undefined) ?? null;
+      return (row?.batch_id as string | undefined) ?? null;
     },
-    async remember(identity, runId) {
+    async remember(identity, batchId) {
       await sql.run(
-        runId === null
+        batchId === null
           ? { sql: "DELETE FROM render_keys WHERE key = ?1", params: [identity], idempotent: true }
           : {
-              sql: `INSERT INTO render_keys(key, run_id) VALUES (?1, ?2)
-ON CONFLICT(key) DO UPDATE SET run_id = excluded.run_id`,
-              params: [identity, runId],
+              sql: `INSERT INTO render_keys(key, batch_id) VALUES (?1, ?2)
+ON CONFLICT(key) DO UPDATE SET batch_id = excluded.batch_id`,
+              params: [identity, batchId],
               idempotent: true,
             },
       );
@@ -61,11 +61,11 @@ export interface Project {
   readonly repo: Repo;
   /** `<home>/<slug>` */
   readonly directory: string;
-  readonly renders: Renders;
+  readonly renderKeys: RenderKeys;
   readonly notes: Notes;
   readonly store: Store;
   readonly storybooks: BuiltStorybooks;
-  readonly snapshots: Snapshots;
+  readonly batches: RenderBatches;
   readonly close: () => void;
 }
 
@@ -78,68 +78,68 @@ export async function openProject({ cwd, env }: { cwd: string; env: NodeJS.Proce
   const adapter = new SqliteAdapter(path.join(directory, "store.db"));
   const sql = new Sql(adapter);
   await initStoreSchema(sql);
-  await sql.run({ sql: "CREATE TABLE IF NOT EXISTS render_keys (key TEXT PRIMARY KEY, run_id TEXT NOT NULL) WITHOUT ROWID" });
+  await sql.run({ sql: "CREATE TABLE IF NOT EXISTS render_keys (key TEXT PRIMARY KEY, batch_id TEXT NOT NULL) WITHOUT ROWID" });
   for (const statement of CREATE_NOTES_TABLES) await sql.run({ sql: statement });
   const blob = new Blobs(new FilesystemBlobStorage(path.join(directory, "blobs")));
   return {
     cwd,
     repo,
     directory,
-    renders: rendersIn(sql),
+    renderKeys: renderKeysIn(sql),
     notes: notesIn(sql, repo.root),
     store: new Store({ sql, blob, codec: sharpCodec }),
     storybooks: new BuiltStorybooks({ sql, blob }),
-    snapshots: new Snapshots({ sql }),
+    batches: new RenderBatches({ sql }),
     close: () => adapter.close(),
   };
 }
 
-/** HEAD, and the runs there in an environment, newest first. */
-export async function runsAtHead(project: Project, environment: string): Promise<{ readonly head: string | null; readonly runs: readonly Run[] }> {
+/** HEAD, and the batches there in an environment, newest first. */
+export async function batchesAtHead(project: Project, environment: string): Promise<{ readonly head: string | null; readonly batches: readonly RenderBatch[] }> {
   const head = await headSha(project.repo);
-  return { head, runs: head === null ? [] : await project.snapshots.runsAt(head, environment) };
+  return { head, batches: head === null ? [] : await project.batches.batchesAt(head, environment) };
 }
 
 /** The baseline this project would use now, in an environment. */
 export function findBaseline(project: Project, environment: string): Promise<BaselineSearch> {
-  return walkToBaseline(project.repo, (shas) => project.snapshots.firstWithGoldens(shas, environment));
+  return walkToBaseline(project.repo, (shas) => project.batches.firstWithGoldens(shas, environment));
 }
 
-/** A run's comparison with every story in it, against what its screens show it against. */
-export async function compareAsShown(project: Project, run: Run, against?: string | null): Promise<Comparison> {
-  const sha = against !== undefined ? against : ((await branchGoldens(project, run)) ?? run.baselineSha);
-  return project.snapshots.compareRun(run.id, sha, { includeUnchanged: true });
+/** A batch's comparison with every story in it, against what its screens show it against. */
+export async function compareAsShown(project: Project, batch: RenderBatch, against?: string | null): Promise<Comparison> {
+  const sha = against !== undefined ? against : ((await branchGoldens(project, batch)) ?? batch.baselineSha);
+  return project.batches.compareBatch(batch.id, sha, { includeUnchanged: true });
 }
 
-/** A run compared with the baseline its reviewer saw. */
+/** A batch compared with the baseline its reviewer saw. */
 export async function compareAsReviewed(
   project: Project,
-  runId: string,
+  batchId: string,
   options?: CompareOptions,
 ): Promise<Comparison> {
-  const run = await requireRun(project, runId);
-  return project.snapshots.compareRun(runId, run.baselineSha, options);
+  const batch = await requireBatch(project, batchId);
+  return project.batches.compareBatch(batchId, batch.baselineSha, options);
 }
 
-/** A run someone named, which must be well formed and in this project's store. */
-export async function requireRun(project: Project, runId: string): Promise<Run> {
-  assertRunId(runId);
-  const run = await project.snapshots.getRun(runId);
-  if (run === null) throw new SelfieError("unknown-run", `No run ${runId} in this project's local store.`);
-  return run;
+/** A batch someone named, which must be well formed and in this project's store. */
+export async function requireBatch(project: Project, batchId: string): Promise<RenderBatch> {
+  assertBatchId(batchId);
+  const batch = await project.batches.getBatch(batchId);
+  if (batch === null) throw new SelfieError("unknown-batch", `No batch ${batchId} in this project's local store.`);
+  return batch;
 }
 
 /**
- * What a person should see a run with no baseline against: the nearest goldens on its branch, if
+ * What a person should see a batch with no baseline against: the nearest goldens on its branch, if
  * it has any. Only to look at. They're never its baseline, so deciding and accepting use
  * `compareAsReviewed`.
  */
-export async function branchGoldens(project: Project, run: Run): Promise<string | null> {
-  if (run.baselineSha !== null) return null;
-  return nearestOnBranch(project.repo, run.gitSha, (shas) => project.snapshots.firstWithGoldens(shas, run.environment));
+export async function branchGoldens(project: Project, batch: RenderBatch): Promise<string | null> {
+  if (batch.baselineSha !== null) return null;
+  return nearestOnBranch(project.repo, batch.gitSha, (shas) => project.batches.firstWithGoldens(shas, batch.environment));
 }
 
-export const runDirectory = (project: Project, runId: string) => path.join(project.directory, "runs", runId);
+export const batchDirectory = (project: Project, batchId: string) => path.join(project.directory, "batches", batchId);
 
 /** A new directory for one render, so concurrent reviews never share one. */
 export const renderDirectory = (project: Project, id: string) => path.join(project.directory, "render", id);
@@ -157,29 +157,29 @@ export interface ReviewCache {
 }
 
 /** Atomic, so a reader never sees half of one. */
-export async function writeReviewCache(project: Project, runId: string, cache: ReviewCache): Promise<void> {
-  const target = path.join(runDirectory(project, runId), CACHE_FILE);
+export async function writeReviewCache(project: Project, batchId: string, cache: ReviewCache): Promise<void> {
+  const target = path.join(batchDirectory(project, batchId), CACHE_FILE);
   await writeFile(`${target}.tmp`, `${JSON.stringify(cache, null, 2)}\n`);
   await rename(`${target}.tmp`, target);
 }
 
 /** The paths and pixel diffs a review exported, or null if they've been pruned. */
-export async function readReviewCache(project: Project, runId: string): Promise<ReviewCache | null> {
-  assertRunId(runId);
-  const text = await readFile(path.join(runDirectory(project, runId), CACHE_FILE), "utf8").catch(() => null);
+export async function readReviewCache(project: Project, batchId: string): Promise<ReviewCache | null> {
+  assertBatchId(batchId);
+  const text = await readFile(path.join(batchDirectory(project, batchId), CACHE_FILE), "utf8").catch(() => null);
   return text === null ? null : (JSON.parse(text) as ReviewCache);
 }
 
 /**
- * Keeps the newest runs' directories, and drops render directories left by a crash. Only ever
+ * Keeps the newest batches' directories, and drops render directories left by a crash. Only ever
  * touches names it would have created itself, directly under these two directories.
  */
-export async function pruneOutput(project: Project, keepRunId: string): Promise<void> {
-  const runsRoot = path.join(project.directory, "runs");
+export async function pruneOutput(project: Project, keepBatchId: string): Promise<void> {
+  const batchesRoot = path.join(project.directory, "batches");
   const dated = async (root: string) => {
     const names = await readdir(root).catch(() => [] as string[]);
     const entries = await Promise.all(
-      names.filter(isRunId).map(async (name) => {
+      names.filter(isBatchId).map(async (name) => {
         const stats = await stat(path.join(root, name)).catch(() => null);
         return { name, modified: stats?.mtimeMs ?? 0 };
       }),
@@ -187,11 +187,11 @@ export async function pruneOutput(project: Project, keepRunId: string): Promise<
     return entries.sort((a, b) => b.modified - a.modified);
   };
 
-  const runs = (await dated(runsRoot)).filter(({ name }) => name !== keepRunId);
+  const batches = (await dated(batchesRoot)).filter(({ name }) => name !== keepBatchId);
   await Promise.all(
-    runs
-      .slice(RUN_DIRECTORIES_KEPT - 1)
-      .map(({ name }) => rm(path.join(runsRoot, name), { recursive: true, force: true })),
+    batches
+      .slice(BATCH_DIRECTORIES_KEPT - 1)
+      .map(({ name }) => rm(path.join(batchesRoot, name), { recursive: true, force: true })),
   );
 
   const renderRoot = path.join(project.directory, "render");

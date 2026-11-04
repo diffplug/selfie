@@ -268,7 +268,7 @@ code {
 
 .selfie-stack {
   position: relative;
-  /* Room for the number of a region at the very top. */
+  /* Room for the number of a hunk at the very top. */
   margin-top: var(--base-size-24);
 }
 
@@ -291,7 +291,7 @@ code {
   inset: 1px;
 }
 
-.selfie-region {
+.selfie-hunk {
   position: absolute;
   box-sizing: content-box;
   min-width: 2px;
@@ -302,8 +302,8 @@ code {
   outline: 1px solid var(--bgColor-default);
 }
 
-/* Side by side, clicking an image stacks it, so there only a region's number selects it. */
-.selfie-stack .selfie-region {
+/* Side by side, clicking an image stacks it, so there only a hunk's number selects it. */
+.selfie-stack .selfie-hunk {
   cursor: pointer;
   pointer-events: auto;
 }
@@ -320,16 +320,16 @@ code {
   --selfie-kind: var(--selfie-kind-spacing);
 }
 
-.selfie-region[data-selected] {
+.selfie-hunk[data-selected] {
   border-style: solid;
   background: color-mix(in srgb, var(--selfie-kind) 15%, transparent);
 }
 
-.selfie-region[data-focused] {
+.selfie-hunk[data-focused] {
   outline: 2px solid var(--focus-outlineColor);
 }
 
-.selfie-region-number {
+.selfie-hunk-number {
   display: inline-block;
   min-width: 1.5em;
   border-radius: var(--borderRadius-small);
@@ -341,12 +341,12 @@ code {
   text-align: center;
 }
 
-.selfie-region-number[data-kind="spacing"] {
+.selfie-hunk-number[data-kind="spacing"] {
   color: #1f2328;
 }
 
 /* Outside the box, so it never covers what changed. */
-.selfie-region > .selfie-region-number {
+.selfie-hunk > .selfie-hunk-number {
   position: absolute;
   bottom: calc(100% + 2px);
   left: -2px;
@@ -354,12 +354,12 @@ code {
   pointer-events: auto;
 }
 
-.selfie-regions {
+.selfie-hunks {
   border: var(--borderWidth-thin) solid var(--borderColor-default);
   border-radius: var(--borderRadius-small);
 }
 
-.selfie-regions-header {
+.selfie-hunks-header {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -369,7 +369,7 @@ code {
   background: var(--bgColor-muted);
 }
 
-.selfie-regions-list {
+.selfie-hunks-list {
   max-height: 11em;
   margin: 0;
   padding: 0;
@@ -377,7 +377,7 @@ code {
   list-style: none;
 }
 
-.selfie-regions-list li {
+.selfie-hunks-list li {
   display: flex;
   align-items: center;
   gap: var(--base-size-8);
@@ -385,15 +385,15 @@ code {
   border-top: var(--borderWidth-thin) solid var(--borderColor-muted);
 }
 
-.selfie-regions-list li[data-selected] {
+.selfie-hunks-list li[data-selected] {
   background: var(--bgColor-accent-muted);
 }
 
-.selfie-regions-list li[data-focused] {
+.selfie-hunks-list li[data-focused] {
   box-shadow: inset 2px 0 0 var(--focus-outlineColor);
 }
 
-.selfie-region-go {
+.selfie-hunk-go {
   display: flex;
   flex: 1;
   align-items: center;
@@ -544,7 +544,7 @@ code {
   margin-top: var(--base-size-4);
 }
 
-.selfie-newer-run {
+.selfie-newer-batch {
   margin-bottom: var(--base-size-16);
 }
 
@@ -712,7 +712,7 @@ code {
   color: var(--fgColor-attention);
 }
 
-.selfie-state-mark[data-state="new"] {
+.selfie-state-mark[data-state="added"] {
   color: var(--fgColor-accent);
 }
 

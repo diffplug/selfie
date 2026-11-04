@@ -1,9 +1,9 @@
 // What crosses between the browser and the server, and what the server needs from its platform.
 // Types only, so the client's bundle holds none of the server, and the server none of the client.
 // `selfie-cli` takes its own result types from here, so each has one definition.
-import type { ComparedSnapshot, DecisionKind, Run } from "selfie-store";
+import type { ComparedRender, DecisionKind, RenderBatch } from "selfie-store";
 
-export type { ComparedSnapshot, DecisionKind, Run, SnapshotState } from "selfie-store";
+export type { ComparedRender, DecisionKind, RenderBatch, RenderState } from "selfie-store";
 
 export interface BoundingBox {
   readonly x: number;
@@ -18,15 +18,15 @@ export interface BoxPair {
   readonly golden: BoundingBox;
 }
 
-/** What a region's difference is. Anything not accounted for by moves and spacing is `changed`. */
-export type RegionKind = "changed" | "moved" | "spacing";
+/** What a hunk's difference is. Anything not accounted for by moves and spacing is `changed`. */
+export type HunkKind = "changed" | "moved" | "spacing";
 
-/** Boxes that differ. Everything outside a region matches. */
-export interface ChangedRegion extends BoxPair {
-  readonly kind: RegionKind;
+/** Boxes that differ. Everything outside a hunk matches. */
+export interface ChangedHunk extends BoxPair {
+  readonly kind: HunkKind;
   /** What moves and spacing don't account for. */
   readonly changedPixels: number;
-  /** What landed here, identical to what was elsewhere in the golden. A region that only lost something to another region is `moved` with none of these. */
+  /** What landed here, identical to what was elsewhere in the golden. A hunk that only lost something to another hunk is `moved` with none of these. */
   readonly moved: readonly BoxPair[];
 }
 
@@ -34,7 +34,7 @@ export interface PixelDiff {
   readonly current: { readonly width: number; readonly height: number };
   readonly golden: { readonly width: number; readonly height: number };
   /** Top to bottom. */
-  readonly regions: readonly ChangedRegion[];
+  readonly hunks: readonly ChangedHunk[];
   /** What moves and spacing don't account for, including what only the golden has, which isn't in `boundingBox`. */
   readonly changedPixels: number;
   /** Of blocks that are identical, but elsewhere. */
@@ -43,7 +43,7 @@ export interface PixelDiff {
   readonly spacingPixels: number;
   /** The larger image's. */
   readonly totalPixels: number;
-  /** In the current image, around what changed, or else what moved or grew. If something was only removed, the row marking where. Null only if the images are identical, which a `changed` snapshot never is. */
+  /** In the current image, around what changed, or else what moved or grew. If something was only removed, the row marking where. Null only if the images are identical, which a `changed` render never is. */
   readonly boundingBox: BoundingBox | null;
   /** Where to look first, in reading order, which `boundingBox`'s center need not be. */
   readonly firstChanged: { readonly x: number; readonly y: number } | null;
@@ -54,7 +54,7 @@ export interface PixelDiff {
 export type BlockerReason =
   | "failed"
   | "changed-unapproved"
-  | "new-unapproved"
+  | "added-unapproved"
   | "rejected"
   | "removed"
   | "pattern-unmatched";
@@ -71,7 +71,7 @@ export interface Attention<Reason extends string> {
 
 export type AcceptRefusal =
   | { readonly reason: "recorded-on-dirty-tree"; readonly gitSha: string }
-  | { readonly reason: "run-has-failures"; readonly stories: readonly string[] }
+  | { readonly reason: "batch-has-failures"; readonly stories: readonly string[] }
   | {
       readonly reason: "unapproved";
       readonly stories: readonly {
@@ -83,7 +83,7 @@ export type AcceptRefusal =
   | {
       readonly reason: "removed-unacknowledged";
       readonly stories: readonly string[];
-      /** How many of `stories` are gone only because the run's filter left them out. */
+      /** How many of `stories` are gone only because the batch's filter left them out. */
       readonly outsideFilter: number;
     }
   | {
@@ -94,8 +94,8 @@ export type AcceptRefusal =
       readonly seen: number;
     };
 
-/** A compared snapshot, with the pixel stats its review exported, if they're still on disk. */
-export interface SnapshotRow extends ComparedSnapshot {
+/** A compared render, with the pixel stats its review exported, if they're still on disk. */
+export interface RenderRow extends ComparedRender {
   readonly pixelDiff: PixelDiff | null;
 }
 
@@ -105,13 +105,13 @@ export interface BaselineNote {
   readonly message: string | null;
 }
 
-export type RunListing = Pick<Run, "id" | "startedAt" | "status" | "dirty">;
+export type BatchListing = Pick<RenderBatch, "id" | "startedAt" | "status" | "dirty">;
 
 /** Where a kept built Storybook is, on a hosted Storybook's origin, ending in a slash. Crosses into `selfie-cli` from here. */
 export const keptStorybookPath = (build: string) => `/built-storybooks/${build}/`;
 
-/** Where a run stands against this checkout, and where the baselines come from, for saying so. */
-export interface RunContext {
+/** Where a batch stands against this checkout, and where the baselines come from, for saying so. */
+export interface BatchContext {
   readonly head: string | null;
   /** The branch HEAD is on, or null if it's detached. */
   readonly branch: string | null;
@@ -119,31 +119,31 @@ export interface RunContext {
   readonly defaultBranch: string | null;
 }
 
-/** A Storybook to open a run's stories in, on an origin of its own. */
+/** A Storybook to open a batch's stories in, on an origin of its own. */
 export interface StorybookLink {
   /** Ending in a slash. */
   readonly url: string;
-  /** Whether it's the very build that rendered this run. If it isn't, a story may not look like its image. */
+  /** Whether it's the very build that rendered this batch. If it isn't, a story may not look like its image. */
   readonly exactStorybook: boolean;
 }
 
-/** Everything a screen shows about a run, recomputed from `summarizeRun` after every action. */
-export interface RunView {
-  readonly run: Run;
+/** Everything a screen shows about a batch, recomputed from `summarizeBatch` after every action. */
+export interface BatchView {
+  readonly batch: RenderBatch;
   /** Null if there's no built Storybook to host. */
   readonly storybook: StorybookLink | null;
-  /** The kept built Storybook of the goldens this run is compared with, or null if there's none. */
+  /** The kept built Storybook of the goldens this batch is compared with, or null if there's none. */
   readonly goldenStorybookUrl: string | null;
-  /** The size this run's stories rendered at, so a live one lays out as its image did. Null if that wasn't recorded. */
+  /** The size this batch's stories rendered at, so a live one lays out as its image did. Null if that wasn't recorded. */
   readonly viewport: { readonly width: number; readonly height: number } | null;
   /** What its Storybook calls `rows`' stories, in the order its sidebar has them, as far as its kept built Storybooks say. */
   readonly storyNames: readonly { readonly story: string; readonly title: string; readonly name: string }[];
-  /** With no baseline, the nearest goldens on the run's branch, which `rows` compares with. Only to look at. */
+  /** With no baseline, the nearest goldens on the batch's branch, which `rows` compares with. Only to look at. */
   readonly branchGoldens: string | null;
-  /** How close a diff's regions group here, in CSS pixels. */
-  readonly regionMergeDistance: number;
-  /** The run whose images are the goldens of this run's Git SHA, which may be this one. */
-  readonly acceptedRunId: string | null;
+  /** How close a diff's hunks group here, in CSS pixels. */
+  readonly hunkMergeDistance: number;
+  /** The batch whose images are the goldens of this batch's Git SHA, which may be this one. */
+  readonly acceptedBatchId: string | null;
   /** Who a decision made here is recorded as, or null if Git doesn't say. */
   readonly actor: string | null;
   readonly blockers: readonly Attention<BlockerReason>[];
@@ -152,31 +152,31 @@ export interface RunView {
     readonly stories: number;
     readonly unchanged: number;
     readonly changed: number;
-    readonly new: number;
+    readonly added: number;
     readonly removed: number;
     readonly failed: number;
     readonly undecided: number;
     readonly advisories: number;
   };
   /** Everything that isn't unchanged, and anything with an advisory, in name order. */
-  readonly rows: readonly SnapshotRow[];
+  readonly rows: readonly RenderRow[];
   /** What `accept` would refuse now, were no removals acknowledged. */
   readonly refusals: readonly AcceptRefusal[];
   /**
-   * Every golden accepting would drop, and how many only the run's filter left out, which aren't in
+   * Every golden accepting would drop, and how many only the batch's filter left out, which aren't in
    * `rows`. Acknowledging means passing the length of `stories`.
    */
   readonly removals: { readonly stories: readonly string[]; readonly outsideFilter: number };
   readonly usableAsBaseline: boolean;
-  /** Every run at this SHA and environment, newest first, this one included. */
-  readonly siblings: readonly RunListing[];
+  /** Every batch at this SHA and environment, newest first, this one included. */
+  readonly siblings: readonly BatchListing[];
 }
 
-/** A story's newest image at HEAD, from whichever run took it. */
+/** A story's newest image at HEAD, from whichever batch took it. */
 export interface StoryRenderInfo {
-  readonly runId: string;
-  readonly state: SnapshotRow["state"];
-  readonly decision: SnapshotRow["decision"];
+  readonly batchId: string;
+  readonly state: RenderRow["state"];
+  readonly decision: RenderRow["decision"];
   readonly renderedAt: number;
   /** Recorded with uncommitted changes, so it can't become a golden. */
   readonly dirty: boolean;
@@ -190,7 +190,7 @@ export interface ListedStory {
   readonly title: string;
   /** What the sidebar calls it, or its ID if that's not known. */
   readonly name: string;
-  /** Null if no run at HEAD has rendered it. */
+  /** Null if no batch at HEAD has rendered it. */
   readonly render: StoryRenderInfo | null;
 }
 
@@ -208,7 +208,7 @@ export interface StorySetup {
   readonly usesDocker: boolean;
 }
 
-/** Every story of the hosted Storybook, each with its newest render, which a single run is a special case of. */
+/** Every story of the hosted Storybook, each with its newest render, which a single batch is a special case of. */
 export interface StoriesView {
   readonly head: string | null;
   /** The branch HEAD is on, or null if it's detached. */
@@ -219,8 +219,8 @@ export interface StoriesView {
   readonly viewport: { readonly width: number; readonly height: number };
   /** In the order the Storybook's sidebar shows them. */
   readonly stories: readonly ListedStory[];
-  /** The newest finished run at HEAD, to review and accept. */
-  readonly newestRunId: string | null;
+  /** The newest finished batch at HEAD, to review and accept. */
+  readonly newestBatchId: string | null;
   /** Whether this server can render a story when asked, which takes a commit, a built Storybook, and a browser to do it with. */
   readonly canRender: boolean;
   /** Null if this server hosts no Storybook. */
@@ -231,7 +231,7 @@ export interface AcceptOutcome {
   readonly accepted: boolean;
   /** Empty if accepted. These include any about the count this request passed. */
   readonly refusals: readonly AcceptRefusal[];
-  readonly view: RunView;
+  readonly view: BatchView;
 }
 
 export interface ApiError {
@@ -252,7 +252,7 @@ export interface NoteMessage {
   readonly sender: "person" | "agent";
   readonly author: string;
   readonly text: string;
-  readonly runId: string | null;
+  readonly batchId: string | null;
   readonly at: number;
   readonly sent: boolean;
 }
@@ -261,7 +261,7 @@ export interface NoteMessage {
 export interface Note {
   readonly id: number;
   readonly story: string;
-  readonly runId: string;
+  readonly batchId: string;
   /** The image it's about, or null for a story with no image, such as one that failed. */
   readonly imageHash: string | null;
   /** Null for all of the image. */
@@ -270,7 +270,7 @@ export interface Note {
   readonly messages: readonly NoteMessage[];
 }
 
-export type NewNote = Pick<Note, "story" | "runId" | "imageHash" | "box"> & { readonly text: string };
+export type NewNote = Pick<Note, "story" | "batchId" | "imageHash" | "box"> & { readonly text: string };
 
 /** One session's notes, which is one local folder's. */
 export interface FeedbackView {
@@ -279,8 +279,8 @@ export interface FeedbackView {
   readonly notes: readonly Note[];
   /** Whether `selfie agent-await-feedback` is running in this folder now. */
   readonly agentWaiting: boolean;
-  /** The newest run recorded from this folder, which is the one to look at, if it's known. */
-  readonly latestRunId: string | null;
+  /** The newest batch recorded from this folder, which is the one to look at, if it's known. */
+  readonly latestBatchId: string | null;
 }
 
 /** `agent` to a waiting agent, or `copy` if the person is pasting them somewhere themselves. */
@@ -293,20 +293,20 @@ export type SendVia = "agent" | "copy";
  */
 export interface ReviewSource {
   storiesView(): Promise<StoriesView>;
-  /** Records a run of just these stories from the hosted Storybook, one at a time. */
-  render(stories: readonly string[]): Promise<{ readonly runId: string }>;
-  runView(runId: string): Promise<RunView>;
-  /** Why the run has no baseline: only a screen showing that asks. */
-  baseline(runId: string): Promise<BaselineNote>;
-  runContext(runId: string): Promise<RunContext>;
-  unchanged(runId: string): Promise<readonly SnapshotRow[]>;
-  /** Decides on exactly these images, or refuses all of them if one isn't what the run holds. */
-  decide(runId: string, decision: DecisionKind, targets: readonly DecisionTarget[]): Promise<RunView>;
-  accept(runId: string, removedSeen: number | undefined): Promise<AcceptOutcome>;
+  /** Records a batch of just these stories from the hosted Storybook, one at a time. */
+  render(stories: readonly string[]): Promise<{ readonly batchId: string }>;
+  batchView(batchId: string): Promise<BatchView>;
+  /** Why the batch has no baseline: only a screen showing that asks. */
+  baseline(batchId: string): Promise<BaselineNote>;
+  batchContext(batchId: string): Promise<BatchContext>;
+  unchanged(batchId: string): Promise<readonly RenderRow[]>;
+  /** Decides on exactly these images, or refuses all of them if one isn't what the batch holds. */
+  decide(batchId: string, decision: DecisionKind, targets: readonly DecisionTarget[]): Promise<BatchView>;
+  accept(batchId: string, removedSeen: number | undefined): Promise<AcceptOutcome>;
   feedback(): Promise<FeedbackView>;
   addNote(note: NewNote): Promise<FeedbackView>;
   removeNote(id: number): Promise<FeedbackView>;
-  answerNote(id: number, text: string, runId: string): Promise<FeedbackView>;
+  answerNote(id: number, text: string, batchId: string): Promise<FeedbackView>;
   resolveNote(id: number): Promise<FeedbackView>;
   /** Sends every draft, and answers with all that's been sent, as text to paste into an agent. */
   sendNotes(via: SendVia): Promise<{ readonly feedback: FeedbackView; readonly text: string }>;

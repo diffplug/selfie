@@ -49,7 +49,7 @@ describe("a project's recipe", () => {
     [{ origin: "localhost:6006" }, /origin must be/],
     [{ origin: "http://localhost:6006/path" }, /origin must be/],
     [{ origin: "file:///etc" }, /origin must be/],
-    [{ snapshotGlobal: "a; alert(1)" }, /snapshotGlobal must be/],
+    [{ renderGlobal: "a; alert(1)" }, /renderGlobal must be/],
     [{ fixedTime: "not a date" }, /fixedTime must be/],
     [{ networkQuietMs: -1 }, /networkQuietMs must be/],
     [{ screenshot: { scale: "big" } }, /screenshot.scale must be/],
@@ -63,10 +63,10 @@ describe("environmentId", () => {
   test("is pinned for the default environment", () => {
     // Changing this literal restarts every project's goldens. Upgrading Playwright or editing
     // DEFAULT_RECIPE are the expected reasons, since the ID includes both.
-    expect(environmentId(defineEnvironment())).toBe("container-linux-arm64-f170197017875437");
+    expect(environmentId(defineEnvironment())).toBe("container-linux-arm64-ea45f9652bd46061");
   });
 
-  test("is deterministic and safe in a snapshot name", () => {
+  test("is deterministic and safe in a render name", () => {
     expect(environmentId(defineEnvironment())).toBe(environmentId(defineEnvironment()));
     expect(environmentId(defineEnvironment())).toMatch(/^[a-z0-9-]+$/);
   });

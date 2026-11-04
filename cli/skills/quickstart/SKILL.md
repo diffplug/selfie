@@ -54,17 +54,17 @@ Run the build command from the top of the repository. Then confirm `iframe.html`
 Then render one story for real, which records nothing:
 
 ```sh
-selfie flakes --runs 2 --story '<any story ID from index.json>'
+selfie flakes --times 2 --story '<any story ID from index.json>'
 ```
 
-The first run downloads the browser, which can take minutes, so say that before you start. Exit 0 means it renders. Exit 1 means it rendered and something varied, which is worth reporting and doesn't block anything. Exit 2 means it couldn't run, so stop and show why. If Docker can't get the image for this machine's platform, say so, and that a project can set `environment.runner` in the config.
+The first render downloads the browser, which can take minutes, so say that before you start. Exit 0 means it renders. Exit 1 means it rendered and something varied, which is worth reporting and doesn't block anything. Exit 2 means it couldn't run, so stop and show why. If Docker can't get the image for this machine's platform, say so, and that a project can set `environment.runner` in the config.
 
 ## 4. Look for what will get in their way
 
 Check each of these, and warn about what applies:
 
-- **Uncommitted changes:** `git status --porcelain`, which counts untracked files, and now includes `selfie.config.json`. Rendering still works, but every render is marked as uncommitted, and **no run can be accepted as goldens until the tree is clean**. List the files, and separate the config you just wrote from what was already there. Don't touch them: say what to commit or ignore.
-- **The build isn't ignored:** `git check-ignore <storybookDir>`. If it isn't, the build itself makes every render uncommitted. Say to add it to `.gitignore`.
+- **Uncommitted changes:** `git status --porcelain`, which counts untracked files, and now includes `selfie.config.json`. Rendering still works, but every render is marked as uncommitted, and **no batch can be accepted as goldens until the tree is clean**. List the files, and separate the config you just wrote from what was already there. Don't touch them: say what to commit or ignore.
+- **The built Storybook isn't ignored:** `git check-ignore <storybookDir>`. If it isn't, the built Storybook itself makes every render uncommitted. Say to add it to `.gitignore`.
 - **Not on the default branch:** only goldens on the default branch's history become a baseline for others. `selfie find-baseline` says what this branch would compare with. Say so if a person making their first goldens here should switch branch.
 - **A shallow clone:** `git rev-parse --is-shallow-repository`. Finding a baseline may stop early.
 - **A big Storybook:** say how many stories there are, and that rendering them all takes a while. Don't guess how long from one story.
@@ -80,7 +80,7 @@ Then report, briefly:
 - every warning from step 4, and what to do about each. Leave out the project's own build warnings, such as CSS or bundle sizes, which have nothing to do with Selfie
 - what's next:
   1. In the browser, pick a story and press `c` to render it.
-  2. To make goldens, on a clean tree on the default branch: **Render all**, **Review the newest run**, **Approve all**, **Accept this run**.
+  2. To make goldens, on a clean tree on the default branch: **Render all**, **Review the newest batch**, **Approve all**, **Accept this batch**.
   3. Then change a component on a branch, commit, restart `selfie`, and **Render all**. The tree shows only what changed.
 
 If `selfie flakes` reported anything, mention `selfie skill fix-flakes`.

@@ -6,17 +6,17 @@
 
 **Blockers and advisories.** Dormouse has two stories with real `play` errors, so with every attention item counted, every review of it exited 1 forever, and 1 stopped meaning anything: an agent learns to ignore it, or can't tell the two errors it knew about from a new one. So `play` errors became advisories, which leave the exit code alone. The cost is the one the spec names, that a new `play` failure doesn't change the exit code. A blocker must be something accepting would refuse or a reviewer must decide, and a `play` error is neither. The user hasn't reviewed this.
 
-**Exit 2 and a typo.** A pattern that matches nothing at all is 2, while one typo beside a good pattern is 1: the second run did render something, and would otherwise read as a pass.
+**Exit 2 and a typo.** A pattern that matches nothing at all is 2, while one typo beside a good pattern is 1: the second batch did render something, and would otherwise read as a pass.
 
 **Everything is one document, including failures.** An agent that parses stdout shouldn't need a second path for the failure case. A build command's stdout could break that, so it goes to stderr. Timings are for people, so they went to stderr too.
 
-**Two verbs rather than flags.** `--no-reuse` and `--stability` were flags on `review` because one verb did both jobs. Someone reviewing wants it as fast as possible, and someone recording wants a render, perhaps two a minute apart to look for flakiness, so each is a verb. The `--no-reuse` measurements here are what `selfie record` does now.
+**Two verbs rather than flags.** `--no-reuse` and `--stability` were flags on `review` because one verb did both jobs. Someone reviewing wants it as fast as possible, and someone recording wants a render, perhaps two a minute apart to look for flakiness, so each is a verb. The `--no-reuse` measurements here are what `selfie render` does now.
 
 ## Library
 
-**Facts and verdicts apart.** The local review UI is the next caller. It approves images one at a time, and must show what's left after each without re-rendering, so whatever computes a verdict must take only what `compareRun` returns. `summarizeRun` does, and the CLI's `blockers`, `advisories`, `undecided`, and a refusal's lists all come from it, so they can't disagree.
+**Facts and verdicts apart.** The local review UI is the next caller. It approves images one at a time, and must show what's left after each without re-rendering, so whatever computes a verdict must take only what `compareBatch` returns. `summarizeBatch` does, and the CLI's `blockers`, `advisories`, `undecided`, and a refusal's lists all come from it, so they can't disagree.
 
-**Coded errors.** A UI wanting to tell "no such run" from "not a repository" would otherwise be reading message text.
+**Coded errors.** A UI wanting to tell "no such batch" from "not a repository" would otherwise be reading message text.
 
 ## Local data
 
@@ -26,17 +26,17 @@
 
 ## Review
 
-**A dirty run is recorded, not refused.** Rendering uncommitted work is the point of the loop. It can be compared and approved, and [`accept`](#accept) is where it stops.
+**A dirty batch is recorded, not refused.** Rendering uncommitted work is the point of the loop. It can be compared and approved, and [`accept`](#accept) is where it stops.
 
-**A gitignored built Storybook isn't dirty.** It usually is ignored, so counting it would make every review dirty. The cost is the [open question](cli.md#open-questions) about stale builds.
+**A gitignored built Storybook isn't dirty.** It usually is ignored, so counting it would make every review dirty. The cost is the [open question](cli.md#open-questions) about stale built Storybooks.
 
-**`--baseline` exits 1 on any difference.** Blockers answer "what stops accepting this run", and two runs that differ can have every image approved. Someone looking for flakiness is asking what differs.
+**`--baseline` exits 1 on any difference.** Blockers answer "what stops accepting this batch", and two batches that differ can have every image approved. Someone looking for flakiness is asking what differs.
 
-**A branch's goldens, only to look at.** Reviewing Selfie's own stories on a branch read every story as new, until a run was compared with the branch's own earlier goldens by hand. So a run with no baseline is shown against them. Nothing about acceptance moves: every image still needs its own approval, so an image matching a golden that someone has since rejected is still refused. So what's shown and what's checked can differ. Blockers and the exit code stay with what's checked, or a review could exit 0 before `accept` refused it, and the document's `baseline` stays the real one, with `comparedWith` saying what this review showed.
+**A branch's goldens, only to look at.** Reviewing Selfie's own stories on a branch read every story as added, until a batch was compared with the branch's own earlier goldens by hand. So a batch with no baseline is shown against them. Nothing about acceptance moves: every image still needs its own approval, so an image matching a golden that someone has since rejected is still refused. So what's shown and what's checked can differ. Blockers and the exit code stay with what's checked, or a review could exit 0 before `accept` refused it, and the document's `baseline` stays the real one, with `comparedWith` saying what this review showed.
 
-**Regions, by a recursive 9-slice.** Whole-page render made any change in a page's height a size change, and a size change once compared nothing: on Selfie's own stories, moving one row put 5 of 18 changed stories there with nothing highlighted. Matching from the edges fixed that, but a heading changed near the top and rows moved near the bottom were then one band, where shifted rows ghost. Trimming all four sides and recursing gives the heading its own 182×18 box, and separates changes side by side, which rows alone can't.
+**Hunks, by a recursive 9-slice.** Whole-page render made any change in a page's height a size change, and a size change once compared nothing: on Selfie's own stories, moving one row put 5 of 18 changed stories there with nothing highlighted. Matching from the edges fixed that, but a heading changed near the top and rows moved near the bottom were then one band, where shifted rows ghost. Trimming all four sides and recursing gives the heading its own 182×18 box, and separates changes side by side, which rows alone can't.
 
-**Why anchors must be unique.** The first prototype cut at the longest run of identical rows, and table rows matched the wrong table rows, pairing 27 rows of one image with 153 of the other. Requiring a row that appears once in each stopped that on Selfie's stories, and a story that had split into 11 regions came out as 2.
+**Why anchors must be unique.** The first prototype cut at the longest run of identical rows, and table rows matched the wrong table rows, pairing 27 rows of one image with 153 of the other. Requiring a row that appears once in each stopped that on Selfie's stories, and a story that had split into 11 hunks came out as 2.
 
 **Moved and spacing.** Rows that line up only take a differ so far: a change in one column defeats them, so a list whose thumbnails changed height has its text shift beside them, and the shifted text ghosts, showing in pink twice over. On three real changes:
 
@@ -50,21 +50,21 @@ It takes 4 to 10 ms an image on average, 17 ms at worst, and a story's stats com
 
 **Why the account is checked.** Calling something moved can hide a change, so the claim isn't taken on trust. The current side is rebuilt from what was matched and compared with what's really there, and what the golden had that matched nothing counts too. Without that last part, deleting one block while moving another would read as nothing changed. Measured on the three changes above, it adds 175,318 changed pixels on Selfie's stories, 2,525 on the restyle, and 5,163 on the layout shift, and no story's label depends on it. It's the difference between a label that's usually right and one that can be relied on.
 
-**Why a region must gain from it.** Rebuilding a region that was restyled counts its pixels on both sides, so taking moves everywhere made the restyle above 18% worse than comparing in place, in a prototype. Comparing whichever is better fixes that, and a region compared in place gives up its blocks, since its pixels are already judged where they are.
+**Why a hunk must gain from it.** Rebuilding a hunk that was restyled counts its pixels on both sides, so taking moves everywhere made the restyle above 18% worse than comparing in place, in a prototype. Comparing whichever is better fixes that, and a hunk compared in place gives up its blocks, since its pixels are already judged where they are.
 
-**Why matching crosses regions.** Moving a button sideways leaves matching columns between where it was and where it is, so the 9-slice makes two regions, and neither alone holds a move. The most obvious kind of move read as two changes until blocks could match across regions.
+**Why matching crosses hunks.** Moving a button sideways leaves matching columns between where it was and where it is, so the 9-slice makes two hunks, and neither alone holds a move. The most obvious kind of move read as two changes until blocks could match across hunks.
 
-**Why what spacing pushes along has stayed put.** A block's place is measured within its region, past any spacing. Measured in the image instead, everything below a gap that grew read as moved, and a page with a taller gap, a moved button, and a changed footer was blue from top to bottom, with the one thing that really moved lost in it.
+**Why what spacing pushes along has stayed put.** A block's place is measured within its hunk, past any spacing. Measured in the image instead, everything below a gap that grew read as moved, and a page with a taller gap, a moved button, and a changed footer was blue from top to bottom, with the one thing that really moved lost in it.
 
 **Why a block has a minimum size.** A single pixel identical to one elsewhere is a coincidence, and a row of little ones floods the document. Letting blocks of any size move gave 131 entries on the layout shift, against 75 at 9 pixels, for 593,522 changed pixels against 595,950, and the same 59 stories. 25 pixels was hardly different again, at 73 entries and 597,639, so 9 is what's small enough to keep a 3×3 bullet.
 
 **Why spacing is tied to what's around it.** A solid row looks the same whether it's a gap that grew or a new banner. A band of the background, or of the color just outside it, can only read as a gap. A banner the color of what's around it, or one that grew, reads as spacing, which is what it looks like on the page too.
 
-**Why moved stories still need a decision.** A layout shift can be the bug. The label says how little there is to look at, and the "Moved and spacing only" filter means a person can approve them all at once, but that's their decision to make. It also keeps what a run's blockers and exit code say from depending on how a differ reads pixels.
+**Why moved stories still need a decision.** A layout shift can be the bug. The label says how little there is to look at, and the "Moved and spacing only" filter means a person can approve them all at once, but that's their decision to make. It also keeps what a batch's blockers and exit code say from depending on how a differ reads pixels.
 
-**Why the merge distance only groups.** It first changed the regions themselves, which meant it changed diff images, two caches keyed without it, and any approval keyed by a region's content. So regions are now a pure result of two images, and grouping happens when something is shown, so a project can change its distance freely.
+**Why the merge distance only groups.** It first changed the hunks themselves, which meant it changed diff images, two caches keyed without it, and any approval keyed by a hunk's content. So hunks are now a pure result of two images, and grouping happens when something is shown, so a project can change its distance freely.
 
-**Why the cut sizes don't follow the scale.** A 2x render cuts at half the CSS size, which only makes regions finer, and grouping follows the scale. Scaling the cuts would make a diff depend on more than its two images.
+**Why the cut sizes don't follow the scale.** A 2x render cuts at half the CSS size, which only makes hunks finer, and grouping follows the scale. Scaling the cuts would make a diff depend on more than its two images.
 
 **Why the distance leans small.** On a style tweak to dormouse changing 290 of 541 stories, groups by distance totaled 1,694 at 12 px, 1,061 at 48, 693 at 96, and 467 at 200, with the most in one story falling from 19 to 6. Selfie's own two-edit change gave 2 at every distance. Much of dormouse's count is the four corners of a rounded button, whose middle didn't change. Someone can select groups to join them, and nothing yet splits one, so too many is the error to prefer.
 
@@ -76,21 +76,21 @@ It takes 4 to 10 ms an image on average, 17 ms at worst, and a story's stats com
 
 ## Output directories
 
-**Pruning loses no facts.** Run directories were first where a run's dirty flag and baseline lived, so pruning one stopped it being acted on, and made the rule against accepting dirty runs depend on a file. Those moved to the store (`docs/specs/snapshots.rationale.md` → Runs), and `review.json` can be deleted at any time.
+**Pruning loses no facts.** Batch directories were first where a batch's dirty flag and baseline lived, so pruning one stopped it being acted on, and made the rule against accepting dirty batches depend on a file. Those moved to the store (`docs/specs/renders.rationale.md` → Render batches), and `review.json` can be deleted at any time.
 
-**Per-run directories rather than one reused one.** A reused directory would be smaller to describe, but a concurrent review, or an agent still reading the last review's images, would see files change underneath it. A run ID in the path also means a run's JSON keeps pointing at its own images.
+**Per-batch directories rather than one reused one.** A reused directory would be smaller to describe, but a concurrent review, or an agent still reading the last review's images, would see files change underneath it. A batch ID in the path also means a batch's JSON keeps pointing at its own images.
 
-**Twenty.** It is meant to outlast an agent's review, fix, review cycle within one task, and be small. Run directories only hold what differs: the 541-story review with nothing changed left 48 KB, holding the images of the 2 stories with `play` errors, and one with 130 changed stories left 14 MB, or about 110 KB per changed story. Twenty runs each changing all 541 would hold about 1.2 GB. A render directory holds every story's PNG, so it can't outlive its review.
+**Twenty.** It is meant to outlast an agent's review, fix, review cycle within one task, and be small. Batch directories only hold what differs: the 541-story review with nothing changed left 48 KB, holding the images of the 2 stories with `play` errors, and one with 130 changed stories left 14 MB, or about 110 KB per changed story. Twenty batches each changing all 541 would hold about 1.2 GB. A render directory holds every story's PNG, so it can't outlive its review.
 
-**The store still grows.** Blobs grow only with new images, but nothing deletes either them or a run's rows: `docs/specs/snapshots.md` → Open questions owns retention. After the 12 runs below and in the sample loop, holding 2,914 run rows and 650 images, `store.db` was 512 KB and `blobs/` 25 MB.
+**The store still grows.** Blobs grow only with new images, but nothing deletes either them or a batch's rows: `docs/specs/renders.md` → Open questions owns retention. After the 12 batches below and in the sample loop, holding 2,914 batch rows and 650 images, `store.db` was 512 KB and `blobs/` 25 MB.
 
 ## Accept
 
-**Only how the run was recorded.** The images come from the moment it rendered, so review with an edit in place, `git checkout .`, and the tree is clean while the run's images aren't that commit's. The same goes for reviewing dirty and committing, where the run's SHA is the commit before the edit. Either way a golden would misdescribe its SHA. A check of the tree as it is now adds nothing to that: a run recorded clean describes its SHA whatever has happened to the tree since. Refusing a dirty run costs one more render after committing, and no approvals, since those carry over. `cli/test/commands.test.ts` covers both.
+**Only how the batch was recorded.** The images come from the moment it rendered, so review with an edit in place, `git checkout .`, and the tree is clean while the batch's images aren't that commit's. The same goes for reviewing dirty and committing, where the batch's SHA is the commit before the edit. Either way a golden would misdescribe its SHA. A check of the tree as it is now adds nothing to that: a batch recorded clean describes its SHA whatever has happened to the tree since. Refusing a dirty batch costs one more render after committing, and no approvals, since those carry over. `cli/test/commands.test.ts` covers both.
 
 **Reporting every refusal at once.** An agent otherwise fixes one, runs again, and finds the next.
 
-**No extra gate for a filtered run.** `acceptRun`'s count already catches it, and the refusal says how many removals are only outside the filter. A person who wants a partial golden set can have one, and the rest read as new later, with their approvals intact.
+**No extra gate for a filtered batch.** `acceptBatch`'s count already catches it, and the refusal says how many removals are only outside the filter. A person who wants a partial golden set can have one, and the rest read as added later, with their approvals intact.
 
 **`usableAsBaseline`.** Accepting on a feature branch succeeds, and no later review reads the result, since a baseline comes from the default branch's history. That's correct by the README's definition, and surprising, so it's reported rather than refused. Off-branch goldens may still be wanted by a later sync.
 
@@ -108,7 +108,7 @@ It takes 4 to 10 ms an image on average, 17 ms at worst, and a story's stats com
 
 **One file, in one place.** Every command that needs an environment must find the same one, or `find-baseline` and `review` disagree. `--config` and `--init-script` let them, so they went. A file at the Git top level does the job without a flag on each call. `--native` stays, for a machine trying something locally, since a checked-in file shouldn't choose that.
 
-**A build command in the config, only when asked.** This was once refused, since reading a command from a file lets a checkout run a shell, and rendering is otherwise safe on an untrusted one: stories run in a container with no network. But a project's build is a fact about that project, and retyping it is the friction `selfie` alone exists to remove. So it's in the config, and runs only for someone who asked for that build, by typing `selfie` or `--build`, and it prints first. What's given up: `selfie` in a stranger's checkout runs their command. `--no-build` is the way not to, and `selfie record`, `review`, and `ui` still never do it by themselves, so CI and agents can't run it by accident.
+**A build command in the config, only when asked.** This was once refused, since reading a command from a file lets a checkout run a shell, and rendering is otherwise safe on an untrusted one: stories run in a container with no network. But a project's build is a fact about that project, and retyping it is the friction `selfie` alone exists to remove. So it's in the config, and runs only for someone who asked for that build, by typing `selfie` or `--build`, and it prints first. What's given up: `selfie` in a stranger's checkout runs their command. `--no-build` is the way not to, and `selfie render`, `review`, and `ui` still never do it by themselves, so CI and agents can't run it by accident.
 
 
 **A config can't name a file outside itself.** A checkout's config file isn't the user's choice in the way a flag is. An init script is only ever run in the browser, with no network, so this is a small precaution at the cost of one check.
@@ -119,36 +119,36 @@ It takes 4 to 10 ms an image on average, 17 ms at worst, and a story's stats com
 
 | 541-story review | Exit | Wall | Render | Store | Compare | Diff |
 |---|---|---|---|---|---|---|
-| First, 512 new images, 29 unchanged | 1 | 72.3 s | 63.1 s | 8.9 s | 2 ms | 56 ms |
+| First, 512 added images, 29 unchanged | 1 | 72.3 s | 63.1 s | 8.9 s | 2 ms | 56 ms |
 | Nothing changed, twice | 0 | 68.6 s, 70.1 s | 64.2 s, 65.7 s | 4.2 s, 4.1 s | 1 ms, 1 ms | 3 ms, 3 ms |
 | 130 changed by a CSS color | 1 | 73.9 s | 66.6 s | 5.3 s | 1 ms | 1,656 ms |
 
-The exit 0 row lists dormouse's 2 `play` errors as advisories. Render is most of the time, as `docs/specs/render.rationale.md` found. Storing costs about 7.6 ms per image to decode and hash when it's already stored, and about 17 ms when it's new. A diff costs about 13 ms per changed story, for decoding two images, comparing 1.08 million pixels, and encoding. `approve` and `accept` take about 0.2 s on the same store, including on a run of 541 whose directory had been deleted.
+The exit 0 row lists dormouse's 2 `play` errors as advisories. Render is most of the time, as `docs/specs/render.rationale.md` found. Storing costs about 7.6 ms per image to decode and hash when it's already stored, and about 17 ms when it's new. A diff costs about 13 ms per changed story, for decoding two images, comparing 1.08 million pixels, and encoding. `approve` and `accept` take about 0.2 s on the same store, including on a batch of 541 whose directory had been deleted.
 
 **The loop on the 30-story sample** takes about 4.8 s, of which render is about 4.3 s, storing about 280 ms, and comparing about 1 ms. A CSS color change touching 10 of the 30 added about 175 ms of diff work.
 
 ## Recording only if necessary
 
-**Measured 2026-11**, as in [End to end](#end-to-end), in the real container, on a scratch repository and a new store. On a reused run, "render" is hashing the built Storybook and reading the earlier run's rows, about 20 ms for 333 files and 12 MB, so a built Storybook many times this size still costs little beside a render.
+**Measured 2026-11**, as in [End to end](#end-to-end), in the real container, on a scratch repository and a new store. On a reused batch, "render" is hashing the built Storybook and reading the earlier batch's rows, about 20 ms for 333 files and 12 MB, so a built Storybook many times this size still costs little beside a render.
 
 | 541-story review | Exit | Wall | Render | Store | Diff |
 |---|---|---|---|---|---|
-| First, 541 new | 1 | 71.8 s | 62.4 s | 9.0 s | 64 ms |
+| First, 541 added | 1 | 71.8 s | 62.4 s | 9.0 s | 64 ms |
 | Rendered again with `--no-reuse`, nothing changed, twice | 0 | 70.1 s, 70.5 s | 65.7 s, 66.0 s | 4.1 s, 4.1 s | 4 ms, 3 ms |
-| Same SHA, all still new, reused, twice | 1 | 0.38 s, 0.35 s | 20 ms, 20 ms | 37 ms, 37 ms | 57 ms, 54 ms |
+| Same SHA, all still added, reused, twice | 1 | 0.38 s, 0.35 s | 20 ms, 20 ms | 37 ms, 37 ms | 57 ms, 54 ms |
 | New commit, nothing changed, reused, twice | 0 | 0.25 s, 0.25 s | 21 ms, 20 ms | 16 ms, 16 ms | 1 ms, 1 ms |
 | One byte of CSS, 80 stories changed | 1 | 70.2 s | 64.0 s | 4.8 s | 1,130 ms |
 | That built Storybook again, reused | 1 | 1.36 s | 22 ms | 15 ms | 1,086 ms |
-| Filtered to 30, answered from the whole run, twice | 0 | 0.25 s, 0.26 s | 23 ms, 22 ms | 12 ms, 13 ms | 1 ms, 1 ms |
+| Filtered to 30, answered from the whole batch, twice | 0 | 0.25 s, 0.26 s | 23 ms, 22 ms | 12 ms, 13 ms | 1 ms, 1 ms |
 | Filtered to 30, `--no-reuse`, to compare | 0 | 5.3 s | 4.8 s | 280 ms | 1 ms |
 
 The estimate here was about 0.5 s, and the feature came in at about 0.25 s of wall time, of which about 85 ms is the review and the rest is starting Node.
 
-**Reused results match a real render.** Two `--no-reuse` renders and three reused runs each held the same image hash, failure, and `play` error as the first render, on 541 of 541 stories. A reused review of the 80-story change listed the same stories, states, hashes, and pixel diffs as the render it reused.
+**Reused results match a real render.** Two `--no-reuse` renders and three reused batches each held the same image hash, failure, and `play` error as the first render, on 541 of 541 stories. A reused review of the 80-story change listed the same stories, states, hashes, and pixel diffs as the render it reused.
 
 **One byte can change nothing, and that's right.** Two one-byte edits of `iframe-*.css` made invalid values (`display:flew`, `background-colox`), rendered, and reported 0 changes: those rules are also in `pocket-chrome-*.css`, so the browser used the duplicate. `.bg-transparent` from `#0000` to `#000f` is valid in the last sheet loaded, and changed 80 stories. A miss only means a render happens: what it reports is the render's own answer.
 
-**Do real builds reproduce? Yes, once two things are left out.** Measured by building each project repeatedly with no source change and comparing with `diff -r`, with `STORYBOOK_DISABLE_TELEMETRY=1`:
+**Do real built Storybooks reproduce? Yes, once two things are left out.** Measured by building each project repeatedly with no source change and comparing with `diff -r`, with `STORYBOOK_DISABLE_TELEMETRY=1`:
 
 | Project | Builds | What differed |
 |---|---|---|
@@ -167,25 +167,27 @@ Without leaving these out, every built Storybook hashed differently and the feat
 
 **Which errors may be reused.** On dormouse's 541 stories, a real render's only errors were 2 `play` and the 2 `console` lines those same failures log. `play`, `console`, and `page` come from the project's own code, the same built Storybook repeats them, and none of them fails a story. `request` and the soft network `timeout` aren't reused: both can come from load, and neither is visible afterward, since a row doesn't record them. An allowed list means a new source starts out unreusable. The cost is that a project whose page always makes a failing off-origin request never reuses, and stderr names the story and the error. A `play` failure that depends on load is replayed too, which is a real gap: it stays listed as an advisory, and `--no-reuse` measures it again.
 
-**A filter is answered only from a whole run.** A whole run holds every answer, and a filtered render is at most a few seconds, so it isn't worth a second key to remember one. On the 30-story sample a hit takes 0.25 s against 5.3 s, once a whole run of that built Storybook exists.
+**A filter is answered only from a whole batch.** A whole batch holds every answer, and a filtered render is at most a few seconds, so it isn't worth a second key to remember one. On the 30-story sample a hit takes 0.25 s against 5.3 s, once a whole batch of that built Storybook exists.
 
-**A run's built Storybook isn't `render_keys`.** Those keys say what a later review may skip rendering, so they hold only a built Storybook's newest reusable render, and forget reused, filtered, and failed runs. `selfie ui` asked them first, and called all of those a different build. So a run says for itself, by a hash of the built Storybook's own files, since the environment and the renderer's code don't change whether a story's page is the one in the image.
+**A batch's built Storybook isn't `render_keys`.** Those keys say what a later review may skip rendering, so they hold only a built Storybook's newest reusable render, and forget reused, filtered, and failed batches. `selfie ui` asked them first, and called all of those a different build. So a batch says for itself, by a hash of the built Storybook's own files, since the environment and the renderer's code don't change whether a story's page is the one in the image.
 
-**Provenance is on the run, and the key is local.** `reused_from_run` is a fact about the run, which `accept`, the UI, and later `trust` all want, so it's read with the run, with no second lookup. `render_keys` is only what this machine rendered, which nothing in the cloud needs. It must outlive a pruned `review.json`, and in `store.db` it lives and dies with the runs it names. After 15 runs here it held 2 rows.
+**Provenance is on the batch, and the key is local.** `reused_from_batch` is a fact about the batch, which `accept`, the UI, and later `trust` all want, so it's read with the batch, with no second lookup. `render_keys` is only what this machine rendered, which nothing in the cloud needs. It must outlive a pruned `review.json`, and in `store.db` it lives and dies with the batches it names. After 15 batches here it held 2 rows.
 
-**A column added to `runs`, against the rule.** `docs/specs/store.md` → Open questions allows only new tables and indexes until migrations are decided, and `CREATE TABLE IF NOT EXISTS` can't add a column. It was made anyway since no project database holds this schema yet, and a separate table was the alternative. On a copy of an older store, `selfie review` renders and then fails with exit 2, `table runs has no column named reused_from_run`, and `accept` fails with `no such column: reused_from_run`. Anyone with a store from before this has to delete it.
+**A column added to `render_batches`, against the rule.** `docs/specs/store.md` → Open questions allows only new tables and indexes until migrations are decided, and `CREATE TABLE IF NOT EXISTS` can't add a column. It was made anyway since no project database holds this schema yet, and a separate table was the alternative. On a copy of an older store, `selfie review` renders and then fails with exit 2, `table render_batches has no column named reused_from_batch`, and `accept` fails with `no such column: reused_from_batch`. Anyone with a store from before this has to delete it.
 
-**`scale`, another column on `runs`.** The same exception, for the same reason, and it comes in the same unmerged stack, so it breaks no store that `reused_from_run` hadn't already. It's a fact about one run that every viewer wants with the run, so a separate table would only add a lookup.
+**Renaming tables and columns, against the same rule.** Calling a run a render batch renamed `runs`, `run_snapshots`, and `run_storybooks`, and columns such as `goldens.run_key`, `render_keys.run_id`, and `note_sessions.latest_batch`. `CREATE TABLE IF NOT EXISTS` leaves an older store's tables as they were, so `selfie render` on one stops with an error such as `table note_sessions has no column named latest_batch`. Nothing was published and no project database existed, so anyone with an older store deletes it rather than this carrying a migration.
 
-**A run at this commit needs no copy.** A review repeated at one commit used to copy every row into a new run, for nothing. A new commit still needs its own run, since goldens are per SHA, and so does a tree that became dirty or a baseline that moved, since a run records both.
+**`scale`, another column on `render_batches`.** The same exception, for the same reason, and it comes in the same unmerged stack, so it breaks no store that `reused_from_batch` hadn't already. It's a fact about one batch that every viewer wants with the batch, so a separate table would only add a lookup.
 
-**The newest real render wins.** Pointing a key at the newest reused run would let `reusedFromRun` name a run that rendered nothing, so reuse never chains. Forgetting a key after a bad render means `--no-reuse` can't uncover a deterministic failure only to have the next review hide it behind an older pass.
+**A batch at this commit needs no copy.** A review repeated at one commit used to copy every row into a new batch, for nothing. A new commit still needs its own batch, since goldens are per SHA, and so does a tree that became dirty or a baseline that moved, since a batch records both.
 
-**What a reused run can't change.** It's still only as good as its built Storybook. A clean tree with a stale gitignored build records stale pixels against the new SHA whether or not it renders, so reuse neither fixes nor worsens [that open question](cli.md#open-questions).
+**The newest real render wins.** Pointing a key at the newest reused batch would let `reusedFromBatch` name a batch that rendered nothing, so reuse never chains. Forgetting a key after a bad render means `--no-reuse` can't uncover a deterministic failure only to have the next review hide it behind an older pass.
 
-**What a diff cache would save.** A reused run with 80 changes spent 1,086 ms of its 1.36 s on diffs it had already computed, about 13 ms a story, which is why it stays in `docs/specs/cli.md` → Future.
+**What a reused batch can't change.** It's still only as good as its built Storybook. A clean tree with a stale gitignored build records stale pixels against the new SHA whether or not it renders, so reuse neither fixes nor worsens [that open question](cli.md#open-questions).
 
-**What copying rows costs.** Each reused run writes 541 rows. A review of this feature estimated about 450 MB a year at 50 hits a day. In the store above, `run_snapshots` held 5,560 rows in 376,832 bytes by `dbstat`, or 68 bytes a row including page overhead and 2 stories' `play` messages, which comes to about 670 MB for the same 18,250 runs. Either is small beside D1's 10 GB, and these rows are local, but it has no bound, as `docs/specs/snapshots.md` → Storing only what changed says of every run.
+**What a diff cache would save.** A reused batch with 80 changes spent 1,086 ms of its 1.36 s on diffs it had already computed, about 13 ms a story, which is why it stays in `docs/specs/cli.md` → Future.
+
+**What copying rows costs.** Each reused batch writes 541 rows. A review of this feature estimated about 450 MB a year at 50 hits a day. In the store above, `renders` held 5,560 rows in 376,832 bytes by `dbstat`, or 68 bytes a row including page overhead and 2 stories' `play` messages, which comes to about 670 MB for the same 18,250 batches. Either is small beside D1's 10 GB, and these rows are local, but it has no bound, as `docs/specs/renders.md` → Storing only what changed says of every batch.
 
 ## selfie alone
 
@@ -195,7 +197,7 @@ Without leaving these out, every built Storybook hashed differently and the feat
 
 ## Flakes
 
-**Why a command, when `review --baseline` already compares two runs.** That records runs, and compares just two, and a run keeps only a render's `play` errors. So the network wait on two stories showed as one line naming one of them, and nothing showed for a play failure that came and went. Measured on this repository's 134 stories, 2026-11: comparing four whole runs that way took about 3 minutes, and gave no way to see the rest.
+**Why a command, when `review --baseline` already compares two batches.** That records batches, and compares just two, and a batch keeps only a render's `play` errors. So the network wait on two stories showed as one line naming one of them, and nothing showed for a play failure that came and went. Measured on this repository's 134 stories, 2026-11: comparing four whole batches that way took about 3 minutes, and gave no way to see the rest.
 
 **What counts.** A `play`, `console`, or `page` error in every render is the project's own code being wrong in the same way, which `review` already says. In only some renders, it's a flake. A `timeout` or a `request` error counts even in every render: the image may be the same each time so far, but it only got there by running out the wait.
 

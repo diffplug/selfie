@@ -6,7 +6,7 @@
 
 ## Notes
 
-**Why any story.** The first thing a person wants to say to an agent while dogfooding Selfie's own UI is "this looks wrong", usually on a story that didn't change, or that's new because nothing has a golden yet. Notes only on changes would miss most of it.
+**Why any story.** The first thing a person wants to say to an agent while dogfooding Selfie's own UI is "this looks wrong", usually on a story that didn't change, or that's added because nothing has a golden yet. Notes only on changes would miss most of it.
 
 **Why notes don't decide anything.** A decision is a claim about whether an image is right, and a note is a request. Keeping them apart means `accept` has nothing new to reason about, and a person can write "make this bigger" on an image they'd still approve.
 
@@ -22,11 +22,11 @@
 
 **Why only a person closes a note.** It's the same reason moved stories need a decision: the agent is the one claiming it's fixed, so it can't also be the one saying so.
 
-## A new run
+## A new batch
 
-**Comparing with a note, with no golden.** The loop this exists for often starts on a story with no golden: someone looks at a live story, notes what's wrong, and an agent changes it. Without this, both images would read as new, with nothing to compare, which is the one moment a person most wants a diff.
+**Comparing with a note, with no golden.** The loop this exists for often starts on a story with no golden: someone looks at a live story, notes what's wrong, and an agent changes it. Without this, both images would read as added, with nothing to compare, which is the one moment a person most wants a diff.
 
-**Why no stacking.** Stepping through diffs from run to run raises what each is against, and how to show it, before anyone has needed it. One run, one diff, and one image per note answers "did this get fixed?" with a single flip. Earlier runs are still reachable by URL.
+**Why no stacking.** Stepping through diffs from run to run raises what each is against, and how to show it, before anyone has needed it. One batch, one diff, and one image per note answers "did this get fixed?" with a single flip. Earlier batches are still reachable by URL.
 
 **Why a banner, and not switching.** A person reading an image shouldn't have it change under them because an agent finished. Whether someone actively waiting would rather it switched is an open question for using it.
 

@@ -1,4 +1,4 @@
-// Runs inside workerd against its local R2 binding. Nothing here crosses to Node.
+// Batches inside workerd against its local R2 binding. Nothing here crosses to Node.
 
 import { afterEach, describe, expect, it } from "vitest";
 import { R2BlobStorage, type R2BucketLike } from "selfie-store/adapters/r2";

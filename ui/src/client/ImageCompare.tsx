@@ -3,15 +3,15 @@
 // is looking stays the same from story to story, since this stays mounted across them.
 import { Button, SegmentedControl, Stack, Text } from "@primer/react";
 import { useEffect, useLayoutEffect, useRef, useState, type ReactEventHandler, type ReactNode } from "react";
-import type { BoundingBox, Note, PixelDiff, SnapshotRow } from "../shared/api.ts";
+import type { BoundingBox, Note, PixelDiff, RenderRow } from "../shared/api.ts";
 import { comparedImage, isOpenNote, newestNotedImage } from "../shared/notes.ts";
-import { hull, type RegionGroup } from "../shared/regions.ts";
+import { hull, type HunkGroup } from "../shared/hunks.ts";
 import { diffImageUrl, imageUrl } from "./api.ts";
-import { useDevicePixelRatio, useHotkeys, type FeedbackState, type RegionSelection } from "./hooks.ts";
+import { useDevicePixelRatio, useHotkeys, type FeedbackState, type HunkSelection } from "./hooks.ts";
 import { Keys } from "./Keys.tsx";
 import { NotesPanel } from "./NotesPanel.tsx";
 import { plural } from "./plural.ts";
-import { RegionList } from "./RegionList.tsx";
+import { HunkList } from "./HunkList.tsx";
 import { stepped } from "./selection.ts";
 import { useDrawnBox } from "./useDrawnBox.ts";
 
@@ -33,7 +33,7 @@ interface Source {
   readonly hash: string | null;
 }
 
-function sourcesOf({ imageHash, goldenHash }: SnapshotRow, hasDiffImage: boolean, noted: string | null, compared: string | null): readonly Source[] {
+function sourcesOf({ imageHash, goldenHash }: RenderRow, hasDiffImage: boolean, noted: string | null, compared: string | null): readonly Source[] {
   const sources: Source[] = [];
   if (noted !== null && noted !== imageHash && noted !== goldenHash) sources.push({ name: "noted", src: imageUrl(noted), hash: noted });
   if (goldenHash !== null) sources.push({ name: "golden", src: imageUrl(goldenHash), hash: goldenHash });
@@ -43,18 +43,18 @@ function sourcesOf({ imageHash, goldenHash }: SnapshotRow, hasDiffImage: boolean
 }
 
 /**
- * Where a region is in whichever image is showing, where the diff is drawn on the current one. A
- * region is between those two images, so on any other it isn't anywhere.
+ * Where a hunk is in whichever image is showing, where the diff is drawn on the current one. A
+ * hunk is between those two images, so on any other it isn't anywhere.
  */
-const boxOn = ({ current, golden }: RegionGroup, layer: Layer): BoundingBox | null => (layer === "noted" ? null : layer === "golden" ? golden : current);
+const boxOn = ({ current, golden }: HunkGroup, layer: Layer): BoundingBox | null => (layer === "noted" ? null : layer === "golden" ? golden : current);
 
-/** So a region too big to center doesn't sit right against the edge. */
+/** So a hunk too big to center doesn't sit right against the edge. */
 const MARGIN = 16;
 
 type Size = { readonly width: number; readonly height: number };
 
 /** Over one image, as shares of its size, so at any zoom. The list says the same to assistive technology. */
-function RegionOutlines({ groups, layer, size, selection }: { groups: readonly RegionGroup[]; layer: Layer; size: Size; selection: RegionSelection }) {
+function HunkOutlines({ groups, layer, size, selection }: { groups: readonly HunkGroup[]; layer: Layer; size: Size; selection: HunkSelection }) {
   const { selected, focused, toggle, setFocused } = selection;
   return (
     <div className="selfie-outlines" aria-hidden="true">
@@ -63,8 +63,8 @@ function RegionOutlines({ groups, layer, size, selection }: { groups: readonly R
         return (
           box !== null && <div
             key={index}
-            className="selfie-region"
-            data-region={index}
+            className="selfie-hunk"
+            data-hunk={index}
             data-kind={group.kind}
             data-selected={selected.has(index) || undefined}
             data-focused={focused === index || undefined}
@@ -74,7 +74,7 @@ function RegionOutlines({ groups, layer, size, selection }: { groups: readonly R
               setFocused(index);
             }}
           >
-            <span className="selfie-region-number" data-kind={group.kind}>
+            <span className="selfie-hunk-number" data-kind={group.kind}>
               {index + 1}
             </span>
           </div>
@@ -124,18 +124,18 @@ function Pane({ layer, src, story, onOpen, onLoad, children }: { layer: Layer; s
 }
 
 interface ImageCompareProps {
-  readonly row: SnapshotRow;
+  readonly row: RenderRow;
   readonly diff: PixelDiff | null;
   readonly scale: number;
-  readonly groups: readonly RegionGroup[];
-  readonly selection: RegionSelection;
-  readonly runId: string;
+  readonly groups: readonly HunkGroup[];
+  readonly selection: HunkSelection;
+  readonly batchId: string;
   readonly feedback: FeedbackState;
   /** Puts someone in the note box from the start, having just asked to write one. */
   readonly startNote?: boolean;
 }
 
-export function ImageCompare({ row, diff, scale, groups, selection, runId, feedback, startNote = false }: ImageCompareProps) {
+export function ImageCompare({ row, diff, scale, groups, selection, batchId, feedback, startNote = false }: ImageCompareProps) {
   const { story, imageHash, goldenHash } = row;
   const allNotes = feedback.view?.notes ?? [];
   const storyNotes = allNotes.filter((note) => note.story === story);
@@ -144,8 +144,8 @@ export function ImageCompare({ row, diff, scale, groups, selection, runId, feedb
   const compared = comparedImage(row, notedImage);
   const sources = sourcesOf(row, diff !== null, notedImage, compared?.hash ?? null);
   const canFlip = compared !== null;
-  // Regions are between the current image and what it's compared with, whichever image that is.
-  const regionLayer = (on: Layer): Layer => (on === "noted" && compared?.layer === "noted" ? "golden" : on);
+  // Hunks are between the current image and what it's compared with, whichever image that is.
+  const hunkLayer = (on: Layer): Layer => (on === "noted" && compared?.layer === "noted" ? "golden" : on);
   const box = diff?.boundingBox ?? null;
   const firstChanged = diff?.firstChanged ?? null;
 
@@ -205,33 +205,33 @@ export function ImageCompare({ row, diff, scale, groups, selection, runId, feedb
     // A box too big for the viewport may show nothing changed at its center, as when two distant
     // pixels changed, so go to a pixel that certainly did.
     const whole = fits(box) || firstChanged === null ? box : { ...firstChanged, width: 1, height: 1 };
-    goToBox((focusedGroup === null ? null : boxOn(focusedGroup, regionLayer(layer))) ?? whole);
+    goToBox((focusedGroup === null ? null : boxOn(focusedGroup, hunkLayer(layer))) ?? whole);
   };
 
   // A small change is usually off-screen when zoomed, so go to it whenever the zoom changes, and as
-  // soon as the image and the change are known. Never on just looking at another region or layer.
+  // soon as the image and the change are known. Never on just looking at another hunk or layer.
   useLayoutEffect(() => {
     if (mode === "flip" && allSized) center();
   }, [mode, allSized, cssPixels, box, firstChanged]);
 
-  // A region can be somewhere else in the golden, so keep the one being looked at still when flipping,
+  // A hunk can be somewhere else in the golden, so keep the one being looked at still when flipping,
   // which is what makes a flip show it changing and not the page jumping.
   const flippedFrom = useRef(layer);
   useLayoutEffect(() => {
     const from = flippedFrom.current;
     flippedFrom.current = layer;
     if (from === layer || focusedGroup === null) return;
-    const [was, now] = [boxOn(focusedGroup, regionLayer(from)), boxOn(focusedGroup, regionLayer(layer))];
+    const [was, now] = [boxOn(focusedGroup, hunkLayer(from)), boxOn(focusedGroup, hunkLayer(layer))];
     if (was !== null && now !== null) viewport.current?.scrollBy((now.x - was.x) * cssPixels, (now.y - was.y) * cssPixels);
   }, [layer]);
 
-  const goToRegion = (index: number | null) => {
+  const goToHunk = (index: number | null) => {
     if (index === null) return;
     setFocused(index);
-    const box = boxOn(groups[index]!, regionLayer(layer));
+    const box = boxOn(groups[index]!, hunkLayer(layer));
     if (mode === "flip") {
       if (box !== null) goToBox(box);
-    } else section.current?.querySelector(`[data-region="${index}"]`)?.scrollIntoView({ block: "center" });
+    } else section.current?.querySelector(`[data-hunk="${index}"]`)?.scrollIntoView({ block: "center" });
   };
 
   const hashOn = (on: Layer) => sources.find(({ name }) => name === on)?.hash ?? null;
@@ -239,18 +239,18 @@ export function ImageCompare({ row, diff, scale, groups, selection, runId, feedb
   const outlinesOn = (on: Layer, size: Size | undefined) =>
     size !== undefined && (
       <>
-        {outlined && <RegionOutlines groups={groups} layer={regionLayer(on)} size={size} selection={selection} />}
+        {outlined && <HunkOutlines groups={groups} layer={hunkLayer(on)} size={size} selection={selection} />}
         <NoteBoxes notes={openNotes.filter(({ imageHash: noted }) => noted === hashOn(on))} drawn={mode === "flip" ? drawn : null} size={size} />
       </>
     );
 
-  const selectedBoxes = [...selected].flatMap((index) => boxOn(groups[index]!, regionLayer(layer)) ?? []);
+  const selectedBoxes = [...selected].flatMap((index) => boxOn(groups[index]!, hunkLayer(layer)) ?? []);
   const noteBox = drawn ?? (selectedBoxes.length === 0 ? null : selectedBoxes.reduce(hull));
   const imageWords = hashOn(layer) === null ? "this story" : LAYER_IMAGE_WORDS[layer];
-  const noteTarget = drawn !== null ? `on the box you drew on ${imageWords}` : selectedBoxes.length > 0 ? `on ${plural(selectedBoxes.length, "selected region")} of ${imageWords}` : `on all of ${imageWords}`;
+  const noteTarget = drawn !== null ? `on the box you drew on ${imageWords}` : selectedBoxes.length > 0 ? `on ${plural(selectedBoxes.length, "selected hunk")} of ${imageWords}` : `on all of ${imageWords}`;
 
   const addNote = async (text: string) => {
-    const saved = await feedback.add({ story, runId, imageHash: hashOn(layer), box: noteBox, text });
+    const saved = await feedback.add({ story, batchId, imageHash: hashOn(layer), box: noteBox, text });
     if (saved) {
       clearDrawn();
       setSelected(new Set());
@@ -283,12 +283,12 @@ export function ImageCompare({ row, diff, scale, groups, selection, runId, feedb
       setMode("flip");
       setLayer(layer === "noted" ? "current" : "noted");
     },
-    n: () => goToRegion(stepped(focused, groups.length, 1)),
-    p: () => goToRegion(stepped(focused, groups.length, -1)),
+    n: () => goToHunk(stepped(focused, groups.length, 1)),
+    p: () => goToHunk(stepped(focused, groups.length, -1)),
     x: () => {
       if (groups.length === 0) return;
       toggle(focused ?? 0);
-      if (focused === null) goToRegion(0);
+      if (focused === null) goToHunk(0);
     },
   });
 
@@ -302,15 +302,15 @@ export function ImageCompare({ row, diff, scale, groups, selection, runId, feedb
 
   return (
     <Stack as="section" aria-label="Images" gap="condensed" ref={section}>
-      {groups.length > 0 && <RegionList groups={groups} selection={selection} onGo={goToRegion} outlined={outlined} onOutlined={setOutlined} />}
+      {groups.length > 0 && <HunkList groups={groups} selection={selection} onGo={goToHunk} outlined={outlined} onOutlined={setOutlined} />}
       <NotesPanel
         notes={storyNotes}
-        runId={runId}
+        batchId={batchId}
         currentImage={imageHash}
         target={noteTarget}
         onAdd={addNote}
         onRemove={(id) => void feedback.remove(id)}
-        onAnswer={(id, text) => feedback.answer(id, text, runId)}
+        onAnswer={(id, text) => feedback.answer(id, text, batchId)}
         onResolve={(id) => void feedback.resolve(id)}
         writing={writing}
       />
@@ -376,7 +376,7 @@ export function ImageCompare({ row, diff, scale, groups, selection, runId, feedb
       </Text>
       {mode === "side" ? (
         <div className="selfie-panes" data-count={sources.length}>
-          {/* Keyed by image, so a new story never shows the last one's image while its own loads. */}
+          {/* Keyed by image, so an added story never shows the last one's image while its own loads. */}
           {sources.map(({ name, src }) => (
             <Pane
               key={src}

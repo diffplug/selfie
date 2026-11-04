@@ -1,6 +1,6 @@
 // The SQL contract against real D1, over the network. Opt-in through `pnpm test:d1`,
 // since it needs credentials and spends the account's shared API rate limit. Only
-// one run at a time: every run uses the same database.
+// one batch at a time: every batch uses the same database.
 
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import { D1RestError } from "../src/adapters/d1-rest.ts";
@@ -16,7 +16,7 @@ import { sharpCodec } from "../src/adapters/sharp-codec.ts";
 const ENABLED = process.env.SELFIE_D1_CONTRACT === "1";
 
 // The contract's concurrent workloads total 1,280 inserts per parameter mode. Sent
-// one per request, a run would pass the 1,200 request limit by itself. Grouped like
+// one per request, a batch would pass the 1,200 request limit by itself. Grouped like
 // this, each worker still interleaves with the others, batch by batch.
 const INSERTS_PER_REQUEST = 25;
 
@@ -35,7 +35,7 @@ describe.skipIf(!ENABLED)("real D1 (opt-in: pnpm test:d1)", () => {
 
   describeSqlContract("D1 REST", async () => {
     harness = await d1Harness();
-    // Only the first time: a crashed run may have left tables behind.
+    // Only the first time: a crashed batch may have left tables behind.
     if (!swept) await harness.sweep();
     swept = true;
     const { connect, sweep, measureOverlap } = harness;

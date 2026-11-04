@@ -1,6 +1,6 @@
 // Stories as Storybook's own sidebar nests them, by the path in each one's title. Pure, so a test
 // needs no browser.
-import type { ListedStory, RunView } from "../shared/api.ts";
+import type { ListedStory, BatchView } from "../shared/api.ts";
 
 export interface StoryFolder {
   readonly kind: "folder";
@@ -87,9 +87,9 @@ export function nameFromId(story: string): { readonly title: string; readonly na
   return name === "" ? { title: "", name: words(path) } : { title: words(path), name: words(name) };
 }
 
-/** A run's rows as a tree's list, in its Storybook's order, with a renamed story there once, under its new name. */
+/** A batch's rows as a tree's list, in its Storybook's order, with a renamed story there once, under its new name. */
 export function differingStories(
-  { run, rows, storyNames }: Pick<RunView, "run" | "rows" | "storyNames">,
+  { batch, rows, storyNames }: Pick<BatchView, "batch" | "rows" | "storyNames">,
   renames: ReadonlyMap<string, string>,
 ): readonly ListedStory[] {
   // Only if the name it went to is here to say so.
@@ -103,7 +103,7 @@ export function differingStories(
     .map(({ story, state, decision }) => ({
       story,
       ...(names.get(story) ?? nameFromId(story)),
-      render: { runId: run.id, state, decision, renderedAt: run.startedAt, dirty: false, fromHostedStorybook: null },
+      render: { batchId: batch.id, state, decision, renderedAt: batch.startedAt, dirty: false, fromHostedStorybook: null },
     }));
 }
 

@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { MIXED, rendering } from "./stories/everyStory.ts";
 import { navigationIn, StoriesLayout, UnrenderedStory } from "./StoriesScreen.tsx";
-import { approved, OTHER_RUN_ID, rejected, rows, viewOf } from "./stories/fixtures.ts";
+import { approved, OTHER_BATCH_ID, rejected, rows, viewOf } from "./stories/fixtures.ts";
 import { BUTTON, StoryPage, press } from "./stories/storyPage.tsx";
 
 const meta = { title: "Pages/Story/States", component: StoryPage } satisfies Meta<typeof StoryPage>;
@@ -19,12 +19,12 @@ export const PlayError: Story = {
 export const RenderedAtTwoTimes: Story = {
   args: {
     row: rows.double("components-button--primary"),
-    view: viewOf([rows.double("components-button--primary")], { run: { scale: 2 } }),
+    view: viewOf([rows.double("components-button--primary")], { batch: { scale: 2 } }),
   },
   play: press("f"),
 };
 export const ReusedPixels: Story = {
-  args: { row: BUTTON, view: viewOf([BUTTON], { run: { reusedFromRun: OTHER_RUN_ID } }) },
+  args: { row: BUTTON, view: viewOf([BUTTON], { batch: { reusedFromBatch: OTHER_BATCH_ID } }) },
 };
 
 const unrenderedStory = (canRender: boolean) => {

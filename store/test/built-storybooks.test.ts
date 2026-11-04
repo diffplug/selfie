@@ -65,12 +65,12 @@ describe("BuiltStorybooks", () => {
     expect(await builds.readFile(BUILD, "index.html")).toEqual(text("first"));
   });
 
-  it("knows a run's build only once it's kept", async () => {
-    expect(await builds.keptStorybookOfRun("run")).toBeNull();
-    await builds.recordRunStorybook("run", BUILD);
-    expect(await builds.keptStorybookOfRun("run")).toBeNull();
+  it("knows a batch's build only once it's kept", async () => {
+    expect(await builds.keptStorybookOfBatch("batch")).toBeNull();
+    await builds.recordBatchStorybook("batch", BUILD);
+    expect(await builds.keptStorybookOfBatch("batch")).toBeNull();
     await keep(BUILD, { "index.html": "page" });
-    expect(await builds.keptStorybookOfRun("run")).toBe(BUILD);
+    expect(await builds.keptStorybookOfBatch("batch")).toBe(BUILD);
   });
 
   it("reads files of more builds than it holds file lists for", async () => {
@@ -87,7 +87,7 @@ describe("BuiltStorybooks", () => {
     expect(() => builds.has("nope")).toThrow(RangeError);
   });
 
-  it("knows the size an environment renders at, once a run says", async () => {
+  it("knows the size an environment renders at, once a batch says", async () => {
     expect(await builds.viewportOf("env")).toBeNull();
     await builds.recordViewport("env", { width: 1200, height: 900 });
     await builds.recordViewport("env", { width: 640, height: 480 });

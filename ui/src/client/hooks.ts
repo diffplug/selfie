@@ -1,17 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { AcceptRefusal, DecisionKind, DecisionTarget, FeedbackView, StoriesView, NewNote, RunView, SendVia, SnapshotRow } from "../shared/api.ts";
-import { deleteNote, fetchFeedback, fetchStories, fetchRun, fetchUnchanged, postAccept, postAnswer, postRender, postDecision, postNote, postResolve, postSendNotes, RequestError } from "./api.ts";
+import type { AcceptRefusal, DecisionKind, DecisionTarget, FeedbackView, StoriesView, NewNote, BatchView, SendVia, RenderRow } from "../shared/api.ts";
+import { deleteNote, fetchFeedback, fetchStories, fetchBatch, fetchUnchanged, postAccept, postAnswer, postRender, postDecision, postNote, postResolve, postSendNotes, RequestError } from "./api.ts";
 import { reuseRows } from "./filter.ts";
 import { toggled } from "./selection.ts";
 
-export interface RunState {
-  readonly view: RunView | null;
-  /** Why the run couldn't be read. */
+export interface BatchState {
+  readonly view: BatchView | null;
+  /** Why the batch couldn't be read. */
   readonly loadError: RequestError | null;
   /** Why the last action didn't happen. */
   readonly actionError: RequestError | null;
   readonly busy: boolean;
-  readonly unchanged: readonly SnapshotRow[] | null;
+  readonly unchanged: readonly RenderRow[] | null;
   readonly loadUnchanged: () => void;
   readonly clearActionError: () => void;
   /** True if the decision was recorded. */
@@ -24,20 +24,20 @@ const asRequestError = (error: unknown) =>
   error instanceof RequestError ? error : new RequestError("unexpected", (error as Error).message);
 
 /**
- * One run as the server last described it. Every action answers with a new description, and the
+ * One batch as the server last described it. Every action answers with a new description, and the
  * page reads again whenever it regains focus, since a CLI or another tab may have decided too.
  */
-export function useRun(runId: string): RunState {
-  const [view, setView] = useState<RunView | null>(null);
+export function useBatch(batchId: string): BatchState {
+  const [view, setView] = useState<BatchView | null>(null);
   const [loadError, setLoadError] = useState<RequestError | null>(null);
   const [actionError, setActionError] = useState<RequestError | null>(null);
   const [busy, setBusy] = useState(false);
-  const [unchanged, setUnchanged] = useState<readonly SnapshotRow[] | null>(null);
+  const [unchanged, setUnchanged] = useState<readonly RenderRow[] | null>(null);
   // At most one read is on its way, and a newer read or an action's answer aborts it, so a slow read
   // can't undo either.
   const reading = useRef<AbortController | null>(null);
 
-  const apply = useCallback((next: RunView) => {
+  const apply = useCallback((next: BatchView) => {
     setView((previous) => (previous === null ? next : { ...next, rows: reuseRows(previous.rows, next.rows) }));
     setLoadError(null);
   }, []);
@@ -46,10 +46,10 @@ export function useRun(runId: string): RunState {
     reading.current?.abort();
     const controller = new AbortController();
     reading.current = controller;
-    fetchRun(runId, controller.signal).then(apply, (error: unknown) => {
+    fetchBatch(batchId, controller.signal).then(apply, (error: unknown) => {
       if (!controller.signal.aborted) setLoadError(asRequestError(error));
     });
-  }, [runId, apply]);
+  }, [batchId, apply]);
 
   useEffect(() => {
     read();
@@ -61,8 +61,8 @@ export function useRun(runId: string): RunState {
   }, [read]);
 
   const loadUnchanged = useCallback(() => {
-    fetchUnchanged(runId).then(setUnchanged, (error: unknown) => setActionError(asRequestError(error)));
-  }, [runId]);
+    fetchUnchanged(batchId).then(setUnchanged, (error: unknown) => setActionError(asRequestError(error)));
+  }, [batchId]);
 
   const act = async <T,>(work: () => Promise<T>): Promise<T | null> => {
     setBusy(true);
@@ -90,12 +90,12 @@ export function useRun(runId: string): RunState {
     loadUnchanged,
     clearActionError: useCallback(() => setActionError(null), []),
     decide: async (decision, targets) => {
-      const next = await act(() => postDecision(runId, decision, targets));
+      const next = await act(() => postDecision(batchId, decision, targets));
       if (next !== null) apply(next);
       return next !== null;
     },
     accept: async (removedSeen) => {
-      const outcome = await act(() => postAccept(runId, removedSeen));
+      const outcome = await act(() => postAccept(batchId, removedSeen));
       if (outcome === null) return null;
       apply(outcome.view);
       return { accepted: outcome.accepted, refusals: outcome.refusals };
@@ -133,7 +133,7 @@ export interface FeedbackState {
   readonly add: (note: NewNote) => Promise<boolean>;
   readonly remove: (id: number) => Promise<void>;
   /** True if the answer was saved. */
-  readonly answer: (id: number, text: string, runId: string) => Promise<boolean>;
+  readonly answer: (id: number, text: string, batchId: string) => Promise<boolean>;
   readonly resolve: (id: number) => Promise<void>;
   /** The text to paste into an agent, or null if the request failed. */
   readonly send: (via: SendVia) => Promise<string | null>;
@@ -188,13 +188,13 @@ export function useFeedback(): FeedbackState {
     clearError: useCallback(() => setError(null), []),
     add: async (note) => (await act(() => postNote(note), (next) => next)) !== null,
     remove: async (id) => void (await act(() => deleteNote(id), (next) => next)),
-    answer: async (id, text, runId) => (await act(() => postAnswer(id, text, runId), (next) => next)) !== null,
+    answer: async (id, text, batchId) => (await act(() => postAnswer(id, text, batchId), (next) => next)) !== null,
     resolve: async (id) => void (await act(() => postResolve(id), (next) => next)),
     send: async (via) => (await act(() => postSendNotes(via), ({ feedback }) => feedback))?.text ?? null,
   };
 }
 
-export interface RegionSelection {
+export interface HunkSelection {
   readonly selected: ReadonlySet<number>;
   readonly focused: number | null;
   readonly toggle: (index: number) => void;
@@ -202,8 +202,8 @@ export interface RegionSelection {
   readonly setFocused: (focused: number) => void;
 }
 
-/** Regions picked out by their place in a story's list, which last only as long as someone stays on `story`. */
-export function useRegionSelection(story: string): RegionSelection {
+/** Hunks picked out by their place in a story's list, which last only as long as someone stays on `story`. */
+export function useHunkSelection(story: string): HunkSelection {
   const nothing = () => ({ story, selected: new Set<number>() as ReadonlySet<number>, focused: null as number | null });
   const [state, setState] = useState(nothing);
   // Forgotten on leaving, and not just hidden, so coming back can't bring it back.
@@ -250,7 +250,7 @@ export function useFetched<T>(key: string | null, load: (signal: AbortSignal) =>
  * Every story of the hosted Storybook, as the server last described them. Read again whenever the
  * page regains focus, or something new is recorded, since an agent records from outside this page.
  */
-export function useStories(latestRunId: string | null | undefined): { readonly view: StoriesView | null; readonly error: RequestError | null; readonly reload: () => void; readonly recheck: () => void } {
+export function useStories(latestBatchId: string | null | undefined): { readonly view: StoriesView | null; readonly error: RequestError | null; readonly reload: () => void; readonly recheck: () => void } {
   const [view, setView] = useState<StoriesView | null>(null);
   const [error, setError] = useState<RequestError | null>(null);
   const reading = useRef<AbortController | null>(null);
@@ -284,16 +284,16 @@ export function useStories(latestRunId: string | null | undefined): { readonly v
     };
   }, [reload]);
   // Not on first learning it, which says nothing has been recorded since this page read.
-  const lastRun = useRef(latestRunId);
+  const lastBatch = useRef(latestBatchId);
   useEffect(() => {
-    const known = lastRun.current;
-    lastRun.current = latestRunId;
-    if (known !== undefined && known !== latestRunId) reload();
-  }, [latestRunId, reload]);
+    const known = lastBatch.current;
+    lastBatch.current = latestBatchId;
+    if (known !== undefined && known !== latestBatchId) reload();
+  }, [latestBatchId, reload]);
   return { view, error, reload, recheck };
 }
 
-export interface RenderState {
+export interface RenderingState {
   readonly can: boolean;
   /** How many stories are being rendered right now. */
   readonly rendering: number;
@@ -304,7 +304,7 @@ export interface RenderState {
 }
 
 /** Asks the server to render stories, and reads every story again once it has. */
-export function useRender(can: boolean, onRendered: () => void): RenderState {
+export function useRender(can: boolean, onRendered: () => void): RenderingState {
   const [rendering, setRendering] = useState(0);
   const [error, setError] = useState<RequestError | null>(null);
   return {

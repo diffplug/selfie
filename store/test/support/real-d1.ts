@@ -6,7 +6,7 @@ const DEFAULT_BUDGET = 600;
 
 let shared: Promise<D1Harness> | undefined;
 
-/** The one harness of this process, so its budget, set by the first call, covers the whole run. */
+/** The one harness of this process, so its budget, set by the first call, covers the whole batch. */
 export function d1Harness(budget = DEFAULT_BUDGET): Promise<D1Harness> {
   shared ??= loadD1Credentials().then(({ accountId, token }) =>
     createD1Harness({ accountId, token, databaseId: CONTRACT_DATABASE_ID, budget }),

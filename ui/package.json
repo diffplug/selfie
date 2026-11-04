@@ -7,7 +7,7 @@
   "exports": {
     "./api": "./src/shared/api.ts",
     "./app": "./src/server/app.ts",
-    "./regions": "./src/shared/regions.ts",
+    "./hunks": "./src/shared/hunks.ts",
     "./notes": "./src/shared/notes.ts",
     "./local": "./src/server/local.ts",
     "./storybook": "./src/server/storybook.ts",

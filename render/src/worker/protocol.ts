@@ -14,7 +14,7 @@ export interface RenderRecipe {
   /** No server listens here: the worker answers every request itself. */
   origin: string;
   /** Set to `true` before any story code loads, so a project can freeze its own timers. */
-  snapshotGlobal: string;
+  renderGlobal: string;
   /** A container has no display. Not a project's to set. */
   headless: true;
   /** One could answer requests that the worker has to. Not a project's to set. */
@@ -46,7 +46,7 @@ export type RecipeOverrides = Partial<Omit<RenderRecipe, "waitSequence" | "headl
 export const DEFAULT_RECIPE: RenderRecipe = {
   waitSequence: 3,
   origin: "http://127.0.0.1:6199",
-  snapshotGlobal: "__SELFIE_SNAPSHOT__",
+  renderGlobal: "__SELFIE_RENDER__",
   headless: true,
   serviceWorkers: "block",
   locale: "en-US",

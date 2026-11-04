@@ -14,10 +14,10 @@ Always work from a built Storybook, and rebuild after every change. `selfie flak
 ## 1. Measure
 
 ```sh
-selfie flakes --build --runs 3
+selfie flakes --build --times 3
 ```
 
-Use `--storybook-dir <dir>` if `selfie.config.json` doesn't say how to build. It renders every story that many times, records no run, and stores nothing, so it's safe to run at any time. It exits 0 if everything held still, 1 if not, and prints one JSON document:
+Use `--storybook-dir <dir>` if `selfie.config.json` doesn't say how to build. It renders every story that many times, records no batch, and stores nothing, so it's safe to run at any time. It exits 0 if everything held still, 1 if not, and prints one JSON document:
 
 ```json
 {
@@ -54,9 +54,9 @@ Most flakes in one Storybook share a few causes, and fixing the biggest usually 
 | Huge box inside something a play function opened | The wait ended before it had content | In the play function, wait for the thing itself, such as an iframe's document having content, not a sleep |
 | A few pixels, delta 1 or 2, exactly at the corners of something | A background showing through the antialiased edge of a rounded border, around something that covers it | Remove the background, which nothing sees once the content's there. Don't square the corner |
 | Text, a date, or a number differs | The current time, a random value, or an ID generated at render | A fixed value in the story's args. The renderer already fixes the page's clock, so look for a server's time or a seeded generator |
-| Something's caught part way through moving | A JavaScript animation or a timer. CSS animations are already stopped | Have the code test `window.__SELFIE_SNAPSHOT__`, which is true before story code runs. `recipe.snapshotGlobal` can rename it, to reach a freeze the project already has |
+| Something's caught part way through moving | A JavaScript animation or a timer. CSS animations are already stopped | Have the code test `window.__SELFIE_RENDER__`, which is true before story code runs. `recipe.renderGlobal` can rename it, to reach a freeze the project already has |
 | `errors` with a play message like "not visible" | An assertion that only checks once, while something's still opening | Retry it: `await waitFor(() => expect(canvas.getByRole(...)).toBeVisible())`. `findBy*` retries finding it, and not what you then assert about it |
-| `timeout`: "network not quiet", in every render | A request nobody answers, or a repeating poll. The message names what was in flight | Look at that URL. The render has no network, so stub what's external, and stop any poll in a snapshot |
+| `timeout`: "network not quiet", in every render | A request nobody answers, or a repeating poll. The message names what was in flight | Look at that URL. The render has no network, so stub what's external, and stop any poll in a render |
 | `request` errors | A request leaving the Storybook, which is aborted | Serve it from `staticDirs`, or stub it |
 | `failed` in some renders | A real intermittent crash, or a story near its time limit | Read `errors`. Treat a crash as a bug in the component, not in the story |
 | Only fails with many stories rendering at once | The story depends on timing, and load exposes it | Same fixes. Confirm with `--concurrency 1`, then keep the fix and measure at the default |
@@ -68,13 +68,13 @@ If a symptom points at Selfie's renderer rather than the project, such as a requ
 Rebuild, and measure the same stories with more renders:
 
 ```sh
-selfie flakes --build --runs 8 --story 'pages-home--*'
+selfie flakes --build --times 8 --story 'pages-home--*'
 ```
 
 Then, once a group looks fixed, measure the whole Storybook:
 
 ```sh
-selfie flakes --build --runs 5
+selfie flakes --build --times 5
 ```
 
 Done means exit 0. It doesn't prove there's no flake left, only that none showed in that many renders, so say how many you ran. A flake seen in 1 of 5 renders would slip past 5 clean renders about a third of the time, so use more renders for a rare one.

@@ -1,17 +1,17 @@
-// Every story of the hosted Storybook, each with its newest render at HEAD, whichever run that was.
-// A story's page is its run's, so looking at one here and in that run's review is the same screen.
+// Every story of the hosted Storybook, each with its newest render at HEAD, whichever batch that was.
+// A story's page is its batch's, so looking at one here and in that batch's review is the same screen.
 import { Banner, Button, Heading, RelativeTime, Stack, Text } from "@primer/react";
 import { useMemo, useState, type ReactNode } from "react";
 import type { ListedStory, StoriesView } from "../shared/api.ts";
 import { DetailScreen, StoryPager } from "./DetailScreen.tsx";
 import { FeedbackBar } from "./Feedback.tsx";
 import { navigationThrough, parseFilter, type StoryNavigation } from "./filter.ts";
-import { useRender, useFeedback, useHotkeys, useRun, useStories, useStoryFocusKeys, useTitle, type RenderState, type FeedbackState, type RunState } from "./hooks.ts";
+import { useRender, useFeedback, useHotkeys, useBatch, useStories, useStoryFocusKeys, useTitle, type RenderingState, type FeedbackState, type BatchState } from "./hooks.ts";
 import { Keys } from "./Keys.tsx";
 import { usePageFacts } from "./PageFacts.tsx";
 import { OpenInStorybook, StoryFrame, storyFrameUrl } from "./LiveStories.tsx";
 import { plural } from "./plural.ts";
-import { ActionFailedBanner } from "./RunNotes.tsx";
+import { ActionFailedBanner } from "./BatchNotes.tsx";
 import { anyStoryPath, navigate, storiesPath } from "./router.tsx";
 import { matchingStories, StoryNavLayout } from "./StoryNav.tsx";
 import { inTreeOrder } from "./storyTree.ts";
@@ -42,19 +42,19 @@ export function StoriesLayout({ view, story, search, children }: { view: Stories
 }
 
 /** What's said while a render runs, or why the last one didn't. */
-export function RenderStatus({ renders }: { renders: RenderState }) {
+export function RenderingStatus({ renders }: { renders: RenderingState }) {
   return (
     <>
       {renders.error !== null && <ActionFailedBanner error={renders.error} onDismiss={renders.clearError} />}
       {renders.rendering > 0 && (
-        <Banner variant="info" title={`Rendering ${plural(renders.rendering, "story", "stories")}`} description="It renders in the same browser as any other run, so it can take a moment." />
+        <Banner variant="info" title={`Rendering ${plural(renders.rendering, "story", "stories")}`} description="It renders in the same browser as any other batch, so it can take a moment." />
       )}
     </>
   );
 }
 
 /** What's on the right with no story picked. */
-export function StoriesOverview({ view, renders, recheck }: { view: StoriesView; renders: RenderState; recheck: () => void }) {
+export function StoriesOverview({ view, renders, recheck }: { view: StoriesView; renders: RenderingState; recheck: () => void }) {
   useTitle("Every story");
   useStoryFocusKeys();
   return (
@@ -69,15 +69,15 @@ export function StoriesOverview({ view, renders, recheck }: { view: StoriesView;
   );
 }
 
-/** Next and previous through this list, whichever runs they're from. */
+/** Next and previous through this list, whichever batches they're from. */
 export function navigationIn(view: StoriesView, story: string, search: string): StoryNavigation {
   const ordered = inTreeOrder(view.stories);
   return navigationThrough(ordered, matchingStories(ordered, parseFilter(search).text), story, (name) => anyStoryPath(name, search), storiesPath(search));
 }
 
-/** A story's page, which is its run's, moving through every story rather than that run's. */
+/** A story's page, which is its batch's, moving through every story rather than that batch's. */
 function RenderedStory({
-  runId,
+  batchId,
   story,
   feedback,
   navigation,
@@ -87,19 +87,19 @@ function RenderedStory({
   startNote,
   onDecided,
 }: {
-  runId: string;
+  batchId: string;
   story: string;
   feedback: FeedbackState;
   navigation: StoryNavigation;
   liveStories: readonly [boolean, (open: boolean) => void];
-  renders: RenderState;
+  renders: RenderingState;
   entry: ListedStory;
   startNote: boolean;
   onDecided: () => void;
 }) {
-  const state = useRun(runId);
+  const state = useBatch(batchId);
   if (state.view === null) return state.loadError !== null ? <LoadFailure error={state.loadError} /> : <Loading label="Reading this story" />;
-  const deciding: RunState = {
+  const deciding: BatchState = {
     ...state,
     decide: async (...args) => {
       const recorded = await state.decide(...args);
@@ -128,7 +128,7 @@ function RenderedStory({
 }
 
 /** A story with no image yet, which is still a real story to look at. */
-export function UnrenderedStory({ view, story, navigation, renders, onWriteNote }: { view: StoriesView; story: string; navigation: StoryNavigation; renders: RenderState; onWriteNote: () => void }) {
+export function UnrenderedStory({ view, story, navigation, renders, onWriteNote }: { view: StoriesView; story: string; navigation: StoryNavigation; renders: RenderingState; onWriteNote: () => void }) {
   useTitle(story);
   const go = (href: string | null) => {
     if (href !== null) navigate(href, { replace: true });
@@ -170,7 +170,7 @@ export function UnrenderedStory({ view, story, navigation, renders, onWriteNote 
           title="Not rendered yet"
           description={
             <>
-              No run at this commit has an image of this story. <code>selfie record --story {story}</code> renders one.
+              No batch at this commit has an image of this story. <code>selfie render --story {story}</code> renders one.
             </>
           }
         />
@@ -194,7 +194,7 @@ function OneStory({
   search: string;
   feedback: FeedbackState;
   liveStories: readonly [boolean, (open: boolean) => void];
-  renders: RenderState;
+  renders: RenderingState;
   onDecided: () => void;
 }) {
   // Which story someone asked to write on, whose note box opens once it's been rendered.
@@ -205,8 +205,8 @@ function OneStory({
   if (entry.render === null) return <UnrenderedStory view={view} story={story} navigation={navigation} renders={renders} onWriteNote={() => setNoteOn(story)} />;
   return (
     <RenderedStory
-      key={entry.render.runId}
-      runId={entry.render.runId}
+      key={entry.render.batchId}
+      batchId={entry.render.batchId}
       story={story}
       feedback={feedback}
       navigation={navigation}
@@ -221,15 +221,15 @@ function OneStory({
 
 export function StoriesRoutes({ story, search }: { story: string | null; search: string }) {
   const feedback = useFeedback();
-  const stories = useStories(feedback.view?.latestRunId);
-  // Here, since each run a story is from has a page of its own.
+  const stories = useStories(feedback.view?.latestBatchId);
+  // Here, since each batch a story is from has a page of its own.
   const liveStories = useState(false);
   const renders = useRender(stories.view?.canRender ?? false, stories.reload);
   if (stories.view === null) return stories.error !== null ? <LoadFailure error={stories.error} /> : <Loading label="Reading every story" />;
   return (
     <StoriesLayout view={stories.view} story={story} search={search}>
       <FeedbackBar feedback={feedback} storyHref={(name) => anyStoryPath(name)} showList={story === null} />
-      <RenderStatus renders={renders} />
+      <RenderingStatus renders={renders} />
       {story === null ? (
         <StoriesOverview view={stories.view} renders={renders} recheck={stories.recheck} />
       ) : (

@@ -1,14 +1,14 @@
 // What the stories of a story's page share.
 import { expect, userEvent, waitFor } from "storybook/test";
-import type { Note, RunView, SnapshotRow } from "../../shared/api.ts";
+import type { Note, BatchView, RenderRow } from "../../shared/api.ts";
 import { DetailScreen } from "../DetailScreen.tsx";
 import { feedbackOf, rows, stateOf, viewOf } from "./fixtures.ts";
-import { RunFrame } from "./RunFrame.tsx";
+import { BatchFrame } from "./BatchFrame.tsx";
 
 export interface StoryPageArgs {
-  readonly row: SnapshotRow;
-  readonly others?: readonly SnapshotRow[];
-  readonly view?: RunView;
+  readonly row: RenderRow;
+  readonly others?: readonly RenderRow[];
+  readonly view?: BatchView;
   readonly notes?: readonly Note[];
 }
 
@@ -16,9 +16,9 @@ export function StoryPage({ row, others = [], view, notes = [] }: StoryPageArgs)
   const shown = view ?? viewOf([row, ...others]);
   const state = stateOf(shown);
   return (
-    <RunFrame view={shown} state={state} story={row.story}>
+    <BatchFrame view={shown} state={state} story={row.story}>
       {(navigation) => navigation !== null && <DetailScreen state={state} view={shown} story={row.story} search="" feedback={feedbackOf(notes)} navigation={navigation} />}
-    </RunFrame>
+    </BatchFrame>
   );
 }
 

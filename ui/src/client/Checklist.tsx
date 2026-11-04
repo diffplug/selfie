@@ -3,9 +3,9 @@ import { AlertFillIcon, CheckCircleFillIcon, CircleIcon } from "@primer/octicons
 import { Banner, Button, Stack, Text } from "@primer/react";
 import { useEffect, type ReactNode } from "react";
 import type { ListedStory, StoriesView, StorySetup } from "../shared/api.ts";
-import type { RenderState } from "./hooks.ts";
+import type { RenderingState } from "./hooks.ts";
 import { plural } from "./plural.ts";
-import { anyStoryPath, AppLink, navigate, runPath } from "./router.tsx";
+import { anyStoryPath, AppLink, navigate, batchPath } from "./router.tsx";
 import { Sha, shortSha } from "./words.tsx";
 
 const RECHECK_MS = 2000;
@@ -131,7 +131,7 @@ const needsRender = ({ render }: ListedStory) => render === null || render.fromH
 
 const fullName = ({ title, name }: ListedStory) => [...(title === "" ? [] : title.split("/")), name].join(" / ");
 
-function RendersItem({ view, setup, renders }: { view: StoriesView; setup: StorySetup | null; renders: RenderState }) {
+function RendersItem({ view, setup, renders }: { view: StoriesView; setup: StorySetup | null; renders: RenderingState }) {
   const rendered = view.stories.filter((entry) => entry.render !== null).length;
   const rest = view.stories.filter(needsRender);
   const first = view.stories[0];
@@ -140,7 +140,7 @@ function RendersItem({ view, setup, renders }: { view: StoriesView; setup: Story
   const renderFirst = async () => {
     if (await renders.render([first.story])) navigate(anyStoryPath(first.story));
   };
-  // The rest alone records a filtered run, and this records a whole one.
+  // The rest alone records a filtered batch, and this records a whole one.
   const renderAll = (
     <Button disabled={renders.rendering > 0} onClick={() => void renders.render(view.stories.map(({ story }) => story))}>
       Render all {view.stories.length.toLocaleString()}
@@ -163,7 +163,7 @@ function RendersItem({ view, setup, renders }: { view: StoriesView; setup: Story
           </Stack>
         ) : (
           <Text as="p">
-            <code>selfie record</code> renders them all.
+            <code>selfie render</code> renders them all.
           </Text>
         )}
       </Item>
@@ -181,13 +181,13 @@ function RendersItem({ view, setup, renders }: { view: StoriesView; setup: Story
           </Button>
         )}
         {renders.can && renderAll}
-        {view.newestRunId !== null && <AppLink href={runPath(view.newestRunId)}>Review the newest run</AppLink>}
+        {view.newestBatchId !== null && <AppLink href={batchPath(view.newestBatchId)}>Review the newest batch</AppLink>}
       </Stack>
     </Item>
   );
 }
 
-export function Checklist({ view, renders, recheck }: { view: StoriesView; renders: RenderState; recheck: () => void }) {
+export function Checklist({ view, renders, recheck }: { view: StoriesView; renders: RenderingState; recheck: () => void }) {
   const { head, branch, setup } = view;
   // What's next, or a fix to what it warns of, happens in a terminal or an editor.
   const waiting = setup !== null && (head === null || view.storybookUrl === null || view.stories.length === 0 || setup.builtBeforeHead || setup.uncommitted.length > 0);

@@ -11,7 +11,7 @@ import {
 } from "./image-hash.ts";
 import { checkImageFile, decodeImage, webpToKeep, type ImageCodec } from "./image-file.ts";
 import { encodePam, type RawImage } from "./pam.ts";
-import { CREATE_SNAPSHOT_TABLES } from "./snapshots.ts";
+import { CREATE_BATCH_TABLES } from "./render-batches.ts";
 import { CREATE_BUILT_STORYBOOK_TABLES } from "./built-storybooks.ts";
 import type { Sql, SqlStatement } from "./sql.ts";
 
@@ -54,17 +54,17 @@ const BLOBS_AT_ONCE = 4;
 
 /** The insert statement for one image, given its hash and its truncated hash. */
 export function imageInsertStatement(hash: string, truncated: number): SqlStatement {
-  // Idempotent: a second run hits ON CONFLICT and returns the key the first assigned.
+  // Idempotent: a second batch hits ON CONFLICT and returns the key the first assigned.
   return { sql: INSERT_IMAGE, params: [truncated, hash], idempotent: true };
 }
 
 /**
  * Creates the store's tables if they are missing, in one request. Safe to call
- * concurrently. It only ever adds: see `docs/specs/snapshots.md` -> Schema.
+ * concurrently. It only ever adds: see `docs/specs/renders.md` -> Schema.
  */
 export async function initStoreSchema(sql: Sql): Promise<void> {
   await sql.batch(
-    [CREATE_IMAGES_TABLE, ...CREATE_SNAPSHOT_TABLES, ...CREATE_BUILT_STORYBOOK_TABLES].map((statement) => ({
+    [CREATE_IMAGES_TABLE, ...CREATE_BATCH_TABLES, ...CREATE_BUILT_STORYBOOK_TABLES].map((statement) => ({
       sql: statement,
       idempotent: true,
     })),

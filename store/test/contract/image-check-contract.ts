@@ -17,7 +17,7 @@ const headerOnly = (fields: HeaderFields) => pngFile(ihdr(fields), idat(1, 2, 3)
 const withChunk = (type: string) => pngFile(ihdr(), chunk(type, 0, 0, 0, 1), idat(1, 2, 3), iend());
 const VALID = pngFile(ihdr(), idat(1, 2, 3), iend());
 
-// A real 1x1 lossless WebP, as `sharp` writes one, so this runs where `sharp` can't.
+// A real 1x1 lossless WebP, as `sharp` writes one, so this batches where `sharp` can't.
 const WEBP = Uint8Array.from(atob("UklGRh4AAABXRUJQVlA4TBEAAAAvAAAAAAdQiirUo/+BiOh/AAA="), (char) => char.charCodeAt(0));
 
 /** The WebP with its 32 bits after the VP8L signature changed. */

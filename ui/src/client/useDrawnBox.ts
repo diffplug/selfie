@@ -45,8 +45,8 @@ export function useDrawnBox({
     clear: () => setDrawnOn(null),
     handlers: {
       onPointerDown: (event: PointerEvent<HTMLElement>) => {
-        // A region's outline is for selecting it.
-        if (event.button !== 0 || (event.target as Element).closest(".selfie-region") !== null) return;
+        // A hunk's outline is for selecting it.
+        if (event.button !== 0 || (event.target as Element).closest(".selfie-hunk") !== null) return;
         from.current = pointOn(event);
         event.currentTarget.setPointerCapture(event.pointerId);
       },

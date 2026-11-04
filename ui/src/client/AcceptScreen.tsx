@@ -1,12 +1,12 @@
-// Making a run its commit's goldens: what stops it, in plain words, and what it would drop.
+// Making a batch its commit's goldens: what stops it, in plain words, and what it would drop.
 import { ArrowLeftIcon } from "@primer/octicons-react";
 import { Banner, Button, Checkbox, FormControl, Heading, Stack, Text } from "@primer/react";
 import { Fragment, useEffect, useState, type ReactNode } from "react";
-import type { AcceptRefusal, RunView } from "../shared/api.ts";
+import type { AcceptRefusal, BatchView } from "../shared/api.ts";
 import { showQuery } from "./filter.ts";
-import { useTitle, type RunState } from "./hooks.ts";
-import { AppLink, runPath } from "./router.tsx";
-import { ActionFailure, RunNotes } from "./RunNotes.tsx";
+import { useTitle, type BatchState } from "./hooks.ts";
+import { AppLink, batchPath } from "./router.tsx";
+import { ActionFailure, BatchNotes } from "./BatchNotes.tsx";
 import { StoryLinks } from "./StoryLinks.tsx";
 import { plural } from "./plural.ts";
 import { ReusedPixels, Sha, shortSha } from "./words.tsx";
@@ -23,22 +23,22 @@ function Refusal({ title, children }: { title: string; children: ReactNode }) {
 }
 
 /** Removal refusals are handled by the acknowledgment, unless the count someone gave was wrong. */
-function refusalWords(refusal: AcceptRefusal, runId: string): ReactNode {
+function refusalWords(refusal: AcceptRefusal, batchId: string): ReactNode {
   switch (refusal.reason) {
     case "recorded-on-dirty-tree":
       return (
         <Refusal title="It was recorded on a dirty tree">
           <Text as="p">
-            The tree had uncommitted changes while it rendered, so its images don't describe <code>{shortSha(refusal.gitSha)}</code>, even if the tree is clean now. Commit, run{" "}
-            <code>selfie review</code>, and accept that run. Your approvals carry over.
+            The tree had uncommitted changes while it rendered, so its images don't describe <code>{shortSha(refusal.gitSha)}</code>, even if the tree is clean now. Commit, batch{" "}
+            <code>selfie review</code>, and accept that batch. Your approvals carry over.
           </Text>
         </Refusal>
       );
-    case "run-has-failures":
+    case "batch-has-failures":
       return (
         <Refusal title={`${plural(refusal.stories.length, "story", "stories")} failed to render`}>
-          <Text as="p">A run with failures can't become goldens. Fix them, and run <code>selfie review</code> again.</Text>
-          <StoryLinks runId={runId} stories={refusal.stories.map((story) => ({ story }))} show="failed" />
+          <Text as="p">A batch with failures can't become goldens. Fix them, and run <code>selfie review</code> again.</Text>
+          <StoryLinks batchId={batchId} stories={refusal.stories.map((story) => ({ story }))} show="failed" />
         </Refusal>
       );
     case "unapproved": {
@@ -47,8 +47,8 @@ function refusalWords(refusal: AcceptRefusal, runId: string): ReactNode {
       const parts = [undecided > 0 ? `${undecided} undecided` : null, rejected > 0 ? `${rejected} rejected` : null].filter(Boolean);
       return (
         <Refusal title={`${plural(refusal.stories.length, "image")} not approved: ${parts.join(", ")}`}>
-          <Text as="p">Every changed or new image must be approved before this run can become goldens.</Text>
-          <StoryLinks runId={runId} stories={refusal.stories} show={rejected > 0 && undecided === 0 ? "rejected" : "all"} />
+          <Text as="p">Every changed or added image must be approved before this batch can become goldens.</Text>
+          <StoryLinks batchId={batchId} stories={refusal.stories} show={rejected > 0 && undecided === 0 ? "rejected" : "all"} />
         </Refusal>
       );
     }
@@ -65,7 +65,7 @@ function refusalWords(refusal: AcceptRefusal, runId: string): ReactNode {
   }
 }
 
-function Removals({ view, acknowledged, setAcknowledged }: { view: RunView; acknowledged: boolean; setAcknowledged: (value: boolean) => void }) {
+function Removals({ view, acknowledged, setAcknowledged }: { view: BatchView; acknowledged: boolean; setAcknowledged: (value: boolean) => void }) {
   const { stories, outsideFilter } = view.removals;
   return (
     <Stack as="section" aria-labelledby="removals-heading" gap="condensed">
@@ -73,16 +73,16 @@ function Removals({ view, acknowledged, setAcknowledged }: { view: RunView; ackn
         Goldens this would drop: {stories.length}
       </Heading>
       <Text as="p">
-        The baseline has {stories.length === 1 ? "this story" : "these stories"}, and this run doesn't. Accepting means {stories.length === 1 ? "its golden is" : "their goldens are"} gone from this commit on.
+        The baseline has {stories.length === 1 ? "this story" : "these stories"}, and this batch doesn't. Accepting means {stories.length === 1 ? "its golden is" : "their goldens are"} gone from this commit on.
       </Text>
       {outsideFilter > 0 && (
         <Banner
           variant="warning"
-          title={`${outsideFilter} of these are only outside this run's --story filter`}
-          description="They weren't removed from the Storybook. A run without a filter may be what you want."
+          title={`${outsideFilter} of these are only outside this batch's --story filter`}
+          description="They weren't removed from the Storybook. A batch without a filter may be what you want."
         />
       )}
-      <StoryLinks runId={view.run.id} stories={stories.map((story) => ({ story }))} show="removed" />
+      <StoryLinks batchId={view.batch.id} stories={stories.map((story) => ({ story }))} show="removed" />
       <FormControl>
         <Checkbox checked={acknowledged} onChange={(event) => setAcknowledged(event.target.checked)} />
         <FormControl.Label>
@@ -93,16 +93,16 @@ function Removals({ view, acknowledged, setAcknowledged }: { view: RunView; ackn
   );
 }
 
-export function AcceptScreen({ state, view }: { state: RunState; view: RunView }) {
-  const { run, refusals, removals, acceptedRunId, advisories } = view;
+export function AcceptScreen({ state, view }: { state: BatchState; view: BatchView }) {
+  const { batch, refusals, removals, acceptedBatchId, advisories } = view;
   const removedCount = removals.stories.length;
   const [acknowledged, setAcknowledged] = useState(false);
   const [lastRefusals, setLastRefusals] = useState<readonly AcceptRefusal[]>([]);
   // Whatever was acknowledged was a different list if the count has moved.
   useEffect(() => setAcknowledged(false), [removedCount]);
 
-  useTitle(`Accept the run at ${shortSha(run.gitSha)}`);
-  const isAccepted = acceptedRunId === run.id;
+  useTitle(`Accept the batch at ${shortSha(batch.gitSha)}`);
+  const isAccepted = acceptedBatchId === batch.id;
   const blocking = refusals.filter(({ reason }) => reason !== "removed-unacknowledged");
   const wrongCount = lastRefusals.filter(({ reason }) => reason === "wrong-removed-count");
   const shownRefusals = [...blocking, ...wrongCount];
@@ -116,41 +116,41 @@ export function AcceptScreen({ state, view }: { state: RunState; view: RunView }
 
   return (
     <Stack gap="normal">
-      <AppLink href={runPath(run.id)}>
-        <ArrowLeftIcon /> Back to the run
+      <AppLink href={batchPath(batch.id)}>
+        <ArrowLeftIcon /> Back to the batch
       </AppLink>
       <Heading as="h2" variant="medium">
-        Accept the run at <Sha sha={run.gitSha} />
+        Accept the batch at <Sha sha={batch.gitSha} />
       </Heading>
       <Text as="p">
-        Accepting makes this run's images the goldens of <code>{shortSha(run.gitSha)}</code> in <code>{run.environment}</code>, for later reviews to compare with.
+        Accepting makes this batch's images the goldens of <code>{shortSha(batch.gitSha)}</code> in <code>{batch.environment}</code>, for later reviews to compare with.
       </Text>
-      {run.reusedFromRun !== null && (
+      {batch.reusedFromBatch !== null && (
         <Banner
           variant="info"
-          title="This run didn't render"
+          title="This batch didn't render"
           description={
             <>
-              <ReusedPixels from={run.reusedFromRun} /> The built Storybook hadn't changed, so nothing rendered at <code>{shortSha(run.gitSha)}</code>.
+              <ReusedPixels from={batch.reusedFromBatch} /> The built Storybook hadn't changed, so nothing rendered at <code>{shortSha(batch.gitSha)}</code>.
             </>
           }
         />
       )}
       <ActionFailure state={state} />
-      <RunNotes view={view} />
+      <BatchNotes view={view} />
       {isAccepted ? (
-        <Banner variant="success" title="Accepted" description={`These images are the goldens of ${shortSha(run.gitSha)}.`} />
+        <Banner variant="success" title="Accepted" description={`These images are the goldens of ${shortSha(batch.gitSha)}.`} />
       ) : (
         <>
-          {acceptedRunId !== null && (
+          {acceptedBatchId !== null && (
             <Banner
               variant="info"
-              title="Another run is this commit's goldens"
+              title="Another batch is this commit's goldens"
               description={
                 <>
-                  Accepting this one replaces them with this run's images.{" "}
-                  <AppLink inline href={runPath(acceptedRunId)}>
-                    See that run
+                  Accepting this one replaces them with this batch's images.{" "}
+                  <AppLink inline href={batchPath(acceptedBatchId)}>
+                    See that batch
                   </AppLink>
                   .
                 </>
@@ -164,30 +164,30 @@ export function AcceptScreen({ state, view }: { state: RunState; view: RunView }
               </Heading>
               <ul className="selfie-attention">
                 {shownRefusals.map((refusal) => (
-                  <Fragment key={refusal.reason}>{refusalWords(refusal, run.id)}</Fragment>
+                  <Fragment key={refusal.reason}>{refusalWords(refusal, batch.id)}</Fragment>
                 ))}
               </ul>
             </Stack>
           ) : (
             <Banner
               variant="success"
-              title="Nothing stops this run"
+              title="Nothing stops this batch"
               description={needsAcknowledgment ? "Once you've acknowledged the removals below, it can be accepted." : "It can be accepted."}
             />
           )}
           {needsAcknowledgment && <Removals view={view} acknowledged={acknowledged} setAcknowledged={setAcknowledged} />}
           {advisories.length > 0 && (
             <Text as="p" className="selfie-muted">
-              {plural(advisories.length, "advisory", "advisories")} on this run {advisories.length === 1 ? "doesn't" : "don't"} stop it, and {advisories.length === 1 ? "is" : "are"} listed on{" "}
-              <AppLink inline href={runPath(run.id, showQuery("advisory"))}>
-                the run's page
+              {plural(advisories.length, "advisory", "advisories")} on this batch {advisories.length === 1 ? "doesn't" : "don't"} stop it, and {advisories.length === 1 ? "is" : "are"} listed on{" "}
+              <AppLink inline href={batchPath(batch.id, showQuery("advisory"))}>
+                the batch's page
               </AppLink>
               .
             </Text>
           )}
           <Stack direction="horizontal">
             <Button variant="primary" disabled={!canAccept || state.busy} onClick={() => void submit()} loading={state.busy}>
-              {needsAcknowledgment ? `Accept, dropping ${plural(removedCount, "golden")}` : "Accept this run"}
+              {needsAcknowledgment ? `Accept, dropping ${plural(removedCount, "golden")}` : "Accept this batch"}
             </Button>
           </Stack>
         </>

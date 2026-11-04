@@ -4,7 +4,7 @@
 >
 > - Owns notes and sessions. `docs/specs/ui.md` owns the routes and the screens they sit on, and `docs/specs/access.md` who may reach them.
 
-Source of truth: `cli/src/notes.ts`, `ui/src/client/Feedback.tsx`, and `ui/src/client/NotesPanel.tsx`; tests in `cli/test/notes.test.ts`, and stories in `Screens/Feedback` and `Screens/Snapshot`.
+Source of truth: `cli/src/notes.ts`, `ui/src/client/Feedback.tsx`, and `ui/src/client/NotesPanel.tsx`; tests in `cli/test/notes.test.ts`, and stories in `Parts/Feedback bar` and `Pages/Batch`.
 
 ## Sessions
 
@@ -20,8 +20,8 @@ A note is where something is. Its messages are the conversation about it.
 | Note | Is |
 |---|---|
 | `id` | A number across the project's store, short enough to say |
-| `story` | The story's name, so a note follows it into later runs |
-| `runId` | The run it was written on |
+| `story` | The story's name, so a note follows it into later batches |
+| `batchId` | The batch it was written on |
 | `imageHash` | The image it's about, or null for a story with no image, such as one that failed |
 | `box` | The part of that image, in its pixels, or null for all of it |
 | `state` | `draft` until its first message is sent, then `sent` |
@@ -32,11 +32,11 @@ A note is where something is. Its messages are the conversation about it.
 | `sender` | `person` or `agent` |
 | `author`, `at` | Who according to Git, and when |
 | `text` | What was said |
-| `runId` | The run it was written on |
+| `batchId` | The batch it was written on |
 | `sent` | Whether it's the agent's yet |
 
 - **Must let a note be on any story with any state**, not only on one that changed, since most feedback is that something looks wrong (rationale).
-- **Must take a note's box from what someone drew on a stacked image, or else the box around the regions they selected, or else all of the image**, on whichever image is showing, where the diff image counts as the current one.
+- **Must take a note's box from what someone drew on a stacked image, or else the box around the hunks they selected, or else all of the image**, on whichever image is showing, where the diff image counts as the current one.
 - **Must draw a note's box on the image it's about, and on no other**, since a box is only meaningful on the pixels it was drawn on.
 - **Must never let a note approve, reject, or block anything.** `selfie accept` doesn't know notes exist (rationale).
 - **Must keep whether something's been sent on the message, and not on the note**, so an answer to a note that's already been read can be a draft (rationale).
@@ -44,14 +44,14 @@ A note is where something is. Its messages are the conversation about it.
 
 ## Starting from a Storybook
 
-`selfie` alone (`docs/specs/cli.md` → selfie alone) opens at every story (`docs/specs/ui.md` → Screens). An agent's answer is `selfie agent-await-feedback`, its change, `selfie record --story <story> --build`, and `selfie reply`.
+`selfie` alone (`docs/specs/cli.md` → selfie alone) opens at every story (`docs/specs/ui.md` → Screens). An agent's answer is `selfie agent-await-feedback`, its change, `selfie render --story <story> --build`, and `selfie reply`.
 
 ## Handing notes to an agent
 
 **The default is to copy and paste**, since it needs nothing of the agent but that it can read.
 
-- **Must show nothing about notes on a run's screens until there's at least one, or an agent is waiting**, so someone not using an agent never sees any of this.
-- **Must offer Copy for agent on every screen of a run, which sends every draft, and gives text with all that's been sent**, so copying again loses nothing.
+- **Must show nothing about notes on a batch's screens until there's at least one, or an agent is waiting**, so someone not using an agent never sees any of this.
+- **Must offer Copy for agent on every screen of a batch, which sends every draft, and gives text with all that's been sent**, so copying again loses nothing.
 - **Must show that text as well as copying it**, since a browser can refuse the clipboard.
 - **Must never name a path in that text**, since a response never does (`docs/specs/access.md`). It names the folder, and tells the agent to run `selfie notes` there.
 
@@ -74,7 +74,7 @@ A note is where something is. Its messages are the conversation about it.
 
 ## Answers
 
-`selfie reply <note> <text> [--run <run>]` answers a note, on the newest run recorded from this folder if `--run` doesn't say. It prints `{ note, runId, imageChanged }`, where `imageChanged` is whether the story's image in that run differs from the one the note is on, or null if there's nothing to compare.
+`selfie reply <note> <text> [--batch <batch>]` answers a note, on the newest batch recorded from this folder if `--batch` doesn't say. It prints `{ note, batchId, imageChanged }`, where `imageChanged` is whether the story's image in that batch differs from the one the note is on, or null if there's nothing to compare.
 
 | `state` | Means | Whose turn |
 |---|---|---|
@@ -85,19 +85,19 @@ A note is where something is. Its messages are the conversation about it.
 
 - **Must let only a person resolve a note**, so an agent says what it did, and the person says whether that's right (rationale).
 - **Must make a person's answer a draft, which goes with the next batch, and which reopens a resolved note.** An agent's reply is never a draft, and never reopens one.
-- **Must leave resolved notes out of what's copied, and out of `selfie notes` without `--all`**, and out of the count on a run's screens.
+- **Must leave resolved notes out of what's copied, and out of `selfie notes` without `--all`**, and out of the count on a batch's screens.
 
-## A new run
+## A new batch
 
-**There's no stacking: the UI shows one run, and a person chooses when to move to the newest in this session** (rationale).
+**There's no stacking: the UI shows one batch, and a person chooses when to move to the newest in this session** (rationale).
 
-- **Must remember as this session's newest whichever run `selfie record`, `selfie review` with no run, or `selfie reply --run` names last**, and not one someone only looked at.
-- **Must say when the run being looked at isn't the session's newest, and offer to go there, to the same story if on one, and never switch by itself**, so an image can't change while someone is looking at it (rationale).
-- **Must keep each story's diff as current against golden, or with no golden, against the image its newest open note is on, and say so** (rationale). A run's diff doesn't accumulate. That's only to look at: a decision is still on the story's new image.
-- **Must show open notes on their story in any run**, whether or not they've been answered.
-- **Must offer one more layer on a story whose newest open note is on an image other than its current and golden ones: When noted**, which is that image, with the boxes of the notes on it. With a golden, it has no regions, since those are between the current image and the golden, so a note written there can't be on selected ones. With no golden, it's what the current image is compared with, so the regions and the diff are between those two.
-- **Must say on a replied note, on the run the agent answered from, when its image is identical to the story's there**, so a claimed fix that moved nothing shows at once (rationale). On an older run, the note's image is simply what's there.
-- Decisions need nothing here, since they're on image hashes (`docs/specs/snapshots.md` → Decisions).
+- **Must remember as this session's newest whichever batch `selfie render`, `selfie review` with no batch, or `selfie reply --batch` names last**, and not one someone only looked at.
+- **Must say when the batch being looked at isn't the session's newest, and offer to go there, to the same story if on one, and never switch by itself**, so an image can't change while someone is looking at it (rationale).
+- **Must keep each story's diff as current against golden, or with no golden, against the image its newest open note is on, and say so** (rationale). A batch's diff doesn't accumulate. That's only to look at: a decision is still on the story's new image.
+- **Must show open notes on their story in any batch**, whether or not they've been answered.
+- **Must offer one more layer on a story whose newest open note is on an image other than its current and golden ones: When noted**, which is that image, with the boxes of the notes on it. With a golden, it has no hunks, since those are between the current image and the golden, so a note written there can't be on selected ones. With no golden, it's what the current image is compared with, so the hunks and the diff are between those two.
+- **Must say on a replied note, on the batch the agent answered from, when its image is identical to the story's there**, so a claimed fix that moved nothing shows at once (rationale). On an older batch, the note's image is simply what's there.
+- Decisions need nothing here, since they're on image hashes (`docs/specs/renders.md` → Decisions).
 
 ## Future
 
@@ -105,8 +105,8 @@ A note is where something is. Its messages are the conversation about it.
 
 Notes in the cloud service, keyed on the pull request and not a folder, and copy and paste only at first. The pasted text has image URLs in place of `selfie notes`. A private repository's only work for someone with access.
 
-Notes are instructions to an agent, so only someone with write access to the repository may send them, since anyone can view a public repository's snapshots.
+Notes are instructions to an agent, so only someone with write access to the repository may send them, since anyone can view a public repository's renders.
 
-### Run history
+### Batch history
 
-Stepping through a session's earlier runs. They're reachable by URL.
+Stepping through a session's earlier batches. They're reachable by URL.

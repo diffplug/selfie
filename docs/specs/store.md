@@ -3,7 +3,7 @@
 > Status: built — the store core, image checks and decoding, WebP storage with PNG as its fallback, kept built Storybooks, its local SQLite and filesystem adapters, and the D1 REST and R2 adapters exist. Questions stay open; see `## Future`.
 >
 > - See `docs/specs/glossary.md` for image, image hash, image key, and store.
-> - Owns image identity, image decoding, image keys, hash collisions, and how built Storybooks are kept. The built Storybook order belongs to `docs/specs/system.md`. Snapshots, runs, and goldens belong to `docs/specs/snapshots.md`.
+> - Owns image identity, image decoding, image keys, hash collisions, and how built Storybooks are kept. The built Storybook order belongs to `docs/specs/system.md`. Batches, and goldens belong to `docs/specs/renders.md`.
 
 ## Image identity
 
@@ -74,7 +74,7 @@ Source of truth: `store/src/core/built-storybooks.ts`; tests in `store/test/buil
 - **Must keep a built Storybook's files by the hash of their exact bytes**, at `built-storybook-files/<sha256>`, so builds that share a file share its bytes, and a rebuilt directory costs only what changed (rationale).
 - **Must write a built Storybook's files, then one blob listing them, at `built-storybooks/<hash>`**, so a built Storybook with that blob is whole, and nothing serves one that's only partly written (`BuiltStorybooks.has`). **The first list stays** (rationale).
 - **Must look up a file only by its whole path within a built Storybook**, never reaching a file system, so nothing in a path can climb out of it.
-- **Must say which built Storybook rendered a run, in `run_storybooks(run_id, storybook)`, and what size each environment renders at, in `environment_viewports`**, since these are facts about what was rendered, and nothing about a run may depend on a file outside the store. Reserved: both are in the store rather than the CLI's local tables for **Scope: cloud-deploy** (`docs/specs/ui.md` → Not built).
+- **Must say which built Storybook rendered a batch, in `batch_storybooks(batch_id, storybook)`, and what size each environment renders at, in `environment_viewports`**, since these are facts about what was rendered, and nothing about a batch may depend on a file outside the store. Reserved: both are in the store rather than the CLI's local tables for **Scope: cloud-deploy** (`docs/specs/ui.md` → Not built).
 
 ## Adapters
 
@@ -97,7 +97,7 @@ The store core runs unchanged locally and in the cloud, the way Hono does for HT
 - **Must bind exactly the parameters a statement uses, each a string or a finite number**, since SQLite silently binds a missing parameter to NULL.
 - **Must run one statement at a time**, since `node:sqlite` silently ignores everything after the first.
 - **Never allow a comment after a statement's closing semicolon**, since real D1 fails on it where local SQLite runs it (rationale). A comment before the semicolon is fine on both.
-- **Must mark a statement idempotent only if running it again, after it may already have run, returns the same rows and changes nothing further.** An adapter may resend a statement after a failure that leaves its outcome unknown only if it is so marked. Everything the store sends is: the image insert returns the key the first run assigned, per [Image keys](#image-keys).
+- **Must mark a statement idempotent only if running it again, after it may already have run, returns the same rows and changes nothing further.** An adapter may resend a statement after a failure that leaves its outcome unknown only if it is so marked. Everything the store sends is: the image insert returns the key the first batch assigned, per [Image keys](#image-keys).
 - **Must write SQL that gives the same result whether a parameter arrives as a number or a string**, since the D1 REST API documents its parameters as strings. Integer parameters are wrapped in `CAST(?1 AS INTEGER)`.
 - **Must make blob put idempotent**, so a retry or a concurrent put of the same image is safe, whichever encoding each one holds.
 - **Must make a blob complete at its key or absent from it, never partial**, including after a crash mid-write.
@@ -118,7 +118,7 @@ Source of truth: `store/src/adapters/d1-rest.ts`; tests in `store/test/d1-rest.t
 - **Must fail at once on any other failure**, such as a SQL error or a bad token, with D1's message.
 - **Must bound every retry and every attempt**: a limit on attempts, a limit on any one wait, and a timeout on each request.
 - **Never put the token in an error or in anything a log could print.**
-- **Must keep tests against real D1 opt-in**, so `pnpm test` runs offline with no credentials. `pnpm test:d1` runs the contract in Node, and `docs/specs/snapshots.md`'s after it, and sends about 495 requests against the shared limit, so never loop it. `pnpm test:d1:snapshots`, in `store/`, runs only the second, at about 90. `pnpm test:d1:workerd` runs inside workerd, with the whole store over this adapter and the [R2 adapter](#r2-adapter), and stops at a budget of 30. Run one at a time, of either, since all runs share one database.
+- **Must keep tests against real D1 opt-in**, so `pnpm test` runs offline with no credentials. `pnpm test:d1` runs the contract in Node, and `docs/specs/renders.md`'s after it, and sends about 495 requests against the shared limit, so never loop it. `pnpm test:d1:render-batches`, in `store/`, runs only the second, at about 90. `pnpm test:d1:workerd` runs inside workerd, with the whole store over this adapter and the [R2 adapter](#r2-adapter), and stops at a budget of 30. Run one at a time, of either, since all batches share one database.
 
 ## R2 adapter
 
@@ -137,5 +137,5 @@ Source of truth: `store/src/adapters/r2.ts`; tests in `store/test/workerd/r2.wor
 
 ### Open questions
 
-- **Removing what's kept.** Nothing removes a kept image or built Storybook, so a local store only grows, by what a built Storybook changes. Decide what may go, since a run or a golden can still refer to it.
-- **Schema migrations.** How a schema change reaches every project database, and how the app treats a database still on the older schema. Until then a change may only add tables and indexes, through `initStoreSchema`, with one exception made before any project database existed (`docs/specs/snapshots.md` → Schema).
+- **Removing what's kept.** Nothing removes a kept image or built Storybook, so a local store only grows, by what a built Storybook changes. Decide what may go, since a batch or a golden can still refer to it.
+- **Schema migrations.** How a schema change reaches every project database, and how the app treats a database still on the older schema. Until then a change may only add tables and indexes, through `initStoreSchema`, with one exception made before any project database existed (`docs/specs/renders.md` → Schema).

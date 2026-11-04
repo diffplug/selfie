@@ -4,7 +4,7 @@
 
 ## Environment
 
-**`--disable-partial-raster`.** Before this flag, 2 to 7 of the 541 stories differed from an earlier run with their timers frozen, 12 distinct stories over 10 runs, by a few pixels each. Every difference inspected, on 5 of those stories, sat on an antialiased edge: rounded corners, diagonal strokes in icons, and one 1 px vertical line. Rendering 19 of the affected stories 6 times each, counting stories with more than one distinct PNG:
+**`--disable-partial-raster`.** Before this flag, 2 to 7 of the 541 stories differed from an earlier batch with their timers frozen, 12 distinct stories over 10 batches, by a few pixels each. Every difference inspected, on 5 of those stories, sat on an antialiased edge: rounded corners, diagonal strokes in icons, and one 1 px vertical line. Rendering 19 of the affected stories 6 times each, counting stories with more than one distinct PNG:
 
 | Flags added | Stories that varied |
 |---|---|
@@ -14,7 +14,7 @@
 | Both of those | 0 of 19 |
 | `--disable-checker-imaging` | 7 of 19 |
 
-With the flag, 7 full runs of all 541 stories, across the settle times, quiet periods, and concurrency below, were byte-identical on 541 of 541. The evidence fits Chromium re-rastering only part of a tile when a repaint lands after the first raster, so timing decides whether an edge is drawn whole or clipped, but Chromium's code wasn't read to confirm it.
+With the flag, 7 full batches of all 541 stories, across the settle times, quiet periods, and concurrency below, were byte-identical on 541 of 541. The evidence fits Chromium re-rastering only part of a tile when a repaint lands after the first raster, so timing decides whether an edge is drawn whole or clipped, but Chromium's code wasn't read to confirm it.
 
 **The flag's one-time cost.** It moved 19 of 541 stories compared with the same settings without it, by 350 pixels in total, at most 19 color levels. That happens once, under a new environment ID. The cross-machine table in [system.rationale.md](system.rationale.md) was measured without the flag, and has not been repeated with it.
 
@@ -55,12 +55,12 @@ Across machines at 1×, comparing image hashes: 541/541 between two GitHub arm64
 
 **No byte cache.** Caching file bytes in the worker made no measurable difference, and needs a MIME table, since `route.fulfill` only infers a type from a path. All 541 stories at the adopted defaults, alternating:
 
-| | Run 1 | Run 2 | Run 3 |
+| | Batch 1 | Batch 2 | Batch 3 |
 |---|---|---|---|
 | `fulfill({ path })` | 65.0 s | 75.4 s | 73.7 s |
 | Byte cache | 68.0 s | 73.1 s | 73.6 s |
 
-**Waits and concurrency.** All 541 stories with the freeze, one pass. With the flag, every run is byte-identical to the 500 ms settings on 541 of 541. "Quiet" is the network wait: Playwright's `networkidle` is a fixed 500 ms, and the others count in-flight requests.
+**Waits and concurrency.** All 541 stories with the freeze, one pass. With the flag, every batch is byte-identical to the 500 ms settings on 541 of 541. "Quiet" is the network wait: Playwright's `networkidle` is a fixed 500 ms, and the others count in-flight requests.
 
 | Quiet | Settle | Concurrency | Time, flag | Time, no flag | Differences, no flag |
 |---|---|---|---|---|---|
@@ -76,11 +76,11 @@ Across machines at 1×, comparing image hashes: 541/541 between two GitHub arm64
 | 100 | 0 | 6 | 71.2 s | | |
 | 0 | 0 | 6 | 69.0 s | | |
 
-"Differences, no flag" compares with one earlier full run, so it counts the partial raster variation, which is why it wanders. The adopted row is 100 ms, 100 ms, and 6 stories at a time, about 64% less time than where it started. Below that the time stops improving, since the CPUs become the limit, so 0 ms would give up the margin for nothing. Concurrency 8 is within the noise of 6, and raises the median story from 639 ms to 877 ms. The same 541 stories with stability on take 175 s, down from 459 s.
+"Differences, no flag" compares with one earlier full batch, so it counts the partial raster variation, which is why it wanders. The adopted row is 100 ms, 100 ms, and 6 stories at a time, about 64% less time than where it started. Below that the time stops improving, since the CPUs become the limit, so 0 ms would give up the margin for nothing. Concurrency 8 is within the noise of 6, and raises the median story from 639 ms to 877 ms. The same 541 stories with stability on take 175 s, down from 459 s.
 
-**Not using the baseline to shorten settling.** Considered and left out: a run with a baseline could screenshot early, and stop as soon as a story matches its golden. Playwright 1.63.0's `expect(page).toHaveScreenshot()` works this way, retrying at 0, 100, 250, and 500 ms, though only through `@playwright/test`, comparing pixels against a file.
+**Not using the baseline to shorten settling.** Considered and left out: a batch with a baseline could screenshot early, and stop as soon as a story matches its golden. Playwright 1.63.0's `expect(page).toHaveScreenshot()` works this way, retrying at 0, 100, 250, and 500 ms, though only through `@playwright/test`, comparing pixels against a file.
 
-- **It saves little.** In the table above, removing the settle entirely took 83.5 s down to 78.0 s at 4 stories at a time, and at the default of 6, 66.1 s became 71.2 s, which is within the runs' spread, since the CPUs are the limit. Stopping early can't beat a settle of 0. A project with a much longer settle would save more.
+- **It saves little.** In the table above, removing the settle entirely took 83.5 s down to 78.0 s at 4 stories at a time, and at the default of 6, 66.1 s became 71.2 s, which is within the batches' spread, since the CPUs are the limit. Stopping early can't beat a settle of 0. A project with a much longer settle would save more.
 - **It can hide a regression.** A page that briefly matches its golden, and then draws something wrong, would record as unchanged.
 - **It makes pixels depend on the baseline**, so the same built Storybook could render differently from one baseline to the next, which sits badly with reusing a render of an unchanged build.
 - **Comparing costs about what it saves.** The image hash means decoding each PNG in the worker, at roughly 10 ms an image, estimated from a review's 6 s store step over 541 stories rather than measured alone. Comparing PNG hashes would be cheaper, but the store keeps WebP, so it would need a column for each golden's PNG hash.
@@ -95,9 +95,9 @@ The reverse was left out too, for the same complexity: retrying a story that doe
 
 **How to find a story that isn't frozen.** Render it twice and compare. A built-in repeat pass did this until it was removed, since flagging unstable stories in the data, and deciding what that means, was more machinery than asking an agent to fix one. These measurements of it remain.
 
-**Comparing PNG bytes.** Equal bytes always mean equal pixels, so bytes can't hide a difference. The only possible error is a false alarm, if one set of pixels could encode two ways. Across the earlier experiment's 59 runs and 1,016 renders, 233 distinct pixel hashes mapped one to one to 233 distinct PNGs. Chromium's PNGs carry no timestamp or text chunk, and `render/test/render.container.test.ts` checks this and that the same render matches byte for byte in the real container.
+**Comparing PNG bytes.** Equal bytes always mean equal pixels, so bytes can't hide a difference. The only possible error is a false alarm, if one set of pixels could encode two ways. Across the earlier experiment's 59 batches and 1,016 renders, 233 distinct pixel hashes mapped one to one to 233 distinct PNGs. Chromium's PNGs carry no timestamp or text chunk, and `render/test/render.container.test.ts` checks this and that the same render matches byte for byte in the real container.
 
-**Equal timing can miss a timer.** Two renders with equal timing called all 30 unfrozen sample stories stable in 4 of 4 runs, though two of them hold running timers: load timing is repeatable enough for a blink to land on the same phase each time. At the 100 ms settle, the second render needed about 730 ms more settling to catch both in every run: 530 ms caught both in 0 of 4 runs, and 730 and 930 ms in 4 of 4, while 1130 ms caught both in only 2 of 4.
+**Equal timing can miss a timer.** Two renders with equal timing called all 30 unfrozen sample stories stable in 4 of 4 batches, though two of them hold running timers: load timing is repeatable enough for a blink to land on the same phase each time. At the 100 ms settle, the second render needed about 730 ms more settling to catch both in every batch: 530 ms caught both in 0 of 4 batches, and 730 and 930 ms in 4 of 4, while 1130 ms caught both in only 2 of 4.
 
 **Limits.** One app's stories, on one machine, so a timer whose period happens to fit the delay can still match. A fixture cycling every 700 ms did exactly that at 730 ms, so a match is not proof.
 

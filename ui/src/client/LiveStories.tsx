@@ -3,7 +3,7 @@
 import { ChevronDownIcon, ChevronRightIcon, LinkExternalIcon } from "@primer/octicons-react";
 import { Button, Heading, Link, Text } from "@primer/react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { RunView, SnapshotRow } from "../shared/api.ts";
+import type { BatchView, RenderRow } from "../shared/api.ts";
 import { LAYER_WORDS } from "./ImageCompare.tsx";
 import { Keys } from "./Keys.tsx";
 
@@ -19,22 +19,22 @@ export function OpenInStorybook({ url, story }: { url: string; story: string }) 
 }
 
 /** The page, on the Storybook's own origin, saying if it may not be what rendered this image. */
-export function StorybookLinkTo({ row, view }: { row: SnapshotRow; view: RunView }) {
+export function StorybookLinkTo({ row, view }: { row: RenderRow; view: BatchView }) {
   const { storybook } = view;
   if (storybook === null || row.state === "removed") return null;
   return (
     <>
       <OpenInStorybook url={storybook.url} story={row.story} />
-      {!storybook.exactStorybook && <Text className="selfie-muted">This run&apos;s own build wasn&apos;t kept, so it&apos;s the latest, which may not match.</Text>}
+      {!storybook.exactStorybook && <Text className="selfie-muted">This batch&apos;s own build wasn&apos;t kept, so it&apos;s the latest, which may not match.</Text>}
     </>
   );
 }
 
-// For a run from before its viewport was recorded, which is laid out at this column's own width.
+// For a batch from before its viewport was recorded, which is laid out at this column's own width.
 const UNKNOWN_SIZE_HEIGHT = 600;
 
 /** Lays a story out at the size it was rendered at, and scales it to fit, as an image is. */
-export function StoryFrame({ title, url, viewport }: { title: string; url: string; viewport: RunView["viewport"] }) {
+export function StoryFrame({ title, url, viewport }: { title: string; url: string; viewport: BatchView["viewport"] }) {
   const box = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
   useLayoutEffect(() => {
@@ -83,9 +83,9 @@ export function StoryFrame({ title, url, viewport }: { title: string; url: strin
   );
 }
 
-export function LiveStories({ row, view, open, onToggle }: { row: SnapshotRow; view: RunView; open: boolean; onToggle: () => void }) {
+export function LiveStories({ row, view, open, onToggle }: { row: RenderRow; view: BatchView; open: boolean; onToggle: () => void }) {
   const current = row.state === "removed" ? null : (view.storybook?.url ?? null);
-  const golden = row.state === "new" ? null : view.goldenStorybookUrl;
+  const golden = row.state === "added" ? null : view.goldenStorybookUrl;
   if (current === null && golden === null) return null;
   const side = (layer: "golden" | "current", url: string | null, missing: string) => (
     <div className="selfie-live-side">
@@ -108,11 +108,11 @@ export function LiveStories({ row, view, open, onToggle }: { row: SnapshotRow; v
         <>
           <Text as="p" className="selfie-muted">
             These run for real, so time and animation aren&apos;t frozen as they are in an image. Once you click in one, keys go to the story.
-            {view.viewport === null && " This run didn't record the size it rendered at, so these may lay out differently."}
+            {view.viewport === null && " This batch didn't record the size it rendered at, so these may lay out differently."}
           </Text>
           <div className="selfie-live-sides">
-            {side("golden", golden, row.state === "new" ? "A new story has no golden." : "The golden's built Storybook wasn't kept.")}
-            {side("current", current, "A removed story isn't in this run.")}
+            {side("golden", golden, row.state === "added" ? "An added story has no golden." : "The golden's built Storybook wasn't kept.")}
+            {side("current", current, "A removed story isn't in this batch.")}
           </div>
         </>
       )}

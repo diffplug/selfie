@@ -13,7 +13,7 @@ export const PORT = 4173;
 export const HOST = `127.0.0.1:${PORT}`;
 export const ORIGIN = `http://${HOST}`;
 export const UNKNOWN_HASH = "0".repeat(64);
-export const UNKNOWN_RUN = "00000000-0000-4000-8000-000000000000";
+export const UNKNOWN_BATCH = "00000000-0000-4000-8000-000000000000";
 
 export let h: Harness;
 export let project: Project;
@@ -52,16 +52,16 @@ export const change = (url: string, body: unknown, headers: Record<string, strin
     },
   });
 
-export const decideOn = (runId: string, decision: string, snapshots: unknown) => change(`/api/runs/${runId}/decisions`, { decision, snapshots });
-export const acceptRun = (runId: string, body: unknown = {}) => change(`/api/runs/${runId}/accept`, body);
-export const viewOf = async (runId: string) => (await (await get(`/api/runs/${runId}`)).json()) as any;
+export const decideOn = (batchId: string, decision: string, renders: unknown) => change(`/api/batches/${batchId}/decisions`, { decision, renders });
+export const acceptBatch = (batchId: string, body: unknown = {}) => change(`/api/batches/${batchId}/accept`, body);
+export const viewOf = async (batchId: string) => (await (await get(`/api/batches/${batchId}`)).json()) as any;
 
 /** `h.stories` as the goldens of HEAD. */
 export async function makeGoldens() {
   const { json } = await review();
-  const view = await viewOf(json.runId);
+  const view = await viewOf(json.batchId);
   const targets = view.rows.map(({ story, imageHash }: any) => ({ story, imageHash }));
-  expect((await decideOn(json.runId, "approved", targets)).status).toBe(200);
-  expect((await acceptRun(json.runId)).status).toBe(200);
-  return json.runId as string;
+  expect((await decideOn(json.batchId, "approved", targets)).status).toBe(200);
+  expect((await acceptBatch(json.batchId)).status).toBe(200);
+  return json.batchId as string;
 }

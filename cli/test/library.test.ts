@@ -13,7 +13,7 @@ import {
   resolveRenderSettings,
   review,
   SelfieError,
-  summarizeRun,
+  summarizeBatch,
   type Project,
 } from "selfie-cli";
 import { BLUE, createHarness, git, type Harness } from "./support.ts";
@@ -31,34 +31,34 @@ afterEach(async () => {
   await h.destroy();
 });
 
-test("isDecidable is true only of what has a new image", () => {
-  expect(["changed", "new", "unchanged", "removed", "failed"].filter((state) => isDecidable(state as any))).toEqual([
+test("isDecidable is true only of what has an image to decide on", () => {
+  expect(["changed", "added", "unchanged", "removed", "failed"].filter((state) => isDecidable(state as any))).toEqual([
     "changed",
-    "new",
+    "added",
   ]);
 });
 
 test("a decision on exact images takes each as itself, and checkAccept changes nothing", async () => {
   h.stories = [{ id: "a*" }, { id: "ab" }];
   const { comparison } = await review(project, options());
-  const { id: runId } = comparison.run;
-  const star = comparison.snapshots.find(({ story }) => story === "a*")!;
+  const { id: batchId } = comparison.batch;
+  const star = comparison.renders.find(({ story }) => story === "a*")!;
   const target = { story: "a*", imageHash: star.imageHash! };
-  const decided = await decide(project, { runId, decision: "approved", actor: "ui", stories: { targets: [target] } });
+  const decided = await decide(project, { batchId, decision: "approved", actor: "ui", stories: { targets: [target] } });
   expect(decided.decided.map(({ story }) => story)).toEqual(["a*"]);
-  expect(summarizeRun(decided.comparison).counts.undecided).toBe(1);
+  expect(summarizeBatch(decided.comparison).counts.undecided).toBe(1);
 
   await expect(
-    decide(project, { runId, decision: "approved", actor: "ui", stories: { targets: [target, { story: "nobody", imageHash: star.imageHash! }] } }),
+    decide(project, { batchId, decision: "approved", actor: "ui", stories: { targets: [target, { story: "nobody", imageHash: star.imageHash! }] } }),
   ).rejects.toMatchObject({ code: "stale-decision" });
 
-  const all = await decide(project, { runId, decision: "approved", actor: "ui", stories: "all" });
+  const all = await decide(project, { batchId, decision: "approved", actor: "ui", stories: "all" });
   const check = await checkAccept(project, all.comparison);
   expect(check.refusals).toEqual([]);
-  const { gitSha, environment } = all.comparison.run;
-  expect(await project.snapshots.acceptedRunAt(gitSha, environment)).toBeNull();
-  expect((await accept(project, { runId })).accepted).toBe(true);
-  expect(await project.snapshots.acceptedRunAt(gitSha, environment)).toBe(runId);
+  const { gitSha, environment } = all.comparison.batch;
+  expect(await project.batches.acceptedBatchAt(gitSha, environment)).toBeNull();
+  expect((await accept(project, { batchId })).accepted).toBe(true);
+  expect(await project.batches.acceptedBatchAt(gitSha, environment)).toBe(batchId);
 });
 
 test("openProject needs only a directory and an environment, and fails with a code", async () => {
@@ -71,48 +71,48 @@ describe("review", () => {
   test("returns facts, and a verdict can be recomputed after every decision", async () => {
     h.stories = [{ id: "a" }, { id: "b" }];
     const reviewed = await review(project, options());
-    const { id: runId } = reviewed.comparison.run;
-    expect(reviewed.comparison.run).toMatchObject({ dirty: false, baselineSha: null, storyFilter: null });
+    const { id: batchId } = reviewed.comparison.batch;
+    expect(reviewed.comparison.batch).toMatchObject({ dirty: false, baselineSha: null, storyFilter: null });
     expect(reviewed.dirtyPaths).toEqual([]);
     expect(reviewed.timings.totalMs).toBeGreaterThanOrEqual(0);
-    expect(summarizeRun(reviewed.comparison).blockers.map(({ reason }) => reason)).toEqual([
-      "new-unapproved",
-      "new-unapproved",
+    expect(summarizeBatch(reviewed.comparison).blockers.map(({ reason }) => reason)).toEqual([
+      "added-unapproved",
+      "added-unapproved",
     ]);
     // No wording about commands anywhere in a result.
     expect(JSON.stringify(reviewed)).not.toContain("selfie approve");
 
-    const one = await decide(project, { runId, decision: "approved", actor: "ui", stories: ["a"] });
+    const one = await decide(project, { batchId, decision: "approved", actor: "ui", stories: ["a"] });
     expect(one.decided.map(({ story }) => story)).toEqual(["a"]);
-    expect(summarizeRun(one.comparison).counts.undecided).toBe(1);
+    expect(summarizeBatch(one.comparison).counts.undecided).toBe(1);
 
-    const rest = await decide(project, { runId, decision: "rejected", actor: "ui", stories: "all" });
-    expect(summarizeRun(rest.comparison).blockers.map(({ reason }) => reason)).toEqual(["rejected", "rejected"]);
+    const rest = await decide(project, { batchId, decision: "rejected", actor: "ui", stories: "all" });
+    expect(summarizeBatch(rest.comparison).blockers.map(({ reason }) => reason)).toEqual(["rejected", "rejected"]);
 
-    const refused = await accept(project, { runId });
+    const refused = await accept(project, { batchId });
     expect(refused.accepted).toBe(false);
     expect(refused.refusals).toEqual([
       {
         reason: "unapproved",
         stories: [
-          { story: "a", state: "new", decision: "rejected" },
-          { story: "b", state: "new", decision: "rejected" },
+          { story: "a", state: "added", decision: "rejected" },
+          { story: "b", state: "added", decision: "rejected" },
         ],
       },
     ]);
 
-    await decide(project, { runId, decision: "approved", actor: "ui", stories: "all" });
-    const accepted = await accept(project, { runId });
+    await decide(project, { batchId, decision: "approved", actor: "ui", stories: "all" });
+    const accepted = await accept(project, { batchId });
     expect(accepted).toMatchObject({ accepted: true, refusals: [], usableAsBaseline: true });
     const { environmentId } = await resolveRenderSettings(project.repo);
     expect((await findBaseline(project, environmentId)).sha).toBe(git(h.repo, "rev-parse", "HEAD"));
   });
 
-  test("keeps a filter's unmatched patterns on the run, and works without one", async () => {
+  test("keeps a filter's unmatched patterns on the batch, and works without one", async () => {
     h.stories = [{ id: "a" }, { id: "b" }];
     const { comparison } = await review(project, { ...options(), stories: ["a", "nope"] });
-    expect(comparison.run.storyFilter).toEqual({ patterns: ["a", "nope"], unmatched: ["nope"] });
-    expect(await project.snapshots.getRun(comparison.run.id)).toMatchObject({
+    expect(comparison.batch.storyFilter).toEqual({ patterns: ["a", "nope"], unmatched: ["nope"] });
+    expect(await project.batches.getBatch(comparison.batch.id)).toMatchObject({
       storyFilter: { patterns: ["a", "nope"], unmatched: ["nope"] },
     });
   });
@@ -127,13 +127,13 @@ describe("review", () => {
   test("keeps the paths and pixel diffs in a cache that pruning can lose", async () => {
     h.stories = [{ id: "a" }];
     const first = await review(project, options());
-    const runId = first.comparison.run.id;
-    await decide(project, { runId, decision: "approved", actor: "ui", stories: "all" });
-    await accept(project, { runId });
+    const batchId = first.comparison.batch.id;
+    await decide(project, { batchId, decision: "approved", actor: "ui", stories: "all" });
+    await accept(project, { batchId });
 
     h.stories = [{ id: "a", color: BLUE }];
     const second = await review(project, options());
-    const secondId = second.comparison.run.id;
+    const secondId = second.comparison.batch.id;
     const cache = await readReviewCache(project, secondId);
     expect(cache?.differences[0]).toMatchObject({
       story: "a",
@@ -144,7 +144,7 @@ describe("review", () => {
     });
 
     await rm(path.dirname(second.differences[0]!.current!), { recursive: true });
-    await rm(path.join(project.directory, "runs", secondId), { recursive: true });
+    await rm(path.join(project.directory, "batches", secondId), { recursive: true });
     expect(await readReviewCache(project, secondId)).toBeNull();
 
     // What the UI would serve in its place.

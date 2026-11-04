@@ -1,8 +1,8 @@
 import { expect, test } from "vitest";
 import { applyFilter, decidableIn, filterQuery, neighbors, NO_FILTER, parseFilter, reuseRows, showQuery } from "../src/client/filter.ts";
-import type { SnapshotRow } from "../src/shared/api.ts";
+import type { RenderRow } from "../src/shared/api.ts";
 
-const row = (story: string, overrides: Partial<SnapshotRow> = {}): SnapshotRow => ({
+const row = (story: string, overrides: Partial<RenderRow> = {}): RenderRow => ({
   story,
   state: "changed",
   imageHash: "a".repeat(64),
@@ -15,12 +15,12 @@ const row = (story: string, overrides: Partial<SnapshotRow> = {}): SnapshotRow =
 });
 
 const approved = { decision: "approved", actor: "me", at: 1 } as const;
-const stories = (rows: readonly SnapshotRow[]) => rows.map(({ story }) => story);
+const stories = (rows: readonly RenderRow[]) => rows.map(({ story }) => story);
 
 const rows = [
   row("button--large"),
   row("button--small", { decision: approved }),
-  row("card--new", { state: "new", goldenHash: null }),
+  row("card--new", { state: "added", goldenHash: null }),
   row("gone", { state: "removed", imageHash: null }),
   row("broken", { state: "failed", imageHash: null, goldenHash: null, failure: "boom" }),
   row("calm", { state: "unchanged", playError: "threw" }),
@@ -73,12 +73,12 @@ test("a filter survives the URL, and a bad one falls back", () => {
 });
 
 test("moved and spacing only is a changed row with nothing changed in it", () => {
-  const stats = (changedPixels: number) => ({ changedPixels }) as SnapshotRow["pixelDiff"];
+  const stats = (changedPixels: number) => ({ changedPixels }) as RenderRow["pixelDiff"];
   const candidates = [
     row("only-moved", { pixelDiff: stats(0) }),
     row("really-changed", { pixelDiff: stats(1) }),
     row("not-compared-yet"),
-    row("new-story", { state: "new", goldenHash: null, pixelDiff: stats(0) }),
+    row("new-story", { state: "added", goldenHash: null, pixelDiff: stats(0) }),
   ];
   expect(stories(applyFilter(candidates, { text: "", show: "layout" }))).toEqual(["only-moved"]);
   expect(parseFilter("?show=layout").show).toBe("layout");

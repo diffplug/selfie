@@ -1,4 +1,4 @@
-// Every run's Storybook, kept so its stories can still be opened long after the directory has been
+// Every batch's Storybook, kept so its stories can still be opened long after the directory has been
 // rebuilt. Files are kept by their hash, as images are, so built Storybooks that share files share bytes.
 // See docs/specs/store.md -> built Storybooks.
 import type { Blobs } from "./blob.ts";
@@ -6,8 +6,8 @@ import { assertImageHash, isImageHash, sha256, toHex } from "./image-hash.ts";
 import type { Sql } from "./sql.ts";
 
 export const CREATE_BUILT_STORYBOOK_TABLES: readonly string[] = [
-  "CREATE TABLE IF NOT EXISTS run_storybooks (run_id TEXT PRIMARY KEY, storybook TEXT NOT NULL) WITHOUT ROWID",
-  // By environment, whose ID already covers it, so a run's story can lay out as it was rendered.
+  "CREATE TABLE IF NOT EXISTS batch_storybooks (batch_id TEXT PRIMARY KEY, storybook TEXT NOT NULL) WITHOUT ROWID",
+  // By environment, whose ID already covers it, so a batch's story can lay out as it was rendered.
   "CREATE TABLE IF NOT EXISTS environment_viewports (environment TEXT PRIMARY KEY, width INTEGER NOT NULL, height INTEGER NOT NULL) WITHOUT ROWID",
 ];
 
@@ -85,12 +85,12 @@ export class BuiltStorybooks {
     return manifest;
   }
 
-  /** Says which build rendered a run, which may be one that isn't kept here. */
-  async recordRunStorybook(runId: string, build: string): Promise<void> {
+  /** Says which build rendered a batch, which may be one that isn't kept here. */
+  async recordBatchStorybook(batchId: string, build: string): Promise<void> {
     assertImageHash(build);
     await this.#sql.run({
-      sql: "INSERT INTO run_storybooks(run_id, storybook) VALUES (?1, ?2) ON CONFLICT(run_id) DO UPDATE SET storybook = excluded.storybook",
-      params: [runId, build],
+      sql: "INSERT INTO batch_storybooks(batch_id, storybook) VALUES (?1, ?2) ON CONFLICT(batch_id) DO UPDATE SET storybook = excluded.storybook",
+      params: [batchId, build],
       idempotent: true,
     });
   }
@@ -104,21 +104,21 @@ export class BuiltStorybooks {
     });
   }
 
-  /** What size an environment renders at, or null for one no run has recorded this. */
+  /** What size an environment renders at, or null for one no batch has recorded this. */
   async viewportOf(environment: string): Promise<StoryViewport | null> {
     const [row] = await this.#sql.run({ sql: "SELECT width, height FROM environment_viewports WHERE environment = ?1", params: [environment], idempotent: true });
     return row === undefined ? null : { width: row.width as number, height: row.height as number };
   }
 
-  /** The built Storybook that rendered a run, if that's known. */
-  async storybookOfRun(runId: string): Promise<string | null> {
-    const [row] = await this.#sql.run({ sql: "SELECT storybook FROM run_storybooks WHERE run_id = ?1", params: [runId], idempotent: true });
+  /** The built Storybook that rendered a batch, if that's known. */
+  async storybookOfBatch(batchId: string): Promise<string | null> {
+    const [row] = await this.#sql.run({ sql: "SELECT storybook FROM batch_storybooks WHERE batch_id = ?1", params: [batchId], idempotent: true });
     return (row?.storybook as string | undefined) ?? null;
   }
 
-  /** The built Storybook that rendered a run, if that's known and kept here. */
-  async keptStorybookOfRun(runId: string): Promise<string | null> {
-    const build = await this.storybookOfRun(runId);
+  /** The built Storybook that rendered a batch, if that's known and kept here. */
+  async keptStorybookOfBatch(batchId: string): Promise<string | null> {
+    const build = await this.storybookOfBatch(batchId);
     return build !== null && (await this.has(build)) ? build : null;
   }
 }

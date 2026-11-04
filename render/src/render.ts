@@ -38,7 +38,7 @@ export interface RenderOptions {
   storyTimeoutMs?: number;
   /** How long to wait after the network and fonts, before the screenshot. Recorded in the manifest. */
   settleMs?: number;
-  /** Runs before story code in every frame, after `window.__SELFIE_SNAPSHOT__` is set. Its hash is in the manifest. */
+  /** Runs before story code in every frame, after `window.__SELFIE_RENDER__` is set. Its hash is in the manifest. */
   initScript?: string;
   signal?: AbortSignal;
   /** Human progress. Defaults to stderr. */

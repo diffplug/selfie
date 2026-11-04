@@ -1,4 +1,4 @@
-// The run: its facts, what blocks it, what to look at, and bulk decisions on what differs.
+// The batch: its facts, what blocks it, what to look at, and bulk decisions on what differs.
 import {
   Banner,
   Button,
@@ -16,12 +16,12 @@ import {
 } from "@primer/react";
 import { Blankslate, ScrollableRegion } from "@primer/react/experimental";
 import { useEffect, useMemo, useState, type ComponentProps, type RefObject } from "react";
-import type { AdvisoryReason, BlockerReason, DecisionKind, RunView, SnapshotRow } from "../shared/api.ts";
+import type { AdvisoryReason, BlockerReason, DecisionKind, BatchView, RenderRow } from "../shared/api.ts";
 import { applyFilter, decidableIn, filterQuery, hasAdvisory, NO_FILTER, parseFilter, showQuery, SHOW_OPTIONS, targetsOf, type RowFilter, type Show } from "./filter.ts";
-import { useStoryFocusKeys, useTitle, type RunState } from "./hooks.ts";
+import { useStoryFocusKeys, useTitle, type BatchState } from "./hooks.ts";
 import { Keys } from "./Keys.tsx";
-import { acceptPath, AppLink, AppLinkButton, navigate, runPath, storiesPath, storyPath } from "./router.tsx";
-import { ActionFailure, RunNotes } from "./RunNotes.tsx";
+import { acceptPath, AppLink, AppLinkButton, navigate, batchPath, storiesPath, storyPath } from "./router.tsx";
+import { ActionFailure, BatchNotes } from "./BatchNotes.tsx";
 import { StoryLinks } from "./StoryLinks.tsx";
 import { plural } from "./plural.ts";
 import { BLOCKER_WORDS, ReusedPixels, Sha, shortSha } from "./words.tsx";
@@ -37,24 +37,24 @@ function Fact({ term, children }: { term: string; children: React.ReactNode }) {
   );
 }
 
-function Facts({ view }: { view: RunView }) {
-  const { run, actor, siblings, branchGoldens } = view;
+function Facts({ view }: { view: BatchView }) {
+  const { batch, actor, siblings, branchGoldens } = view;
   return (
     <dl className="selfie-facts">
       <Fact term="Commit">
-        <Sha sha={run.gitSha} />
+        <Sha sha={batch.gitSha} />
       </Fact>
-      <Fact term="Run">
-        <code>{run.id}</code>
+      <Fact term="Batch">
+        <code>{batch.id}</code>
       </Fact>
-      {run.reusedFromRun !== null && (
+      {batch.reusedFromBatch !== null && (
         <Fact term="Pixels">
-          <ReusedPixels from={run.reusedFromRun} />
+          <ReusedPixels from={batch.reusedFromBatch} />
         </Fact>
       )}
-      <Fact term="Working tree">{run.dirty ? "Dirty when recorded" : "Clean when recorded"}</Fact>
+      <Fact term="Working tree">{batch.dirty ? "Dirty when recorded" : "Clean when recorded"}</Fact>
       <Fact term="Baseline">
-        {run.baselineSha === null ? "None" : <Sha sha={run.baselineSha} />}
+        {batch.baselineSha === null ? "None" : <Sha sha={batch.baselineSha} />}
       </Fact>
       {branchGoldens !== null && (
         <Fact term="Compared with">
@@ -62,28 +62,28 @@ function Facts({ view }: { view: RunView }) {
         </Fact>
       )}
       <Fact term="Environment">
-        <code>{run.environment}</code>
+        <code>{batch.environment}</code>
       </Fact>
       <Fact term="Recorded">
-        <RelativeTime date={new Date(run.startedAt)} />
+        <RelativeTime date={new Date(batch.startedAt)} />
       </Fact>
       <Fact term="Decisions are by">{actor ?? "Nobody: set git config user.email"}</Fact>
-      {run.storyFilter !== null && (
+      {batch.storyFilter !== null && (
         <Fact term="Story filter">
-          {run.storyFilter.patterns.length > PATTERNS_LISTED ? (
-            <span title={run.storyFilter.patterns.join(" ")}>{run.storyFilter.patterns.length} patterns</span>
+          {batch.storyFilter.patterns.length > PATTERNS_LISTED ? (
+            <span title={batch.storyFilter.patterns.join(" ")}>{batch.storyFilter.patterns.length} patterns</span>
           ) : (
-            <code>{run.storyFilter.patterns.join(" ")}</code>
+            <code>{batch.storyFilter.patterns.join(" ")}</code>
           )}
         </Fact>
       )}
       {siblings.length > 1 && (
-        <Fact term="Runs at this commit">
+        <Fact term="Batches at this commit">
           <Select
-            aria-label="Open another run at this commit"
-            value={run.id}
+            aria-label="Open another batch at this commit"
+            value={batch.id}
             size="small"
-            onChange={(event) => navigate(runPath(event.target.value))}
+            onChange={(event) => navigate(batchPath(event.target.value))}
           >
             {siblings.map((sibling, index) => (
               <Select.Option key={sibling.id} value={sibling.id} disabled={sibling.status === "recording"}>
@@ -126,18 +126,18 @@ const BLOCKERS: readonly { readonly reason: BlockerReason; readonly show?: Show 
   { reason: "failed", show: "failed" },
   { reason: "rejected", show: "rejected" },
   { reason: "changed-unapproved", show: "undecided" },
-  { reason: "new-unapproved", show: "undecided" },
+  { reason: "added-unapproved", show: "undecided" },
   { reason: "removed", show: "removed" },
   { reason: "pattern-unmatched" },
 ];
 
-function Blockers({ view, onShow }: { view: RunView; onShow: (show: Show) => void }) {
+function Blockers({ view, onShow }: { view: BatchView; onShow: (show: Show) => void }) {
   const byReason = Map.groupBy(view.blockers, ({ reason }) => reason);
   const present = BLOCKERS.filter(({ reason }) => byReason.has(reason));
   return (
     <Stack as="section" aria-labelledby="blockers-heading" gap="condensed">
       <Heading as="h3" id="blockers-heading" variant="small">
-        Blocking this run <CounterLabel>{view.blockers.length}</CounterLabel>
+        Blocking this batch <CounterLabel>{view.blockers.length}</CounterLabel>
       </Heading>
       {present.length === 0 ? (
         <Text as="p" className="selfie-muted">
@@ -167,7 +167,7 @@ function Blockers({ view, onShow }: { view: RunView; onShow: (show: Show) => voi
                   </ul>
                 ) : (
                   <StoryList
-                    runId={view.run.id}
+                    batchId={view.batch.id}
                     show={show}
                     stories={entries.map(({ story, detail }) => ({ story: story!, detail: reason === "failed" ? detail : null }))}
                   />
@@ -185,7 +185,7 @@ const ADVISORIES: readonly { readonly reason: AdvisoryReason; readonly words: st
   { reason: "play-error", words: "whose play function threw" },
 ];
 
-function Advisories({ view }: { view: RunView }) {
+function Advisories({ view }: { view: BatchView }) {
   if (view.advisories.length === 0) return null;
   return (
     <Stack as="section" aria-labelledby="advisories-heading" gap="condensed">
@@ -204,7 +204,7 @@ function Advisories({ view }: { view: RunView }) {
               <Text weight="semibold">
                 {plural(entries.length, "story", "stories")} {words}
               </Text>
-              <StoryList runId={view.run.id} show="advisory" stories={entries.map(({ story, detail }) => ({ story: story!, detail }))} />
+              <StoryList batchId={view.batch.id} show="advisory" stories={entries.map(({ story, detail }) => ({ story: story!, detail }))} />
             </li>
           );
         })}
@@ -216,18 +216,18 @@ function Advisories({ view }: { view: RunView }) {
 interface PendingBulk {
   readonly decision: DecisionKind;
   /** Each decidable, as they were when the dialog opened, which is exactly what gets sent. */
-  readonly rows: readonly SnapshotRow[];
-  /** All of the run, as opposed to what a filter is showing. */
+  readonly rows: readonly RenderRow[];
+  /** All of the batch, as opposed to what a filter is showing. */
   readonly scope: "all" | "shown";
 }
 
 function BulkDialog({ pending, onClose }: { pending: PendingBulk; onClose: (confirmed: boolean) => void }) {
   const { decision, rows, scope } = pending;
   const verb = decision === "approved" ? "Approve" : "Reject";
-  const count = (test: (row: SnapshotRow) => boolean) => rows.filter(test).length;
+  const count = (test: (row: RenderRow) => boolean) => rows.filter(test).length;
   const facts = [
     [count(({ state }) => state === "changed"), "changed"],
-    [count(({ state }) => state === "new"), "new"],
+    [count(({ state }) => state === "added"), "added"],
     [count(({ decision: made }) => made?.decision === "approved"), "already approved"],
     [count(({ decision: made }) => made?.decision === "rejected"), "already rejected"],
     [count(hasAdvisory), "with an advisory"],
@@ -243,8 +243,8 @@ function BulkDialog({ pending, onClose }: { pending: PendingBulk; onClose: (conf
     >
       <Stack gap="condensed">
         <Text as="p">
-          {scope === "all" ? "This decides on every image in this run that has one to decide on." : "This decides on exactly the images the current filter shows."}{" "}
-          A decision on an image holds in later runs too, until it's replaced.
+          {scope === "all" ? "This decides on every image in this batch that has one to decide on." : "This decides on exactly the images the current filter shows."}{" "}
+          A decision on an image holds in later batches too, until it's replaced.
         </Text>
         <ul className="selfie-bulk-facts">
           {facts
@@ -275,7 +275,7 @@ function BulkButton({
 }: {
   decision: DecisionKind;
   scope: PendingBulk["scope"];
-  rows: readonly SnapshotRow[];
+  rows: readonly RenderRow[];
   busy: boolean;
   onPick: (pending: PendingBulk) => void;
 }) {
@@ -298,8 +298,8 @@ function Differences({
   filter,
   setFilter,
 }: {
-  state: RunState;
-  view: RunView;
+  state: BatchState;
+  view: BatchView;
   filter: RowFilter;
   setFilter: (filter: RowFilter, replace?: boolean) => void;
 }) {
@@ -332,7 +332,7 @@ function Differences({
           Differences
         </Heading>
         {undecided.length > 0 && (
-          <AppLinkButton variant="primary" href={storyPath(view.run.id, undecided[0]!.story, showQuery("undecided"))}>
+          <AppLinkButton variant="primary" href={storyPath(view.batch.id, undecided[0]!.story, showQuery("undecided"))}>
             Review {plural(undecided.length, "undecided image")}
           </AppLinkButton>
         )}
@@ -383,20 +383,20 @@ function Differences({
   );
 }
 
-export function RunScreen({
+export function BatchScreen({
   state,
   view,
   search,
   returningFrom,
 }: {
-  state: RunState;
-  view: RunView;
+  state: BatchState;
+  view: BatchView;
   search: string;
   returningFrom: RefObject<string | null>;
 }) {
-  const { run, counts, refusals, acceptedRunId, removals } = view;
+  const { batch, counts, refusals, acceptedBatchId, removals } = view;
   const filter = useMemo(() => parseFilter(search), [search]);
-  const setFilter = (next: RowFilter, replace = false) => navigate(runPath(run.id, filterQuery(next)), { replace });
+  const setFilter = (next: RowFilter, replace = false) => navigate(batchPath(batch.id, filterQuery(next)), { replace });
   const showInList = (show: Show) => {
     setFilter({ ...NO_FILTER, show });
   };
@@ -411,45 +411,45 @@ export function RunScreen({
 
   useStoryFocusKeys();
 
-  useTitle(`Run at ${shortSha(run.gitSha)}`);
+  useTitle(`Batch at ${shortSha(batch.gitSha)}`);
   const newest = view.siblings.find(({ status }) => status !== "recording");
   const stopsAccept = refusals.filter(({ reason }) => reason !== "removed-unacknowledged");
-  const ready = stopsAccept.length === 0 && acceptedRunId !== run.id;
+  const ready = stopsAccept.length === 0 && acceptedBatchId !== batch.id;
   const { outsideFilter } = removals;
 
   return (
     <Stack gap="normal">
       <Stack direction="horizontal" align="center" justify="space-between" wrap="wrap" gap="condensed">
         <Heading as="h2" variant="medium">
-          Run at <Sha sha={run.gitSha} />
+          Batch at <Sha sha={batch.gitSha} />
         </Heading>
         <AppLink href={storiesPath()}>Every story</AppLink>
-        <AppLinkButton variant={ready ? "primary" : "default"} href={acceptPath(run.id)}>
-          {acceptedRunId === run.id ? "Accepted" : ready ? "Accept this run" : "Why can't this be accepted?"}
+        <AppLinkButton variant={ready ? "primary" : "default"} href={acceptPath(batch.id)}>
+          {acceptedBatchId === batch.id ? "Accepted" : ready ? "Accept this batch" : "Why can't this be accepted?"}
         </AppLinkButton>
       </Stack>
       <ActionFailure state={state} />
-      {newest !== undefined && newest.id !== run.id && (
+      {newest !== undefined && newest.id !== batch.id && (
         <Banner
           variant="info"
-          title="There's a newer run at this commit"
-          description={<AppLink href={runPath(newest.id)}>Open the newest run</AppLink>}
+          title="There's a newer batch at this commit"
+          description={<AppLink href={batchPath(newest.id)}>Open the newest batch</AppLink>}
         />
       )}
       <Facts view={view} />
-      {run.dirty && (
+      {batch.dirty && (
         <Banner
           variant="warning"
           title="Recorded on a dirty tree"
-          description={`The tree had uncommitted changes while this rendered, so these images don't describe ${shortSha(run.gitSha)} and can't become its goldens. You can still decide on them. Commit, then run selfie review again: your approvals carry over.`}
+          description={`The tree had uncommitted changes while this rendered, so these images don't describe ${shortSha(batch.gitSha)} and can't become its goldens. You can still decide on them. Commit, then run selfie review again: your approvals carry over.`}
         />
       )}
-      <RunNotes view={view} />
+      <BatchNotes view={view} />
       <div className="selfie-counts">
         <Count label="Stories" count={counts.stories} onShow={showInList} />
         <Count label="Unchanged" count={counts.unchanged} show="unchanged" onShow={showInList} />
         <Count label="Changed" count={counts.changed} show="changed" onShow={showInList} />
-        <Count label="New" count={counts.new} show="new" onShow={showInList} />
+        <Count label="Added" count={counts.added} show="added" onShow={showInList} />
         <Count label="Removed" count={counts.removed} show="removed" onShow={showInList} />
         <Count label="Failed" count={counts.failed} show="failed" onShow={showInList} />
         <Count label="Undecided" count={counts.undecided} show="undecided" onShow={showInList} />
@@ -458,7 +458,7 @@ export function RunScreen({
       {outsideFilter > 0 && (
         <Banner
           variant="info"
-          title="This run was filtered"
+          title="This batch was filtered"
           description={`${plural(outsideFilter, "golden")} of the baseline ${outsideFilter === 1 ? "is" : "are"} outside its --story filter, so ${outsideFilter === 1 ? "it isn't" : "they aren't"} compared here. Accepting would drop ${outsideFilter === 1 ? "it" : "them"}.`}
         />
       )}
