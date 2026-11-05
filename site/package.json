@@ -1,0 +1,13 @@
+{
+  "name": "selfie-landing",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler pages dev",
+    "test": "node --test test/",
+    "deploy": "wrangler pages deploy"
+  },
+  "devDependencies": {
+    "wrangler": "4.157.0"
+  }
+}

@@ -1,0 +1,104 @@
+@font-face { font-family: "Bagel Fat One"; src: url("/fonts/BagelFatOne.woff2") format("woff2"); font-display: swap; }
+@font-face { font-family: "Jost"; src: url("/fonts/Jost.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+
+:root {
+  --ink: #1f2328;
+  --muted: #4a525c;
+  --sky: #bfd9f0;
+  --paper: #fffdf7;
+  --yellow: #ffdb5c;
+  --pink: #e8509b;
+  --edge: 3px solid var(--ink);
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 400 1.1875rem/1.5 "Jost", system-ui, sans-serif; }
+img { display: block; max-width: 100%; height: auto; }
+p { margin: 0 0 1em; }
+a { color: inherit; text-underline-offset: 0.15em; }
+a:hover { text-decoration-thickness: 2px; }
+:focus-visible { outline: 3px solid var(--pink); outline-offset: 3px; }
+code { font: 0.86em ui-monospace, SFMono-Regular, Menlo, monospace; }
+h1, h2 { margin: 0; font-family: "Bagel Fat One", "Jost", sans-serif; font-weight: 400; line-height: 1.05; text-wrap: balance; }
+h2 { font-size: clamp(2rem, 4vw, 2.75rem); }
+.wrap { width: min(1120px, 100% - 2.5rem); margin-inline: auto; }
+
+.strip { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: center; gap: 0.25rem 1.25rem; padding: 0.7rem 1.25rem; background: var(--ink); color: #fff; font-size: 1.0625rem; }
+.strip p { margin: 0; }
+.strip a { color: var(--yellow); font-weight: 600; white-space: nowrap; }
+
+.brand { display: inline-flex; align-items: center; gap: 0.5rem; font: 400 1.875rem/1 "Bagel Fat One", sans-serif; text-decoration: none; }
+
+.hero { overflow: hidden; background: var(--sky); border-bottom: var(--edge); }
+.hero-grid { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 2rem; align-items: end; }
+.hero-copy { padding-block: 2rem 3.5rem; }
+.hero h1 { margin: 2.75rem 0 1.25rem; font-size: clamp(2.75rem, 6.4vw, 4.75rem); }
+.lede { max-width: 38em; font-size: 1.3125rem; line-height: 1.45; }
+.mascot { width: 100%; margin-top: 1.5rem; margin-bottom: -2.5rem; }
+
+.actions { display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 1.75rem; }
+.actions-stack { flex-direction: column; margin-top: 0; }
+.btn { display: inline-block; padding: 0.7rem 1.25rem; background: #fff; border: var(--edge); border-radius: 12px; box-shadow: 4px 4px 0 var(--ink); font-weight: 600; text-align: center; text-decoration: none; transition: transform 0.12s ease-out, box-shadow 0.12s ease-out; }
+.btn:hover { transform: translate(-1px, -1px); box-shadow: 5px 5px 0 var(--ink); }
+.btn:active { transform: translate(3px, 3px); box-shadow: 1px 1px 0 var(--ink); }
+.btn-primary { background: var(--yellow); }
+.btn-dark { background: var(--ink); color: #fff; }
+
+.stats { display: flex; flex-wrap: wrap; gap: 0.75rem 2.5rem; margin: 2.5rem 0 0; }
+.stats dt { color: var(--muted); font-size: 1rem; }
+.stats dd { margin: 0; font-size: 1.625rem; font-weight: 600; line-height: 1.2; }
+.stats-note { margin: 0.5rem 0 0; color: var(--muted); font-size: 1rem; }
+
+.videos { padding-block: 4.5rem; }
+.video-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2rem; margin-top: 1.75rem; }
+.video { display: flex; flex-direction: column; gap: 0.25rem; text-decoration: none; }
+.video strong { margin-top: 0.75rem; font-size: 1.375rem; font-weight: 600; }
+.video:hover strong { text-decoration: underline; text-underline-offset: 0.15em; }
+.video > span:last-child { color: var(--muted); }
+.thumb { position: relative; display: block; overflow: hidden; border: var(--edge); border-radius: 14px; box-shadow: 5px 5px 0 var(--ink); }
+.play { position: absolute; left: 1rem; bottom: 1rem; width: 3.5rem; height: 3.5rem; background: var(--pink); border: var(--edge); border-radius: 50%; }
+.play::after { content: ""; position: absolute; left: 1.2rem; top: 0.85rem; border-style: solid; border-width: 0.75rem 0 0.75rem 1.2rem; border-color: transparent transparent transparent #fff; }
+
+.loop { padding-block: 4.5rem; background: #fff; border-block: var(--edge); }
+.loop-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 3.5rem; align-items: start; }
+.terminal { margin: 1.75rem 0 0; padding: 1.25rem 1.5rem; overflow-x: auto; background: var(--ink); color: #fff; border-radius: 14px; font-size: 1.125rem; line-height: 1.55; }
+.terminal .c { color: #a9b4c0; }
+.features { display: grid; gap: 1.5rem; margin: 0; padding: 0; list-style: none; }
+.features strong { display: block; font-size: 1.25rem; font-weight: 600; }
+
+.early { padding-block: 4.5rem; background: var(--yellow); }
+.early-grid { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3.5rem; align-items: center; }
+.early h2 { margin-bottom: 1.25rem; }
+.early p { max-width: 42em; }
+.early p:last-child { margin-bottom: 0; }
+
+.footer { padding-block: 2.5rem; background: var(--ink); color: #fff; }
+.footer a { color: var(--yellow); }
+.footer p { max-width: 48em; }
+.fine { margin: 0; color: #a9b4c0; font-size: 1rem; }
+
+.not-found { display: grid; min-height: 100vh; align-items: center; background: var(--sky); }
+.not-found main { padding-block: 3rem; }
+.not-found h1 { margin: 2.5rem 0 0.75rem; font-size: clamp(2.75rem, 7vw, 4.75rem); }
+.not-found p { max-width: 42em; }
+
+@media (max-width: 860px) {
+  .hero-grid { grid-template-columns: minmax(0, 1fr) 118px; gap: 0.5rem; align-items: start; }
+  .hero-copy { display: contents; }
+  .brand, .hero h1 { grid-column: 1; }
+  .brand { margin-top: 1.5rem; justify-self: start; }
+  .hero h1 { margin: 1.5rem 0 0; }
+  .mascot { grid-column: 2; grid-row: 1 / span 2; margin: 1rem 0 0; }
+  .hero .lede, .hero .actions, .hero .stats, .stats-note { grid-column: 1 / -1; }
+  .hero .lede { margin: 1.25rem 0 0; }
+  .stats-note { margin-bottom: 2.5rem; }
+  .video-grid, .loop-grid, .early-grid { grid-template-columns: minmax(0, 1fr); }
+  .videos, .loop, .early { padding-block: 3.25rem; }
+  .terminal { padding: 1.125rem 1.25rem; font-size: 1rem; }
+  .loop-grid, .early-grid { gap: 2.25rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn { transition: none; }
+}

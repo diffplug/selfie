@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Selfie: Storybook testing your coding agent can afford</title>
+  <meta name="description" content="Distributed Storybook testing that runs on your machine beside your agent, in CI, and on GitHub, with no bill per image.">
+  <link rel="canonical" href="https://selfie.dev/">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://selfie.dev/">
+  <meta property="og:title" content="Selfie: Storybook testing your coding agent can afford">
+  <meta property="og:description" content="Distributed Storybook testing that runs on your machine beside your agent, in CI, and on GitHub, with no bill per image.">
+  <meta property="og:image" content="https://selfie.dev/img/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" type="image/svg+xml" href="/logo-icon.svg">
+  <link rel="preload" href="/fonts/BagelFatOne.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/Jost.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <aside class="strip">
+    <p><strong>Using Selfie on Java, Kotlin, or Python?</strong> The snapshot testing library moved, and your build doesn't need to change.</p>
+    <a href="https://lib.selfie.dev">Go to lib.selfie.dev <span aria-hidden="true">→</span></a>
+  </aside>
+
+  <header class="hero">
+    <div class="wrap hero-grid">
+      <div class="hero-copy">
+        <a class="brand" href="/"><img src="/logo-icon.svg" alt="" width="44" height="44"><span>selfie</span></a>
+        <h1>Storybook testing your coding agent can afford.</h1>
+        <p class="lede">Putting renders inside the coding loop can multiply render counts by 100x to 1000x, which centralized services like Chromatic make wildly unaffordable. Selfie runs on your machine beside your agent, in CI, and on GitHub.</p>
+        <div class="actions">
+          <a class="btn btn-primary" href="https://github.com/diffplug/selfie-hackathon">Get started on GitHub</a>
+          <a class="btn" href="https://nedshed.dev/subscribe">Subscribe for updates</a>
+        </div>
+        <dl class="stats">
+          <div><dt>124 stories</dt><dd>about 25 s</dd></div>
+          <div><dt>541 stories</dt><dd>about 70 s</dd></div>
+          <div><dt>Bill per image</dt><dd>$0</dd></div>
+        </dl>
+        <p class="stats-note">Local renders on an M4 MacBook Air.</p>
+      </div>
+      <img class="mascot" src="/img/mascot.webp" alt="" width="666" height="1400">
+    </div>
+  </header>
+
+  <main>
+    <section class="videos">
+      <div class="wrap">
+        <h2>Watch it</h2>
+        <div class="video-grid">
+          <a class="video" href="https://youtu.be/8B3-v4DTwfU">
+            <span class="thumb"><img src="/img/video-why.webp" alt="" width="960" height="540" loading="lazy"><span class="play" aria-hidden="true"></span></span>
+            <strong>Why Selfie</strong>
+            <span>From Storybook to Chromatic to Selfie: why snapshot testing needs to change for coding agents.</span>
+          </a>
+          <a class="video" href="https://youtu.be/FiGuwfB13b0">
+            <span class="thumb"><img src="/img/video-demo.webp" alt="" width="960" height="540" loading="lazy"><span class="play" aria-hidden="true"></span></span>
+            <strong>Product demo</strong>
+            <span>The real app: a two-line CSS change touches all 124 stories, and a person and an agent work through it together.</span>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <section class="loop">
+      <div class="wrap loop-grid">
+        <div>
+          <h2>A review gate for the agent's loop</h2>
+          <pre class="terminal" tabindex="0" aria-label="An agent's loop, as shell commands"><code><span class="c"># JSON naming the diff images</span>
+selfie review
+
+<span class="c"># after looking at them</span>
+selfie approve &lt;batch&gt; --all
+git commit
+
+<span class="c"># nothing left to ask</span>
+selfie review</code></pre>
+        </div>
+        <ul class="features">
+          <li><strong>Fits an agent's loop.</strong> <code>selfie review</code> prints one JSON document, and its exit code says whether anything blocks.</li>
+          <li><strong>Says what kind of change it is.</strong> It separates what moved or gained spacing from what really changed, so you can approve the harmless ones together.</li>
+          <li><strong>Lets you point at the problem.</strong> Write a note on an image, and your agent gets your words, the exact box, and a picture of what you saw.</li>
+          <li><strong>Follows Git.</strong> An approval counts wherever history reaches it, so it isn't repeated after a commit, a rebase, or a merge.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="early">
+      <div class="wrap early-grid">
+        <div>
+          <h2>Early days. Follow along.</h2>
+          <p>Selfie is piloting with StorybookJS. The local loop, CI, and commit statuses are built and in use on its own repository. It isn't on npm yet, so setup starts from a checkout, and you'll need Node 26 or later, pnpm, and Docker. GitHub sign-in and private repositories aren't built yet.</p>
+          <p><a href="https://hackathon.selfie.dev/diffplug/selfie-hackathon">See Selfie reviewing itself</a>, no sign-in needed.</p>
+        </div>
+        <div class="actions actions-stack">
+          <a class="btn btn-dark" href="https://github.com/diffplug/selfie-hackathon#quickstart">Read the quickstart</a>
+          <a class="btn" href="https://nedshed.dev/subscribe">Subscribe at nedshed.dev</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap">
+      <p>Looking for the JVM/Python snapshot testing library (<code>expectSelfie</code>, <code>expect_selfie</code>)? It moved to <a href="https://github.com/diffplug/selfie-lib">diffplug/selfie-lib</a>, with docs at <a href="https://lib.selfie.dev">lib.selfie.dev</a>.</p>
+      <p class="fine">© 2026 DiffPlug LLC</p>
+    </div>
+  </footer>
+</body>
+</html>
