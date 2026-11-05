@@ -97,8 +97,8 @@ function HunkOutlines({ groups, layer, size, selection }: { groups: readonly Hun
   );
 }
 
-const share = (part: number, whole: number) => `${(part / whole) * 100}%`;
-const placed = ({ x, y, width, height }: BoundingBox, size: Size) => ({
+export const share = (part: number, whole: number) => `${(part / whole) * 100}%`;
+export const placed = ({ x, y, width, height }: BoundingBox, size: Size) => ({
   left: share(x, size.width),
   top: share(y, size.height),
   width: share(width, size.width),
@@ -122,7 +122,7 @@ function NoteBoxes({ notes, drawn, size }: { notes: readonly Note[]; drawn: Boun
   );
 }
 
-function Pane({
+export function Pane({
   words,
   src,
   story,
@@ -138,7 +138,7 @@ function Pane({
   captioned: boolean;
   openLabel: string;
   onOpen: () => void;
-  onLoad: ReactEventHandler<HTMLImageElement>;
+  onLoad?: ReactEventHandler<HTMLImageElement>;
   children: ReactNode;
 }) {
   return (

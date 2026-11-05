@@ -183,18 +183,17 @@ export function stateOf(view: BatchView, overrides: Partial<BatchState> = {}): B
   };
 }
 
-/** A delta from the first hunk of a generated diff. */
+/** A delta from the first hunk of a generated diff, in these stories. */
 export function deltaFrom(pair: keyof typeof PIXEL_DIFFS, stories: readonly string[]): Delta {
   const [current, golden] = pair.split("-") as [keyof typeof HASHES, keyof typeof HASHES];
   const diff = PIXEL_DIFFS[pair];
   const { kind, golden: goldenBox, current: currentBox } = diff.hunks[0]!;
-  return {
-    key: pair,
-    kind,
-    golden: { hash: HASHES[golden], box: goldenBox, image: diff.golden },
-    current: { hash: HASHES[current], box: currentBox, image: diff.current },
-    stories,
-  };
+  const examples = stories.map((story) => ({
+    story,
+    golden: { hash: HASHES[golden], boxes: [goldenBox], image: diff.golden },
+    current: { hash: HASHES[current], boxes: [currentBox], image: diff.current },
+  }));
+  return { key: pair, kind, examples };
 }
 
 /** Nothing found, with actions that are recorded but change nothing. */

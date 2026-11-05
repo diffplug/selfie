@@ -32,6 +32,8 @@ Evidence and reasoning for `docs/specs/ui.md`, keyed by its headings.
 
 **Why raw hunks, and by pixels.** A group is only a choice of what to show together, and its box holds whatever's between its hunks, so the same change could group differently beside something else. Position isn't compared, since a band that closes up sits at a different height on each page. A hash and not pixels held in memory, since a whole page's change on each of 568 stories would hold gigabytes. SHA-256, since this approves images, and a weaker hash would let a crafted image pass as a change someone accepted.
 
+**Why whole images to go through a delta's stories.** A delta's pixels are the same in every story by definition, so its crop can't tell one from another. What can be wrong is where it landed and what's around it, as when a change that's right on most pages is on top of something on one. Only one is open at a time, since 28 pairs of whole images would be a very long page.
+
 **Why it needs no second comparison.** Everything outside a hunk matches, which is what makes hunks correct at all, so with some redrawn, what's different is exactly the rest. `cli/test/deltas.test.ts` shows it on the real differ, by comparing again for every combination. It was also compared pixel by pixel in a browser, on all 83 of that batch's finished images, through canvas and PNG.
 
 - **Why moves and spacing are a filter, not a pass.** On one real layout shift, 59 of 134 stories had nothing else in them. Looking through them one at a time is the cost the label should save, and `kind` must not decide for anyone (`cli.rationale.md`), so the filter lets a person see just those, glance over the thumbnails, and approve what's shown.

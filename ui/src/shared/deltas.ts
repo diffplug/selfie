@@ -20,20 +20,26 @@ export interface ScannedRow {
   readonly keys: readonly (string | null)[];
 }
 
-/** Where one example of a delta is. */
+/** Where one side of a delta is, in one story's image: every place it has it, which accepting covers, in the order of its hunks. */
 export interface DeltaSide {
   readonly hash: string;
-  readonly box: BoundingBox;
+  readonly boxes: readonly BoundingBox[];
   /** The whole image's, to crop it. */
   readonly image: { readonly width: number; readonly height: number };
+}
+
+/** One story a delta is in. */
+export interface DeltaExample {
+  readonly story: string;
+  readonly golden: DeltaSide;
+  readonly current: DeltaSide;
 }
 
 export interface Delta {
   readonly key: string;
   readonly kind: ChangedHunk["kind"];
-  readonly golden: DeltaSide;
-  readonly current: DeltaSide;
-  readonly stories: readonly string[];
+  /** Each story once, in the order they're listed. */
+  readonly examples: readonly DeltaExample[];
 }
 
 export const sizeKey = ({ golden, current }: ChangedHunk) => `${golden.width}x${golden.height}>${current.width}x${current.height}`;
@@ -59,35 +65,35 @@ export function repeatedSizes(diffs: readonly PixelDiff[]): ReadonlySet<string> 
 
 const areaOf = ({ width, height }: BoundingBox) => width * height;
 
+const sideWith = (box: BoundingBox, hash: string, image: DeltaSide["image"], known: DeltaSide | undefined): DeltaSide => ({ hash, image, boxes: [...(known?.boxes ?? []), box] });
+
 /** Whichever `wanted` picks, most stories first, and then the largest, so the order never depends on the list's. */
 function deltasIn(scans: readonly ScannedRow[], wanted: (key: string) => boolean): Delta[] {
-  const found = new Map<string, Omit<Delta, "stories"> & { stories: Set<string> }>();
+  const found = new Map<string, { readonly kind: Delta["kind"]; readonly examples: Map<string, DeltaExample> }>();
   for (const { row, diff, keys } of scans) {
     diff.hunks.forEach((hunk, index) => {
       const key = keys[index];
       if (key === null || key === undefined || !wanted(key)) return;
-      const held = found.get(key);
-      if (held !== undefined) return void held.stories.add(row.story);
-      found.set(key, {
-        key,
-        kind: hunk.kind,
-        golden: { hash: row.goldenHash, box: hunk.golden, image: diff.golden },
-        current: { hash: row.imageHash, box: hunk.current, image: diff.current },
-        stories: new Set([row.story]),
+      const { examples } = found.get(key) ?? found.set(key, { kind: hunk.kind, examples: new Map() }).get(key)!;
+      const known = examples.get(row.story);
+      examples.set(row.story, {
+        story: row.story,
+        golden: sideWith(hunk.golden, row.goldenHash, diff.golden, known?.golden),
+        current: sideWith(hunk.current, row.imageHash, diff.current, known?.current),
       });
     });
   }
-  const size = ({ golden, current }: Pick<Delta, "golden" | "current">) => areaOf(golden.box) + areaOf(current.box);
-  return [...found.values()]
-    .map(({ stories, ...delta }) => ({ ...delta, stories: [...stories].sort() }))
-    .sort((p, q) => q.stories.length - p.stories.length || size(q) - size(p) || (p.key < q.key ? -1 : 1));
+  const size = ({ examples }: Delta) => areaOf(examples[0]!.golden.boxes[0]!) + areaOf(examples[0]!.current.boxes[0]!);
+  return [...found]
+    .map(([key, { kind, examples }]): Delta => ({ key, kind, examples: [...examples.values()] }))
+    .sort((p, q) => q.examples.length - p.examples.length || size(q) - size(p) || (p.key < q.key ? -1 : 1));
 }
 
 const isUndecided = ({ row }: ScannedRow) => row.decision === null;
 
 /** What to offer: only undecided stories are affected, since an image with a decision has had its look. */
 export const offeredDeltas = (scans: readonly ScannedRow[], accepted: ReadonlySet<string>): readonly Delta[] =>
-  deltasIn(scans.filter(isUndecided), (key) => !accepted.has(key)).filter(({ stories }) => stories.length >= MIN_AFFECTED);
+  deltasIn(scans.filter(isUndecided), (key) => !accepted.has(key)).filter(({ examples }) => examples.length >= MIN_AFFECTED);
 
 export const acceptedDeltas = (scans: readonly ScannedRow[], accepted: ReadonlySet<string>): readonly Delta[] => deltasIn(scans, (key) => accepted.has(key));
 

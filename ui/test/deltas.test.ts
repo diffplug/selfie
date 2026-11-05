@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import type { ChangedHunk, PixelDiff, RenderRow } from "../src/shared/api.ts";
-import { type Comparable, acceptedDeltas, canApply, finishedBy, hunksAccepted, MIN_AFFECTED, offeredDeltas, patchGolden, repeatedSizes, type ScannedRow } from "../src/shared/deltas.ts";
+import { type Comparable, type Delta, acceptedDeltas, canApply, finishedBy, hunksAccepted, MIN_AFFECTED, offeredDeltas, patchGolden, repeatedSizes, type ScannedRow } from "../src/shared/deltas.ts";
 
 const box = (x: number, y: number, width: number, height: number) => ({ x, y, width, height });
 
@@ -24,6 +24,8 @@ const scan = (story: string, keys: readonly (string | null)[], decision: RenderR
   diff: diffOf(keys.map((_, index) => hunk(box(0, index * 10, 4, 4), box(0, index * 10, 4, 4)))),
   keys,
 });
+
+const storiesOf = (examples: Delta["examples"]) => examples.map(({ story }) => story);
 
 const approved = { decision: "approved", actor: "a", at: 1 } as const;
 const rejected = { decision: "rejected", actor: "a", at: 1 } as const;
@@ -54,7 +56,7 @@ describe("repeatedSizes", () => {
 describe("offeredDeltas", () => {
   test("offers only what enough stories share, most stories first", () => {
     const scans = [scan("a", ["x", "y"]), scan("b", ["x", "y"]), scan("c", ["x", "y"]), scan("d", ["x"]), scan("e", ["z"]), scan("f", ["z"])];
-    expect(offeredDeltas(scans, new Set()).map(({ key, stories }) => [key, stories])).toEqual([
+    expect(offeredDeltas(scans, new Set()).map(({ key, examples }) => [key, storiesOf(examples)])).toEqual([
       ["x", ["a", "b", "c", "d"]],
       ["y", ["a", "b", "c"]],
     ]);
@@ -68,7 +70,27 @@ describe("offeredDeltas", () => {
     const scans = [scan("a", ["x"]), scan("b", ["x"]), scan("c", ["x"], approved), scan("d", ["x"], rejected)];
     expect(offeredDeltas(scans, new Set())).toEqual([]);
     expect(offeredDeltas([...scans, scan("e", ["x"])], new Set(["x"]))).toEqual([]);
-    expect(offeredDeltas([...scans, scan("e", ["x"])], new Set()).map(({ stories }) => stories)).toEqual([["a", "b", "e"]]);
+    expect(offeredDeltas([...scans, scan("e", ["x"])], new Set()).map(({ examples }) => storiesOf(examples))).toEqual([["a", "b", "e"]]);
+  });
+
+  test("says where each story has it, which may be different in each", () => {
+    const at = (story: string, y: number): ScannedRow => {
+      const placed = scan(story, ["x"]);
+      return { ...placed, diff: diffOf([hunk(box(0, y, 4, 4), box(0, y + 15, 4, 4))]) };
+    };
+    const [delta] = offeredDeltas([at("a", 10), at("b", 40), at("c", 70)], new Set());
+    expect(delta?.examples.map(({ story, golden, current }) => [story, golden.hash, golden.boxes[0]?.y, current.hash, current.boxes[0]?.y])).toEqual([
+      ["a", "a-was", 10, "a-now", 25],
+      ["b", "b-was", 40, "b-now", 55],
+      ["c", "c-was", 70, "c-now", 85],
+    ]);
+  });
+
+  test("gives every place a story has it, and counts that story once", () => {
+    const twice: ScannedRow = { ...scan("a", ["x", "x"]), diff: diffOf([hunk(box(0, 10, 4, 4), box(0, 10, 4, 4)), hunk(box(0, 90, 4, 4), box(0, 90, 4, 4))]) };
+    const [delta] = offeredDeltas([twice, scan("b", ["x"]), scan("c", ["x"])], new Set());
+    expect(delta?.examples[0]?.golden.boxes.map(({ y }) => y)).toEqual([10, 90]);
+    expect(delta?.examples).toHaveLength(3);
   });
 
   test("never offers a hunk that can't be applied", () => {
@@ -78,7 +100,7 @@ describe("offeredDeltas", () => {
 
 test("acceptedDeltas lists every story, whatever's been decided since", () => {
   const scans = [scan("a", ["x"], approved), scan("b", ["x"]), scan("c", ["y"])];
-  expect(acceptedDeltas(scans, new Set(["x"])).map(({ stories }) => stories)).toEqual([["a", "b"]]);
+  expect(acceptedDeltas(scans, new Set(["x"])).map(({ examples }) => storiesOf(examples))).toEqual([["a", "b"]]);
 });
 
 describe("finishedBy", () => {

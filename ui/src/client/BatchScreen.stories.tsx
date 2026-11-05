@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useRef } from "react";
-import { userEvent, within } from "storybook/test";
+import { expect, userEvent, within } from "storybook/test";
 import type { BatchView } from "../shared/api.ts";
 import type { BatchState } from "./hooks.ts";
 import { BatchFrame } from "./stories/BatchFrame.tsx";
@@ -123,6 +123,14 @@ const AFFECTED = ["components-button--primary", "pages-settings--account", "comp
 const OFFERS = [deltaFrom("taller-golden", [...AFFECTED, "pages-home--rearranged"]), deltaFrom("changed-golden", AFFECTED), deltaFrom("spaced-golden", AFFECTED)];
 export const LookingForRepeatedChanges: Story = { args: { view: viewOf(SOME_CHANGES), deltas: deltasOf({ progress: 40 }) } };
 export const RepeatedChanges: Story = { args: { view: viewOf(SOME_CHANGES), deltas: deltasOf({ offers: OFFERS }) } };
+export const LookingThroughADelta: Story = {
+  args: { view: viewOf(SOME_CHANGES), deltas: deltasOf({ offers: OFFERS }) },
+  play: async ({ canvasElement }) => {
+    await userEvent.click(within(canvasElement).getAllByRole("button", { name: "Look through 3 snapshots" })[0]!);
+    await userEvent.click(within(canvasElement).getByRole("button", { name: "Next" }));
+    await expect(within(canvasElement).getByText("2 of 3")).toBeVisible();
+  },
+};
 export const ConfirmAcceptingADelta: Story = {
   args: { view: viewOf(SOME_CHANGES), deltas: deltasOf({ offers: OFFERS, finishes: () => [rows.changed(AFFECTED[0]!), rows.changed(AFFECTED[1]!)] }) },
   play: async ({ canvasElement }) => {
