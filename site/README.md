@@ -27,4 +27,4 @@ pnpm test    # checks the redirects, the links, and the 404 against that server
 
 ## Licenses
 
-The logo comes from [`branding/`](https://github.com/diffplug/selfie-hackathon/tree/main/branding) in selfie-hackathon, under Apache-2.0 ([LICENSE-branding](LICENSE-branding)). The hero's robot was generated with Codex's image tool; its sources and the script that cuts it into layers are in [`art/`](art/README.md). Jost and Neucha are under OFL-1.1.
+The video thumbnails come from the selfie-hackathon videos, and selfie-hackathon's [`branding/`](https://github.com/diffplug/selfie-hackathon/tree/main/branding) is under Apache-2.0 ([LICENSE-branding](LICENSE-branding)). The icon is new. The hero's robot was generated with Codex's image tool; its sources and the script that cuts it into layers are in [`art/`](art/README.md). Jost and Neucha are under OFL-1.1.
