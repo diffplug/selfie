@@ -115,8 +115,8 @@ h2 { font-size: clamp(2rem, 4vw, 2.75rem); }
   .argument-rest { margin-top: calc(20 * var(--u)); font-size: calc(26 * var(--u)); }
   .hero .lede { margin-top: calc(30 * var(--u)); font-size: calc(26 * var(--u)); }
   .price { margin-top: calc(6 * var(--u)); font-size: calc(48 * var(--u)); }
-  .btn-hero { margin-top: calc(40 * var(--u)); padding: calc(16 * var(--u)) calc(50 * var(--u)); border-width: calc(6 * var(--u)); font-weight: 700; color: #0b0b0c; border-radius: calc(14 * var(--u)); box-shadow: calc(5 * var(--u)) calc(8 * var(--u)) 0 #0b0b0c; font-size: calc(33 * var(--u)); }
-  .btn-hero:hover { box-shadow: calc(6 * var(--u)) calc(9 * var(--u)) 0 #0b0b0c; }
+  .btn-hero { margin-top: calc(40 * var(--u)); padding: calc(16 * var(--u)) calc(50 * var(--u)); border-width: calc(6 * var(--u)); font-weight: 700; color: var(--ink); border-radius: calc(14 * var(--u)); box-shadow: calc(5 * var(--u)) calc(8 * var(--u)) 0 var(--ink); font-size: calc(33 * var(--u)); }
+  .btn-hero:hover { box-shadow: calc(6 * var(--u)) calc(9 * var(--u)) 0 var(--ink); }
   .shot { position: absolute; right: 0; top: 0; width: calc(776 * var(--u)); margin: 0; }
 }
 
