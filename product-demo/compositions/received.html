@@ -11,21 +11,15 @@
       const t = S.term(stage);
       S.slideIn(tl, t.win);
       t.write(tl, [
-        [0.3, `<span class="p">$</span> <span class="b">selfie agent-await-feedback</span>`],
-        [0.4, `<span class="c">{</span>`],
-        [0.4, `  <span class="k">"outcome"</span>: <span class="s">"notes"</span>,`],
-        [0.4, `  <span class="k">"notes"</span>: [{`],
-        [w("words"), `    <span class="k">"text"</span>: <span class="s">"This bar went white in dark mode,</span>`, { hl: true }],
-        [w("words"), `             <span class="s">and you can't read it."</span>,`, { hl: true }],
-        [w("story"), `    <span class="k">"story"</span>: <span class="s">"pages-every-story--dark"</span>,`, { hl: true }],
-        [w("exact"), `    <span class="k">"box"</span>: { <span class="k">"x"</span>: <span class="n">0</span>, <span class="k">"y"</span>: <span class="n">0</span>, <span class="k">"width"</span>: <span class="n">1200</span>, <span class="k">"height"</span>: <span class="n">71</span> },`, { hl: true }],
-        [w("picture"), `    <span class="k">"image"</span>: <span class="s">"…/notes/967fab86…-0-0-1200-71.png"</span>`, { hl: true }],
-        [0.4, `  }]`],
-        [0.4, `<span class="c">}</span>`],
+        [0.2, `<span class="p">$</span> <span class="b">selfie agent-await-feedback</span>`],
+        [w("words"), `  <span class="k">"text"</span>: <span class="s">"This bar went white in dark mode,</span>`, { row: 2, hl: true }],
+        [w("words"), `          <span class="s">and you can't read it."</span>`, { row: 3, hl: true }],
+        [w("exact"), `  <span class="k">"box"</span>: { <span class="k">"width"</span>: <span class="n">1200</span>, <span class="k">"height"</span>: <span class="n">71</span> … }`, { row: 4, hl: true }],
+        [w("picture"), `  <span class="k">"image"</span>: <span class="s">"…/notes/967fab86…-0-0-1200-71.png"</span>`, { row: 5, hl: true }],
       ]);
-      const img = S.html(t.win, `<img class="abs" src="assets/ui/note-image.png" alt="" style="width:580px;height:auto;border:5px solid #fff;border-radius:8px" data-layout-ignore />`);
-      gsap.set(img, { x: 985, y: 450, opacity: 0, scale: 0.8, transformOrigin: "100% 100%" });
-      tl.to(img, { opacity: 1, scale: 1, duration: 0.35, ease: "back.out(1.5)" }, w("picture"));
+      const img = S.html(t.win, `<img class="abs" src="assets/ui/note-image.png" alt="" style="width:680px;height:auto;border:5px solid #fff;border-radius:8px" data-layout-ignore />`);
+      gsap.set(img, { x: 885, y: 340, opacity: 0, scale: 0.8, transformOrigin: "100% 100%" });
+      tl.to(img, { opacity: 1, scale: 1, duration: 0.3, ease: "back.out(1.5)" }, w("picture"));
       window.__timelines["received"] = tl;
     })();
   </script>

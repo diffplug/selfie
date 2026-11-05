@@ -8,20 +8,16 @@
   <script>
     (() => {
       const { tl, w, stage } = S.begin("verify");
-      const a = S.app(stage, ["h1-newer", "h2-replied"]);
+      const a = S.app(stage, ["h2-replied"], { pointer: [1000, 700] });
       S.slideIn(tl, a.win);
-      a.point(tl, w("newer") - 0.3, "h2-replied", 0.5);
-      a.press(tl, w("and") - 0.05);
-      a.show(tl, "h2-replied", w("and") - 0.02);
-      a.zoom(tl, w("reply") - 0.15, { x: 320, y: 520, w: 1100 }, 0.5);
-      // The real images, one above the other. White is what the note was on, and dark is the batch it answered from.
+      // The real images. White is what the note was on, and dark is the batch the agent answered from.
       const before = S.html(a.win, `<img class="abs" src="assets/ui/dark-before.png" alt="" style="width:1600px;height:1200px;opacity:0" data-layout-ignore />`);
       const after = S.html(a.win, `<img class="abs" src="assets/ui/dark-after.png" alt="" style="width:1600px;height:1200px;opacity:0" data-layout-ignore />`);
-      const bar = w("bar") - 0.25, back = w("85000") - 0.05;
-      tl.set(before, { opacity: 1 }, bar);
+      const back = w("85000") - 0.05;
+      tl.set(before, { opacity: 1 }, 0.05);
       tl.set(after, { opacity: 1 }, w("dark"));
       tl.set([before, after], { opacity: 0 }, back);
-      a.zoom(tl, back - 0.25, { x: 320, y: 255, w: 800 }, 0.2);
+      a.zoomNow({ x: 320, y: 255, w: 800 });
       S.call(tl, stage, "85,143 → 13", 1310, 60, w("85000") + 0.1);
       window.__timelines["verify"] = tl;
     })();

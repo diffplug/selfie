@@ -7,24 +7,21 @@
   </div>
   <script>
     (() => {
-      const { tl, w, stage, D } = S.begin("ask");
+      const { tl, w, stage } = S.begin("ask");
       const t = S.term(stage);
       t.write(tl, [
         [-1, `<span class="p">❯</span>`],
-        [0.25, `  <span class="b">Give the top bar a bit more room.</span>`, { row: 0, type: true }],
-        [w("it") - 0.5, `<span class="c">● Edited ui/src/client/styles.css</span>`, { row: 2 }],
-        [w("it") - 0.1, `<span class="c"> .selfie-header {</span>`, { row: 4 }],
-        [w("it") + 0.05, `<span class="del">-  padding: var(--base-size-8) var(--base-size-24);</span>`, { row: 5 }],
-        [w("it") + 0.05, `<span class="add">+  padding: var(--base-size-16) var(--base-size-24);</span>`, { row: 6, hl: true }],
-        [w("it") + 0.05, `<span class="c">   border-bottom: var(--borderWidth-thin) solid var(--borderColor-default);</span>`, { row: 7 }],
-        [w("it") + 0.05, `<span class="del">-  background: var(--bgColor-muted);</span>`, { row: 8 }],
-        [w("it") + 0.05, `<span class="add">+  background: #f6f8fa;</span>`, { row: 9, hl: true }],
-        [w("it") + 0.05, `<span class="c">   display: flex;</span>`, { row: 10 }],
-        [w("it") + 0.05, `<span class="c"> }</span>`, { row: 11 }],
+        [0.2, `  <span class="b">Give the top bar a bit more room.</span>`, { row: 0, type: true }],
+        [w("two") - 0.35, `<span class="c">● Edited ui/src/client/styles.css</span>`, { row: 2 }],
+        [w("two") - 0.1, `<span class="c"> .selfie-header {</span>`, { row: 3 }],
+        [w("two") - 0.1, `<span class="del">-  padding: var(--base-size-8) var(--base-size-24);</span>`, { row: 4 }],
+        [w("two") - 0.1, `<span class="add">+  padding: var(--base-size-16) var(--base-size-24);</span>`, { row: 5, hl: true }],
+        [w("two") - 0.1, `<span class="c">   border-bottom: var(--borderWidth-thin) solid var(--borderColor-default);</span>`, { row: 6 }],
+        [w("two") - 0.1, `<span class="del">-  background: var(--bgColor-muted);</span>`, { row: 7 }],
+        [w("two") - 0.1, `<span class="add">+  background: #f6f8fa;</span>`, { row: 8, hl: true }],
+        [w("then") - 0.05, `<span class="p">$</span> <span class="b">selfie render --build</span>`, { row: 10, type: true }],
       ]);
-      S.call(tl, stage, "two lines of CSS", 1210, 470, w("two"));
-      S.call(tl, stage, "Looks fine, right?", 1120, 720, w("looks"), { style: "background:#fff" });
-      S.slideOut(tl, t.win, D);
+      S.call(tl, stage, "two lines of CSS", 1210, 425, w("two"));
       window.__timelines["ask"] = tl;
     })();
   </script>
