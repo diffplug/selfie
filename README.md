@@ -10,8 +10,8 @@ Go to [selfie.dev](https://selfie.dev) to follow development after the hackathon
 
 | [Why Selfie](https://youtu.be/8B3-v4DTwfU) | [Product demo](https://youtu.be/ZrUv0Pn7yyc) |
 | --- | --- |
-| [![Watch: Why Selfie](https://img.youtube.com/vi/8B3-v4DTwfU/sddefault.jpg)](https://youtu.be/8B3-v4DTwfU) | [![Watch: Selfie product demo](https://img.youtube.com/vi/ZrUv0Pn7yyc/sddefault.jpg)](https://youtu.be/ZrUv0Pn7yyc) |
-| From Storybook to Chromatic to Selfie: why snapshot testing needs to change for coding agents. | The real app: a two-line CSS change touches all 142 stories, Muse Spark finds the line that broke dark mode, and a person and an agent fix it together. |
+| <a href="https://youtu.be/8B3-v4DTwfU"><img src="https://img.youtube.com/vi/8B3-v4DTwfU/maxresdefault.jpg" alt="Watch: Why Selfie" width="380" /></a> | <a href="https://youtu.be/ZrUv0Pn7yyc"><img src="https://img.youtube.com/vi/ZrUv0Pn7yyc/maxresdefault.jpg" alt="Watch: Selfie product demo" width="380" /></a> |
+| From Storybook to Chromatic to Selfie: why snapshot testing has to change for coding agents. | The real app: two lines of CSS touch all 142 stories, and Muse Spark finds what broke dark mode. |
 
 You can also look around the hosted review pages without signing in: here's [Selfie reviewing itself](https://hackathon.selfie.dev/diffplug/selfie-hackathon).
 
