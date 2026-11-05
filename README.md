@@ -1,6 +1,4 @@
-<img height="80" width="80" src="branding/logo-icon.svg" />
-
-# Selfie - distributed Storybook testing (and agent control surface)
+# Selfie - distributed Storybook testing
 
 Visual screenshot testing is an excellent control surface for directing coding agents. Using renders inside the coding loop can increase render counts by 100x to 1000x, which is wildly unaffordable with existing centralized render services such as Chromatic.
 
