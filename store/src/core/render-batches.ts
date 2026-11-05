@@ -198,17 +198,29 @@ CROSS JOIN decisions d ON d.environment_key = ${environmentKey("?1")} AND d.comm
 ${NAMES_OF_DECISION}`;
 
 // What a batch's commit reaches, walked by key, so that a long history's SHAs never leave the database.
-const DECISIONS_REACHED = `WITH RECURSIVE reach(key) AS (
+const REACH_OF_BATCH = `WITH RECURSIVE reach(key) AS (
   SELECT commit_key FROM render_batches WHERE id = ?1
   UNION
   SELECT p.parent_key FROM reach r CROSS JOIN commit_parents p ON p.commit_key = r.key
   LIMIT ${MAX_REACHED_COMMITS}
-)
+)`;
+
+const DECISIONS_REACHED = `${REACH_OF_BATCH}
 ${PLACED_DECISION}
 FROM reach r
 CROSS JOIN decisions d ON d.environment_key = (SELECT environment_key FROM render_batches WHERE id = ?1) AND d.commit_key = r.key
 CROSS JOIN commits c ON c.key = d.commit_key
 ${NAMES_OF_DECISION}`;
+
+/** The newest finished batch of a branch among these commits, in another's environment, and never at that one's own commit. */
+const newestOfBranchWhere = (branch: string, environment: string, commit: string, commits: string) => `SELECT ${BATCH_COLUMNS} FROM render_batches
+WHERE branch = ${branch} AND finished_at IS NOT NULL AND environment_key = ${environment} AND commit_key != ${commit} AND commit_key IN (${commits})
+ORDER BY started_at DESC LIMIT 1`;
+
+const BASE_REACHED = `${REACH_OF_BATCH}
+${newestOfBranchWhere("?2", "(SELECT environment_key FROM render_batches WHERE id = ?1)", "(SELECT commit_key FROM render_batches WHERE id = ?1)", "SELECT key FROM reach")}`;
+
+const BASE_AMONG = newestOfBranchWhere("?1", environmentKey("?2"), commitKey("?3"), "SELECT c.key FROM json_each(?4) j CROSS JOIN commits c ON c.sha = j.value");
 
 const rendersPage = (batchId: string, after: string): SqlStatement => ({ sql: READ_RENDERS_PAGE, params: [batchId, after, ROWS_PER_PAGE], idempotent: true });
 
@@ -350,6 +362,14 @@ export interface ComparedRender {
   readonly failure: string | null;
   /** The decision on exactly `imageHash` for this name, if there is one. */
   readonly decision: Decision | null;
+}
+
+/** What a batch's history has approved since its base, which reads as unchanged against what's approved now. */
+export interface ApprovedSince {
+  /** The default branch's batch it's told apart from, or null if its commit reaches none, and then every approval counts. */
+  readonly base: RenderBatch | null;
+  /** Each as the base would compare it, so `goldenHash` is what it replaced, and with the batch it was approved on. */
+  readonly renders: readonly (ComparedRender & { readonly approvedIn: string })[];
 }
 
 export interface Comparison {
@@ -618,9 +638,46 @@ ORDER BY started_at DESC, key DESC`,
   }
 
   async #withApprovals(batchId: string, batchRows: readonly SqlRow[], firstRenders: readonly SqlRow[], decisions: readonly PlacedDecision[], { includeUnchanged = false }: CompareOptions = {}): Promise<Comparison> {
+    const { batch, rendered } = await this.#renderedOf(batchId, batchRows, firstRenders);
+    return compareWithApprovals(batch, rendered, decisions, { includeUnchanged });
+  }
+
+  async #renderedOf(batchId: string, batchRows: readonly SqlRow[], firstRenders: readonly SqlRow[]): Promise<{ readonly batch: RenderBatch; readonly rendered: readonly RenderedStory[] }> {
     const batch = finishedBatch(batchRows, batchId);
     const rows = await this.#remainingPages(firstRenders, (after) => rendersPage(batchId, after));
-    return compareWithApprovals(batch, rows.map((row) => ({ story: row.story as string, imageHash: row.image_hash as string | null, failure: row.failure as string | null })).sort(byStory), decisions, { includeUnchanged });
+    return { batch, rendered: rows.map((row) => ({ story: row.story as string, imageHash: row.image_hash as string | null, failure: row.failure as string | null })).sort(byStory) };
+  }
+
+  /**
+   * The base a batch is told apart from, as `compareReached` knows it: the newest batch of the default branch
+   * its commit reaches, and what was approved as of there. See `docs/specs/renders.md` -> Approved since a base.
+   */
+  async approvedSinceReached(batchId: string, defaultBranch: string): Promise<ApprovedSince & { readonly current: Comparison }> {
+    const [batchRows, decisionRows, baseRows, firstRenders] = (await this.#sql.batch([
+      { sql: SELECT_BATCH, params: [batchId], idempotent: true },
+      { sql: DECISIONS_REACHED, params: [batchId], idempotent: true },
+      { sql: BASE_REACHED, params: [batchId, defaultBranch], idempotent: true },
+      rendersPage(batchId, START),
+    ])) as [SqlRow[], SqlRow[], SqlRow[], SqlRow[]];
+    const base = baseRows[0] === undefined ? null : toBatch(baseRows[0]);
+    const baseDecisions = base === null ? [] : await this.#sql.run({ sql: DECISIONS_REACHED, params: [base.id], idempotent: true });
+    const { batch, rendered } = await this.#renderedOf(batchId, batchRows, firstRenders);
+    const decisions = decisionRows.map(toPlacedDecision);
+    const current = compareWithApprovals(batch, rendered, decisions);
+    return { base, current, renders: approvedSinceBase(current, rendered, decisions, baseDecisions.map(toPlacedDecision)) };
+  }
+
+  /** The newest batch of a branch at any of these commits, other than a batch's own, for a store told what's reachable. */
+  async baseAmong(branch: string, { environment, gitSha }: Pick<RenderBatch, "environment" | "gitSha">, commits: readonly string[]): Promise<RenderBatch | null> {
+    const [row] = await this.#sql.run({ sql: BASE_AMONG, params: [branch, environment, gitSha, JSON.stringify(commits)], idempotent: true });
+    return row === undefined ? null : toBatch(row);
+  }
+
+  /** As `approvedSinceReached`, with decisions from `decisionsAt`, for a caller with Git. */
+  async approvedSinceFromHistory(batchId: string, decisions: readonly PlacedDecision[], baseDecisions: readonly PlacedDecision[]): Promise<ApprovedSince["renders"]> {
+    const [batchRows, firstRenders] = (await this.#sql.batch([{ sql: SELECT_BATCH, params: [batchId], idempotent: true }, rendersPage(batchId, START)])) as [SqlRow[], SqlRow[]];
+    const { batch, rendered } = await this.#renderedOf(batchId, batchRows, firstRenders);
+    return approvedSinceBase(compareWithApprovals(batch, rendered, decisions), rendered, decisions, baseDecisions);
   }
 
   /** Every decision made at these commits. One parameter however many, so a long history is one statement. */
@@ -870,6 +927,16 @@ function decisionsByStory(decisions: readonly PlacedDecision[]): Map<string, Pla
   return byStory;
 }
 
+interface RenderedStory {
+  readonly story: string;
+  readonly imageHash: string | null;
+  readonly failure: string | null;
+}
+
+/** What a story is compared with: its newest approval, leaving out any made on the batch being compared. */
+const newestApproval = (decisionsOf: ReadonlyMap<string, readonly PlacedDecision[]>, story: string, batchId: string) =>
+  decisionsOf.get(story)?.find((decision) => decision.decision === "approved" && decision.batchId !== batchId);
+
 /**
  * A batch's renders against the approvals that history reaches. Pure, since this is the rule. A
  * story's reference is the image of its newest approval, leaving out any made on this batch. A
@@ -878,13 +945,13 @@ function decisionsByStory(decisions: readonly PlacedDecision[]): Map<string, Pla
  */
 export function compareWithApprovals(
   batch: RenderBatch,
-  rendered: readonly { readonly story: string; readonly imageHash: string | null; readonly failure: string | null }[],
+  rendered: readonly RenderedStory[],
   decisions: readonly PlacedDecision[],
   { includeUnchanged = false }: CompareOptions = {},
 ): Comparison {
   const decisionsOf = decisionsByStory(decisions);
 
-  const referenceOf = (story: string) => decisionsOf.get(story)?.find(({ decision, batchId }) => decision === "approved" && batchId !== batch.id);
+  const referenceOf = (story: string) => newestApproval(decisionsOf, story, batch.id);
   /** What's been said about this image since the reference, if anything has. */
   const decisionOn = (story: string, imageHash: string | null, referenceAt: number): Decision | null => {
     const found = decisionsOf.get(story)?.find((decision) => decision.imageHash === imageHash && decision.at >= referenceAt);
@@ -911,6 +978,22 @@ export function compareWithApprovals(
     removed.push({ story, state: "removed", imageHash: null, goldenHash: reference.imageHash, goldenBatchId: reference.batchId, failure: null, decision: decisionOn(story, null, reference.at) });
   }
   return { batch, renders: [...compared, ...removed], unchangedCount };
+}
+
+/**
+ * The stories a batch has nothing to say about now, because of an approval the base doesn't reach. Each is
+ * as the base's approvals compare it, which is how a change stays visible once it's what's approved.
+ */
+export function approvedSinceBase(current: Comparison, rendered: readonly RenderedStory[], decisions: readonly PlacedDecision[], baseDecisions: readonly PlacedDecision[]): ApprovedSince["renders"] {
+  const { batch } = current;
+  const stillDiffers = new Set(current.renders.map(({ story }) => story));
+  const decisionsOf = decisionsByStory(decisions);
+  return compareWithApprovals(batch, rendered, baseDecisions).renders.flatMap((render) => {
+    const approval = newestApproval(decisionsOf, render.story, batch.id);
+    if (stillDiffers.has(render.story) || approval === undefined) return [];
+    const { decision, actor, at, batchId: approvedIn } = approval;
+    return [{ ...render, decision: { decision, actor, at }, approvedIn }];
+  });
 }
 
 const stateOf = (imageHash: string | null, goldenHash: string | null, failure: string | null): RenderState =>

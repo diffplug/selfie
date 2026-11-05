@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, useLayoutEffect } from "react";
 import { isHosted } from "./base.ts";
-import type { DecisionKind, DecisionTarget, FeedbackView, StoriesView, NewNote, BatchView, SendVia, RenderProgress, RenderRow } from "../shared/api.ts";
-import { deleteNote, fetchFeedback, fetchRenderProgress, fetchStories, fetchBatch, fetchUnchanged, postAnswer, postRender, postDecision, postNote, postResolve, postSendNotes, RequestError } from "./api.ts";
+import type { ApprovedSinceView, DecisionKind, DecisionTarget, FeedbackView, StoriesView, NewNote, BatchView, SendVia, RenderProgress, RenderRow } from "../shared/api.ts";
+import { deleteNote, fetchApprovedSince, fetchFeedback, fetchRenderProgress, fetchStories, fetchBatch, fetchUnchanged, postAnswer, postRender, postDecision, postNote, postResolve, postSendNotes, RequestError } from "./api.ts";
 import { reuseRows } from "./filter.ts";
 import { toggled } from "./selection.ts";
 
@@ -13,6 +13,8 @@ export interface BatchState {
   readonly actionError: RequestError | null;
   readonly busy: boolean;
   readonly unchanged: readonly RenderRow[] | null;
+  /** What's been approved since this batch's base, once it's read. */
+  readonly approvedSince: ApprovedSinceView | null;
   readonly loadUnchanged: () => void;
   readonly clearActionError: () => void;
   /** True if the decision was recorded. */
@@ -32,6 +34,7 @@ export function useBatch(batchId: string): BatchState {
   const [actionError, setActionError] = useState<RequestError | null>(null);
   const [busy, setBusy] = useState(false);
   const [unchanged, setUnchanged] = useState<readonly RenderRow[] | null>(null);
+  const [approvedSince, setApprovedSince] = useState<ApprovedSinceView | null>(null);
   // At most one read is on its way, and a newer read or an action's answer aborts it, so a slow read
   // can't undo either.
   const reading = useRef<AbortController | null>(null);
@@ -58,6 +61,15 @@ export function useBatch(batchId: string): BatchState {
       reading.current?.abort();
     };
   }, [read]);
+
+  // Once, since what it says of history seldom changes while someone's here, and nothing's decided by it.
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchApprovedSince(batchId, controller.signal).then(setApprovedSince, (error: unknown) => {
+      if (!controller.signal.aborted) setActionError(asRequestError(error));
+    });
+    return () => controller.abort();
+  }, [batchId]);
 
   const loadUnchanged = useCallback(() => {
     fetchUnchanged(batchId).then(setUnchanged, (error: unknown) => setActionError(asRequestError(error)));
@@ -86,6 +98,7 @@ export function useBatch(batchId: string): BatchState {
     actionError,
     busy,
     unchanged,
+    approvedSince,
     loadUnchanged,
     clearActionError: useCallback(() => setActionError(null), []),
     decide: async (decision, targets) => {

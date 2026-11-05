@@ -6,6 +6,37 @@ import { UNKNOWN_HASH, h, project, review, get, change, decideOn, viewOf, approv
 
 const ON = { batchId: "00000000-0000-4000-8000-000000000001", gitSha: "e".repeat(40) };
 
+describe("what's been approved since a batch's base", () => {
+  test("says what a merge brought, and refuses a decision on it", async () => {
+    h.stories = [{ id: "a" }, { id: "b" }];
+    const onMain = await approveAll();
+    git(h.repo, "checkout", "-b", "feature");
+    await commit(h.repo, "on a branch");
+    h.stories = [{ id: "a", color: BLUE }, { id: "b" }];
+    const onBranch = (await review()).json.batchId as string;
+    await h.cli("approve", onBranch, "--all");
+    git(h.repo, "checkout", "-");
+    git(h.repo, "merge", "--no-ff", "--no-edit", "feature");
+    const { batchId } = (await review()).json;
+
+    expect((await viewOf(batchId)).rows).toEqual([]);
+    const { base, rows } = (await (await get(`/api/batches/${batchId}/approved-since`)).json()) as any;
+    expect(base.id).toBe(onMain);
+    expect(rows.map(({ story, state, approvedIn, pixelDiff, decision }: any) => [story, state, approvedIn, pixelDiff, decision.decision])).toEqual([["a", "changed", onBranch, null, "approved"]]);
+    expect(rows[0].goldenHash).not.toBe(rows[0].imageHash);
+
+    expect((await decideOn(batchId, "rejected", [{ story: "a", imageHash: rows[0].imageHash }])).status).toBe(409);
+    expect((await viewOf(batchId)).blockers).toEqual([]);
+  });
+
+  test("has nothing to say for a batch that decided on its own changes", async () => {
+    h.stories = [{ id: "a" }];
+    const onMain = await approveAll();
+    const again = (await (await get(`/api/batches/${onMain}/approved-since`)).json()) as any;
+    expect(again).toEqual({ base: null, rows: [] });
+  });
+});
+
 describe("approve and reject", () => {
   let batchId: string;
   let rows: any[];

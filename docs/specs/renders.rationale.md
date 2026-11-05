@@ -62,6 +62,14 @@
 
 **No derived table, locally.** Measured on local SQLite at Dormouse's 568 stories, reaching 1,000 commits: reading 11,360 decisions takes about 0.4 s, 113,600 about 1.7 s, and 568,000 about 4 s. Those have every story approved at every commit, which is much worse than a commit that changes a few stories. A compare reads them once, and an approval twice.
 
+## Approved since a base
+
+**Why a batch of the default branch.** It's what a merge commit's first parent and a branch's starting point have in common, and it needs no parent order, which `commit_parents` doesn't keep, and no merge base, which a store with no Git can't ask for. The default branch filter is what keeps a branch's own batches from being the base, so all a branch approved stays in the list of each of its later commits, and of its merge. Once a batch of the default branch has it, later batches take that as their base, and stop listing it, so a merge shows only what it brought. If a run renders an old commit again, it's the newest by when it started, and the list reaches further back than it needs to, which only shows more.
+
+**Why not keep what an approval replaced.** It'd need a schema change, and existing decisions wouldn't have it, while this reads what's already there, and works on every batch already recorded.
+
+**Why a list of its own, and not more rows.** A batch's `rows` are what it blocks on and what can be decided, so these would need leaving out everywhere those are used. Most of the time nobody opens them.
+
 ## Schema
 
 **Foreign keys, before there's data.** Nothing in the store deletes yet, and every write already goes through a path that writes parents first, so these catch only bugs for now. What they're for is retention: once a batch can be deleted, they're what stop one going while something points at it. SQLite can't add a foreign key to an existing table, so waiting would mean rebuilding tables in a migration, where today it's an edit to their `CREATE` statements. Inserting 10,000 renders took 9 ms with checks and 8 ms without, in one local run. They haven't run on real D1, only on its engine in the Worker tests.

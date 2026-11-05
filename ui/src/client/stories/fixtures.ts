@@ -176,6 +176,7 @@ export function stateOf(view: BatchView, overrides: Partial<BatchState> = {}): B
     actionError: null,
     busy: false,
     unchanged: null,
+    approvedSince: null,
     loadUnchanged: fn(),
     clearActionError: fn(),
     decide: fn(async () => true),

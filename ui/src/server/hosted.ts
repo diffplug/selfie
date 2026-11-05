@@ -65,6 +65,7 @@ export function hostedReviewSource(
       const { renders } = await batches.compareReached(batchId, { includeUnchanged: true });
       return views.toRows(batchId, renders.filter(({ state }) => state === "unchanged"));
     },
+    approvedSince: async (batchId) => views.approvedSinceView(await batches.approvedSinceReached(batchId, project.defaultBranch)),
     async decide(batchId: string, decision: DecisionKind, targets: readonly DecisionTarget[]) {
       if (actor === null) throw refusal("not-signed-in", "Sign in to approve or reject.");
       const before = await batches.compareReached(batchId);

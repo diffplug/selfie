@@ -46,6 +46,7 @@ Source of truth: `ReviewSource` in `ui/src/shared/api.ts`.
 | `renderProgress()` | How far that render has got, or null with none in flight |
 | `batchView(batchId)` | A `BatchView` ([Recomputing](#recomputing)) |
 | `unchanged(batchId)` | The batch's unchanged rows |
+| `approvedSince(batchId)` | Its base, and its rows of what's been approved since that (`docs/specs/renders.md` → Approved since a base) |
 | `decide(batchId, decision, targets)` | The new `BatchView` |
 | `feedback()`, `addNote(note)`, `removeNote(id)` | This session's notes (`docs/specs/feedback.md`) |
 | `answerNote(id, text, batchId)`, `resolveNote(id)` | This session's notes after a person's answer, or closing one |
@@ -67,6 +68,7 @@ Source of truth: `ui/src/server/app.ts`; tests in `cli/test/ui-*.test.ts`.
 | `GET /api/renders/progress` | `{ progress }`: `{ total, finished, startedAtMs, firstStoryStartedAtMs }`, or null with no render in flight. `startedAtMs` is when the render was asked for, and `firstStoryStartedAtMs` is null until its first story starts. Both are milliseconds since the epoch, on the clock the page shares with a local server (rationale) |
 | `GET /api/batches/:id` | `batchView` |
 | `GET /api/batches/:id/unchanged` | `{ rows }` |
+| `GET /api/batches/:id/approved-since` | `{ base, rows }` |
 | `POST /api/batches/:id/decisions` | `{ decision, renders: [{ story, imageHash }] }` |
 | `GET /api/feedback` | `feedback` |
 | `POST /api/notes` | `{ story, batchId, imageHash, box, text }` |
@@ -92,7 +94,7 @@ On a hosted Storybook's own origin (`docs/specs/access.md` → Local review serv
 - **Must give images, diff images, and diff stats `Cache-Control: private, max-age=31536000, immutable`**, since all are addressed by content (`docs/specs/access.md` → Local review server), and every other API answer `no-store`.
 - **Must decide on exactly the images a request names, or none:** the library's `decide` refuses with `stale-decision` if any named story and hash isn't a changed or added image of that batch, or a null hash a removed story of it, and takes the names exactly, never as patterns (rationale).
 - **Must refuse a bulk request no differently from a single one.** Nothing on the server knows "all": the client sends what it showed.
-- **Must compare a batch at most twice for a decision, and once for anything else**, never reading unchanged rows unless a route asks for them.
+- **Must compare a batch at most twice for a decision, and once for anything else**, never reading unchanged rows unless a route asks for them. What's approved since a base also compares it with that base's approvals, and a page reads that once.
 - **Must serve any page but `/assets/*` and `/api/*` as the client's one document**, with `no-store`, and a missing asset as 404.
 
 ## Recomputing
@@ -133,6 +135,7 @@ Source of truth: `ui/src/client/`.
 - **Must group blockers by reason, in words, and offer each as a filter of the list.**
 - **Must keep the filter, text and state, in the URL, and nowhere else**, so back, reload, and next and previous all follow it.
 - **Must list unchanged stories only when asked**, by the `unchanged` filter, which is when they're fetched.
+- **Must say so when a batch has changes approved earlier, and how to see them**, by the `approved-earlier` filter, with what they're compared with. Each opens as any changed, added, or removed render does, between what it replaced and this image, saying where it was approved, with a link to that, and offering no decision (rationale).
 
 **Bulk decisions:** approve or reject all, or all the current filter shows.
 

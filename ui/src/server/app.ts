@@ -178,6 +178,8 @@ export function createReviewApi(given: ReviewSource | ((context: Context) => Pro
     context.json({ rows: await (await sourceOf(context)).unchanged(context.req.param("batchId")) }),
   );
 
+  api.get("/batches/:batchId/approved-since", async (context) => context.json(await (await sourceOf(context)).approvedSince(context.req.param("batchId"))));
+
   api.post("/batches/:batchId/decisions", async (context) => {
     const { decision, renders } = await jsonBody(context);
     if (decision !== "approved" && decision !== "rejected") {

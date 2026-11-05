@@ -1,5 +1,6 @@
 // Which rows a filter shows, and where next and previous go. Pure, so a test needs no browser.
 import { isDecidable } from "selfie-store";
+import type { BatchState } from "./hooks.ts";
 import type { DecisionTarget, RenderRow } from "../shared/api.ts";
 import { isLayoutOnly } from "../shared/hunks.ts";
 import { plural } from "../shared/plural.ts";
@@ -15,6 +16,7 @@ export const SHOW_OPTIONS = [
   ["approved", "Approved"],
   ["rejected", "Rejected"],
   ["unchanged", "Unchanged"],
+  ["approved-earlier", "Approved earlier"],
 ] as const;
 
 export type Show = (typeof SHOW_OPTIONS)[number][0];
@@ -35,6 +37,8 @@ function inShow(row: RenderRow, show: Show): boolean {
     case "approved":
     case "rejected":
       return isDecidable(row.state) && row.decision?.decision === show;
+    case "approved-earlier":
+      return true;
     case "layout":
       return row.state === "changed" && row.pixelDiff !== null && isLayoutOnly(row.pixelDiff);
     default:
@@ -57,6 +61,10 @@ export function applyFilter(rows: readonly RenderRow[], { text, show }: RowFilte
 
 /** What these rows have to decide on. */
 export const decidableIn = (rows: readonly RenderRow[]) => rows.filter(({ state }) => isDecidable(state));
+
+/** The rows a Show picks from: what differs, unless it asks for what's read separately, and then null until that's read. */
+export const rowsFor = (show: Show, rows: readonly RenderRow[], { unchanged, approvedSince }: Pick<BatchState, "unchanged" | "approvedSince">): readonly RenderRow[] | null =>
+  show === "unchanged" ? unchanged : show === "approved-earlier" ? (approvedSince?.rows ?? null) : rows;
 
 export const targetsOf = (rows: readonly RenderRow[]): DecisionTarget[] =>
   rows.map(({ story, imageHash }) => ({ story, imageHash }));

@@ -9,11 +9,11 @@ import type { DecisionKind, PixelDiff, BatchView, RenderRow } from "../shared/ap
 import { diffImageUrl, fetchDiff, imageUrl } from "./api.ts";
 import { prepareNext, usePatchedGolden, type PatchedGolden } from "./deltas.ts";
 import { canDecide, signInHref } from "./base.ts";
-import { parseFilter, targetsOf, type StoryNavigation } from "./filter.ts";
+import { parseFilter, rowsFor, targetsOf, type StoryNavigation } from "./filter.ts";
 import { useFetched, useHotkeys, useHunkSelection, useTitle, type FeedbackState, type BatchState } from "./hooks.ts";
 import { imageCount, ImageCompare } from "./ImageCompare.tsx";
 import { Keys } from "./Keys.tsx";
-import { AppLink, navigate } from "./router.tsx";
+import { AppLink, navigate, storyPath } from "./router.tsx";
 import { ActionFailure } from "./ActionFailure.tsx";
 import { LiveStories, StorybookLinkTo } from "./LiveStories.tsx";
 import { LoadFailure, Loading } from "./Status.tsx";
@@ -77,7 +77,7 @@ function PixelStats({ stats }: { stats: PixelDiff }) {
   );
 }
 
-function Notes({ row, diff, renamedFrom, renamedTo }: { row: RenderRow; diff: PixelDiff | null; renamedFrom?: string | undefined; renamedTo?: string | undefined }) {
+function Notes({ row, diff, renamedFrom, renamedTo, approvedIn }: { row: RenderRow; diff: PixelDiff | null; renamedFrom?: string | undefined; renamedTo?: string | undefined; approvedIn?: string | undefined }) {
   return (
     <>
       {row.state === "failed" && (
@@ -98,6 +98,21 @@ function Notes({ row, diff, renamedFrom, renamedTo }: { row: RenderRow; diff: Pi
         <Banner variant="info" title="Renamed story" description={<>The added story <code>{renamedTo}</code> has this very image, so it looks to have been renamed.</>} />
       )}
       {row.state === "unchanged" && <Banner variant="info" title="Unchanged" description="This image is the same as what's approved." />}
+      {approvedIn !== undefined && (
+        <Banner
+          variant="info"
+          title="Approved earlier"
+          description={
+            <>
+              This is what this commit's history changed, and it reads as unchanged in this batch, since it's what's approved now.{" "}
+              <AppLink inline href={storyPath(approvedIn, row.story)}>
+                See it on the batch it was approved on
+              </AppLink>
+              .
+            </>
+          }
+        />
+      )}
       {diff !== null && isLayoutOnly(diff) && (
         <Banner variant="info" title="Moved and spacing only" description="Everything in this image is in the golden too, and only where it sits changed. That can still be a bug, so it needs a decision like any other." />
       )}
@@ -168,12 +183,15 @@ export function DetailScreen({
   const filter = useMemo(() => parseFilter(search), [search]);
   const renames = useMemo(() => findRenames(view.rows), [view.rows]);
   const inRows = view.rows.find((candidate) => candidate.story === story);
-  const needsUnchanged = (filter.show === "unchanged" || inRows === undefined) && unchanged === null;
+  const source = rowsFor(filter.show, view.rows, state);
+  const found = source?.find((candidate) => candidate.story === story) ?? inRows;
+  const needsUnchanged = (filter.show === "unchanged" || (source !== null && found === undefined)) && unchanged === null;
   useEffect(() => {
     if (needsUnchanged) loadUnchanged();
   }, [needsUnchanged, loadUnchanged]);
 
-  const row = inRows ?? unchanged?.find((candidate) => candidate.story === story) ?? null;
+  const row = source === null ? null : (found ?? unchanged?.find((candidate) => candidate.story === story) ?? null);
+  const approvedIn = state.approvedSince?.rows.find((candidate) => candidate === row)?.approvedIn;
   const { previous, next, nextStory, list: listHref, position } = navigation;
 
   const [helpOpen, setHelpOpen] = useState(false);
@@ -195,7 +213,9 @@ export function DetailScreen({
     fetchDiff(row!.imageHash!, compared!.hash, signal),
   );
   const recordedDiff = row?.pixelDiff ?? fetched;
-  const patched = usePatchedGolden(row, accepted);
+  // Only what this batch lists takes a decision, and a delta is only ever accepted on that.
+  const decidable = row !== null && row === inRows && isDecidable(row.state);
+  const patched = usePatchedGolden(row, decidable ? accepted : NOTHING_ACCEPTED);
   // Here, so that it stays as it is from story to story, like how someone's looking at the images.
   const [deltasShown, setDeltasShown] = useState(true);
   const applied = deltasShown ? patched : null;
@@ -227,8 +247,8 @@ export function DetailScreen({
       setMessage("Sign in to approve or reject.");
       return;
     }
-    if (!isDecidable(row.state)) {
-      setMessage(row.state === "unchanged" ? "An unchanged image needs no decision." : "This story failed, so it takes no decision. Fix it and render again.");
+    if (!decidable) {
+      setMessage(approvedIn !== undefined ? "This was approved on another batch, so it takes no decision here." : row.state === "unchanged" ? "An unchanged image needs no decision." : "This story failed, so it takes no decision. Fix it and render again.");
       return;
     }
     const recorded = await state.decide(decision, targetsOf([row]));
@@ -250,11 +270,10 @@ export function DetailScreen({
   });
 
   if (row === null) {
-    if (unchanged === null) return state.actionError !== null ? <LoadFailure error={state.actionError} /> : <Loading label="Finding this story" />;
+    if (source === null || unchanged === null) return state.actionError !== null ? <LoadFailure error={state.actionError} /> : <Loading label="Finding this story" />;
     return <Banner variant="warning" title="This batch has no such story" description={<AppLink href={listHref}>Back to the batch</AppLink>} />;
   }
 
-  const decidable = isDecidable(row.state);
   const finished = view.counts.undecided === 0 && next === null && filter.show === "undecided";
   const renamedFrom = renames.get(row.story);
 
@@ -295,13 +314,13 @@ export function DetailScreen({
       <Stack direction="horizontal" align="center" gap="condensed" wrap="wrap">
         <StateLabel state={row.state} />
         <DecisionLabel row={row} />
-        {decidable && row.decision !== null && (
+        {isDecidable(row.state) && row.decision !== null && (
           <Text className="selfie-muted">
             by {row.decision.actor}, <RelativeTime date={new Date(row.decision.at)} />.
           </Text>
         )}
-        {row.state === "added" && !comparedWithNote && renamedFrom === undefined && <Text className="selfie-muted">Nothing has been approved for this story yet. Approving makes this image what later batches compare with.</Text>}
-        {row.state === "removed" && <Text className="selfie-muted">This story was approved, and this batch doesn't have it. Approving says it's meant to be gone, so later batches stop asking.</Text>}
+        {decidable && row.state === "added" && !comparedWithNote && renamedFrom === undefined && <Text className="selfie-muted">Nothing has been approved for this story yet. Approving makes this image what later batches compare with.</Text>}
+        {decidable && row.state === "removed" && <Text className="selfie-muted">This story was approved, and this batch doesn't have it. Approving says it's meant to be gone, so later batches stop asking.</Text>}
         {diff !== null && <PixelStats stats={diff} />}
         {changedPair && diff === null && diffError === null && <Text className="selfie-muted">Comparing pixels…</Text>}
         {diffError !== null && <Text className="selfie-muted">The pixels couldn't be compared: {diffError.message}</Text>}
@@ -325,7 +344,7 @@ export function DetailScreen({
       {comparedWithNote ? (
         <Banner variant="info" title="Compared with the image when noted" description="Nothing has been approved for this story yet, so what's shown is what's changed since its newest note. Approving makes this image what later batches compare with." />
       ) : (
-        <Notes row={row} diff={diff} renamedFrom={renamedFrom} renamedTo={[...renames].find(([, from]) => from === row.story)?.[0]} />
+        <Notes row={row} diff={diff} approvedIn={approvedIn} renamedFrom={renamedFrom} renamedTo={[...renames].find(([, from]) => from === row.story)?.[0]} />
       )}
       {patched !== null && <PatchedBanner patched={patched} shown={deltasShown} onShown={setDeltasShown} />}
       <LiveStories row={row} view={view} open={liveOpen} onToggle={() => setLiveOpen(!liveOpen)} />
