@@ -70,13 +70,20 @@ test("the home page sends each audience to the right place", async () => {
   for (const href of [
     "https://lib.selfie.dev",
     "https://github.com/diffplug/selfie-hackathon",
-    "https://nedshed.dev/subscribe",
     "https://youtu.be/8B3-v4DTwfU",
     "https://youtu.be/FiGuwfB13b0",
   ]) {
     assert.ok(html.includes(`href="${href}"`), `missing link to ${href}`);
   }
   assert.match(html, NOTICE);
+});
+
+test("the signup form posts to the selfie.dev MailerLite form", async () => {
+  const html = await (await get("/")).text();
+  assert.ok(html.includes('action="https://assets.mailerlite.com/jsonp/2772060/forms/203332822830679835/subscribe"'), "missing MailerLite form action");
+  assert.match(html, /name="fields\[email\]"/);
+  assert.ok(html.includes('href="#join"'), "the shutter should lead to the signup form");
+  assert.ok(!html.includes("nedshed.dev"), "nedshed.dev should no longer be linked");
 });
 
 test("an unknown path is a real 404 that points to the library", async () => {
@@ -88,11 +95,14 @@ test("an unknown path is a real 404 that points to the library", async () => {
 test("everything the home page loads from this site exists", async () => {
   const html = await (await get("/")).text();
   const css = await (await get("/style.css")).text();
+  // The home page and the stylesheet both sit at the site root, so a relative
+  // path resolves the same as one starting with "/".
+  const local = (path) => (path.startsWith("/") ? path : `/${path}`);
   const paths = [
-    ...html.matchAll(/(?:src|href)="(\/[^"]+)"/g),
-    ...css.matchAll(/url\("(\/[^"]+)"\)/g),
+    ...html.matchAll(/(?:src|href|srcset)="(?!https?:|\/\/|#|mailto:)([^"]+)"/g),
+    ...css.matchAll(/url\("(?!https?:|data:)([^"]+)"\)/g),
     ...html.matchAll(/content="https:\/\/selfie\.dev(\/[^"]+\.png)"/g),
-  ].map((match) => match[1]);
+  ].map((match) => local(match[1]));
   assert.ok(paths.length > 5);
   for (const path of new Set(paths)) {
     assert.equal((await get(path)).status, 200, path);
