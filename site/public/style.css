@@ -83,6 +83,14 @@ h2 { font-size: clamp(2rem, 4vw, 2.75rem); }
 
 .arrow { left: 42.784%; top: 9.897%; width: 26.546%; height: 10.309%; overflow: visible; z-index: 3; fill: none; stroke: var(--hot); stroke-width: 4.6; stroke-linecap: round; stroke-linejoin: round; }
 .note { left: 69.072%; top: 3.505%; width: 18.814%; margin: 0; color: var(--hot); font: 400 5.7cqw/0.92 "Neucha", "Jost", sans-serif; transform: translate(9%, 6%) rotate(-12deg) skewX(-10deg); transform-origin: 0 100%; }
+.arrow path { stroke-dasharray: 1; stroke-dashoffset: 0; }
+@media (prefers-reduced-motion: no-preference) {
+  .note { animation: note-in 0.35s 0.35s ease-out both; }
+  .arrow-line { animation: draw 0.6s 0.6s cubic-bezier(0.3, 0, 0.2, 1) both; }
+  .arrow-head { animation: draw 0.22s 1.15s ease-out both; }
+}
+@keyframes draw { from { stroke-dashoffset: 1; } }
+@keyframes note-in { from { opacity: 0; } }
 
 .arm { left: 2.835%; top: 35.155%; width: 97.165%; height: 64.845%; z-index: 3; pointer-events: none; }
 .arm img { position: absolute; }
