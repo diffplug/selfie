@@ -35,7 +35,7 @@ Every project here is public, and one person writes (rationale).
 - **Must sign a session cookie with the password, so that changing it signs everyone out, and name it `__Host-` with `HttpOnly`, `Secure`, and `SameSite=Strict`**, for 30 days.
 - **Must refuse a sign-in from another site, and send a person only to a path on this site after signing in.**
 - **Must keep `sameOriginWrites` and `pageHeaders` on the review routes.** The sync routes answer only to a bearer token, and never read the cookie.
-- **Must use one GitHub App, Selfie Hackathon, with only `statuses: write` and `contents: read`, and no webhook**, to say whether a repository has a commit and to post a commit's status. **Its private key stays in Worker secrets.**
+- **Must use one GitHub App, Selfie Hackathon, with only `statuses: write` and `contents: read`, and no webhook**, to say whether a repository has a commit, to post a commit's status, and to read what code changed for `docs/specs/chat.md`. **Its private key stays in Worker secrets.**
 - **Must refuse a commit GitHub doesn't have**, as `docs/specs/sync.md` → What goes says, and treat any other answer from GitHub as an error.
 
 ## Future
@@ -100,4 +100,4 @@ GitHub decides. Selfie keeps no member list of its own.
 A batch isn't uploaded until GitHub has its commit (`docs/specs/sync.md` → What goes), so anonymous viewers see no unpushed work.
 
 - **Running an approved render pass.** Decide how a maintainer approves it and how it runs, since it executes the fork's code and needs a token to upload. GitHub's docs don't say whether a fork's `pull_request` batch can get an OIDC token, and `pull_request_target` runs with write access even from a public fork, so both need testing. The fork's code could forge its screenshots, so its batch must stay subject to normal approval. It would also be the one uploader without write access, so it must not reach the project's images through the route that takes a client's hash on trust: it could plant a false picture under the hash of an image that hasn't been rendered yet.
-- **Reading code for `change-grouping`.** That scope sends code diffs to a Meta model, which needs more app permissions and means private code leaves GitHub. Decide how a repository owner consents.
+- **Reading code for `change-grouping`.** `docs/specs/chat.md` sends a public repository's code diffs to a Meta model, for anyone who asks. For a private repository, that would mean private code leaves GitHub, and only for someone with read access. Decide how a repository owner consents.

@@ -1,17 +1,19 @@
 // The whole cloud service: the sync routes for whoever pushes, the review page and its routes for
 // whoever looks, and kept built Storybooks on an origin of their own. See docs/specs/cloud.md.
 import { Hono, type Context } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import { html } from "hono/html";
 import { Blobs, BuiltStorybooks, initStoreSchema, ReceivingStore, RenderBatches, Sql, StoredDiffs, type Comparison } from "selfie-store";
 import { D1BindingAdapter, type D1DatabaseLike } from "selfie-store/adapters/d1-binding";
 import { R2BlobStorage, type R2BucketLike } from "selfie-store/adapters/r2";
-import { createReviewApi, pageHeaders, sameOrigin, sameOriginWrites } from "../server/app.ts";
+import { createReviewApi, failure, pageHeaders, sameOrigin, sameOriginWrites } from "../server/app.ts";
 import { hostedReviewSource, hostedViews, type HostedProject } from "../server/hosted.ts";
 import { afterResponse } from "../server/http.ts";
 import { keptStorybookRoutes, storybookHeaders } from "../server/storybook.ts";
 import { createSyncApi, type SyncAccess, type SyncProject } from "../server/sync.ts";
 import { commitStatusOf } from "../shared/commit-status.ts";
 import { actorFromCookie, sameSecret, sessionCookie, WRITER } from "./auth.ts";
+import { createChat, MAX_CHAT_BYTES, type ChatModel } from "./chat.ts";
 import type { GitHub } from "./github.ts";
 
 export interface CloudProject {
@@ -32,6 +34,9 @@ export interface CloudConfig {
   /** What CI uploads with, which can't approve anything. */
   readonly uploadToken: string;
   readonly github: GitHub;
+  readonly model: ChatModel;
+  /** Whether whoever this is may ask the model something now. */
+  readonly mayChat: (client: string) => Promise<boolean>;
   /** The built client's files. */
   readonly assets: { fetch(request: Request): Promise<Response> };
   readonly now?: () => number;
@@ -177,16 +182,28 @@ export function createCloudApp(config: CloudConfig): Hono {
   const reviewHeaders = pageHeaders(storybookOrigin);
 
   app.use("/:owner/:repo/api/*", knownProject, reviewHeaders, sameOriginWrites(() => reviewOrigin));
+  const readyProject = async (context: Context) => {
+    const found = byName(context.req.param("owner"), context.req.param("repo"))!;
+    await found.ready();
+    return found;
+  };
+  const chat = createChat({ github, model: config.model, mayChat: config.mayChat });
   app.route(
     "/:owner/:repo/api",
-    createReviewApi(async (context) => {
-      const found = byName(context.req.param("owner"), context.req.param("repo"))!;
-      await found.ready();
-      return hostedReviewSource(found.hosted, found.views, {
-        actor: await actorFromCookie(context.req.header("cookie"), password, now()),
-        decided: (comparison) => afterResponse(context, publish(found, comparison.batch.gitSha, comparison.batch.environment, comparison)),
-      });
-    }),
+    createReviewApi(
+      async (context) => {
+        const found = await readyProject(context);
+        return hostedReviewSource(found.hosted, found.views, {
+          actor: await actorFromCookie(context.req.header("cookie"), password, now()),
+          decided: (comparison) => afterResponse(context, publish(found, comparison.batch.gitSha, comparison.batch.environment, comparison)),
+        });
+      },
+      (api) =>
+        api.post("/batches/:batchId/chat", bodyLimit({ maxSize: MAX_CHAT_BYTES, onError: (context) => context.json(failure("bad-request", "That's more than a question can hold."), 400) }), async (context) => {
+          const { project, hosted } = await readyProject(context);
+          return chat(context, project, hosted);
+        }),
+    ),
   );
 
   // The client routes for itself, so any other page of a project is its one document, told where it is.
