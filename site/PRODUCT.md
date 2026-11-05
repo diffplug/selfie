@@ -55,7 +55,7 @@ Renders happen where the agent runs, with no cloud required and no bill per imag
 - The name is Selfie, from DiffPlug LLC.
 - The "robots taking selfies" theme stays, and the premise can be playful. The art itself should be serious: the owner rejected the cute anime style. The current hero robot isn't binding, and the logo and mascot reused from the earlier library (Apache-2.0, `LICENSE-branding`) are available rather than required.
 - Background: [Surrendering to grooves in latent space](https://nedshed.dev/p/surrendering-to-grooves-in-latent-space) tells how the name and theme came about. Phones beat DSLRs because they have fewer, simpler controls, and that idea shaped the earlier library's design.
-- Bagel Fat One is banned from this product's design.
+- Jost is the typeface. Bagel Fat One and Andika were tried and rejected.
 - Muse Spark stays off selfie.dev. The owner treats it as hackathon-only, not lasting product truth.
 - The library notice stays verbatim, as specified in selfie-hackathon#26.
 
