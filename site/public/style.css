@@ -38,7 +38,7 @@ h2 { font-size: clamp(2rem, 4vw, 2.75rem); }
 .hero { position: relative; overflow: hidden; background: var(--sky); border-bottom: var(--edge); }
 .hero-copy { position: relative; z-index: 2; padding: 2rem 1.25rem 0; }
 .hero h1 { margin: 1.75rem 0 0; font-size: clamp(2.6rem, 9vw, 4.75rem); font-weight: 600; letter-spacing: -0.012em; line-height: 1.12; }
-.hero h1 em { font-weight: 500; }
+.hero h1 em { font-weight: 600; }
 .hero h1 > span { display: block; }
 .argument-lead { margin: 1.5rem 0 0; font-size: 1.5rem; font-weight: 600; line-height: 1.25; letter-spacing: -0.01em; text-wrap: pretty; }
 .argument-lead strong { font-weight: 700; white-space: nowrap; background: linear-gradient(transparent 58%, var(--yellow) 58%, var(--yellow) 92%, transparent 92%); }
