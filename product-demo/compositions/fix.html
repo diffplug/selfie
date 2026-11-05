@@ -1,0 +1,26 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; }
+  </style>
+  <div id="root" data-composition-id="fix" data-width="1920" data-height="1080">
+    <div id="fix-stage" class="stage" data-layout-allow-overflow></div>
+  </div>
+  <script>
+    (() => {
+      const { tl, w, stage, D } = S.begin("fix");
+      const t = S.term(stage);
+      t.write(tl, [
+        [0.15, `<span class="del">-  background: #f6f8fa;</span>`, { row: 0 }],
+        [0.15, `<span class="add">+  background: var(--bgColor-muted);</span>`, { row: 1, hl: true }],
+        [w("renders") - 0.15, `<span class="p">$</span> <span class="b">selfie render --build</span>`, { row: 3 }],
+        [w("again") - 0.2, `Recorded batch f070fed9-aa47-45f6-b2eb-f06c2a550093: <span class="n">124</span> stories.`, { row: 4 }],
+        [w("again") - 0.2, `Timings: render 18943 ms, store 587 ms, <span class="b">total 22423 ms</span>`, { row: 5 }],
+        [w("answers") - 0.1, `<span class="p">$</span> <span class="b">selfie reply 1 "That was me: I hard-coded the light theme's color.</span>`, { row: 7 }],
+        [w("answers") - 0.1, `<span class="b">  It's back on the --bgColor-muted token, so it follows the theme."</span>`, { row: 8 }],
+        [w("note") - 0.05, `<span class="c">{</span> <span class="k">"imageChanged"</span>: <span class="n">true</span> <span class="c">… }</span>`, { row: 9, hl: true }],
+      ]);
+      S.slideOut(tl, t.win, D);
+      window.__timelines["fix"] = tl;
+    })();
+  </script>
+</template>

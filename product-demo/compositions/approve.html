@@ -1,0 +1,21 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; }
+  </style>
+  <div id="root" data-composition-id="approve" data-width="1920" data-height="1080">
+    <div id="approve-stage" class="stage" data-layout-allow-overflow></div>
+  </div>
+  <script>
+    (() => {
+      const { tl, w, stage } = S.begin("approve");
+      const a = S.app(stage, ["a2-layout", "c1-dialog", "c2-approved"], { pointer: [420, 620] });
+      a.point(tl, 0.1, "c1-dialog", 0.55);
+      a.press(tl, w("i") + 0.45);
+      a.show(tl, "c1-dialog", w("i") + 0.48);
+      a.point(tl, w("approve") + 0.1, "c2-approved", 0.5);
+      a.press(tl, w("together") + 0.1);
+      a.show(tl, "c2-approved", w("together") + 0.13);
+      window.__timelines["approve"] = tl;
+    })();
+  </script>
+</template>

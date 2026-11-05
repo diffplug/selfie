@@ -1,0 +1,52 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; }
+    #bucks-stage { background: var(--fog); }
+  </style>
+  <div data-hf-id="hf-ddy1" id="root" data-composition-id="bucks" data-width="1920" data-height="1080">
+    <div data-hf-id="hf-zgye" id="bucks-stage" class="stage" data-layout-allow-overflow></div>
+  </div>
+  <script>
+    (() => {
+      const { tl, at, w, stage } = S.begin("bucks", 8.6);
+      const b = S.booth(stage);
+      gsap.set(b.bar, { scaleX: 1 });
+      const rnd = S.rand(7);
+
+      // The hand leaves, and a robot takes over the button.
+      const hand = S.hand(stage, "bucks-hand");
+      gsap.set(hand, { x: 560, y: 736 });
+      tl.to(hand, { x: 880, y: 1160, duration: 0.4, ease: "power3.in" }, at(0.1));
+      const r = S.robot(stage, { id: "bucks-robot", prop: "hammer", scale: 1.5 });
+      gsap.set(r.armR, { rotation: -60 });
+      const { x: rx, y: ry } = S.hammerAt({ x: 560, y: 772 }, 1.5);
+      tl.fromTo(r.el, { x: rx, y: -640 }, { x: rx, y: ry, duration: 0.45, ease: "power3.in" }, at(0.45));
+
+      // Each run is 1,000 images, and the hammer never stops.
+      const sum = S.html(stage, `<div class="abs label" style="left:1040px;top:280px;width:720px;text-align:center;font-size:48px;font-weight:700;color:#a8232a">1,000 stories × 0.8¢ = $8</div>`);
+      gsap.set(sum, { opacity: 0 });
+      tl.set(b.per, { opacity: 0 }, w("1000"));
+      tl.set(sum, { opacity: 1 }, w("1000"));
+
+      const money = [["$0.016", 0], ["$8", w("8")], ["$16", w("run")], ["$40", w("each")], ["$80", w("time") + 0.2], ["$160", w("look")], ["$320", w("code")], ["$800", w("change")]];
+      S.ticker(tl, money.map(([t, s]) => [s, b.digit(t)]));
+      // One coin per strike, and strikes speed up as the money does.
+      let t = 1.2, step = 0.52, n = 0;
+      while (t < at(8.6) - 0.25) {
+        S.swing(tl, r.armR, t, { wind: 0.16 });
+        S.press(tl, b.button, t - 0.02);
+        const count = n < 3 ? 1 : n < 8 ? 2 : 3;
+        for (let i = 0; i < count; i++) {
+          const fill = Math.min(n / 22, 1);
+          S.coinDrop(tl, stage, t + i * 0.05, 1170 + rnd() * 410, 828 - fill * 330 - rnd() * 70, 0.36);
+        }
+        t += step;
+        step = Math.max(0.27, step * 0.94);
+        n++;
+      }
+      tl.to(r.head, { rotation: 18, duration: 0.25, ease: "power2.inOut" }, w("code"));
+      S.gasp(tl, r, w("change") + 0.15);
+      window.__timelines["bucks"] = tl;
+    })();
+  </script>
+</template>

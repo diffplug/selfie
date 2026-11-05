@@ -1,0 +1,56 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; }
+    #storybook-stage { background: var(--sky); }
+  </style>
+  <div data-hf-id="hf-2coh" id="root" data-composition-id="storybook" data-width="1920" data-height="1080">
+    <div data-hf-id="hf-51hm" id="storybook-stage" class="stage" data-layout-allow-overflow></div>
+  </div>
+  <script>
+    (() => {
+      const { tl, at, w, stage } = S.begin("storybook", 10.4);
+      const frame = S.storybookFrame(stage);
+      const cam = S.html(stage, `<div class="abs" style="width:1920px;height:1080px;transform-origin:0 0"></div>`);
+      const cards = S.grid(cam);
+      S.rowLabels(cam);
+      gsap.set(cam, S.GRID_CAM);
+
+      // The grid backs into a Storybook window, which comes up around it.
+      gsap.set(frame.el, { opacity: 0, scale: 1.08, transformOrigin: "50% 50%" });
+      tl.to(cam, { ...S.FRAMED, duration: 0.9, ease: "power3.inOut" }, at(0.2));
+      tl.to(frame.el, { opacity: 1, scale: 1, duration: 0.55, ease: "power3.out" }, at(0.65));
+
+      // The sidebar walks through its stories, and each column answers.
+      S.KIND_ORDER.forEach((k, c) => {
+        const t = 1.4 + c * 0.85;
+        tl.set(frame.items[c], { backgroundColor: S.SUN }, t);
+        if (c) tl.set(frame.items[c - 1], { backgroundColor: "rgba(0,0,0,0)" }, t);
+        cards[c].forEach((el, r) => {
+          tl.to(el, { y: S.gridPos(c, r).y - 14, duration: 0.12, ease: "power2.out" }, t + r * 0.03);
+          tl.to(el, { y: S.gridPos(c, r).y, duration: 0.24, ease: "power2.in" }, t + r * 0.03 + 0.12);
+        });
+      });
+      tl.set(frame.items[5], { backgroundColor: "rgba(0,0,0,0)" }, w("ever"));
+
+      // A person points at one specific story.
+      const target = S.framedCell(3, 2);
+      const hand = S.hand(stage, "storybook-hand");
+      tl.set(frame.items[3], { backgroundColor: S.SUN }, w("you") + 0.2);
+      tl.fromTo(hand, { x: target.x + 360, y: 1150 }, { x: target.x, y: target.y, duration: 0.8, ease: "expo.out" }, w("point") - 0.65);
+      tl.to(hand, { y: target.y + 14, duration: 0.09, ease: "power2.in" }, w("page"));
+      tl.to(hand, { y: target.y, duration: 0.2, ease: "power2.out" }, w("page") + 0.09);
+
+      // And the robot does the rest.
+      const r = S.robot(stage, { id: "storybook-robot", prop: "hammer", scale: 1.1 });
+      gsap.set(r.armR, { rotation: -60 });
+      const { x: rx, y: ry } = S.hammerAt(target, 1.1);
+      tl.fromTo(r.el, { x: rx, y: -500 }, { x: rx, y: ry, duration: 0.42, ease: "power3.in" }, w("page") + 0.1);
+      tl.to(hand, { x: target.x + 420, y: 1180, duration: 0.42, ease: "power3.in" }, w("page") + 0.35);
+      [w("changed"), w("changed") + 0.45].forEach((t) => {
+        S.swing(tl, r.armR, t, { rest: -60 });
+        S.ringAt(tl, stage, target.x, target.y, t, { size: 260, color: S.ORANGE, dur: 0.35 });
+      });
+      window.__timelines["storybook"] = tl;
+    })();
+  </script>
+</template>

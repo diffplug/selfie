@@ -1,0 +1,5 @@
+renders/
+snapshots/
+.hyperframes/
+.thumbnails/
+.waveform-cache/

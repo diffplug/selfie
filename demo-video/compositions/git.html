@@ -1,0 +1,70 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; }
+    #git-stage { background: var(--sky); }
+  </style>
+  <div data-hf-id="hf-grjx" id="root" data-composition-id="git" data-width="1920" data-height="1080">
+    <div data-hf-id="hf-1doe" id="git-stage" class="stage" data-layout-allow-overflow></div>
+  </div>
+  <script>
+    (() => {
+      const { tl, w, stage } = S.begin("git");
+
+      // The cloud has a shared wall of photos, and the agents below each have their own suitcase.
+      const cl = S.cloud(stage, "git-cloud", 1040);
+      gsap.set(cl, { x: 540, y: -40 });
+      const line = S.html(stage, `<div class="abs display" style="font-size:96px">just like git</div>`);
+      gsap.set(line, { x: 60, y: 70, opacity: 0 });
+      tl.fromTo(line, { filter: "blur(8px)" }, { filter: "blur(0px)", duration: 0.2, ease: "power4.out", immediateRender: false }, w("just"));
+      tl.to(line, { opacity: 1, duration: 0.15 }, w("just"));
+      const spots = [[740, 190], [900, 170], [1060, 190], [1220, 170]];
+      const kinds = ["chart", "form", "profile", "list"];
+      const robots = [150, 830, 1490].map((x, i) => {
+        const r = S.robot(stage, { id: `git-robot${i}`, prop: "suitcase", scale: 1.25 });
+        tl.fromTo(r.el, { x, y: 1100 }, { x, y: 520, duration: 0.5, ease: "back.out(1.2)" }, w("images") - 0.3 + i * 0.28);
+        tl.to(r.armL, { rotation: 130, duration: 0.3, ease: "back.out(2)" }, w("locally") + 0.3 + i * 0.2);
+        [0, 1, 2, 3].forEach((n) => tl.to(r.armL, { rotation: n % 2 ? 130 : 100, duration: 0.2, ease: "power1.inOut" }, w("locally") + 0.6 + i * 0.2 + n * 0.2));
+        return x;
+      });
+
+      // Photos go up from every suitcase.
+      kinds.forEach((k, i) => {
+        const from = robots[i % 3], p = S.photo(stage, k, "easy");
+        gsap.set(p, { x: from + 220, y: 800, scale: 0.15, rotation: 10, transformOrigin: "0 0", opacity: 0 });
+        const t = w("running") + i * 0.35;
+        tl.set(p, { opacity: 1 }, t);
+        tl.to(p, { x: spots[i][0], duration: 0.7, ease: "power1.inOut" }, t);
+        tl.to(p, { y: spots[i][1], scale: 0.52, rotation: [-4, 3, -3, 4][i], duration: 0.7, ease: "power2.out" }, t);
+      });
+
+      // Cut to what that gets you: a commit list where each commit has its visual result.
+      const cover = S.html(stage, `<div class="abs" style="width:1920px;height:1080px;background:var(--sky);opacity:0" data-layout-ignore></div>`);
+      tl.to(cover, { opacity: 1, duration: 0.2 }, w("so") + 0.12);
+      const win = S.html(stage, `<div class="window" style="left:120px;top:40px;width:1680px;height:860px" data-layout-ignore><div class="bar"><span class="dot" style="background:${S.CORAL}"></span><span class="dot" style="background:${S.SUN}"></span><span class="dot" style="background:${S.TEAL}"></span><span class="url">GitHub · acme/app · commits</span></div></div>`);
+      gsap.set(win, { y: 1100 });
+      tl.to(win, { y: 0, duration: 0.5, ease: "expo.out" }, w("so"));
+      // The status text is what Selfie really posts on a commit.
+      const row = (y, msg, sha, mark, status, bg) => {
+        const el = S.html(stage, `<div class="abs" style="left:170px;top:${y}px;width:1580px;height:96px;border-bottom:4px solid var(--grey);display:flex;align-items:center;gap:26px" data-layout-ignore><div style="font:600 42px Jost,sans-serif;flex:1;white-space:nowrap">${msg}</div><div style="font:500 32px Jost,sans-serif;color:#666">${sha}</div><div style="font:700 32px Jost,sans-serif;padding:6px 20px 8px;border-radius:12px;background:${bg};border:4px solid var(--ink);white-space:nowrap">${mark} selfie: ${status}</div></div>`);
+        gsap.set(el, { opacity: 0 });
+        return el;
+      };
+      const GOOD = "#a9dcb4", MATCH = "24 stories match what’s approved";
+      const rows = [row(120, "Fix the sign up button", "9e1c7a2", "●", "6 changed, waiting for approval", S.SUN), row(460, "Add the settings page", "41bd03f", "✓", MATCH, GOOD), row(556, "Tidy the team list", "c07e5d1", "✓", MATCH, GOOD), row(652, "Rename a helper", "e2a4497", "✓", MATCH, GOOD)];
+      rows.forEach((el, i) => tl.to(el, { opacity: 1, duration: 0.15 }, w("every") + i * 0.1));
+
+      // The consequences of the first commit, laid out under it.
+      S.KIND_ORDER.forEach((k, i) => {
+        const c = S.card(stage, k, "easy", { changed: i === 1 });
+        const pos = { x: 170 + i * 268, y: 240, scale: 0.98 };
+        S.place(c, { ...pos, scale: 0.7 });
+        gsap.set(c, { opacity: 0 });
+        tl.to(c, { opacity: 1, scale: pos.scale, duration: 0.35, ease: "back.out(1.6)" }, w("complete") + i * 0.13);
+        tl.to(c.querySelector(".flag"), { opacity: 1, backgroundColor: "rgba(244,104,159,.3)", duration: 0.12 }, w("consequences") + i * 0.09);
+      });
+      S.flashIn(tl, stage);
+      S.whipOut(tl, stage, "git");
+      window.__timelines["git"] = tl;
+    })();
+  </script>
+</template>

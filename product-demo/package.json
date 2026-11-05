@@ -1,0 +1,8 @@
+{
+  "name": "selfie-product-demo",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "hyperframes": "0.9.9"
+  }
+}

@@ -1,0 +1,79 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; }
+    #launch-stage { background: var(--sky); }
+  </style>
+  <div data-hf-id="hf-tzuw" id="root" data-composition-id="launch" data-width="1920" data-height="1080">
+    <div data-hf-id="hf-vq3x" id="launch-stage" class="stage" data-layout-allow-overflow></div>
+  </div>
+  <script>
+    (() => {
+      const { tl, at, w, stage } = S.begin("launch", 12.5);
+      const space = S.html(stage, `<div class="abs" style="width:1920px;height:1080px;background:#2b2f5e;opacity:0" data-layout-ignore></div>`);
+      const rnd = S.rand(11);
+      const stars = S.html(stage, `<div class="abs" style="width:1920px;height:3400px" data-layout-ignore></div>`);
+      for (let i = 0; i < 90; i++) {
+        const sz = 5 + rnd() * 9;
+        S.html(stars, `<div class="abs" style="left:${rnd() * 1920}px;top:${rnd() * 3400}px;width:${sz}px;height:${sz}px;border-radius:50%;background:#fff"></div>`);
+      }
+      gsap.set(stars, { y: -2300, opacity: 0 });
+      const ground = S.html(stage, `<div class="abs" style="width:1920px;height:1400px" data-layout-ignore></div>`);
+      S.html(ground, `<div class="abs" style="left:0;top:800px;width:1920px;height:600px;background:#9fbd8f;border-top:7px solid var(--ink)"></div>`);
+      S.html(ground, `<div class="abs" style="left:1340px;top:770px;width:520px;height:42px;background:var(--grey);border:7px solid var(--ink);border-radius:8px"></div>`);
+
+      // Waitlist first: one last robot boards.
+      const tag = S.html(stage, `<div class="tag" style="font-size:54px">join our waitlist</div>`);
+      gsap.set(tag, { x: 120, y: 150, opacity: 0 });
+      tl.to(tag, { opacity: 1, duration: 0.14 }, w("join"));
+      const last = S.robot(stage, { id: "launch-robot", scale: 0.98 });
+      gsap.set(last.el, { x: 700, y: 480 });
+      tl.to(last.el, { x: 1500, y: 700, scale: 0.1, opacity: 0, duration: 0.6, ease: "power2.in" }, at(0.25));
+
+      // Lift-off. The rocket moves to the middle, and the world falls away below it.
+      const rk = S.rocket(stage, "launch-rocket");
+      gsap.set(rk.el, { x: 1420, y: 72 });
+      gsap.set(rk.fire, { scaleY: 0 });
+      const lift = w("get");
+      tl.set(rk.fire, { opacity: 1 }, lift - 0.4);
+      tl.to(rk.fire, { scaleY: 1.3, duration: 0.35, ease: "power2.out" }, lift - 0.4);
+      [-5, 5, -4, 4, -3, 3, 0].forEach((v, i) => tl.to(rk.el, { x: 1420 + v, duration: 0.05 }, lift - 0.4 + i * 0.05));
+      tl.to(tag, { opacity: 0, duration: 0.15 }, lift + 0.7);
+      tl.to(ground, { y: 1300, duration: 1.6, ease: "power3.in" }, lift);
+      tl.to(rk.el, { x: 780, y: 60, duration: w("launch") - lift - 0.05, ease: "power2.inOut" }, lift);
+      tl.to(space, { opacity: 1, duration: 1.4, ease: "power1.in" }, lift + 0.4);
+      tl.to(stars, { opacity: 1, duration: 0.8 }, lift + 1);
+      const endAt = w("midnovember", { after: true }) + 0.25;
+      tl.to(stars, { y: 0, duration: endAt - lift, ease: "none" }, lift);
+
+      // Selfies out of every window, not in unison.
+      const flicker = [[0.9, 0], [1.15, 2], [1.42, 1], [1.62, 0], [1.88, 2], [2.08, 1], [2.3, 2], [2.48, 0]];
+      flicker.forEach(([t, w]) => {
+        const flare = S.html(stage, `<div class="abs" style="width:240px;height:240px;border-radius:50%;background:radial-gradient(circle,#fff 0 28%,rgba(255,255,255,0) 68%);opacity:0" data-layout-ignore></div>`);
+        gsap.set(flare, { x: 780 + 180 - 120 + 14, y: 60 + [240, 372, 504][w] - 120 + 14 });
+        S.flash(tl, flare, lift + t, 1);
+      });
+
+      const when = S.html(stage, `<div class="abs display" style="font-size:112px;color:#fff;width:640px;line-height:1.05">launching mid-November</div>`);
+      gsap.set(when, { x: 1200, y: 310, opacity: 0 });
+      tl.to(when, { opacity: 1, duration: 0.18 }, w("launch"));
+
+      // End card: a flash, and the real mascot.
+      const end = S.html(stage, `<div class="abs" style="width:1920px;height:1080px;background:var(--sun);opacity:0" data-layout-ignore></div>`);
+      const white = S.html(stage, `<div class="flash"></div>`);
+      const mascot = S.html(stage, `<img id="launch-mascot" class="abs" src="assets/mascot-cutout.png" alt="" style="height:1040px;width:auto" data-layout-ignore />`);
+      gsap.set(mascot, { x: 1270, y: 24, opacity: 0 });
+      const word = S.html(stage, `<div class="abs wordmark" style="font-size:230px;white-space:nowrap">selfie.dev</div>`);
+      gsap.set(word, { x: 110, y: 220, opacity: 0 });
+      const sub = S.html(stage, `<div class="abs label" style="font-size:60px;line-height:1.2;width:1100px;font-weight:600">Use it locally today.<br>Join the waitlist for the cloud.</div>`);
+      gsap.set(sub, { x: 124, y: 500, opacity: 0 });
+      tl.set(end, { opacity: 1 }, endAt);
+      S.flash(tl, white, endAt, 1);
+      tl.set(word, { opacity: 1 }, endAt);
+      tl.fromTo(word, { scale: 1.06, transformOrigin: "0 50%" }, { scale: 1, duration: 0.6, ease: "expo.out", immediateRender: false }, endAt);
+      tl.set(mascot, { opacity: 1 }, endAt);
+      tl.fromTo(mascot, { x: 1340 }, { x: 1270, duration: 0.7, ease: "expo.out", immediateRender: false }, endAt);
+      tl.to(sub, { opacity: 1, duration: 0.2 }, endAt + 0.5);
+      window.__timelines["launch"] = tl;
+    })();
+  </script>
+</template>

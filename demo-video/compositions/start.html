@@ -1,0 +1,51 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; }
+    #start-stage { background: var(--sky); }
+  </style>
+  <div data-hf-id="hf-mpq1" id="root" data-composition-id="start" data-width="1920" data-height="1080">
+    <div data-hf-id="hf-8qry" id="start-stage" class="stage" data-layout-allow-overflow></div>
+  </div>
+  <script>
+    (() => {
+      const { tl, at, w, stage } = S.begin("start", 7.2);
+      S.html(stage, `<div class="abs" style="left:0;top:800px;width:1920px;height:280px;background:#9fbd8f;border-top:7px solid var(--ink)" data-layout-ignore></div>`);
+      const rk = S.rocket(stage, "start-rocket");
+      gsap.set(rk.el, { x: 1420, y: 72 });
+      S.html(stage, `<div class="abs" style="left:1340px;top:770px;width:520px;height:42px;background:var(--grey);border:7px solid var(--ink);border-radius:8px" data-layout-ignore></div>`);
+
+      // The URL lands first.
+      const url = S.html(stage, `<div class="abs display" style="font-size:150px">selfie.dev</div>`);
+      gsap.set(url, { x: 110, y: 90, opacity: 0 });
+      tl.to(url, { opacity: 1, duration: 0.14 }, w("selfiedev"));
+      tl.fromTo(url, { scale: 1.12, transformOrigin: "0 50%" }, { scale: 1, duration: 0.4, ease: "expo.out", immediateRender: false }, w("selfiedev"));
+      const local = S.html(stage, `<div class="tag" style="font-size:52px">works locally, right now</div>`);
+      gsap.set(local, { x: 120, y: 270, opacity: 0 });
+      tl.to(local, { opacity: 1, duration: 0.16 }, w("locally"));
+
+      // A desk, a clipboard, and robots lining up to sign.
+      S.html(stage, `<div class="abs" style="left:980px;top:700px;width:240px;height:120px;background:var(--orange);border:7px solid var(--ink);border-radius:10px" data-layout-ignore></div>`);
+      S.html(stage, `<div class="abs" style="left:1040px;top:636px;width:120px;height:74px;background:#fff;border:6px solid var(--ink);border-radius:6px;font:700 30px/60px Jost,sans-serif;text-align:center" data-layout-ignore>Sign</div>`);
+      const queue = [0, 1, 2, 3].map((i) => S.robot(stage, { id: `start-robot${i}`, scale: 0.98 }));
+      queue.forEach((r, i) => {
+        const home = 700 - i * 210, y = 480;
+        gsap.set(r.el, { x: home - 900, y });
+        tl.to(r.el, { x: home, duration: 0.9, ease: "power2.out" }, at(0.1 + i * 0.22));
+        [0, 1, 2].forEach((n) => {
+          tl.to(r.el, { y: y - 30, duration: 0.12, ease: "power2.out" }, at(0.1 + i * 0.22) + n * 0.27);
+          tl.to(r.el, { y, duration: 0.12, ease: "power2.in" }, at(0.1 + i * 0.22) + n * 0.27 + 0.13);
+        });
+      });
+      // The front of the line signs, heads for the rocket, and the rest shuffle up.
+      [2.8, 4.1, 5.4].forEach((t, n) => {
+        const r = queue[n];
+        tl.to(r.armR, { rotation: -70, duration: 0.15, ease: "power2.out" }, at(t) - 0.5);
+        tl.to(r.armR, { rotation: 0, duration: 0.15, ease: "power2.in" }, at(t) - 0.2);
+        tl.to(r.el, { x: 1500, y: 700, scale: 0.1, opacity: 0, duration: 0.55, ease: "power2.in" }, at(t));
+        queue.slice(n + 1).forEach((q, j) => tl.to(q.el, { x: 700 - j * 210, duration: 0.42, ease: "power2.inOut" }, at(t) + 0.15));
+      });
+      S.whipIn(tl, stage);
+      window.__timelines["start"] = tl;
+    })();
+  </script>
+</template>

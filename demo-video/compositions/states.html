@@ -1,0 +1,64 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; }
+    #states-stage { background: var(--sky); }
+  </style>
+  <div data-hf-id="hf-qgmh" id="root" data-composition-id="states" data-width="1920" data-height="1080">
+    <div data-hf-id="hf-peaq" id="states-stage" class="stage" data-layout-allow-overflow></div>
+  </div>
+  <script>
+    (() => {
+      const { tl, at, w, stage } = S.begin("states", 8.2);
+      const cam = S.html(stage, `<div class="abs" style="width:1920px;height:1080px;transform-origin:0 0"></div>`);
+      const cards = S.grid(cam);
+      const labels = S.rowLabels(cam);
+      gsap.set(labels, { opacity: 0 });
+
+      // Everything but the top row starts hidden, and the top row starts where the last scene left it.
+      cards.forEach((col, c) => {
+        S.place(col[0], S.rowPos(c));
+        col.slice(1).forEach((el, i) => { S.place(el, S.gridPos(c, i)); gsap.set(el, { opacity: 0, zIndex: 10 - i }); });
+      });
+      cards.forEach((col) => gsap.set(col[0], { zIndex: 20 }));
+
+      const Z = 1.7, FOCUS = 1;
+      const camAt = (r) => ({ x: 1010 - Z * (S.gridPos(FOCUS, r).x + 122), y: 440 - Z * (S.gridPos(FOCUS, r).y + 95), scale: Z });
+
+      // Zoom in on one component.
+      cards.forEach((col, c) => {
+        const p = S.gridPos(c, 0);
+        tl.to(col[0], { x: p.x, y: p.y, scale: 1, duration: 0.8, ease: "power3.inOut" }, at(0.2));
+      });
+      tl.to(cam, { ...camAt(0), duration: 1.1, ease: "power2.inOut" }, at(0.5));
+
+      // It gets ready to split while the sentence builds.
+      const col = cards[FOCUS];
+      ["state", "see"].forEach((word) => {
+        tl.to(col[0], { scale: 1.05, duration: 0.12, ease: "power2.out" }, w(word));
+        tl.to(col[0], { scale: 1, duration: 0.28, ease: "power2.out" }, w(word) + 0.12);
+      });
+
+      // A copy slides out of the card above as each state is named, and the camera only ever follows it down.
+      ["empty", "error", "simple", "complex"].forEach((word, i) => {
+        const r = i + 1, t = w(word) - 0.05;
+        tl.set(col[r], { opacity: 1 }, t);
+        tl.to(col[r], { y: S.gridPos(FOCUS, r).y, duration: 0.45, ease: "back.out(1.4)" }, t);
+        tl.to(cam, { ...camAt(r), duration: 0.45, ease: "power2.inOut" }, t);
+        tl.to(labels[r], { opacity: 1, duration: 0.2 }, t + 0.1);
+      });
+
+      // Zoom out as every other column does the same.
+      const out = w("ones") - 0.05;
+      tl.to(cam, { ...S.GRID_CAM, duration: 0.7, ease: "power2.inOut" }, out);
+      cards.forEach((c0, c) => {
+        if (c === FOCUS) return;
+        c0.slice(1).forEach((el, i) => {
+          const t = out + 0.02 + (Math.abs(c - FOCUS) - 1) * 0.05 + i * 0.03;
+          tl.set(el, { opacity: 1 }, t);
+          tl.to(el, { y: S.gridPos(c, i + 1).y, duration: 0.36, ease: "power3.out" }, t);
+        });
+      });
+      window.__timelines["states"] = tl;
+    })();
+  </script>
+</template>
