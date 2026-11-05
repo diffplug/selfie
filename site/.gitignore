@@ -1,3 +1,9 @@
 node_modules/
 .wrangler/
 .DS_Store
+
+# Impeccable working files: mockups, review captures, build state. The surface brief and live config are kept.
+.impeccable/mocks/
+.impeccable/review/
+.impeccable/build/
+.impeccable/questions/

@@ -88,11 +88,14 @@ test("an unknown path is a real 404 that points to the library", async () => {
 test("everything the home page loads from this site exists", async () => {
   const html = await (await get("/")).text();
   const css = await (await get("/style.css")).text();
+  // The home page and the stylesheet both sit at the site root, so a relative
+  // path resolves the same as one starting with "/".
+  const local = (path) => (path.startsWith("/") ? path : `/${path}`);
   const paths = [
-    ...html.matchAll(/(?:src|href)="(\/[^"]+)"/g),
-    ...css.matchAll(/url\("(\/[^"]+)"\)/g),
+    ...html.matchAll(/(?:src|href|srcset)="(?!https?:|\/\/|#|mailto:)([^"]+)"/g),
+    ...css.matchAll(/url\("(?!https?:|data:)([^"]+)"\)/g),
     ...html.matchAll(/content="https:\/\/selfie\.dev(\/[^"]+\.png)"/g),
-  ].map((match) => match[1]);
+  ].map((match) => local(match[1]));
   assert.ok(paths.length > 5);
   for (const path of new Set(paths)) {
     assert.equal((await get(path)).status, 200, path);
