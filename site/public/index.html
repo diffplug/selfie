@@ -69,17 +69,17 @@
   <main>
     <section class="videos">
       <div class="wrap">
-        <h2>Watch it</h2>
+        <h2>See it work</h2>
         <div class="video-grid">
           <a class="video" href="https://youtu.be/8B3-v4DTwfU">
             <span class="thumb"><img src="img/video-why.webp" alt="" width="960" height="540" loading="lazy"><span class="play" aria-hidden="true"></span></span>
             <strong>Why Selfie</strong>
-            <span>From Storybook to Chromatic to Selfie: why snapshot testing needs to change for coding agents.</span>
+            <span>From Storybook to Chromatic to Selfie: why snapshot testing has to change for coding agents.</span>
           </a>
           <a class="video" href="https://youtu.be/FiGuwfB13b0">
             <span class="thumb"><img src="img/video-demo.webp" alt="" width="960" height="540" loading="lazy"><span class="play" aria-hidden="true"></span></span>
             <strong>Product demo</strong>
-            <span>The real app: a two-line CSS change touches all 124 stories, and a person and an agent work through it together.</span>
+            <span>A two-line CSS change touches all 124 stories, and a person and an agent work through it together.</span>
           </a>
         </div>
       </div>
@@ -88,7 +88,7 @@
     <section class="loop">
       <div class="wrap loop-grid">
         <div>
-          <h2>A review gate for the agent's loop</h2>
+          <h2>The agent checks its <em>own</em> work</h2>
           <pre class="terminal" tabindex="0" aria-label="An agent's loop, as shell commands"><code><span class="c"># JSON naming the diff images</span>
 selfie review
 
@@ -100,10 +100,10 @@ git commit
 selfie review</code></pre>
         </div>
         <ul class="features">
-          <li><strong>Fits an agent's loop.</strong> <code>selfie review</code> prints one JSON document, and its exit code says whether anything blocks.</li>
-          <li><strong>Says what kind of change it is.</strong> It separates what moved or gained spacing from what really changed, so you can approve the harmless ones together.</li>
-          <li><strong>Lets you point at the problem.</strong> Write a note on an image, and your agent gets your words, the exact box, and a picture of what you saw.</li>
-          <li><strong>Follows Git.</strong> An approval counts wherever history reaches it, so it isn't repeated after a commit, a rebase, or a merge.</li>
+          <li><strong>One JSON document.</strong> <code>selfie review</code> names every changed image, and its exit code says whether anything blocks.</li>
+          <li><strong>It knows what kind of change it is.</strong> What moved or gained spacing is kept apart from what really changed, so the harmless ones get approved together.</li>
+          <li><strong>Point at the problem.</strong> Write a note on an image, and your agent gets your words, the exact box, and a picture of what you saw.</li>
+          <li><strong>Approvals follow Git.</strong> An approval counts wherever history reaches it, so a commit, a rebase, or a merge never asks again.</li>
         </ul>
       </div>
     </section>
@@ -111,13 +111,13 @@ selfie review</code></pre>
     <section class="early">
       <div class="wrap early-grid">
         <div>
-          <h2>Early days. Follow along.</h2>
-          <p>Selfie is piloting with StorybookJS. The local loop, CI, and commit statuses are built and in use on its own repository. It isn't on npm yet, so setup starts from a checkout, and you'll need Node 26 or later, pnpm, and Docker. GitHub sign-in and private repositories aren't built yet.</p>
+          <h2>It's <em>early</em>. Follow along.</h2>
+          <p>Selfie is piloting with StorybookJS. The local loop, CI, and commit statuses are built, and in use on Selfie's own repository. It isn't on npm yet, so setup starts from a checkout: you'll need Node 26 or later, pnpm, and Docker. GitHub sign-in and private repositories aren't built yet.</p>
           <p><a href="https://hackathon.selfie.dev/diffplug/selfie-hackathon">See Selfie reviewing itself</a>, no sign-in needed.</p>
         </div>
         <div class="actions actions-stack">
           <a class="btn btn-dark" href="https://github.com/diffplug/selfie-hackathon#quickstart">Read the quickstart</a>
-          <a class="btn" href="https://nedshed.dev/subscribe">Subscribe at nedshed.dev</a>
+          <a class="btn" href="https://nedshed.dev/subscribe">Join the list</a>
         </div>
       </div>
     </section>

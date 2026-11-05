@@ -6,7 +6,7 @@
   --ink: #1f2328;
   --muted: #4a525c;
   --sky: #bfd9f0;
-  --paper: #fffdf7;
+  --paper: #ffffff;
   --yellow: #f9d535;
   --pink: #e8509b;
   --edge: 3px solid var(--ink);
@@ -25,6 +25,7 @@ a:hover { text-decoration-thickness: 2px; }
 :focus-visible { outline: 3px solid var(--pink); outline-offset: 3px; }
 code { font: 0.86em ui-monospace, SFMono-Regular, Menlo, monospace; }
 h1, h2 { margin: 0; font-weight: 700; letter-spacing: -0.015em; line-height: 1.08; text-wrap: balance; }
+h2 em { font-weight: 600; }
 h2 { font-size: clamp(2rem, 4vw, 2.75rem); }
 .wrap { width: min(1120px, 100% - 2.5rem); margin-inline: auto; }
 
@@ -114,7 +115,7 @@ h2 { font-size: clamp(2rem, 4vw, 2.75rem); }
 .btn-primary { background: var(--yellow); }
 .btn-dark { background: var(--ink); color: #fff; }
 
-.videos { padding-block: 4.5rem; }
+.videos { padding-block: 5rem; }
 .video-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2rem; margin-top: 1.75rem; }
 .video { display: flex; flex-direction: column; gap: 0.25rem; text-decoration: none; }
 .video strong { margin-top: 0.75rem; font-size: 1.375rem; font-weight: 600; }
@@ -124,12 +125,16 @@ h2 { font-size: clamp(2rem, 4vw, 2.75rem); }
 .play { position: absolute; left: 1rem; bottom: 1rem; width: 3.5rem; height: 3.5rem; background: var(--pink); border: var(--edge); border-radius: 50%; }
 .play::after { content: ""; position: absolute; left: 1.2rem; top: 0.85rem; border-style: solid; border-width: 0.75rem 0 0.75rem 1.2rem; border-color: transparent transparent transparent #fff; }
 
-.loop { padding-block: 4.5rem; background: #fff; border-block: var(--edge); }
+.loop { padding-block: 5rem; background: var(--ink); color: #fff; }
+.loop code { color: var(--yellow); }
 .loop-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 3.5rem; align-items: start; }
-.terminal { margin: 1.75rem 0 0; padding: 1.25rem 1.5rem; overflow-x: auto; background: var(--ink); color: #fff; border-radius: 14px; font-size: 1.125rem; line-height: 1.55; }
+.terminal { margin: 1.75rem 0 0; padding: 1.25rem 1.5rem; overflow-x: auto; background: #0f0f11; color: #fff; border: 1px solid rgb(255 255 255 / 0.14); border-radius: 14px; font-size: 1.125rem; line-height: 1.55; }
+.terminal code { color: inherit; }
 .terminal .c { color: #a9b4c0; }
 .features { display: grid; gap: 1.5rem; margin: 0; padding: 0; list-style: none; }
 .features strong { display: block; font-size: 1.25rem; font-weight: 600; }
+.features li { color: #c9d1d9; }
+.features li strong { color: #fff; }
 
 .early { padding-block: 4.5rem; background: var(--yellow); }
 .early-grid { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3.5rem; align-items: center; }
