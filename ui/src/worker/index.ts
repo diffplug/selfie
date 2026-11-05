@@ -4,6 +4,7 @@ import type { ExecutionContext, Hono } from "hono";
 import type { D1DatabaseLike } from "selfie-store/adapters/d1-binding";
 import type { R2BucketLike } from "selfie-store/adapters/r2";
 import { createCloudApp } from "./app.ts";
+import { metaModel } from "./chat.ts";
 import { githubApp } from "./github.ts";
 
 interface Env {
@@ -18,6 +19,8 @@ interface Env {
   readonly SELFIE_UPLOAD_TOKEN: string;
   readonly GITHUB_APP_ID: string;
   readonly GITHUB_APP_PRIVATE_KEY: string;
+  readonly MODEL_API_KEY: string;
+  readonly CHAT_LIMIT: { limit(request: { readonly key: string }): Promise<{ readonly success: boolean }> };
 }
 
 /** Once per Worker's life, which is what lets a project's caches and a GitHub token last between requests. */
@@ -37,6 +40,8 @@ export default {
       password: env.SELFIE_WRITER_PASSWORD,
       uploadToken: env.SELFIE_UPLOAD_TOKEN,
       github: githubApp({ appId: env.GITHUB_APP_ID, privateKey: env.GITHUB_APP_PRIVATE_KEY }),
+      model: metaModel({ apiKey: env.MODEL_API_KEY }),
+      mayChat: async (client) => (await env.CHAT_LIMIT.limit({ key: client })).success,
       assets: env.ASSETS,
     });
     return app.fetch(request, env, context);

@@ -8,7 +8,7 @@ import { batchViews, type BatchViews } from "./batch-view.ts";
 /** Nothing in the cloud reads a project's own config, so it groups hunks as a project does by default. */
 const HUNK_MERGE_DISTANCE = 12;
 
-const refusal = (code: string, message: string) => Object.assign(new Error(message), { code });
+export const refusal = (code: string, message: string) => Object.assign(new Error(message), { code });
 
 export interface HostedProject {
   readonly batches: RenderBatches;

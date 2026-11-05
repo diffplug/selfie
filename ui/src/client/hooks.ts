@@ -21,7 +21,7 @@ export interface BatchState {
   readonly decide: (decision: DecisionKind, targets: readonly DecisionTarget[]) => Promise<boolean>;
 }
 
-const asRequestError = (error: unknown) =>
+export const asRequestError = (error: unknown) =>
   error instanceof RequestError ? error : new RequestError("unexpected", (error as Error).message);
 
 /**

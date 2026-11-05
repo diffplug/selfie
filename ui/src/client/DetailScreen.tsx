@@ -8,7 +8,8 @@ import { isDecidable } from "selfie-store";
 import type { DecisionKind, PixelDiff, BatchView, RenderRow } from "../shared/api.ts";
 import { diffImageUrl, fetchDiff, imageUrl } from "./api.ts";
 import { prepareNext, usePatchedGolden, type PatchedGolden } from "./deltas.ts";
-import { canDecide, signInHref } from "./base.ts";
+import { canDecide, isHosted, signInHref } from "./base.ts";
+import { ChatPanel } from "./ChatPanel.tsx";
 import { parseFilter, rowsFor, targetsOf, type StoryNavigation } from "./filter.ts";
 import { useFetched, useHotkeys, useHunkSelection, useTitle, type FeedbackState, type BatchState } from "./hooks.ts";
 import { imageCount, ImageCompare } from "./ImageCompare.tsx";
@@ -348,6 +349,7 @@ export function DetailScreen({
       )}
       {patched !== null && <PatchedBanner patched={patched} shown={deltasShown} onShown={setDeltasShown} />}
       <LiveStories row={row} view={view} open={liveOpen} onToggle={() => setLiveOpen(!liveOpen)} />
+      {isHosted && row.state !== "unchanged" && <ChatPanel key={`${view.batch.id} ${row.story}`} batchId={view.batch.id} story={row.story} />}
       <ImageCompare row={row} diff={diff} patched={applied?.images ?? null} scale={view.batch.scale} groups={groups} selection={selection} batchId={view.batch.id} feedback={feedback} startNote={startNote} />
       {helpOpen && <ShortcutsDialog images={imageCount(row, notedImage)} onClose={() => setHelpOpen(false)} />}
     </Stack>
