@@ -1,4 +1,5 @@
 @font-face { font-family: "Jost"; src: url("fonts/Jost.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: "Jost"; src: url("fonts/Jost-Italic.woff2") format("woff2"); font-weight: 100 900; font-style: italic; font-display: swap; }
 @font-face { font-family: "Neucha"; src: url("fonts/Neucha.woff2") format("woff2"); font-weight: 400; font-display: swap; }
 
 :root {
@@ -37,8 +38,12 @@ h2 { font-size: clamp(2rem, 4vw, 2.75rem); }
 .hero { position: relative; overflow: hidden; background: var(--sky); border-bottom: var(--edge); }
 .hero-copy { position: relative; z-index: 2; padding: 2rem 1.25rem 0; }
 .hero h1 { margin: 1.75rem 0 0; font-size: clamp(2.6rem, 9vw, 4.75rem); font-weight: 600; letter-spacing: -0.012em; line-height: 1.12; }
-.hero h1 span { display: inline; }
-.hero .lede { margin: 1.25rem 0 0; font-size: 1.375rem; font-weight: 500; line-height: 1.35; }
+.hero h1 em { font-weight: 700; }
+.hero h1 > span { display: block; }
+.argument-lead { margin: 1.5rem 0 0; font-size: 1.5rem; font-weight: 600; line-height: 1.25; letter-spacing: -0.01em; text-wrap: pretty; }
+.argument-lead strong { font-weight: 700; white-space: nowrap; background: linear-gradient(transparent 58%, var(--yellow) 58%, var(--yellow) 92%, transparent 92%); }
+.argument-rest { margin: 0.75rem 0 0; font-size: 1.1875rem; line-height: 1.45; text-wrap: pretty; }
+.hero .lede { margin: 1.25rem 0 0; font-size: 1.1875rem; font-weight: 600; line-height: 1.35; }
 .btn-hero { margin-top: 1.5rem; font-size: 1.25rem; }
 .hero-note { margin: 0.75rem 0 0; color: var(--muted); font-size: 1rem; }
 
@@ -90,12 +95,11 @@ h2 { font-size: clamp(2rem, 4vw, 2.75rem); }
 @media (min-width: 1100px) {
   .strip { min-height: calc(54 * var(--u)); padding-block: calc(12 * var(--u)); gap: calc(4 * var(--u)) calc(28 * var(--u)); font-size: max(15px, calc(21.5 * var(--u))); }
   .hero { height: calc(970 * var(--u)); }
-  .hero-copy { position: absolute; left: calc(112 * var(--u)); top: calc(48 * var(--u)); width: calc(700 * var(--u)); padding: 0; }
-  .hero .brand { gap: calc(14 * var(--u)); font-size: calc(40 * var(--u)); }
-  .hero .brand img { width: calc(46 * var(--u)); height: auto; }
-  .hero h1 { margin-top: calc(150 * var(--u)); font-size: calc(82 * var(--u)); line-height: 1.08; }
-  .hero h1 span { display: block; }
-  .hero .lede { margin-top: calc(30 * var(--u)); font-size: calc(30 * var(--u)); font-weight: 500; line-height: 1.3; }
+  .hero-copy { position: absolute; left: calc(112 * var(--u)); top: 50%; width: calc(700 * var(--u)); padding: 0; transform: translateY(-50%); }
+  .hero h1 { margin-top: 0; font-size: calc(82 * var(--u)); line-height: 1.06; }
+  .argument-lead { margin-top: calc(44 * var(--u)); font-size: calc(38 * var(--u)); }
+  .argument-rest { margin-top: calc(20 * var(--u)); font-size: calc(26 * var(--u)); }
+  .hero .lede { margin-top: calc(30 * var(--u)); font-size: calc(26 * var(--u)); }
   .btn-hero { margin-top: calc(40 * var(--u)); padding: calc(16 * var(--u)) calc(50 * var(--u)); border-width: calc(6 * var(--u)); font-weight: 700; color: #0b0b0c; border-radius: calc(14 * var(--u)); box-shadow: calc(5 * var(--u)) calc(8 * var(--u)) 0 #0b0b0c; font-size: calc(33 * var(--u)); }
   .btn-hero:hover { box-shadow: calc(6 * var(--u)) calc(9 * var(--u)) 0 #0b0b0c; }
   .hero-note { margin-top: calc(28 * var(--u)); color: var(--ink); font-size: calc(23 * var(--u)); }
@@ -109,12 +113,6 @@ h2 { font-size: clamp(2rem, 4vw, 2.75rem); }
 .btn:active { transform: translate(3px, 3px); box-shadow: 1px 1px 0 var(--ink); }
 .btn-primary { background: var(--yellow); }
 .btn-dark { background: var(--ink); color: #fff; }
-
-.argument { padding-block: clamp(4rem, 9vw, 7.5rem); background: var(--ink); color: #fff; }
-.argument p { margin: 0; letter-spacing: -0.015em; text-wrap: balance; }
-.argument-lead { max-width: 22em; font-size: clamp(2.1rem, 4.6vw, 4.25rem); font-weight: 600; line-height: 1.1; }
-.argument-lead strong { color: var(--yellow); font-weight: 700; }
-.argument-rest { max-width: 30em; margin-top: 1.25em !important; color: #c9d1d9; font-size: clamp(1.4rem, 2.4vw, 2.125rem); line-height: 1.3; }
 
 .videos { padding-block: 4.5rem; }
 .video-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2rem; margin-top: 1.75rem; }
