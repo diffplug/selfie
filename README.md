@@ -23,7 +23,7 @@ You can also look around the hosted review pages without signing in: here's [Sel
 - **Tells you why, with Muse Spark.** On a changed story in the cloud, ask what caused it. Muse Spark reads the before, after, and diff images and the code from GitHub, and it can point out what nobody asked for.
 - **Lets you point at the problem.** Write a note on an image, and your agent gets your words, the exact box, and a picture of what you saw. It answers on the same note, and you flip between before and after.
 - **Follows Git.** An approval counts wherever history reaches it, so it isn't repeated after a commit, a rebase, or a merge.
-- **Gives the same pixels everywhere.** Stories render in a pinned container, and `selfie flakes` finds any that still vary between renders.
+- **Keeps the pixels reproducible.** Stories render in a container pinned by digest, and `selfie flakes` finds any that still vary between renders.
 - **Reports on every commit.** A GitHub Action renders each push, and the commit gets a `selfie` status that links to its review.
 
 ## Quickstart
@@ -68,6 +68,7 @@ From a checkout, `pnpm selfie <command>` runs these.
 | `notes`, `agent-await-feedback`, `reply` | How a person's notes on the images reach a coding agent, and how it answers |
 | `push`, `pull` | Sends a batch and its decisions to the cloud, and takes what a commit's history approved from it |
 | `flakes` | Renders a built Storybook several times, and says what wasn't the same each time. `selfie skill fix-flakes` is a guide for a coding agent to fix what it finds |
+| `skill` | Prints a guide for a coding agent: `quickstart` to set Selfie up in a repository, and `fix-flakes` to make every story render the same way |
 
 ## What's built, and what isn't
 
