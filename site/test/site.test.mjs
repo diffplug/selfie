@@ -70,13 +70,20 @@ test("the home page sends each audience to the right place", async () => {
   for (const href of [
     "https://lib.selfie.dev",
     "https://github.com/diffplug/selfie-hackathon",
-    "https://nedshed.dev/subscribe",
     "https://youtu.be/8B3-v4DTwfU",
     "https://youtu.be/FiGuwfB13b0",
   ]) {
     assert.ok(html.includes(`href="${href}"`), `missing link to ${href}`);
   }
   assert.match(html, NOTICE);
+});
+
+test("the signup form posts to the selfie.dev MailerLite form", async () => {
+  const html = await (await get("/")).text();
+  assert.ok(html.includes('action="https://assets.mailerlite.com/jsonp/2772060/forms/203332822830679835/subscribe"'), "missing MailerLite form action");
+  assert.match(html, /name="fields\[email\]"/);
+  assert.ok(html.includes('href="#join"'), "the shutter should lead to the signup form");
+  assert.ok(!html.includes("nedshed.dev"), "nedshed.dev should no longer be linked");
 });
 
 test("an unknown path is a real 404 that points to the library", async () => {

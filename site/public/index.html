@@ -19,6 +19,7 @@
   <link rel="preload" href="fonts/Neucha.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="style.css">
   <script src="hero.js" defer></script>
+  <script src="join.js" defer></script>
 </head>
 <body>
   <aside class="strip">
@@ -50,7 +51,7 @@
           <picture><source srcset="img/plates/today.webp" type="image/webp"><img class="today" src="img/plates/today.png" alt="" width="1024" height="1536"></picture>
           <span class="brackets" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
           <div class="controls">
-            <a class="shutter" href="https://nedshed.dev/subscribe"><span>Join the list</span></a>
+            <a class="shutter" href="#join"><span>Join the list</span></a>
             <span class="last-photo" aria-hidden="true"></span>
             <ul class="modes" aria-hidden="true"><li>VIDEO</li><li class="on">SELFIE</li><li>PHOTO</li></ul>
           </div>
@@ -117,9 +118,18 @@ selfie review</code></pre>
           <p>Selfie is piloting with StorybookJS. The local loop, CI, and commit statuses are built, and in use on Selfie's own repository. It isn't on npm yet, so setup starts from a checkout: you'll need Node 26 or later, pnpm, and Docker. GitHub sign-in and private repositories aren't built yet.</p>
           <p><a href="https://hackathon.selfie.dev/diffplug/selfie-hackathon">See Selfie reviewing itself</a>, no sign-in needed.</p>
         </div>
-        <div class="actions actions-stack">
-          <a class="btn btn-dark" href="https://github.com/diffplug/selfie-hackathon#quickstart">Read the quickstart</a>
-          <a class="btn" href="https://nedshed.dev/subscribe">Join the list</a>
+        <div class="join-box">
+          <form class="join" id="join" action="https://assets.mailerlite.com/jsonp/2772060/forms/203332822830679835/subscribe" method="post">
+            <label for="join-email">Follow Selfie's development by email</label>
+            <div class="join-row">
+              <input id="join-email" type="email" name="fields[email]" placeholder="you@example.com" autocomplete="email" required>
+              <button class="btn btn-primary" type="submit">Join the list</button>
+            </div>
+            <input type="hidden" name="ml-submit" value="1">
+            <input type="hidden" name="anticsrf" value="true">
+            <p class="join-status" role="status" aria-live="polite"></p>
+          </form>
+          <a class="btn btn-dark" href="https://github.com/diffplug/selfie-hackathon#quickstart">Or read the quickstart</a>
         </div>
       </div>
     </section>

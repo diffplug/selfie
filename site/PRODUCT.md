@@ -48,7 +48,7 @@ Renders happen where the agent runs, with no cloud required and no bill per imag
 
 **Terminology:** the library and this product share a name and a general theme but no code. Keep them clearly separate.
 
-**Mailing list:** MailerLite. Its signup replaces the nedshed.dev link, and launches at the same time as the local-only install.
+**Mailing list:** MailerLite form "selfie.dev signup", which adds people to the group "selfie.dev launch" with double opt-in. Mail comes from Selfie <hello@selfie.dev>, a Google Workspace group, and selfie.dev is authenticated for sending (DKIM, SPF). The signup replaced the nedshed.dev link, and the list launches at the same time as the local-only install.
 
 ## Brand Commitments
 

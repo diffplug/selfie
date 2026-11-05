@@ -156,6 +156,19 @@ h2 { font-size: clamp(2rem, 4vw, 2.75rem); }
 .early h2 { margin-bottom: 1.25rem; }
 .early p { max-width: 42em; }
 .early p:last-child { margin-bottom: 0; }
+.join-box { display: grid; gap: 1rem; width: min(100%, 30rem); }
+.join label { display: block; margin-bottom: 0.5rem; font-weight: 600; }
+.join-row { display: flex; gap: 0.75rem; }
+.join input[type=email] { flex: 1; min-width: 0; padding: 0.7rem 0.9rem; background: #fff; border: var(--edge); border-radius: 12px; color: var(--ink); font: inherit; }
+.join input[type=email]:focus-visible { outline-offset: 2px; }
+.join button { flex: none; cursor: pointer; font: inherit; font-weight: 600; }
+.join button[disabled] { cursor: progress; opacity: 0.7; }
+.join-status { min-height: 1.5em; margin: 0.5rem 0 0 !important; font-weight: 600; }
+.join-status:empty { display: none; }
+.join.done .join-row, .join.done label { display: none; }
+.join.done .join-status { font-size: 1.25rem; }
+.join-box .btn-dark { justify-self: start; }
+@media (max-width: 480px) { .join-row { flex-direction: column; } }
 
 .footer { padding-block: 2.5rem; background: var(--ink); color: #fff; }
 .footer a { color: var(--yellow); }
