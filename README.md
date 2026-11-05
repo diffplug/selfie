@@ -8,37 +8,10 @@ Selfie is a visual review gate built for that loop. It runs on your machine besi
 
 ## Watch it
 
-<table>
-  <tr>
-    <td width="50%" valign="top">
-      <a href="https://youtu.be/8B3-v4DTwfU">
-        ![Watch: Why Selfie](https://img.youtube.com/vi/8B3-v4DTwfU/maxresdefault.jpg)
-      </a>
-
-      <br />
-
-      <strong><a href="https://youtu.be/8B3-v4DTwfU">Why Selfie</a></strong>
-
-      <br />
-
-      From Storybook to Chromatic to Selfie: why snapshot testing needs to change for coding agents.
-    </td>
-
-    <td width="50%" valign="top">
-      <a href="https://youtu.be/FiGuwfB13b0">
-        ![Watch: Selfie product demo](https://img.youtube.com/vi/FiGuwfB13b0/maxresdefault.jpg)
-      </a>
-
-      <br />
-
-      <strong><a href="https://youtu.be/FiGuwfB13b0">Product demo</a></strong>
-
-      <br />
-
-      The real app: a two-line CSS change touches all 124 stories, and a person and an agent work through it together.
-    </td>
-  </tr>
-</table>
+| [Why Selfie](https://youtu.be/8B3-v4DTwfU) | [Product demo](https://youtu.be/FiGuwfB13b0) |
+| --- | --- |
+| [![Watch: Why Selfie](https://img.youtube.com/vi/8B3-v4DTwfU/maxresdefault.jpg)](https://youtu.be/8B3-v4DTwfU) | [![Watch: Selfie product demo](https://img.youtube.com/vi/FiGuwfB13b0/maxresdefault.jpg)](https://youtu.be/FiGuwfB13b0) |
+| From Storybook to Chromatic to Selfie: why snapshot testing needs to change for coding agents. | The real app: a two-line CSS change touches all 124 stories, and a person and an agent work through it together. |
 
 You can also look around the hosted review pages without signing in: here's [Selfie reviewing itself](https://hackathon.selfie.dev/diffplug/selfie-hackathon).
 
