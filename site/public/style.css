@@ -38,14 +38,14 @@ h2 { font-size: clamp(2rem, 4vw, 2.75rem); }
 .hero { position: relative; overflow: hidden; background: var(--sky); border-bottom: var(--edge); }
 .hero-copy { position: relative; z-index: 2; padding: 2rem 1.25rem 0; }
 .hero h1 { margin: 1.75rem 0 0; font-size: clamp(2.6rem, 9vw, 4.75rem); font-weight: 600; letter-spacing: -0.012em; line-height: 1.12; }
-.hero h1 em { font-weight: 700; }
+.hero h1 em { font-weight: 500; }
 .hero h1 > span { display: block; }
 .argument-lead { margin: 1.5rem 0 0; font-size: 1.5rem; font-weight: 600; line-height: 1.25; letter-spacing: -0.01em; text-wrap: pretty; }
 .argument-lead strong { font-weight: 700; white-space: nowrap; background: linear-gradient(transparent 58%, var(--yellow) 58%, var(--yellow) 92%, transparent 92%); }
 .argument-rest { margin: 0.75rem 0 0; font-size: 1.1875rem; line-height: 1.45; text-wrap: pretty; }
 .hero .lede { margin: 1.25rem 0 0; font-size: 1.1875rem; font-weight: 600; line-height: 1.35; }
+.price { margin: 0.25rem 0 0; font-size: 2rem; font-weight: 700; letter-spacing: -0.015em; line-height: 1.1; }
 .btn-hero { margin-top: 1.5rem; font-size: 1.25rem; }
-.hero-note { margin: 0.75rem 0 0; color: var(--muted); font-size: 1rem; }
 
 .shot { position: relative; width: min(100%, 560px); margin: 1.5rem 0 0 auto; aspect-ratio: 776 / 970; container-type: inline-size; }
 .shot > * { position: absolute; }
@@ -53,7 +53,7 @@ h2 { font-size: clamp(2rem, 4vw, 2.75rem); }
 .screen { position: absolute; left: 4.577%; top: 2.01%; width: 91.075%; height: 96.48%; overflow: hidden; background: #0f0f11; border-radius: 5cqw; }
 .screen > * { position: absolute; }
 .screen > picture { display: contents; }
-.readouts { left: 3.769%; top: 3.385%; width: 92.462%; height: 3.906%; display: flex; align-items: center; justify-content: space-between; margin: 0; padding: 0; list-style: none; color: #f3f4f4; font-size: 1.95cqw; font-weight: 500; letter-spacing: 0.01em; line-height: 1; white-space: nowrap; }
+.readouts { left: 3.769%; top: 3.385%; width: 92.462%; height: 3.906%; display: flex; align-items: center; justify-content: center; margin: 0; padding: 0; list-style: none; color: #f3f4f4; font-size: 1.95cqw; font-weight: 500; letter-spacing: 0.01em; line-height: 1; white-space: nowrap; }
 .readouts li { display: flex; align-items: center; gap: 0.45em; }
 .readouts li + li { padding-left: 0.7em; border-left: 1px solid rgb(255 255 255 / 0.35); }
 .readouts svg { width: 1.15em; height: 1.15em; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linejoin: round; stroke-linecap: round; }
@@ -100,9 +100,9 @@ h2 { font-size: clamp(2rem, 4vw, 2.75rem); }
   .argument-lead { margin-top: calc(44 * var(--u)); font-size: calc(38 * var(--u)); }
   .argument-rest { margin-top: calc(20 * var(--u)); font-size: calc(26 * var(--u)); }
   .hero .lede { margin-top: calc(30 * var(--u)); font-size: calc(26 * var(--u)); }
+  .price { margin-top: calc(6 * var(--u)); font-size: calc(48 * var(--u)); }
   .btn-hero { margin-top: calc(40 * var(--u)); padding: calc(16 * var(--u)) calc(50 * var(--u)); border-width: calc(6 * var(--u)); font-weight: 700; color: #0b0b0c; border-radius: calc(14 * var(--u)); box-shadow: calc(5 * var(--u)) calc(8 * var(--u)) 0 #0b0b0c; font-size: calc(33 * var(--u)); }
   .btn-hero:hover { box-shadow: calc(6 * var(--u)) calc(9 * var(--u)) 0 #0b0b0c; }
-  .hero-note { margin-top: calc(28 * var(--u)); color: var(--ink); font-size: calc(23 * var(--u)); }
   .shot { position: absolute; right: 0; top: 0; width: calc(776 * var(--u)); margin: 0; }
 }
 
