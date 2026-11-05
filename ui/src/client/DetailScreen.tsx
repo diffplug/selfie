@@ -349,7 +349,7 @@ export function DetailScreen({
       )}
       {patched !== null && <PatchedBanner patched={patched} shown={deltasShown} onShown={setDeltasShown} />}
       <LiveStories row={row} view={view} open={liveOpen} onToggle={() => setLiveOpen(!liveOpen)} />
-      {isHosted && row.state !== "unchanged" && <ChatPanel key={`${view.batch.id} ${row.story}`} batchId={view.batch.id} story={row.story} />}
+      {isHosted && row.state !== "unchanged" && approvedIn === undefined && <ChatPanel key={`${view.batch.id} ${row.story}`} batchId={view.batch.id} story={row.story} />}
       <ImageCompare row={row} diff={diff} patched={applied?.images ?? null} scale={view.batch.scale} groups={groups} selection={selection} batchId={view.batch.id} feedback={feedback} startNote={startNote} />
       {helpOpen && <ShortcutsDialog images={imageCount(row, notedImage)} onClose={() => setHelpOpen(false)} />}
     </Stack>
