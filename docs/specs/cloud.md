@@ -26,6 +26,7 @@ Source of truth: `ui/src/worker/index.ts`, `ui/src/worker/app.ts`, `ui/wrangler.
 | `/sign-in` | A password, which sets the session cookie (`docs/specs/access.md` → Who can do what) |
 | `/api/…` | The sync routes (`docs/specs/sync.md` → Routes) |
 | `/:owner/:repo/api/…` | The review routes (`docs/specs/ui.md` → Routes), with `pageHeaders` and `sameOriginWrites` |
+| `/:owner/:repo/api/batches/:id/chat` | Asking Muse Spark about a story's change (`docs/specs/chat.md`), with those same headers, and only here |
 | `/:owner/:repo`, `/:owner/:repo/…` | The client's one document, with `<meta name="selfie-base">` saying which project it's in |
 
 - **Must keep every client path and request under that base**, through `BASE` in `ui/src/client/base.ts`, which is empty for a local server, whose paths don't change.
@@ -65,5 +66,5 @@ Source of truth: `commitStatusOf` in `ui/src/shared/commit-status.ts`, `publish`
 - A status on a fork's pull request, which gets no upload token (`docs/specs/access.md` → Pull requests from forks).
 - A list of a project's commits and batches.
 - A project's own `hunkMergeDistance`, since nothing here reads its config. Hunks group at the default of 12.
-- Rate limits on anonymous requests (`docs/specs/access.md` → Serving images).
+- Rate limits on anonymous requests other than chat's (`docs/specs/access.md` → Serving images).
 - More people, which is **Scope: github-access** (`docs/specs/access.md` → Future).

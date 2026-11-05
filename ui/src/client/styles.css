@@ -513,6 +513,34 @@ code {
   gap: var(--base-size-4);
 }
 
+.selfie-chat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-8);
+}
+
+.selfie-chat-log {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-8);
+}
+
+.selfie-chat-message {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.selfie-chat-error {
+  margin: 0;
+  color: var(--fgColor-danger);
+}
+
+.selfie-chat-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-4);
+}
+
 .selfie-stack {
   cursor: crosshair;
   touch-action: none;

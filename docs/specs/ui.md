@@ -16,6 +16,7 @@ Source of truth: `ui/`.
 | `ui/src/shared/diff-image.ts`, exported as `selfie-ui/diff-image` | How a diff image draws what didn't change and where something was taken away, for the differ and a page redrawing one |
 | `ui/src/shared/deltas.ts`, exported as `selfie-ui/deltas` | What a [delta](#screens) is, which to offer, and what redrawing one leaves; tests in `ui/test/deltas.test.ts`, and in `cli/test/deltas.test.ts` against the real differ |
 | `ui/src/shared/notes.ts`, exported as `selfie-ui/notes` | Shared note validation and open-note state (`docs/specs/feedback.md`) |
+| `ui/src/shared/chat.ts` | What crosses between the page and the Worker's chat route (`docs/specs/chat.md`), which isn't on `ReviewSource`, since only the cloud has it |
 | `ui/src/shared/renderProgress.ts`, exported as `selfie-ui/render-progress` | A render's estimate and how it's said, for the client and `selfie flakes`; tests in `ui/test/renderProgress.test.ts` |
 | `selfie-ui/sync`, `selfie-ui/sync-api` | `docs/specs/sync.md` → Routes |
 | `ui/src/server/app.ts`, exported as `selfie-ui/app` | The routes under `/api`, over a `ReviewSource`, on Hono, and `sameOriginWrites` and `pageHeaders`. It re-exports the wire types |

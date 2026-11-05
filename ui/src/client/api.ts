@@ -15,6 +15,7 @@ import {
   type RenderRow,
   type StoriesView,
 } from "../shared/api.ts";
+import type { ChatEvent, ChatMessage } from "../shared/chat.ts";
 import { BASE, isHosted } from "./base.ts";
 
 /** What went wrong, in words a screen can show. `code` tells the cases apart. */
@@ -56,6 +57,37 @@ export const fetchDiff = (current: string, golden: string, signal: AbortSignal |
 
 export const postDecision = (batchId: string, decision: DecisionKind, renders: readonly DecisionTarget[]) =>
   post<BatchView>(`${batchRoute(batchId)}/decisions`, { decision, renders });
+
+/** Hands over each piece of the answer as it comes, and throws if it never finishes. */
+export async function askAboutStory(batchId: string, question: { readonly story: string; readonly messages: readonly ChatMessage[] }, onEvent: (event: ChatEvent) => void, signal: AbortSignal): Promise<void> {
+  let response: Response;
+  try {
+    response = await fetch(`${BASE}/api${batchRoute(batchId)}/chat`, { method: "POST", headers: WRITE_HEADERS, body: JSON.stringify(question), signal });
+  } catch (error) {
+    if (signal.aborted) throw error;
+    throw new RequestError("unreachable", "Can't reach Selfie. Check your connection, and try again.");
+  }
+  if (!response.ok || response.body === null) {
+    const error = ((await response.json().catch(() => null)) as ApiError | null)?.error;
+    throw new RequestError(error?.code ?? "bad-response", error?.message ?? `The server answered ${response.status}.`);
+  }
+  const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+  let held = "";
+  let finished = false;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    held += value;
+    const lines = held.split("\n");
+    held = lines.pop()!;
+    for (const line of lines) {
+      const event = JSON.parse(line) as ChatEvent;
+      if (event.type === "done") finished = true;
+      onEvent(event);
+    }
+  }
+  if (!finished) throw new RequestError("model-failed", "The answer stopped before it finished. Try asking again.");
+}
 
 export const fetchStories = (signal: AbortSignal) => request<StoriesView>("/stories", { signal });
 export const postRender = (stories: readonly string[]) => post<{ readonly batchId: string }>("/renders", { stories });

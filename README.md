@@ -99,7 +99,7 @@ From a checkout, `pnpm selfie <command>` runs these.
 
 The local loop, CI, and commit statuses are all built and in use on this repository.
 
-The cloud service at [hackathon.selfie.dev](https://hackathon.selfie.dev) is deployed for a few public repositories. Anyone can view them, and for now only one person can sign in to approve or upload.
+The cloud service at [hackathon.selfie.dev](https://hackathon.selfie.dev) is deployed for a few public repositories. Anyone can view them, and ask Muse Spark about a story's change. For now only one person can sign in to approve or upload.
 
 Not built yet:
 
@@ -115,9 +115,9 @@ We previously launched [Selfie](https://lib.selfie.dev), a snapshot testing libr
 
 ### Meta models
 
-**As submitted, Selfie doesn't call a Meta model.** We spent the event building the foundation: rendering, storage, review, and sync.
+Most of the event went on the foundation: rendering, storage, review, and sync. **Selfie calls a Meta model in one place so far.** On a changed story's page in the cloud service, anyone can ask Muse Spark about the change. It reads the before, after, and diff images, and the commits and code diff from GitHub between what was approved and this commit ([`docs/specs/chat.md`](docs/specs/chat.md)).
 
-The planned integration is specified in [`docs/specs/system.md`](docs/specs/system.md) as `change-grouping`. It would send Muse Spark the before and after renders, the code diff, and the stated intent of the change, then group the changed renders by the code change that caused them, and flag the changes nobody asked for. Selfie's own code can say exactly which pixels differ and whether content moved, but not why, or whether anyone wanted it. That matters at agent scale: one style tweak we measured changed 290 of a Storybook's 541 stories.
+Selfie's own code can say exactly which pixels differ and whether content moved, but not why, or whether anyone wanted it. That matters at agent scale: one style tweak we measured changed 290 of a Storybook's 541 stories, which is why the next step, specified in [`docs/specs/system.md`](docs/specs/system.md) as `change-grouping`, is to group changed stories by the code change that caused them, and flag the changes nobody asked for.
 
 ## Architecture
 
