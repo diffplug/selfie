@@ -11,7 +11,6 @@ import type { PatchedImages } from "./deltas.ts";
 import { isHosted } from "./base.ts";
 import { useDevicePixelRatio, useHotkeys, type FeedbackState, type HunkSelection } from "./hooks.ts";
 import { Keys } from "./Keys.tsx";
-import { ChatPanel } from "./ChatPanel.tsx";
 import { NotesPanel } from "./NotesPanel.tsx";
 import { plural } from "../shared/plural.ts";
 import { HunkList } from "./HunkList.tsx";
@@ -353,7 +352,6 @@ export function ImageCompare({ row, diff, patched, scale, groups, selection, bat
   return (
     <Stack as="section" aria-label="Images" gap="condensed" ref={section}>
       {groups.length > 0 && <HunkList groups={groups} selection={selection} onGo={goToHunk} outlined={outlined} onOutlined={setOutlined} />}
-      {isHosted && row.state !== "unchanged" && <ChatPanel key={`${batchId} ${row.story}`} batchId={batchId} story={row.story} />}
       {!isHosted && (
         <NotesPanel
           notes={storyNotes}

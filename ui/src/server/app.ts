@@ -34,6 +34,8 @@ const ERROR_STATUS: Readonly<Record<string, ContentfulStatusCode>> = {
   "not-signed-in": 401,
   "read-only": 403,
   "batch-not-finished": 409,
+  "too-many-questions": 429,
+  "model-failed": 502,
 };
 
 class BadRequest extends Error {
@@ -96,7 +98,7 @@ export function sameOrigin(allowedOrigin: (context: Context) => string): Middlew
 
 /** Content-addressed, so a browser may keep it for good, and only that browser may. */
 
-async function jsonBody(context: Context): Promise<Record<string, unknown>> {
+export async function jsonBody(context: Context): Promise<Record<string, unknown>> {
   const body: unknown = await context.req.json().catch(() => null);
   if (body === null || typeof body !== "object" || Array.isArray(body)) {
     throw new BadRequest("The request body must be a JSON object.");
@@ -148,8 +150,8 @@ function noteId(value: string): number {
 /** The routes under `/api`, which never answer with anything but JSON or an image. */
 export { failure };
 
-/** Given one source for a server's whole life, or a way to find the one a request is for. */
-export function createReviewApi(given: ReviewSource | ((context: Context) => Promise<ReviewSource>)): Hono {
+/** Given one source for a server's whole life, or a way to find the one a request is for, and any routes only this deployment has. */
+export function createReviewApi(given: ReviewSource | ((context: Context) => Promise<ReviewSource>), extraRoutes: (api: Hono) => void = () => undefined): Hono {
   const sourceOf = typeof given === "function" ? given : async () => given;
   const api = new Hono();
 
@@ -230,6 +232,8 @@ export function createReviewApi(given: ReviewSource | ((context: Context) => Pro
     if (png === null) return context.json(failure("unknown-image", "This store doesn't hold those images."), 404);
     return imageResponse(context, png);
   });
+
+  extraRoutes(api);
 
   // Here rather than `notFound`, which a parent app's own routes would come before.
   api.all("*", (context) => context.json(failure("not-found", "No such route."), 404));

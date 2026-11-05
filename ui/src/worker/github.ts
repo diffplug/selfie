@@ -24,6 +24,8 @@ export interface CodeChange {
   readonly totalCommits: number;
   readonly commits: readonly { readonly sha: string; readonly message: string }[];
   readonly files: readonly ChangedFile[];
+  /** GitHub lists only so many files, and this many says there may have been more. */
+  readonly mayHaveMoreFiles: boolean;
 }
 
 /** What the Worker needs from GitHub, which a test stands in for. */
@@ -39,6 +41,7 @@ const API = "https://api.github.com";
 const STATUS_CONTEXT = "selfie";
 // They last an hour, so there's room for a request that started just before this ran out.
 const TOKEN_KEPT_MS = 50 * 60 * 1000;
+const MOST_FILES_LISTED = 300;
 
 interface GitHubComparison {
   readonly merge_base_commit: { readonly sha: string };
@@ -92,13 +95,14 @@ export function githubApp({ appId, privateKey }: { readonly appId: string; reado
       const response = await ask(`/repos/${repository.owner}/${repository.name}/compare/${encodeURIComponent(base)}...${encodeURIComponent(head)}`, await tokenFor(repository));
       if (response.status === 404) return null;
       if (!response.ok) throw new Error(`GitHub couldn't compare ${base} with ${head}: ${response.status}`);
-      const { merge_base_commit, total_commits, commits, files } = (await response.json()) as GitHubComparison;
+      const { merge_base_commit, total_commits, commits, files = [] } = (await response.json()) as GitHubComparison;
       return {
         base: merge_base_commit.sha,
         head,
         totalCommits: total_commits,
         commits: commits.map(({ sha, commit }) => ({ sha, message: commit.message })),
-        files: (files ?? []).map(({ filename, status, additions, deletions, patch }) => ({ path: filename, status, additions, deletions, patch: patch ?? null })),
+        files: files.map(({ filename, status, additions, deletions, patch }) => ({ path: filename, status, additions, deletions, patch: patch ?? null })),
+        mayHaveMoreFiles: files.length >= MOST_FILES_LISTED,
       };
     },
   };

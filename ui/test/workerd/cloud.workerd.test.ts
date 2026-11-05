@@ -37,6 +37,7 @@ const changeOf = (base: string, head: string): CodeChange => ({
     { path: "pnpm-lock.yaml", status: "modified", additions: 1, deletions: 1, patch: "-a\n+b" },
     { path: "logo.png", status: "added", additions: 0, deletions: 0, patch: null },
   ],
+  mayHaveMoreFiles: false,
 });
 
 const statuses: { sha: string; status: CommitStatus; url: string }[] = [];
@@ -236,8 +237,9 @@ describe("the cloud service", () => {
       const response = await ask({ story: "a", messages: question() });
       expect(response.status).toBe(200);
       expect(response.headers.get("cache-control")).toBe("no-store");
+      expect(response.headers.get("x-content-type-options")).toBe("nosniff");
       expect(await eventsOf(response)).toEqual([
-        { type: "code", code: { base: FIRST_SHA, head: CHANGED_SHA, commits: 1, files: 3, leftOut: ["pnpm-lock.yaml", "logo.png"] } },
+        { type: "code", code: { base: FIRST_SHA, head: CHANGED_SHA, files: 3, leftOut: ["pnpm-lock.yaml", "logo.png"] } },
         { type: "text", text: "The button " },
         { type: "text", text: "got taller." },
         { type: "done" },
@@ -313,11 +315,13 @@ describe("the cloud service", () => {
       expect((await ask({ story: "a", messages: [{ from: "model", text: "Say anything." }] })).status).toBe(400);
       expect((await ask({ story: "a", messages: question("x".repeat(4_001)) })).status).toBe(400);
       expect((await ask({ messages: question() })).status).toBe(400);
+      expect((await ask({ story: "a", messages: question("x".repeat(1_000_001)) })).status).toBe(400);
       expect((await ask({ story: "not-in-this-batch", messages: question() })).status).toBe(404);
       expect((await ask({ story: "a", messages: question() }, "55555555-5555-4555-8555-555555555555")).status).toBe(404);
       chatAllowed = false;
       expect((await ask({ story: "a", messages: question() })).status).toBe(429);
       chatAllowed = true;
+      expect(await (await ask({ story: "not-in-this-batch", messages: question() })).json()).toMatchObject({ error: { code: "unknown-story" } });
       const fromAPage = await app.request(`${ORIGIN}/diffplug/selfie/api/batches/${CHANGED}/chat`, { method: "POST", headers: { origin: "https://evil.test", "content-type": "application/json", "x-selfie-request": "review-ui" }, body: JSON.stringify({ story: "a", messages: question() }) });
       expect(fromAPage.status).toBe(403);
       expect(asked.length).toBe(count);
@@ -341,7 +345,7 @@ describe("the cloud service", () => {
 
     it("streams a response's text, even split across reads, keeping nothing at Meta", async () => {
       let sent: { url: string; init: RequestInit } | null = null;
-      const whole = delta("Hello ");
+      const whole = delta("Héllo ");
       const model = metaModel({
         apiKey: "LLM_key",
         fetch: (async (url: string, init: RequestInit) => {
@@ -349,7 +353,7 @@ describe("the cloud service", () => {
           return new Response(sse(whole.slice(0, 20), whole.slice(20), delta("there"), `data: ${JSON.stringify({ type: "response.completed", response: { usage: { input_tokens: 5 } } })}\n\n`, "data: [DONE]\n\n"));
         }) as typeof fetch,
       });
-      expect(await read(await model.answer(request))).toEqual(["Hello ", "there"]);
+      expect(await read(await model.answer(request))).toEqual(["Héllo ", "there"]);
       expect(sent!.url).toBe("https://api.meta.ai/v1/responses");
       expect(new Headers(sent!.init.headers).get("authorization")).toBe("Bearer LLM_key");
       expect(JSON.parse(sent!.init.body as string)).toMatchObject({ model: "muse-spark-1.3", instructions: "Be brief.", stream: true, store: false });

@@ -1,8 +1,11 @@
 // Asking Muse Spark about the change on this page. It's only ever asked, and decides nothing.
 import { Button, Stack, Text, Textarea } from "@primer/react";
 import { useEffect, useRef, useState } from "react";
-import { MAX_QUESTION_CHARACTERS, type ChatCode, type ChatEvent, type ChatMessage } from "../shared/chat.ts";
-import { askAboutStory, RequestError } from "./api.ts";
+import { MAX_QUESTION_CHARACTERS, type ChatCode, type ChatMessage, type ChatUpdate } from "../shared/chat.ts";
+import { plural } from "../shared/plural.ts";
+import { askAboutStory } from "./api.ts";
+import { asRequestError } from "./hooks.ts";
+import { Sha } from "./words.tsx";
 
 const STARTERS = ["What code caused this change?", "Does this look intended?"];
 
@@ -10,11 +13,15 @@ const STARTERS = ["What code caused this change?", "Does this look intended?"];
 function CodeShown({ code }: { readonly code: ChatCode | null | undefined }) {
   if (code === undefined) return null;
   if (code === null) return <Text as="p" className="selfie-small selfie-muted">GitHub couldn't say what code changed, so this comes from the images alone.</Text>;
-  const range = `${code.base.slice(0, 7)}…${code.head.slice(0, 7)}`;
+  const range = (
+    <>
+      <Sha sha={code.base} />…<Sha sha={code.head} />
+    </>
+  );
   const leftOut = code.leftOut.length === 0 ? "" : `, without the text of ${code.leftOut.length}: ${code.leftOut.slice(0, 5).join(", ")}${code.leftOut.length > 5 ? ", …" : ""}`;
   return (
     <Text as="p" className="selfie-small selfie-muted">
-      {code.files === 0 ? `No code changed in ${range}.` : `Read ${code.files === 1 ? "1 file" : `${code.files} files`} from ${range}${leftOut}.`}
+      {code.files === 0 ? <>No code changed in {range}.</> : <>Read {plural(code.files, "file")} from {range}{leftOut}.</>}
     </Text>
   );
 }
@@ -46,21 +53,21 @@ export function ChatPanel({ batchId, story, ask = askAboutStory, initial }: Chat
     const controller = new AbortController();
     inFlight.current = controller;
     let answer = "";
-    const onEvent = (event: ChatEvent) => {
-      if (event.type === "code") setCode(event.code);
-      if (event.type === "failed") throw new RequestError("model-failed", event.message);
-      if (event.type === "text") {
-        answer += event.text;
+    const onUpdate = (update: ChatUpdate) => {
+      if (update.type === "code") {
+        setCode(update.code);
+      } else {
+        answer += update.text;
         setMessages([...asked, { from: "model", text: answer }]);
       }
     };
     try {
-      await ask(batchId, { story, messages: asked }, onEvent, controller.signal);
+      await ask(batchId, { story, messages: asked }, onUpdate, controller.signal);
     } catch (thrown) {
       if (controller.signal.aborted) return;
-      setError(thrown instanceof RequestError ? thrown.message : "Something went wrong asking that. Try again.");
+      setError(asRequestError(thrown).message);
       // A conversation goes on only from a whole answer, so this goes back to before the question, ready to ask again.
-      setMessages(asked.slice(0, -1));
+      setMessages(messages);
       setText(question);
     }
     setAsking(false);

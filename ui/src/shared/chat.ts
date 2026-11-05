@@ -1,9 +1,9 @@
 // What crosses between the page and the Worker when someone asks about a story's change. See docs/specs/chat.md.
 
-export const MAX_CHAT_MESSAGES = 40;
+const MAX_CHAT_MESSAGES = 40;
 export const MAX_QUESTION_CHARACTERS = 4_000;
 /** Far past what the model may answer in, which only a page's own replay of it would reach. */
-export const MAX_ANSWER_CHARACTERS = 40_000;
+const MAX_ANSWER_CHARACTERS = 40_000;
 
 export interface ChatMessage {
   readonly from: "person" | "model";
@@ -14,7 +14,6 @@ export interface ChatMessage {
 export interface ChatCode {
   readonly base: string;
   readonly head: string;
-  readonly commits: number;
   readonly files: number;
   /** Changed files it wasn't shown the text of. */
   readonly leftOut: readonly string[];
@@ -26,6 +25,28 @@ export type ChatEvent =
   | { readonly type: "text"; readonly text: string }
   | { readonly type: "done" }
   | { readonly type: "failed"; readonly message: string };
+
+/** What a page does anything with as an answer comes in, since how it ends is for whatever's reading the body. */
+export type ChatUpdate = Extract<ChatEvent, { readonly type: "code" | "text" }>;
+
+/** A body's lines as they arrive, stopping it if nobody reads to the end. */
+export async function* linesOf(body: ReadableStream<Uint8Array>): AsyncGenerator<string, void, void> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let held = "";
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) return;
+      held += decoder.decode(value, { stream: true });
+      const lines = held.split("\n");
+      held = lines.pop()!;
+      yield* lines;
+    }
+  } finally {
+    await reader.cancel().catch(() => undefined);
+  }
+}
 
 /** A conversation the model can be asked to go on with: taking turns, starting and ending with the person. */
 export function isConversation(value: unknown): value is readonly ChatMessage[] {

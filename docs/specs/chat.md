@@ -9,22 +9,22 @@ Source of truth: `ui/src/worker/chat.ts`, `compare` in `ui/src/worker/github.ts`
 
 ## Asking
 
-`POST /:owner/:repo/api/batches/:batchId/chat` takes `{ story, messages }`, with `messages` as `[{ from: "person" | "model", text }]`, taking turns, starting and ending with the person.
+`POST /:owner/:repo/api/batches/:batchId/chat`, among the review routes but not on `ReviewSource`, takes `{ story, messages }`, with `messages` as `[{ from: "person" | "model", text }]`, taking turns, starting and ending with the person.
 
 - **Must answer anyone, signed in or not**, since every project here is public (rationale).
 - **Must keep `pageHeaders` and `sameOriginWrites` on it**, as on any review route (`docs/specs/cloud.md` → Pages).
 - **Must take at most 10 questions a minute from one address**, by the `CHAT_LIMIT` binding, and answer 429 `too-many-questions` past that (rationale).
-- **Must take at most 40 messages, with at most 4,000 characters in a question and 40,000 in an answer**, and answer 400 `bad-request` otherwise.
+- **Must take at most 40 messages, with at most 4,000 characters in a question and 40,000 in an answer, in at most 1 MB**, and answer 400 `bad-request` otherwise.
 - **Must offer it only on a hosted story that isn't unchanged.** `selfie ui` has no chat. Any other story is 404 `unknown-story`.
 
 ## What the model reads
 
 Each question is worked out afresh, and nothing of a conversation is kept here or at Meta (`store: false`).
 
-- **Must send, in this order, so that the model's cache can match it from one question to the next:** the story and its state; the commits and code; the image last approved, the batch's image, and the stored diff image, as whichever exist, in `data:` URLs; the stored measurements of their differences; and then the conversation.
+- **Must send, in this order, so that the model's cache can match it from one question to the next:** the story, its state, and why it failed if it did; the commits and code; the image last approved, the batch's image, and the stored diff image, as whichever exist, in `data:` URLs; the stored measurements of their differences; and then the conversation.
 - **Must read the code since the commit of the batch whose approval made the image the reference**, through `goldenBatchId`.
 - **Must read a story with no reference from where its commit left the default branch, or if that's empty, what its commit itself changed.**
-- **Must keep what's between two commits for as long as a Worker lives, at most 16 pairs**, since commits don't change. Reserved: a story with no reference reads a moving branch through this as well, which at worst shows an earlier merge base.
+- **May keep what it worked out of the code for as long as a Worker lives, for at most 16 pairs of a reference and a commit, least recently used going first.** A story with no reference reads a moving branch through this as well, which at worst shows an earlier merge base.
 - **Must leave out lockfiles, generated files, and `dist/`, and what has no text to show, and show the smallest files first, up to 160,000 characters of patches**, so one huge file can't push out many.
 - **Must tell the model everything it wasn't shown, by name**, and that GitHub may list no more than 300 files.
 - **Must still answer if GitHub can't say**, from the images alone, and tell both the model and the reader so.
@@ -33,7 +33,7 @@ Each question is worked out afresh, and nothing of a conversation is kept here o
 
 The body is lines of JSON, as `ChatEvent` in `ui/src/shared/chat.ts`: one `code`, then any number of `text`, and then `done` or `failed`.
 
-- **Must say what code was read**, which commits and how many files, with what was left out, wherever an answer is shown, so nobody takes it for more than it read.
+- **Must say what code was read**, from which commit to which and how many files, with what was left out, wherever an answer is shown, so nobody takes it for more than it read.
 - **Must show a failure before the first piece of an answer as a JSON error**, 502 `model-failed`, and one part way through as `failed`, and never what the model or GitHub said about it, which stays in the log.
 - **Must treat a body that ends with neither `done` nor `failed` as a failure**, and go back to before the question, with it ready to ask again, since a conversation goes on only from a whole answer.
 - **Must stop reading from the model when whoever asked has gone**, so nothing's paid for that nobody will read.
