@@ -8,7 +8,7 @@ It's plain HTML and CSS in `public/`, with no build step, hosted on Cloudflare P
 
 ```sh
 pnpm install
-pnpm dev     # serves public/ the way Pages does, including _redirects and 404.html
+pnpm dev     # serves public/ the way Pages does, including _redirects and 404.html, on every interface so phones can reach it
 pnpm test    # checks the redirects, the links, and the 404 against that server
 ```
 
