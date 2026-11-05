@@ -105,6 +105,15 @@
     aim({ d1: cur.d1, d2: clamp(cur.d2 + (3 * Math.PI) / 180, -LIMIT2, LIMIT2), s: 0.95 });
   }
 
+  // The camera's capture moment: the screen blinks white when the shutter goes down.
+  const flashEl = document.querySelector(".flash");
+  function flash() {
+    if (!flashEl || calm.matches) return;
+    flashEl.classList.remove("on");
+    void flashEl.offsetWidth; // restart the animation
+    flashEl.classList.add("on");
+  }
+
   function enabled() {
     return fine.matches && !calm.matches;
   }
@@ -115,10 +124,11 @@
   document.documentElement.addEventListener("pointerleave", () => { if (!pressing) rest(); });
 
   shutter.addEventListener("pointerdown", (e) => {
-    if (e.pointerType !== "mouse" || !enabled()) return;
+    if (e.pointerType !== "mouse" || !enabled()) return flash();
     pressing = true;
     shutter.classList.add("pressed");
     press();
+    flash();
   });
   addEventListener("pointerup", (e) => {
     if (!pressing) return;
