@@ -1,0 +1,35 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; }
+  </style>
+  <div id="root" data-composition-id="muse" data-width="1920" data-height="1080">
+    <div id="muse-stage" class="stage" data-layout-allow-overflow></div>
+  </div>
+  <script>
+    (() => {
+      const { tl, w, stage, D } = S.begin("muse");
+      const streams = ["n3-stream01", "n3-stream02", "n3-stream03", "n3-stream04", "n3-stream05", "n3-stream06", "n3-stream07"];
+      const a = S.app(stage, ["n2-hover", ...streams], { pointer: window.UI_POINTS["n2-hover"] });
+      a.zoomNow({ x: 320, y: 220, w: 1000 });
+      // The real answer, as it arrived, sped up to fit the sentence.
+      const end = w("finds") - 0.1;
+      streams.forEach((name, i) => a.show(tl, name, 0.06 + ((end - 0.06) * i) / (streams.length - 1)));
+      a.point(tl, 0.1, [1150, 860], 0.5);
+      a.zoom(tl, w("code") - 0.1, { x: 320, y: 270, w: 1270 }, 0.5);
+      const mark = (x, y, width, height) => {
+        const box = S.html(a.cam, `<div class="abs" style="width:${width}px;height:${height}px;border:5px solid #f4689f;background:rgba(244,104,159,.18);border-radius:8px" data-layout-ignore></div>`);
+        a.cam.insertBefore(box, a.arrow);
+        gsap.set(box, { x, y, opacity: 0 });
+        return box;
+      };
+      const line = mark(324, 479, 440, 52);
+      tl.to(line, { opacity: 1, duration: 0.2 }, w("line") - 0.1);
+      const unasked = mark(322, 660, 1262, 58);
+      tl.to(line, { opacity: 0, duration: 0.15 }, w("never") - 0.2);
+      tl.to(unasked, { opacity: 1, duration: 0.2 }, w("never"));
+      S.call(tl, stage, "“so check dark mode before accepting”", 620, 790, w("even") - 0.05);
+      S.slideOut(tl, a.win, D);
+      window.__timelines["muse"] = tl;
+    })();
+  </script>
+</template>

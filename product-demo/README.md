@@ -6,7 +6,7 @@ A [HyperFrames](https://hyperframes.heygen.com) film of the real product, review
 |---|---|
 | `SCRIPT.md` | The words. One paragraph is one scene, and the bold line under it is what's on screen. |
 | `scenes.json` | The scenes, in the same order, and how long the last one holds after its last word. |
-| `assets/narration.mp3`, `assets/narration-timing.json` | The voiceover, and when each word of it happens, from ElevenLabs. |
+| `assets/narration.mp3`, `assets/narration-timing.json` | The voiceover, and when each word of it happens, from ElevenLabs. Without them, timing is estimated. |
 | `compositions/<id>.html` | Each scene. Beats are written as `w("word")`, so they follow the voice. |
 | `assets/ui/` | Screenshots of the real app, 2x, each one a state it was really in. `points.json` is where the pointer was. |
 | `assets/lib.js`, `assets/style.css` | The app window, its pointer and camera, and the terminal. |

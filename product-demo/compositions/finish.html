@@ -1,0 +1,36 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; }
+  </style>
+  <div id="root" data-composition-id="finish" data-width="1920" data-height="1080">
+    <div id="finish-stage" class="stage" data-layout-allow-overflow></div>
+  </div>
+  <script>
+    (() => {
+      const { tl, w, stage, D } = S.begin("finish");
+      const a = S.app(stage, ["k0-before", "k1-dialog", "k2-done"], { pointer: [1000, 500] });
+      a.point(tl, 0.05, "k1-dialog", 0.3);
+      a.press(tl, w("approve") + 0.1);
+      a.show(tl, "k1-dialog", w("approve") + 0.13);
+      a.point(tl, w("the") + 0.05, "k2-done", 0.2);
+      a.press(tl, w("rest") + 0.1);
+      a.show(tl, "k2-done", w("rest") + 0.13);
+      const t = S.term(stage);
+      gsap.set(t.win, { x: 1920 });
+      tl.to(t.win, { x: 0, duration: 0.4, ease: "expo.out" }, w("commits") - 0.1);
+      t.write(tl, [
+        [w("commits"), `<span class="p">$</span> <span class="b">git commit -m "Keep the top bar's color on the theme's token"</span>`, { row: 0, type: true }],
+        [w("reviews") + 0.1, `<span class="c">[demo/top-bar-room 7c681cd] Keep the top bar's color on the theme's token</span>`, { row: 1 }],
+        [w("reviews") + 0.2, `<span class="p">$</span> <span class="b">selfie review</span>`, { row: 3, type: true }],
+        [w("exact") - 0.1, `Reused the images of batch 2f8addb6-…, since this exact built Storybook`, { row: 4 }],
+        [w("exact") - 0.1, `already rendered.`, { row: 5 }],
+        [w("nothing"), `Timings: render 42 ms, store 23 ms, compare 27 ms, diff 1 ms, <span class="b">total 125 ms</span>`, { row: 6 }],
+        [w("under"), `<span class="c">selfie review  0.29s user 0.09s system</span> <span class="b">0.370 total</span>`, { row: 8, hl: true }],
+        [w("exit") - 0.1, `<span class="p">$</span> <span class="b">echo $?</span>`, { row: 9 }],
+        [w("exit") + 0.05, `<span class="n">0</span>`, { row: 10, hl: true }],
+      ]);
+      S.slideOut(tl, t.win, D);
+      window.__timelines["finish"] = tl;
+    })();
+  </script>
+</template>

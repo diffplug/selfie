@@ -1,6 +1,6 @@
 // Generates index.html, compositions/captions.html and the subtitle files from SCRIPT.md, scenes.json and the voiceover.
 // SCRIPT.md owns the words, the voiceover's timing file owns when they happen, compositions/<id>.html owns the pictures.
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
 const AUDIO = "assets/narration.mp3";
 const TIMING = "assets/narration-timing.json";
@@ -14,9 +14,24 @@ if (narration.length !== scenes.length) {
 }
 
 const plain = (w) => w.toLowerCase().replace(/[^a-z0-9]/g, "");
+// Until there's a voiceover, a word lasts by its length, and punctuation pauses.
+function estimate() {
+  let clock = 0.12;
+  return narration.map((paragraph) => {
+    const words = paragraph.split(/\s+/).map((text) => {
+      const start = clock;
+      const end = start + ((text.length + 1) * (/\d/.test(text) ? 2.2 : 1)) / 18;
+      clock = end + (/[.?!:]$/.test(text) ? 0.32 : /,$/.test(text) ? 0.14 : 0);
+      return { text, start, end };
+    });
+    clock += 0.2;
+    return words;
+  });
+}
+
 // Each word of the script takes its time from what the voice said, and a difference is an error.
 function fromVoice() {
-  const SPOKEN_AS = { "1": ["one"], "0": ["zero"], "13": ["thirteen"], twentyfive: ["25"] };
+  const SPOKEN_AS = { "0": ["zero"], "13": ["thirteen"], "30": ["thirty"], "63": ["sixtythree"], "142": ["onefortytwo"] };
   const spoken = JSON.parse(readFileSync(TIMING, "utf8"))
     .segments.flatMap((s) => s.words)
     .filter((w) => w.text.trim())
@@ -35,7 +50,9 @@ function fromVoice() {
   return words;
 }
 
-const wordsByScene = fromVoice();
+const hasVoice = existsSync(TIMING);
+const wordsByScene = hasVoice ? fromVoice() : estimate();
+if (!hasVoice) console.warn("No voiceover yet, so timing is estimated.");
 
 const timed = scenes.map((s, i) => {
   const start = i === 0 ? 0 : wordsByScene[i][0].start - LEAD_IN;
@@ -120,8 +137,7 @@ writeFileSync(
     <div id="root" data-composition-id="main" data-start="0" data-duration="${total}" data-width="1920" data-height="1080">
 ${hosts}
       <div id="captions" data-composition-id="captions" data-composition-src="compositions/captions.html" data-start="0" data-duration="${total}" data-track-index="2" data-track-kind="captions" data-width="1920" data-height="1080"></div>
-      <audio id="narration" src="${AUDIO}" data-start="0" data-track-index="3" data-volume="1"></audio>
-    </div>
+${hasVoice ? `      <audio id="narration" src="${AUDIO}" data-start="0" data-track-index="3" data-volume="1"></audio>\n` : ""}    </div>
     <script>
       window.__timelines["main"] = gsap.timeline({ paused: true });
     </script>

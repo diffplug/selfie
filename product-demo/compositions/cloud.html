@@ -8,18 +8,21 @@
   <script>
     (() => {
       const { tl, w, stage } = S.begin("cloud");
-      const a = S.app(stage, ["m1-github-commits", "m1b-github-status", "m2-hosted-batch"]);
-      S.slideIn(tl, a.win);
-      a.point(tl, w("renders"), "m1b-github-status", 0.6);
-      a.press(tl, w("status") - 0.05);
-      a.show(tl, "m1b-github-status", w("status") - 0.02);
-      a.zoom(tl, w("status"), { x: 440, y: 340, w: 760 }, 0.5);
-      a.point(tl, w("click") - 0.4, [1082, 465], 0.4);
-      a.press(tl, w("through") + 0.1);
-      a.zoom(tl, w("through") + 0.13, null, 0.01);
-      a.show(tl, "m2-hosted-batch", w("through") + 0.13);
-      a.point(tl, w("through") + 0.2, [1000, 620], 0.3);
-      S.call(tl, stage, "hackathon.selfie.dev", 1180, 780, w("same"));
+      const a = S.app(stage, ["d5-current", "m1-commits", "m2-status", "n1-hosted-dark", "n2-hover"], { pointer: [1140, 660] });
+      a.zoomNow({ x: 320, y: 590, w: 1270 });
+      a.show(tl, "m1-commits", w("commit") - 0.1);
+      a.zoom(tl, w("commit") - 0.1, null, 0.01);
+      a.point(tl, w("commit"), "m2-status", 0.4);
+      a.press(tl, w("github") + 0.1);
+      a.show(tl, "m2-status", w("github") + 0.13);
+      a.zoom(tl, w("github") + 0.15, { x: 440, y: 330, w: 760 }, 0.35);
+      a.show(tl, "n1-hosted-dark", w("open") + 0.1);
+      a.zoom(tl, w("open") + 0.1, null, 0.01);
+      a.point(tl, w("open") + 0.15, "n2-hover", 0.6);
+      a.zoom(tl, w("same") + 0.1, { x: 320, y: 220, w: 1000 }, 0.5);
+      S.call(tl, stage, "hackathon.selfie.dev", 1180, 780, w("cloud") - 0.1, { until: w("ask") });
+      a.show(tl, "n2-hover", w("ask") - 0.05);
+      a.press(tl, w("what") - 0.05);
       window.__timelines["cloud"] = tl;
     })();
   </script>
