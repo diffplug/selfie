@@ -27,4 +27,4 @@ pnpm test    # checks the redirects, the links, and the 404 against that server
 
 ## Licenses
 
-The logo and mascot come from [`branding/`](https://github.com/diffplug/selfie-hackathon/tree/main/branding) in selfie-hackathon, under Apache-2.0 ([LICENSE-branding](LICENSE-branding)). Bagel Fat One and Jost are under OFL-1.1.
+The logo and mascot come from [`branding/`](https://github.com/diffplug/selfie-hackathon/tree/main/branding) in selfie-hackathon, under Apache-2.0 ([LICENSE-branding](LICENSE-branding)). Jost is under OFL-1.1.
