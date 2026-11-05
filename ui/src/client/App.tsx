@@ -19,7 +19,7 @@ function BatchRoutes({ batchId, route, search }: { batchId: string; route: Route
   const state = useBatch(batchId);
   const feedback = useFeedback();
   const { data: context } = useFetched(batchId, (signal) => fetchBatchContext(batchId, signal));
-  const tree = useBatchTree(state.view, state.unchanged, search, route.kind === "story" ? route.story : null);
+  const tree = useBatchTree(state.view, state, search, route.kind === "story" ? route.story : null);
   const deltas = useDeltas(batchId, state.view?.rows, route.kind === "batch" && state.view !== null && canDecide(state.view));
   // Where to put focus on coming back to the list.
   const lastStory = useRef<string | null>(null);

@@ -9,7 +9,7 @@ import { SHA } from "./fixtures.ts";
 const CONTEXT: BatchContext = { head: SHA, branch: "topic" };
 
 export function BatchFrame({ view, state, story = null, search = "", children }: { view: BatchView; state: BatchState; story?: string | null; search?: string; children: (navigation: StoryNavigation | null) => ReactNode }) {
-  const tree = useBatchTree(view, state.unchanged, search, story);
+  const tree = useBatchTree(view, state, search, story);
   return (
     <BatchLayout view={view} tree={tree} story={story} search={search} context={CONTEXT}>
       {children(tree.navigation)}

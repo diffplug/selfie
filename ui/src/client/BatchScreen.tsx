@@ -16,11 +16,11 @@ import {
 } from "@primer/react";
 import { Blankslate } from "@primer/react/experimental";
 import { useEffect, useMemo, useState, type ComponentProps, type RefObject } from "react";
-import type { BlockerReason, DecisionKind, BatchView, RenderRow } from "../shared/api.ts";
+import type { ApprovedSinceView, BlockerReason, DecisionKind, BatchView, RenderRow } from "../shared/api.ts";
 import { BulkDialog } from "./BulkDialog.tsx";
 import { DeltaOffers } from "./DeltaOffers.tsx";
 import type { DeltaState } from "./deltas.ts";
-import { applyFilter, decidableIn, filterQuery, NO_FILTER, parseFilter, showQuery, SHOW_OPTIONS, targetsOf, type RowFilter, type Show } from "./filter.ts";
+import { applyFilter, decidableIn, filterQuery, NO_FILTER, parseFilter, rowsFor, showQuery, SHOW_OPTIONS, targetsOf, type RowFilter, type Show } from "./filter.ts";
 import { useStoryFocusKeys, useTitle, type BatchState } from "./hooks.ts";
 import { Keys } from "./Keys.tsx";
 import { AppLink, AppLinkButton, navigate, batchPath, storiesPath, storyPath } from "./router.tsx";
@@ -38,6 +38,11 @@ function Fact({ term, children }: { term: string; children: React.ReactNode }) {
       <dd>{children}</dd>
     </div>
   );
+}
+
+/** What the rows of what's approved since a base are compared with. */
+function approvedBaseWords({ base }: ApprovedSinceView) {
+  return base === null ? "Compared with nothing, since this commit doesn't reach a batch of the default branch." : `Compared with what was approved at ${shortSha(base.gitSha)} on ${base.branch}.`;
 }
 
 function Facts({ view }: { view: BatchView }) {
@@ -228,13 +233,12 @@ function Differences({
     if (wantsUnchanged && unchanged === null) loadUnchanged();
   }, [wantsUnchanged, unchanged, loadUnchanged]);
 
-  const source = filter.show === "unchanged" ? (unchanged ?? []) : view.rows;
-  const shown = useMemo(() => applyFilter(source, filter), [source, filter]);
+  const source = rowsFor(filter.show, view.rows, state);
+  const shown = useMemo(() => applyFilter(source ?? [], filter), [source, filter]);
   const allDecidable = useMemo(() => decidableIn(view.rows), [view.rows]);
   const shownDecidable = useMemo(() => decidableIn(shown), [shown]);
   const undecided = useMemo(() => applyFilter(view.rows, { ...NO_FILTER, show: "undecided" }), [view.rows]);
   const isFiltered = filter.text !== "" || filter.show !== "all";
-  const loadingUnchanged = wantsUnchanged && unchanged === null;
 
   const confirm = async (confirmed: boolean) => {
     const decided = pending;
@@ -267,7 +271,7 @@ function Differences({
         </FormControl>
         {canDecide(view) && (
           <Stack direction="horizontal" wrap="wrap" gap="condensed" className="selfie-bulk" role="group" aria-label="Decide on many images">
-            {isFiltered && (
+            {isFiltered && source === view.rows && (
               <>
                 <BulkButton decision="approved" scope="shown" rows={shownDecidable} busy={state.busy} onPick={setPending} />
                 <BulkButton decision="rejected" scope="shown" rows={shownDecidable} busy={state.busy} onPick={setPending} />
@@ -279,10 +283,11 @@ function Differences({
         )}
       </Stack>
       <Text as="p" className="selfie-muted" role="status">
-        {loadingUnchanged ? "Reading the unchanged stories…" : `Showing ${shown.length.toLocaleString()} of ${source.length.toLocaleString()}.`}{" "}
+        {source === null ? "Reading these stories…" : `Showing ${shown.length.toLocaleString()} of ${source.length.toLocaleString()}.`}{" "}
         <Keys keys="j" /> and <Keys keys="k" /> move through the list, <Keys keys="/" /> searches.
       </Text>
-      {shown.length > 0 || loadingUnchanged ? null : (
+      {filter.show === "approved-earlier" && state.approvedSince !== null && <Text as="p" className="selfie-muted">{approvedBaseWords(state.approvedSince)} Each was approved on another batch, so there's nothing to decide on here.</Text>}
+      {shown.length > 0 || source === null ? null : (
         <Blankslate border>
           <Blankslate.Heading as="h4">
             {isFiltered ? "Nothing matches this filter" : "Nothing differs from what's approved"}
@@ -341,6 +346,8 @@ export function BatchScreen({
 
   useTitle(`Batch at ${shortSha(batch.gitSha)}`);
   const newest = view.siblings.find(({ status }) => status !== "recording");
+  const { approvedSince } = state;
+  const approvedEarlier = approvedSince?.rows.length ?? 0;
 
   return (
     <Stack gap="normal">
@@ -359,6 +366,14 @@ export function BatchScreen({
           description={<AppLink href={batchPath(newest.id)}>Open the newest batch</AppLink>}
         />
       )}
+      {approvedSince !== null && approvedEarlier > 0 && filter.show !== "approved-earlier" && (
+        <Banner
+          variant="info"
+          title={`${plural(approvedEarlier, "story", "stories")} changed and approved earlier`}
+          description={`This commit brought ${approvedEarlier === 1 ? "this change" : "these changes"}, approved before this batch, so ${approvedEarlier === 1 ? "it reads" : "they read"} as unchanged here. ${approvedBaseWords(approvedSince)}`}
+          primaryAction={<Banner.PrimaryAction onClick={() => showInList("approved-earlier")}>See what changed</Banner.PrimaryAction>}
+        />
+      )}
       <Facts view={view} />
       {batch.dirty && (
         <Banner
@@ -375,6 +390,7 @@ export function BatchScreen({
         <Count label="Removed" count={counts.removed} show="removed" onShow={showInList} />
         <Count label="Failed" count={counts.failed} show="failed" onShow={showInList} />
         <Count label="Undecided" count={counts.undecided} show="undecided" onShow={showInList} />
+        <Count label="Approved earlier" count={approvedEarlier} show="approved-earlier" onShow={showInList} />
       </div>
       {outsideFilter > 0 && (
         <Banner

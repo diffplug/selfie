@@ -2,19 +2,22 @@
 import { useMemo, type ReactNode } from "react";
 import type { BatchContext, BatchView, RenderRow } from "../shared/api.ts";
 import { findRenames } from "../shared/renames.ts";
-import { applyFilter, navigationThrough, NO_FILTER, parseFilter } from "./filter.ts";
+import { applyFilter, navigationThrough, NO_FILTER, parseFilter, rowsFor } from "./filter.ts";
+import type { BatchState } from "./hooks.ts";
 import { usePageFacts } from "./PageFacts.tsx";
 import { batchPath, storyPath } from "./router.tsx";
 import { matchingStories, StoryNavLayout } from "./StoryNav.tsx";
 import { differingStories, inTreeOrder } from "./storyTree.ts";
 import { describePixels } from "./words.tsx";
 
+const NO_ROWS: readonly RenderRow[] = [];
+
 /** The tree shows what the page's Show says, and its own search does the text. Next and previous go through just that. */
-export function useBatchTree(view: BatchView | null, unchanged: readonly RenderRow[] | null, search: string, story: string | null) {
+export function useBatchTree(view: BatchView | null, read: Pick<BatchState, "unchanged" | "approvedSince">, search: string, story: string | null) {
   const rows = view?.rows;
   const renames = useMemo(() => findRenames(rows ?? []), [rows]);
   const { show, text } = parseFilter(search);
-  const source = show === "unchanged" ? (unchanged ?? []) : (rows ?? []);
+  const source = rowsFor(show, rows ?? [], read) ?? NO_ROWS;
   const shownRows = useMemo(() => applyFilter(source, { ...NO_FILTER, show }), [source, show]);
   const stories = useMemo(() => (view === null ? [] : differingStories({ ...view, rows: shownRows }, renames)), [view, shownRows, renames]);
   const rowOf = useMemo(() => new Map(source.map((row) => [row.story, row])), [source]);

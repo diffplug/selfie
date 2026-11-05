@@ -161,6 +161,7 @@ export function createCloudApp(config: CloudConfig): Hono {
         const { batches, store, storybooks: kept, diffs } = found.hosted;
         return {
           access: await accessOf(token),
+          defaultBranch: found.project.defaultBranch,
           batches,
           store,
           storybooks: kept,

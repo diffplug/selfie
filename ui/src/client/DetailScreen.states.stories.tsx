@@ -21,6 +21,17 @@ const expectNoComparing = (canvasElement: HTMLElement) => {
   expect(canvas.queryByText("Stacked")).toBeNull();
 };
 
+const APPROVED_EARLIER = { ...rows.changed("components-button--primary", approved()), approvedIn: OTHER_BATCH_ID };
+export const ApprovedEarlier: Story = {
+  args: { row: APPROVED_EARLIER, approvedEarlier: [APPROVED_EARLIER] },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    expect(canvas.getByRole("link", { name: "See it on the batch it was approved on" })).toBeVisible();
+    expect(canvas.queryByRole("button", { name: /Approve/ })).toBeNull();
+    expect(canvas.queryByRole("button", { name: /Reject/ })).toBeNull();
+  },
+};
+
 export const AddedAtFit: Story = {
   args: { row: ADDED },
   play: async ({ canvasElement }) => {

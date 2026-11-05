@@ -12,7 +12,7 @@ import { runCli } from "../src/cli.ts";
 import { encodePng } from "../src/png.ts";
 import { openProject, type Project } from "../src/project.ts";
 import { localReviewSource } from "../src/ui.ts";
-import { commit, createHarness, fakeRender, git, GREEN, RED, solid, type FakeStory, type Harness, writeTestConfig } from "./support.ts";
+import { BLUE, commit, createHarness, fakeRender, git, GREEN, RED, solid, type FakeStory, type Harness, writeTestConfig } from "./support.ts";
 
 const REMOTE = "http://127.0.0.1:9";
 /** What the cloud would answer, in the shape the client calls it. */
@@ -100,7 +100,7 @@ beforeEach(async () => {
   app = createSyncApi({
     open: async (project, token) => {
       const access = project === "42" && token !== null ? ACCESS[token] : undefined;
-      return access === undefined ? null : { access, batches: cloud.batches, store: cloud.store, storybooks: cloud.storybooks, diffs: cloud.diffs, hasCommit: async (sha) => pushedCommits === null || pushedCommits.has(sha) };
+      return access === undefined ? null : { access, defaultBranch: "main", batches: cloud.batches, store: cloud.store, storybooks: cloud.storybooks, diffs: cloud.diffs, hasCommit: async (sha) => pushedCommits === null || pushedCommits.has(sha) };
     },
     findProject: async (owner, name) => (owner === "diffplug" && name === "selfie" ? "42" : null),
   });
@@ -122,6 +122,23 @@ describe("pushing", () => {
     const held = await cloud.batches.getBatch(batchId);
     expect(held).toMatchObject({ id: batchId, gitSha: head, status: "complete" });
     expect(await cloud.batches.decisionsAt(held!.environment, [head])).toHaveLength(2);
+  });
+
+  test("keeps the comparison of what a branch approved with what its base had, which no one commit compared", async () => {
+    const before = (await imagesOf(await approved()))[0]!;
+    await laptop("writer", "push");
+    git(h.repo, "checkout", "-b", "feature");
+    for (const color of [BLUE, [1, 2, 3]] as const) {
+      await commit(h.repo, `makes it ${color}`);
+      stories = [{ id: "a", color }, { id: "b", color: GREEN }];
+      await approved();
+      await laptop("writer", "push");
+    }
+    await commit(h.repo, "changes nothing");
+    const after = (await imagesOf(await record()))[0]!;
+    expect(await cloud.diffs.has(after, before)).toBe(false);
+    await laptop("writer", "push");
+    expect(await cloud.diffs.has(after, before)).toBe(true);
   });
 
   test("names who pushed as a decision's author, not what the laptop says", async () => {

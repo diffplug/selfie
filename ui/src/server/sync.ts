@@ -18,6 +18,8 @@ export interface SyncAccess {
 /** One project, as this token sees it. */
 export interface SyncProject {
   readonly access: SyncAccess;
+  /** What a batch's base is on (`docs/specs/renders.md` -> Approved since a base). */
+  readonly defaultBranch: string;
   readonly batches: RenderBatches;
   readonly store: ReceivingStore;
   readonly storybooks: BuiltStorybooks;
@@ -324,9 +326,9 @@ export function createSyncApi(host: SyncHost): Hono {
   });
 
   api.get("/projects/:project/batches/:id/diffs/needed", async (context) => {
-    const { batches, diffs } = await uploadable(context);
-    const { renders } = await batches.compareReached(readBatchId(context.req.param("id")));
-    const pairs = renders.flatMap(({ state, imageHash, goldenHash }) => (state === "changed" && imageHash !== null && goldenHash !== null ? [{ current: imageHash, golden: goldenHash }] : []));
+    const { batches, diffs, defaultBranch } = await uploadable(context);
+    const { current, renders } = await batches.approvedSinceReached(readBatchId(context.req.param("id")), defaultBranch);
+    const pairs = [...current.renders, ...renders].flatMap(({ state, imageHash, goldenHash }) => (state === "changed" && imageHash !== null && goldenHash !== null ? [{ current: imageHash, golden: goldenHash }] : []));
     const held = await Promise.all(pairs.map(({ current, golden }) => diffs.has(current, golden)));
     return context.json({ pairs: pairs.filter((_, i) => !held[i]) });
   });
