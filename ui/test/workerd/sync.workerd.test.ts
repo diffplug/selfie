@@ -52,7 +52,7 @@ beforeAll(async () => {
   app = createSyncApi({
     open: async (_project, token) => {
       const access = token === null ? undefined : ACCESS[token];
-      return access === undefined ? null : { access, batches, store, storybooks, diffs, hasCommit: async () => true };
+      return access === undefined ? null : { access, defaultBranch: "main", batches, store, storybooks, diffs, hasCommit: async () => true };
     },
     findProject: async () => "42",
   });

@@ -6,7 +6,7 @@ import path from "node:path";
 import { FilesystemBlobStorage } from "selfie-store/adapters/filesystem-blob";
 import { sharpCodec } from "selfie-store/adapters/sharp-codec";
 import { SqliteAdapter } from "selfie-store/adapters/sqlite";
-import { Blobs, initStoreSchema, RenderBatches, Sql, Store, BuiltStorybooks, StoredDiffs, type CompareOptions, type Comparison, type RenderBatch } from "selfie-store";
+import { Blobs, initStoreSchema, RenderBatches, Sql, Store, BuiltStorybooks, StoredDiffs, type ApprovedSince, type CompareOptions, type Comparison, type RenderBatch } from "selfie-store";
 import type { PixelDiff } from "./diff.ts";
 import { SelfieError } from "./errors.ts";
 import { ancestorsOf, defaultBranchOf, earliestAuthoredSince, headSha, openRepo, type Repo } from "./git.ts";
@@ -119,6 +119,18 @@ export async function compareAsReviewed(project: Project, batchId: string, optio
   const batch = await requireBatch(project, batchId);
   const decisions = await project.batches.decisionsAt(batch.environment, await reachableCommits(project, batch));
   return project.batches.compareFromHistory(batchId, decisions, options);
+}
+
+/** See `docs/specs/renders.md` -> Approved since a base. With no default branch to tell one from, there's no saying. */
+export async function approvedSinceOf(project: Project, batchId: string): Promise<ApprovedSince> {
+  const batch = await requireBatch(project, batchId);
+  const { batches, repo } = project;
+  const { defaultBranch } = await defaultBranchOf(repo, batch.gitSha);
+  if (defaultBranch === null) return { base: null, renders: [] };
+  const commits = await reachableCommits(project, batch);
+  const base = await batches.baseAmong(defaultBranch, batch, commits);
+  const [decisions, baseDecisions] = await Promise.all([batches.decisionsAt(batch.environment, commits), base === null ? [] : batches.decisionsAt(base.environment, await ancestorsOf(repo, base.gitSha))]);
+  return { base, renders: await batches.approvedSinceFromHistory(batchId, decisions, baseDecisions) };
 }
 
 /** A batch someone named, which must be well formed and in this project's store. */

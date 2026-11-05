@@ -1,7 +1,7 @@
 // Everything a screen shows about a batch, from a comparison and what a platform can say about it. It
 // knows `selfie-store`'s core and nothing else, so a local server and a Worker show the same thing.
-import { storyEntriesIn, summarizeBatch, type BuiltStorybooks, type Comparison, type RenderBatch, type RenderBatches, type StoryEntry } from "selfie-store";
-import type { BatchView, PixelDiff, RenderRow, StorybookLink } from "../shared/api.ts";
+import { storyEntriesIn, summarizeBatch, type ApprovedSince, type BuiltStorybooks, type ComparedRender, type Comparison, type RenderBatch, type RenderBatches, type StoryEntry } from "selfie-store";
+import type { ApprovedSinceView, BatchView, PixelDiff, RenderRow, StorybookLink } from "../shared/api.ts";
 
 /** A person looks at a few batches at a time. */
 const KEPT_INDEXES_HELD = 8;
@@ -21,6 +21,7 @@ export interface BatchViewPlatform {
 export interface BatchViews {
   toRows(batchId: string, compared: Comparison["renders"]): Promise<RenderRow[]>;
   viewOf(comparison: Comparison, actor: string | null): Promise<BatchView>;
+  approvedSinceView(approved: ApprovedSince): Promise<ApprovedSinceView>;
   /** A kept built Storybook's stories, which never change, or nothing if it can't say. */
   storiesOfKept(hash: string): Promise<readonly StoryEntry[]>;
 }
@@ -53,8 +54,7 @@ export function batchViews(platform: BatchViewPlatform): BatchViews {
     return [...named.values()].map(({ id: story, title, name }) => ({ story, title, name }));
   };
 
-  const toRows = async (batchId: string, compared: Comparison["renders"]): Promise<RenderRow[]> => {
-    const pixelDiffs = await platform.pixelDiffs(batchId);
+  const rowsWith = async <Compared extends ComparedRender>(compared: readonly Compared[], pixelDiffs: ReadonlyMap<string, PixelDiff>) => {
     const references = new Map(
       await Promise.all(
         [...new Set(compared.flatMap(({ goldenBatchId }) => goldenBatchId ?? []))].map(
@@ -72,6 +72,8 @@ export function batchViews(platform: BatchViewPlatform): BatchViews {
       };
     });
   };
+
+  const toRows = async (batchId: string, compared: Comparison["renders"]): Promise<RenderRow[]> => rowsWith(compared, await platform.pixelDiffs(batchId));
 
   /** Everything recomputed from what deciding compares with, which the caller already has. */
   const viewOf = async (comparison: Comparison, actor: string | null): Promise<BatchView> => {
@@ -100,5 +102,8 @@ export function batchViews(platform: BatchViewPlatform): BatchViews {
     };
   };
 
-  return { toRows, viewOf, storiesOfKept };
+  /** Never a batch's cached stats, which are by story, of what it was compared with when it was reviewed. */
+  const approvedSinceView = async ({ base, renders }: ApprovedSince): Promise<ApprovedSinceView> => ({ base, rows: await rowsWith(renders, new Map()) });
+
+  return { toRows, viewOf, approvedSinceView, storiesOfKept };
 }

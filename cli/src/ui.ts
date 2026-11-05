@@ -16,7 +16,7 @@ import { currentBranch, dirtyPaths, gitUserEmail, headMovedAt, headSha } from ".
 import { isOpenNote } from "selfie-ui/notes";
 import { advanceRenderProgress } from "selfie-ui/render-progress";
 import { sentNotes, textForAgent } from "./notes.ts";
-import { batchesAtHead, compareAsReviewed, reachableCommits, readReviewCache, requireBatch, type Project } from "./project.ts";
+import { approvedSinceOf, batchesAtHead, compareAsReviewed, reachableCommits, readReviewCache, requireBatch, type Project } from "./project.ts";
 
 /** Each is about 20 KB of PNG. This is a reviewer going back and forth, not a cache of a batch. */
 const DIFFS_KEPT = 32;
@@ -75,7 +75,7 @@ export function localReviewSource(
     );
   };
 
-  const { toRows, viewOf } = batchViews({
+  const { toRows, viewOf, approvedSinceView } = batchViews({
     batches,
     storybooks: project.storybooks,
     keptStorybookUrl,
@@ -268,6 +268,8 @@ export function localReviewSource(
         compared.filter(({ state }) => state === "unchanged"),
       );
     },
+
+    approvedSince: async (batchId) => approvedSinceView(await approvedSinceOf(project, batchId)),
 
     async decide(batchId: string, decision: DecisionKind, targets: readonly DecisionTarget[]) {
       const actor = await requireActor("no decision was recorded");

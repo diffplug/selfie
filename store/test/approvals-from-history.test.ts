@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { compareWithApprovals, decisionsThatCount, imageInsertStatement, RenderBatches, type PlacedDecision, type RenderBatch } from "../src/core/index.ts";
+import { approvedSinceBase, compareWithApprovals, decisionsThatCount, imageInsertStatement, RenderBatches, type PlacedDecision, type RenderBatch } from "../src/core/index.ts";
 import { hashOf } from "./support/sql-params.ts";
 import { createTempStore } from "./support/temp-store.ts";
 
@@ -65,6 +65,34 @@ describe("comparing with what history has approved", () => {
 
   it("keeps a failed story's reference, with no decision", () => {
     expect(states([render("s", null)], [approved("s", A, 1)])).toEqual([["s", "failed", A, null]]);
+  });
+});
+
+describe("what's been approved since a base", () => {
+  const since = (rendered: Parameters<typeof approvedSinceBase>[1], decisions: readonly PlacedDecision[], baseDecisions: readonly PlacedDecision[]) =>
+    approvedSinceBase(compareWithApprovals(batch, rendered, decisions), rendered, decisions, baseDecisions).map(({ story, state, goldenHash, approvedIn, decision }) => [story, state, goldenHash, approvedIn, decision?.decision]);
+
+  it("shows an approved change as the base would compare it", () => {
+    expect(since([render("s", B)], [approved("s", A, 1), approved("s", B, 2)], [approved("s", A, 1)])).toEqual([["s", "changed", A, OTHER, "approved"]]);
+  });
+
+  it("shows an approved addition and an approved removal", () => {
+    expect(since([render("new", A)], [approved("new", A, 2)], [])).toEqual([["new", "added", null, OTHER, "approved"]]);
+    expect(since([], [approved("gone", A, 1), approved("gone", null, 2)], [approved("gone", A, 1)])).toEqual([["gone", "removed", A, OTHER, "approved"]]);
+  });
+
+  it("leaves out what the base had approved already", () => {
+    const decisions = [approved("s", A, 1)];
+    expect(since([render("s", A)], decisions, decisions)).toEqual([]);
+  });
+
+  it("leaves out what still differs, since that's for this batch to decide on", () => {
+    expect(since([render("s", C)], [approved("s", A, 1), approved("s", B, 2)], [approved("s", A, 1)])).toEqual([]);
+    expect(since([render("s", B)], [approved("s", A, 1), approved("s", B, 2, THIS)], [approved("s", A, 1)])).toEqual([]);
+  });
+
+  it("leaves out a failure", () => {
+    expect(since([render("s", null)], [approved("s", A, 1), approved("s", B, 2)], [approved("s", A, 1)])).toEqual([]);
   });
 });
 
@@ -164,6 +192,72 @@ describe("on a store", () => {
     const compared = await batches.compareFromHistory(second.batch.id, await batches.decisionsAt(ENV, [SHAS[1], SHAS[0]]));
     expect(compared.renders.map(({ story, state }) => [story, state])).toEqual([["b", "added"]]);
     expect(compared.unchangedCount).toBe(1);
+  });
+
+  describe("what's been approved since a base", () => {
+    const [BASE, FEATURE, MERGE, LATER, FOLLOWUP] = ["a".repeat(40), "b".repeat(40), "c".repeat(40), "d".repeat(40), "f".repeat(40)] as const;
+    const on = async (gitSha: string, branch: string, stories: Record<string, number>) => {
+      const entries = Object.entries(stories);
+      await temp.sql.batch(entries.map(([, image]) => imageInsertStatement(hashOf(image), image)));
+      const batch = await batches.beginBatch({ gitSha, environment: ENV, scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, branch });
+      await batches.recordRenders(batch.id, entries.map(([story, image]) => ({ story, imageHash: hashOf(image) })));
+      await batches.finishBatch(batch.id, entries.length);
+      return batch;
+    };
+    const listed = async (batch: RenderBatch) => {
+      const { base, renders } = await batches.approvedSinceReached(batch.id, "main");
+      return { base: base?.id ?? null, renders: renders.map(({ story, state, imageHash, goldenHash, approvedIn }) => [story, state, imageHash, goldenHash, approvedIn]) };
+    };
+
+    /** A base on main, a branch off it that approves a change, and that branch merged back. */
+    async function merged() {
+      const base = await on(BASE, "main", { s: 1, t: 2 });
+      await approve(base, "s", hashOf(1));
+      await approve(base, "t", hashOf(2));
+      const feature = await on(FEATURE, "topic", { s: 3, t: 2 });
+      await approve(feature, "s", hashOf(3));
+      const merge = await on(MERGE, "main", { s: 3, t: 2 });
+      await batches.recordCommits([{ sha: FEATURE, parents: [BASE] }, { sha: MERGE, parents: [BASE, FEATURE] }, { sha: LATER, parents: [MERGE] }]);
+      return { base, feature, merge };
+    }
+
+    it("shows a merge what it brought, which it reads as unchanged", async () => {
+      const { base, feature, merge } = await merged();
+      expect((await batches.compareReached(merge.id)).renders).toEqual([]);
+      expect(await listed(merge)).toEqual({ base: base.id, renders: [["s", "changed", hashOf(3), hashOf(1), feature.id]] });
+    });
+
+    it("shows a later commit on the branch what the branch approved", async () => {
+      const { base, feature } = await merged();
+      await batches.recordCommits([{ sha: FOLLOWUP, parents: [FEATURE] }]);
+      expect(await listed(await on(FOLLOWUP, "topic", { s: 3, t: 2 }))).toEqual({ base: base.id, renders: [["s", "changed", hashOf(3), hashOf(1), feature.id]] });
+    });
+
+    it("stops showing it once a batch of the default branch has it", async () => {
+      const { merge } = await merged();
+      expect(await listed(await on(LATER, "main", { s: 3, t: 2 }))).toEqual({ base: merge.id, renders: [] });
+    });
+
+    it("shows a batch rendered again at a commit what was approved on the first, since that's not its base", async () => {
+      const first = await on(BASE, "main", { s: 1 });
+      await approve(first, "s", hashOf(1));
+      expect(await listed(await on(BASE, "main", { s: 1 }))).toEqual({ base: null, renders: [["s", "added", hashOf(1), null, first.id]] });
+    });
+
+    it("never takes a base from another branch, or a batch the commit doesn't reach", async () => {
+      const { base, feature } = await merged();
+      await on("e".repeat(40), "main", { s: 9 });
+      expect((await listed(feature)).base).toBe(base.id);
+      expect((await batches.approvedSinceReached(feature.id, "topic")).base).toBeNull();
+    });
+
+    it("finds the same base from a list of commits", async () => {
+      const { base, merge } = await merged();
+      expect((await batches.baseAmong("main", merge, [MERGE, FEATURE, BASE]))?.id).toBe(base.id);
+      expect(await batches.baseAmong("main", merge, [MERGE, FEATURE])).toBeNull();
+      const decisions = await batches.decisionsAt(ENV, [MERGE, FEATURE, BASE]);
+      expect((await batches.approvedSinceFromHistory(merge.id, decisions, await batches.decisionsAt(ENV, [BASE]))).map(({ story, state }) => [story, state])).toEqual([["s", "changed"]]);
+    });
   });
 
   it("finds a branch's commits since a time, for a rebase's sake", async () => {

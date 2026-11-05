@@ -17,6 +17,7 @@
 | **Session** | Whose notes these are: a local Git worktree's top folder (`docs/specs/feedback.md`). |
 | **Approval** | A person's or agent's acceptance of a render, or of a story being gone, at the commit of the batch it was made on. It counts wherever that commit's history reaches, and may be made before the change is pushed (`docs/specs/renders.md` → Approvals). |
 | **Rejection** | A person's or agent's refusal of a render change. |
+| **Base** | The batch of the default branch that a batch's changes approved earlier are told apart from (`docs/specs/renders.md` → Approved since a base). |
 | **Decision** | An approval or a rejection, recorded against a render name, an image hash or a removal, and a commit (`docs/specs/renders.md`). |
 | **Render name** | What identifies a render across batches and stores: its story ID, with any render variant in it, and its environment ID. |
 | **Render state** | How a batch's render compares with its reference: unchanged, changed, added, removed, or failed (`docs/specs/renders.md`). |

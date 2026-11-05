@@ -62,6 +62,15 @@ export interface RenderRow extends ComparedRender {
   readonly goldenViewport: Viewport | null;
 }
 
+/** Approved on another batch, which is where its decision was made. */
+export type ApprovedRow = RenderRow & { readonly approvedIn: string };
+
+/** What a batch's history has approved since its base, each row compared as that base would, so its change can still be seen. */
+export interface ApprovedSinceView {
+  readonly base: RenderBatch | null;
+  readonly rows: readonly ApprovedRow[];
+}
+
 export type BatchListing = Pick<RenderBatch, "id" | "startedAt" | "status" | "dirty">;
 
 /** Where a kept built Storybook is, on a hosted Storybook's origin, ending in a slash. Crosses into `selfie-cli` from here. */
@@ -247,6 +256,7 @@ export interface ReviewSource {
   batchView(batchId: string): Promise<BatchView>;
   batchContext(batchId: string): Promise<BatchContext>;
   unchanged(batchId: string): Promise<readonly RenderRow[]>;
+  approvedSince(batchId: string): Promise<ApprovedSinceView>;
   /** Decides on exactly these images, or refuses all of them if one isn't what the batch holds. */
   decide(batchId: string, decision: DecisionKind, targets: readonly DecisionTarget[]): Promise<BatchView>;
   feedback(): Promise<FeedbackView>;

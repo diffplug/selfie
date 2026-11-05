@@ -1,6 +1,6 @@
 // What the stories of a story's page share.
 import { expect, userEvent, waitFor } from "storybook/test";
-import type { Note, BatchView, RenderRow } from "../../shared/api.ts";
+import type { ApprovedRow, Note, BatchView, RenderRow } from "../../shared/api.ts";
 import { DetailScreen } from "../DetailScreen.tsx";
 import { feedbackOf, rows, stateOf, viewOf } from "./fixtures.ts";
 import { BatchFrame } from "./BatchFrame.tsx";
@@ -11,14 +11,17 @@ export interface StoryPageArgs {
   readonly view?: BatchView;
   readonly notes?: readonly Note[];
   readonly accepted?: ReadonlySet<string>;
+  /** What's approved since this batch's base, and that it's being looked at. */
+  readonly approvedEarlier?: readonly ApprovedRow[];
 }
 
-export function StoryPage({ row, others = [], view, notes = [], accepted }: StoryPageArgs) {
-  const shown = view ?? viewOf([row, ...others]);
-  const state = stateOf(shown);
+export function StoryPage({ row, others = [], view, notes = [], accepted, approvedEarlier }: StoryPageArgs) {
+  const shown = view ?? viewOf(approvedEarlier === undefined ? [row, ...others] : others);
+  const state = stateOf(shown, approvedEarlier === undefined ? {} : { approvedSince: { base: null, rows: approvedEarlier } });
+  const search = approvedEarlier === undefined ? "" : "?show=approved-earlier";
   return (
-    <BatchFrame view={shown} state={state} story={row.story}>
-      {(navigation) => navigation !== null && <DetailScreen state={state} view={shown} story={row.story} search="" feedback={feedbackOf(notes)} navigation={navigation} {...(accepted === undefined ? {} : { accepted })} />}
+    <BatchFrame view={shown} state={state} story={row.story} search={search}>
+      {(navigation) => navigation !== null && <DetailScreen state={state} view={shown} story={row.story} search={search} feedback={feedbackOf(notes)} navigation={navigation} {...(accepted === undefined ? {} : { accepted })} />}
     </BatchFrame>
   );
 }

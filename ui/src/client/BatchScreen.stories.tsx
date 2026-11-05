@@ -121,6 +121,9 @@ export const ConfirmApproveAll: Story = {
 
 const AFFECTED = ["components-button--primary", "pages-settings--account", "components-list--with-new-row"];
 const OFFERS = [deltaFrom("taller-golden", [...AFFECTED, "pages-home--rearranged"]), deltaFrom("changed-golden", AFFECTED), deltaFrom("spaced-golden", AFFECTED)];
+const APPROVED_EARLIER = { base: batchOf({ id: OTHER_BATCH_ID, branch: "main" }), rows: [{ ...rows.changed("components-button--primary", approved()), approvedIn: OTHER_BATCH_ID }, { ...rows.fresh("pages-home--new", approved()), approvedIn: OTHER_BATCH_ID }] };
+export const ChangesApprovedEarlier: Story = { args: { view: viewOf([]), state: { approvedSince: APPROVED_EARLIER } } };
+export const ChangesApprovedEarlierListed: Story = { args: { view: viewOf([]), state: { approvedSince: APPROVED_EARLIER }, search: "?show=approved-earlier" } };
 export const LookingForRepeatedChanges: Story = { args: { view: viewOf(SOME_CHANGES), deltas: deltasOf({ progress: 40 }) } };
 export const RepeatedChanges: Story = { args: { view: viewOf(SOME_CHANGES), deltas: deltasOf({ offers: OFFERS }) } };
 export const LookingThroughADelta: Story = {

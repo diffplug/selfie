@@ -15,7 +15,7 @@ Source of truth: `ui/src/worker/chat.ts`, `compare` in `ui/src/worker/github.ts`
 - **Must keep `pageHeaders` and `sameOriginWrites` on it**, as on any review route (`docs/specs/cloud.md` → Pages).
 - **Must take at most 10 questions a minute from one address**, by the `CHAT_LIMIT` binding, and answer 429 `too-many-questions` past that (rationale).
 - **Must take at most 40 messages, with at most 4,000 characters in a question and 40,000 in an answer, in at most 1 MB**, and answer 400 `bad-request` otherwise.
-- **Must offer it only on a hosted story that isn't unchanged.** `selfie ui` has no chat. Any other story is 404 `unknown-story`.
+- **Must offer it only on a hosted story that isn't unchanged.** `selfie ui` has no chat. Any other story is 404 `unknown-story`, which includes one shown as approved earlier (`docs/specs/ui.md` → Screens), since it's unchanged in that batch.
 
 ## What the model reads
 

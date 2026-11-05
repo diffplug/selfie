@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
-import { applyFilter, decidableIn, filterQuery, neighbors, NO_FILTER, parseFilter, reuseRows, showQuery } from "../src/client/filter.ts";
-import type { RenderRow } from "../src/shared/api.ts";
+import { applyFilter, decidableIn, filterQuery, neighbors, NO_FILTER, parseFilter, reuseRows, rowsFor, showQuery } from "../src/client/filter.ts";
+import type { ApprovedRow, RenderRow } from "../src/shared/api.ts";
 
 const row = (story: string, overrides: Partial<RenderRow> = {}): RenderRow => ({
   story,
@@ -82,4 +82,15 @@ test("moved and spacing only is a changed row with nothing changed in it", () =>
   ];
   expect(stories(applyFilter(candidates, { text: "", show: "layout" }))).toEqual(["only-moved"]);
   expect(parseFilter("?show=layout").show).toBe("layout");
+});
+
+test("what's read separately is null until it's been read, and otherwise a Show picks from what differs", () => {
+  const differs = { story: "differs", state: "changed", decision: null } as RenderRow;
+  const earlier = { story: "earlier", state: "changed", decision: { decision: "approved", actor: "a", at: 1 }, approvedIn: "elsewhere" } as ApprovedRow;
+  const read = { unchanged: null, approvedSince: { base: null, rows: [earlier] } };
+  expect(rowsFor("all", [differs], read)).toEqual([differs]);
+  expect(rowsFor("unchanged", [differs], read)).toBeNull();
+  expect(rowsFor("approved-earlier", [differs], read)).toEqual([earlier]);
+  expect(rowsFor("approved-earlier", [differs], { unchanged: null, approvedSince: null })).toBeNull();
+  expect(applyFilter([earlier], { text: "", show: "approved-earlier" })).toEqual([earlier]);
 });

@@ -3,6 +3,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { approvedSinceOf, openProject } from "../src/project.ts";
 import { BLUE, commit, createHarness, git, GREEN, TEST_CONFIG, type Harness } from "./support.ts";
 
 let h: Harness;
@@ -138,6 +139,30 @@ describe("across branches", () => {
     const { code, states } = await review();
     expect(code).toBe(0);
     expect(states).toEqual({});
+  });
+
+  test("a merge reads as unchanged, and can still say what it brought and what that replaced", async () => {
+    const onMain = await review();
+    await h.cli("approve", onMain.batchId, "--all");
+    git(h.repo, "checkout", "-b", "feature");
+    await commit(h.repo, "changes one");
+    h.stories = [{ id: "a--one", color: BLUE }, { id: "a--two" }];
+    const onFeature = await review();
+    await h.cli("approve", onFeature.batchId, "--all");
+    git(h.repo, "checkout", "-");
+    git(h.repo, "merge", "--no-ff", "--no-edit", "feature");
+    const merged = await review();
+    expect(merged.states).toEqual({});
+
+    const project = await openProject({ cwd: h.repo, env: { SELFIE_HOME: h.home } });
+    try {
+      const { base, renders } = await approvedSinceOf(project, merged.batchId);
+      expect(base?.id).toBe(onMain.batchId);
+      expect(renders.map(({ story, state, approvedIn }) => [story, state, approvedIn])).toEqual([["a--one", "changed", onFeature.batchId]]);
+      expect(renders[0]!.goldenHash).not.toBe(renders[0]!.imageHash);
+    } finally {
+      project.close();
+    }
   });
 
   test("a branch's approvals count nowhere its history doesn't go", async () => {
