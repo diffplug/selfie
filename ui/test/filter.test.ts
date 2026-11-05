@@ -73,7 +73,7 @@ test("a filter survives the URL, and a bad one falls back", () => {
 });
 
 test("moved and spacing only is a changed row with nothing changed in it", () => {
-  const stats = (changedPixels: number) => ({ changedPixels }) as RenderRow["pixelDiff"];
+  const stats = (changedPixels: number) => ({ changedPixels, hunks: [{ changedPixels }] }) as unknown as RenderRow["pixelDiff"];
   const candidates = [
     row("only-moved", { pixelDiff: stats(0) }),
     row("really-changed", { pixelDiff: stats(1) }),

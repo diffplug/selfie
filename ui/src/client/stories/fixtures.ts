@@ -11,6 +11,8 @@ import type {
   BatchView,
   RenderRow,
 } from "../../shared/api.ts";
+import type { Delta } from "../../shared/deltas.ts";
+import type { DeltaState } from "../deltas.ts";
 import type { FeedbackState, BatchState } from "../hooks.ts";
 import { RequestError } from "../api.ts";
 import { HASHES, PIXEL_DIFFS } from "./images.generated.ts";
@@ -179,6 +181,24 @@ export function stateOf(view: BatchView, overrides: Partial<BatchState> = {}): B
     decide: fn(async () => true),
     ...overrides,
   };
+}
+
+/** A delta from the first hunk of a generated diff, in these stories. */
+export function deltaFrom(pair: keyof typeof PIXEL_DIFFS, stories: readonly string[]): Delta {
+  const [current, golden] = pair.split("-") as [keyof typeof HASHES, keyof typeof HASHES];
+  const diff = PIXEL_DIFFS[pair];
+  const { kind, golden: goldenBox, current: currentBox } = diff.hunks[0]!;
+  const examples = stories.map((story) => ({
+    story,
+    golden: { hash: HASHES[golden], boxes: [goldenBox], image: diff.golden },
+    current: { hash: HASHES[current], boxes: [currentBox], image: diff.current },
+  }));
+  return { key: pair, kind, examples };
+}
+
+/** Nothing found, with actions that are recorded but change nothing. */
+export function deltasOf(overrides: Partial<DeltaState> = {}): DeltaState {
+  return { progress: null, accepted: new Set(), offers: [], taken: [], finishes: () => [], accept: fn(), undo: fn(), ...overrides };
 }
 
 export const failure = (code: string, message: string) => new RequestError(code, message);

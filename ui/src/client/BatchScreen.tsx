@@ -1,9 +1,8 @@
-import { isHosted, signInHref } from "./base.ts";
+import { canDecide, isHosted, signInHref } from "./base.ts";
 // The batch: its facts, what blocks it, what to look at, and bulk decisions on what differs.
 import {
   Banner,
   Button,
-  ConfirmationDialog,
   CounterLabel,
   Details,
   FormControl,
@@ -15,9 +14,12 @@ import {
   Text,
   useDetails,
 } from "@primer/react";
-import { Blankslate, ScrollableRegion } from "@primer/react/experimental";
+import { Blankslate } from "@primer/react/experimental";
 import { useEffect, useMemo, useState, type ComponentProps, type RefObject } from "react";
 import type { BlockerReason, DecisionKind, BatchView, RenderRow } from "../shared/api.ts";
+import { BulkDialog } from "./BulkDialog.tsx";
+import { DeltaOffers } from "./DeltaOffers.tsx";
+import type { DeltaState } from "./deltas.ts";
 import { applyFilter, decidableIn, filterQuery, NO_FILTER, parseFilter, showQuery, SHOW_OPTIONS, targetsOf, type RowFilter, type Show } from "./filter.ts";
 import { useStoryFocusKeys, useTitle, type BatchState } from "./hooks.ts";
 import { Keys } from "./Keys.tsx";
@@ -176,54 +178,9 @@ function Blockers({ view, onShow }: { view: BatchView; onShow: (show: Show) => v
 
 interface PendingBulk {
   readonly decision: DecisionKind;
-  /** Each decidable, as they were when the dialog opened, which is exactly what gets sent. */
   readonly rows: readonly RenderRow[];
   /** All of the batch, as opposed to what a filter is showing. */
   readonly scope: "all" | "shown";
-}
-
-function BulkDialog({ pending, onClose }: { pending: PendingBulk; onClose: (confirmed: boolean) => void }) {
-  const { decision, rows, scope } = pending;
-  const verb = decision === "approved" ? "Approve" : "Reject";
-  const count = (test: (row: RenderRow) => boolean) => rows.filter(test).length;
-  const facts = [
-    [count(({ state }) => state === "changed"), "changed"],
-    [count(({ state }) => state === "added"), "added"],
-    [count(({ decision: made }) => made?.decision === "approved"), "already approved"],
-    [count(({ decision: made }) => made?.decision === "rejected"), "already rejected"],
-  ] as const;
-  return (
-    <ConfirmationDialog
-      title={`${verb} ${plural(rows.length, "image")}?`}
-      confirmButtonContent={`${verb} ${plural(rows.length, "image")}`}
-      cancelButtonContent="Cancel"
-      confirmButtonType="danger"
-      width="large"
-      onClose={(gesture) => onClose(gesture === "confirm")}
-    >
-      <Stack gap="condensed">
-        <Text as="p">
-          {scope === "all" ? "This decides on every image in this batch that has one to decide on." : "This decides on exactly the images the current filter shows."}{" "}
-          A decision on an image holds in later batches too, until it's replaced.
-        </Text>
-        <ul className="selfie-bulk-facts">
-          {facts
-            .filter(([value]) => value > 0)
-            .map(([value, words]) => (
-              <li key={words}>
-                {value.toLocaleString()} {words}
-              </li>
-            ))}
-        </ul>
-        <ScrollableRegion className="selfie-bulk-sample" aria-label="The images this decides on">
-          {rows.slice(0, 200).map(({ story }) => (
-            <div key={story}>{story}</div>
-          ))}
-          {rows.length > 200 && <div className="selfie-muted">and {rows.length - 200} more</div>}
-        </ScrollableRegion>
-      </Stack>
-    </ConfirmationDialog>
-  );
 }
 
 function BulkButton({
@@ -308,7 +265,7 @@ function Differences({
             ))}
           </Select>
         </FormControl>
-        {(!isHosted || view.actor !== null) && (
+        {canDecide(view) && (
           <Stack direction="horizontal" wrap="wrap" gap="condensed" className="selfie-bulk" role="group" aria-label="Decide on many images">
             {isFiltered && (
               <>
@@ -340,7 +297,14 @@ function Differences({
           )}
         </Blankslate>
       )}
-      {pending !== null && <BulkDialog pending={pending} onClose={(confirmed) => void confirm(confirmed)} />}
+      {pending !== null && (
+        <BulkDialog
+          decision={pending.decision}
+          rows={pending.rows}
+          why={pending.scope === "all" ? "This decides on every image in this batch that has one to decide on." : "This decides on exactly the images the current filter shows."}
+          onClose={(confirmed) => void confirm(confirmed)}
+        />
+      )}
     </Stack>
   );
 }
@@ -350,11 +314,13 @@ export function BatchScreen({
   view,
   search,
   returningFrom,
+  deltas,
 }: {
   state: BatchState;
   view: BatchView;
   search: string;
   returningFrom: RefObject<string | null>;
+  deltas: DeltaState;
 }) {
   const { batch, counts, outsideFilter } = view;
   const filter = useMemo(() => parseFilter(search), [search]);
@@ -385,6 +351,7 @@ export function BatchScreen({
         <AppLink href={storiesPath()}>Every story</AppLink>
       </Stack>
       <ActionFailure state={state} />
+      {canDecide(view) && <DeltaOffers deltas={deltas} state={state} batchId={batch.id} />}
       {newest !== undefined && newest.id !== batch.id && (
         <Banner
           variant="info"

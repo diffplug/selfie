@@ -84,7 +84,7 @@ describe("who may ask", () => {
       const refused = await get("/api/stories", { host: "evil.example" });
       for (const response of [await get("/"), await get("/api/stories"), refused]) {
         expect(response.headers.get("content-security-policy")).toBe(
-          "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
+          "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
         );
         expect(response.headers.get("x-frame-options")).toBe("DENY");
         expect(response.headers.get("cross-origin-resource-policy")).toBe("same-origin");

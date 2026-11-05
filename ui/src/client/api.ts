@@ -52,7 +52,7 @@ const batchRoute = (batchId: string) => `/batches/${encodeURIComponent(batchId)}
 export const fetchBatch = (batchId: string, signal: AbortSignal) => request<BatchView>(batchRoute(batchId), { signal });
 export const fetchBatchContext = (batchId: string, signal: AbortSignal) => request<BatchContext>(`/batches/${encodeURIComponent(batchId)}/context`, { signal });
 export const fetchUnchanged = async (batchId: string) => (await request<{ rows: readonly RenderRow[] }>(`${batchRoute(batchId)}/unchanged`)).rows;
-export const fetchDiff = (current: string, golden: string, signal: AbortSignal) => request<PixelDiff>(`/diffs/${current}/${golden}`, { signal });
+export const fetchDiff = (current: string, golden: string, signal: AbortSignal | null = null) => request<PixelDiff>(`/diffs/${current}/${golden}`, { signal });
 
 export const postDecision = (batchId: string, decision: DecisionKind, renders: readonly DecisionTarget[]) =>
   post<BatchView>(`${batchRoute(batchId)}/decisions`, { decision, renders });

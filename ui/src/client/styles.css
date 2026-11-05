@@ -780,3 +780,46 @@ code {
     gap: var(--base-size-8);
   }
 }
+
+.selfie-deltas {
+  max-height: 75vh;
+  overflow: auto;
+}
+
+.selfie-delta-whole {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--base-size-12);
+  align-items: start;
+}
+
+.selfie-delta-crops {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--base-size-8) var(--base-size-16);
+}
+
+.selfie-delta-crop {
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+}
+
+.selfie-delta-window {
+  position: relative;
+  max-width: 100%;
+  overflow: hidden;
+  border: var(--borderWidth-thin) solid var(--borderColor-default);
+}
+
+.selfie-delta-window img {
+  position: absolute;
+  max-width: none;
+}
+
+.selfie-delta-box {
+  position: absolute;
+  box-sizing: border-box;
+  border: var(--borderWidth-thin) solid var(--borderColor-accent-emphasis);
+  pointer-events: none;
+}

@@ -137,11 +137,16 @@ export function DecisionLabel({ row }: { readonly row: Pick<RenderRow, "state" |
   );
 }
 
+type Size = { readonly width: number; readonly height: number };
+
 export const sizeChanged = ({ current, golden }: PixelDiff) => current.width !== golden.width || current.height !== golden.height;
+
+export const sizeChangeWords = (from: Size, to: Size) => `${from.width}×${from.height} to ${to.width}×${to.height}`;
 
 export function describePixels(diff: PixelDiff | null): string {
   if (diff === null) return "";
-  const size = sizeChanged(diff) ? `, ${diff.golden.width}×${diff.golden.height} to ${diff.current.width}×${diff.current.height}` : "";
+  if (diff.hunks.length === 0) return "Nothing left to look at";
+  const size = sizeChanged(diff) ? `, ${sizeChangeWords(diff.golden, diff.current)}` : "";
   if (isLayoutOnly(diff)) return `Moved and spacing only${size}`;
   const percent = (diff.changedPixels / diff.totalPixels) * 100;
   return `${plural(diff.changedPixels, "pixel")} (${percent < 0.01 ? "<0.01" : percent.toFixed(2)}%)${size}`;

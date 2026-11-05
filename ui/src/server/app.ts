@@ -50,7 +50,7 @@ export const pageHeaders = (storybookOrigin?: string): MiddlewareHandler =>
     contentSecurityPolicy: {
       defaultSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
-      imgSrc: ["'self'", "data:"],
+      imgSrc: ["'self'", "data:", "blob:"],
       ...(storybookOrigin === undefined ? {} : { frameSrc: [storybookOrigin] }),
       frameAncestors: ["'none'"],
       baseUri: ["'none'"],

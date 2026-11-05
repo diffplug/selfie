@@ -1,5 +1,6 @@
 import type { RawImage } from "selfie-store";
 import type { BoundingBox, ChangedHunk, PixelDiff, HunkKind } from "selfie-ui/app";
+import { fade, seamOf } from "selfie-ui/diff-image";
 import { explainHunks, forEachUnexplained } from "./explain.ts";
 import { encodePng } from "./png.ts";
 import { findHunks } from "./hunks.ts";
@@ -9,18 +10,6 @@ export type { BoundingBox, PixelDiff } from "selfie-ui/app";
 type Color = readonly [number, number, number];
 
 const COLORS: Readonly<Record<HunkKind, Color>> = { changed: [255, 0, 80], moved: [9, 105, 218], spacing: [255, 214, 102] };
-// An unchanged pixel fades into gray from this level to white, so the page stays readable
-// behind the highlight and no color in it can be mistaken for one.
-const FADED_FLOOR = 190;
-
-function fade(from: Uint8Array, out: Uint8Array, at: number): void {
-  const luma = (from[at]! * 77 + from[at + 1]! * 150 + from[at + 2]! * 29) >> 8;
-  const faded = FADED_FLOOR + ((luma * (255 - FADED_FLOOR)) >> 8);
-  out[at] = faded;
-  out[at + 1] = faded;
-  out[at + 2] = faded;
-}
-
 function paint(out: Uint8Array, at: number, [red, green, blue]: Color): void {
   out[at] = red;
   out[at + 1] = green;
@@ -94,12 +83,10 @@ export function diffImages(current: RawImage, golden: RawImage): { readonly diff
     changedPixels += explanation.changedPixels;
     if (explanation.changedPixels === goldenOnly && moved.length === 0 && (kind !== "spacing" || goldenSpacingRows > 0)) {
       // Nothing here is different, since something was only taken away, so mark the seam it left.
-      const seam = Math.min(here.y, height - 1);
-      const from = here.width === 0 ? 0 : here.x;
-      const to = here.width === 0 ? width : here.x + here.width;
-      for (let x = from; x < to; x++) {
-        if (kind === "changed") mark(x, seam);
-        paint(out, (seam * width + x) * 3, COLORS[kind]);
+      const seam = seamOf(here, current);
+      for (let x = seam.x; x < seam.x + seam.width; x++) {
+        if (kind === "changed") mark(x, seam.y);
+        paint(out, (seam.y * width + x) * 3, COLORS[kind]);
       }
     }
     return { ...hunk, kind, changedPixels: explanation.changedPixels, moved };

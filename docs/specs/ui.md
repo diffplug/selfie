@@ -13,6 +13,8 @@ Source of truth: `ui/`.
 |---|---|
 | `ui/src/shared/api.ts` | The JSON on the wire, and `ReviewSource` |
 | `ui/src/shared/hunks.ts`, exported as `selfie-ui/hunks` | Grouping a diff's hunks for showing, for the client and the CLI's document |
+| `ui/src/shared/diff-image.ts`, exported as `selfie-ui/diff-image` | How a diff image draws what didn't change and where something was taken away, for the differ and a page redrawing one |
+| `ui/src/shared/deltas.ts`, exported as `selfie-ui/deltas` | What a [delta](#screens) is, which to offer, and what redrawing one leaves; tests in `ui/test/deltas.test.ts`, and in `cli/test/deltas.test.ts` against the real differ |
 | `ui/src/shared/notes.ts`, exported as `selfie-ui/notes` | Shared note validation and open-note state (`docs/specs/feedback.md`) |
 | `ui/src/shared/renderProgress.ts`, exported as `selfie-ui/render-progress` | A render's estimate and how it's said, for the client and `selfie flakes`; tests in `ui/test/renderProgress.test.ts` |
 | `selfie-ui/sync`, `selfie-ui/sync-api` | `docs/specs/sync.md` → Routes |
@@ -126,7 +128,7 @@ Source of truth: `ui/src/client/`.
 
 - **Must say a story is renamed if it's added and a removed story's reference is its very image**, one to one, and the closest names first where several share an image (rationale). The list has it once, under its new name. This is only to look at: to decisions they're still one added and one removed.
 
-**The batch** shows, in order: its commit, batch ID, whether its pixels were rendered earlier and by which batch, dirty state, environment, and decision actor; a warning if it was recorded dirty; the counts; blockers; and the differences.
+**The batch** shows, in order: any [repeated changes](#screens); its commit, batch ID, whether its pixels were rendered earlier and by which batch, dirty state, environment, and decision actor; a warning if it was recorded dirty; the counts; blockers; and the differences.
 
 - **Must group blockers by reason, in words, and offer each as a filter of the list.**
 - **Must keep the filter, text and state, in the URL, and nowhere else**, so back, reload, and next and previous all follow it.
@@ -136,6 +138,20 @@ Source of truth: `ui/src/client/`.
 
 - **Must confirm every bulk decision in a dialog, with the count, how many are changed and added, how many are already decided, and which stories.** Focus starts on Cancel.
 - **Must hold the rows in the dialog from when it opens, and send those**, so what it listed is what's sent, whatever a filter or a read does meanwhile.
+
+**Repeated changes:** a delta is one change repeated across stories (`docs/specs/glossary.md`). Source of truth: `ui/src/shared/deltas.ts`, `ui/src/client/deltas.ts`, `ui/src/client/DeltaOffers.tsx`.
+
+- **Must keep all of this in the browser.** It adds no route and no table, and sends only approvals, through the same route any decision takes. Which deltas are accepted is held in `localStorage`, by batch, so a reload keeps them, and another browser, batch, or person doesn't have them (rationale).
+- **Must look for deltas only for someone who [may decide](#screens)**, since nothing else can come of it, and looking decodes every changed image.
+- **Must find a delta from a pair's own diff, fetched by both hashes, and never a review's stats** ([Screens](#screens)), since those are by story, and could be of another pair.
+- **Must group raw hunks, not the groups a list shows, by the size of each side, and then by the SHA-256 of each side's pixels**, wherever in an image a hunk sits (rationale). It decodes only images with a size at least 3 stories share.
+- **Must only group a hunk that can be redrawn on its own:** one with the same size on both sides, or one the whole width of both images. A narrower hunk that changes height only balances out with others in its column, so it stays a hunk to look at.
+- **Must offer each delta at least 3 undecided changed stories have**, most stories first, once all of them have been looked through, each with how many stories and a crop of it before and after. An image with a decision isn't affected.
+- **Must let someone go through a delta's stories before accepting it**, one delta at a time, starting with the first and moving on once it's accepted: previous and next through its stories, wrapping around, naming each with a link to it, and showing that story's crop and all of its image on each side as it is on record, with the delta outlined where that story has it (rationale).
+- **Must say what's accepted, and let each be undone**, which brings its hunks back and takes back no approval.
+- **Must approve an image once every one of its hunks is an accepted delta, and only an undecided one**, so a rejection is never overturned, and confirm that as any [bulk decision](#screens) is, with accepting nothing if it's cancelled. A delta that finishes no image needs no confirming, since it decides nothing.
+- **Must redraw only on a batch's own pages.** One render's golden and diff are drawn from a pair's images and the server's diff image, with its pixel stats, hunk list, and outlines all from the hunks left, and it says that it's redrawn, that the golden on record hasn't changed, and offers that golden instead (rationale).
+- **Must keep what's on the golden to a note on all of it while it's redrawn**, since a box on it is in pixels the golden on record doesn't have in that place. Its existing boxes aren't shown then.
 
 **One render** shows its state and decision, pixel stats, and images.
 
