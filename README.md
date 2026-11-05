@@ -86,7 +86,7 @@ Not built yet:
 
 ## Built for the Meta Global AI Developer Hackathon
 
-We previously launched [Selfie](https://lib.selfie.dev), a snapshot testing library focused on data rather than screenshots with no cloud or agent integrations. We are backgrounding it to focus on this completely new and unrelated service, which shares the same general theme and name but none of its code. Everything in this repo was built from November 1, 2026 onward for the [Meta Global AI Developer Hackathon](https://cerebralvalley.ai/e/meta-ai-developer-hackathon/details).
+We previously launched [Selfie](https://lib.selfie.dev), a snapshot testing library focused on data rather than screenshots with no cloud or agent integrations. We are backgrounding it to focus on this completely new and unrelated service, which shares the same general theme and name but none of its code. Everything in this repo was built from November 1, 2026 onward for the [Meta Global AI Developer Hackathon](https://cerebralvalley.ai/e/meta-ai-developer-hackathon/details). The one exception is `branding/`: the logo and mascot are reused from the earlier library.
 
 ### Meta models
 
@@ -107,6 +107,8 @@ We wrote that bug on purpose for the demo, and that answer is real and unedited.
 It's built to be safe to leave open on a public page. Each answer says which code it read and what it left out. The model has no tools, and its answer is plain text, so an instruction hidden in a branch's code has nothing to act with. An answer can never approve, reject, or block anything. See [`docs/specs/chat.md`](docs/specs/chat.md).
 
 That matters at agent scale: one style tweak we measured changed 290 of a Storybook's 541 stories. The next step, specified in [`docs/specs/system.md`](docs/specs/system.md) as `change-grouping`, is to ask about a whole batch, grouping changed stories by the code change that caused them, and flagging the changes nobody asked for.
+
+To run your own, set `MODEL_API_KEY` to a Meta Model API key. The hosted demo needs no key.
 
 ## Architecture
 
