@@ -180,6 +180,25 @@ h2 { font-size: clamp(2rem, 4vw, 2.75rem); }
 .not-found h1 { margin: 2.5rem 0 0.75rem; font-size: clamp(2.75rem, 7vw, 4.75rem); }
 .not-found p { max-width: 42em; }
 
+.welcome { min-height: 100vh; background: var(--sky); }
+.welcome-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 22rem); gap: 3rem 4rem; align-items: center; min-height: 100vh; padding-block: 3rem; }
+.welcome h1 { margin: 2.5rem 0 0.75rem; font-size: clamp(2.75rem, 7vw, 4.75rem); font-weight: 600; }
+.welcome h1 em { font-weight: 600; }
+.welcome .lede { margin-bottom: 2.25rem; }
+.welcome h2 { margin-bottom: 0.75rem; font-size: 1.375rem; font-weight: 700; }
+.welcome-next { display: grid; gap: 0.6rem; margin: 0; padding: 0; list-style: none; }
+.welcome-next li { padding-left: 1.4em; text-indent: -1.4em; }
+.welcome-next li::before { content: ""; display: inline-block; width: 0.6em; height: 0.6em; margin-right: 0.8em; background: var(--yellow); border: 2px solid var(--ink); border-radius: 50%; vertical-align: 0.05em; }
+.welcome-next a { font-weight: 600; }
+.welcome .actions { margin-top: 2.25rem; }
+.welcome-print { margin: 0; padding: 1rem 1rem 0; background: #f8f7f4; border: var(--edge); border-radius: 6px; box-shadow: 0 10px 24px rgb(31 35 40 / 0.18); transform: rotate(5deg); }
+.welcome-print img { width: 100%; aspect-ratio: 1; object-fit: cover; object-position: 50% 15%; }
+.welcome-print figcaption { padding: 0.75rem 0 1rem; font: 400 1.75rem/1 "Neucha", "Jost", sans-serif; text-align: center; transform: rotate(-3deg); }
+@media (max-width: 760px) {
+  .welcome-grid { grid-template-columns: minmax(0, 1fr); min-height: 0; }
+  .welcome-print { width: min(70%, 16rem); justify-self: center; }
+}
+
 @media (max-width: 600px) {
   .hero-copy { padding-top: 1.5rem; }
   .hero h1 { font-size: 2.35rem; line-height: 1.05; }

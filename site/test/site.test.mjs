@@ -86,6 +86,14 @@ test("the signup form posts to the selfie.dev MailerLite form", async () => {
   assert.ok(!html.includes("nedshed.dev"), "nedshed.dev should no longer be linked");
 });
 
+test("the welcome page that MailerLite's confirm link lands on exists", async () => {
+  const res = await get("/welcome");
+  assert.equal(res.status, 200);
+  const html = await res.text();
+  assert.match(html, /on<\/em> the list/);
+  assert.match(html, /name="robots" content="noindex"/);
+});
+
 test("an unknown path is a real 404 that points to the library", async () => {
   const res = await get("/no-such-page");
   assert.equal(res.status, 404);
