@@ -1,5 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="14" fill="#1f2328"/>
-  <path d="M14 23v-9h9M41 14h9v9M50 41v9h-9M23 50h-9v-9" fill="none" stroke="#ffd60a" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M21.5 25h21l-3.2 14.5h-14.6Z" fill="#2b6fe3"/>
+  <title>Selfie</title>
+  <!-- A robot gripper holding up a phone for a selfie. -->
+  <g transform="rotate(-8 32.5 25.5)" stroke="#1f2328" stroke-width="2.6" stroke-linejoin="round">
+    <rect x="19.5" y="8" width="26" height="35" rx="4" fill="#f9d535"/>
+    <rect x="34" y="9.6" width="6.8" height="10.6" rx="3.4" fill="#a8b1bb"/>
+    <circle cx="37.4" cy="13" r="1.7" fill="#1f2328" stroke="none"/>
+  </g>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M27.5 53 L15.8 40.6 L22 33.6 M35.5 53 L48.4 40.4 L43 33" stroke="#1f2328" stroke-width="9"/>
+    <path d="M27.5 53 L15.8 40.6 L22 33.6 M35.5 53 L48.4 40.4 L43 33" stroke="#a8b1bb" stroke-width="4"/>
+  </g>
+  <circle cx="31.5" cy="53.6" r="4.3" fill="#a8b1bb" stroke="#1f2328" stroke-width="2.8"/>
 </svg>
