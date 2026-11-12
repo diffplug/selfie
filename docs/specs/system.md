@@ -51,7 +51,7 @@ Selfie is for fully opaque images, and transparency is never allowed: `docs/spec
 
 | Data | Lives in |
 |---|---|
-| User accounts and their GitHub tokens, app installations, and which D1 database belongs to each project | Neon Postgres |
+| Sign-in's users, their GitHub accounts, and sessions, through pgstencil and an uncached Hyperdrive; reserved for `github-access`, app installations and which D1 database belongs to each project | Neon Postgres |
 | A project's render metadata | That project's own D1 database |
 | Image bytes, and built Storybooks' files | R2 |
 
@@ -61,9 +61,9 @@ Selfie is for fully opaque images, and transparency is never allowed: `docs/spec
 
 **Scope: store** — `docs/specs/store.md`.
 
-**Scope: cloud-deploy** — The same Hono app ([Local review](#local-review)) deployed at `hackathon.selfie.dev`, with per-project D1 and R2, is built for a few public repositories and one writer (`docs/specs/cloud.md`). What's left is accounts in Neon through pgstencil and Hyperdrive ([Cloud data](#cloud-data)), and private repositories, which wait for `github-access`.
+**Scope: cloud-deploy** — The same Hono app ([Local review](#local-review)) deployed at `app.selfie.dev`, with per-project D1 and R2, is built for a few public repositories and one writer (`docs/specs/cloud.md`). Its one writer signs in through GitHub, with accounts in Neon through pgstencil and Hyperdrive ([Cloud data](#cloud-data)). What's left is private repositories, which wait for `github-access`.
 
-**Scope: github-access** — Sign-in through GitHub, and access checks from what GitHub reports (`docs/specs/access.md` → Future), before the service holds anyone else's images.
+**Scope: github-access** — Sign-in through GitHub for anyone with access, rather than one writer, and access checks from what GitHub reports (`docs/specs/access.md` → Future), before the service holds anyone else's images.
 
 **Scope: trust** — The cloud accepts local results without re-rendering.
 

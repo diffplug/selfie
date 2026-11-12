@@ -1,6 +1,6 @@
 # Chat
 
-> Status: built, and deployed at `hackathon.selfie.dev`, on one story at a time.
+> Status: built, and deployed at `app.selfie.dev`, on one story at a time.
 >
 > - See `docs/specs/glossary.md` for story, batch, render, and reference.
 > - Owns asking a model about a story's change: what it reads, what it says it read, and what it may do. `docs/specs/cloud.md` owns the Worker it's in, and `docs/specs/access.md` the GitHub App it reads through.

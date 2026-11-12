@@ -1,6 +1,6 @@
 # Sync
 
-> Status: built, and mounted by the Worker at `hackathon.selfie.dev` (`docs/specs/cloud.md`). `selfie push` runs against it from CI. See `## Future`.
+> Status: built, and mounted by the Worker at `app.selfie.dev` (`docs/specs/cloud.md`). `selfie push` runs against it from CI. See `## Future`.
 >
 > - Owns moving batches, images, and decisions between stores, and the routes and commands that do it. `docs/specs/renders.md` owns what each store does with them, `docs/specs/access.md` who may ask, and `docs/specs/system.md` where cloud data lives.
 

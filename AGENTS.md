@@ -12,7 +12,7 @@ A spec is the accurate reference for the current code: it states the invariants 
 - **`docs/specs/renders.md`** — Render batches, render states, decisions, and approvals: the data layer `selfie review` and the review UI use.
 - **`docs/specs/store.md`** — Image storage: image identity, decoding, keys, hash collisions, kept built Storybooks, and the SQL and blob adapters.
 - **`docs/specs/sync.md`** — Moving batches, images, decisions, and goldens between stores.
-- **`docs/specs/cloud.md`** — The Worker at `hackathon.selfie.dev`: its projects, origins, pages, and a commit's status.
+- **`docs/specs/cloud.md`** — The Worker at `app.selfie.dev`: its projects, origins, pages, and a commit's status.
 - **`docs/specs/feedback.md`** — Notes: how a person tells a coding agent what they see, and how the agent answers.
 - **`docs/specs/chat.md`** — Asking Muse Spark about a story's change, with its images and the code from GitHub.
 - **`docs/specs/render.md`** — The renderer: rendering a built Storybook into PNGs in a pinned environment, the environment ID, and the manifest.

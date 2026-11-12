@@ -21,7 +21,7 @@ There's no login on this server, since anyone who can reach loopback on the mach
 
 ## Who can do what
 
-Source of truth: `ui/src/worker/auth.ts`, `accessOf` in `ui/src/worker/app.ts`, `ui/src/worker/github.ts`; tests in `ui/test/workerd/cloud.workerd.test.ts`. `docs/specs/cloud.md` says what the Worker hosts.
+Source of truth: `ui/src/worker/auth.ts`, `ui/src/worker/login.ts`, `accessOf` in `ui/src/worker/app.ts`, `ui/src/worker/github.ts`; tests in `ui/test/workerd/cloud.workerd.test.ts`. `docs/specs/cloud.md` says what the Worker hosts.
 
 Every project here is public, and one person writes (rationale).
 
@@ -29,18 +29,21 @@ Every project here is public, and one person writes (rationale).
 |---|---|---|---|---|
 | Anyone | Nothing | Yes | No | No |
 | CI | `SELFIE_UPLOAD_TOKEN`, a repository secret and a Worker secret, as a bearer token | Yes | Yes | No |
-| The writer, `nedtwigg` | `SELFIE_WRITER_PASSWORD`, a Worker secret: as a bearer token, or through `/sign-in` for a cookie | Yes | Yes | Yes |
+| The writer, `nedtwigg` | Their GitHub account, `2924992`, signed in through `/sign-in` for a session cookie; or `SELFIE_WRITER_TOKEN`, a Worker secret, as a bearer token | Yes | Yes | Yes |
 
-- **Must keep the password and the upload token only in Worker secrets, and compare them by digest**, so how long a comparison takes says nothing of a guess.
-- **Must sign a session cookie with the password, so that changing it signs everyone out, and name it `__Host-` with `HttpOnly`, `Secure`, and `SameSite=Strict`**, for 30 days.
-- **Must refuse a sign-in from another site, and send a person only to a path on this site after signing in.**
-- **Must keep `sameOriginWrites` and `pageHeaders` on the review routes.** The sync routes answer only to a bearer token, and never read the cookie.
-- **Must use one GitHub App, Selfie Hackathon, with only `statuses: write` and `contents: read`, and no webhook**, to say whether a repository has a commit, to post a commit's status, and to read what code changed for `docs/specs/chat.md`. **Its private key stays in Worker secrets.**
+- **Must keep the writer token and the upload token only in Worker secrets, and compare them by digest**, so how long a comparison takes says nothing of a guess.
+- **Must sign in only through GitHub, with pgstencil's Better Auth adapter (`@pgstencil/auth`), using the GitHub App's own OAuth client**, its users and sessions in Postgres through an uncached Hyperdrive, and its cookies named `__Host-` (rationale).
+- **Must know the writer by their GitHub account's numeric ID, never their login**, which can be renamed and taken by someone else.
+- **Must sign anyone else straight back out when GitHub returns them**, and never treat their session as the writer's (rationale).
+- **Must drive the adapter from the Worker, and let nothing outside reach it but GitHub's callback, `GET /api/auth/callback/github`.** Its CSRF token, its sign-in and sign-out writes, and its account list are only ever the Worker's own requests to it, and its email routes are reached by nothing. It's given only its own bindings, and an email sender that sends nothing.
+- **Must refuse a sign-in or sign-out from another site, and send a person only to a path on this site after signing in**, held in a 10-minute `__Host-` cookie, since the adapter returns everyone to one fixed path.
+- **Must keep `sameOriginWrites` and `pageHeaders` on the review routes.** The sync routes answer only to a bearer token, and never read a cookie.
+- **Must use one GitHub App with only `statuses: write` and `contents: read`, and no webhook**, to say whether a repository has a commit, to post a commit's status, to read what code changed for `docs/specs/chat.md`, and, through its OAuth client, to sign the writer in. **Its private key and client secret stay in Worker secrets.**
 - **Must refuse a commit GitHub doesn't have**, as `docs/specs/sync.md` → What goes says, and treat any other answer from GitHub as an error.
 
 ## Future
 
-**Scope: github-access** replaces the password with what follows, for a service with other people or private repositories on it.
+**Scope: github-access** replaces the one writer with what follows, for a service with other people or private repositories on it.
 
 ### GitHub App
 
@@ -78,7 +81,9 @@ GitHub decides. Selfie keeps no member list of its own.
 
 ### Signing in
 
-- **Must sign browsers in through the GitHub App's web application flow.**
+Browsers already sign in through the GitHub App's web application flow ([Who can do what](#who-can-do-what)).
+
+- **Must let anyone with write access to a project sign in**, in place of signing everyone else back out, and stop keeping a row for each account that was refused.
 - **Must sign the CLI in through the GitHub App's device flow**, which is an opt-in setting on the app.
 - **Must not need a login to view a public repository.**
 

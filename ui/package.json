@@ -25,11 +25,17 @@
     "prepare": "vite build",
     "test": "pnpm typecheck && vite build --logLevel warn && vitest run",
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.workerd.json",
-    "deploy": "vite build --logLevel warn && wrangler deploy"
+    "deploy": "vite build --logLevel warn && wrangler deploy",
+    "db:migrate": "pgstencil migrate --require-database-url",
+    "db:validate": "pgstencil validate --require-database-url",
+    "db:status": "pgstencil status --require-database-url"
   },
   "dependencies": {
     "@hono/node-server": "2.1.5",
+    "@pgstencil/auth": "0.5.1",
     "hono": "4.13.16",
+    "kysely": "^0.29.8",
+    "pgstencil": "0.5.1",
     "selfie-store": "workspace:*"
   },
   "devDependencies": {
@@ -45,6 +51,7 @@
     "@types/react-dom": "19.3.0",
     "@types/react-is": "19.3.0",
     "@vitejs/plugin-react": "6.1.2",
+    "node-pg-migrate": "^9.0.0",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "react-is": "19.3.1",

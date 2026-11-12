@@ -1,10 +1,18 @@
-name = "selfie-hackathon"
+# app.selfie.dev. See docs/specs/cloud.md, and OPERATIONS.md for deploying it.
+name = "selfie-app"
 main = "src/worker/index.ts"
 compatibility_date = "2026-11-01"
 compatibility_flags = ["nodejs_compat"]
-workers_dev = true
+# Only its own custom domains: any other name for it answers 421 (docs/specs/cloud.md -> Origins).
+workers_dev = false
 preview_urls = false
-routes = [{ pattern = "hackathon.selfie.dev", custom_domain = true }]
+routes = [
+  { pattern = "app.selfie.dev", custom_domain = true },
+  # Built Storybooks are a branch's own code, so they're on another site altogether.
+  { pattern = "selfieusercontent.com", custom_domain = true },
+  # Where the hackathon's service was, which redirects here.
+  { pattern = "hackathon.selfie.dev", custom_domain = true },
+]
 
 [assets]
 directory = "./dist"
@@ -12,8 +20,15 @@ binding = "ASSETS"
 run_worker_first = true
 
 [vars]
-REVIEW_ORIGIN = "https://hackathon.selfie.dev"
-STORYBOOK_ORIGIN = "https://selfie-hackathon.ned-twigg.workers.dev"
+APP_ORIGIN = "https://app.selfie.dev"
+STORYBOOK_ORIGIN = "https://selfieusercontent.com"
+FORMER_ORIGINS = "https://hackathon.selfie.dev"
+
+# Sign-in's Postgres, with query caching off, since a sign-out must be seen at once. The release
+# workflow overrides this placeholder with the `HYPERDRIVE_ID` variable (OPERATIONS.md).
+[[hyperdrive]]
+binding = "HYPERDRIVE"
+id = "00000000000000000000000000000000"
 
 # How often one address may ask the model anything, since anyone may. See docs/specs/chat.md.
 [[ratelimits]]
@@ -21,6 +36,7 @@ name = "CHAT_LIMIT"
 namespace_id = "1001"
 simple = { limit = 10, period = 60 }
 
+# Named for the hackathon, and R2 can't rename a bucket.
 [[r2_buckets]]
 binding = "BLOBS"
 bucket_name = "selfie-hackathon-images"

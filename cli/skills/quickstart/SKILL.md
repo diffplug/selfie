@@ -95,7 +95,7 @@ Say first what it asks of them, then go through these in order, and stop and say
 1. **Check the service hosts this repository**, from the owner and name in its `origin`:
 
    ```sh
-   curl -s -o /dev/null -w '%{http_code}\n' https://hackathon.selfie.dev/api/repositories/<owner>/<name>
+   curl -s -o /dev/null -w '%{http_code}\n' https://app.selfie.dev/api/repositories/<owner>/<name>
    ```
 
    200 means it does. 404 means it doesn't, since the service only hosts the public repositories written into `ui/src/worker/index.ts`, so stop here and say so.
@@ -129,7 +129,7 @@ Say first what it asks of them, then go through these in order, and stop and say
            with:
              node-version: 26
          # Install the repository's dependencies here, such as `npm ci`, or `pnpm/action-setup` then `pnpm install --frozen-lockfile`.
-         - uses: diffplug/selfie-hackathon/.github/actions/selfie@main
+         - uses: diffplug/selfie/.github/actions/selfie@main
            with:
              upload-token: ${{ secrets.SELFIE_UPLOAD_TOKEN }}
    ```
@@ -147,6 +147,6 @@ Say first what it asks of them, then go through these in order, and stop and say
 Then tell them:
 
 - Every story reads as added at first, so the status is yellow, or red if any story failed.
-- To approve, follow the status's **Details** link, sign in with the writer's password, and **Approve all**. That's what later commits compare with, and a merge commit reaches it by itself, as long as the repository merges with merge commits rather than squashing or rebasing.
-- To see those approvals locally: `SELFIE_REMOTE=https://hackathon.selfie.dev selfie pull`.
+- To approve, follow the status's **Details** link, sign in with the writer's GitHub account, and **Approve all**. That's what later commits compare with, and a merge commit reaches it by itself, as long as the repository merges with merge commits rather than squashing or rebasing.
+- To see those approvals locally: `SELFIE_REMOTE=https://app.selfie.dev selfie pull`.
 - The `selfie` status only blocks merging if they make it a required check in branch protection.
