@@ -54,7 +54,7 @@ export function githubApp({ appId, privateKey }: { readonly appId: string; reado
   const ask = (path: string, token: string, init: RequestInit = {}) =>
     fetch(`${API}${path}`, {
       ...init,
-      headers: { authorization: `Bearer ${token}`, accept: "application/vnd.github+json", "user-agent": "selfie-hackathon", "x-github-api-version": "2022-11-28" },
+      headers: { authorization: `Bearer ${token}`, accept: "application/vnd.github+json", "user-agent": "selfie", "x-github-api-version": "2022-11-28" },
     });
 
   // So that a status needn't sign anything twice in the hour.

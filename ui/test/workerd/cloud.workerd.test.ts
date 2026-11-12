@@ -1,17 +1,19 @@
-// The whole cloud service inside workerd, on its local D1 and R2, with a stand-in for GitHub. Nothing
-// crosses to Node, and no account is involved. These run in order, each on what the last left.
+// The whole cloud service inside workerd, on its local D1 and R2, with stand-ins for GitHub and for
+// pgstencil's auth adapter. Nothing crosses to Node, and no account is involved. These run in order, each on what the last left.
 import { env } from "cloudflare:workers";
 import { beforeAll, describe, expect, it } from "vitest";
 import type { R2BucketLike } from "selfie-store/adapters/r2";
 import { createCloudApp } from "../../src/worker/app.ts";
 import { metaModel, type ModelRequest } from "../../src/worker/chat.ts";
+import { pgstencilLogin, type AuthFetch } from "../../src/worker/login.ts";
 import type { CodeChange } from "../../src/worker/github.ts";
 import type { ChatEvent } from "../../src/shared/chat.ts";
 import type { CommitStatus } from "../../src/shared/commit-status.ts";
 
 const ORIGIN = "https://review.test";
 const STORYBOOKS = "https://storybooks.test";
-const PASSWORD = "the-password";
+const WRITER_TOKEN = "the-writer-token";
+const FORMER = "https://hackathon.test";
 const UPLOAD = "the-upload-token";
 const ENV = "container-linux-arm64-0123456789abcdef";
 const FIRST_SHA = "a".repeat(40);
@@ -53,6 +55,45 @@ let refused = false;
 let app: ReturnType<typeof createCloudApp>;
 let cookie = "";
 
+/**
+ * pgstencil's adapter, as far as the Worker uses it: a CSRF token, GitHub's authorization URL, a session from
+ * GitHub's callback (whose `code` here says whose account it is), the session's accounts, and signing out.
+ */
+const signedOut: string[] = [];
+const fakeAuth: AuthFetch = async (request) => {
+  const url = new URL(request.url);
+  const cookies = request.headers.get("cookie") ?? "";
+  const session = /__Host-pgstencil\.session_token=([^;]+)/.exec(cookies)?.[1];
+  const json = (body: unknown, setCookie?: string) => {
+    const response = Response.json(body);
+    if (setCookie !== undefined) response.headers.append("set-cookie", setCookie);
+    return response;
+  };
+  const csrfOk = () => request.headers.get("origin") === ORIGIN && request.headers.get("x-csrf-token") === "t" && cookies.includes("__Host-pgstencil.csrf=t.sig");
+  switch (`${request.method} ${url.pathname}`) {
+    case "GET /api/auth/csrf":
+      return json({ csrf: "t" }, "__Host-pgstencil.csrf=t.sig; Path=/; HttpOnly; SameSite=Lax; Secure");
+    case "POST /api/auth/sign-in/social":
+      if (!csrfOk()) return new Response(null, { status: 403 });
+      return json({ url: "https://github.com/login/oauth/authorize?state=s", redirect: false }, "__Host-pgstencil.state=s; Path=/; HttpOnly; SameSite=Lax; Secure");
+    case "GET /api/auth/callback/github": {
+      const response = new Response(null, { status: 302, headers: { location: `${ORIGIN}/signed-in` } });
+      response.headers.append("set-cookie", `__Host-pgstencil.session_token=${url.searchParams.get("code")}; Path=/; HttpOnly; SameSite=Lax; Secure`);
+      return response;
+    }
+    case "GET /api/auth/list-accounts":
+      if (session === "writer") return json([{ providerId: "github", accountId: "2924992" }]);
+      if (session === "stranger") return json([{ providerId: "github", accountId: "1" }]);
+      return Response.json({ message: "Unauthorized" }, { status: 401 });
+    case "POST /api/auth/sign-out":
+      if (!csrfOk()) return new Response(null, { status: 403 });
+      signedOut.push(session ?? "");
+      return json({ success: true }, "__Host-pgstencil.session_token=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax; Secure");
+    default:
+      return new Response(null, { status: 404 });
+  }
+};
+
 const api = (method: string, route: string, token: string | null, body?: unknown) =>
   app.request(`${ORIGIN}/api/projects/42${route}`, {
     method,
@@ -78,11 +119,13 @@ async function pushBatch(id: string, sha: string) {
 
 beforeAll(() => {
   app = createCloudApp({
-    projects: [{ id: "42", owner: "diffplug", name: "selfie", defaultBranch: "main", db: env.DB as never }],
+    projects: [{ id: "42", owner: "diffplug", name: "selfie", formerNames: ["selfie-hackathon"], defaultBranch: "main", db: env.DB as never }],
     bucket: env.BLOBS as R2BucketLike,
     reviewOrigin: ORIGIN,
     storybookOrigin: STORYBOOKS,
-    password: PASSWORD,
+    formerOrigins: [FORMER],
+    login: pgstencilLogin({ origin: ORIGIN, auth: fakeAuth, writerGithubId: "2924992", writerName: "nedtwigg" }),
+    writerToken: WRITER_TOKEN,
     uploadToken: UPLOAD,
     now: () => 1_000_000,
     github: {
@@ -139,21 +182,72 @@ describe("the cloud service", () => {
     expect((await (await review("GET", "/images/" + hash)).arrayBuffer()).byteLength).toBe(png.length);
   });
 
-  it("signs in with the password only, and only sends you back to this site", async () => {
-    const signIn = (password: string, next = "/diffplug/selfie") =>
-      app.request(`${ORIGIN}/sign-in`, { method: "POST", headers: { origin: ORIGIN, "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ password, next }).toString() });
-    expect((await signIn("wrong")).status).toBe(401);
-    expect((await signIn(PASSWORD, "https://evil.test/")).headers.get("location")).toBe("/");
-    expect((await signIn(PASSWORD, "//evil.test/")).headers.get("location")).toBe("/");
-    const response = await signIn(PASSWORD);
-    expect(response.status).toBe(303);
-    const set = response.headers.get("set-cookie")!;
-    expect(set).toMatch(/^__Host-selfie-session=.*HttpOnly; Secure; SameSite=Strict$/);
-    cookie = set.split(";")[0]!;
-    const tampered = await review("GET", `/batches/${FIRST}`, { signedIn: false });
-    expect(((await tampered.json()) as { actor: string | null }).actor).toBeNull();
+  it("signs in through GitHub, and only sends you back to this site", async () => {
+    const begin = (next: string, origin = ORIGIN) =>
+      app.request(`${ORIGIN}/sign-in`, { method: "POST", headers: { origin, "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ next }).toString() });
+    const page = await app.request(`${ORIGIN}/sign-in?next=/diffplug/selfie`);
+    expect(await page.text()).toContain("Sign in with GitHub");
+    expect(page.headers.get("content-security-policy")).toContain("form-action 'self' https://github.com");
+    expect((await begin("/diffplug/selfie", "https://evil.test")).status).toBe(403);
+
+    const started = await begin("/diffplug/selfie");
+    expect(started.status).toBe(303);
+    expect(started.headers.get("location")).toBe("https://github.com/login/oauth/authorize?state=s");
+    const set = started.headers.getSetCookie();
+    expect(set.map((line) => line.split("=")[0])).toEqual(["__Host-pgstencil.csrf", "__Host-pgstencil.state", "__Host-selfie-next"]);
+    expect(set[2]).toBe("__Host-selfie-next=%2Fdiffplug%2Fselfie; Path=/; Max-Age=600; HttpOnly; SameSite=Lax; Secure");
+    expect((await begin("//evil.test/")).headers.getSetCookie()[2]).toMatch(/^__Host-selfie-next=%2F;/);
+
+    const back = await app.request(`${ORIGIN}/api/auth/callback/github?code=writer&state=s`);
+    expect(back.headers.get("location")).toBe(`${ORIGIN}/signed-in`);
+    cookie = back.headers.getSetCookie()[0]!.split(";")[0]!;
+    const landed = await app.request(`${ORIGIN}/signed-in`, { headers: { cookie: `${cookie}; __Host-selfie-next=%2Fdiffplug%2Fselfie` } });
+    expect(landed.headers.get("location")).toBe("/diffplug/selfie");
+    expect(landed.headers.getSetCookie()).toEqual(["__Host-selfie-next=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax; Secure"]);
+    const sneaky = await app.request(`${ORIGIN}/signed-in`, { headers: { cookie: `${cookie}; __Host-selfie-next=https%3A%2F%2Fevil.test` } });
+    expect(sneaky.headers.get("location")).toBe("/");
+    const garbled = await app.request(`${ORIGIN}/signed-in`, { headers: { cookie: `${cookie}; __Host-selfie-next=%E0%A4%A` } });
+    expect(garbled.headers.get("location")).toBe("/");
+
+    const anonymous = await review("GET", `/batches/${FIRST}`, { signedIn: false });
+    expect(((await anonymous.json()) as { actor: string | null }).actor).toBeNull();
     const view = await review("GET", `/batches/${FIRST}`, { signedIn: true });
     expect(((await view.json()) as { actor: string | null }).actor).toBe("nedtwigg");
+  });
+
+  it("signs anyone but the writer straight back out, and never lets them decide", async () => {
+    const stranger = "__Host-pgstencil.session_token=stranger";
+    const landed = await app.request(`${ORIGIN}/signed-in`, { headers: { cookie: stranger } });
+    expect(landed.headers.get("location")).toBe("/sign-in?refused=1");
+    expect(landed.headers.getSetCookie()).toContain("__Host-pgstencil.session_token=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax; Secure");
+    expect(signedOut).toEqual(["stranger"]);
+    expect(await (await app.request(`${ORIGIN}/sign-in?refused=1`)).text()).toContain("only @nedtwigg can sign in");
+    const view = await app.request(`${ORIGIN}/diffplug/selfie/api/batches/${FIRST}`, { headers: { origin: ORIGIN, cookie: stranger } });
+    expect(((await view.json()) as { actor: string | null }).actor).toBeNull();
+  });
+
+  it("reaches the auth adapter from outside only through GitHub's callback", async () => {
+    for (const [method, path] of [
+      ["GET", "/api/auth/csrf"],
+      ["GET", "/api/auth/list-accounts"],
+      ["POST", "/api/auth/sign-in/social"],
+      ["POST", "/api/auth/email-otp/send-verification-otp"],
+      ["POST", "/api/auth/sign-in/email-otp"],
+      ["GET", "/api/providers"],
+    ] as const)
+      expect((await app.request(`${ORIGIN}${path}`, { method, headers: { origin: ORIGIN, cookie } })).status, path).toBe(404);
+  });
+
+  it("sends a former origin and a former name to where they are now", async () => {
+    const moved = await app.request(`${FORMER}/diffplug/selfie-hackathon/batches/${FIRST}?x=1`);
+    expect(moved.status).toBe(308);
+    expect(moved.headers.get("location")).toBe(`${ORIGIN}/diffplug/selfie-hackathon/batches/${FIRST}?x=1`);
+    const renamed = await app.request(`${ORIGIN}/diffplug/selfie-hackathon/batches/${FIRST}?x=1`);
+    expect(renamed.status).toBe(308);
+    expect(renamed.headers.get("location")).toBe(`/diffplug/selfie/batches/${FIRST}?x=1`);
+    const found = (await (await app.request(`${ORIGIN}/api/repositories/diffplug/selfie-hackathon`)).json()) as { project: string };
+    expect(found.project).toBe("42");
+    expect((await app.request("https://selfie-app.example.workers.dev/diffplug/selfie")).status).toBe(421);
   });
 
   it("turns green when the writer approves, and red when they reject", async () => {
@@ -173,7 +267,7 @@ describe("the cloud service", () => {
   it("says a commit's status only at the end of a push, or on a decision made here", async () => {
     const posted = statuses.length;
     const decision = { story: "a", imageHash: hash, decision: "approved", at: 900, gitSha: FIRST_SHA, batchId: FIRST };
-    expect((await api("POST", "/decisions", PASSWORD, { environment: ENV, decisions: [decision] })).status).toBe(200);
+    expect((await api("POST", "/decisions", WRITER_TOKEN, { environment: ENV, decisions: [decision] })).status).toBe(200);
     expect(statuses.length).toBe(posted);
     expect((await api("POST", `/batches/${NEXT}/status`, null, {})).status).toBe(403);
     expect((await api("POST", `/batches/${NEXT}/status`, UPLOAD, {})).status).toBe(200);

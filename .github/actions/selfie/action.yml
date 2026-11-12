@@ -6,7 +6,7 @@ inputs:
     required: true
   remote:
     description: The Selfie service.
-    default: https://hackathon.selfie.dev
+    default: https://app.selfie.dev
 runs:
   using: composite
   steps:

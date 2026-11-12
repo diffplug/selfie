@@ -28,6 +28,8 @@
 
 ## Who can do what
 
-**One writer, by password.** The service holds only public repositories, and only their owner reviews them, so sign-in through GitHub would be a client secret, a callback, and a token store to say what's already known. It's also what lets a writer sign in without the service ever holding a GitHub token. **Scope: github-access** is what it takes for that to stop being true.
+**One writer, through GitHub.** The service holds only public repositories, and only their owner reviews them. A password did that through the hackathon; GitHub sign-in replaces it so there's no shared secret to type or leak, and so the session, cookie, and CSRF handling are pgstencil's, already audited in Dormouse, rather than this Worker's own. Postgres holds only sign-in, while projects stay in D1, because pgstencil is built on Postgres. **Scope: github-access** is what it takes for more people to sign in.
+
+**Signed straight back out.** GitHub will authorize anyone who presses the button, and the adapter has no allowlist, so the refusal happens on the page the adapter returns everyone to. A refused person's session lives for one redirect, and grants nothing even then, since the writer is looked up on every request.
 
 **An upload token rather than OIDC.** It's a secret a repository has to hold, which OIDC avoids, and it costs a rotation if it leaks. A leak lets someone upload to a public project, which can't approve anything, and can only add batches at commits GitHub has.

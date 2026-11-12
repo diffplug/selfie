@@ -12,7 +12,7 @@ A spec is the accurate reference for the current code: it states the invariants 
 - **`docs/specs/renders.md`** — Render batches, render states, decisions, and approvals: the data layer `selfie review` and the review UI use.
 - **`docs/specs/store.md`** — Image storage: image identity, decoding, keys, hash collisions, kept built Storybooks, and the SQL and blob adapters.
 - **`docs/specs/sync.md`** — Moving batches, images, decisions, and goldens between stores.
-- **`docs/specs/cloud.md`** — The Worker at `hackathon.selfie.dev`: its projects, origins, pages, and a commit's status.
+- **`docs/specs/cloud.md`** — The Worker at `app.selfie.dev`: its projects, origins, pages, and a commit's status.
 - **`docs/specs/feedback.md`** — Notes: how a person tells a coding agent what they see, and how the agent answers.
 - **`docs/specs/chat.md`** — Asking Muse Spark about a story's change, with its images and the code from GitHub.
 - **`docs/specs/render.md`** — The renderer: rendering a built Storybook into PNGs in a pinned environment, the environment ID, and the manifest.
@@ -28,6 +28,10 @@ A spec is the accurate reference for the current code: it states the invariants 
 - **Named scopes.** A cut is recorded as a named scope in `## Future` (`**Scope: store**`). A scope is defined in exactly one spec; others link it by name.
 - **Reservations.** Unbuilt design that constrains present code is stated in the body, marked `Reserved:`, pointing at the `## Future` item it serves.
 - **Promotion is part of done.** A staged item is finished only when its text moves above the fold, rewritten to present tense, and the built portion is deleted from `## Future`.
+
+## Layout and deployment
+
+`store/`, `render/`, `cli/`, and `ui/` are the product; `ui/src/worker/` is the cloud service at `app.selfie.dev`. `site/` is the landing page at `selfie.dev`, plain HTML with no build step; its `PRODUCT.md` and `DESIGN.md` are the brief for it. `OPERATIONS.md` says how each is deployed, and what holds which secret.
 
 ## Skills
 

@@ -1,0 +1,75 @@
+# app.selfie.dev: tests and builds every push to main, and deploys only when run by hand with
+# `promote`. OPERATIONS.md says what it needs set up first.
+name: App production release
+on:
+  push:
+    branches: [main]
+    paths: ["ui/**", "store/**", "pnpm-lock.yaml", ".github/workflows/app-production.yml"]
+  workflow_dispatch:
+    inputs:
+      promote:
+        description: Migrate sign-in's database and deploy the Worker after verification
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: app-production
+  cancel-in-progress: false
+jobs:
+  verify:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter selfie-store test
+      - run: pnpm --filter selfie-ui test
+  deploy:
+    needs: verify
+    if: inputs.promote
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: app-production
+      url: https://app.selfie.dev
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      HYPERDRIVE_ID: ${{ vars.HYPERDRIVE_ID }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26
+          # A job holding deploy credentials restores no cache another job could have written.
+          package-manager-cache: false
+      - run: pnpm install --frozen-lockfile
+      - name: Check the Hyperdrive is uncached, and every Worker secret is set
+        working-directory: ui
+        run: node scripts/production.mjs preflight
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      - name: Apply and validate sign-in's migrations
+        working-directory: ui
+        run: pnpm db:migrate && pnpm db:validate
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      - name: Deploy the Worker
+        working-directory: ui
+        run: node scripts/production.mjs deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      - name: Check the live origins
+        working-directory: ui
+        run: node scripts/production.mjs smoke

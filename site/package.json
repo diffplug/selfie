@@ -1,0 +1,13 @@
+{
+  "name": "selfie-site",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler pages dev --ip 0.0.0.0",
+    "test": "node --test --test-force-exit test/",
+    "deploy": "wrangler pages deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.156.2"
+  }
+}

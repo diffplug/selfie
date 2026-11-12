@@ -8,7 +8,9 @@
 
 ## Origins
 
-**A workers.dev hostname.** Another subdomain of `selfie.dev` would be the same site, so it needs a cookie and a request guard to hold, where a different site simply gets neither. It also takes no DNS.
+**Another site for Storybooks.** Another subdomain of `selfie.dev` would be the same site, so a branch's Storybook could set cookies the app reads and send requests `SameSite` doesn't stop. A different registrable domain, `selfieusercontent.com`, gets neither, as `dormouseusercontent.com` does for Dormouse. The hackathon used the Worker's workers.dev name, which the Public Suffix List made a site of its own.
+
+**A landing page on another origin.** The landing page loads third-party things, a mailing-list form and video thumbnails, and may load analytics. On its own origin none of it can read the app's pages or ride its cookie. The two are still the same site, so the app's routes keep their own `Origin` checks.
 
 ## Without Git or a decoder
 

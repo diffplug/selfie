@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Selfie: distributed Storybook testing</title>
+  <meta name="description" content="Distributed Storybook testing that runs on your machine beside your agent, in CI, and on GitHub, for $0 per snapshot.">
+  <link rel="canonical" href="https://selfie.dev/">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://selfie.dev/">
+  <meta property="og:title" content="Selfie: distributed Storybook testing">
+  <meta property="og:description" content="Distributed Storybook testing that runs on your machine beside your agent, in CI, and on GitHub, for $0 per snapshot.">
+  <meta property="og:image" content="https://selfie.dev/img/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" type="image/svg+xml" href="icon.svg">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="preload" href="fonts/Jost.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/Jost-Italic.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/Neucha.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="style.css">
+  <script src="hero.js" defer></script>
+  <script src="join.js" defer></script>
+</head>
+<body>
+  <aside class="strip">
+    <p><strong>Using Selfie on Java, Kotlin, or Python?</strong> The snapshot testing library moved, and your build doesn't need to change.</p>
+    <a href="https://lib.selfie.dev">Go to lib.selfie.dev <svg class="icon-arrow" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 8h10M8.5 3.5 13 8l-4.5 4.5"/></svg></a>
+  </aside>
+
+  <header class="hero">
+    <div class="hero-copy">
+      <h1><em>Distributed</em> <span>Storybook testing.</span></h1>
+      <p class="argument-lead">Putting renders <em>inside</em> the coding agent's loop can multiply render counts by <strong>100x to 1000x</strong>.</p>
+      <p class="argument-rest">The extra snapshots are wildly effective, but wildly unaffordable with a pay-per-snapshot service like Chromatic.</p>
+      <p class="lede">Selfie lets your agent take its own snapshots.</p>
+      <p class="price">$0 per snapshot</p>
+      <a class="btn btn-primary btn-hero" href="https://github.com/diffplug/selfie">Get started on GitHub</a>
+    </div>
+
+    <figure class="shot" aria-label="A robot takes a selfie. Yesterday's photo of it had a red head plate, and today's has a blue one, circled with the note: this changed.">
+      <div class="print" aria-hidden="true">
+        <picture><source srcset="img/plates/yesterday.webp" type="image/webp"><img src="img/plates/yesterday.png" alt="" width="1024" height="1052"></picture>
+        <span>yesterday</span>
+      </div>
+      <div class="phone">
+        <div class="screen">
+          <span class="flash" aria-hidden="true"></span>
+          <ul class="readouts">
+            <li><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="9.2" r="5.6"/><path d="M8 9.2V6.2 M6.2 1.6h3.6 M8 1.6v2"/></svg>~500 stories per minute on M4 MacBook Air</li>
+          </ul>
+          <picture><source srcset="img/plates/today.webp" type="image/webp"><img class="today" src="img/plates/today.png" alt="" width="1024" height="1536"></picture>
+          <span class="brackets" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+          <div class="controls">
+            <a class="shutter" href="#join"><span>Join the list</span></a>
+            <span class="last-photo" aria-hidden="true"></span>
+            <ul class="modes" aria-hidden="true"><li>VIDEO</li><li class="on">SELFIE</li><li>PHOTO</li></ul>
+          </div>
+        </div>
+      </div>
+      <svg class="arrow" viewBox="0 0 206 100" aria-hidden="true"><path class="arrow-line" pathLength="1" d="M200 14 C 160 34, 120 30, 80 40 C 50 48, 30 60, 12 80"/><path class="arrow-head" pathLength="1" d="M10 58 L 11 81 L 33 82"/></svg>
+      <p class="note" aria-hidden="true">this changed</p>
+      <div class="arm" aria-hidden="true">
+        <picture><source srcset="img/plates/arm-hand.webp" type="image/webp"><img class="hand" src="img/plates/arm-hand.png" alt="" width="1373" height="1145"></picture>
+        <div class="thumb-base">
+          <picture><source srcset="img/plates/arm-thumb-base.webp" type="image/webp"><img src="img/plates/arm-thumb-base.png" alt="" width="340" height="340"></picture>
+          <div class="thumb-tip"><picture><source srcset="img/plates/arm-thumb.webp" type="image/webp"><img src="img/plates/arm-thumb.png" alt="" width="260" height="210"></picture></div>
+        </div>
+      </div>
+    </figure>
+  </header>
+
+  <main>
+    <section class="videos">
+      <div class="wrap">
+        <h2>See it work</h2>
+        <div class="video-grid">
+          <a class="video" href="https://youtu.be/8B3-v4DTwfU">
+            <span class="thumb"><img src="img/video-why.webp" alt="" width="960" height="540" loading="lazy"><span class="play" aria-hidden="true"></span></span>
+            <strong>Why Selfie</strong>
+            <span>From Storybook to Chromatic to Selfie: why snapshot testing has to change for coding agents.</span>
+          </a>
+          <a class="video" href="https://youtu.be/FiGuwfB13b0">
+            <span class="thumb"><img src="img/video-demo.webp" alt="" width="960" height="540" loading="lazy"><span class="play" aria-hidden="true"></span></span>
+            <strong>Product demo</strong>
+            <span>A two-line CSS change touches all 124 stories, and a person and an agent work through it together.</span>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <section class="loop">
+      <div class="wrap loop-grid">
+        <div>
+          <h2>The agent checks its <em>own</em> work</h2>
+          <pre class="terminal" tabindex="0" aria-label="An agent's loop, as shell commands"><code><span class="c"># JSON naming the diff images</span>
+selfie review
+
+<span class="c"># after looking at them</span>
+selfie approve &lt;batch&gt; --all
+git commit
+
+<span class="c"># nothing left to ask</span>
+selfie review</code></pre>
+        </div>
+        <ul class="features">
+          <li><strong>One JSON document.</strong> <code>selfie review</code> names every changed image, and its exit code says whether anything blocks.</li>
+          <li><strong>It knows what kind of change it is.</strong> What moved or gained spacing is kept apart from what really changed, so the harmless ones get approved together.</li>
+          <li><strong>Point at the problem.</strong> Write a note on an image, and your agent gets your words, the exact box, and a picture of what you saw.</li>
+          <li><strong>Approvals follow Git.</strong> An approval counts wherever history reaches it, so a commit, a rebase, or a merge never asks again.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="early">
+      <div class="wrap early-grid">
+        <div>
+          <h2>It's <em>early</em>. Follow along.</h2>
+          <p>Selfie is piloting with StorybookJS. The local loop, CI, and commit statuses are built, and in use on Selfie's own repository. It isn't on npm yet, so setup starts from a checkout: you'll need Node 26 or later, pnpm, and Docker. GitHub sign-in and private repositories aren't built yet.</p>
+          <p><a href="https://app.selfie.dev/diffplug/selfie">See Selfie reviewing itself</a>, no sign-in needed.</p>
+        </div>
+        <div class="join-box">
+          <form class="join" id="join" action="https://assets.mailerlite.com/jsonp/2772060/forms/203332822830679835/subscribe" method="post">
+            <label for="join-email">Follow Selfie's development by email</label>
+            <div class="join-row">
+              <input id="join-email" type="email" name="fields[email]" placeholder="you@example.com" autocomplete="email" required>
+              <button class="btn btn-primary" type="submit">Join the list</button>
+            </div>
+            <input type="hidden" name="ml-submit" value="1">
+            <input type="hidden" name="anticsrf" value="true">
+            <p class="join-status" role="status" aria-live="polite"></p>
+          </form>
+          <a class="btn btn-dark" href="https://github.com/diffplug/selfie#quickstart">Or read the quickstart</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap">
+      <p>Looking for the JVM/Python snapshot testing library (<code>expectSelfie</code>, <code>expect_selfie</code>)? It moved to <a href="https://github.com/diffplug/selfie-lib">diffplug/selfie-lib</a>, with docs at <a href="https://lib.selfie.dev">lib.selfie.dev</a>.</p>
+      <p class="fine">© 2026 DiffPlug LLC</p>
+    </div>
+  </footer>
+</body>
+</html>

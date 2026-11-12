@@ -1,0 +1,42 @@
+# selfie.dev: tests the landing page on every change to it, and publishes it from main. OPERATIONS.md
+# says what it needs set up first.
+name: Site
+on:
+  push:
+    paths: ["site/**", ".github/workflows/site.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: site-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  site:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26
+          package-manager-cache: false
+      - run: pnpm install --frozen-lockfile --filter selfie-site
+      - name: Check the redirects, links, and 404 against a local server
+        working-directory: site
+        run: pnpm test
+      - name: Publish to the selfie-landing Pages project
+        if: github.ref == 'refs/heads/main'
+        working-directory: site
+        run: pnpm exec wrangler pages deploy --branch main --commit-hash "$GITHUB_SHA"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_PAGES_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Check the live site
+        if: github.ref == 'refs/heads/main'
+        working-directory: site
+        run: pnpm test
+        env:
+          BASE_URL: https://selfie.dev

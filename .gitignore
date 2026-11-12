@@ -6,3 +6,6 @@ ui/storybook-fixtures/
 *.tsbuildinfo
 .claude/worktrees/
 .DS_Store
+.wrangler/
+ui/wrangler.production.toml
+.pgstencil/

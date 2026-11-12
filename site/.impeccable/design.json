@@ -1,0 +1,374 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-05T20:36:33+00:00",
+  "title": "Design System: Selfie",
+  "extensions": {
+    "colorMeta": {
+      "sky": {
+        "role": "neutral",
+        "displayName": "Sky",
+        "canonical": "oklch(87.3% 0.042 245.0)",
+        "tonalRamp": [
+          "oklch(15% 0.015 245.0)",
+          "oklch(26% 0.025 245.0)",
+          "oklch(37% 0.036 245.0)",
+          "oklch(48% 0.042 245.0)",
+          "oklch(59% 0.042 245.0)",
+          "oklch(70% 0.038 245.0)",
+          "oklch(82% 0.025 245.0)",
+          "oklch(94% 0.013 245.0)"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Primer Ink",
+        "canonical": "oklch(25.4% 0.011 254.0)",
+        "tonalRamp": [
+          "oklch(15% 0.004 254.0)",
+          "oklch(26% 0.007 254.0)",
+          "oklch(37% 0.009 254.0)",
+          "oklch(48% 0.011 254.0)",
+          "oklch(59% 0.011 254.0)",
+          "oklch(70% 0.010 254.0)",
+          "oklch(82% 0.007 254.0)",
+          "oklch(94% 0.003 254.0)"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Primer Muted",
+        "canonical": "oklch(43.5% 0.019 254.0)",
+        "tonalRamp": [
+          "oklch(15% 0.007 254.0)",
+          "oklch(26% 0.011 254.0)",
+          "oklch(37% 0.016 254.0)",
+          "oklch(48% 0.019 254.0)",
+          "oklch(59% 0.019 254.0)",
+          "oklch(70% 0.017 254.0)",
+          "oklch(82% 0.011 254.0)",
+          "oklch(94% 0.006 254.0)"
+        ]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Paper",
+        "canonical": "oklch(100% 0 0)",
+        "tonalRamp": [
+          "oklch(15% 0.000 0.0)",
+          "oklch(26% 0.000 0.0)",
+          "oklch(37% 0.000 0.0)",
+          "oklch(48% 0.000 0.0)",
+          "oklch(59% 0.000 0.0)",
+          "oklch(70% 0.000 0.0)",
+          "oklch(82% 0.000 0.0)",
+          "oklch(94% 0.000 0.0)"
+        ]
+      },
+      "yellow": {
+        "role": "primary",
+        "displayName": "Button Yellow",
+        "canonical": "oklch(87.9% 0.168 95.4)",
+        "tonalRamp": [
+          "oklch(15% 0.059 95.4)",
+          "oklch(26% 0.101 95.4)",
+          "oklch(37% 0.143 95.4)",
+          "oklch(48% 0.168 95.4)",
+          "oklch(59% 0.168 95.4)",
+          "oklch(70% 0.151 95.4)",
+          "oklch(82% 0.101 95.4)",
+          "oklch(94% 0.050 95.4)"
+        ]
+      },
+      "cam-yellow": {
+        "role": "secondary",
+        "displayName": "Camera Chrome Yellow",
+        "canonical": "oklch(88.5% 0.181 94.8)",
+        "tonalRamp": [
+          "oklch(15% 0.063 94.8)",
+          "oklch(26% 0.109 94.8)",
+          "oklch(37% 0.154 94.8)",
+          "oklch(48% 0.181 94.8)",
+          "oklch(59% 0.181 94.8)",
+          "oklch(70% 0.163 94.8)",
+          "oklch(82% 0.109 94.8)",
+          "oklch(94% 0.054 94.8)"
+        ]
+      },
+      "hot-pink": {
+        "role": "tertiary",
+        "displayName": "Annotation Hot Pink",
+        "canonical": "oklch(66.0% 0.255 355.0)",
+        "tonalRamp": [
+          "oklch(15% 0.089 355.0)",
+          "oklch(26% 0.153 355.0)",
+          "oklch(37% 0.217 355.0)",
+          "oklch(48% 0.255 355.0)",
+          "oklch(59% 0.255 355.0)",
+          "oklch(70% 0.230 355.0)",
+          "oklch(82% 0.153 355.0)",
+          "oklch(94% 0.076 355.0)"
+        ]
+      },
+      "signal-pink": {
+        "role": "tertiary",
+        "displayName": "Signal Pink",
+        "canonical": "oklch(65.8% 0.200 353.5)",
+        "tonalRamp": [
+          "oklch(15% 0.070 353.5)",
+          "oklch(26% 0.120 353.5)",
+          "oklch(37% 0.170 353.5)",
+          "oklch(48% 0.200 353.5)",
+          "oklch(59% 0.200 353.5)",
+          "oklch(70% 0.180 353.5)",
+          "oklch(82% 0.120 353.5)",
+          "oklch(94% 0.060 353.5)"
+        ]
+      },
+      "screen-black": {
+        "role": "neutral",
+        "displayName": "Screen Black",
+        "canonical": "oklch(16.9% 0.004 286.0)",
+        "tonalRamp": [
+          "oklch(15% 0.001 286.0)",
+          "oklch(26% 0.002 286.0)",
+          "oklch(37% 0.003 286.0)",
+          "oklch(48% 0.004 286.0)",
+          "oklch(59% 0.004 286.0)",
+          "oklch(70% 0.004 286.0)",
+          "oklch(82% 0.002 286.0)",
+          "oklch(94% 0.001 286.0)"
+        ]
+      },
+      "slate-note": {
+        "role": "neutral",
+        "displayName": "Slate Note",
+        "canonical": "oklch(76.5% 0.021 250.4)",
+        "tonalRamp": [
+          "oklch(15% 0.007 250.4)",
+          "oklch(26% 0.013 250.4)",
+          "oklch(37% 0.018 250.4)",
+          "oklch(48% 0.021 250.4)",
+          "oklch(59% 0.021 250.4)",
+          "oklch(70% 0.019 250.4)",
+          "oklch(82% 0.013 250.4)",
+          "oklch(94% 0.006 250.4)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "The hero headline; desktop size is 82 comp units, italic word at the same weight 600."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Section heads; italic words inside drop to 600."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Hero argument line; the 600-weight family of smaller titles (1.375rem video titles, 1.25rem feature names)."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Running copy, held to about 42-48em."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Fine print; the notice strip uses 1.0625rem."
+      },
+      "hand": {
+        "displayName": "Hand",
+        "purpose": "Neucha handwriting on the artwork only: the note and the print caption."
+      },
+      "code": {
+        "displayName": "Code",
+        "purpose": "Inline code and the terminal."
+      }
+    },
+    "shadows": [
+      {
+        "name": "pressable",
+        "value": "4px 4px 0 #1f2328",
+        "purpose": "Buttons at rest; the shadow is the button travel."
+      },
+      {
+        "name": "pressable-hover",
+        "value": "5px 5px 0 #1f2328",
+        "purpose": "Button hover, with a -1px translate."
+      },
+      {
+        "name": "pressable-active",
+        "value": "1px 1px 0 #1f2328",
+        "purpose": "Button press, with a 3px translate."
+      },
+      {
+        "name": "print-drop",
+        "value": "0.6cqw 0.8cqw 1.6cqw rgb(31 35 40 / 0.18)",
+        "purpose": "The paper print of yesterday, the one soft shadow."
+      }
+    ],
+    "motion": [
+      {
+        "name": "press",
+        "value": "0.12s ease-out",
+        "purpose": "Button and shutter transform and shadow."
+      },
+      {
+        "name": "flash",
+        "value": "0.32s ease-out",
+        "purpose": "White screen flash when the shutter fires."
+      },
+      {
+        "name": "arrow-draw",
+        "value": "0.6s 0.6s cubic-bezier(0.3, 0, 0.2, 1)",
+        "purpose": "The annotation arrow draws in from the note; head follows at 0.22s after 1.15s. Skipped under reduced motion."
+      },
+      {
+        "name": "note-in",
+        "value": "0.35s 0.35s ease-out",
+        "purpose": "The handwritten note fades in before the arrow."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "phone",
+        "value": "600px"
+      },
+      {
+        "name": "stack",
+        "value": "860px"
+      },
+      {
+        "name": "stage",
+        "value": "1100px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Yellow, ink-outlined, hard offset shadow that moves with hover and press. The main call to action.",
+      "html": "<a class=\"ds-btn ds-btn-primary\" href=\"#\">Get started on GitHub</a>",
+      "css": ".ds-btn { display: inline-block; padding: 0.7rem 1.25rem; font-family: Jost, system-ui, sans-serif; font-size: 1.1875rem; font-weight: 600; color: var(--ink, #1f2328); text-decoration: none; border: 3px solid var(--ink, #1f2328); border-radius: 12px; box-shadow: 4px 4px 0 var(--ink, #1f2328); transition: transform 0.12s ease-out, box-shadow 0.12s ease-out; } .ds-btn:hover { transform: translate(-1px, -1px); box-shadow: 5px 5px 0 var(--ink, #1f2328); } .ds-btn:active { transform: translate(3px, 3px); box-shadow: 1px 1px 0 var(--ink, #1f2328); } .ds-btn:focus-visible { outline: 3px solid var(--pink, #e8509b); outline-offset: 3px; } .ds-btn-primary { background: var(--yellow, #f9d535); }"
+    },
+    {
+      "name": "Dark Button",
+      "kind": "button",
+      "refersTo": "button-dark",
+      "description": "Ink fill, white text; a second action on the yellow band.",
+      "html": "<a class=\"ds-btn ds-btn-dark\" href=\"#\">Read the quickstart</a>",
+      "css": ".ds-btn { display: inline-block; padding: 0.7rem 1.25rem; font-family: Jost, system-ui, sans-serif; font-size: 1.1875rem; font-weight: 600; color: var(--ink, #1f2328); text-decoration: none; border: 3px solid var(--ink, #1f2328); border-radius: 12px; box-shadow: 4px 4px 0 var(--ink, #1f2328); transition: transform 0.12s ease-out, box-shadow 0.12s ease-out; } .ds-btn:hover { transform: translate(-1px, -1px); box-shadow: 5px 5px 0 var(--ink, #1f2328); } .ds-btn:active { transform: translate(3px, 3px); box-shadow: 1px 1px 0 var(--ink, #1f2328); } .ds-btn:focus-visible { outline: 3px solid var(--pink, #e8509b); outline-offset: 3px; } .ds-btn-dark { background: var(--ink, #1f2328); color: #fff; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "White fill, ink text, same outline and shadow.",
+      "html": "<a class=\"ds-btn ds-btn-secondary\" href=\"#\">Join the list</a>",
+      "css": ".ds-btn { display: inline-block; padding: 0.7rem 1.25rem; font-family: Jost, system-ui, sans-serif; font-size: 1.1875rem; font-weight: 600; color: var(--ink, #1f2328); text-decoration: none; border: 3px solid var(--ink, #1f2328); border-radius: 12px; box-shadow: 4px 4px 0 var(--ink, #1f2328); transition: transform 0.12s ease-out, box-shadow 0.12s ease-out; } .ds-btn:hover { transform: translate(-1px, -1px); box-shadow: 5px 5px 0 var(--ink, #1f2328); } .ds-btn:active { transform: translate(3px, 3px); box-shadow: 1px 1px 0 var(--ink, #1f2328); } .ds-btn:focus-visible { outline: 3px solid var(--pink, #e8509b); outline-offset: 3px; } .ds-btn-secondary { background: #fff; }"
+    },
+    {
+      "name": "Notice Strip",
+      "kind": "nav",
+      "refersTo": "notice-strip",
+      "description": "Top ink strip with one sentence and one yellow link; the only navigation.",
+      "html": "<aside class=\"ds-strip\"><p><strong>Using Selfie on Java, Kotlin, or Python?</strong> The snapshot testing library moved.</p><a href=\"#\">Go to lib.selfie.dev <svg class=\"ds-arrow\" viewBox=\"0 0 16 16\" aria-hidden=\"true\"><path d=\"M2.5 8h10M8.5 3.5 13 8l-4.5 4.5\"/></svg></a></aside>",
+      "css": ".ds-strip { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: center; gap: 0.25rem 1.25rem; padding: 0.7rem 1.25rem; background: var(--ink, #1f2328); color: #fff; font-family: Jost, system-ui, sans-serif; font-size: 1.0625rem; line-height: 1.5; } .ds-strip p { margin: 0; } .ds-strip a { color: var(--yellow, #f9d535); font-weight: 600; white-space: nowrap; text-underline-offset: 0.15em; } .ds-strip a:hover { text-decoration-thickness: 2px; } .ds-strip a:focus-visible { outline: 3px solid var(--pink, #e8509b); outline-offset: 3px; } .ds-arrow { display: inline-block; width: 0.95em; height: 0.95em; margin-left: 0.15em; vertical-align: -0.12em; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }"
+    },
+    {
+      "name": "Video Card",
+      "kind": "card",
+      "refersTo": "video-thumb",
+      "description": "16:9 thumbnail in a 3px ink frame, no shadow, with a signal-pink play disc; title and muted description below.",
+      "html": "<a class=\"ds-video\" href=\"#\"><span class=\"ds-thumb\"><span class=\"ds-thumb-img\"></span><span class=\"ds-play\" aria-hidden=\"true\"></span></span><strong>Product demo</strong><span class=\"ds-desc\">A two-line CSS change touches all 124 stories.</span></a>",
+      "css": ".ds-video { display: flex; flex-direction: column; gap: 0.25rem; width: 320px; color: var(--ink, #1f2328); text-decoration: none; font-family: Jost, system-ui, sans-serif; font-size: 1.1875rem; line-height: 1.5; } .ds-thumb { position: relative; display: block; overflow: hidden; aspect-ratio: 16 / 9; background: var(--sky, #bfd9f0); border: 3px solid var(--ink, #1f2328); border-radius: 14px; } .ds-play { position: absolute; left: 1rem; bottom: 1rem; width: 3.5rem; height: 3.5rem; background: var(--pink, #e8509b); border: 3px solid var(--ink, #1f2328); border-radius: 50%; } .ds-play::after { content: ''; position: absolute; left: 1.2rem; top: 0.85rem; border-style: solid; border-width: 0.75rem 0 0.75rem 1.2rem; border-color: transparent transparent transparent #fff; } .ds-video strong { margin-top: 0.75rem; font-size: 1.375rem; font-weight: 600; } .ds-video:hover strong { text-decoration: underline; text-underline-offset: 0.15em; } .ds-video:focus-visible { outline: 3px solid var(--pink, #e8509b); outline-offset: 3px; } .ds-desc { color: var(--muted, #4a525c); }"
+    },
+    {
+      "name": "Terminal",
+      "kind": "card",
+      "refersTo": "terminal",
+      "description": "Screen-black command block on the ink band, slate comments.",
+      "html": "<pre class=\"ds-terminal\"><code><span class=\"ds-c\"># JSON naming the diff images</span>\nselfie review\n\n<span class=\"ds-c\"># after looking at them</span>\nselfie approve &lt;batch&gt; --all</code></pre>",
+      "css": ".ds-terminal { margin: 0; padding: 1.25rem 1.5rem; overflow-x: auto; background: #0f0f11; color: #fff; border: 1px solid rgb(255 255 255 / 0.14); border-radius: 14px; font: 1.125rem/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; } .ds-terminal:focus-visible { outline: 3px solid var(--pink, #e8509b); outline-offset: 3px; } .ds-c { color: #a9b4c0; }"
+    },
+    {
+      "name": "Shutter",
+      "kind": "custom",
+      "refersTo": "shutter",
+      "description": "The camera shutter: a white ringed circle that is a real link, with camera-yellow mode row; focus in annotation hot pink.",
+      "html": "<div class=\"ds-cam\"><a class=\"ds-shutter\" href=\"#\"><span>Join the list</span></a><ul class=\"ds-modes\"><li>VIDEO</li><li class=\"ds-on\">SELFIE</li><li>PHOTO</li></ul></div>",
+      "css": ".ds-cam { display: grid; justify-items: center; gap: 1rem; width: 280px; padding: 1.25rem; background: #0f0f11; border-radius: 24px; font-family: Jost, system-ui, sans-serif; } .ds-shutter { display: grid; place-items: center; width: 96px; aspect-ratio: 1; background: #f7f7f7; border-radius: 50%; color: #1f2328; font-size: 0.8rem; font-weight: 600; text-decoration: none; box-shadow: inset 0 0 0 4px #f7f7f7, inset 0 0 0 6px #151516; transition: transform 0.12s ease-out; } .ds-shutter:hover { text-decoration: underline; text-decoration-thickness: 2px; } .ds-shutter:active { transform: scale(0.95); } .ds-shutter:focus-visible { outline: 3px solid var(--hot, #fd259a); outline-offset: 3px; } .ds-modes { display: flex; gap: 1.5rem; margin: 0; padding: 0; list-style: none; color: #f2f3f3; font-size: 0.8rem; font-weight: 500; letter-spacing: 0.02em; } .ds-on { color: var(--cam, #ffd60a); border-bottom: 3px solid var(--cam, #ffd60a); padding-bottom: 0.2em; }"
+    },
+    {
+      "name": "Handwritten Annotation",
+      "kind": "custom",
+      "refersTo": "handwritten-note",
+      "description": "Neucha note in annotation hot pink with a code-drawn arrow; the only place pink and Neucha appear together.",
+      "html": "<div class=\"ds-annot\"><p class=\"ds-note\">this changed</p><svg class=\"ds-arrow-draw\" viewBox=\"0 0 206 100\" aria-hidden=\"true\"><path pathLength=\"1\" d=\"M200 14 C 160 34, 120 30, 80 40 C 50 48, 30 60, 12 80\"/><path pathLength=\"1\" d=\"M10 58 L 11 81 L 33 82\"/></svg></div>",
+      "css": ".ds-annot { position: relative; width: 260px; height: 140px; background: #bfd9f0; } .ds-note { position: absolute; right: 12px; top: 8px; margin: 0; color: #fd259a; font: 400 2.2rem/0.92 Neucha, Jost, sans-serif; transform: rotate(-12deg) skewX(-10deg); } .ds-arrow-draw { position: absolute; left: 10px; top: 50px; width: 150px; height: 74px; overflow: visible; fill: none; stroke: #fd259a; stroke-width: 4.6; stroke-linecap: round; stroke-linejoin: round; } .ds-arrow-draw path { stroke-dasharray: 1; animation: ds-draw 0.6s 0.3s cubic-bezier(0.3, 0, 0.2, 1) both; } @keyframes ds-draw { from { stroke-dashoffset: 1; } } @media (prefers-reduced-motion: reduce) { .ds-arrow-draw path { animation: none; } }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Robot's Own Selfie",
+    "overview": "Selfie's world is a flat sky-blue field with ink-outlined objects on it, and a serious, photoreal robot doing a playful thing: holding up a phone and checking today's selfie against yesterday's print. The premise is a joke; the art is not. The robot is a matte white ceramic and dark-metal studio robot, lit like product photography, and it is only ever shown in the selfie situation: the phone in its hand, yesterday's print beside it, and the one changed plate circled in hot pink. Never the robot alone as a mascot.\n\nEverything around the art is quiet and graphic so the photograph can carry the page. Copy is one typeface, Jost, set heavy and close with real italics for the single stressed word in a line. Surfaces are flat fields of colour (sky, white paper, ink, yellow) divided by full-width bands rather than cards. Objects that can be touched or picked up (buttons, thumbnails, the print, the phone) get a 3px ink outline. The neighbouring product, the review app, is stock GitHub Primer, and the marketing world was chosen to sit beside it: Primer's ink and muted greys are this system's text colours.\n\nRejected and not to return: the cute anime or cartoon robot style, and the typefaces Bagel Fat One and Andika.",
+    "keyCharacteristics": [
+      "One flat sky ground (#bfd9f0) for the first screen and the 404; white, ink, and yellow bands below.",
+      "3px ink outlines on handled objects; flat colour everywhere else.",
+      "Jost for all UI and copy, with true italics for emphasis; Neucha only for handwriting.",
+      "Hot pink belongs to the annotation layer alone.",
+      "A photoreal studio robot, always mid-selfie, never alone.",
+      "The camera interface is drawn in code with its own yellow."
+    ],
+    "rules": [
+      {
+        "name": "The Pen Rule",
+        "body": "Hot pink is the annotation layer: handwriting, arrows, circles, and the shutter's focus ring. It never fills a button, a band, a logo, or a headline.",
+        "section": "colors"
+      },
+      {
+        "name": "The Two Yellows Rule",
+        "body": "Button Yellow belongs to the page; Camera Chrome Yellow belongs to the phone. Don't swap them.",
+        "section": "colors"
+      },
+      {
+        "name": "The Sky Ground Rule",
+        "body": "The first screen sits on the one flat sky, with no gradient, texture, or second tint.",
+        "section": "colors"
+      },
+      {
+        "name": "The One Family Rule",
+        "body": "Jost sets every word of UI and copy. Emphasis is Jost Italic, a real italic, applied to one stressed word (\"*Distributed*\", \"*inside*\", \"*own*\", \"*early*\"), not to whole phrases.",
+        "section": "typography"
+      },
+      {
+        "name": "The Marker Rule",
+        "body": "Neucha appears only where a person would have written by hand on the artwork. It never sets a heading, button, or paragraph.",
+        "section": "typography"
+      },
+      {
+        "name": "The Pressable Rule",
+        "body": "The hard offset shadow means \"you can press this\". It belongs to buttons and nothing else; thumbnails, panels and frames get the outline without the shadow.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do set the first screen on flat Sky (#bfd9f0) with ink text.",
+      "Do set every UI and copy word in Jost, and use Jost Italic at the surrounding weight for the single stressed word.",
+      "Do keep Annotation Hot Pink (#fd259a) for handwriting, drawn arrows, circles, and the shutter focus ring.",
+      "Do give buttons the 3px ink outline and the 4px hard offset shadow, and let the shadow move with hover and press.",
+      "Do use Camera Chrome Yellow (#ffd60a) for anything that belongs to the phone's own interface.",
+      "Do show the robot as a photoreal matte-white studio robot in the selfie situation: phone, yesterday's print, the circled change.",
+      "Do build robot plates from `art/source` and `art/masks` with `art/build-plates.sh`, and keep every difference between yesterday and today to the one masked plate."
+    ],
+    "donts": [
+      "Don't use hot pink as a brand colour: no pink buttons, bands, logos or headings.",
+      "Don't put the hard offset shadow on anything that isn't pressable; thumbnails and frames get the outline only.",
+      "Don't set headings, buttons, or paragraphs in Neucha, and don't bring back Bagel Fat One or Andika.",
+      "Don't show the robot alone as a mascot, or draw it in a cute, anime, or cartoon style.",
+      "Don't add gradients, textures, or a second tint to the sky ground.",
+      "Don't let the page drift from Primer's ink and muted greys for text; the app it sits beside is stock GitHub Primer."
+    ]
+  }
+}

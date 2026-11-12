@@ -13,7 +13,7 @@ Go to [selfie.dev](https://selfie.dev) to follow development after the hackathon
 | <a href="https://youtu.be/8B3-v4DTwfU"><img src="https://img.youtube.com/vi/8B3-v4DTwfU/maxresdefault.jpg" alt="Watch: Why Selfie" width="380" /></a> | <a href="https://youtu.be/ZrUv0Pn7yyc"><img src="https://img.youtube.com/vi/ZrUv0Pn7yyc/maxresdefault.jpg" alt="Watch: Selfie product demo" width="380" /></a> |
 | From Storybook to Chromatic to Selfie: why snapshot testing has to change for coding agents. | The real app: two lines of CSS touch all 142 stories, and Muse Spark finds what broke dark mode. |
 
-You can also look around the hosted review pages without signing in: here's [Selfie reviewing itself](https://hackathon.selfie.dev/diffplug/selfie-hackathon).
+You can also look around the hosted review pages without signing in: here's [Selfie reviewing itself](https://app.selfie.dev/diffplug/selfie).
 
 ## What it does
 
@@ -32,7 +32,7 @@ Paste this into your coding agent, in your project:
 
 ```text
 Set up Selfie in this repository. If you don't have a checkout of it, clone
-https://github.com/diffplug/selfie-hackathon outside this repository, and run
+https://github.com/diffplug/selfie outside this repository, and run
 pnpm install there. Then run this, and follow what it prints:
 
 node --disable-warning=ExperimentalWarning <checkout>/cli/src/main.ts skill quickstart
@@ -74,13 +74,13 @@ From a checkout, `pnpm selfie <command>` runs these.
 
 The local loop, CI, and commit statuses are all built and in use on this repository.
 
-The cloud service at [hackathon.selfie.dev](https://hackathon.selfie.dev) is deployed for a few public repositories. Anyone can view them, and ask Muse Spark about a story's change. For now only one person can sign in to approve or upload.
+The cloud service at [app.selfie.dev](https://app.selfie.dev) is deployed for a few public repositories. Anyone can view them, and ask Muse Spark about a story's change. For now only one person can sign in, through GitHub, to approve or upload.
 
 Not built yet:
 
 - **Change grouping with Muse Spark** ([below](#meta-models))
 - **Trusting local results,** so that the cloud can accept an agent's renders without rendering them again
-- **Signing in through GitHub,** with access that follows GitHub's permissions, and private repositories
+- **Signing in for everyone,** with access that follows GitHub's permissions, and private repositories
 - **Notes in the cloud.** Notes are local for now
 - **An npm package**
 
@@ -115,7 +115,9 @@ To run your own, set `MODEL_API_KEY` to a Meta Model API key. The hosted demo ne
 Selfie stores data in two places:
 
 - **Locally,** at `~/.config/selfie/<git-origin-slugified>/`, in SQLite and image files. Locally generated renders live here, along with what's mirrored from the cloud.
-- **In the cloud,** in a Hono app on Cloudflare Workers, with render metadata in a per-project D1 database and image bytes in R2.
+- **In the cloud,** in a Hono app on Cloudflare Workers at `app.selfie.dev`, with render metadata in a per-project D1 database and image bytes in R2. Signing in goes through GitHub, with [pgstencil](https://github.com/diffplug/pgstencil) keeping its sessions in Postgres. Built Storybooks are served from `selfieusercontent.com`, a site of their own.
+
+The landing page at `selfie.dev` is plain HTML in [`site/`](site/), on Cloudflare Pages. [OPERATIONS.md](OPERATIONS.md) says how each is deployed.
 
 Implementation details:
 

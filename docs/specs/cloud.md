@@ -1,6 +1,6 @@
 # Cloud
 
-> Status: built, and deployed at `hackathon.selfie.dev`, for a few public repositories and one writer.
+> Status: built, and deployed at `app.selfie.dev`, for a few public repositories and one writer.
 >
 > - See `docs/specs/glossary.md` for vocabulary.
 > - Owns the Worker: what it hosts, its pages and origins, how a project's data is reached with no Git and no image decoding, and a commit's status. `docs/specs/access.md` owns who may do what, `docs/specs/sync.md` the routes a push uses, and `docs/specs/ui.md` what the screens show.
@@ -10,12 +10,16 @@
 Source of truth: `ui/src/worker/index.ts`, `ui/src/worker/app.ts`, `ui/wrangler.toml`; tests in `ui/test/workerd/cloud.workerd.test.ts`, inside workerd, with a stand-in for GitHub.
 
 - **Must list the projects it hosts in the Worker's own code**, each with its repository's numeric ID, owner, name, default branch, and D1 binding (rationale). A repository not listed is 404, whatever the GitHub App can reach.
+- **Must answer a project's former names, listed with it**, a page or review route with a 308 to the same path under its name now, and `/api/repositories/:owner/:name` with the project, so a checkout whose `origin` still has the old name still pushes.
 - **Must give each project a D1 database of its own, through a Worker binding, named `selfie-project-<id>`**, and its blobs a prefix of its own in one R2 bucket (`docs/specs/store.md` → R2 adapter).
 - **Must set up a project's schema on its first request in a Worker's life.**
 
 ## Origins
 
-- **Must serve the review page, its routes, and the sync routes from `REVIEW_ORIGIN`, and kept built Storybooks only from `STORYBOOK_ORIGIN`, a different site**, since a built Storybook is the code of whatever branch was built, and on the review origin it could approve its own images (rationale).
+- **Must serve the review page, its routes, the sync routes, and sign-in from `APP_ORIGIN`, `https://app.selfie.dev`, and kept built Storybooks only from `STORYBOOK_ORIGIN`, `https://selfieusercontent.com`, a different site**, since a built Storybook is the code of whatever branch was built, and on the app's site it could approve its own images (rationale).
+- **Must answer each of `FORMER_ORIGINS`, `https://hackathon.selfie.dev`, with a 308 to the same path and query on `APP_ORIGIN`**, keeping the method and body for a `selfie push` still pointed there.
+- **Must answer any other host with 421**, so no other name for the Worker is an alias for the app. The Worker has no workers.dev name.
+- **Never serve the landing page from `APP_ORIGIN`.** `selfie.dev` is `site/`, on Cloudflare Pages, so nothing it loads shares an origin with the session cookie (rationale).
 - **Must answer nothing on the Storybook origin but `/<project>/built-storybooks/<hash>/…`**, with `storybookHeaders` letting only itself and the review origin frame it.
 
 ## Pages
@@ -23,7 +27,10 @@ Source of truth: `ui/src/worker/index.ts`, `ui/src/worker/app.ts`, `ui/wrangler.
 | Route | What it is |
 |---|---|
 | `/` | Redirects to the first project |
-| `/sign-in` | A password, which sets the session cookie (`docs/specs/access.md` → Who can do what) |
+| `/sign-in` | A button that starts signing in through GitHub (`docs/specs/access.md` → Who can do what) |
+| `/api/auth/callback/github` | GitHub's return from signing in, to pgstencil's adapter |
+| `/signed-in` | Where the adapter sends a browser after GitHub: on to where it was going for the writer, signed out for anyone else |
+| `/sign-out` | Ends the session |
 | `/api/…` | The sync routes (`docs/specs/sync.md` → Routes) |
 | `/:owner/:repo/api/…` | The review routes (`docs/specs/ui.md` → Routes), with `pageHeaders` and `sameOriginWrites` |
 | `/:owner/:repo/api/batches/:id/chat` | Asking Muse Spark about a story's change (`docs/specs/chat.md`), with those same headers, and only here |
