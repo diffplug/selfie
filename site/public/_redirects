@@ -1,7 +1,7 @@
 # The prior snapshot testing library moved to lib.selfie.dev. Released jars and
 # wheels link to these paths and can't be changed, so these are permanent, and
 # these paths stay reserved. Don't reuse them for anything on this site.
-# https://github.com/diffplug/selfie-hackathon/issues/26
+# https://github.com/diffplug/selfie/issues/26
 /jvm       https://lib.selfie.dev/jvm 301
 /jvm/*     https://lib.selfie.dev/jvm/:splat 301
 /py        https://lib.selfie.dev/py 301

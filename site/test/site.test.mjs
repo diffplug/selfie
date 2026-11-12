@@ -69,7 +69,7 @@ test("the home page sends each audience to the right place", async () => {
   const html = await res.text();
   for (const href of [
     "https://lib.selfie.dev",
-    "https://github.com/diffplug/selfie-hackathon",
+    "https://github.com/diffplug/selfie",
     "https://youtu.be/8B3-v4DTwfU",
     "https://youtu.be/FiGuwfB13b0",
   ]) {
