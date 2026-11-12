@@ -29,6 +29,10 @@ A spec is the accurate reference for the current code: it states the invariants 
 - **Reservations.** Unbuilt design that constrains present code is stated in the body, marked `Reserved:`, pointing at the `## Future` item it serves.
 - **Promotion is part of done.** A staged item is finished only when its text moves above the fold, rewritten to present tense, and the built portion is deleted from `## Future`.
 
+## Layout and deployment
+
+`store/`, `render/`, `cli/`, and `ui/` are the product; `ui/src/worker/` is the cloud service at `app.selfie.dev`. `site/` is the landing page at `selfie.dev`, plain HTML with no build step; its `PRODUCT.md` and `DESIGN.md` are the brief for it. `OPERATIONS.md` says how each is deployed, and what holds which secret.
+
 ## Skills
 
 `cli/skills/` holds guides for a coding agent, linked from `.claude/skills/`, and printed for anyone by `selfie skill`. `quickstart` sets Selfie up in a repository, which the README's Quickstart points an agent at. `fix-flakes` is how to make every story render the same way every time, which `selfie flakes` measures.

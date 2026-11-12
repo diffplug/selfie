@@ -38,11 +38,11 @@ Renders happen where the agent runs, with no cloud required and no bill per imag
 
 **Built:** the local loop, CI, and commit statuses, in use on Selfie's own repository. Change classification (moved or gained spacing versus really changed), notes on images, Git-following approvals, reproducible renders in a digest-pinned container, and `selfie flakes`.
 
-**Not built:** an npm package, signing in through GitHub, private repositories, notes in the cloud, and trusting local results without re-rendering. Don't imply any of these exist.
+**Not built:** an npm package, signing in for anyone but the owner, private repositories, notes in the cloud, and trusting local results without re-rendering. Don't imply any of these exist.
 
 **The app:** the review UI uses GitHub Primer and looks exactly like GitHub, with no distinctive style of its own.
 
-**Hosting:** Cloudflare Pages project `selfie-landing`, serving static files from `public/`. `lib.selfie.dev` stays on a separate project.
+**Hosting:** Cloudflare Pages project `selfie-landing`, serving static files from `public/`. The app is on its own origin, `app.selfie.dev`, and `lib.selfie.dev` stays on a separate project.
 
 **Reserved paths:** `/jvm`, `/py`, `/demo-gif`, `/go`, `/other-platforms`, and `/js` are permanent redirects, because released jars and wheels link to them. They can't be reused for anything on this site.
 
