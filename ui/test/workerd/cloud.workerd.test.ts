@@ -206,6 +206,8 @@ describe("the cloud service", () => {
     expect(landed.headers.getSetCookie()).toEqual(["__Host-selfie-next=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax; Secure"]);
     const sneaky = await app.request(`${ORIGIN}/signed-in`, { headers: { cookie: `${cookie}; __Host-selfie-next=https%3A%2F%2Fevil.test` } });
     expect(sneaky.headers.get("location")).toBe("/");
+    const garbled = await app.request(`${ORIGIN}/signed-in`, { headers: { cookie: `${cookie}; __Host-selfie-next=%E0%A4%A` } });
+    expect(garbled.headers.get("location")).toBe("/");
 
     const anonymous = await review("GET", `/batches/${FIRST}`, { signedIn: false });
     expect(((await anonymous.json()) as { actor: string | null }).actor).toBeNull();

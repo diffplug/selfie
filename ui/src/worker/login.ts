@@ -67,6 +67,15 @@ function redirect(location: string, from: readonly Response[], extra: readonly s
   return new Response(null, { status: 303, headers });
 }
 
+/** A cookie's value as it was set, or nothing if someone set one that doesn't decode. */
+const decoded = (value: string) => {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return null;
+  }
+};
+
 const hasSession = (request: Request) => [...cookieValues(request.headers.get("cookie")).keys()].some((name) => name.endsWith(".session_token"));
 
 export function pgstencilLogin({ origin, auth, writerGithubId, writerName }: LoginConfig): Login {
@@ -113,7 +122,7 @@ export function pgstencilLogin({ origin, auth, writerGithubId, writerName }: Log
     callback: (request) => auth(new Request(request.url, { headers: forwarded(request) })),
 
     async landed(request) {
-      const next = localPath(decodeURIComponent(cookieValues(request.headers.get("cookie")).get(nextCookie) ?? "/"));
+      const next = localPath(decoded(cookieValues(request.headers.get("cookie")).get(nextCookie) ?? "/"));
       const forget = `${nextCookie}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax${secure}`;
       if ((await writerOf(request)) !== null) return redirect(next, [], [forget]);
       // Someone else's GitHub account: their session goes at once, so for now only the writer is ever signed in.
