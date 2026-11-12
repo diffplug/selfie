@@ -28,7 +28,7 @@ GitHub environment `app-production`, limited to the `main` branch:
 
 | Name | Kind | What |
 |---|---|---|
-| `CLOUDFLARE_API_TOKEN` | secret | From the **Edit Cloudflare Workers** template, limited to account `0a95e814…` and the zones `selfie.dev` and `selfieusercontent.com`, plus Hyperdrive Read and D1 Read. If a deploy is refused a custom domain, add the zones' DNS Edit |
+| `CLOUDFLARE_API_TOKEN` | secret | The deploy token, below |
 | `DATABASE_URL` | secret | The Neon migration role's direct URL (not the pooler, and not Hyperdrive) |
 | `HYPERDRIVE_ID` | variable | The Hyperdrive the Worker reaches Postgres through |
 
@@ -39,6 +39,10 @@ Repository-wide:
 | `CLOUDFLARE_ACCOUNT_ID` | variable | `0a95e814ccf2b6a95d2dc3bea0a4a2b4` |
 | `CLOUDFLARE_PAGES_TOKEN` | secret | Account `0a95e814…`: Cloudflare Pages Edit, and nothing else |
 | `SELFIE_UPLOAD_TOKEN` | secret | What this repository's own CI uploads with, as on every repository the app hosts |
+
+The two Cloudflare tokens are kept nowhere else. To rotate one, create a token with the same permissions, set it with `pbpaste | gh secret set …`, and delete the old one.
+
+The deploy token holds exactly: Workers Scripts Edit, Account Settings Read, Hyperdrive Read, and D1 Read on the account, and Workers Routes Edit, DNS Edit, and Zone Read on `selfie.dev` and `selfieusercontent.com`. The Pages token holds Pages Edit.
 
 Worker secrets on `selfie-app`, set with `pnpm --dir ui exec wrangler secret put <NAME>`, which `preflight` checks are all there. Cloudflare can't show them again, so keep each in the password manager:
 
