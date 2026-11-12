@@ -70,15 +70,10 @@ Done once, in this order.
 
 1. Create a project `selfie` on PostgreSQL 18, with a database `selfie`, and turn on point-in-time restore. Keep it apart from Dormouse's.
 2. Its owner role is the migration role: put its direct URL in `DATABASE_URL`, then apply the schema once: `DATABASE_URL=… pnpm --dir ui db:migrate`, and `db:validate`.
-3. Create the runtime role with SQL as the owner, over the encrypted connection, not through Neon's console, whose roles get `neon_superuser`:
+3. Create the runtime role, `selfie_app`, with only the DML sign-in's tables need, by `ui/scripts/runtime-role.mjs` as the owner. It runs SQL over the encrypted connection, since Neon's console would give the role `neon_superuser`. It takes both values from the environment, and running it again sets a new password:
 
-   ```sql
-   CREATE ROLE selfie_app LOGIN PASSWORD '…';
-   GRANT USAGE ON SCHEMA public TO selfie_app;
-   GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO selfie_app;
-   GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO selfie_app;
-   ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO selfie_app;
-   ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO selfie_app;
+   ```sh
+   DATABASE_URL=… SELFIE_APP_PASSWORD="$(openssl rand -hex 24)" node ui/scripts/runtime-role.mjs
    ```
 
 ### 3. Cloudflare
