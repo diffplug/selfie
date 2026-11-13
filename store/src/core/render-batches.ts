@@ -761,17 +761,10 @@ ORDER BY started_at DESC, key DESC`,
 
   /** As `approvedSinceReached`, but with the base's images and not its approvals: what the batch changed since its base, approved or not. */
   async sinceBaseReached(batchId: string, defaultBranch: string): Promise<SinceBase> {
-    const [batchRows, decisionRows, baseRows, firstRenders] = (await this.#sql.batch([
-      { sql: SELECT_BATCH, params: [batchId], idempotent: true },
-      { sql: DECISIONS_REACHED, params: [batchId], idempotent: true },
-      { sql: BASE_REACHED, params: [batchId, defaultBranch], idempotent: true },
-      rendersPage(batchId, START),
-    ])) as [SqlRow[], SqlRow[], SqlRow[], SqlRow[]];
-    const base = baseRows[0] === undefined ? null : toBatch(baseRows[0]);
-    if (base === null) return { base, renders: [] };
-    const { batch, rendered } = await this.#renderedOf(batchId, batchRows, firstRenders);
-    const approvals = compareWithApprovals(batch, rendered, decisionRows.map(toPlacedDecision), { includeUnchanged: true });
-    return { base, renders: changedSinceBase(await this.compareWithBatch(batchId, base.id), approvals, base) };
+    // Two requests at once, rather than finding the base and then comparing with it.
+    const [found, approvals] = await Promise.all([this.compareWithBaseReached(batchId, defaultBranch), this.compareReached(batchId, { includeUnchanged: true })]);
+    if (found === null) return { base: null, renders: [] };
+    return { base: found.base, renders: changedSinceBase(found.comparison, approvals, found.base) };
   }
 
   /** As `sinceBaseReached`, for a caller with Git, who found the base and the decisions history reaches. */
