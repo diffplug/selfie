@@ -126,6 +126,7 @@ renders(batch_key → render_batches.key, story_key → stories.key, image_key �
 decisions(environment_key → environments.key, commit_key → commits.key, story_key → stories.key, image_key, rejected, decided_at, actor_key → actors.key, batch_id)  PK (environment_key, commit_key, story_key, image_key)  WITHOUT ROWID
   INDEX decisions_by_image(environment_key, story_key, image_key)
 commit_parents(commit_key → commits.key, parent_key → commits.key)  PK (commit_key, parent_key)  WITHOUT ROWID
+  INDEX commit_parents_by_parent(parent_key, commit_key)
 ```
 
 - **Must leave out the CLI's local table** (`docs/specs/cli.md` → Recording only if necessary): it's in a local `store.db`, not this schema, and D1 doesn't have it.
@@ -135,7 +136,7 @@ commit_parents(commit_key → commits.key, parent_key → commits.key)  PK (comm
 - **Must say in `render_batches.viewport_width` and `viewport_height` the window a batch's stories lay out in, in CSS pixels, and in those columns of `renders` only a story's own, if it differs**, both or neither, so a story with neither laid out in its batch's (`docs/specs/render.md` → A story's viewport). They only size a story running live, so a comparison never reads them (rationale). **A batch reusing another's images must hold the same sizes.**
 - **Must hold what repeats across a great many rows once, by an integer key, and never let a key leave the store**, as with image keys (rationale). A batch's `id`, a story's ID, a commit's SHA, an environment's ID, an actor's name, and an image's hash are what leave it. **Must give a name its key in the same request, before the first row that uses it.**
 - **May list a batch's pages in any order**, and `next` only says where the next one starts. A comparison lists stories by name.
-- **Never scan a table:** every statement reaches its rows through one of these keys. `store/test/render-batches.test.ts` checks SQLite's query plan for everything a review sends.
+- **Never scan a table:** every statement reaches its rows through one of these keys, and none through an index SQLite builds for itself, which reads the whole table. `store/test/render-batches.test.ts` checks SQLite's query plan for everything a review sends. `commit_parents_by_parent` is what walks from a commit to those whose history holds it (`docs/specs/cloud.md` → Commit status).
 
 ## Requests
 
