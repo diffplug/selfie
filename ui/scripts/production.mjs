@@ -66,7 +66,18 @@ function deploy() {
   run("pnpm", ["exec", "wrangler", "deploy", "--config", "wrangler.production.toml"]);
 }
 
+/** A first deploy's custom domains need a minute or two for DNS and certificates, so the checks try for up to 3 minutes. */
 async function smoke() {
+  for (let attempt = 1; ; attempt++) {
+    const failures = await smokeOnce();
+    if (failures.length === 0) return;
+    if (attempt === 12) throw new Error(`Live checks failed:\n${failures.join("\n")}`);
+    console.log(`${failures.length} live checks failed, trying again in 15 seconds`);
+    await new Promise((resolve) => setTimeout(resolve, 15_000));
+  }
+}
+
+async function smokeOnce() {
   const failures = [];
   const check = async (what, url, init, expect) => {
     try {
@@ -100,7 +111,7 @@ async function smoke() {
     r.status === 308 && r.headers.get("location") === "/diffplug/selfie" ? null : `answered ${r.status}, to ${r.headers.get("location")}`,
   );
 
-  if (failures.length > 0) throw new Error(`Live checks failed:\n${failures.join("\n")}`);
+  return failures;
 }
 
 const steps = { preflight, deploy, smoke };

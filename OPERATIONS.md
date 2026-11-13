@@ -28,7 +28,7 @@ GitHub environment `app-production`, limited to the `main` branch:
 
 | Name | Kind | What |
 |---|---|---|
-| `CLOUDFLARE_API_TOKEN` | secret | From the **Edit Cloudflare Workers** template, limited to account `0a95e814…` and the zones `selfie.dev` and `selfieusercontent.com`, plus Hyperdrive Read and D1 Read. If a deploy is refused a custom domain, add the zones' DNS Edit |
+| `CLOUDFLARE_API_TOKEN` | secret | The deploy token, below |
 | `DATABASE_URL` | secret | The Neon migration role's direct URL (not the pooler, and not Hyperdrive) |
 | `HYPERDRIVE_ID` | variable | The Hyperdrive the Worker reaches Postgres through |
 
@@ -39,6 +39,10 @@ Repository-wide:
 | `CLOUDFLARE_ACCOUNT_ID` | variable | `0a95e814ccf2b6a95d2dc3bea0a4a2b4` |
 | `CLOUDFLARE_PAGES_TOKEN` | secret | Account `0a95e814…`: Cloudflare Pages Edit, and nothing else |
 | `SELFIE_UPLOAD_TOKEN` | secret | What this repository's own CI uploads with, as on every repository the app hosts |
+
+The two Cloudflare tokens are kept nowhere else. To rotate one, create a token with the same permissions, set it with `pbpaste | gh secret set …`, and delete the old one.
+
+The deploy token holds exactly: Workers Scripts Edit, Account Settings Read, Hyperdrive Read, and D1 Read on the account, and Workers Routes Edit, DNS Edit, and Zone Read on `selfie.dev` and `selfieusercontent.com`. The Pages token holds Pages Edit.
 
 Worker secrets on `selfie-app`, set with `pnpm --dir ui exec wrangler secret put <NAME>`, which `preflight` checks are all there. Cloudflare can't show them again, so keep each in the password manager:
 
@@ -70,15 +74,10 @@ Done once, in this order.
 
 1. Create a project `selfie` on PostgreSQL 18, with a database `selfie`, and turn on point-in-time restore. Keep it apart from Dormouse's.
 2. Its owner role is the migration role: put its direct URL in `DATABASE_URL`, then apply the schema once: `DATABASE_URL=… pnpm --dir ui db:migrate`, and `db:validate`.
-3. Create the runtime role with SQL as the owner, over the encrypted connection, not through Neon's console, whose roles get `neon_superuser`:
+3. Create the runtime role, `selfie_app`, with only the DML sign-in's tables need, by `ui/scripts/runtime-role.mjs` as the owner. It runs SQL over the encrypted connection, since Neon's console would give the role `neon_superuser`. It takes both values from the environment, and running it again sets a new password:
 
-   ```sql
-   CREATE ROLE selfie_app LOGIN PASSWORD '…';
-   GRANT USAGE ON SCHEMA public TO selfie_app;
-   GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO selfie_app;
-   GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO selfie_app;
-   ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO selfie_app;
-   ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO selfie_app;
+   ```sh
+   DATABASE_URL=… SELFIE_APP_PASSWORD="$(openssl rand -hex 24)" node ui/scripts/runtime-role.mjs
    ```
 
 ### 3. Cloudflare
