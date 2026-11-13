@@ -22,7 +22,6 @@ const SECRETS = [
   "SELFIE_UPLOAD_TOKEN",
   "GITHUB_APP_ID",
   "GITHUB_APP_PRIVATE_KEY",
-  "MODEL_API_KEY",
 ];
 
 const need = (name) => {

@@ -56,7 +56,6 @@ Renders happen where the agent runs, with no cloud required and no bill per imag
 - The "robots taking selfies" theme stays, and the premise can be playful. The art itself should be serious: the owner rejected the cute anime style. The current hero robot isn't binding, and the logo and mascot reused from the earlier library (Apache-2.0, `LICENSE-branding`) are available rather than required.
 - Background: [Surrendering to grooves in latent space](https://nedshed.dev/p/surrendering-to-grooves-in-latent-space) tells how the name and theme came about. Phones beat DSLRs because they have fewer, simpler controls, and that idea shaped the earlier library's design.
 - Jost is the typeface. Bagel Fat One and Andika were tried and rejected.
-- Muse Spark stays off selfie.dev. The owner treats it as hackathon-only, not lasting product truth.
 - The library notice stays verbatim, as specified in diffplug/selfie#26.
 
 The rest of the branding is unsettled. The owner intends to work it out next, and the mailing list's branding will follow it.
@@ -65,7 +64,7 @@ The rest of the branding is unsettled. The owner intends to work it out next, an
 
 - **Render timing on an M4 MacBook Air, per the root README:** about 140 stories in under 30 seconds, and 541 stories in about 70 seconds. Reviewing an already-rendered build takes under half a second.
 - **Scale example:** one style tweak changed 290 of a Storybook's 541 stories.
-- **Videos:** [Why Selfie](https://youtu.be/8B3-v4DTwfU), and an [older product demo](https://youtu.be/FiGuwfB13b0) of a two-line CSS change touching all 124 stories. The README's [current demo](https://youtu.be/ZrUv0Pn7yyc) is built around Muse Spark.
+- **Videos:** [Why Selfie](https://youtu.be/8B3-v4DTwfU), and a [product demo](https://youtu.be/FiGuwfB13b0) of a two-line CSS change touching all 124 stories.
 - **Live proof:** [Selfie reviewing itself](https://app.selfie.dev/diffplug/selfie), viewable without signing in.
 - **Assets:** `public/img/mascot.webp`, `public/logo-icon.svg`, `public/img/video-why.webp`, `public/img/video-demo.webp`, `public/img/og.png`.
 - **Absent:** customers, testimonials, press, pricing, and a mailing list. Don't fabricate them.

@@ -487,9 +487,7 @@ code {
   font-size: var(--text-caption-size, 12px);
 }
 
-.selfie-notes,
-.selfie-chat,
-.selfie-chat-log {
+.selfie-notes {
   display: flex;
   flex-direction: column;
   gap: var(--base-size-8);
@@ -509,21 +507,10 @@ code {
   white-space: pre-wrap;
 }
 
-.selfie-note-form,
-.selfie-chat-form {
+.selfie-note-form {
   display: flex;
   flex-direction: column;
   gap: var(--base-size-4);
-}
-
-.selfie-chat-message {
-  margin: 0;
-  white-space: pre-wrap;
-}
-
-.selfie-chat-error {
-  margin: 0;
-  color: var(--fgColor-danger);
 }
 
 .selfie-stack {
