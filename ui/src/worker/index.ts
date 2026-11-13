@@ -16,6 +16,7 @@ interface Env {
   readonly DB_1183663019: D1DatabaseLike;
   readonly DB_1442175397: D1DatabaseLike;
   readonly DB_1445291541: D1DatabaseLike;
+  readonly DB_1447790929: D1DatabaseLike;
   /** Postgres, through an uncached Hyperdrive, holding only sign-in's users, accounts, and sessions. */
   readonly HYPERDRIVE: { readonly connectionString: string };
   readonly APP_ORIGIN: string;
@@ -70,6 +71,7 @@ export default {
         { id: "1442175397", owner: "diffplug", name: "selfie", formerNames: ["selfie-hackathon"], defaultBranch: "main", db: env.DB_1442175397 },
         { id: "1445291541", owner: "diffplug", name: "selfie-sandbox", defaultBranch: "main", db: env.DB_1445291541 },
         { id: "1183663019", owner: "diffplug", name: "dormouse", defaultBranch: "main", db: env.DB_1183663019 },
+        { id: "1447790929", owner: "diffplug", name: "pridm", defaultBranch: "main", db: env.DB_1447790929 },
       ],
       bucket: env.BLOBS,
       reviewOrigin: env.APP_ORIGIN,
