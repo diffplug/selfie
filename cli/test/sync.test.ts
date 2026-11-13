@@ -10,7 +10,7 @@ import { createSyncApi, type SyncAccess } from "selfie-ui/sync";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { runCli } from "../src/cli.ts";
 import { encodePng } from "../src/png.ts";
-import { openProject, type Project } from "../src/project.ts";
+import { approvedSinceOf, openProject, type Project } from "../src/project.ts";
 import { localReviewSource } from "../src/ui.ts";
 import { BLUE, commit, createHarness, fakeRender, git, GREEN, RED, solid, type FakeStory, type Harness, writeTestConfig } from "./support.ts";
 
@@ -350,7 +350,7 @@ describe("another machine", () => {
     const hashes = await imagesOf(batchId);
     const { code, json } = await desktop("reader", "pull", head);
     expect(code).toBe(0);
-    expect(json).toEqual({ sha: head, environment: expect.any(String), images: { received: 2, alreadyHere: 0 }, decisions: 2 });
+    expect(json).toEqual({ sha: head, environment: expect.any(String), images: { received: 2, alreadyHere: 0 }, decisions: 2, base: null });
 
     await withStore(desktopRepo, desktopHome, async (local) => {
       expect(await local.batches.getBatch(batchId)).toBeNull();
@@ -492,8 +492,8 @@ describe("another machine", () => {
     const { code, json: second } = await counting("reader", "pull");
     expect(code).toBe(0);
     expect(second).toEqual({ ...first, images: { received: 0, alreadyHere: 2 } });
-    expect(asked.filter((request) => request.includes("/images/") || request.includes("/batches/"))).toEqual([]);
-    expect(asked).toEqual(["GET /api/repositories/diffplug/selfie", "POST /api/projects/42/decisions/reached"]);
+    expect(asked.filter((request) => request.includes("/images/") || request.includes("/renders"))).toEqual([]);
+    expect(asked).toEqual(["GET /api/repositories/diffplug/selfie", "POST /api/projects/42/decisions/reached", "POST /api/projects/42/batches/base"]);
     expect(await held()).toEqual(before);
   });
 
@@ -668,11 +668,95 @@ describe("another machine", () => {
     });
   });
 
+  describe("the base", () => {
+    /** CI renders the default branch and pushes it, and the desktop, which never rendered it, starts a branch from there. */
+    async function ciOnMain() {
+      const onMain = await record();
+      expect((await laptop("ci", "push")).code).toBe(0);
+      const mainSha = headOf();
+      git(desktopRepo, "switch", "--quiet", "-c", "feature");
+      await commit(desktopRepo, "on a branch");
+      return { onMain, mainSha };
+    }
+
+    /** A machine on the desktop's store that says what it asked the cloud. */
+    function counting(asked: string[]) {
+      return machine(desktopRepo, desktopHome, () => (async (url: string, init?: RequestInit) => {
+        asked.push(`${init?.method ?? "GET"} ${new URL(url).pathname}`);
+        return toCloud(url, init);
+      }) as typeof fetch);
+    }
+
+    test("comes with a pull, so a branch here is told apart from a default branch nobody rendered here", async () => {
+      const { onMain, mainSha } = await ciOnMain();
+      stories = [{ id: "a", color: BLUE }, { id: "b", color: GREEN }];
+      const own = await record(desktop);
+      expect(await withStore(desktopRepo, desktopHome, async (local) => (await approvedSinceOf(local, own)).base)).toBeNull();
+
+      const { code, json } = await desktop("reader", "pull");
+      expect(code).toBe(0);
+      // Only red: green came with the desktop's own batch.
+      expect(json.base).toEqual({ batchId: onMain, gitSha: mainSha, images: { received: 1, alreadyHere: 1 } });
+
+      const held = await cloud.batches.readBatch(onMain);
+      await withStore(desktopRepo, desktopHome, async (local) => {
+        expect(await local.batches.readBatch(onMain)).toEqual(held);
+        expect(held.batch).toMatchObject({ branch: "main", status: "complete" });
+        expect((await approvedSinceOf(local, own)).base?.id).toBe(onMain);
+        const sinceBase = await local.batches.compareWithBatch(own, onMain);
+        expect(sinceBase.renders.map(({ story, state }) => [story, state])).toEqual([["a", "changed"]]);
+        for (const { imageHash } of held.renders) expect(await local.store.getPixels(imageHash!)).not.toBeNull();
+      });
+
+      // A review here reads its own batch as before, and a push sends that, never the base.
+      expect((await desktop(null, "review", own)).json.counts).toMatchObject({ added: 2, unchanged: 0 });
+      expect((await desktop("writer", "push")).json).toMatchObject({ batchId: own });
+    });
+
+    test("pulling it again fetches nothing", async () => {
+      const { onMain, mainSha } = await ciOnMain();
+      expect((await desktop("reader", "pull")).json.base).toEqual({ batchId: onMain, gitSha: mainSha, images: { received: 2, alreadyHere: 0 } });
+      const asked: string[] = [];
+      const { code, json } = await counting(asked)("reader", "pull");
+      expect(code).toBe(0);
+      expect(json.base).toEqual({ batchId: onMain, gitSha: mainSha, images: { received: 0, alreadyHere: 2 } });
+      expect(asked).toEqual(["GET /api/repositories/diffplug/selfie", "POST /api/projects/42/decisions/reached", "POST /api/projects/42/batches/base"]);
+    });
+
+    test("is the newest of the default branch the commit reaches, never one at the commit itself", async () => {
+      const first = await record();
+      await laptop("ci", "push");
+      await commit(h.repo, "second");
+      const second = await record();
+      await laptop("ci", "push");
+      // At the first commit, which reaches no other.
+      expect((await desktop("reader", "pull")).json.base).toBeNull();
+      git(desktopRepo, "pull", "--quiet", h.repo, "main");
+      expect((await desktop("reader", "pull")).json.base).toMatchObject({ batchId: first });
+      git(desktopRepo, "switch", "--quiet", "-c", "feature");
+      await commit(desktopRepo, "on a branch");
+      expect((await desktop("reader", "pull")).json.base).toMatchObject({ batchId: second });
+    });
+
+    test("one whose image the cloud holds wrongly stops the pull, by name, and leaves no batch here", async () => {
+      const onMain = await record();
+      const [hash] = await imagesOf(onMain);
+      await cloud.store.receiveImage(await encodePng(solid(4, 4, [0, 0, 255])), hash!);
+      await laptop("ci", "push");
+      git(desktopRepo, "switch", "--quiet", "-c", "feature");
+      await commit(desktopRepo, "on a branch");
+      const { code, json } = await desktop("reader", "pull");
+      expect(code).toBe(2);
+      expect(json.error).toMatchObject({ code: "corrupt-image", message: expect.stringContaining(hash!) });
+      expect(await withStore(desktopRepo, desktopHome, ({ batches }) => batches.getBatch(onMain))).toBeNull();
+    });
+  });
+
   test("with nothing on the remote, takes no decisions and exits 0", async () => {
     const head = git(desktopRepo, "rev-parse", "HEAD");
     const { code, json } = await desktop("reader", "pull");
     expect(code).toBe(0);
-    expect(json).toEqual({ sha: head, environment: expect.any(String), images: { received: 0, alreadyHere: 0 }, decisions: 0 });
+    expect(json).toEqual({ sha: head, environment: expect.any(String), images: { received: 0, alreadyHere: 0 }, decisions: 0, base: null });
   });
 
   test("a batch with nothing decided on it gives no decisions, and exits 0", async () => {
@@ -700,7 +784,7 @@ describe("another machine", () => {
     }) as typeof fetch);
     const { code, json } = await run("reader", "pull");
     expect(code).toBe(0);
-    expect(json).toEqual({ sha: null, environment: expect.any(String), images: { received: 0, alreadyHere: 0 }, decisions: 0 });
+    expect(json).toEqual({ sha: null, environment: expect.any(String), images: { received: 0, alreadyHere: 0 }, decisions: 0, base: null });
     expect(asked).toEqual([]);
   });
 

@@ -61,7 +61,7 @@ describe("defaultBranchOf", () => {
     // A local `main` that isn't the default branch must not win.
     git(clone, "switch", "--quiet", "-c", "main");
     const b = await commit(clone, "b", "b.txt");
-    expect(await defaultBranch(clone, b)).toEqual({ defaultBranch: "origin/develop", mergeBase: a });
+    expect(await defaultBranch(clone, b)).toEqual({ defaultBranch: "develop", mergeBase: a });
   });
 
   test("works from a detached HEAD", async () => {

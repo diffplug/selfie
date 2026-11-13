@@ -220,7 +220,8 @@ ORDER BY started_at DESC LIMIT 1`;
 const BASE_REACHED = `${REACH_OF_BATCH}
 ${newestOfBranchWhere("?2", "(SELECT environment_key FROM render_batches WHERE id = ?1)", "(SELECT commit_key FROM render_batches WHERE id = ?1)", "SELECT key FROM reach")}`;
 
-const BASE_AMONG = newestOfBranchWhere("?1", environmentKey("?2"), commitKey("?3"), "SELECT c.key FROM json_each(?4) j CROSS JOIN commits c ON c.sha = j.value");
+// A commit this store has never heard of has no batch to leave out, and no key, which no commit is given as 0.
+const BASE_AMONG = newestOfBranchWhere("?1", environmentKey("?2"), `COALESCE(${commitKey("?3")}, 0)`, "SELECT c.key FROM json_each(?4) j CROSS JOIN commits c ON c.sha = j.value");
 
 const rendersPage = (batchId: string, after: string): SqlStatement => ({ sql: READ_RENDERS_PAGE, params: [batchId, after, ROWS_PER_PAGE], idempotent: true });
 
@@ -667,7 +668,10 @@ ORDER BY started_at DESC, key DESC`,
     return { base, current, renders: approvedSinceBase(current, rendered, decisions, baseDecisions.map(toPlacedDecision)) };
   }
 
-  /** The newest batch of a branch at any of these commits, other than a batch's own, for a store told what's reachable. */
+  /**
+   * The newest batch of a branch at any of these commits, other than a batch's own, for a store told what's reachable.
+   * That commit may be one this store has never heard of, as a remote is asked for the base of a commit not yet pushed.
+   */
   async baseAmong(branch: string, { environment, gitSha }: Pick<RenderBatch, "environment" | "gitSha">, commits: readonly string[]): Promise<RenderBatch | null> {
     const [row] = await this.#sql.run({ sql: BASE_AMONG, params: [branch, environment, gitSha, JSON.stringify(commits)], idempotent: true });
     return row === undefined ? null : toBatch(row);

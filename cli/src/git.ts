@@ -120,7 +120,8 @@ async function defaultBranchRef(repo: Repo): Promise<string | null> {
   return remoteHead || (DEFAULT_BRANCH_CANDIDATES.find((ref) => commits.has(ref)) ?? null);
 }
 
-const branchNameOf = (ref: string | null) => ref?.replace(/^refs\/(?:remotes|heads)\//, "") ?? null;
+/** As a batch names the branch it was on, so `refs/remotes/origin/main` is `main`, which is what HEAD there is called. */
+const branchNameOf = (ref: string | null) => ref?.replace(/^refs\/(?:remotes\/[^/]+|heads)\//, "") ?? null;
 
 /** Each commit this one reaches with what came right before it, for a server with no Git to ask. Nothing if this clone doesn't have it. */
 export async function commitGraph(repo: Repo, sha: string): Promise<readonly { readonly sha: string; readonly parents: readonly string[] }[]> {

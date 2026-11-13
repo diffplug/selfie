@@ -1,6 +1,6 @@
 // What crosses between a store's client and the sync routes. Types only, so the CLI can use them
 // without loading the server. See docs/specs/sync.md.
-import type { PlacedDecision, RenderBatch } from "selfie-store";
+import type { PlacedDecision, RecordedRender, RenderBatch } from "selfie-store";
 
 export interface ProjectAccess {
   readonly view: boolean;
@@ -26,4 +26,29 @@ export const SYNC_LIMITS = { hashes: 500, renders: 1_000, decisions: 1_000, shas
 export interface DiffPair {
   readonly current: string;
   readonly golden: string;
+}
+
+/**
+ * What a store asks for to find a commit's base, which the remote may not have, by the commits its history
+ * reaches, as for decisions (`docs/specs/renders.md` -> Approved since a base).
+ */
+export interface BaseRequest {
+  readonly environment: string;
+  /** The default branch, as a batch names the branch it was on. */
+  readonly branch: string;
+  /** The commit whose base it is, which is never its own. */
+  readonly gitSha: string;
+  /** Its history, at most `SYNC_LIMITS.shas`. */
+  readonly commits: readonly string[];
+}
+
+export interface BaseAnswer {
+  /** The finished batch, or null if those commits reach none. */
+  readonly batch: RenderBatch | null;
+}
+
+/** A page of a finished batch's renders, and where the next starts, or null after the last. */
+export interface RendersPage {
+  readonly renders: readonly RecordedRender[];
+  readonly next: string | null;
 }

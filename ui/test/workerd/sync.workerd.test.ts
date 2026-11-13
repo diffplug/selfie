@@ -101,6 +101,18 @@ describe("the sync routes, in a Worker", () => {
     expect((await send("POST", "/decisions/reached", "ci", { environment: ENV, commits: [SHA] })).status).toBe(403);
   });
 
+  it("finds a commit's base, from a commit it's never heard of, and hands over its renders, on D1's own engine", async () => {
+    const onMain = "33333333-3333-4333-8333-333333333333";
+    const unheardOf = "c".repeat(40);
+    expect((await send("PUT", `/batches/${onMain}`, "ci", { ...batchFacts(SHA), branch: "main" })).status).toBe(200);
+    expect((await send("POST", `/batches/${onMain}/renders`, "ci", { renders: [{ story: "a", imageHash: hash }] })).status).toBe(200);
+    expect(await sendJson("POST", `/batches/${onMain}/finish`, "ci", { count: 1, finishedAt: 600 })).toEqual({ status: "complete" });
+    const base = { environment: ENV, branch: "main", gitSha: unheardOf, commits: [unheardOf, NEXT_SHA, SHA] };
+    expect(await sendJson("POST", "/batches/base", "writer", base)).toMatchObject({ batch: { id: onMain, gitSha: SHA, branch: "main", status: "complete" } });
+    expect(await sendJson("POST", "/batches/base", "writer", { ...base, gitSha: SHA })).toEqual({ batch: null });
+    expect(await sendJson("GET", `/batches/${onMain}/renders`, "writer")).toEqual({ renders: [{ story: "a", imageHash: hash }], next: null });
+  });
+
   it("serves an image's bytes back, from R2", async () => {
     const response = await send("GET", `/images/${hash}`, "writer");
     expect(response.status).toBe(200);
