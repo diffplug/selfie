@@ -306,6 +306,24 @@ describe("the cloud service", () => {
     expect(statusOf(OWN_SHA)).toEqual({ state: "pending", description: "1 changed by this branch, and 1 inherited from main, waiting for approval" });
   });
 
+  it("turns every later commit in a stack green when one low in it is approved", async () => {
+    const [low, high] = ["e".repeat(40), "f".repeat(40)];
+    const [onLow, onHigh] = ["66666666-6666-4666-8666-666666666666", "77777777-7777-4777-8777-777777777777"];
+    expect((await api("POST", "/commits", UPLOAD, { commits: [{ sha: high, parents: [low] }, { sha: low, parents: [] }] })).status).toBe(200);
+    await pushBatch(onLow, low, { images: { stacked: hash } });
+    await pushBatch(onHigh, high, { images: { stacked: hash } });
+    const newestOf = (sha: string) => statuses.findLast((posted) => posted.sha === sha)?.status.state;
+    expect([newestOf(low), newestOf(high)]).toEqual(["pending", "pending"]);
+
+    const posted = statuses.length;
+    const approved = await review("POST", `/batches/${onLow}/decisions`, { signedIn: true, body: { decision: "approved", renders: [{ story: "stacked", imageHash: hash }] } });
+    expect(approved.status).toBe(200);
+    expect(statuses.slice(posted).map(({ sha, status, url }) => [sha, status.state, url])).toEqual([
+      [low, "success", `${ORIGIN}/diffplug/selfie/batches/${onLow}`],
+      [high, "success", `${ORIGIN}/diffplug/selfie/batches/${onHigh}`],
+    ]);
+  });
+
   it("serves a kept built Storybook only from its own origin", async () => {
     const file = new TextEncoder().encode("<html>story</html>");
     const fileHash = [...new Uint8Array(await crypto.subtle.digest("SHA-256", file))].map((byte) => byte.toString(16).padStart(2, "0")).join("");

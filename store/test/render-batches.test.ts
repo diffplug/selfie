@@ -442,6 +442,20 @@ describe("RenderBatches", () => {
     });
   });
 
+  describe("batches reaching a commit", () => {
+    it("walks up to 1,000 commits from it, itself among them, nearest first", async () => {
+      const shaOf = (i: number) => i.toString(16).padStart(40, "0");
+      // SHA 0 and a line of 1,001 commits on top of it.
+      await batches.recordCommits(Array.from({ length: 1_001 }, (_, i) => ({ sha: shaOf(i + 1), parents: [shaOf(i)] })));
+      const at = async (i: number) => (await recordBatch(shaOf(i), [])).id;
+      const [at999, at1000] = [await at(999), await at(1_000)];
+      await at(1_001);
+      const reaching = async (i: number) => (await batches.batchesReaching(shaOf(i), ENV, 50)).map(({ id }) => id);
+      expect(await reaching(0)).toEqual([at999]);
+      expect(await reaching(1)).toEqual([at1000, at999]);
+    });
+  });
+
   describe("compare", () => {
     it("lists only differences and failures, unless asked for everything", async () => {
       const baseline = await recordBatch(SHA_A, [rendered("same", 1), rendered("played", 2), rendered("calm", 3)]);
@@ -691,6 +705,7 @@ describe("RenderBatches", () => {
       await model.mergeDecisions(ENV, [{ story: "b", imageHash: null, decision: "approved", actor: "ned", at: 2, gitSha: ON.gitSha, batchId: ON.batchId }]);
       await model.receiveBatch(clean);
       await model.recordCommits([{ sha: SHA_B, parents: [SHA_A] }]);
+      expect(await model.batchesReaching(SHA_A, ENV, 50)).toMatchObject([{ id: head.id }]);
 
       const db = new DatabaseSync(temp.path);
       try {
@@ -705,7 +720,8 @@ describe("RenderBatches", () => {
             .map(({ detail }) => String(detail))
             // Reading a statement's own VALUES or JSON list, a one-row aggregate, or the commits a walk has reached, is no table scan.
             // The primary key by environment alone is every decision there, which the plan doesn't call a scan.
-            .filter((detail) => (/\bSCAN\b/.test(detail) && !/\bSCAN (v|c|j|json_each|reach|\d+ CONSTANT ROWS?|CONSTANT ROW)\b/.test(detail)) || /USING PRIMARY KEY \(environment_key=\?\)/.test(detail))
+            // So is a walk reading its own rows, each found by a key. An automatic index is built by reading the whole table.
+            .filter((detail) => (/\bSCAN\b/.test(detail) && !/\bSCAN (v|c|j|json_each|reach|descendants|\d+ CONSTANT ROWS?|CONSTANT ROW)\b/.test(detail)) || /USING PRIMARY KEY \(environment_key=\?\)/.test(detail) || /\bAUTOMATIC\b/.test(detail))
             .map((detail) => `${detail} in ${text}`);
         });
         expect(seen.size).toBeGreaterThan(10);
