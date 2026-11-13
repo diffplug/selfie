@@ -150,6 +150,8 @@ describe("the cloud service", () => {
     expect((await review("POST", `/batches/${FIRST}/decisions`, { body: target })).status).toBe(401);
     expect((await api("POST", "/decisions", UPLOAD, { environment: ENV, decisions: [] })).status).toBe(403);
     expect((await (await review("GET", "/images/" + hash)).arrayBuffer()).byteLength).toBe(png.length);
+    // The first batch reaches no other batch of main, so there's no base to say what changed since.
+    expect(await (await review("GET", `/batches/${FIRST}/since-base`)).json()).toEqual({ base: null, rows: [] });
   });
 
   it("signs in through GitHub, and only sends you back to this site", async () => {
@@ -275,6 +277,10 @@ describe("the cloud service", () => {
     expect((await api("POST", "/commits", UPLOAD, { commits: [{ sha: NEXT_SHA, parents: [FIRST_SHA] }, { sha: FIRST_SHA, parents: [] }] })).status).toBe(200);
     await pushBatch(NEXT, NEXT_SHA);
     expect(statuses.at(-1)).toMatchObject({ sha: NEXT_SHA, status: { state: "success", description: "1 story matches what's approved" } });
+    // Its base is the first batch, whose image it has, so it changed nothing since.
+    const since = (await (await review("GET", `/batches/${NEXT}/since-base`)).json()) as { base: { id: string }; rows: unknown[] };
+    expect(since.base.id).toBe(FIRST);
+    expect(since.rows).toEqual([]);
   });
 
   it("says a commit's status only at the end of a push, or on a decision made here", async () => {

@@ -111,6 +111,17 @@ Once it's approved, a change is what later batches compare with, so they read it
 - **Must compare a batch with its base's images as `compareWithBatch` does, against the same base**, which `docs/specs/cloud.md` → Commit status uses to tell what a branch changed from what it inherited.
 - **Never take a decision on one of these.** `decide` refuses it as it does any unchanged image (`stale-decision`).
 
+## Changed since a base
+
+Source of truth: `changedSinceBase`, `RenderBatches.sinceBaseReached`, and `sinceBaseFromHistory` in `store/src/core/render-batches.ts`; `sinceBaseOf` in `cli/src/project.ts`.
+
+What differs from what's approved isn't what a commit changed: a default branch whose own changes were never approved passes every one of them to each branch from it. This is what a commit's history did change.
+
+- **Must take the same base as [Approved since a base](#approved-since-a-base)**, and with none, list nothing.
+- **Must compare with the base's own images, not its approvals**, by `compareWithBatch`, and list what isn't `unchanged`, with `goldenBatchId` the base.
+- **Must give each the decision on exactly its image as the batch's comparison with approvals has it, whatever its state there**, and `approvedIn`, the batch whose approval made it the reference, when it reads as unchanged there because it was approved on another batch.
+- **Never take a decision of its own.** One on a row here is a decision on the same image as the batch compares it with approvals, which `decide` takes only if that's decidable there.
+
 ## Schema
 
 Source of truth: `CREATE_BATCH_TABLES` in `store/src/core/render-batches.ts`, `initStoreSchema` in `store/src/core/store.ts`.

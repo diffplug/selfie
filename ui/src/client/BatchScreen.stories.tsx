@@ -147,3 +147,15 @@ export const AcceptedDeltas: Story = {
     await userEvent.click(within(canvasElement).getByText(/1 delta accepted in this browser/));
   },
 };
+
+// The base has its own changes nobody approved, which every branch from it inherits.
+const BASE = batchOf({ id: OTHER_BATCH_ID, branch: "main", gitSha: "157c71787d1b9f2a3c4d5e6f708192a3b4c5d6e7" });
+const INHERITED = [rows.changed("components-button--primary"), rows.fresh("components-badge--new"), rows.tall("pages-settings--account")];
+const OWN = rows.taller("components-list--with-new-row");
+const sinceBase = (...changed: readonly ReturnType<typeof rows.changed>[]) => ({ base: BASE, rows: changed.map((row) => ({ ...row, goldenBatchId: OTHER_BATCH_ID, approvedIn: null })) });
+export const InheritedFromBase: Story = { args: { view: viewOf(INHERITED), state: { sinceBase: sinceBase() } } };
+export const ChangedSinceBase: Story = {
+  args: { view: viewOf([...INHERITED, OWN]), state: { sinceBase: { base: BASE, rows: [...sinceBase(OWN).rows, { ...rows.spaced("pages-home--with-more-space", approved()), goldenBatchId: OTHER_BATCH_ID, approvedIn: OTHER_BATCH_ID }] } } },
+};
+export const ChangedSinceBaseListed: Story = { ...ChangedSinceBase, args: { ...ChangedSinceBase.args, search: "?show=since-base" } };
+export const NoBase: Story = { args: { view: viewOf(SOME_CHANGES), state: { sinceBase: { base: null, rows: [] } }, search: "?show=since-base" } };

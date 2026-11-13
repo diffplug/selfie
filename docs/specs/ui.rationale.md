@@ -36,6 +36,10 @@ Evidence and reasoning for `docs/specs/ui.md`, keyed by its headings.
 
 **Why say what was approved earlier.** A merged pull request's commit reads as nothing differing, since its approvals are what it's compared with, which is right for what blocks it and hides what it did. It's found on the page, instead of on the batch that was approved, since that's where a link from a commit lands, and nothing else leads from a later commit to an earlier batch.
 
+**Why say what changed since the base, approved or not.** Someone following a commit's status from GitHub wants to know what it changed. What's left to decide on is something else: it leaves out what was approved on an earlier commit, and takes in whatever its base never approved. A decision on a row goes to the batch's own row for the same image, since that's what the store decides on, and a row approved on another batch has nothing left to decide here.
+
+**Why say what was inherited.** Otherwise each branch from a base with undecided changes asks about them as if it made them, and nobody can tell from the page that it changed nothing.
+
 **Why raw hunks, and by pixels.** A group is only a choice of what to show together, and its box holds whatever's between its hunks, so the same change could group differently beside something else. Position isn't compared, since a band that closes up sits at a different height on each page. A hash and not pixels held in memory, since a whole page's change on each of 568 stories would hold gigabytes. SHA-256, since this approves images, and a weaker hash would let a crafted image pass as a change someone accepted.
 
 **Why whole images to go through a delta's stories.** A delta's pixels are the same in every story by definition, so its crop can't tell one from another. What can be wrong is where it landed and what's around it, as when a change that's right on most pages is on top of something on one. Only one is open at a time, since 28 pairs of whole images would be a very long page.
