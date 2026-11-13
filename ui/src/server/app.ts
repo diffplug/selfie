@@ -179,6 +179,7 @@ export function createReviewApi(given: ReviewSource | ((context: Context) => Pro
   );
 
   api.get("/batches/:batchId/approved-since", async (context) => context.json(await (await sourceOf(context)).approvedSince(context.req.param("batchId"))));
+  api.get("/batches/:batchId/since-base", async (context) => context.json(await (await sourceOf(context)).sinceBase(context.req.param("batchId"))));
 
   api.post("/batches/:batchId/decisions", async (context) => {
     const { decision, renders } = await jsonBody(context);

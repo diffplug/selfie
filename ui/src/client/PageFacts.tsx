@@ -5,7 +5,13 @@ import { Sha } from "./words.tsx";
 
 export type PageFacts =
   | { readonly kind: "view"; readonly view: Pick<StoriesView, "head" | "branch" | "storybookUrl" | "setup"> }
-  | { readonly kind: "diff"; readonly batch: Pick<RenderBatch, "gitSha" | "dirty">; readonly context: BatchContext | null };
+  | {
+      readonly kind: "diff";
+      readonly batch: Pick<RenderBatch, "gitSha" | "dirty">;
+      readonly context: BatchContext | null;
+      /** The base it's compared with instead of what's approved, if the page shows what changed since one. */
+      readonly base?: Pick<RenderBatch, "gitSha" | "branch">;
+    };
 
 function ofHead(branch: string | null): ReactNode {
   return branch === null ? ", HEAD" : <>, HEAD of <code>{branch}</code></>;
@@ -30,13 +36,19 @@ function ViewFacts({ view: { head, branch, storybookUrl, setup } }: { view: Extr
 
 export function PageFactsLine({ facts }: { facts: PageFacts }) {
   if (facts.kind === "view") return <ViewFacts view={facts.view} />;
-  const { batch, context } = facts;
+  const { batch, context, base } = facts;
   return (
     <>
       Built Storybook diff between <Sha sha={batch.gitSha} />
       {context?.head === batch.gitSha && ofHead(context.branch)}
       {batch.dirty && ", with uncommitted changes"}
-      , and what its history has approved
+      {base === undefined ? (
+        ", and what its history has approved"
+      ) : (
+        <>
+          , and what <code>{base.branch}</code> rendered at <Sha sha={base.gitSha} />
+        </>
+      )}
     </>
   );
 }

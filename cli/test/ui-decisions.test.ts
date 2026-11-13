@@ -37,6 +37,37 @@ describe("what's been approved since a batch's base", () => {
   });
 });
 
+describe("what a batch changed since its base, before anything is pushed", () => {
+  test("tells a branch's own change from one it inherited from a base nobody approved", async () => {
+    // main renders `a` blue, and nobody approves it there.
+    h.stories = [{ id: "a" }, { id: "b" }];
+    await approveAll();
+    await commit(h.repo, "blue on main");
+    h.stories = [{ id: "a", color: BLUE }, { id: "b" }];
+    const onMain = (await review()).json.batchId as string;
+    git(h.repo, "checkout", "-b", "feature");
+    await commit(h.repo, "green on a branch");
+    h.stories = [{ id: "a", color: BLUE }, { id: "b", color: GREEN }];
+    const onBranch = (await review()).json.batchId as string;
+
+    expect((await viewOf(onBranch)).rows.map(({ story }: any) => story)).toEqual(["a", "b"]);
+    const since = (await (await get(`/api/batches/${onBranch}/since-base`)).json()) as any;
+    expect(since.base.id).toBe(onMain);
+    expect(since.rows.map(({ story, state, decision, approvedIn }: any) => [story, state, decision, approvedIn])).toEqual([["b", "changed", null, null]]);
+
+    // Deciding on the branch's own change is a decision on the batch's own row for the same image.
+    expect((await decideOn(onBranch, "approved", [{ story: "b", imageHash: since.rows[0].imageHash }])).status).toBe(200);
+    const after = (await (await get(`/api/batches/${onBranch}/since-base`)).json()) as any;
+    expect(after.rows[0].decision.decision).toBe("approved");
+  });
+
+  test("has no base with nothing rendered on the default branch", async () => {
+    h.stories = [{ id: "a" }];
+    const first = await approveAll();
+    expect(await (await get(`/api/batches/${first}/since-base`)).json()).toEqual({ base: null, rows: [] });
+  });
+});
+
 describe("approve and reject", () => {
   let batchId: string;
   let rows: any[];

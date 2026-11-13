@@ -47,6 +47,7 @@ Source of truth: `ReviewSource` in `ui/src/shared/api.ts`.
 | `batchView(batchId)` | A `BatchView` ([Recomputing](#recomputing)) |
 | `unchanged(batchId)` | The batch's unchanged rows |
 | `approvedSince(batchId)` | Its base, and its rows of what's been approved since that (`docs/specs/renders.md` → Approved since a base) |
+| `sinceBase(batchId)` | Its base, and its rows of what's changed since that, approved or not (`docs/specs/renders.md` → Changed since a base) |
 | `decide(batchId, decision, targets)` | The new `BatchView` |
 | `feedback()`, `addNote(note)`, `removeNote(id)` | This session's notes (`docs/specs/feedback.md`) |
 | `answerNote(id, text, batchId)`, `resolveNote(id)` | This session's notes after a person's answer, or closing one |
@@ -71,6 +72,7 @@ Source of truth: `ui/src/server/app.ts`; tests in `cli/test/ui-*.test.ts`.
 | `GET /api/batches/:id` | `batchView` |
 | `GET /api/batches/:id/unchanged` | `{ rows }` |
 | `GET /api/batches/:id/approved-since` | `{ base, rows }` |
+| `GET /api/batches/:id/since-base` | `{ base, rows }` |
 | `POST /api/batches/:id/decisions` | `{ decision, renders: [{ story, imageHash }] }` |
 | `GET /api/feedback` | `feedback` |
 | `POST /api/notes` | `{ story, batchId, imageHash, box, text }` |
@@ -138,6 +140,10 @@ Source of truth: `ui/src/client/`.
 - **Must keep the filter, text and state, in the URL, and nowhere else**, so back, reload, and next and previous all follow it.
 - **Must list unchanged stories only when asked**, by the `unchanged` filter, which is when they're fetched.
 - **Must say so when a batch has changes approved earlier, and how to see them**, by the `approved-earlier` filter, with what they're compared with. Each opens as any changed, added, or removed render does, between what it replaced and this image, saying where it was approved, with a link to that, and offering no decision (rationale).
+
+- **Must say what a batch changed since its base, approved or not**, by the `since-base` filter, with a count beside the others, and the base named in the top bar while it's shown. Each opens between the base's image and this one, and takes a decision only where the batch's own comparison has that very image to decide on, which is where the decision goes (rationale).
+- **Must say when what needs a decision wasn't changed by this commit's history, but inherited from its base**, where nobody approved it, with how much was changed since the base, and that approving it here counts for the base's branch once merged (rationale).
+- **Must keep each row's decision since the base as the batch's own row for that image last said**, so a decision shows at once, with no read but the one every action answers with.
 
 **Bulk decisions:** approve or reject all, or all the current filter shows.
 

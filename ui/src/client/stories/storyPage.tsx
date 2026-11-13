@@ -1,6 +1,6 @@
 // What the stories of a story's page share.
 import { expect, userEvent, waitFor } from "storybook/test";
-import type { ApprovedRow, Note, BatchView, RenderRow } from "../../shared/api.ts";
+import type { ApprovedRow, Note, BatchView, RenderRow, SinceBaseView } from "../../shared/api.ts";
 import { DetailScreen } from "../DetailScreen.tsx";
 import { feedbackOf, rows, stateOf, viewOf } from "./fixtures.ts";
 import { BatchFrame } from "./BatchFrame.tsx";
@@ -13,12 +13,17 @@ export interface StoryPageArgs {
   readonly accepted?: ReadonlySet<string>;
   /** What's approved since this batch's base, and that it's being looked at. */
   readonly approvedEarlier?: readonly ApprovedRow[];
+  /** What's changed since this batch's base, and that it's being looked at, with `row` among its rows. */
+  readonly sinceBase?: SinceBaseView;
 }
 
-export function StoryPage({ row, others = [], view, notes = [], accepted, approvedEarlier }: StoryPageArgs) {
-  const shown = view ?? viewOf(approvedEarlier === undefined ? [row, ...others] : others);
-  const state = stateOf(shown, approvedEarlier === undefined ? {} : { approvedSince: { base: null, rows: approvedEarlier } });
-  const search = approvedEarlier === undefined ? "" : "?show=approved-earlier";
+export function StoryPage({ row, others = [], view, notes = [], accepted, approvedEarlier, sinceBase }: StoryPageArgs) {
+  const shown = view ?? viewOf(approvedEarlier === undefined && sinceBase === undefined ? [row, ...others] : others);
+  const state = stateOf(shown, {
+    ...(approvedEarlier === undefined ? {} : { approvedSince: { base: null, rows: approvedEarlier } }),
+    ...(sinceBase === undefined ? {} : { sinceBase }),
+  });
+  const search = approvedEarlier !== undefined ? "?show=approved-earlier" : sinceBase !== undefined ? "?show=since-base" : "";
   return (
     <BatchFrame view={shown} state={state} story={row.story} search={search}>
       {(navigation) => navigation !== null && <DetailScreen state={state} view={shown} story={row.story} search={search} feedback={feedbackOf(notes)} navigation={navigation} {...(accepted === undefined ? {} : { accepted })} />}

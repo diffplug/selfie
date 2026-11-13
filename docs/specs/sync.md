@@ -34,7 +34,7 @@ To mount under `/api`. `GET /repositories/:owner/:name` finds a repository's pro
 | `PUT /storybooks/files/:hash` | A file's bytes, which must hash to that | Upload |
 | `PUT /storybooks/:hash` | `{ files }`, each `{ path, fileHash }`, once all are here, or `missing-files` | Upload |
 | `POST /batches/:id/storybook` | `{ build }`, which built Storybook rendered this batch | Upload |
-| `GET /batches/:id/diffs/needed` | `{ pairs }`, each `{ current, golden }`, the changed pairs with no diff here, including those of what's been approved since its base (`docs/specs/renders.md` → Approved since a base) | Upload |
+| `GET /batches/:id/diffs/needed` | `{ pairs }`, each `{ current, golden }`, the changed pairs with no diff here, including those of what's been approved since its base (`docs/specs/renders.md` → Approved since a base) and of what's changed since it (`docs/specs/renders.md` → Changed since a base) | Upload |
 | `PUT /diffs/:current/:golden/image` | The diff image's bytes, sent first | Upload |
 | `PUT /diffs/:current/:golden` | Its `PixelDiff`, which says both are here | Upload |
 | `POST /decisions` | `{ environment, decisions }`, at most 1,000, each with its `gitSha` and `batchId`, and a null `imageHash` for a removal | Decide |

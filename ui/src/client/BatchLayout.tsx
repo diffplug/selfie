@@ -13,7 +13,7 @@ import { describePixels } from "./words.tsx";
 const NO_ROWS: readonly RenderRow[] = [];
 
 /** The tree shows what the page's Show says, and its own search does the text. Next and previous go through just that. */
-export function useBatchTree(view: BatchView | null, read: Pick<BatchState, "unchanged" | "approvedSince">, search: string, story: string | null) {
+export function useBatchTree(view: BatchView | null, read: Pick<BatchState, "unchanged" | "approvedSince" | "sinceBase">, search: string, story: string | null) {
   const rows = view?.rows;
   const renames = useMemo(() => findRenames(rows ?? []), [rows]);
   const { show, text } = parseFilter(search);
@@ -26,12 +26,14 @@ export function useBatchTree(view: BatchView | null, read: Pick<BatchState, "unc
     const all = inTreeOrder(differingStories({ ...view, rows: source }, renames));
     return navigationThrough(all, matchingStories(inTreeOrder(stories), text), story, (name) => storyPath(view.batch.id, name, search), batchPath(view.batch.id, search));
   }, [view, source, renames, stories, text, story, search]);
-  return { renames, stories, rowOf, navigation };
+  // The base, when what's shown is what changed since it, which the top bar then names.
+  const base = show === "since-base" ? (read.sinceBase?.base ?? undefined) : undefined;
+  return { renames, stories, rowOf, navigation, base };
 }
 
 export function BatchLayout({
   view,
-  tree: { stories, renames, rowOf },
+  tree: { stories, renames, rowOf, base },
   story,
   search,
   context,
@@ -44,7 +46,7 @@ export function BatchLayout({
   context: BatchContext | null;
   children: ReactNode;
 }) {
-  usePageFacts({ kind: "diff", batch: view.batch, context });
+  usePageFacts({ kind: "diff", batch: view.batch, context, ...(base === undefined ? {} : { base: { gitSha: base.gitSha, branch: base.branch } }) });
   return (
     <StoryNavLayout
       stories={stories}

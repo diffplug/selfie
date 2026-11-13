@@ -6,7 +6,7 @@ import path from "node:path";
 import { FilesystemBlobStorage } from "selfie-store/adapters/filesystem-blob";
 import { sharpCodec } from "selfie-store/adapters/sharp-codec";
 import { SqliteAdapter } from "selfie-store/adapters/sqlite";
-import { Blobs, initStoreSchema, RenderBatches, Sql, Store, BuiltStorybooks, StoredDiffs, type ApprovedSince, type CompareOptions, type Comparison, type RenderBatch } from "selfie-store";
+import { Blobs, initStoreSchema, RenderBatches, Sql, Store, BuiltStorybooks, StoredDiffs, type ApprovedSince, type SinceBase, type CompareOptions, type Comparison, type RenderBatch } from "selfie-store";
 import type { PixelDiff } from "./diff.ts";
 import { SelfieError } from "./errors.ts";
 import { ancestorsOf, defaultBranchOf, earliestAuthoredSince, headSha, openRepo, type Repo } from "./git.ts";
@@ -141,6 +141,18 @@ export async function approvedSinceOf(project: Project, batchId: string): Promis
   const base = await batches.baseAmong(defaultBranch, batch, commits);
   const [decisions, baseDecisions] = await Promise.all([batches.decisionsAt(batch.environment, commits), base === null ? [] : batches.decisionsAt(base.environment, await ancestorsOf(repo, base.gitSha))]);
   return { base, renders: await batches.approvedSinceFromHistory(batchId, decisions, baseDecisions) };
+}
+
+/** See `docs/specs/renders.md` -> Changed since a base, with the base `approvedSinceOf` finds. */
+export async function sinceBaseOf(project: Project, batchId: string): Promise<SinceBase> {
+  const batch = await requireBatch(project, batchId);
+  const { batches, repo } = project;
+  const { defaultBranch } = await defaultBranchOf(repo, batch.gitSha);
+  if (defaultBranch === null) return { base: null, renders: [] };
+  const commits = await reachableCommits(project, batch);
+  const base = await batches.baseAmong(defaultBranch, batch, commits);
+  if (base === null) return { base, renders: [] };
+  return { base, renders: await batches.sinceBaseFromHistory(batchId, base, await batches.decisionsAt(batch.environment, commits)) };
 }
 
 /** A batch someone named, which must be well formed and in this project's store. */

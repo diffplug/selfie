@@ -136,9 +136,24 @@ describe("pushing", () => {
     }
     await commit(h.repo, "changes nothing");
     const after = (await imagesOf(await record()))[0]!;
-    expect(await cloud.diffs.has(after, before)).toBe(false);
     await laptop("writer", "push");
     expect(await cloud.diffs.has(after, before)).toBe(true);
+  });
+
+  test("sends the diff of what a branch changed since its base, approved or not", async () => {
+    await approved();
+    await laptop("writer", "push");
+    // main makes `a` blue, and nobody approves it, so what's approved and what main renders differ.
+    await commit(h.repo, "makes it blue");
+    stories = [{ id: "a", color: BLUE }, { id: "b", color: GREEN }];
+    const base = (await imagesOf(await record()))[0]!;
+    await laptop("ci", "push");
+    git(h.repo, "checkout", "-b", "feature");
+    await commit(h.repo, "makes it another color");
+    stories = [{ id: "a", color: [1, 2, 3] }, { id: "b", color: GREEN }];
+    const after = (await imagesOf(await record()))[0]!;
+    await laptop("ci", "push");
+    expect(await cloud.diffs.has(after, base)).toBe(true);
   });
 
   test("names who pushed as a decision's author, not what the laptop says", async () => {

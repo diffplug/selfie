@@ -70,6 +70,12 @@
 
 **Why a list of its own, and not more rows.** A batch's `rows` are what it blocks on and what can be decided, so these would need leaving out everywhere those are used. Most of the time nobody opens them.
 
+## Changed since a base
+
+**Why the base's images, and not its approvals.** On 2026-11-12, diffplug/selfie's pull requests #70, #71, and #72 each listed 21 changed and 11 added, waiting for approval, and each changed no image at all from its base: all 32 were changes on `main` nobody had approved, which every branch from it inherits. Compared with what's approved, a branch's own change and an inherited one look the same. Compared with what its base rendered, only what the branch did is left. [Approved since a base](#approved-since-a-base) compares with the base's approvals, which are the same images only when the base has nothing undecided.
+
+**Why the same base.** So the two lists are of the same span of history, and a store with no Git finds it the same way.
+
 ## Schema
 
 **Foreign keys, before there's data.** Nothing in the store deletes yet, and every write already goes through a path that writes parents first, so these catch only bugs for now. What they're for is retention: once a batch can be deleted, they're what stop one going while something points at it. SQLite can't add a foreign key to an existing table, so waiting would mean rebuilding tables in a migration, where today it's an edit to their `CREATE` statements. Inserting 10,000 renders took 9 ms with checks and 8 ms without, in one local run. They haven't run on real D1, only on its engine in the Worker tests.
