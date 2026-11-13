@@ -1,7 +1,7 @@
 // Everything a screen shows about a batch, from a comparison and what a platform can say about it. It
 // knows `selfie-store`'s core and nothing else, so a local server and a Worker show the same thing.
-import { storyEntriesIn, summarizeBatch, type ApprovedSince, type BuiltStorybooks, type ComparedRender, type Comparison, type RenderBatch, type RenderBatches, type StoryEntry } from "selfie-store";
-import type { ApprovedSinceView, BatchView, PixelDiff, RenderRow, StorybookLink } from "../shared/api.ts";
+import { storyEntriesIn, summarizeBatch, type ApprovedSince, type SinceBase, type BuiltStorybooks, type ComparedRender, type Comparison, type RenderBatch, type RenderBatches, type StoryEntry } from "selfie-store";
+import type { ApprovedSinceView, BatchView, PixelDiff, RenderRow, SinceBaseView, StorybookLink } from "../shared/api.ts";
 
 /** A person looks at a few batches at a time. */
 const KEPT_INDEXES_HELD = 8;
@@ -22,6 +22,7 @@ export interface BatchViews {
   toRows(batchId: string, compared: Comparison["renders"]): Promise<RenderRow[]>;
   viewOf(comparison: Comparison, actor: string | null): Promise<BatchView>;
   approvedSinceView(approved: ApprovedSince): Promise<ApprovedSinceView>;
+  sinceBaseView(since: SinceBase): Promise<SinceBaseView>;
   /** A kept built Storybook's stories, which never change, or nothing if it can't say. */
   storiesOfKept(hash: string): Promise<readonly StoryEntry[]>;
 }
@@ -105,5 +106,8 @@ export function batchViews(platform: BatchViewPlatform): BatchViews {
   /** Never a batch's cached stats, which are by story, of what it was compared with when it was reviewed. */
   const approvedSinceView = async ({ base, renders }: ApprovedSince): Promise<ApprovedSinceView> => ({ base, rows: await rowsWith(renders, new Map()) });
 
-  return { toRows, viewOf, approvedSinceView, storiesOfKept };
+  /** Never a batch's cached stats either, which are of what it's compared with against approvals. */
+  const sinceBaseView = async ({ base, renders }: SinceBase): Promise<SinceBaseView> => ({ base, rows: await rowsWith(renders, new Map()) });
+
+  return { toRows, viewOf, approvedSinceView, sinceBaseView, storiesOfKept };
 }

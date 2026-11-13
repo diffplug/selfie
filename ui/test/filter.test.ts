@@ -1,6 +1,6 @@
-import { expect, test } from "vitest";
-import { applyFilter, decidableIn, filterQuery, neighbors, NO_FILTER, parseFilter, reuseRows, rowsFor, showQuery } from "../src/client/filter.ts";
-import type { ApprovedRow, RenderRow } from "../src/shared/api.ts";
+import { describe, expect, test } from "vitest";
+import { applyFilter, decidableIn, filterQuery, neighbors, NO_FILTER, parseFilter, reuseRows, rowsFor, showQuery, decisionRowOf, inheritedFrom, withDecisionsOf } from "../src/client/filter.ts";
+import type { ApprovedRow, RenderRow, SinceBaseRow } from "../src/shared/api.ts";
 
 const row = (story: string, overrides: Partial<RenderRow> = {}): RenderRow => ({
   story,
@@ -87,10 +87,38 @@ test("moved and spacing only is a changed row with nothing changed in it", () =>
 test("what's read separately is null until it's been read, and otherwise a Show picks from what differs", () => {
   const differs = { story: "differs", state: "changed", decision: null } as RenderRow;
   const earlier = { story: "earlier", state: "changed", decision: { decision: "approved", actor: "a", at: 1 }, approvedIn: "elsewhere" } as ApprovedRow;
-  const read = { unchanged: null, approvedSince: { base: null, rows: [earlier] } };
+  const read = { unchanged: null, approvedSince: { base: null, rows: [earlier] }, sinceBase: null };
   expect(rowsFor("all", [differs], read)).toEqual([differs]);
   expect(rowsFor("unchanged", [differs], read)).toBeNull();
   expect(rowsFor("approved-earlier", [differs], read)).toEqual([earlier]);
-  expect(rowsFor("approved-earlier", [differs], { unchanged: null, approvedSince: null })).toBeNull();
+  expect(rowsFor("approved-earlier", [differs], { unchanged: null, approvedSince: null, sinceBase: null })).toBeNull();
   expect(applyFilter([earlier], { text: "", show: "approved-earlier" })).toEqual([earlier]);
+  expect(rowsFor("since-base", [differs], read)).toBeNull();
+  expect(rowsFor("since-base", [differs], { ...read, sinceBase: { base: null, rows: [{ ...earlier, approvedIn: null }] } })).toHaveLength(1);
+});
+
+describe("what's changed since a base", () => {
+  const own = { story: "own", state: "changed", imageHash: "h2", goldenHash: "h1", decision: null } as RenderRow;
+  const inherited = { story: "inherited", state: "added", imageHash: "h3", goldenHash: null, decision: null } as RenderRow;
+  const sinceOwn = { ...own, goldenHash: "h0", approvedIn: null } as SinceBaseRow;
+  const earlier = { story: "earlier", state: "changed", imageHash: "h5", goldenHash: "h4", decision: { decision: "approved", actor: "a", at: 1 }, approvedIn: "b" } as SinceBaseRow;
+
+  test("decides on the batch's own row for the very same image, and on nothing else", () => {
+    expect(decisionRowOf(sinceOwn, [own, inherited])).toBe(own);
+    expect(decisionRowOf({ ...sinceOwn, imageHash: "other" }, [own])).toBeNull();
+    expect(decisionRowOf(earlier, [own, inherited])).toBeNull();
+  });
+
+  test("takes each decision from the batch's own rows, so deciding shows at once", () => {
+    const decided = { ...own, decision: { decision: "approved", actor: "a", at: 2 } } as RenderRow;
+    const [updated, untouched] = withDecisionsOf([sinceOwn, earlier], [decided]);
+    expect(updated!.decision?.decision).toBe("approved");
+    expect(untouched).toBe(earlier);
+    expect(withDecisionsOf([sinceOwn], [own])[0]).toBe(sinceOwn);
+  });
+
+  test("calls inherited what differs from what's approved and not from the base", () => {
+    expect(inheritedFrom({ base: {}, rows: [sinceOwn] }, [own, inherited])).toEqual([inherited]);
+    expect(inheritedFrom({ base: null, rows: [] }, [own, inherited])).toBeNull();
+  });
 });

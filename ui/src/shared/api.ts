@@ -71,6 +71,18 @@ export interface ApprovedSinceView {
   readonly rows: readonly ApprovedRow[];
 }
 
+/**
+ * Differs from the base's own image, approved or not, with the decision approvals have on exactly this
+ * image. `approvedIn` is where it was approved, if that's on another batch, so it reads as unchanged here.
+ */
+export type SinceBaseRow = RenderRow & { readonly approvedIn: string | null };
+
+/** What a batch changed since its base: the newest batch of the default branch its commit reaches. */
+export interface SinceBaseView {
+  readonly base: RenderBatch | null;
+  readonly rows: readonly SinceBaseRow[];
+}
+
 export type BatchListing = Pick<RenderBatch, "id" | "startedAt" | "status" | "dirty">;
 
 /** Where a kept built Storybook is, on a hosted Storybook's origin, ending in a slash. Crosses into `selfie-cli` from here. */
@@ -258,6 +270,8 @@ export interface ReviewSource {
   batchContext(batchId: string): Promise<BatchContext>;
   unchanged(batchId: string): Promise<readonly RenderRow[]>;
   approvedSince(batchId: string): Promise<ApprovedSinceView>;
+  /** What the batch changed since its base, approved or not, as its base's images compare it. */
+  sinceBase(batchId: string): Promise<SinceBaseView>;
   /** Decides on exactly these images, or refuses all of them if one isn't what the batch holds. */
   decide(batchId: string, decision: DecisionKind, targets: readonly DecisionTarget[]): Promise<BatchView>;
   feedback(): Promise<FeedbackView>;

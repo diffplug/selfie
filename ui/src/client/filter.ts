@@ -1,7 +1,7 @@
 // Which rows a filter shows, and where next and previous go. Pure, so a test needs no browser.
 import { isDecidable } from "selfie-store";
 import type { BatchState } from "./hooks.ts";
-import type { DecisionTarget, RenderRow } from "../shared/api.ts";
+import type { DecisionTarget, RenderRow, SinceBaseRow } from "../shared/api.ts";
 import { isLayoutOnly } from "../shared/hunks.ts";
 import { plural } from "../shared/plural.ts";
 
@@ -17,6 +17,7 @@ export const SHOW_OPTIONS = [
   ["rejected", "Rejected"],
   ["unchanged", "Unchanged"],
   ["approved-earlier", "Approved earlier"],
+  ["since-base", "Changed since the base, approved or not"],
 ] as const;
 
 export type Show = (typeof SHOW_OPTIONS)[number][0];
@@ -38,6 +39,7 @@ function inShow(row: RenderRow, show: Show): boolean {
     case "rejected":
       return isDecidable(row.state) && row.decision?.decision === show;
     case "approved-earlier":
+    case "since-base":
       return true;
     case "layout":
       return row.state === "changed" && row.pixelDiff !== null && isLayoutOnly(row.pixelDiff);
@@ -63,8 +65,35 @@ export function applyFilter(rows: readonly RenderRow[], { text, show }: RowFilte
 export const decidableIn = (rows: readonly RenderRow[]) => rows.filter(({ state }) => isDecidable(state));
 
 /** The rows a Show picks from: what differs, unless it asks for what's read separately, and then null until that's read. */
-export const rowsFor = (show: Show, rows: readonly RenderRow[], { unchanged, approvedSince }: Pick<BatchState, "unchanged" | "approvedSince">): readonly RenderRow[] | null =>
-  show === "unchanged" ? unchanged : show === "approved-earlier" ? (approvedSince?.rows ?? null) : rows;
+export const rowsFor = (show: Show, rows: readonly RenderRow[], { unchanged, approvedSince, sinceBase }: Pick<BatchState, "unchanged" | "approvedSince" | "sinceBase">): readonly RenderRow[] | null =>
+  show === "unchanged" ? unchanged : show === "approved-earlier" ? (approvedSince?.rows ?? null) : show === "since-base" ? (sinceBase?.rows ?? null) : rows;
+
+/**
+ * The batch's own row for the very image a row from another comparison shows, which is what a decision on it
+ * goes to, or null if this batch has none to decide on, as when it was approved on another batch.
+ */
+export function decisionRowOf(row: RenderRow, rows: readonly RenderRow[]): RenderRow | null {
+  const own = rows.find((candidate) => candidate.story === row.story);
+  return own !== undefined && own.imageHash === row.imageHash && isDecidable(own.state) ? own : null;
+}
+
+/** Rows since a base, each with the decision the batch's own row for that image now has, so deciding shows at once. */
+export function withDecisionsOf(since: readonly SinceBaseRow[], rows: readonly RenderRow[]): readonly SinceBaseRow[] {
+  return since.map((row) => {
+    const own = decisionRowOf(row, rows);
+    return own === null || own.decision === row.decision ? row : { ...row, decision: own.decision };
+  });
+}
+
+/**
+ * What differs from what's approved, but not from the base: what the branch didn't change, and inherited from
+ * a base where it was never approved. Null until what's changed since the base is read, or with no base.
+ */
+export function inheritedFrom({ base, rows: since }: { readonly base: unknown; readonly rows: readonly RenderRow[] }, rows: readonly RenderRow[]): readonly RenderRow[] | null {
+  if (base === null) return null;
+  const changed = new Set(since.map(({ story }) => story));
+  return rows.filter((row) => row.state !== "unchanged" && !changed.has(row.story));
+}
 
 export const targetsOf = (rows: readonly RenderRow[]): DecisionTarget[] =>
   rows.map(({ story, imageHash }) => ({ story, imageHash }));

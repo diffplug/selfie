@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useRef, useState, useLayoutEffect } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useLayoutEffect } from "react";
 import { isHosted } from "./base.ts";
-import type { ApprovedSinceView, DecisionKind, DecisionTarget, FeedbackView, StoriesView, NewNote, BatchView, SendVia, RenderProgress, RenderRow } from "../shared/api.ts";
-import { deleteNote, fetchApprovedSince, fetchFeedback, fetchRenderProgress, fetchStories, fetchBatch, fetchUnchanged, postAnswer, postRender, postDecision, postNote, postResolve, postSendNotes, RequestError } from "./api.ts";
-import { reuseRows } from "./filter.ts";
+import type { ApprovedSinceView, SinceBaseView, DecisionKind, DecisionTarget, FeedbackView, StoriesView, NewNote, BatchView, SendVia, RenderProgress, RenderRow } from "../shared/api.ts";
+import { deleteNote, fetchApprovedSince, fetchSinceBase, fetchFeedback, fetchRenderProgress, fetchStories, fetchBatch, fetchUnchanged, postAnswer, postRender, postDecision, postNote, postResolve, postSendNotes, RequestError } from "./api.ts";
+import { reuseRows, withDecisionsOf } from "./filter.ts";
 import { toggled } from "./selection.ts";
 
 export interface BatchState {
@@ -15,6 +15,8 @@ export interface BatchState {
   readonly unchanged: readonly RenderRow[] | null;
   /** What's been approved since this batch's base, once it's read. */
   readonly approvedSince: ApprovedSinceView | null;
+  /** What this batch changed since its base, approved or not, once it's read, with each decision as `view` last said. */
+  readonly sinceBase: SinceBaseView | null;
   readonly loadUnchanged: () => void;
   readonly clearActionError: () => void;
   /** True if the decision was recorded. */
@@ -35,6 +37,7 @@ export function useBatch(batchId: string): BatchState {
   const [busy, setBusy] = useState(false);
   const [unchanged, setUnchanged] = useState<readonly RenderRow[] | null>(null);
   const [approvedSince, setApprovedSince] = useState<ApprovedSinceView | null>(null);
+  const [sinceBaseRead, setSinceBaseRead] = useState<SinceBaseView | null>(null);
   // At most one read is on its way, and a newer read or an action's answer aborts it, so a slow read
   // can't undo either.
   const reading = useRef<AbortController | null>(null);
@@ -68,8 +71,14 @@ export function useBatch(batchId: string): BatchState {
     fetchApprovedSince(batchId, controller.signal).then(setApprovedSince, (error: unknown) => {
       if (!controller.signal.aborted) setActionError(asRequestError(error));
     });
+    fetchSinceBase(batchId, controller.signal).then(setSinceBaseRead, (error: unknown) => {
+      if (!controller.signal.aborted) setActionError(asRequestError(error));
+    });
     return () => controller.abort();
   }, [batchId]);
+
+  // Read once, and kept up to date with decisions from what every action answers, so it costs no reads.
+  const sinceBase = useMemo(() => (sinceBaseRead === null ? null : { ...sinceBaseRead, rows: withDecisionsOf(sinceBaseRead.rows, view?.rows ?? []) }), [sinceBaseRead, view?.rows]);
 
   const loadUnchanged = useCallback(() => {
     fetchUnchanged(batchId).then(setUnchanged, (error: unknown) => setActionError(asRequestError(error)));
@@ -99,6 +108,7 @@ export function useBatch(batchId: string): BatchState {
     busy,
     unchanged,
     approvedSince,
+    sinceBase,
     loadUnchanged,
     clearActionError: useCallback(() => setActionError(null), []),
     decide: async (decision, targets) => {

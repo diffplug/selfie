@@ -372,6 +372,21 @@ export interface ApprovedSince {
   readonly renders: readonly (ComparedRender & { readonly approvedIn: string })[];
 }
 
+/**
+ * What a batch changed since its base, as the base's own images compare it, approved or not, so a branch's
+ * change can be told apart from what it inherited. See `docs/specs/renders.md` -> Changed since a base.
+ */
+export interface SinceBase {
+  /** The default branch's batch it's compared with, or null if its commit reaches none, and then there's nothing to say. */
+  readonly base: RenderBatch | null;
+  /**
+   * Each that differs from the base, with `goldenHash` the base's image, `goldenBatchId` the base, and the
+   * decision on exactly its image as approvals have it. `approvedIn` is the batch whose approval made its image
+   * what's approved, when it reads as unchanged against approvals, and otherwise null.
+   */
+  readonly renders: readonly (ComparedRender & { readonly approvedIn: string | null })[];
+}
+
 export interface Comparison {
   readonly batch: RenderBatch;
   /**
@@ -678,6 +693,27 @@ ORDER BY started_at DESC, key DESC`,
     const [batchRows, firstRenders] = (await this.#sql.batch([{ sql: SELECT_BATCH, params: [batchId], idempotent: true }, rendersPage(batchId, START)])) as [SqlRow[], SqlRow[]];
     const { batch, rendered } = await this.#renderedOf(batchId, batchRows, firstRenders);
     return approvedSinceBase(compareWithApprovals(batch, rendered, decisions), rendered, decisions, baseDecisions);
+  }
+
+  /** As `approvedSinceReached`, but with the base's images and not its approvals: what the batch changed since its base, approved or not. */
+  async sinceBaseReached(batchId: string, defaultBranch: string): Promise<SinceBase> {
+    const [batchRows, decisionRows, baseRows, firstRenders] = (await this.#sql.batch([
+      { sql: SELECT_BATCH, params: [batchId], idempotent: true },
+      { sql: DECISIONS_REACHED, params: [batchId], idempotent: true },
+      { sql: BASE_REACHED, params: [batchId, defaultBranch], idempotent: true },
+      rendersPage(batchId, START),
+    ])) as [SqlRow[], SqlRow[], SqlRow[], SqlRow[]];
+    const base = baseRows[0] === undefined ? null : toBatch(baseRows[0]);
+    if (base === null) return { base, renders: [] };
+    const { batch, rendered } = await this.#renderedOf(batchId, batchRows, firstRenders);
+    const approvals = compareWithApprovals(batch, rendered, decisionRows.map(toPlacedDecision), { includeUnchanged: true });
+    return { base, renders: changedSinceBase(await this.compareWithBatch(batchId, base.id), approvals, base) };
+  }
+
+  /** As `sinceBaseReached`, for a caller with Git, who found the base and the decisions history reaches. */
+  async sinceBaseFromHistory(batchId: string, base: RenderBatch, decisions: readonly PlacedDecision[]): Promise<SinceBase["renders"]> {
+    const [againstBase, approvals] = await Promise.all([this.compareWithBatch(batchId, base.id), this.compareFromHistory(batchId, decisions, { includeUnchanged: true })]);
+    return changedSinceBase(againstBase, approvals, base);
   }
 
   /** Every decision made at these commits. One parameter however many, so a long history is one statement. */
@@ -993,6 +1029,27 @@ export function approvedSinceBase(current: Comparison, rendered: readonly Render
     if (stillDiffers.has(render.story) || approval === undefined) return [];
     const { decision, actor, at, batchId: approvedIn } = approval;
     return [{ ...render, decision: { decision, actor, at }, approvedIn }];
+  });
+}
+
+/**
+ * What differs from the base, each with the decision approvals have on exactly its image, whatever its state
+ * against them, so a change approved earlier still says so. `approvals` must list unchanged renders too.
+ */
+export function changedSinceBase(againstBase: Comparison, approvals: Comparison, base: RenderBatch): SinceBase["renders"] {
+  const approvalOf = new Map(approvals.renders.map((render) => [render.story, render]));
+  return againstBase.renders.flatMap((render) => {
+    if (render.state === "unchanged") return [];
+    const approved = approvalOf.get(render.story);
+    const same = approved !== undefined && approved.imageHash === render.imageHash;
+    return [
+      {
+        ...render,
+        goldenBatchId: base.id,
+        decision: same && render.state !== "failed" ? approved.decision : null,
+        approvedIn: same && approved.state === "unchanged" ? (approved.goldenBatchId ?? null) : null,
+      },
+    ];
   });
 }
 

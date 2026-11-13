@@ -4,6 +4,7 @@ import {
   REQUEST_HEADER_VALUE,
   type ApiError,
   type ApprovedSinceView,
+  type SinceBaseView,
   type BatchContext,
   type DecisionKind,
   type DecisionTarget,
@@ -58,6 +59,7 @@ export const fetchUnchanged = async (batchId: string) => (await request<{ rows: 
 export const fetchDiff = (current: string, golden: string, signal: AbortSignal | null = null) => request<PixelDiff>(`/diffs/${current}/${golden}`, { signal });
 
 export const fetchApprovedSince = (batchId: string, signal: AbortSignal) => request<ApprovedSinceView>(`${batchRoute(batchId)}/approved-since`, { signal });
+export const fetchSinceBase = (batchId: string, signal: AbortSignal) => request<SinceBaseView>(`${batchRoute(batchId)}/since-base`, { signal });
 
 export const postDecision = (batchId: string, decision: DecisionKind, renders: readonly DecisionTarget[]) =>
   post<BatchView>(`${batchRoute(batchId)}/decisions`, { decision, renders });
