@@ -246,6 +246,40 @@ export function describeBatchContract(
       expect(renders.map(({ story, state }) => [story, state])).toEqual([["elsewhere", "added"], ["no-decision", "added"], ["through-a-merge", "unchanged"]]);
     });
 
+    it("finds the newest finished batch at each commit that reaches one, through a merge, in its environment alone", async () => {
+      // A stack root ← first ← second ← third, and a side branch merged into it after second.
+      const [root, first, second, third, side, merge, unknown] = ["1", "2", "3", "4", "5", "6", "7"].map((digit) => `${"f".repeat(39)}${digit}`) as [string, string, string, string, string, string, string];
+      await batches.recordCommits([
+        { sha: first, parents: [root] },
+        { sha: second, parents: [first] },
+        { sha: third, parents: [second] },
+        { sha: side, parents: [root] },
+        { sha: merge, parents: [side, second] },
+      ]);
+      const environment = "descending";
+      const at = async (gitSha: string, finish = true, inEnvironment = environment) => {
+        const batch = await batches.beginBatch({ gitSha, environment: inEnvironment, scale: 1, viewport: { width: 1200, height: 900 }, dirty: false });
+        return finish ? (await batches.finishBatch(batch.id, 0)).id : batch.id;
+      };
+      await at(root);
+      await at(first);
+      await at(second);
+      const newerAtSecond = await at(second);
+      await at(second, false);
+      await at(third, false);
+      await at(third, true, "descending elsewhere");
+      await at(side);
+      const atMerge = await at(merge);
+
+      const reaching = async (gitSha: string, limit = 50) => (await batches.batchesReaching(gitSha, environment, limit)).map(({ id }) => id);
+      expect(await reaching(first)).toEqual([atMerge, newerAtSecond]);
+      expect(await reaching(first, 1)).toEqual([atMerge]);
+      expect(await reaching(side)).toEqual([atMerge]);
+      expect(await reaching(merge)).toEqual([]);
+      expect(await reaching(unknown)).toEqual([]);
+      expect(await batches.batchesReaching(first, "descending elsewhere", 50)).toMatchObject([{ gitSha: third, status: "complete" }]);
+    });
+
     it("finds the newest finished batch on a branch, or anywhere", async () => {
       const on = (branch: string) => batches.beginBatch({ gitSha: SHA_0, environment: "newest", scale: 1, viewport: { width: 1200, height: 900 }, dirty: false, branch });
       const finishedOnTopic = await on("topic-newest");

@@ -50,7 +50,7 @@ Source of truth: `ui/src/server/hosted.ts`, `RenderBatches.compareReached` and `
 
 ## Commit status
 
-Source of truth: `commitStatusOf` in `ui/src/shared/commit-status.ts`, `publish` in `ui/src/worker/app.ts`, `.github/actions/selfie/action.yml`.
+Source of truth: `commitStatusOf` in `ui/src/shared/commit-status.ts`, `publish` and `publishDecided` in `ui/src/worker/app.ts`, `RenderBatches.batchesReaching` in `store/src/core/render-batches.ts`, `.github/actions/selfie/action.yml`.
 
 | State | When |
 |---|---|
@@ -60,7 +60,8 @@ Source of truth: `commitStatusOf` in `ui/src/shared/commit-status.ts`, `publish`
 
 - **Must post one status per commit, in the context `selfie`, linking to its batch's page.**
 - **Must post it from the newest finished batch at that commit, at the end of a push and on every decision made here, after answering**, so nobody waits on GitHub to see their decision.
-- **Must keep a decision if GitHub can't take its status**, and log why. The next decision or push says it again.
+- **Must, on a decision made here, after its own commit's, post it again for each later commit whose history reaches that commit, by `commit_parents`, and has a finished batch in the same environment**, so a stack of pull requests turns green when one low in it is approved (rationale). It walks up to 1,000 commits from the decided one, as [Without Git or a decoder](#without-git-or-a-decoder) does the other way, and posts at most 50 of these, newest batch first. **May post a state a commit already has.** A later commit beyond those keeps its status until its next push, or a decision on it.
+- **Must keep a decision if GitHub can't take its status**, and log why, and go on to the next commit. The next decision or push says it again.
 - **Must leave a repository's own tools alone in that action**, installing Selfie's dependencies with its own pnpm, since a repository may pin another for its build.
 - **Must render on every pushed branch, through `.github/actions/selfie` on an arm64 runner, with all of a commit's history**, so what's pinned matches (`docs/specs/render.md`) and what it reaches is known. A failed story is a result the status says, and only a push that fails fails the job.
 - **Never make a commit's status required from here.** Whether `selfie` blocks a merge is the repository owner's choice, in branch protection.

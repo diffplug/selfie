@@ -25,3 +25,7 @@
 **A status and not a check run.** A status is one call, with a yellow state that means what's meant here. `action_required` on a check run isn't yellow, and a run left `in_progress` goes stale.
 
 **Rejected is red.** Someone looked and said no, so the next thing that happens is a code change, which is what red means for a failure too.
+
+**Later commits too.** What a commit is compared with is the newest approval its history reaches, worked out when it's read, so an approval on one pull request already changes how every pull request stacked on it reads, and a merge that has it. Only the status on GitHub stayed behind, yellow until that commit's next push. Saying it again for each later commit that has a batch is what closes that.
+
+**Why 50, and newest first.** What a Worker does after its response gets about 30 seconds, and one invocation has a limit on how many queries and requests it makes, which is lower on the Workers Free plan. Each status here is two queries and a request to GitHub, and GitHub also limits how fast an app may post. Neither limit was measured here. Fifty covers a deep stack with room left, and newest first says it for the work in progress before an old commit that nobody's looking at. A walk past 1,000 commits from the decided one is far from any stack.

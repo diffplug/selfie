@@ -60,6 +60,9 @@ const signInPage = (next: string, failed: boolean, code: string | null) => html`
     </body>
   </html>`;
 
+/** How many later commits a decision says the status of again, besides its own. See docs/specs/cloud.md -> Commit status. */
+const MAX_STATUSES_REACHING = 50;
+
 /** Its one form posts here, and is answered with a redirect to GitHub, which `form-action` also governs. */
 const SIGN_IN_POLICY = "default-src 'none'; style-src 'unsafe-inline'; form-action 'self' https://github.com; frame-ancestors 'none'; base-uri 'none'";
 
@@ -112,6 +115,20 @@ export function createCloudApp(config: CloudConfig): Hono {
     } catch (error) {
       console.error(error);
     }
+  };
+
+  /**
+   * After a decision, says again what its commit reads as, then each later commit with a batch here whose history
+   * reaches it, newest first, since what they're compared with may have changed too. Up to a bound, after answering.
+   */
+  const publishDecided = async (found: Opened, comparison: Comparison) => {
+    const { gitSha, environment } = comparison.batch;
+    await publish(found, gitSha, environment, comparison);
+    const reaching = await found.hosted.batches.batchesReaching(gitSha, environment, MAX_STATUSES_REACHING).catch((error: unknown) => {
+      console.error(error);
+      return [];
+    });
+    for (const later of reaching) await publish(found, later.gitSha, environment);
   };
 
   const accessOf = async (token: string | null): Promise<SyncAccess> => {
@@ -215,7 +232,7 @@ export function createCloudApp(config: CloudConfig): Hono {
       const found = await readyProject(context);
       return hostedReviewSource(found.hosted, found.views, {
         actor: await login.writerOf(context.req.raw),
-        decided: (comparison) => afterResponse(context, publish(found, comparison.batch.gitSha, comparison.batch.environment, comparison)),
+        decided: (comparison) => afterResponse(context, publishDecided(found, comparison)),
       });
     }),
   );

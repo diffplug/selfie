@@ -88,9 +88,9 @@ const review = (method: string, route: string, { body, signedIn = false }: { bod
 
 const facts = (gitSha: string) => ({ gitSha, environment: ENV, startedAt: 500, dirty: false, storyFilter: null, reusedFromBatch: null, scale: 1, viewport: { width: 1200, height: 900 }, branch: "main" });
 
-async function pushBatch(id: string, sha: string) {
+async function pushBatch(id: string, sha: string, story = "a") {
   expect((await api("PUT", `/batches/${id}`, UPLOAD, facts(sha))).status).toBe(200);
-  expect((await api("POST", `/batches/${id}/renders`, UPLOAD, { renders: [{ story: "a", imageHash: hash }] })).status).toBe(200);
+  expect((await api("POST", `/batches/${id}/renders`, UPLOAD, { renders: [{ story, imageHash: hash }] })).status).toBe(200);
   expect((await api("POST", `/batches/${id}/finish`, UPLOAD, { count: 1, finishedAt: 600 })).status).toBe(200);
   expect((await api("POST", `/batches/${id}/status`, UPLOAD, {})).status).toBe(200);
 }
@@ -281,6 +281,24 @@ describe("the cloud service", () => {
     expect((await api("POST", `/batches/${NEXT}/status`, null, {})).status).toBe(403);
     expect((await api("POST", `/batches/${NEXT}/status`, UPLOAD, {})).status).toBe(200);
     expect(statuses.slice(posted).map(({ sha }) => sha)).toEqual([NEXT_SHA]);
+  });
+
+  it("turns every later commit in a stack green when one low in it is approved", async () => {
+    const [low, high] = ["e".repeat(40), "f".repeat(40)];
+    const [onLow, onHigh] = ["33333333-3333-4333-8333-333333333333", "44444444-4444-4444-8444-444444444444"];
+    expect((await api("POST", "/commits", UPLOAD, { commits: [{ sha: high, parents: [low] }, { sha: low, parents: [] }] })).status).toBe(200);
+    await pushBatch(onLow, low, "stacked");
+    await pushBatch(onHigh, high, "stacked");
+    const newestOf = (sha: string) => statuses.findLast((posted) => posted.sha === sha)?.status.state;
+    expect([newestOf(low), newestOf(high)]).toEqual(["pending", "pending"]);
+
+    const posted = statuses.length;
+    const approved = await review("POST", `/batches/${onLow}/decisions`, { signedIn: true, body: { decision: "approved", renders: [{ story: "stacked", imageHash: hash }] } });
+    expect(approved.status).toBe(200);
+    expect(statuses.slice(posted).map(({ sha, status, url }) => [sha, status.state, url])).toEqual([
+      [low, "success", `${ORIGIN}/diffplug/selfie/batches/${onLow}`],
+      [high, "success", `${ORIGIN}/diffplug/selfie/batches/${onHigh}`],
+    ]);
   });
 
   it("serves a kept built Storybook only from its own origin", async () => {

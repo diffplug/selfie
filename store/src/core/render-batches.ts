@@ -65,6 +65,8 @@ export const CREATE_BATCH_TABLES: readonly string[] = [
   parent_key INTEGER NOT NULL REFERENCES commits(key),
   PRIMARY KEY (commit_key, parent_key)
 ) WITHOUT ROWID`,
+  // The other way, from a commit to those whose history holds it.
+  "CREATE INDEX IF NOT EXISTS commit_parents_by_parent ON commit_parents(parent_key, commit_key)",
 ];
 
 // Each as one bound parameter. Renders by what a request of them was measured at, and decisions of about 200 bytes.
@@ -204,6 +206,26 @@ const REACH_OF_BATCH = `WITH RECURSIVE reach(key) AS (
   SELECT p.parent_key FROM reach r CROSS JOIN commit_parents p ON p.commit_key = r.key
   LIMIT ${MAX_REACHED_COMMITS}
 )`;
+
+// The commits whose history reaches the one named by ?1, itself first, walked by key as `REACH_OF_BATCH` is, the other way.
+const DESCENDANTS_OF_COMMIT = `WITH RECURSIVE descendants(key) AS (
+  SELECT ${commitKey("?1")}
+  UNION
+  SELECT p.commit_key FROM descendants CROSS JOIN commit_parents p ON p.parent_key = descendants.key
+  LIMIT ${MAX_REACHED_COMMITS}
+)`;
+
+// At each of those but the commit itself, its newest finished batch in the environment named by ?2, as `batchesAt` orders them.
+const BATCHES_REACHING = `${DESCENDANTS_OF_COMMIT}
+SELECT ${BATCH_COLUMNS} FROM render_batches
+WHERE key IN (
+  SELECT (SELECT b.key FROM render_batches b
+    WHERE b.commit_key = descendants.key AND b.environment_key = ${environmentKey("?2")} AND b.finished_at IS NOT NULL
+    ORDER BY b.started_at DESC, b.key DESC LIMIT 1)
+  FROM descendants WHERE descendants.key != ${commitKey("?1")}
+)
+ORDER BY started_at DESC, key DESC
+LIMIT CAST(?3 AS INTEGER)`;
 
 const DECISIONS_REACHED = `${REACH_OF_BATCH}
 ${PLACED_DECISION}
@@ -703,6 +725,17 @@ WHERE true ON CONFLICT(commit_key, parent_key) DO NOTHING`,
       })),
     ];
     for (const group of chunks(statements, STATEMENTS_PER_REQUEST)) await this.#sql.batch(group);
+  }
+
+  /**
+   * The newest finished batch in this environment at each commit whose history reaches this one, by
+   * `recordCommits`, up to `limit` of them, newest first. Never one at this commit itself. It walks up to
+   * 1,000 commits, as what a batch reaches does, the other way.
+   */
+  async batchesReaching(gitSha: string, environment: string, limit: number): Promise<RenderBatch[]> {
+    assertGitSha(gitSha);
+    const rows = await this.#sql.run({ sql: BATCHES_REACHING, params: [gitSha, environment, limit], idempotent: true });
+    return rows.map(toBatch);
   }
 
   /** The newest finished batch here, on this branch if one is given, or null. */
