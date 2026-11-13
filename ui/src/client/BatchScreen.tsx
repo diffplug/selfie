@@ -16,11 +16,11 @@ import {
 } from "@primer/react";
 import { Blankslate } from "@primer/react/experimental";
 import { useEffect, useMemo, useState, type ComponentProps, type RefObject } from "react";
-import type { ApprovedSinceView, BlockerReason, DecisionKind, BatchView, RenderRow } from "../shared/api.ts";
+import type { ApprovedSinceView, BlockerReason, DecisionKind, BatchView, RenderBatch, RenderRow, SinceBaseView } from "../shared/api.ts";
 import { BulkDialog } from "./BulkDialog.tsx";
 import { DeltaOffers } from "./DeltaOffers.tsx";
 import type { DeltaState } from "./deltas.ts";
-import { applyFilter, decidableIn, filterQuery, NO_FILTER, parseFilter, rowsFor, showQuery, SHOW_OPTIONS, targetsOf, type RowFilter, type Show } from "./filter.ts";
+import { applyFilter, decidableIn, filterQuery, inheritedFrom, NO_FILTER, parseFilter, rowsFor, showQuery, SHOW_OPTIONS, targetsOf, type RowFilter, type Show } from "./filter.ts";
 import { useStoryFocusKeys, useTitle, type BatchState } from "./hooks.ts";
 import { Keys } from "./Keys.tsx";
 import { AppLink, AppLinkButton, navigate, batchPath, storiesPath, storyPath } from "./router.tsx";
@@ -43,6 +43,35 @@ function Fact({ term, children }: { term: string; children: React.ReactNode }) {
 /** What the rows of what's approved since a base are compared with. */
 function approvedBaseWords({ base }: ApprovedSinceView) {
   return base === null ? "Compared with nothing, since this commit doesn't reach a batch of the default branch." : `Compared with what was approved at ${shortSha(base.gitSha)} on ${base.branch}.`;
+}
+
+/** Where a batch's base is, in words. */
+const baseWords = (base: RenderBatch) => `${base.branch} at ${shortSha(base.gitSha)}`;
+
+/** What the rows changed since a base are compared with. */
+function sinceBaseWords({ base }: SinceBaseView) {
+  return base === null
+    ? "This commit reaches no batch of the default branch, so there's no base to compare with. Rendering the default branch where it started gives it one."
+    : `Compared with what ${baseWords(base)} rendered, the newest batch of ${base.branch} this commit reaches. Approved or not, this is everything that changed since then.`;
+}
+
+/**
+ * Says how much of what needs a decision this commit's history didn't change, but inherited from a base
+ * where it was never approved, which is otherwise indistinguishable from what it did change.
+ */
+function InheritedBanner({ sinceBase, view, onShow }: { sinceBase: SinceBaseView; view: BatchView; onShow: (show: Show) => void }) {
+  const inherited = inheritedFrom(sinceBase, view.rows);
+  if (sinceBase.base === null || inherited === null || inherited.length === 0) return null;
+  const where = baseWords(sinceBase.base);
+  const changed = sinceBase.rows.length;
+  return (
+    <Banner
+      variant="info"
+      title={changed === 0 ? `Nothing changed since ${where}` : `${plural(changed, "story", "stories")} changed since ${where}`}
+      description={`${changed === 0 ? (inherited.length === 1 ? "The difference" : `All ${inherited.length.toLocaleString()} differences`) : plural(inherited.length, "other difference")} from what's approved ${inherited.length === 1 ? "was" : "were"} already in ${where}, and nobody has approved ${inherited.length === 1 ? "it" : "them"} there. Approving ${inherited.length === 1 ? "it" : "them"} here counts for ${sinceBase.base.branch} too, once this commit is merged.`}
+      {...(changed === 0 ? {} : { primaryAction: <Banner.PrimaryAction onClick={() => onShow("since-base")}>See what changed</Banner.PrimaryAction> })}
+    />
+  );
 }
 
 function Facts({ view }: { view: BatchView }) {
@@ -287,6 +316,7 @@ function Differences({
         <Keys keys="j" /> and <Keys keys="k" /> move through the list, <Keys keys="/" /> searches.
       </Text>
       {filter.show === "approved-earlier" && state.approvedSince !== null && <Text as="p" className="selfie-muted">{approvedBaseWords(state.approvedSince)} Each was approved on another batch, so there's nothing to decide on here.</Text>}
+      {filter.show === "since-base" && state.sinceBase !== null && <Text as="p" className="selfie-muted">{sinceBaseWords(state.sinceBase)}</Text>}
       {shown.length > 0 || source === null ? null : (
         <Blankslate border>
           <Blankslate.Heading as="h4">
@@ -298,6 +328,13 @@ function Differences({
           {isFiltered && (
             <Stack direction="horizontal" justify="center">
               <Button onClick={() => setFilter(NO_FILTER)}>Clear the filter</Button>
+            </Stack>
+          )}
+          {!isFiltered && state.sinceBase?.base != null && state.sinceBase.rows.length > 0 && (
+            <Stack direction="horizontal" justify="center">
+              <Button onClick={() => setFilter({ ...NO_FILTER, show: "since-base" })}>
+                See what changed since {baseWords(state.sinceBase.base)} ({state.sinceBase.rows.length.toLocaleString()})
+              </Button>
             </Stack>
           )}
         </Blankslate>
@@ -346,7 +383,7 @@ export function BatchScreen({
 
   useTitle(`Batch at ${shortSha(batch.gitSha)}`);
   const newest = view.siblings.find(({ status }) => status !== "recording");
-  const { approvedSince } = state;
+  const { approvedSince, sinceBase } = state;
   const approvedEarlier = approvedSince?.rows.length ?? 0;
 
   return (
@@ -374,6 +411,7 @@ export function BatchScreen({
           primaryAction={<Banner.PrimaryAction onClick={() => showInList("approved-earlier")}>See what changed</Banner.PrimaryAction>}
         />
       )}
+      {sinceBase !== null && filter.show !== "since-base" && <InheritedBanner sinceBase={sinceBase} view={view} onShow={showInList} />}
       <Facts view={view} />
       {batch.dirty && (
         <Banner
@@ -391,6 +429,7 @@ export function BatchScreen({
         <Count label="Failed" count={counts.failed} show="failed" onShow={showInList} />
         <Count label="Undecided" count={counts.undecided} show="undecided" onShow={showInList} />
         <Count label="Approved earlier" count={approvedEarlier} show="approved-earlier" onShow={showInList} />
+        {sinceBase?.base != null && <Count label={`Changed since ${sinceBase.base.branch}`} count={sinceBase.rows.length} show="since-base" onShow={showInList} />}
       </div>
       {outsideFilter > 0 && (
         <Banner

@@ -9,7 +9,7 @@ import type { DecisionKind, PixelDiff, BatchView, RenderRow } from "../shared/ap
 import { diffImageUrl, fetchDiff, imageUrl } from "./api.ts";
 import { prepareNext, usePatchedGolden, type PatchedGolden } from "./deltas.ts";
 import { canDecide, signInHref } from "./base.ts";
-import { parseFilter, rowsFor, targetsOf, type StoryNavigation } from "./filter.ts";
+import { decisionRowOf, parseFilter, rowsFor, targetsOf, type StoryNavigation } from "./filter.ts";
 import { useFetched, useHotkeys, useHunkSelection, useTitle, type FeedbackState, type BatchState } from "./hooks.ts";
 import { imageCount, ImageCompare } from "./ImageCompare.tsx";
 import { Keys } from "./Keys.tsx";
@@ -19,7 +19,7 @@ import { LiveStories, StorybookLinkTo } from "./LiveStories.tsx";
 import { LoadFailure, Loading } from "./Status.tsx";
 import { describeBox, groupHunks, isLayoutOnly } from "../shared/hunks.ts";
 import { comparedImage, newestNotedImage } from "../shared/notes.ts";
-import { DecisionLabel, describePixels, sizeChanged, StateLabel } from "./words.tsx";
+import { DecisionLabel, describePixels, Sha, sizeChanged, StateLabel } from "./words.tsx";
 
 /** Each key, what it does, and how many images it takes for it to do anything. */
 const SHORTCUTS: readonly (readonly [string, string, number])[] = [
@@ -191,7 +191,8 @@ export function DetailScreen({
   }, [needsUnchanged, loadUnchanged]);
 
   const row = source === null ? null : (found ?? unchanged?.find((candidate) => candidate.story === story) ?? null);
-  const approvedIn = state.approvedSince?.rows.find((candidate) => candidate === row)?.approvedIn;
+  const sinceRow = state.sinceBase?.rows.find((candidate) => candidate === row);
+  const approvedIn = state.approvedSince?.rows.find((candidate) => candidate === row)?.approvedIn ?? sinceRow?.approvedIn ?? undefined;
   const { previous, next, nextStory, list: listHref, position } = navigation;
 
   const [helpOpen, setHelpOpen] = useState(false);
@@ -213,9 +214,12 @@ export function DetailScreen({
     fetchDiff(row!.imageHash!, compared!.hash, signal),
   );
   const recordedDiff = row?.pixelDiff ?? fetched;
-  // Only what this batch lists takes a decision, and a delta is only ever accepted on that.
-  const decidable = row !== null && row === inRows && isDecidable(row.state);
-  const patched = usePatchedGolden(row, decidable ? accepted : NOTHING_ACCEPTED);
+  // Only what this batch lists takes a decision, which a row from another comparison of the very same image
+  // goes to, and a delta is only ever accepted on the batch's own row.
+  const ownDecidable = row !== null && row === inRows && isDecidable(row.state);
+  const decisionRow = ownDecidable ? row : row !== null && sinceRow !== undefined ? decisionRowOf(row, view.rows) : null;
+  const decidable = decisionRow !== null;
+  const patched = usePatchedGolden(row, ownDecidable ? accepted : NOTHING_ACCEPTED);
   // Here, so that it stays as it is from story to story, like how someone's looking at the images.
   const [deltasShown, setDeltasShown] = useState(true);
   const applied = deltasShown ? patched : null;
@@ -251,7 +255,7 @@ export function DetailScreen({
       setMessage(approvedIn !== undefined ? "This was approved on another batch, so it takes no decision here." : row.state === "unchanged" ? "An unchanged image needs no decision." : "This story failed, so it takes no decision. Fix it and render again.");
       return;
     }
-    const recorded = await state.decide(decision, targetsOf([row]));
+    const recorded = await state.decide(decision, targetsOf([decisionRow!]));
     if (!recorded) return;
     const word = decision === "approved" ? "Approved" : "Rejected";
     setMessage(next === null ? `${word} ${row.story}. That's the last one here.` : `${word} ${row.story}.`);
@@ -319,8 +323,8 @@ export function DetailScreen({
             by {row.decision.actor}, <RelativeTime date={new Date(row.decision.at)} />.
           </Text>
         )}
-        {decidable && row.state === "added" && !comparedWithNote && renamedFrom === undefined && <Text className="selfie-muted">Nothing has been approved for this story yet. Approving makes this image what later batches compare with.</Text>}
-        {decidable && row.state === "removed" && <Text className="selfie-muted">This story was approved, and this batch doesn't have it. Approving says it's meant to be gone, so later batches stop asking.</Text>}
+        {decisionRow?.state === "added" && !comparedWithNote && renamedFrom === undefined && <Text className="selfie-muted">Nothing has been approved for this story yet. Approving makes this image what later batches compare with.</Text>}
+        {decisionRow?.state === "removed" && <Text className="selfie-muted">This story was approved, and this batch doesn't have it. Approving says it's meant to be gone, so later batches stop asking.</Text>}
         {diff !== null && <PixelStats stats={diff} />}
         {changedPair && diff === null && diffError === null && <Text className="selfie-muted">Comparing pixels…</Text>}
         {diffError !== null && <Text className="selfie-muted">The pixels couldn't be compared: <ErrorText error={diffError} /></Text>}
@@ -345,6 +349,12 @@ export function DetailScreen({
         <Banner variant="info" title="Compared with the image when noted" description="Nothing has been approved for this story yet, so what's shown is what's changed since its newest note. Approving makes this image what later batches compare with." />
       ) : (
         <Notes row={row} diff={diff} approvedIn={approvedIn} renamedFrom={renamedFrom} renamedTo={[...renames].find(([, from]) => from === row.story)?.[0]} />
+      )}
+      {sinceRow !== undefined && state.sinceBase?.base != null && (
+        <Text as="p" className="selfie-muted">
+          Compared with what {state.sinceBase.base.branch} rendered at <Sha sha={state.sinceBase.base.gitSha} />, where this commit started from, approved or not.
+          {decisionRow !== null && decisionRow.goldenHash !== row.goldenHash && " A decision here is on this image, as this batch compares it with what's approved."}
+        </Text>
       )}
       {patched !== null && <PatchedBanner patched={patched} shown={deltasShown} onShown={setDeltasShown} />}
       <LiveStories row={row} view={view} open={liveOpen} onToggle={() => setLiveOpen(!liveOpen)} />

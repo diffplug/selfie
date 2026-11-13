@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, within } from "storybook/test";
 import { MIXED, rendering } from "./stories/everyStory.ts";
 import { navigationIn, StoriesLayout, UnrenderedStory } from "./StoriesScreen.tsx";
-import { approved, note, OTHER_BATCH_ID, rejected, rows, viewOf } from "./stories/fixtures.ts";
+import { approved, batchOf, note, OTHER_BATCH_ID, rejected, rows, viewOf } from "./stories/fixtures.ts";
 import { BUTTON, StoryPage, press, stackedImagesLoaded } from "./stories/storyPage.tsx";
 
 const meta = { title: "Pages/Story/States", component: StoryPage } satisfies Meta<typeof StoryPage>;
@@ -29,6 +29,28 @@ export const ApprovedEarlier: Story = {
     expect(canvas.getByRole("link", { name: "See it on the batch it was approved on" })).toBeVisible();
     expect(canvas.queryByRole("button", { name: /Approve/ })).toBeNull();
     expect(canvas.queryByRole("button", { name: /Reject/ })).toBeNull();
+  },
+};
+
+const BASE = batchOf({ id: OTHER_BATCH_ID, branch: "main", gitSha: "157c71787d1b9f2a3c4d5e6f708192a3b4c5d6e7" });
+const OWN = rows.changed("components-button--primary");
+const SINCE_BASE = { ...OWN, goldenBatchId: OTHER_BATCH_ID, approvedIn: null };
+export const ChangedSinceBase: Story = {
+  args: { row: SINCE_BASE, others: [OWN], sinceBase: { base: BASE, rows: [SINCE_BASE] } },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    expect(canvas.getByText(/Compared with what main rendered at/)).toBeVisible();
+    // The batch has this very image to decide on, so a decision here goes to it.
+    expect(canvas.getByRole("button", { name: /Approve/ })).toBeVisible();
+  },
+};
+const SINCE_BASE_APPROVED = { ...rows.spaced("pages-home--with-more-space", approved()), goldenBatchId: OTHER_BATCH_ID, approvedIn: OTHER_BATCH_ID };
+export const ChangedSinceBaseApprovedEarlier: Story = {
+  args: { row: SINCE_BASE_APPROVED, others: [OWN], sinceBase: { base: BASE, rows: [SINCE_BASE, SINCE_BASE_APPROVED] } },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    expect(canvas.getByRole("link", { name: "See it on the batch it was approved on" })).toBeVisible();
+    expect(canvas.queryByRole("button", { name: /Approve/ })).toBeNull();
   },
 };
 

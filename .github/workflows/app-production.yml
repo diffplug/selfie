@@ -1,16 +1,11 @@
-# app.selfie.dev: tests and builds every push to main, and deploys only when run by hand with
-# `promote`. OPERATIONS.md says what it needs set up first.
+# app.selfie.dev: tests every push to main, and deploys only when run by hand.
+# OPERATIONS.md says what it needs set up first.
 name: App production release
 on:
   push:
     branches: [main]
     paths: ["ui/**", "store/**", "pnpm-lock.yaml", ".github/workflows/app-production.yml"]
   workflow_dispatch:
-    inputs:
-      promote:
-        description: Migrate sign-in's database and deploy the Worker after verification
-        type: boolean
-        default: false
 permissions:
   contents: read
 concurrency:
@@ -35,7 +30,7 @@ jobs:
       - run: pnpm --filter selfie-ui test
   deploy:
     needs: verify
-    if: inputs.promote
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment:

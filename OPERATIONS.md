@@ -5,7 +5,7 @@ Selfie has two deployments, both in Cloudflare account `0a95e814ccf2b6a95d2dc3be
 | What | Where | Source | Deployed by |
 |---|---|---|---|
 | The landing page | `selfie.dev`, Pages project `selfie-landing` | `site/` | `.github/workflows/site.yml`, on every push to `main` that touches `site/` |
-| The app | `app.selfie.dev`, Worker `selfie-app`, with built Storybooks on `selfieusercontent.com` and a redirect from `hackathon.selfie.dev` | `ui/`, `store/` | `.github/workflows/app-production.yml`, run by hand with **promote** |
+| The app | `app.selfie.dev`, Worker `selfie-app`, with built Storybooks on `selfieusercontent.com` and a redirect from `hackathon.selfie.dev` | `ui/`, `store/` | `.github/workflows/app-production.yml`, run by hand |
 
 `lib.selfie.dev`, `kdoc.selfie.dev`, and `pydoc.selfie.dev` belong to the earlier library ([diffplug/selfie-lib](https://github.com/diffplug/selfie-lib)), on their own Pages projects. Never move them here.
 
@@ -18,7 +18,7 @@ The app keeps its data in three places:
 ## Releasing
 
 - **The site:** merge to `main`. The workflow tests the site locally, publishes `site/public/`, and tests `https://selfie.dev`.
-- **The app:** every push to `main` that touches the app runs its tests. To release, run **App production release** from the Actions tab on `main`, with **promote** checked. It checks the Hyperdrive and the Worker's secrets, applies sign-in's migrations, deploys, and then checks the live origins with `ui/scripts/production.mjs smoke`. Migrations are append-only and run before the new Worker serves, so the Worker that's live during a release must work with the new schema.
+- **The app:** every push to `main` that touches the app runs its tests. To release, run **App production release** from the Actions tab on `main`, or `gh workflow run app-production.yml --ref main`. It checks the Hyperdrive and the Worker's secrets, applies sign-in's migrations, deploys, and then checks the live origins with `ui/scripts/production.mjs smoke`. Migrations are append-only and run before the new Worker serves, so the Worker that's live during a release must work with the new schema.
 
 From a laptop, the same steps are `node ui/scripts/production.mjs preflight|deploy|smoke`, with the environment the workflow sets.
 
@@ -103,7 +103,7 @@ Done once, in this order.
 The hackathon's Worker, `selfie-hackathon`, holds `hackathon.selfie.dev` as a custom domain, and `selfie-app` claims it.
 
 1. In the dashboard, remove `hackathon.selfie.dev` from `selfie-hackathon`'s domains. The old URL is down until the next step finishes.
-2. Run **App production release** with **promote**. Its smoke checks cover the new origins, the redirect, and starting a sign-in.
+2. Run **App production release**. Its smoke checks cover the new origins, the redirect, and starting a sign-in.
 3. Sign in at `https://app.selfie.dev/sign-in`, and check a project page says you can approve.
 4. Push a commit, and check its `selfie` status links to `app.selfie.dev`.
 5. Delete the `selfie-hackathon` Worker. Its D1 databases and R2 bucket are `selfie-app`'s now, so delete only the Worker.

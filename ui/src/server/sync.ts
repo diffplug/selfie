@@ -327,8 +327,12 @@ export function createSyncApi(host: SyncHost): Hono {
 
   api.get("/projects/:project/batches/:id/diffs/needed", async (context) => {
     const { batches, diffs, defaultBranch } = await uploadable(context);
-    const { current, renders } = await batches.approvedSinceReached(readBatchId(context.req.param("id")), defaultBranch);
-    const pairs = [...current.renders, ...renders].flatMap(({ state, imageHash, goldenHash }) => (state === "changed" && imageHash !== null && goldenHash !== null ? [{ current: imageHash, golden: goldenHash }] : []));
+    const batchId = readBatchId(context.req.param("id"));
+    const { base, current, renders } = await batches.approvedSinceReached(batchId, defaultBranch);
+    // And each against its base's image, which is what a page shows of what the branch changed.
+    const sinceBase = base === null ? [] : (await batches.compareWithBatch(batchId, base.id)).renders;
+    const unique = new Map([...current.renders, ...renders, ...sinceBase].map((render) => [`${render.imageHash}/${render.goldenHash}`, render]));
+    const pairs = [...unique.values()].flatMap(({ state, imageHash, goldenHash }) => (state === "changed" && imageHash !== null && goldenHash !== null ? [{ current: imageHash, golden: goldenHash }] : []));
     const held = await Promise.all(pairs.map(({ current, golden }) => diffs.has(current, golden)));
     return context.json({ pairs: pairs.filter((_, i) => !held[i]) });
   });
