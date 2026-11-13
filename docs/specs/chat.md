@@ -34,7 +34,7 @@ Each question is worked out afresh, and nothing of a conversation is kept here o
 The body is lines of JSON, as `ChatEvent` in `ui/src/shared/chat.ts`: one `code`, then any number of `text`, and then `done` or `failed`.
 
 - **Must say what code was read**, from which commit to which and how many files, with what was left out, wherever an answer is shown, so nobody takes it for more than it read.
-- **Must show a failure before the first piece of an answer as a JSON error**, 502 `model-failed`, and one part way through as `failed`, and never what the model or GitHub said about it, which stays in the log.
+- **Must show a failure before the first piece of an answer as a JSON error**, 502 `model-failed`, and one part way through as `failed` with its error code as `id`, and never what the model or GitHub said about it, which stays in the log under that code (`docs/specs/ui.md` → ReviewSource).
 - **Must treat a body that ends with neither `done` nor `failed` as a failure**, and go back to before the question, with it ready to ask again, since a conversation goes on only from a whole answer.
 - **Must stop reading from the model when whoever asked has gone**, so nothing's paid for that nobody will read.
 - **Must log the tokens each question used**, since anyone can spend this key.

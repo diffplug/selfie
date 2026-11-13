@@ -4,6 +4,7 @@ import type { Context } from "hono";
 import { imageMediaType, type ComparedRender, type Comparison } from "selfie-store";
 import { jsonBody } from "../server/app.ts";
 import { refusal, type HostedProject } from "../server/hosted.ts";
+import { errorId, logError } from "../server/http.ts";
 import { isConversation, linesOf, type ChatCode, type ChatEvent, type ChatMessage } from "../shared/chat.ts";
 import { plural } from "../shared/plural.ts";
 import type { ChangedFile, CodeChange, GitHub, Repository } from "./github.ts";
@@ -194,8 +195,8 @@ export function createChat({ github, model, mayChat }: { readonly github: GitHub
     if (row === undefined) throw refusal("unknown-story", "That story didn't change in this batch.");
     const [{ text, code }, images] = await Promise.all([codeBehind(project, hosted.batches, comparison, row), describeImages(hosted, row)]);
     const answer = await model.answer(modelRequest(row, text, images, messages)).catch((error: unknown) => {
-      console.error(error);
-      throw refusal("model-failed", "Muse Spark couldn't answer that. Try again in a moment.");
+      // `errorCodes` logs what the model said under the code the person sees, and only that code reaches them.
+      throw Object.assign(refusal("model-failed", "Muse Spark couldn't answer that. Try again in a moment."), { cause: error });
     });
 
     const line = (event: ChatEvent) => new TextEncoder().encode(`${JSON.stringify(event)}\n`);
@@ -211,8 +212,9 @@ export function createChat({ github, model, mayChat }: { readonly github: GitHub
             controller.enqueue(line({ type: "text", text: value }));
           }
         } catch (error) {
-          console.error(error);
-          controller.enqueue(line({ type: "failed", message: "Muse Spark stopped before it finished. Try asking again." }));
+          const id = errorId();
+          logError(id, "Muse Spark stopped part way through an answer", error);
+          controller.enqueue(line({ type: "failed", message: "Muse Spark stopped before it finished. Try asking again.", id }));
           controller.close();
         }
       },

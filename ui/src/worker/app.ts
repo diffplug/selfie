@@ -8,7 +8,7 @@ import { D1BindingAdapter, type D1DatabaseLike } from "selfie-store/adapters/d1-
 import { R2BlobStorage, type R2BucketLike } from "selfie-store/adapters/r2";
 import { createReviewApi, failure, pageHeaders, sameOrigin, sameOriginWrites } from "../server/app.ts";
 import { hostedReviewSource, hostedViews, type HostedProject } from "../server/hosted.ts";
-import { afterResponse } from "../server/http.ts";
+import { afterResponse, errorCodes } from "../server/http.ts";
 import { keptStorybookRoutes, storybookHeaders } from "../server/storybook.ts";
 import { createSyncApi, type SyncAccess, type SyncProject } from "../server/sync.ts";
 import { commitStatusOf } from "../shared/commit-status.ts";
@@ -50,14 +50,14 @@ export interface CloudConfig {
   readonly now?: () => number;
 }
 
-const signInPage = (next: string, failed: boolean) => html`<!doctype html>
+const signInPage = (next: string, failed: boolean, code: string | null) => html`<!doctype html>
   <html lang="en">
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Sign in to Selfie</title>
     <body style="font:16px system-ui;max-width:420px;margin:15vh auto;padding:0 16px">
       <h1 style="font-size:22px">Sign in to Selfie</h1>
-      ${failed ? html`<p role="alert" style="color:#b35900">GitHub didn't sign you in. Try again.</p>` : ""}
+      ${failed ? html`<p role="alert" style="color:#b35900">GitHub didn't sign you in. Try again.${code === null ? "" : html`<br />Error code: ${code}`}</p>` : ""}
       <form method="post">
         <input type="hidden" name="next" value="${next}" />
         <button style="font-size:16px;padding:8px 16px">Sign in with GitHub</button>
@@ -135,6 +135,10 @@ export function createCloudApp(config: CloudConfig): Hono {
   const reviewHost = new URL(reviewOrigin).host;
   const formerHosts = new Set((config.formerOrigins ?? []).map((origin) => new URL(origin).host));
   const app = new Hono();
+  // First, so it sees every answer, from every origin.
+  app.use("*", errorCodes);
+  // Without Hono's own logging, since `errorCodes` logs it under the code the person sees.
+  app.onError((_error, context) => context.text("Something went wrong in the Selfie server.", 500));
   app.use("*", async (context, next) => {
     const url = new URL(context.req.url);
     if (url.host === storybookHost) return storybooks.fetch(context.req.raw);
@@ -152,8 +156,10 @@ export function createCloudApp(config: CloudConfig): Hono {
     await next();
   };
   app.get("/sign-in", signInPolicy, (context) => {
-    const failed = context.req.query("failed") !== undefined;
-    return context.html(signInPage(localPath(context.req.query("next")), failed), failed ? 401 : 200);
+    const failed = context.req.query("failed");
+    // Only a code the callback could have made, since anyone can link here with anything after `failed=`.
+    const code = failed !== undefined && /^[0-9A-Z]{8}$/.test(failed) ? failed : null;
+    return context.html(signInPage(localPath(context.req.query("next")), failed !== undefined, code), failed !== undefined ? 401 : 200);
   });
   app.post("/sign-in", signInPolicy, sameOrigin(() => reviewOrigin), async (context) => {
     const form = await context.req.parseBody();

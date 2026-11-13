@@ -15,7 +15,7 @@ import { useFetched, useHotkeys, useHunkSelection, useTitle, type FeedbackState,
 import { imageCount, ImageCompare } from "./ImageCompare.tsx";
 import { Keys } from "./Keys.tsx";
 import { AppLink, navigate, storyPath } from "./router.tsx";
-import { ActionFailure } from "./ActionFailure.tsx";
+import { ActionFailure, ErrorText } from "./ActionFailure.tsx";
 import { LiveStories, StorybookLinkTo } from "./LiveStories.tsx";
 import { LoadFailure, Loading } from "./Status.tsx";
 import { describeBox, groupHunks, isLayoutOnly } from "../shared/hunks.ts";
@@ -324,7 +324,7 @@ export function DetailScreen({
         {decidable && row.state === "removed" && <Text className="selfie-muted">This story was approved, and this batch doesn't have it. Approving says it's meant to be gone, so later batches stop asking.</Text>}
         {diff !== null && <PixelStats stats={diff} />}
         {changedPair && diff === null && diffError === null && <Text className="selfie-muted">Comparing pixels…</Text>}
-        {diffError !== null && <Text className="selfie-muted">The pixels couldn't be compared: {diffError.message}</Text>}
+        {diffError !== null && <Text className="selfie-muted">The pixels couldn't be compared: <ErrorText error={diffError} /></Text>}
       </Stack>
 
       <ActionFailure state={state} />

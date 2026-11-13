@@ -12,6 +12,10 @@ Evidence and reasoning for `docs/specs/ui.md`, keyed by its headings.
 - **Why `hono/secure-headers`.** It can say the exact policy, which `cli/test/ui-*.test.ts` checks string for string. Its other defaults (`Cross-Origin-Opener-Policy`, `Origin-Agent-Cluster`, and a few legacy ones) are harmless here. `Strict-Transport-Security` is turned off, since browsers ignore it over plain HTTP and a hosted edge will decide it.
 - **Why no router or state package.** There are four routes, and one piece of shared state, a batch's `BatchView`. `router.tsx` and `useBatch` together are about 150 lines, and a router would add more than that to the bundle and the dependency list.
 
+## ReviewSource
+
+- **Error codes:** a message alone can't be found again: the same words come from many requests, and what a person remembers is rarely exact. A code made for one error is in what they saw and in exactly one log line, so they can say it and the log answers. Every error gets one, refusals too, since a refusal someone didn't expect is often the clue. App production keeps only these lines, with no line for every request (`OPERATIONS.md` → Logs).
+
 ## Routes
 
 - **Why targets are taken exactly.** `decide` also takes patterns, where `*` matches anything, and a story's ID comes from a project's built Storybook. An ID `a*` passed as a pattern also approves `ab`, which the reviewer never saw. `cli/test/ui-*.test.ts` checks this with those two IDs.

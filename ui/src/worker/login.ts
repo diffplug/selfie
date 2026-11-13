@@ -2,6 +2,8 @@
 // adapter from the server, so the sign-in page needs no script, and only GitHub's callback reaches the
 // adapter from outside. See docs/specs/access.md -> Who can do what.
 
+import { errorId, logError } from "../server/http.ts";
+
 /** What a request to the auth adapter gets back. */
 export type AuthFetch = (request: Request) => Promise<Response>;
 
@@ -32,6 +34,8 @@ export interface LoginConfig {
 
 export const SUCCESS_PATH = "/signed-in";
 export const ERROR_PATH = "/sign-in?failed=1";
+/** Where a failed sign-in ends, followed by its error's code. */
+const FAILED_PATH = "/sign-in?failed=";
 
 const SECURE = (origin: string) => origin.startsWith("https:");
 const NEXT_COOKIE = (origin: string) => (SECURE(origin) ? "__Host-selfie-next" : "selfie-next");
@@ -130,7 +134,17 @@ export function pgstencilLogin({ origin, auth, writerGithubId, writerName, signu
       return redirect(url, [csrf, response], [`${nextCookie}=${encodeURIComponent(localPath(next))}; Path=/; Max-Age=600; HttpOnly; SameSite=Lax${secure}`]);
     },
 
-    callback: (request) => auth(new Request(request.url, { headers: forwarded(request) })),
+    async callback(request) {
+      const response = await auth(new Request(request.url, { headers: forwarded(request) }));
+      const location = response.headers.get("location");
+      const to = location === null ? null : new URL(location, origin);
+      if (to !== null && to.origin === origin && to.pathname === SUCCESS_PATH) return response;
+      // GitHub or the adapter refused: logged under a code the sign-in page shows, with whatever the adapter said.
+      const id = errorId();
+      const said = to === null ? (await response.text()).slice(0, 500) : `to ${to.pathname}${to.search}`;
+      logError(id, `GitHub's sign-in callback answered ${response.status}, ${said}`);
+      return redirect(`${FAILED_PATH}${id}`, [response]);
+    },
 
     async landed(request) {
       const next = localPath(decoded(cookieValues(request.headers.get("cookie")).get(nextCookie) ?? "/"));

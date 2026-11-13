@@ -14,6 +14,13 @@ routes = [
   { pattern = "hackathon.selfie.dev", custom_domain = true },
 ]
 
+# Keeps what the Worker logs, which is each error under the code the person saw, and not a line for every request.
+[observability]
+enabled = true
+
+[observability.logs]
+invocation_logs = false
+
 [assets]
 directory = "./dist"
 binding = "ASSETS"

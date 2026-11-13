@@ -24,7 +24,8 @@ export type ChatEvent =
   | { readonly type: "code"; readonly code: ChatCode | null }
   | { readonly type: "text"; readonly text: string }
   | { readonly type: "done" }
-  | { readonly type: "failed"; readonly message: string };
+  /** `id` is the error's code, which the server logged it under. */
+  | { readonly type: "failed"; readonly message: string; readonly id: string };
 
 /** What a page does anything with as an answer comes in, since how it ends is for whatever's reading the body. */
 export type ChatUpdate = Extract<ChatEvent, { readonly type: "code" | "text" }>;

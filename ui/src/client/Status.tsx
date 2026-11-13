@@ -3,6 +3,7 @@ import { AlertIcon, QuestionIcon, ServerIcon, type Icon } from "@primer/octicons
 import { Button, Spinner, Stack, Text } from "@primer/react";
 import { Blankslate } from "@primer/react/experimental";
 import type { ReactNode } from "react";
+import { ErrorText } from "./ActionFailure.tsx";
 import type { RequestError } from "./api.ts";
 import { AppLinkButton, storiesPath } from "./router.tsx";
 
@@ -68,7 +69,7 @@ export function LoadFailure({ error }: { readonly error: RequestError }) {
   }
   return (
     <Blank icon={ServerIcon} title="That didn't load" action={<Button onClick={reload}>Try again</Button>}>
-      {error.message}
+      <ErrorText error={error} />
     </Blank>
   );
 }
