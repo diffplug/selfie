@@ -436,6 +436,43 @@ export function describeBatchContract(
         return batch;
       };
 
+      it("reaches the commits of its branch's earlier batches since its branch began, as a review with Git does, but not their history", async () => {
+        const environment = "branch-reached";
+        const [root, before, rebasedAway, newBase, head, elsewhere] = ["b0", "b1", "b2", "b3", "b4", "b5"].map((tag) => tag.padEnd(40, "f")) as [string, string, string, string, string, string];
+        // `rebasedAway` was the branch's head, and the rebase left it, and `before` under it, out of `head`'s history.
+        await batches.recordCommits([{ sha: before, parents: [root] }, { sha: rebasedAway, parents: [before] }, { sha: newBase, parents: [root] }, { sha: head, parents: [newBase] }]);
+        const receive = async (gitSha: string, startedAt: number, branch: string | null, branchBegan?: number, env = environment) => {
+          const batch = { ...received(env), gitSha, startedAt, branch, ...(branchBegan === undefined ? {} : { branchBegan }) };
+          await batches.receiveBatch(batch);
+          await batches.recordRenders(batch.id, [rendered("old-work", 1), rendered("rebased", 2), rendered("before", 3), rendered("elsewhere", 4)]);
+          await batches.finishBatch(batch.id, 4);
+          return batch;
+        };
+        const oldWork = await receive(elsewhere, 1_000, "topic");
+        const onRebasedAway = await receive(rebasedAway, 2_000, "topic");
+        const inAnotherEnvironment = await receive(elsewhere, 2_500, "topic", undefined, "branch-reached-elsewhere");
+        const decision = { decision: "approved" as const, actor: "ned", at: 1 };
+        await batches.mergeDecisions(environment, [
+          { story: "old-work", imageHash: hashOf(1), gitSha: elsewhere, batchId: oldWork.id, ...decision },
+          { story: "rebased", imageHash: hashOf(2), gitSha: rebasedAway, batchId: onRebasedAway.id, ...decision },
+          { story: "before", imageHash: hashOf(3), gitSha: before, batchId: ON.batchId, ...decision },
+        ]);
+        await batches.mergeDecisions("branch-reached-elsewhere", [{ story: "elsewhere", imageHash: hashOf(4), gitSha: elsewhere, batchId: inAnotherEnvironment.id, ...decision }]);
+
+        const rebased = await receive(head, 3_000, "topic", 1_500);
+        const states = async (batchId: string) => statesOf((await batches.compareReached(batchId, { includeUnchanged: true })).renders);
+        expect(await states(rebased.id)).toEqual({ "old-work": "added", rebased: "unchanged", before: "added", elsewhere: "added" });
+        expect(statesOf((await batches.approvedSinceReached(rebased.id, "main")).current.renders.filter(({ state }) => state !== "unchanged"))).toEqual({ "old-work": "added", before: "added", elsewhere: "added" });
+        // Sent again saying something else, it keeps what it was first told, since a batch never changes.
+        await batches.receiveBatch({ ...rebased, branchBegan: 0 });
+        expect(await states(rebased.id)).toMatchObject({ "old-work": "added", rebased: "unchanged" });
+
+        // From a sender that doesn't say when its branch began, and a detached batch, only history counts.
+        for (const [startedAt, branch, began] of [[3_100, "topic", undefined], [3_200, null, 1_500]] as const) {
+          expect(await states((await receive(head, startedAt, branch, began)).id)).toMatchObject({ rebased: "added" });
+        }
+      });
+
       it("keeps a batch's identity and its times", async () => {
         const batch = received("received-batch");
         expect(await batches.receiveBatch(batch)).toMatchObject({ ...batch, status: "recording", finishedAt: null });

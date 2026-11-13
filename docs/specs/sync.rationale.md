@@ -18,6 +18,8 @@ What's given up: wrong bytes under a hash stay, a browser won't notice, and a pu
 
 ## Pushing and pulling
 
+**When a branch began, with the batch.** It's a field of the batch's facts, not a route of its own, so an older server ignores it, and an older CLI that doesn't send it pushes as it always did, with no request added. The CLI's own Git works it out the way a review does, so the two can't drift.
+
 **Decisions rather than a batch.** A pull used to fetch one commit's goldens, a whole batch that CI had to make. What a review reads is decisions, so those are what it brings, which also means no walk for a commit to hold to.
 
 **Back through the second approval.** Older decisions can't change what a story reads as, since its reference is its newest approval. The second is there because an approval made on a batch isn't what that batch compares with, so that batch falls back on the one before.

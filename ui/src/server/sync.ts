@@ -113,9 +113,13 @@ function recordedRender(value: unknown): RecordedRender {
   return { ...named, imageHash: readHash(imageHash), failure: orNull(failure, (present) => readText(present, "failure")) ?? undefined };
 }
 
-/** A batch's facts as a sender states them, whose times can't be later than now. */
-function receivedBatch(id: string, body: Record<string, unknown>, now: number): ReceivedBatch {
-  const { gitSha, environment, startedAt, dirty, storyFilter, reusedFromBatch, scale, viewport, branch } = body;
+/**
+ * A batch's facts as a sender states them, whose times can't be later than now. When its branch began counts only
+ * off the default branch, and an older sender doesn't say it.
+ */
+function receivedBatch(id: string, body: Record<string, unknown>, now: number, defaultBranch: string): ReceivedBatch {
+  const { gitSha, environment, startedAt, dirty, storyFilter, reusedFromBatch, scale, viewport, branch, branchBegan } = body;
+  const onBranch = orNull(branch, (name) => readText(name, "branch"));
   if (typeof dirty !== "boolean") throw badRequest("dirty must be true or false.");
   if (typeof scale !== "number") throw badRequest("scale must be a number.");
   return {
@@ -128,7 +132,8 @@ function receivedBatch(id: string, body: Record<string, unknown>, now: number): 
     reusedFromBatch: orNull(reusedFromBatch, (batch) => readText(batch, "reusedFromBatch")),
     scale,
     viewport: readViewport(viewport),
-    branch: orNull(branch, (name) => readText(name, "branch")),
+    branch: onBranch,
+    branchBegan: onBranch === null || onBranch === defaultBranch ? null : orNull(branchBegan, (began) => readWhole(began, "branchBegan")),
   };
 }
 
@@ -229,7 +234,7 @@ export function createSyncApi(host: SyncHost): Hono {
     const project = await uploadable(context);
     const { batches } = project;
     const id = readBatchId(context.req.param("id"));
-    const received = receivedBatch(id, await bodyOf(context), now());
+    const received = receivedBatch(id, await bodyOf(context), now(), project.defaultBranch);
     if (received.dirty) throw new Refusal(409, "batch-dirty", "This batch is from a dirty tree, so it may show work that's in no commit.");
     const existing = await batches.getBatch(id);
     if (existing?.gitSha !== received.gitSha && !(await project.hasCommit(received.gitSha))) {

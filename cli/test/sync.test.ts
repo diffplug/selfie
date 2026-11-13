@@ -232,6 +232,52 @@ describe("pushing", () => {
     expect(await cloud.batches.compareReached(batchId)).toMatchObject({ renders: [], unchangedCount: 2 });
   });
 
+  describe("after a rebase leaves a branch's approvals out of its history", () => {
+    /** Says the batch's facts with `change` made to them, as a CLI of another version would. */
+    const stating = (change: (facts: Record<string, unknown>) => void) =>
+      machine(h.repo, h.home, () => (async (url: string, init?: RequestInit) => {
+        if (init?.method !== "PUT" || !/\/batches\/[^/]+$/.test(new URL(url).pathname)) return toCloud(url, init);
+        const facts = JSON.parse(init.body as string) as Record<string, unknown>;
+        change(facts);
+        return toCloud(url, { ...init, body: JSON.stringify(facts) });
+      }) as typeof fetch);
+
+    /** Approves a batch at a commit and pushes it, then amends that commit so HEAD's history no longer has it, and renders again. */
+    async function amended() {
+      const before = await commit(h.repo, "the work");
+      await approved();
+      await laptop("writer", "push");
+      git(h.repo, "commit", "--quiet", "--amend", "-m", "the work, amended");
+      expect(() => git(h.repo, "merge-base", "--is-ancestor", before, "HEAD")).toThrow();
+      const batchId = await record();
+      const local = (await laptop(null, "review", batchId)).json.differences.map(({ story, state }: { story: string; state: string }) => [story, state]);
+      return { batchId, local };
+    }
+    const onCloud = async (batchId: string) => (await cloud.batches.compareReached(batchId)).renders.map(({ story, state }) => [story, state]);
+
+    test("the cloud still counts them on that branch, as a review here does", async () => {
+      git(h.repo, "checkout", "-b", "feature");
+      const { batchId, local } = await amended();
+      expect(local).toEqual([]);
+      expect((await laptop("ci", "push", batchId)).code).toBe(0);
+      expect(await cloud.batches.compareReached(batchId)).toMatchObject({ renders: [], unchangedCount: 2 });
+    });
+
+    test("a CLI that doesn't say when its branch began leaves the cloud reaching only history, as before", async () => {
+      git(h.repo, "checkout", "-b", "feature");
+      const { batchId } = await amended();
+      expect((await stating((facts) => void delete facts.branchBegan)("ci", "push", batchId)).code).toBe(0);
+      expect(await onCloud(batchId)).toEqual([["a", "added"], ["b", "added"]]);
+    });
+
+    test("on the default branch, only history counts, whatever a CLI says", async () => {
+      const { batchId, local } = await amended();
+      expect(local).toEqual([["a", "added"], ["b", "added"]]);
+      expect((await stating((facts) => void (facts.branchBegan = 0))("ci", "push", batchId)).code).toBe(0);
+      expect(await onCloud(batchId)).toEqual(local);
+    });
+  });
+
   test("the default is the newest from a clean tree, and skips a dirty one", async () => {
     const clean = await record();
     await writeFile(path.join(h.repo, "file.txt"), "uncommitted\n");

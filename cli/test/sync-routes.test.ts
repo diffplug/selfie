@@ -254,6 +254,7 @@ describe("batches", () => {
     expect((await send("PUT", `/batches/${BATCH}`, "writer", batchFacts({ gitSha: "nope" }))).status).toBe(400);
     expect((await send("PUT", `/batches/${BATCH}`, "writer", batchFacts({ scale: "big" }))).status).toBe(400);
     expect((await send("PUT", `/batches/${BATCH}`, "writer", batchFacts({ viewport: null }))).status).toBe(400);
+    expect((await send("PUT", `/batches/${BATCH}`, "writer", batchFacts({ branch: "topic", branchBegan: "soon" }))).status).toBe(400);
   });
 });
 

@@ -43,9 +43,10 @@ Source of truth: `ui/src/worker/index.ts`, `ui/src/worker/app.ts`, `ui/wrangler.
 
 ## Without Git or a decoder
 
-Source of truth: `ui/src/server/hosted.ts`, `RenderBatches.compareReached` and `recordCommits` in `store/src/core/render-batches.ts`, `StoredDiffs` in `store/src/core/stored-diffs.ts`; `uploadCommits` and `uploadDiffs` in `cli/src/sync.ts`.
+Source of truth: `ui/src/server/hosted.ts`, `RenderBatches.compareReached`, `recordCommits`, and `receiveBatch` in `store/src/core/render-batches.ts`, `StoredDiffs` in `store/src/core/stored-diffs.ts`; `uploadCommits`, `uploadDiffs`, and `push` in `cli/src/sync.ts`; `branchBegan` in `cli/src/project.ts`. Tests in `store/test/contract/render-batches-contract.ts` and `cli/test/sync.test.ts`.
 
-- **Must learn what a commit reaches from `commit_parents`, which a push fills from `git rev-list --parents`**, walked in SQL, through every parent, up to 1,000 commits, so what history reaches means here what it means locally (`docs/specs/renders.md` → Approvals), but for the commits of a branch's earlier batches, which aren't followed yet (rationale).
+- **Must learn what a batch reaches from `commit_parents`, which a push fills from `git rev-list --parents`, and from `branch_began`, which a push fills from when the batch's branch began, as its pusher's Git says**, so what history reaches means here what it means locally (`docs/specs/renders.md` → Approvals). It walks the batch's commit through every parent, up to 1,000 commits, in SQL, and adds the commits of the batches this project holds of that branch, in that environment, from when it began until the batch started, and not their history (rationale).
+- **Must take when a branch began only for a batch on a branch other than the project's default**, and only the first time it's told for that batch. A batch it was never told for reaches only its history, which is how a batch from an older CLI reads.
 - **Must be told a pair's diff by whoever pushed, who has to fetch what it's compared with to work it out**, since a Worker can't decode an image (rationale). **A pair with no diff shows its images with no highlight**, as when a later approval changed what a batch is compared with.
 - **Must take a built Storybook's files, and only what's missing**, then write its row last, as `docs/specs/store.md` → Built Storybooks says.
 
@@ -72,7 +73,6 @@ Source of truth: `commitStatusOf` in `ui/src/shared/commit-status.ts`, `publish`
 ## Future
 
 - A status saying a commit is still rendering, between a push and its batch. Until then a commit has no `selfie` status for those minutes.
-- Following a branch's earlier batches, so a force-push keeps the approvals its old commits had. Until then it asks again.
 - A status on a fork's pull request, which gets no upload token (`docs/specs/access.md` → Pull requests from forks).
 - A list of a project's commits and batches.
 - A project's own `hunkMergeDistance`, since nothing here reads its config. Hunks group at the default of 12.

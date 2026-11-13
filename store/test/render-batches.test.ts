@@ -705,6 +705,13 @@ describe("RenderBatches", () => {
       await model.mergeDecisions(ENV, [{ story: "b", imageHash: null, decision: "approved", actor: "ned", at: 2, gitSha: ON.gitSha, batchId: ON.batchId }]);
       await model.receiveBatch(clean);
       await model.recordCommits([{ sha: SHA_B, parents: [SHA_A] }]);
+      // What history reaches, through `commit_parents` and the branch's earlier batches.
+      const onBranch = { ...clean, id: crypto.randomUUID(), branch: "topic", branchBegan: 0 };
+      await model.receiveBatch(onBranch);
+      await model.recordRenders(onBranch.id, [rendered("a", 3)]);
+      await model.finishBatch(onBranch.id, 1);
+      await model.compareReached(onBranch.id);
+      await model.approvedSinceReached(onBranch.id, "main");
       expect(await model.batchesReaching(SHA_A, ENV, 50)).toMatchObject([{ id: head.id }]);
 
       const db = new DatabaseSync(temp.path);
@@ -718,10 +725,10 @@ describe("RenderBatches", () => {
           const plan = db.prepare(`EXPLAIN QUERY PLAN ${text}`).all(...params);
           return plan
             .map(({ detail }) => String(detail))
-            // Reading a statement's own VALUES or JSON list, a one-row aggregate, or the commits a walk has reached, is no table scan.
+            // Reading a statement's own VALUES or JSON list, a one-row aggregate, or the commits a walk has reached, history among them, is no table scan.
             // The primary key by environment alone is every decision there, which the plan doesn't call a scan.
             // So is a walk reading its own rows, each found by a key. An automatic index is built by reading the whole table.
-            .filter((detail) => (/\bSCAN\b/.test(detail) && !/\bSCAN (v|c|j|json_each|reach|descendants|\d+ CONSTANT ROWS?|CONSTANT ROW)\b/.test(detail)) || /USING PRIMARY KEY \(environment_key=\?\)/.test(detail) || /\bAUTOMATIC\b/.test(detail))
+            .filter((detail) => (/\bSCAN\b/.test(detail) && !/\bSCAN (v|c|j|json_each|history|reach|descendants|\d+ CONSTANT ROWS?|CONSTANT ROW)\b/.test(detail)) || /USING PRIMARY KEY \(environment_key=\?\)/.test(detail) || /\bAUTOMATIC\b/.test(detail))
             .map((detail) => `${detail} in ${text}`);
         });
         expect(seen.size).toBeGreaterThan(10);
