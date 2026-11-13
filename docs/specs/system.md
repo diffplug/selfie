@@ -67,7 +67,7 @@ Selfie is for fully opaque images, and transparency is never allowed: `docs/spec
 
 **Scope: trust** — The cloud accepts local results without re-rendering.
 
-**Scope: change-grouping** — Muse Spark reads before/after renders with the code diff and the stated intent, groups changed renders by the code change that caused them, and flags changes nobody asked for, for batch approval or rejection. Asking it about one story's change is built (`docs/specs/chat.md`). Is not ordered against `sync` or `trust`.
+**Scope: change-grouping** — Muse Spark reads before/after renders with the code diff and the stated intent, groups changed renders by the code change that caused them, and flags changes nobody asked for, for batch approval or rejection. Is not ordered against `sync` or `trust`.
 
 **Scope: platforms-upgrade** — Possible future: reach each project's existing D1 through Workers for Platforms bindings instead of the REST API, when the shared API rate limit constrains the service. Requires no data migration.
 

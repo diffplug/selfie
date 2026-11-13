@@ -6,7 +6,6 @@ import type { D1DatabaseLike } from "selfie-store/adapters/d1-binding";
 import type { R2BucketLike } from "selfie-store/adapters/r2";
 import { createCloudApp } from "./app.ts";
 import { WRITER, WRITER_GITHUB_ID } from "./auth.ts";
-import { metaModel } from "./chat.ts";
 import { githubApp } from "./github.ts";
 import { ERROR_PATH, pgstencilLogin, SUCCESS_PATH } from "./login.ts";
 
@@ -31,8 +30,6 @@ interface Env {
   readonly SELFIE_UPLOAD_TOKEN: string;
   readonly GITHUB_APP_ID: string;
   readonly GITHUB_APP_PRIVATE_KEY: string;
-  readonly MODEL_API_KEY: string;
-  readonly CHAT_LIMIT: { limit(request: { readonly key: string }): Promise<{ readonly success: boolean }> };
 }
 
 /** Only these reach the auth adapter, so no other secret is ever in its hands. */
@@ -88,8 +85,6 @@ export default {
       writerToken: env.SELFIE_WRITER_TOKEN,
       uploadToken: env.SELFIE_UPLOAD_TOKEN,
       github: githubApp({ appId: env.GITHUB_APP_ID, privateKey: env.GITHUB_APP_PRIVATE_KEY }),
-      model: metaModel({ apiKey: env.MODEL_API_KEY }),
-      mayChat: async (client) => (await env.CHAT_LIMIT.limit({ key: client })).success,
       assets: env.ASSETS,
     });
     return app.fetch(request, env, context);

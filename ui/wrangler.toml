@@ -37,12 +37,6 @@ FORMER_ORIGINS = "https://hackathon.selfie.dev"
 binding = "HYPERDRIVE"
 id = "00000000000000000000000000000000"
 
-# How often one address may ask the model anything, since anyone may. See docs/specs/chat.md.
-[[ratelimits]]
-name = "CHAT_LIMIT"
-namespace_id = "1001"
-simple = { limit = 10, period = 60 }
-
 # Named for the hackathon, and R2 can't rename a bucket.
 [[r2_buckets]]
 binding = "BLOBS"

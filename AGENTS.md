@@ -14,7 +14,6 @@ A spec is the accurate reference for the current code: it states the invariants 
 - **`docs/specs/sync.md`** — Moving batches, images, decisions, and goldens between stores.
 - **`docs/specs/cloud.md`** — The Worker at `app.selfie.dev`: its projects, origins, pages, and a commit's status.
 - **`docs/specs/feedback.md`** — Notes: how a person tells a coding agent what they see, and how the agent answers.
-- **`docs/specs/chat.md`** — Asking Muse Spark about a story's change, with its images and the code from GitHub.
 - **`docs/specs/render.md`** — The renderer: rendering a built Storybook into PNGs in a pinned environment, the environment ID, and the manifest.
 - **`docs/specs/cli.md`** — The `selfie` CLI: `review`, `approve`, `reject`, and `ui`, their exit codes and JSON, and local data's layout.
 - **`docs/specs/ui.md`** — The review UI: its routes, the seam a platform implements, and what each screen must show. Read `docs/specs/access.md` → Local review server with it.

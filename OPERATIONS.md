@@ -56,10 +56,9 @@ Worker secrets on `selfie-app`, set with `pnpm --dir ui exec wrangler secret put
 |---|---|
 | `AUTH_SECRET` | 32 or more random characters, for pgstencil's cookies and keys; changing it signs everyone out |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | The GitHub App's OAuth client, for signing in |
-| `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY` | The GitHub App itself, for commit statuses and reading code |
+| `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY` | The GitHub App itself, for commit statuses and checking that a pushed commit is on GitHub |
 | `SELFIE_UPLOAD_TOKEN` | CI's bearer token: uploads, and can't decide anything |
 | `SELFIE_WRITER_TOKEN` | The writer's bearer token, for `SELFIE_TOKEN` in their own `selfie push`, `pull`, and `approve` |
-| `MODEL_API_KEY` | The Meta Model API key for chat |
 
 ## Setting up from nothing
 
@@ -96,7 +95,7 @@ Done once, in this order.
    ```
 
    Use Neon's direct host, not its `-pooler` one, since Hyperdrive pools. Its ID is `HYPERDRIVE_ID`. `ui/wrangler.toml` keeps a placeholder, which `deploy` replaces.
-3. Set every Worker secret above on `selfie-app`. Copy `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, `SELFIE_UPLOAD_TOKEN`, and `MODEL_API_KEY` from the hackathon's Worker's entries in the password manager. Generate `AUTH_SECRET` and `SELFIE_WRITER_TOKEN` fresh, with `openssl rand -hex 32`.
+3. Set every Worker secret above on `selfie-app`. Copy `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, and `SELFIE_UPLOAD_TOKEN` from the hackathon's Worker's entries in the password manager. Generate `AUTH_SECRET` and `SELFIE_WRITER_TOKEN` fresh, with `openssl rand -hex 32`.
 4. Create the two API tokens above.
 
 ### 4. Moving off the hackathon's Worker

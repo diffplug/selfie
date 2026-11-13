@@ -1,5 +1,5 @@
-// The GitHub App, as far as the service needs it: which commits a repository has, saying what a commit's
-// snapshots read as, and what code changed between two commits. See docs/specs/access.md -> GitHub App.
+// The GitHub App, as far as the service needs it: which commits a repository has, and saying
+// what a commit's snapshots read as. See docs/specs/access.md -> GitHub App.
 import { sign } from "hono/jwt";
 import type { CommitStatus } from "../shared/commit-status.ts";
 
@@ -8,32 +8,10 @@ export interface Repository {
   readonly name: string;
 }
 
-export interface ChangedFile {
-  readonly path: string;
-  readonly status: string;
-  readonly additions: number;
-  readonly deletions: number;
-  /** Null for what has no text to show, such as a binary file, or one too large for GitHub to say. */
-  readonly patch: string | null;
-}
-
-export interface CodeChange {
-  /** Where the two sides met, which is `base` itself when `head` is built on it. */
-  readonly base: string;
-  readonly head: string;
-  readonly totalCommits: number;
-  readonly commits: readonly { readonly sha: string; readonly message: string }[];
-  readonly files: readonly ChangedFile[];
-  /** GitHub lists only so many files, and this many says there may have been more. */
-  readonly mayHaveMoreFiles: boolean;
-}
-
 /** What the Worker needs from GitHub, which a test stands in for. */
 export interface GitHub {
   hasCommit(repository: Repository, sha: string): Promise<boolean>;
   postStatus(repository: Repository, sha: string, status: CommitStatus, targetUrl: string): Promise<void>;
-  /** What changed from `base` to `head`, either of which may be any name Git has for a commit, or null if GitHub has no such pair. */
-  compare(repository: Repository, base: string, head: string): Promise<CodeChange | null>;
 }
 
 const API = "https://api.github.com";
@@ -41,14 +19,6 @@ const API = "https://api.github.com";
 const STATUS_CONTEXT = "selfie";
 // They last an hour, so there's room for a request that started just before this ran out.
 const TOKEN_KEPT_MS = 50 * 60 * 1000;
-const MOST_FILES_LISTED = 300;
-
-interface GitHubComparison {
-  readonly merge_base_commit: { readonly sha: string };
-  readonly total_commits: number;
-  readonly commits: readonly { readonly sha: string; readonly commit: { readonly message: string } }[];
-  readonly files?: readonly { readonly filename: string; readonly status: string; readonly additions: number; readonly deletions: number; readonly patch?: string }[];
-}
 
 export function githubApp({ appId, privateKey }: { readonly appId: string; readonly privateKey: string }): GitHub {
   const ask = (path: string, token: string, init: RequestInit = {}) =>
@@ -90,20 +60,6 @@ export function githubApp({ appId, privateKey }: { readonly appId: string; reado
         body: JSON.stringify({ state, description: description.slice(0, 140), context: STATUS_CONTEXT, target_url: targetUrl }),
       });
       if (!response.ok) throw new Error(`GitHub wouldn't take a status for ${sha}: ${response.status}`);
-    },
-    async compare(repository, base, head) {
-      const response = await ask(`/repos/${repository.owner}/${repository.name}/compare/${encodeURIComponent(base)}...${encodeURIComponent(head)}`, await tokenFor(repository));
-      if (response.status === 404) return null;
-      if (!response.ok) throw new Error(`GitHub couldn't compare ${base} with ${head}: ${response.status}`);
-      const { merge_base_commit, total_commits, commits, files = [] } = (await response.json()) as GitHubComparison;
-      return {
-        base: merge_base_commit.sha,
-        head,
-        totalCommits: total_commits,
-        commits: commits.map(({ sha, commit }) => ({ sha, message: commit.message })),
-        files: files.map(({ filename, status, additions, deletions, patch }) => ({ path: filename, status, additions, deletions, patch: patch ?? null })),
-        mayHaveMoreFiles: files.length >= MOST_FILES_LISTED,
-      };
     },
   };
 }
