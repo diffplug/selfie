@@ -67,7 +67,7 @@ Done once, in this order.
    - leave **Request user authorization (OAuth) during installation** off
    - generate a **client secret**; it and the app's **Client ID** are `GITHUB_CLIENT_SECRET` and `GITHUB_CLIENT_ID`
 
-   Keep its permissions as they are: `statuses: write`, `contents: read`, and no webhook. Signing in needs no permission of its own, since only the account's numeric ID is read.
+   Its permissions are `statuses: write` and `contents: read` on repositories, **Email addresses: Read-only** on accounts, and no webhook. Without the email permission, GitHub refuses pgstencil's read of `/user/emails`, and every sign-in fails with a 500.
 3. Create the `app-production` environment, limited to `main`, and set the secrets and variables above.
 
 ### 2. Neon
