@@ -81,9 +81,13 @@ const fakeAuth: AuthFetch = async (request) => {
       response.headers.append("set-cookie", `__Host-pgstencil.session_token=${url.searchParams.get("code")}; Path=/; HttpOnly; SameSite=Lax; Secure`);
       return response;
     }
+    case "GET /api/auth/get-session":
+      if (session === "stranger") return json({ user: { email: "new.person+selfie@example.com", emailVerified: true } });
+      if (session === "unverified") return json({ user: { email: "maybe@example.com", emailVerified: false } });
+      return json(null);
     case "GET /api/auth/list-accounts":
       if (session === "writer") return json([{ providerId: "github", accountId: "2924992" }]);
-      if (session === "stranger") return json([{ providerId: "github", accountId: "1" }]);
+      if (session === "stranger" || session === "unverified") return json([{ providerId: "github", accountId: "1" }]);
       return Response.json({ message: "Unauthorized" }, { status: 401 });
     case "POST /api/auth/sign-out":
       if (!csrfOk()) return new Response(null, { status: 403 });
@@ -124,7 +128,7 @@ beforeAll(() => {
     reviewOrigin: ORIGIN,
     storybookOrigin: STORYBOOKS,
     formerOrigins: [FORMER],
-    login: pgstencilLogin({ origin: ORIGIN, auth: fakeAuth, writerGithubId: "2924992", writerName: "nedtwigg" }),
+    login: pgstencilLogin({ origin: ORIGIN, auth: fakeAuth, writerGithubId: "2924992", writerName: "nedtwigg", signupUrl: "https://landing.test/" }),
     writerToken: WRITER_TOKEN,
     uploadToken: UPLOAD,
     now: () => 1_000_000,
@@ -215,15 +219,21 @@ describe("the cloud service", () => {
     expect(((await view.json()) as { actor: string | null }).actor).toBe("nedtwigg");
   });
 
-  it("signs anyone but the writer straight back out, and never lets them decide", async () => {
+  it("signs anyone but the writer straight back out, offers them the mailing list, and never lets them decide", async () => {
     const stranger = "__Host-pgstencil.session_token=stranger";
-    const landed = await app.request(`${ORIGIN}/signed-in`, { headers: { cookie: stranger } });
-    expect(landed.headers.get("location")).toBe("/sign-in?refused=1");
+    const landed = await app.request(`${ORIGIN}/signed-in`, { headers: { cookie: `${stranger}; __Host-selfie-next=%2Fdiffplug%2Fselfie` } });
+    // In the fragment, which the browser never sends to a server.
+    expect(landed.headers.get("location")).toBe("https://landing.test/#join=new.person%2Bselfie%40example.com");
     expect(landed.headers.getSetCookie()).toContain("__Host-pgstencil.session_token=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax; Secure");
+    expect(landed.headers.getSetCookie()).toContain("__Host-selfie-next=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax; Secure");
     expect(signedOut).toEqual(["stranger"]);
-    expect(await (await app.request(`${ORIGIN}/sign-in?refused=1`)).text()).toContain("only @nedtwigg can sign in");
     const view = await app.request(`${ORIGIN}/diffplug/selfie/api/batches/${FIRST}`, { headers: { origin: ORIGIN, cookie: stranger } });
     expect(((await view.json()) as { actor: string | null }).actor).toBeNull();
+
+    const unverified = await app.request(`${ORIGIN}/signed-in`, { headers: { cookie: "__Host-pgstencil.session_token=unverified" } });
+    expect(unverified.headers.get("location")).toBe("https://landing.test/#join=");
+    expect(signedOut).toEqual(["stranger", "unverified"]);
+    expect((await app.request(`${ORIGIN}/signed-in`)).headers.get("location")).toBe("https://landing.test/#join=");
   });
 
   it("reaches the auth adapter from outside only through GitHub's callback", async () => {

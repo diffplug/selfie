@@ -10,7 +10,7 @@ export interface Login {
   begin(request: Request, next: string): Promise<Response>;
   /** GitHub's redirect back, which the adapter turns into a session cookie. */
   callback(request: Request): Promise<Response>;
-  /** Where the adapter sends a browser after signing in: on to `next` for the writer, and signed out for anyone else. */
+  /** Where the adapter sends a browser after signing in: on to `next` for the writer, and anyone else signed out, to the mailing list. */
   landed(request: Request): Promise<Response>;
   /** Ends this browser's session. */
   signOut(request: Request): Promise<Response>;
@@ -26,6 +26,8 @@ export interface LoginConfig {
   readonly writerGithubId: string;
   /** What decisions record as their decider. */
   readonly writerName: string;
+  /** Where anyone else goes after signing in: the mailing list's signup form, which reads `#join=<email>`. */
+  readonly signupUrl: string;
 }
 
 export const SUCCESS_PATH = "/signed-in";
@@ -78,7 +80,7 @@ const decoded = (value: string) => {
 
 const hasSession = (request: Request) => [...cookieValues(request.headers.get("cookie")).keys()].some((name) => name.endsWith(".session_token"));
 
-export function pgstencilLogin({ origin, auth, writerGithubId, writerName }: LoginConfig): Login {
+export function pgstencilLogin({ origin, auth, writerGithubId, writerName, signupUrl }: LoginConfig): Login {
   const nextCookie = NEXT_COOKIE(origin);
   const secure = SECURE(origin) ? "; Secure" : "";
 
@@ -98,6 +100,15 @@ export function pgstencilLogin({ origin, auth, writerGithubId, writerName }: Log
   async function signOutCookies(request: Request): Promise<Response[]> {
     const { response, csrf } = await write(request, "/sign-out", {});
     return [csrf, response];
+  }
+
+  /** The session's verified email, or nothing for an account GitHub gave none, or a session that's gone. */
+  async function emailOf(request: Request): Promise<string | null> {
+    const response = await auth(new Request(`${origin}/api/auth/get-session`, { headers: forwarded(request) }));
+    if (!response.ok) return null;
+    const session = (await response.json()) as { user?: { email?: unknown; emailVerified?: unknown } } | null;
+    const email = session?.user?.email;
+    return session?.user?.emailVerified === true && typeof email === "string" ? email : null;
   }
 
   async function writerOf(request: Request): Promise<string | null> {
@@ -125,8 +136,11 @@ export function pgstencilLogin({ origin, auth, writerGithubId, writerName }: Log
       const next = localPath(decoded(cookieValues(request.headers.get("cookie")).get(nextCookie) ?? "/"));
       const forget = `${nextCookie}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax${secure}`;
       if ((await writerOf(request)) !== null) return redirect(next, [], [forget]);
-      // Someone else's GitHub account: their session goes at once, so for now only the writer is ever signed in.
-      return redirect("/sign-in?refused=1", hasSession(request) ? await signOutCookies(request) : [], [forget]);
+      // Someone else's GitHub account: their session goes at once, so for now only the writer is ever signed in,
+      // and they're offered the mailing list instead. Their email rides in the fragment, which no server sees.
+      if (!hasSession(request)) return redirect(`${signupUrl}#join=`, [], [forget]);
+      const email = await emailOf(request);
+      return redirect(`${signupUrl}#join=${encodeURIComponent(email ?? "")}`, await signOutCookies(request), [forget]);
     },
 
     async signOut(request) {

@@ -18,6 +18,29 @@
     });
   });
 
+  // Someone signed in to app.selfie.dev before it's open to them. The app sends them here with their
+  // verified email in the fragment, which no server, log, or Referer ever sees. Fill it in, say why
+  // they're here, and leave joining to them.
+  const arrived = /^#join=([^&]*)$/.exec(location.hash);
+  if (arrived) {
+    let address = "";
+    try {
+      address = decodeURIComponent(arrived[1]);
+    } catch {
+      // A garbled address is no address.
+    }
+    history.replaceState(null, "", "#join");
+    if (address.length <= 254 && /^[^\s@<>]+@[^\s@<>]+$/.test(address)) email.value = address;
+    status.textContent = "Selfie's cloud isn't open to everyone yet. Join the list, and we'll email you when it is.";
+    // After load, since the browser's own scroll to the fragment would otherwise take focus away again.
+    const arrive = () => {
+      form.scrollIntoView({ block: "center" });
+      (email.value ? button : email).focus({ preventScroll: true });
+    };
+    if (document.readyState === "complete") arrive();
+    else addEventListener("load", arrive, { once: true });
+  }
+
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     if (!email.checkValidity()) {

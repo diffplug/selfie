@@ -34,7 +34,7 @@ Every project here is public, and one person writes (rationale).
 - **Must keep the writer token and the upload token only in Worker secrets, and compare them by digest**, so how long a comparison takes says nothing of a guess.
 - **Must sign in only through GitHub, with pgstencil's Better Auth adapter (`@pgstencil/auth`), using the GitHub App's own OAuth client**, its users and sessions in Postgres through an uncached Hyperdrive, and its cookies named `__Host-` (rationale).
 - **Must know the writer by their GitHub account's numeric ID, never their login**, which can be renamed and taken by someone else.
-- **Must sign anyone else straight back out when GitHub returns them**, and never treat their session as the writer's (rationale).
+- **Must sign anyone else straight back out when GitHub returns them**, and never treat their session as the writer's (rationale). **Must then send them to selfie.dev's mailing list signup, `https://selfie.dev/#join=<email>`, with the verified email GitHub gave, or none**, in the URL's fragment, which a browser never sends to a server or in a `Referer` (rationale). `site/public/join.js` fills the form in and says the cloud isn't open yet, and joining stays their click.
 - **Must drive the adapter from the Worker, and let nothing outside reach it but GitHub's callback, `GET /api/auth/callback/github`.** Its CSRF token, its sign-in and sign-out writes, and its account list are only ever the Worker's own requests to it, and its email routes are reached by nothing. It's given only its own bindings, and an email sender that sends nothing.
 - **Must refuse a sign-in or sign-out from another site, and send a person only to a path on this site after signing in**, held in a 10-minute `__Host-` cookie, since the adapter returns everyone to one fixed path.
 - **Must keep `sameOriginWrites` and `pageHeaders` on the review routes.** The sync routes answer only to a bearer token, and never read a cookie.
@@ -83,7 +83,7 @@ GitHub decides. Selfie keeps no member list of its own.
 
 Browsers already sign in through the GitHub App's web application flow ([Who can do what](#who-can-do-what)).
 
-- **Must let anyone with write access to a project sign in**, in place of signing everyone else back out, and stop keeping a row for each account that was refused.
+- **Must let anyone with write access to a project sign in**, in place of signing everyone else back out and offering them the mailing list, and stop keeping a row for each account that was refused.
 - **Must sign the CLI in through the GitHub App's device flow**, which is an opt-in setting on the app.
 - **Must not need a login to view a public repository.**
 

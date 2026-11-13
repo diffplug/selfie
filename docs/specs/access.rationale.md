@@ -32,4 +32,6 @@
 
 **Signed straight back out.** GitHub will authorize anyone who presses the button, and the adapter has no allowlist, so the refusal happens on the page the adapter returns everyone to. A refused person's session lives for one redirect, and grants nothing even then, since the writer is looked up on every request.
 
+**On to the mailing list.** Anyone who gets as far as GitHub's consent screen wants Selfie, and doesn't know who its one writer is, so they're offered the list rather than a refusal. Their address is already in hand, so it's filled in, but in the fragment: a query string would land in Cloudflare's and Pages' logs, and in MailerLite's if the page's own requests carried a `Referer`. The form still needs their click, and MailerLite's double opt-in still applies.
+
 **An upload token rather than OIDC.** It's a secret a repository has to hold, which OIDC avoids, and it costs a rotation if it leaks. A leak lets someone upload to a public project, which can't approve anything, and can only add batches at commits GitHub has.
