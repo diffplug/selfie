@@ -279,6 +279,23 @@ describe("pushing", () => {
     expect(json.error.code).toBe("not-allowed");
   });
 
+  test("says the code a remote logged its error under", async () => {
+    await record();
+    let stdout = "";
+    let stderr = "";
+    const failing = async () => Response.json({ error: { code: "not-allowed", message: "This token can't upload.", id: "7K3MQ9XP" } }, { status: 403 });
+    const code = await runCli(["push"], {
+      cwd: h.repo,
+      env: { SELFIE_HOME: h.home, SELFIE_REMOTE: REMOTE, SELFIE_TOKEN: "writer" },
+      stdout: (text) => void (stdout += text),
+      stderr: (text) => void (stderr += text),
+      fetch: failing as typeof fetch,
+    });
+    expect(code).toBe(2);
+    expect(stderr).toBe("selfie: This token can't upload.\nError code: 7K3MQ9XP\n");
+    expect(JSON.parse(stdout).error).toEqual({ code: "not-allowed", message: "This token can't upload.", id: "7K3MQ9XP" });
+  });
+
   test("someone who can't see it learns nothing", async () => {
     await record();
     const { code, json } = await laptop("stranger", "push");

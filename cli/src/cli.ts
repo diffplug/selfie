@@ -436,8 +436,10 @@ export async function runCli(argv: readonly string[], context: Context): Promise
     return await dispatch(command, args, context);
   } catch (error) {
     const { message } = error as Error;
-    context.stderr(`selfie: ${message}\n`);
-    printJson(context, { error: { code: errorCode(error as Error), message } });
+    // A remote's error carries the code it logged it under, which is how its log finds it.
+    const id = error instanceof Error && "id" in error && typeof error.id === "string" ? error.id : null;
+    context.stderr(id === null ? `selfie: ${message}\n` : `selfie: ${message}\nError code: ${id}\n`);
+    printJson(context, { error: { code: errorCode(error as Error), message, ...(id === null ? {} : { id }) } });
     return EXIT_COULD_NOT_RUN;
   }
 }

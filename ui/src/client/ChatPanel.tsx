@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { MAX_QUESTION_CHARACTERS, type ChatCode, type ChatMessage, type ChatUpdate } from "../shared/chat.ts";
 import { plural } from "../shared/plural.ts";
 import { askAboutStory } from "./api.ts";
+import { ErrorText } from "./ActionFailure.tsx";
 import { asRequestError } from "./hooks.ts";
 import { Sha } from "./words.tsx";
 
@@ -37,7 +38,7 @@ export interface ChatPanelProps {
 export function ChatPanel({ batchId, story, ask = askAboutStory, initial }: ChatPanelProps) {
   const [messages, setMessages] = useState<readonly ChatMessage[]>(initial?.messages ?? []);
   const [code, setCode] = useState(initial?.code);
-  const [error, setError] = useState<string | null>(initial?.error ?? null);
+  const [error, setError] = useState<Error | null>(initial?.error === undefined ? null : new Error(initial.error));
   const [text, setText] = useState("");
   const [asking, setAsking] = useState(false);
   const inFlight = useRef<AbortController | null>(null);
@@ -65,7 +66,7 @@ export function ChatPanel({ batchId, story, ask = askAboutStory, initial }: Chat
       await ask(batchId, { story, messages: asked }, onUpdate, controller.signal);
     } catch (thrown) {
       if (controller.signal.aborted) return;
-      setError(asRequestError(thrown).message);
+      setError(asRequestError(thrown));
       // A conversation goes on only from a whole answer, so this goes back to before the question, ready to ask again.
       setMessages(messages);
       setText(question);
@@ -89,7 +90,7 @@ export function ChatPanel({ batchId, story, ask = askAboutStory, initial }: Chat
       )}
       {error !== null && (
         <Text as="p" className="selfie-chat-error" role="alert">
-          {error}
+          <ErrorText error={error} />
         </Text>
       )}
       <form

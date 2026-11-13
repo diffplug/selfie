@@ -159,7 +159,7 @@ export function createReviewApi(given: ReviewSource | ((context: Context) => Pro
     const code = (error as { code?: unknown }).code;
     const status = typeof code === "string" ? ERROR_STATUS[code] : undefined;
     if (status !== undefined) return context.json(failure(code as string, error.message), status);
-    console.error(error);
+    // `errorCodes` logs it, under the code the person sees.
     return context.json(INTERNAL_ERROR, 500);
   });
 

@@ -19,13 +19,15 @@ import {
 import { linesOf, type ChatEvent, type ChatMessage, type ChatUpdate } from "../shared/chat.ts";
 import { BASE, isHosted } from "./base.ts";
 
-/** What went wrong, in words a screen can show. `code` tells the cases apart. */
+/** What went wrong, in words a screen can show. `code` tells the cases apart, and `id` is the code the server logged it under, if it did. */
 export class RequestError extends Error {
   readonly code: string;
+  readonly id: string | null;
 
-  constructor(code: string, message: string) {
+  constructor(code: string, message: string, id: string | null = null) {
     super(message);
     this.code = code;
+    this.id = id;
   }
 }
 
@@ -40,7 +42,7 @@ async function respond(path: string, init?: RequestInit): Promise<Response> {
   }
   if (response.ok) return response;
   const error = ((await response.json().catch(() => null)) as ApiError | null)?.error;
-  throw new RequestError(error?.code ?? "bad-response", error?.message ?? `The server answered ${response.status}.`);
+  throw new RequestError(error?.code ?? "bad-response", error?.message ?? `The server answered ${response.status}.`, error?.id ?? null);
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -72,7 +74,7 @@ export async function askAboutStory(batchId: string, question: { readonly story:
   for await (const line of linesOf(response.body!)) {
     const event = JSON.parse(line) as ChatEvent;
     if (event.type === "done") return;
-    if (event.type === "failed") throw new RequestError("model-failed", event.message);
+    if (event.type === "failed") throw new RequestError("model-failed", event.message, event.id);
     onUpdate(event);
   }
   throw new RequestError("model-failed", "The answer stopped before it finished. Try asking again.");

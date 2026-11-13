@@ -23,7 +23,7 @@ Source of truth: `cli/src/cli.ts`, `cli/src/document.ts`; the real binary's test
 | `selfie agent-await-feedback` | Blocks until a person sends notes from this folder (`docs/specs/feedback.md`) |
 | `selfie ui [<batch>]` | Serves the review UI until stopped, and prints its URL ([ui](#ui)) |
 
-- **Must print exactly one document on stdout, whatever happens,** and everything for people on stderr, including a review's one line of timings. A command that couldn't run prints `{ "error": { "code", "message" } }`. `--help` prints usage.
+- **Must print exactly one document on stdout, whatever happens,** and everything for people on stderr, including a review's one line of timings. A command that couldn't run prints `{ "error": { "code", "message" } }`, and, when a remote refused, the error code it logged that under as `id`, which stderr shows as `Error code: <id>`. `--help` prints usage.
 - **Must use these exit codes:**
 
 | Code | Meaning | Examples |

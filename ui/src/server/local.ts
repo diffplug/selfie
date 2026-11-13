@@ -8,6 +8,7 @@ import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { ReviewSource } from "../shared/api.ts";
 import { createReviewApi, failure, pageHeaders, sameOriginWrites } from "./app.ts";
+import { errorCodes } from "./http.ts";
 import { keptStorybookRoutes, storybookHeaders, type StorybookFileReader } from "./storybook.ts";
 
 const LOOPBACK = "127.0.0.1";
@@ -88,6 +89,7 @@ export function createLocalApp({
   readonly storybookOrigin?: string | undefined;
 }): Hono {
   const app = new Hono();
+  app.use(errorCodes);
   app.use(pageHeaders(storybookOrigin));
   app.use(loopbackHosts(port));
   app.use(sameOriginWrites((context) => `http://${context.req.header("host")}`));

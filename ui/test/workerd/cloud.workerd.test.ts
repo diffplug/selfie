@@ -1,7 +1,7 @@
 // The whole cloud service inside workerd, on its local D1 and R2, with stand-ins for GitHub and for
 // pgstencil's auth adapter. Nothing crosses to Node, and no account is involved. These run in order, each on what the last left.
 import { env } from "cloudflare:workers";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import type { R2BucketLike } from "selfie-store/adapters/r2";
 import { createCloudApp } from "../../src/worker/app.ts";
 import { metaModel, type ModelRequest } from "../../src/worker/chat.ts";
@@ -77,6 +77,8 @@ const fakeAuth: AuthFetch = async (request) => {
       if (!csrfOk()) return new Response(null, { status: 403 });
       return json({ url: "https://github.com/login/oauth/authorize?state=s", redirect: false }, "__Host-pgstencil.state=s; Path=/; HttpOnly; SameSite=Lax; Secure");
     case "GET /api/auth/callback/github": {
+      if (url.searchParams.get("code") === "refused") return new Response(null, { status: 302, headers: { location: `${ORIGIN}/sign-in?failed=1&error=state_mismatch` } });
+      if (url.searchParams.get("code") === "crash") return new Response("GitHub identity request failed", { status: 500 });
       const response = new Response(null, { status: 302, headers: { location: `${ORIGIN}/signed-in` } });
       response.headers.append("set-cookie", `__Host-pgstencil.session_token=${url.searchParams.get("code")}; Path=/; HttpOnly; SameSite=Lax; Secure`);
       return response;
@@ -88,6 +90,7 @@ const fakeAuth: AuthFetch = async (request) => {
     case "GET /api/auth/list-accounts":
       if (session === "writer") return json([{ providerId: "github", accountId: "2924992" }]);
       if (session === "stranger" || session === "unverified") return json([{ providerId: "github", accountId: "1" }]);
+      if (session === "broken") return new Response(null, { status: 500 });
       return Response.json({ message: "Unauthorized" }, { status: 401 });
     case "POST /api/auth/sign-out":
       if (!csrfOk()) return new Response(null, { status: 403 });
@@ -248,6 +251,43 @@ describe("the cloud service", () => {
       expect((await app.request(`${ORIGIN}${path}`, { method, headers: { origin: ORIGIN, cookie } })).status, path).toBe(404);
   });
 
+  it("gives every error a code, and logs what went wrong under it", async () => {
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const lineOf = (id: string) => logged.mock.calls.find(([first]) => String(first).startsWith(`Error ${id}: `));
+    try {
+      const refused = await review("POST", `/batches/${FIRST}/decisions`, { body: { decision: "approved", renders: [{ story: "a", imageHash: hash }] } });
+      const { error } = (await refused.json()) as { error: { code: string; id: string } };
+      expect(error.code).toBe("not-signed-in");
+      expect(error.id).toMatch(/^[0-9A-Z]{8}$/);
+      expect(lineOf(error.id)?.[0]).toBe(`Error ${error.id}: 401 for POST /diffplug/selfie/api/batches/${FIRST}/decisions, not-signed-in: Sign in to approve or reject.`);
+
+      const broken = await app.request(`${ORIGIN}/diffplug/selfie/api/batches/${FIRST}`, { headers: { origin: ORIGIN, cookie: "__Host-pgstencil.session_token=broken" } });
+      expect(broken.status).toBe(500);
+      const internal = ((await broken.json()) as { error: { code: string; id: string } }).error;
+      expect(internal.code).toBe("internal");
+      // What went wrong stays in the log, under the code the person sees.
+      expect((lineOf(internal.id)?.[1] as Error).message).toBe("The adapter's account list answered 500");
+
+      const missing = await app.request(`${ORIGIN}/someone/else`);
+      expect(await missing.text()).toMatch(/^No such project\.\nError code: [0-9A-Z]{8}$/);
+
+      for (const how of ["refused", "crash"]) {
+        const back = await app.request(`${ORIGIN}/api/auth/callback/github?code=${how}&state=s`);
+        expect(back.status).toBe(303);
+        const id = /^\/sign-in\?failed=([0-9A-Z]{8})$/.exec(back.headers.get("location") ?? "")?.[1];
+        expect(lineOf(id!)?.[0]).toMatch(how === "refused" ? /answered 302, to \/sign-in\?failed=1&error=state_mismatch$/ : /answered 500, GitHub identity request failed$/);
+        const page = await app.request(`${ORIGIN}/sign-in?failed=${id}`);
+        expect(page.status).toBe(401);
+        expect(await page.text()).toContain(`Error code: ${id}`);
+      }
+      const forged = await (await app.request(`${ORIGIN}/sign-in?failed=%3Cb%3Ehi`)).text();
+      expect(forged).toContain("GitHub didn't sign you in.");
+      expect(forged).not.toContain("Error code");
+    } finally {
+      logged.mockRestore();
+    }
+  });
+
   it("sends a former origin and a former name to where they are now", async () => {
     const moved = await app.request(`${FORMER}/diffplug/selfie-hackathon/batches/${FIRST}?x=1`);
     expect(moved.status).toBe(308);
@@ -402,15 +442,26 @@ describe("the cloud service", () => {
         yield "The ";
         throw new Error("cut off");
       };
-      expect((await eventsOf(await ask({ story: "a", messages: question() }))).map(({ type }) => type)).toEqual(["code", "text", "failed"]);
-      answer = async function* () {
-        yield "Fine.";
-      };
-      refused = true;
-      const response = await ask({ story: "a", messages: question() });
-      expect(response.status).toBe(502);
-      expect(await response.text()).not.toContain("secret detail");
-      refused = false;
+      const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+      try {
+        const events = await eventsOf(await ask({ story: "a", messages: question() }));
+        expect(events.map(({ type }) => type)).toEqual(["code", "text", "failed"]);
+        const stopped = events.at(-1) as Extract<ChatEvent, { type: "failed" }>;
+        expect(logged).toHaveBeenCalledWith(`Error ${stopped.id}: Muse Spark stopped part way through an answer`, expect.objectContaining({ message: "cut off" }));
+        answer = async function* () {
+          yield "Fine.";
+        };
+        refused = true;
+        const response = await ask({ story: "a", messages: question() });
+        expect(response.status).toBe(502);
+        const body = await response.text();
+        expect(body).not.toContain("secret detail");
+        const { id } = (JSON.parse(body) as { error: { id: string } }).error;
+        expect(JSON.stringify(logged.mock.calls.find(([first]) => String(first).startsWith(`Error ${id}: 502 `))?.slice(1).map((cause) => (cause as Error).message))).toContain("secret detail");
+        refused = false;
+      } finally {
+        logged.mockRestore();
+      }
     });
 
     it("refuses what can't be asked, and too many questions", async () => {

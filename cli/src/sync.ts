@@ -28,10 +28,13 @@ export interface Remote {
 class RemoteError extends Error {
   override readonly name = "RemoteError";
   readonly code: string;
+  /** The code the remote logged this error under, if it did. */
+  readonly id: string | null;
 
-  constructor(code: string, message: string) {
+  constructor(code: string, message: string, id: string | null = null) {
     super(message);
     this.code = code;
+    this.id = id;
   }
 }
 
@@ -85,7 +88,7 @@ async function ask(remote: Remote, route: string, init: RequestInit = {}): Promi
       continue;
     }
     const body = (await response.json().catch(() => null)) as SyncError | null;
-    throw new RemoteError(body?.error.code ?? "remote-failed", body?.error.message ?? `${remote.url} answered ${response.status}.`);
+    throw new RemoteError(body?.error.code ?? "remote-failed", body?.error.message ?? `${remote.url} answered ${response.status}.`, body?.error.id ?? null);
   }
   throw new RemoteError("remote-failed", `${remote.url} didn't answer.`);
 }

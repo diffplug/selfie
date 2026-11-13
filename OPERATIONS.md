@@ -22,6 +22,12 @@ The app keeps its data in three places:
 
 From a laptop, the same steps are `node ui/scripts/production.mjs preflight|deploy|smoke`, with the environment the workflow sets.
 
+## Logs
+
+`selfie-app` keeps what it logs in Workers Logs (`[observability]` in `ui/wrangler.toml`), for 3 days on the Workers Free plan and 7 on Paid: in the dashboard, **Workers & Pages → selfie-app → Logs**. It doesn't keep a line for every request, only what the code logs, which is mostly errors.
+
+Every error a person sees comes with an error code, such as `Error code: 7K3MQ9XP`, and its log line starts `Error 7K3MQ9XP:`. To find it, search the logs for the code. A server error's line has the error and its stack. To watch live instead, `pnpm --dir ui exec wrangler tail selfie-app`.
+
 ## Secrets and settings
 
 GitHub environment `app-production`, limited to the `main` branch:

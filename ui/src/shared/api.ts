@@ -178,7 +178,8 @@ export interface StoriesView {
 }
 
 export interface ApiError {
-  readonly error: { readonly code: string; readonly message: string };
+  /** `id` is this one error's code, which the server logged it under. */
+  readonly error: { readonly code: string; readonly message: string; readonly id?: string };
 }
 
 export interface DecisionTarget {

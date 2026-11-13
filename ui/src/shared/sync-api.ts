@@ -15,7 +15,8 @@ export type SentBatch = Omit<RenderBatch, "id" | "status" | "finishedAt" | "fail
 export type SentDecision = Omit<PlacedDecision, "actor">;
 
 export interface SyncError {
-  readonly error: { readonly code: string; readonly message: string };
+  /** `id` is this one error's code, which the server logged it under. */
+  readonly error: { readonly code: string; readonly message: string; readonly id?: string };
 }
 
 /** The most of each a request may hold. */

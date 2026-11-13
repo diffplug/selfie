@@ -56,6 +56,8 @@ Source of truth: `ReviewSource` in `ui/src/shared/api.ts`.
 | `diffStats(current, golden)`, `diffImage(current, golden)` | Pixel stats, and a PNG, or null if the store lacks either image |
 
 - **Must throw an error with a `code` to mean a status.** `ERROR_STATUS` in `ui/src/server/app.ts` maps them, and any other error stays in the server's log, with a generic message to the page.
+- **Must give every error answer its own error code, and log the error under it**, by `errorCodes` in `ui/src/server/http.ts`: eight random characters of Crockford's base 32, as `error.id` in JSON and as a last line, `Error code: <id>`, in plain text. A 5xx's log line has the error that caused it. A code is what lets someone who saw an error find it in the log (rationale).
+- **Must show an error's code on a line of its own under its message**, `Error code: <id>`, wherever the page shows an error the server answered with. An error the page found itself, such as not reaching the server, has no code.
 
 ## Routes
 
