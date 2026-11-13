@@ -30,18 +30,26 @@ export interface BatchViews {
 export function batchViews(platform: BatchViewPlatform): BatchViews {
   const { batches, storybooks } = platform;
 
-  const keptIndexes = new Map<string, Promise<readonly StoryEntry[]>>();
-  const storiesOfKept = (hash: string) => {
-    let index = keptIndexes.get(hash);
-    if (index === undefined) {
-      index = storybooks.readFile(hash, "index.json").then(
-        (bytes) => (bytes === null ? [] : (storyEntriesIn(JSON.parse(new TextDecoder().decode(bytes))) ?? [])),
-      ).catch(() => []);
-      keptIndexes.set(hash, index);
-      for (const oldest of keptIndexes.keys()) {
-        if (keptIndexes.size <= KEPT_INDEXES_HELD) break;
-        keptIndexes.delete(oldest);
-      }
+  /**
+   * Only what's been read, never a read still under way: in a Worker, a read belongs to the request
+   * that started it, and if that request is canceled, anything else waiting on it waits forever.
+   */
+  const keptIndexes = new Map<string, readonly StoryEntry[]>();
+  const storiesOfKept = async (hash: string): Promise<readonly StoryEntry[]> => {
+    const held = keptIndexes.get(hash);
+    if (held !== undefined) return held;
+    let index: readonly StoryEntry[];
+    try {
+      const bytes = await storybooks.readFile(hash, "index.json");
+      index = bytes === null ? [] : (storyEntriesIn(JSON.parse(new TextDecoder().decode(bytes))) ?? []);
+    } catch {
+      // Nothing to show names from, and nothing kept, so the next look tries again.
+      return [];
+    }
+    keptIndexes.set(hash, index);
+    for (const oldest of keptIndexes.keys()) {
+      if (keptIndexes.size <= KEPT_INDEXES_HELD) break;
+      keptIndexes.delete(oldest);
     }
     return index;
   };

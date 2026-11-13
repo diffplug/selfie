@@ -101,13 +101,14 @@ Source of truth: `compareWithApprovals` and `RenderBatches.compareFromHistory` i
 
 ## Approved since a base
 
-Source of truth: `approvedSinceBase`, `RenderBatches.approvedSinceReached`, `baseAmong`, and `approvedSinceFromHistory` in `store/src/core/render-batches.ts`; `approvedSinceOf` in `cli/src/project.ts`.
+Source of truth: `approvedSinceBase`, `RenderBatches.approvedSinceReached`, `compareWithBaseReached`, `baseAmong`, and `approvedSinceFromHistory` in `store/src/core/render-batches.ts`; `approvedSinceOf` in `cli/src/project.ts`.
 
 Once it's approved, a change is what later batches compare with, so they read it as unchanged. This is how they can still show it.
 
 - **Must take a batch's base to be the newest finished batch of the default branch, in its environment, at a commit it reaches other than its own**, by when they started (rationale). A batch that reaches none has no base, and every approval it reaches counts. With no default branch to go by, there's nothing to say.
 - **Must list each story that doesn't differ now and would by the base's approvals, as those compare it**, so `goldenHash` is what it replaced, with the newest approval's `decision` and the batch it was made on as `approvedIn`. That takes in what's been added, and a removal that's been approved.
 - **Must leave out what the batch still lists**, which is for it to decide on, including what was approved on this batch, which stays there as [Approvals](#approvals) says.
+- **Must compare a batch with its base's images as `compareWithBatch` does, against the same base**, which `docs/specs/cloud.md` → Commit status uses to tell what a branch changed from what it inherited.
 - **Never take a decision on one of these.** `decide` refuses it as it does any unchanged image (`stale-decision`).
 
 ## Changed since a base
@@ -137,6 +138,7 @@ renders(batch_key → render_batches.key, story_key → stories.key, image_key �
 decisions(environment_key → environments.key, commit_key → commits.key, story_key → stories.key, image_key, rejected, decided_at, actor_key → actors.key, batch_id)  PK (environment_key, commit_key, story_key, image_key)  WITHOUT ROWID
   INDEX decisions_by_image(environment_key, story_key, image_key)
 commit_parents(commit_key → commits.key, parent_key → commits.key)  PK (commit_key, parent_key)  WITHOUT ROWID
+  INDEX commit_parents_by_parent(parent_key, commit_key)
 ```
 
 - **Must leave out the CLI's local table** (`docs/specs/cli.md` → Recording only if necessary): it's in a local `store.db`, not this schema, and D1 doesn't have it.
@@ -146,7 +148,7 @@ commit_parents(commit_key → commits.key, parent_key → commits.key)  PK (comm
 - **Must say in `render_batches.viewport_width` and `viewport_height` the window a batch's stories lay out in, in CSS pixels, and in those columns of `renders` only a story's own, if it differs**, both or neither, so a story with neither laid out in its batch's (`docs/specs/render.md` → A story's viewport). They only size a story running live, so a comparison never reads them (rationale). **A batch reusing another's images must hold the same sizes.**
 - **Must hold what repeats across a great many rows once, by an integer key, and never let a key leave the store**, as with image keys (rationale). A batch's `id`, a story's ID, a commit's SHA, an environment's ID, an actor's name, and an image's hash are what leave it. **Must give a name its key in the same request, before the first row that uses it.**
 - **May list a batch's pages in any order**, and `next` only says where the next one starts. A comparison lists stories by name.
-- **Never scan a table:** every statement reaches its rows through one of these keys. `store/test/render-batches.test.ts` checks SQLite's query plan for everything a review sends.
+- **Never scan a table:** every statement reaches its rows through one of these keys, and none through an index SQLite builds for itself, which reads the whole table. `store/test/render-batches.test.ts` checks SQLite's query plan for everything a review sends. `commit_parents_by_parent` is what walks from a commit to those whose history holds it (`docs/specs/cloud.md` → Commit status).
 
 ## Requests
 

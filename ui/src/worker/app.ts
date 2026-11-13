@@ -2,7 +2,7 @@
 // whoever looks, and kept built Storybooks on an origin of their own. See docs/specs/cloud.md.
 import { Hono, type Context } from "hono";
 import { html } from "hono/html";
-import { Blobs, BuiltStorybooks, initStoreSchema, ReceivingStore, RenderBatches, Sql, StoredDiffs, type Comparison } from "selfie-store";
+import { Blobs, BuiltStorybooks, initStoreSchema, ReceivingStore, RenderBatches, Sql, StoredDiffs, type Comparison, type RenderBatch } from "selfie-store";
 import { D1BindingAdapter, type D1DatabaseLike } from "selfie-store/adapters/d1-binding";
 import { R2BlobStorage, type R2BucketLike } from "selfie-store/adapters/r2";
 import { createReviewApi, pageHeaders, sameOrigin, sameOriginWrites } from "../server/app.ts";
@@ -10,7 +10,7 @@ import { hostedReviewSource, hostedViews, type HostedProject } from "../server/h
 import { afterResponse, errorCodes } from "../server/http.ts";
 import { keptStorybookRoutes, storybookHeaders } from "../server/storybook.ts";
 import { createSyncApi, type SyncAccess, type SyncProject } from "../server/sync.ts";
-import { commitStatusOf } from "../shared/commit-status.ts";
+import { commitStatusOf, type SinceBase } from "../shared/commit-status.ts";
 import { sameSecret, WRITER } from "./auth.ts";
 import type { GitHub } from "./github.ts";
 import { localPath, type Login } from "./login.ts";
@@ -60,6 +60,9 @@ const signInPage = (next: string, failed: boolean, code: string | null) => html`
     </body>
   </html>`;
 
+/** How many later commits a decision says the status of again, besides its own. See docs/specs/cloud.md -> Commit status. */
+const MAX_STATUSES_REACHING = 50;
+
 /** Its one form posts here, and is answered with a redirect to GitHub, which `form-action` also governs. */
 const SIGN_IN_POLICY = "default-src 'none'; style-src 'unsafe-inline'; form-action 'self' https://github.com; frame-ancestors 'none'; base-uri 'none'";
 
@@ -81,18 +84,18 @@ export function createCloudApp(config: CloudConfig): Hono {
       defaultBranch: project.defaultBranch,
       storybookBase: `${storybookOrigin}/${project.id}`,
     };
-    let schema: Promise<void> | null = null;
+    // Whether it's done, and never the setting up itself, since a request waiting on another's would
+    // wait forever if that one were canceled. Two first requests may both set it up, which is harmless.
+    let schemaReady = false;
     return {
       project,
       hosted,
       views: hostedViews(hosted),
-      /** Sets up its database once, or tries again next time if that failed. */
-      ready: () => {
-        schema ??= initStoreSchema(sql).catch((error: unknown) => {
-          schema = null;
-          throw error;
-        });
-        return schema;
+      /** Sets up its database until that's worked once. */
+      ready: async () => {
+        if (schemaReady) return;
+        await initStoreSchema(sql);
+        schemaReady = true;
       },
     };
   };
@@ -102,16 +105,41 @@ export function createCloudApp(config: CloudConfig): Hono {
   const byName = (owner: string | undefined, name: string | undefined) =>
     opened.find(({ project }) => project.owner === owner && (project.name === name || project.formerNames?.includes(name ?? "") === true));
 
+  /** How a batch compares with its base, unless its commit has a batch of the default branch, which is then its own base. */
+  const sinceBase = async (batches: RenderBatches, batch: RenderBatch, atCommit: readonly RenderBatch[], defaultBranch: string): Promise<SinceBase | undefined> => {
+    if (atCommit.some(({ branch }) => branch === defaultBranch)) return undefined;
+    const found = await batches.compareWithBaseReached(batch.id, defaultBranch);
+    return found === null ? undefined : { branch: defaultBranch, comparison: found.comparison };
+  };
+
   /** Says what a commit reads as where people look. A person's decision stands whether or not GitHub hears of it. */
   const publish = async ({ project, hosted: { batches } }: Opened, gitSha: string, environment: string, known?: Comparison) => {
     try {
-      const newest = (await batches.batchesAt(gitSha, environment)).find(({ status }) => status !== "recording");
+      const atCommit = await batches.batchesAt(gitSha, environment);
+      const newest = atCommit.find(({ status }) => status !== "recording");
       if (newest === undefined) return;
-      const comparison = known?.batch.id === newest.id ? known : await batches.compareReached(newest.id);
-      await github.postStatus(project, gitSha, commitStatusOf(comparison), `${reviewOrigin}/${project.owner}/${project.name}/batches/${newest.id}`);
+      const [comparison, base] = await Promise.all([
+        known?.batch.id === newest.id ? known : batches.compareReached(newest.id),
+        sinceBase(batches, newest, atCommit, project.defaultBranch),
+      ]);
+      await github.postStatus(project, gitSha, commitStatusOf(comparison, base), `${reviewOrigin}/${project.owner}/${project.name}/batches/${newest.id}`);
     } catch (error) {
       console.error(error);
     }
+  };
+
+  /**
+   * After a decision, says again what its commit reads as, then each later commit with a batch here whose history
+   * reaches it, newest first, since what they're compared with may have changed too. Up to a bound, after answering.
+   */
+  const publishDecided = async (found: Opened, comparison: Comparison) => {
+    const { gitSha, environment } = comparison.batch;
+    await publish(found, gitSha, environment, comparison);
+    const reaching = await found.hosted.batches.batchesReaching(gitSha, environment, MAX_STATUSES_REACHING).catch((error: unknown) => {
+      console.error(error);
+      return [];
+    });
+    for (const later of reaching) await publish(found, later.gitSha, environment);
   };
 
   const accessOf = async (token: string | null): Promise<SyncAccess> => {
@@ -215,7 +243,7 @@ export function createCloudApp(config: CloudConfig): Hono {
       const found = await readyProject(context);
       return hostedReviewSource(found.hosted, found.views, {
         actor: await login.writerOf(context.req.raw),
-        decided: (comparison) => afterResponse(context, publish(found, comparison.batch.gitSha, comparison.batch.environment, comparison)),
+        decided: (comparison) => afterResponse(context, publishDecided(found, comparison)),
       });
     }),
   );
