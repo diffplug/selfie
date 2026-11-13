@@ -21,9 +21,10 @@ export const storybookHeaders = (reviewOrigins: () => readonly string[]): Middle
     strictTransportSecurity: false,
   });
 
+/** A kept built Storybook's file, gzipped, as `BuiltStorybooks.readGzippedFile` gives it. */
 export type StorybookFileReader = (build: string, file: string, context: Context) => Promise<Uint8Array | null>;
 
-/** Every kept built Storybook's files, which never change, so a browser may hold on to them. */
+/** Every kept built Storybook's files, which never change, so a browser may hold on to them. Sent gzipped, as they're kept. */
 export function keptStorybookRoutes(readStorybookFile: StorybookFileReader): Hono {
   const app = new Hono();
   app.get(`${keptStorybookPath(":build")}*`, async (context) => {
@@ -33,9 +34,11 @@ export function keptStorybookRoutes(readStorybookFile: StorybookFileReader): Hon
     const file = tryDecodeURIComponent(context.req.path.slice(context.req.path.indexOf(kept) + kept.length)) || "index.html";
     const bytes = await readStorybookFile(build, file, context);
     if (bytes === null) return context.text("That isn't a file of a kept built Storybook.", 404);
-    return context.body(bytes as Uint8Array<ArrayBuffer>, 200, {
-      "Content-Type": getMimeType(file) ?? "application/octet-stream",
-      "Cache-Control": CONTENT_ADDRESSED,
+    // Whatever the request accepts, since every browser takes gzip. `encodeBody` has a Worker send the bytes as they are.
+    const init = { status: 200, encodeBody: "manual" } as ResponseInit;
+    return new Response(bytes as Uint8Array<ArrayBuffer>, {
+      ...init,
+      headers: { "Content-Type": getMimeType(file) ?? "application/octet-stream", "Content-Encoding": "gzip", "Cache-Control": CONTENT_ADDRESSED },
     });
   });
   return app;

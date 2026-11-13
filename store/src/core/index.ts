@@ -53,6 +53,7 @@ export {
   type SqlValue,
 } from "./sql.ts";
 export { BuiltStorybooks, type BuiltStorybookFile } from "./built-storybooks.ts";
+export { gunzip, gzip } from "./gzip.ts";
 export { filterStories, storyEntriesIn, type StoryEntry } from "./stories.ts";
 export { exactRows, staleDecisionMessage, summarizeBatch, type Attention, type BatchSummary, type BlockerReason, type ExactTarget } from "./summary.ts";
 export { StoredDiffs } from "./stored-diffs.ts";

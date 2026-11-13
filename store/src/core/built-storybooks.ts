@@ -1,7 +1,8 @@
 // Every batch's Storybook, kept so its stories can still be opened long after the directory has been
-// rebuilt. Files are kept by their hash, as images are, so built Storybooks that share files share bytes.
-// See docs/specs/store.md -> built Storybooks.
+// rebuilt. Files are kept gzipped, by the hash of their bytes as built, so built Storybooks that share files share
+// bytes, and a file goes from upload to a browser as it's kept. See docs/specs/store.md -> Built Storybooks.
 import type { Blobs } from "./blob.ts";
+import { gunzip, gzip } from "./gzip.ts";
 import { insertHashKeyStatement } from "./hash-keys.ts";
 import { assertImageHash, fromHex, isImageHash, sha256, toHex, truncateHash } from "./image-hash.ts";
 import type { Sql } from "./sql.ts";
@@ -21,10 +22,10 @@ type StorybookManifest = Readonly<Record<string, string>>;
 // A page load reads a built Storybook's manifest once per file, and a person looks at a few builds at a time.
 const MANIFESTS_HELD = 8;
 
-const fileBlobKey = (fileHash: string) => `built-storybook-files/${fileHash}`;
+const fileBlobKey = (fileHash: string) => `built-storybook-files-gzip/${fileHash}`;
 const manifestBlobKey = (build: string) => `built-storybooks/${build}`;
 
-/** One file of a built Storybook: where it is in the built Storybook, and what `putFile` said its bytes are. */
+/** One file of a built Storybook: where it is in the built Storybook, and what `putFile` said its bytes are, as built. */
 export interface BuiltStorybookFile {
   readonly path: string;
   readonly fileHash: string;
@@ -47,12 +48,22 @@ export class BuiltStorybooks {
     return rows.length > 0;
   }
 
-  /** Keeps a file's bytes, if they aren't here already, and says what to call them. */
+  /** Keeps a file, gzipped, if it isn't here already, and says what to call it: the hash of its bytes as built. */
   async putFile(bytes: Uint8Array): Promise<string> {
     const fileHash = toHex(await sha256(bytes as Uint8Array<ArrayBuffer>));
     const key = fileBlobKey(fileHash);
-    if (!(await this.#blob.has(key))) await this.#blob.put(key, bytes);
+    if (!(await this.#blob.has(key))) await this.#blob.put(key, await gzip(bytes));
     return fileHash;
+  }
+
+  /**
+   * Keeps a file already gzipped, as it came, under the hash of its bytes decompressed. Only for a caller that has
+   * checked that's what they hash to, since this store can't without holding them whole: see `docs/specs/sync.md`.
+   */
+  async putGzippedFile(fileHash: string, gzipped: Uint8Array): Promise<void> {
+    assertImageHash(fileHash);
+    const key = fileBlobKey(fileHash);
+    if (!(await this.#blob.has(key))) await this.#blob.put(key, gzipped);
   }
 
   /** Those of these file hashes whose bytes aren't here, for a sender deciding what to upload. */
@@ -83,14 +94,20 @@ export class BuiltStorybooks {
   }
 
   /**
-   * A file of a kept built Storybook, or null if there's no such build or file. A path is only ever looked up
-   * whole, and never reaches a file system, so nothing in one can climb out of the built Storybook.
+   * A file of a kept built Storybook, gzipped, as it's kept, or null if there's no such build or file. A path is only
+   * ever looked up whole, and never reaches a file system, so nothing in one can climb out of the built Storybook.
    */
-  async readFile(build: string, path: string): Promise<Uint8Array | null> {
+  async readGzippedFile(build: string, path: string): Promise<Uint8Array | null> {
     if (!isImageHash(build)) return null;
     const manifest = await this.#manifest(build);
     const fileHash = manifest !== null && Object.hasOwn(manifest, path) ? manifest[path]! : null;
     return fileHash === null ? null : this.#blob.get(fileBlobKey(fileHash));
+  }
+
+  /** As `readGzippedFile`, decompressed, for a caller that reads what's in it. */
+  async readFile(build: string, path: string): Promise<Uint8Array | null> {
+    const gzipped = await this.readGzippedFile(build, path);
+    return gzipped === null ? null : gunzip(gzipped);
   }
 
   async #manifest(build: string): Promise<StorybookManifest | null> {

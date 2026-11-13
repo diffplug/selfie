@@ -336,13 +336,25 @@ describe("the cloud service", () => {
     const build = "d".repeat(64);
     expect(((await (await api("POST", "/storybooks/files/missing", UPLOAD, { hashes: [fileHash] })).json()) as { missing: string[] }).missing).toEqual([fileHash]);
     expect((await api("PUT", `/storybooks/${build}`, UPLOAD, { files: [{ path: "index.html", fileHash }] })).status).toBe(409);
-    expect((await api("PUT", `/storybooks/files/${"e".repeat(64)}`, UPLOAD, file)).status).toBe(400);
-    expect((await api("PUT", `/storybooks/files/${fileHash}`, UPLOAD, file)).status).toBe(200);
+    const gzipped = new Uint8Array(await new Response(new Blob([file]).stream().pipeThrough(new CompressionStream("gzip"))).arrayBuffer());
+    const putFile = (hash: string, body: Uint8Array, encoding: string | null = "gzip") =>
+      app.request(`${ORIGIN}/api/projects/42/storybooks/files/${hash}`, {
+        method: "PUT",
+        headers: { authorization: `Bearer ${UPLOAD}`, ...(encoding === null ? {} : { "content-encoding": encoding }) },
+        body: body as Uint8Array<ArrayBuffer>,
+      });
+    // Only gzipped, only gzip, and only bytes that hash to its name once decompressed.
+    expect((await putFile(fileHash, file, null)).status).toBe(400);
+    expect((await putFile(fileHash, file)).status).toBe(400);
+    expect((await putFile("e".repeat(64), gzipped)).status).toBe(400);
+    expect((await putFile(fileHash, gzipped)).status).toBe(200);
     expect((await api("PUT", `/storybooks/${build}`, UPLOAD, { files: [{ path: "index.html", fileHash }] })).status).toBe(200);
     expect((await api("POST", `/batches/${FIRST}/storybook`, UPLOAD, { build })).status).toBe(200);
 
+    // As it was sent, whatever the request accepts.
     const served = await app.request(`${STORYBOOKS}/42/built-storybooks/${build}/`);
-    expect(await served.text()).toBe("<html>story</html>");
+    expect(served.headers.get("content-encoding")).toBe("gzip");
+    expect(new Uint8Array(await served.arrayBuffer())).toEqual(gzipped);
     expect(served.headers.get("content-security-policy")).toContain(`frame-ancestors 'self' ${ORIGIN}`);
     expect((await app.request(`${STORYBOOKS}/42/api/projects/42`)).status).toBe(404);
     expect((await app.request(`${STORYBOOKS}/api/projects/42`)).status).toBe(404);

@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { Blobs, initStoreSchema, BuiltStorybooks, RenderBatches, truncateHash, type BlobStorage } from "../src/core/index.ts";
+import { Blobs, initStoreSchema, BuiltStorybooks, RenderBatches, gunzip, gzip, truncateHash, type BlobStorage } from "../src/core/index.ts";
 import { fromHex } from "../src/core/image-hash.ts";
 import { createTempStore } from "./support/temp-store.ts";
 
 const BUILD = "a".repeat(64);
 const OTHER = "b".repeat(64);
 const text = (value: string) => new TextEncoder().encode(value);
+const sha256Hex = async (bytes: Uint8Array) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes as Uint8Array<ArrayBuffer>))].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 
 describe("BuiltStorybooks", () => {
   let temp: Awaited<ReturnType<typeof createTempStore>>;
@@ -37,6 +38,25 @@ describe("BuiltStorybooks", () => {
     expect(await builds.readFile(BUILD, "assets/a.js")).toEqual(text("script"));
     expect(await builds.readFile(BUILD, "assets/b.js")).toBeNull();
     expect(await builds.readFile(OTHER, "assets/a.js")).toBeNull();
+  });
+
+  it("keeps a file gzipped, under the hash of its bytes as built", async () => {
+    const fileHash = await builds.putFile(text("script"));
+    expect(fileHash).toBe(await sha256Hex(text("script")));
+    await builds.putStorybook(BUILD, [{ path: "a.js", fileHash }]);
+    const gzipped = await builds.readGzippedFile(BUILD, "a.js");
+    expect(await gunzip(gzipped!)).toEqual(text("script"));
+    expect(await temp.blob.get(`built-storybook-files-gzip/${fileHash}`)).toEqual(gzipped);
+  });
+
+  it("keeps a file sent gzipped as it came", async () => {
+    const sent = await gzip(text("sent"));
+    const fileHash = await sha256Hex(text("sent"));
+    await builds.putGzippedFile(fileHash, sent);
+    expect(await builds.missingFiles([fileHash])).toEqual([]);
+    await builds.putStorybook(BUILD, [{ path: "sent.js", fileHash }]);
+    expect(await builds.readGzippedFile(BUILD, "sent.js")).toEqual(sent);
+    expect(await builds.readFile(BUILD, "sent.js")).toEqual(text("sent"));
   });
 
   it("holds one copy of a file two builds share, and keeps their paths apart", async () => {

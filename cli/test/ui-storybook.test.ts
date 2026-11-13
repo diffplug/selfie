@@ -3,6 +3,7 @@ import { mkdir, rm, utimes, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { RenderProgress, ReviewSource } from "selfie-ui/app";
 import { createLocalApp, createStorybookApp, serveLocal, serveStorybook } from "selfie-ui/local";
+import { gunzip } from "selfie-store";
 import { beforeEach, describe, expect, test } from "vitest";
 import { openProject } from "../src/project.ts";
 import { renderBatch } from "../src/review.ts";
@@ -23,7 +24,7 @@ describe("the hosted Storybook", () => {
     await writeFile(path.join(dir, "assets", "story.js"), "export {};");
   };
 
-  const storybook = () => createStorybookApp({ dir, port: () => STORYBOOK_PORT, readStorybookFile: (build, file) => project.storybooks.readFile(build, file), reviewOrigins: () => [ORIGIN] });
+  const storybook = () => createStorybookApp({ dir, port: () => STORYBOOK_PORT, readStorybookFile: (build, file) => project.storybooks.readGzippedFile(build, file), reviewOrigins: () => [ORIGIN] });
   const read = (url: string, host = `127.0.0.1:${STORYBOOK_PORT}`) => storybook().request(url, { headers: { host } });
 
   beforeEach(() => {
@@ -108,13 +109,28 @@ describe("the hosted Storybook", () => {
     test("serves its files, and a browser may keep them", async () => {
       await kept();
       const page = await read(`/built-storybooks/${hash}/`);
-      expect(await page.text()).toContain("kept");
+      // Gzipped as it's kept, whatever the request accepts.
+      expect(page.headers.get("content-encoding")).toBe("gzip");
+      expect(new TextDecoder().decode(await gunzip(new Uint8Array(await page.arrayBuffer())))).toContain("kept");
       expect(page.headers.get("content-type")).toContain("text/html");
       expect(page.headers.get("cache-control")).toContain("immutable");
       expect(page.headers.get("content-security-policy")).toBe(`frame-ancestors 'self' ${ORIGIN}`);
       const script = await read(`/built-storybooks/${hash}/assets/a%20b.js`);
-      expect(await script.text()).toBe("export {};");
+      expect(new TextDecoder().decode(await gunzip(new Uint8Array(await script.arrayBuffer())))).toBe("export {};");
       expect(script.headers.get("content-type")).toContain("javascript");
+    });
+
+    test("serves its files over HTTP as a browser reads them", async () => {
+      await kept();
+      const hosted = await serveStorybook({ dir, readStorybookFile: (build, file) => project.storybooks.readGzippedFile(build, file), reviewOrigins: () => [ORIGIN] });
+      try {
+        // `fetch` decompresses as a browser does, so this is the bytes as built, arrived whole.
+        const script = await fetch(`${hosted.url}built-storybooks/${hash}/assets/a%20b.js`);
+        expect(script.headers.get("content-encoding")).toBe("gzip");
+        expect(await script.text()).toBe("export {};");
+      } finally {
+        await hosted.close();
+      }
     });
 
     test.each(["/built-storybooks/nope/", `/built-storybooks/${"b".repeat(64)}/`, `/built-storybooks/${hash}/missing.js`, `/built-storybooks/${hash}/..%2f..%2fsecret.txt`, `/built-storybooks/${hash}/%ff`])(
@@ -519,7 +535,8 @@ describe("the hosted Storybook", () => {
       expect(link).toMatchObject({ exactStorybook: true, url: expect.stringContaining(`${hostedAt}built-storybooks/`) });
       await writeFile(path.join(dir, "index.html"), "<!doctype html><title>the next build</title>");
       expect(await linkOf(batchId)).toEqual(link);
-      expect(await (await read(new URL(link!.url).pathname)).text()).toContain("the manager");
+      const kept = await read(new URL(link!.url).pathname);
+      expect(new TextDecoder().decode(await gunzip(new Uint8Array(await kept.arrayBuffer())))).toContain("the manager");
       expect(await (await read("/")).text()).toContain("the next build");
     });
 

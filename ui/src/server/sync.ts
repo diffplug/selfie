@@ -6,6 +6,7 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { assertViewport, decisionsThatCount, ImageDecodeError, isGitSha, isImageHash, isBatchId, BatchError, type PlacedDecision, type ReceivedBatch, type BuiltStorybooks, type StoredDiffs, type ReceivingStore, type RecordedRender, type RenderBatches, type StoryFilter, type Viewport } from "selfie-store";
 import { SYNC_LIMITS, type ProjectAccess } from "../shared/sync-api.ts";
 import { afterResponse, failure, imageResponse, INTERNAL_ERROR, noStoreByDefault } from "./http.ts";
+import { sha256OfGzipped, TooLargeError } from "./gzipped-hash.ts";
 
 /** What a token may do in a project. */
 export interface SyncAccess {
@@ -293,9 +294,18 @@ export function createSyncApi(host: SyncHost): Hono {
   api.put("/projects/:project/storybooks/files/:hash", async (context) => {
     const { storybooks } = await uploadable(context);
     const hash = readHash(context.req.param("hash"));
+    if (context.req.header("content-encoding")?.trim().toLowerCase() !== "gzip") throw badRequest("A built Storybook's file is sent gzipped, with Content-Encoding: gzip.");
     // Whatever a built Storybook is, a file's name is its bytes' hash, so one file can't stand in for another.
-    const kept = await storybooks.putFile(await readLimited(context));
+    const gzipped = await readLimited(context);
+    let kept: string;
+    try {
+      kept = await sha256OfGzipped(gzipped, maxImageBytes);
+    } catch (error) {
+      if (error instanceof TooLargeError) throw new Refusal(413, "file-too-large", `This server takes files of at most ${maxImageBytes} bytes, decompressed.`);
+      throw error;
+    }
     if (kept !== hash) throw badRequest(`Those bytes hash to ${kept}, not ${hash}.`);
+    await storybooks.putGzippedFile(hash, gzipped);
     return context.json({ hash });
   });
 
