@@ -25,3 +25,5 @@
 **A status and not a check run.** A status is one call, with a yellow state that means what's meant here. `action_required` on a check run isn't yellow, and a run left `in_progress` goes stale.
 
 **Rejected is red.** Someone looked and said no, so the next thing that happens is a code change, which is what red means for a failure too.
+
+**What a branch inherited.** A branch's batch is compared with what its history approved, so whatever its base on the default branch still waits for shows on every branch cut from it. Pull requests #70, #71 and #72 each read "21 changed, 11 added, waiting for approval", and each changed none of those 32 images from its base: all were the default branch's own, never approved. Read alone, that can't be told from a branch that changed 32 stories. Telling the two apart needs only the base's images, so it costs one request, and it changes only the words: an inherited change still waits for someone, wherever it's approved. A commit with a batch of the default branch is that branch, which inherits nothing from itself.

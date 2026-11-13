@@ -679,6 +679,7 @@ describe("RenderBatches", () => {
       await model.compareWithBatch(head.id, baseline.id);
       await model.compareWithBatch(head.id, baseline.id, { includeUnchanged: true });
       await model.compareFromHistory(head.id, await model.decisionsAt(ENV, [SHA_A, SHA_B]));
+      await model.compareWithBaseReached(head.id, "main");
       await model.commitsOfBranch("topic", ENV, 0, Number.MAX_SAFE_INTEGER);
       const clean = await recordBatch(SHA_C, [rendered("a", 3)], ENV, model);
       await model.batchesAt(SHA_A, ENV);
@@ -702,9 +703,9 @@ describe("RenderBatches", () => {
           const plan = db.prepare(`EXPLAIN QUERY PLAN ${text}`).all(...params);
           return plan
             .map(({ detail }) => String(detail))
-            // Reading a statement's own VALUES or JSON list, or a one-row aggregate, is no table scan.
+            // Reading a statement's own VALUES or JSON list, a one-row aggregate, or the commits a walk has reached, is no table scan.
             // The primary key by environment alone is every decision there, which the plan doesn't call a scan.
-            .filter((detail) => (/\bSCAN\b/.test(detail) && !/\bSCAN (v|c|j|json_each|\d+ CONSTANT ROWS?|CONSTANT ROW)\b/.test(detail)) || /USING PRIMARY KEY \(environment_key=\?\)/.test(detail))
+            .filter((detail) => (/\bSCAN\b/.test(detail) && !/\bSCAN (v|c|j|json_each|reach|\d+ CONSTANT ROWS?|CONSTANT ROW)\b/.test(detail)) || /USING PRIMARY KEY \(environment_key=\?\)/.test(detail))
             .map((detail) => `${detail} in ${text}`);
         });
         expect(seen.size).toBeGreaterThan(10);

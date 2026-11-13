@@ -50,16 +50,18 @@ Source of truth: `ui/src/server/hosted.ts`, `RenderBatches.compareReached` and `
 
 ## Commit status
 
-Source of truth: `commitStatusOf` in `ui/src/shared/commit-status.ts`, `publish` in `ui/src/worker/app.ts`, `.github/actions/selfie/action.yml`.
+Source of truth: `commitStatusOf` in `ui/src/shared/commit-status.ts`, `publish` in `ui/src/worker/app.ts`, `RenderBatches.compareWithBaseReached` in `store/src/core/render-batches.ts`, `.github/actions/selfie/action.yml`.
 
-| State | When |
-|---|---|
-| `failure`, red | A story failed, or a person rejected a change, so someone has to change the code |
-| `pending`, yellow | Something is changed, added, or removed with no decision, so a writer has to look |
-| `success`, green | Every story matches what its history approved |
+| State | When | Says, for example |
+|---|---|---|
+| `failure`, red | A story failed, or a person rejected a change, so someone has to change the code | "1 story failed, 1 change rejected" |
+| `pending`, yellow | Something is changed, added, or removed with no decision, so a writer has to look | "21 changed, 11 added, waiting for approval"; on a branch, "Changes nothing from main; 32 inherited changes wait for approval" or "3 changed by this branch, and 29 inherited from main, waiting for approval" |
+| `success`, green | Every story matches what its history approved | "145 stories match what's approved" |
 
 - **Must post one status per commit, in the context `selfie`, linking to its batch's page.**
 - **Must post it from the newest finished batch at that commit, at the end of a push and on every decision made here, after answering**, so nobody waits on GitHub to see their decision.
+- **Must tell apart, in a yellow status, what a commit's branch changed from what it inherited**, unless the commit has a batch of the default branch or its batch has no base (`docs/specs/renders.md` → Approved since a base), when it counts each state alone (rationale). A story waiting for approval is inherited when the base has the very same image, or, for a removal, lacks it too, and the branch's own otherwise. The state and what blocks never depend on it.
+- **Must keep a description within GitHub's 140 characters**, naming the default branch as "the default branch" if its own name would go past them.
 - **Must keep a decision if GitHub can't take its status**, and log why. The next decision or push says it again.
 - **Must leave a repository's own tools alone in that action**, installing Selfie's dependencies with its own pnpm, since a repository may pin another for its build.
 - **Must render on every pushed branch, through `.github/actions/selfie` on an arm64 runner, with all of a commit's history**, so what's pinned matches (`docs/specs/render.md`) and what it reaches is known. A failed story is a result the status says, and only a push that fails fails the job.

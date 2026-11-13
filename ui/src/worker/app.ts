@@ -2,7 +2,7 @@
 // whoever looks, and kept built Storybooks on an origin of their own. See docs/specs/cloud.md.
 import { Hono, type Context } from "hono";
 import { html } from "hono/html";
-import { Blobs, BuiltStorybooks, initStoreSchema, ReceivingStore, RenderBatches, Sql, StoredDiffs, type Comparison } from "selfie-store";
+import { Blobs, BuiltStorybooks, initStoreSchema, ReceivingStore, RenderBatches, Sql, StoredDiffs, type Comparison, type RenderBatch } from "selfie-store";
 import { D1BindingAdapter, type D1DatabaseLike } from "selfie-store/adapters/d1-binding";
 import { R2BlobStorage, type R2BucketLike } from "selfie-store/adapters/r2";
 import { createReviewApi, pageHeaders, sameOrigin, sameOriginWrites } from "../server/app.ts";
@@ -10,7 +10,7 @@ import { hostedReviewSource, hostedViews, type HostedProject } from "../server/h
 import { afterResponse, errorCodes } from "../server/http.ts";
 import { keptStorybookRoutes, storybookHeaders } from "../server/storybook.ts";
 import { createSyncApi, type SyncAccess, type SyncProject } from "../server/sync.ts";
-import { commitStatusOf } from "../shared/commit-status.ts";
+import { commitStatusOf, type SinceBase } from "../shared/commit-status.ts";
 import { sameSecret, WRITER } from "./auth.ts";
 import type { GitHub } from "./github.ts";
 import { localPath, type Login } from "./login.ts";
@@ -102,13 +102,24 @@ export function createCloudApp(config: CloudConfig): Hono {
   const byName = (owner: string | undefined, name: string | undefined) =>
     opened.find(({ project }) => project.owner === owner && (project.name === name || project.formerNames?.includes(name ?? "") === true));
 
+  /** How a batch compares with its base, unless its commit has a batch of the default branch, which is then its own base. */
+  const sinceBase = async (batches: RenderBatches, batch: RenderBatch, atCommit: readonly RenderBatch[], defaultBranch: string): Promise<SinceBase | undefined> => {
+    if (atCommit.some(({ branch }) => branch === defaultBranch)) return undefined;
+    const found = await batches.compareWithBaseReached(batch.id, defaultBranch);
+    return found === null ? undefined : { branch: defaultBranch, comparison: found.comparison };
+  };
+
   /** Says what a commit reads as where people look. A person's decision stands whether or not GitHub hears of it. */
   const publish = async ({ project, hosted: { batches } }: Opened, gitSha: string, environment: string, known?: Comparison) => {
     try {
-      const newest = (await batches.batchesAt(gitSha, environment)).find(({ status }) => status !== "recording");
+      const atCommit = await batches.batchesAt(gitSha, environment);
+      const newest = atCommit.find(({ status }) => status !== "recording");
       if (newest === undefined) return;
-      const comparison = known?.batch.id === newest.id ? known : await batches.compareReached(newest.id);
-      await github.postStatus(project, gitSha, commitStatusOf(comparison), `${reviewOrigin}/${project.owner}/${project.name}/batches/${newest.id}`);
+      const [comparison, base] = await Promise.all([
+        known?.batch.id === newest.id ? known : batches.compareReached(newest.id),
+        sinceBase(batches, newest, atCommit, project.defaultBranch),
+      ]);
+      await github.postStatus(project, gitSha, commitStatusOf(comparison, base), `${reviewOrigin}/${project.owner}/${project.name}/batches/${newest.id}`);
     } catch (error) {
       console.error(error);
     }
