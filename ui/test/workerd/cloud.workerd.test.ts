@@ -86,12 +86,16 @@ const review = (method: string, route: string, { body, signedIn = false }: { bod
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
 
-const facts = (gitSha: string) => ({ gitSha, environment: ENV, startedAt: 500, dirty: false, storyFilter: null, reusedFromBatch: null, scale: 1, viewport: { width: 1200, height: 900 }, branch: "main" });
+const facts = (gitSha: string, branch = "main") => ({ gitSha, environment: ENV, startedAt: 500, dirty: false, storyFilter: null, reusedFromBatch: null, scale: 1, viewport: { width: 1200, height: 900 }, branch });
 
-async function pushBatch(id: string, sha: string, story = "a") {
-  expect((await api("PUT", `/batches/${id}`, UPLOAD, facts(sha))).status).toBe(200);
-  expect((await api("POST", `/batches/${id}/renders`, UPLOAD, { renders: [{ story, imageHash: hash }] })).status).toBe(200);
-  expect((await api("POST", `/batches/${id}/finish`, UPLOAD, { count: 1, finishedAt: 600 })).status).toBe(200);
+/** A push from CI: a batch of these stories' images on a branch, the writer's decisions synced, and then its status. */
+async function pushBatch(id: string, sha: string, { images = { a: hash } as Record<string, string>, branch = "main", approve = [] as string[] } = {}) {
+  const renders = Object.entries(images).map(([story, imageHash]) => ({ story, imageHash }));
+  expect((await api("PUT", `/batches/${id}`, UPLOAD, facts(sha, branch))).status).toBe(200);
+  expect((await api("POST", `/batches/${id}/renders`, UPLOAD, { renders })).status).toBe(200);
+  expect((await api("POST", `/batches/${id}/finish`, UPLOAD, { count: renders.length, finishedAt: 600 })).status).toBe(200);
+  const decisions = approve.map((story) => ({ story, imageHash: images[story], decision: "approved", at: 900, gitSha: sha, batchId: id }));
+  if (decisions.length > 0) expect((await api("POST", "/decisions", WRITER_TOKEN, { environment: ENV, decisions })).status).toBe(200);
   expect((await api("POST", `/batches/${id}/status`, UPLOAD, {})).status).toBe(200);
 }
 
@@ -283,12 +287,31 @@ describe("the cloud service", () => {
     expect(statuses.slice(posted).map(({ sha }) => sha)).toEqual([NEXT_SHA]);
   });
 
+  it("tells what a branch changed from what it inherited from the default branch", async () => {
+    const [MAIN_SHA, SAME_SHA, OWN_SHA] = ["1".repeat(40), "2".repeat(40), "3".repeat(40)];
+    const [changedOnMain, changedOnBranch] = ["7".repeat(64), "8".repeat(64)];
+    for (const image of [changedOnMain, changedOnBranch]) expect((await api("PUT", `/images/${image}`, UPLOAD, png)).status).toBe(200);
+    const commits = [{ sha: MAIN_SHA, parents: [NEXT_SHA] }, { sha: SAME_SHA, parents: [MAIN_SHA] }, { sha: OWN_SHA, parents: [SAME_SHA] }];
+    expect((await api("POST", "/commits", UPLOAD, { commits })).status).toBe(200);
+    const statusOf = (sha: string) => statuses.findLast((posted) => posted.sha === sha)!.status;
+
+    // main approves a new story, and changes one it doesn't approve.
+    await pushBatch("33333333-3333-4333-8333-333333333333", MAIN_SHA, { images: { a: changedOnMain, b: hash }, approve: ["b"] });
+    expect(statusOf(MAIN_SHA)).toEqual({ state: "pending", description: "1 changed, waiting for approval" });
+
+    await pushBatch("44444444-4444-4444-8444-444444444444", SAME_SHA, { images: { a: changedOnMain, b: hash }, branch: "topic" });
+    expect(statusOf(SAME_SHA)).toEqual({ state: "pending", description: "Changes nothing from main; 1 inherited change waits for approval" });
+
+    await pushBatch("55555555-5555-4555-8555-555555555555", OWN_SHA, { images: { a: changedOnMain, b: changedOnBranch }, branch: "topic" });
+    expect(statusOf(OWN_SHA)).toEqual({ state: "pending", description: "1 changed by this branch, and 1 inherited from main, waiting for approval" });
+  });
+
   it("turns every later commit in a stack green when one low in it is approved", async () => {
     const [low, high] = ["e".repeat(40), "f".repeat(40)];
-    const [onLow, onHigh] = ["33333333-3333-4333-8333-333333333333", "44444444-4444-4444-8444-444444444444"];
+    const [onLow, onHigh] = ["66666666-6666-4666-8666-666666666666", "77777777-7777-4777-8777-777777777777"];
     expect((await api("POST", "/commits", UPLOAD, { commits: [{ sha: high, parents: [low] }, { sha: low, parents: [] }] })).status).toBe(200);
-    await pushBatch(onLow, low, "stacked");
-    await pushBatch(onHigh, high, "stacked");
+    await pushBatch(onLow, low, { images: { stacked: hash } });
+    await pushBatch(onHigh, high, { images: { stacked: hash } });
     const newestOf = (sha: string) => statuses.findLast((posted) => posted.sha === sha)?.status.state;
     expect([newestOf(low), newestOf(high)]).toEqual(["pending", "pending"]);
 

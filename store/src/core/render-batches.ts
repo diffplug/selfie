@@ -121,20 +121,19 @@ LEFT JOIN actors a ON a.key = d.actor_key`;
 
 const DECISION_WORD = "CASE d.rejected WHEN 1 THEN 'rejected' WHEN 0 THEN 'approved' END";
 
-/** A comparison's statements, against the finished batch named by ?2. */
-const AGAINST_BATCH = {
-  baseline: `SELECT ${NAMED_BATCH_KEY} AS batch_key`,
+/** A comparison's statements, of the batch named by ?1 against the one whose key `baselineKey` reads, with any condition `and` adds. */
+const againstBatch = (baselineKey: string, and = "") => ({
   // `gs` joins before the images so that a row left out never reads them.
   comparedPage: `SELECT rs.story_key, s.id AS story, i.hash AS image_hash, rs.failure,
   gi.hash AS golden_hash, ${DECISION_WORD} AS decision, a.name AS actor, d.decided_at
 FROM render_batches r
 CROSS JOIN renders rs ON rs.batch_key = r.key
-LEFT JOIN renders gs ON gs.batch_key = ${NAMED_BATCH_KEY} AND gs.story_key = rs.story_key
+LEFT JOIN renders gs ON gs.batch_key = ${baselineKey} AND gs.story_key = rs.story_key
 LEFT JOIN images i ON i.key = rs.image_key
 LEFT JOIN images gi ON gi.key = gs.image_key
 ${DECISION_ON_RENDER}
 LEFT JOIN stories s ON s.key = rs.story_key
-WHERE r.id = ?1 AND rs.story_key > CAST(?3 AS INTEGER)
+WHERE r.id = ?1${and} AND rs.story_key > CAST(?3 AS INTEGER)
   AND (CAST(?5 AS INTEGER) = 1 OR rs.failure IS NOT NULL
     OR rs.image_key IS NOT gs.image_key)
 ORDER BY rs.story_key
@@ -143,15 +142,21 @@ LIMIT CAST(?4 AS INTEGER)`,
 FROM renders gs
 JOIN images gi ON gi.key = gs.image_key
 JOIN stories s ON s.key = gs.story_key
-WHERE gs.batch_key = ${NAMED_BATCH_KEY} AND gs.story_key > CAST(?3 AS INTEGER)
+WHERE gs.batch_key = ${baselineKey}${and} AND gs.story_key > CAST(?3 AS INTEGER)
   AND NOT EXISTS (SELECT 1 FROM renders rs
     WHERE rs.batch_key = ${BATCH_KEY} AND rs.story_key = gs.story_key)
 ORDER BY gs.story_key
 LIMIT CAST(?4 AS INTEGER)`,
   unchangedCount: `SELECT COUNT(*) AS total
 FROM renders rs
-JOIN renders gs ON gs.batch_key = ${NAMED_BATCH_KEY} AND gs.story_key = rs.story_key
-WHERE rs.batch_key = ${BATCH_KEY} AND rs.image_key = gs.image_key AND rs.failure IS NULL`,
+JOIN renders gs ON gs.batch_key = ${baselineKey} AND gs.story_key = rs.story_key
+WHERE rs.batch_key = ${BATCH_KEY}${and} AND rs.image_key = gs.image_key AND rs.failure IS NULL`,
+});
+
+/** A comparison's statements, against the finished batch named by ?2. */
+const AGAINST_BATCH = {
+  baseline: `SELECT ${NAMED_BATCH_KEY} AS batch_key`,
+  ...againstBatch(NAMED_BATCH_KEY),
 };
 
 // Counted in the statement that marks the batch, so statements that never landed can't be
@@ -203,7 +208,7 @@ ${NAMES_OF_DECISION}`;
 const REACH_OF_BATCH = `WITH RECURSIVE reach(key) AS (
   SELECT commit_key FROM render_batches WHERE id = ?1
   UNION
-  SELECT p.parent_key FROM reach r CROSS JOIN commit_parents p ON p.commit_key = r.key
+  SELECT p.parent_key FROM reach CROSS JOIN commit_parents p ON p.commit_key = reach.key
   LIMIT ${MAX_REACHED_COMMITS}
 )`;
 
@@ -235,14 +240,36 @@ CROSS JOIN commits c ON c.key = d.commit_key
 ${NAMES_OF_DECISION}`;
 
 /** The newest finished batch of a branch among these commits, in another's environment, and never at that one's own commit. */
-const newestOfBranchWhere = (branch: string, environment: string, commit: string, commits: string) => `SELECT ${BATCH_COLUMNS} FROM render_batches
+const newestOfBranchWhere = (branch: string, environment: string, commit: string, commits: string, columns = BATCH_COLUMNS) => `SELECT ${columns} FROM render_batches
 WHERE branch = ${branch} AND finished_at IS NOT NULL AND environment_key = ${environment} AND commit_key != ${commit} AND commit_key IN (${commits})
 ORDER BY started_at DESC LIMIT 1`;
 
+const baseReached = (columns?: string) =>
+  newestOfBranchWhere("?2", "(SELECT environment_key FROM render_batches WHERE id = ?1)", "(SELECT commit_key FROM render_batches WHERE id = ?1)", "SELECT key FROM reach", columns);
+
 const BASE_REACHED = `${REACH_OF_BATCH}
-${newestOfBranchWhere("?2", "(SELECT environment_key FROM render_batches WHERE id = ?1)", "(SELECT commit_key FROM render_batches WHERE id = ?1)", "SELECT key FROM reach")}`;
+${baseReached()}`;
+
+// A comparison's statements against the base of the batch named by ?1, on the default branch named by ?2, which
+// read nothing when there's none. `docs/specs/renders.md` -> Approved since a base.
+const BASE_REACHED_KEY = `(${baseReached("key")})`;
+const AGAINST_BASE_REACHED = Object.fromEntries(
+  Object.entries(againstBatch(BASE_REACHED_KEY, ` AND ${BASE_REACHED_KEY} IS NOT NULL`)).map(([name, sql]) => [name, `${REACH_OF_BATCH}\n${sql}`]),
+) as ReturnType<typeof againstBatch>;
 
 const BASE_AMONG = newestOfBranchWhere("?1", environmentKey("?2"), commitKey("?3"), "SELECT c.key FROM json_each(?4) j CROSS JOIN commits c ON c.sha = j.value");
+
+// ?2 names the baseline: a batch for `AGAINST_BATCH`, and the default branch for `AGAINST_BASE_REACHED`.
+const comparedPage = (against: ReturnType<typeof againstBatch>, batchId: string, baseline: string, after: string, includeUnchanged: boolean): SqlStatement => ({
+  sql: against.comparedPage,
+  params: [batchId, baseline, after, ROWS_PER_PAGE, includeUnchanged ? 1 : 0],
+  idempotent: true,
+});
+const removedPage = (against: ReturnType<typeof againstBatch>, batchId: string, baseline: string, after: string): SqlStatement => ({
+  sql: against.removedPage,
+  params: [batchId, baseline, after, ROWS_PER_PAGE],
+  idempotent: true,
+});
 
 const rendersPage = (batchId: string, after: string): SqlStatement => ({ sql: READ_RENDERS_PAGE, params: [batchId, after, ROWS_PER_PAGE], idempotent: true });
 
@@ -604,33 +631,48 @@ ORDER BY started_at DESC, key DESC`,
    * finished batch in this environment. Lists only what a reviewer needs unless told otherwise: see `Comparison`.
    */
   async compareWithBatch(batchId: string, baselineBatchId: string, { includeUnchanged = false }: CompareOptions = {}): Promise<Comparison> {
-    const comparedPage = (after: string): SqlStatement => ({
-      sql: AGAINST_BATCH.comparedPage,
-      params: [batchId, baselineBatchId, after, ROWS_PER_PAGE, includeUnchanged ? 1 : 0],
-      idempotent: true,
-    });
-    const removedPage = (after: string): SqlStatement => ({
-      sql: AGAINST_BATCH.removedPage,
-      params: [batchId, baselineBatchId, after, ROWS_PER_PAGE],
-      idempotent: true,
-    });
-
     // One request, which is all a comparison shorter than a page needs.
     const [batchRows, baselineRows, unchangedRows, firstCompared, firstRemoved] =
       (await this.#sql.batch([
         { sql: SELECT_BATCH, params: [batchId], idempotent: true },
         { sql: AGAINST_BATCH.baseline, params: [batchId, baselineBatchId], idempotent: true },
         { sql: AGAINST_BATCH.unchangedCount, params: [batchId, baselineBatchId], idempotent: true },
-        comparedPage(START),
-        removedPage(START),
+        comparedPage(AGAINST_BATCH, batchId, baselineBatchId, START, includeUnchanged),
+        removedPage(AGAINST_BATCH, batchId, baselineBatchId, START),
       ])) as [SqlRow[], SqlRow[], SqlRow[], SqlRow[], SqlRow[]];
 
     const batch = finishedBatch(batchRows, batchId);
     if (baselineRows[0]?.batch_key === null) {
       throw new BatchError("no-baseline-batch", `${baselineBatchId} isn't a finished batch in environment ${batch.environment}`);
     }
-    const compared = await this.#remainingPages(firstCompared, comparedPage);
-    const removed = await this.#remainingPages(firstRemoved, removedPage);
+    return this.#againstBatch(batch, baselineBatchId, unchangedRows, firstCompared, firstRemoved, includeUnchanged);
+  }
+
+  /**
+   * As `compareWithBatch`, against the batch's base as `approvedSinceReached` finds it: what the batch differs in from
+   * the default branch it reaches. Null if it reaches no batch of that branch. One request, for a comparison shorter than a page.
+   */
+  async compareWithBaseReached(batchId: string, defaultBranch: string): Promise<{ readonly base: RenderBatch; readonly comparison: Comparison } | null> {
+    const [batchRows, baseRows, unchangedRows, firstCompared, firstRemoved] =
+      (await this.#sql.batch([
+        { sql: SELECT_BATCH, params: [batchId], idempotent: true },
+        { sql: BASE_REACHED, params: [batchId, defaultBranch], idempotent: true },
+        { sql: AGAINST_BASE_REACHED.unchangedCount, params: [batchId, defaultBranch], idempotent: true },
+        comparedPage(AGAINST_BASE_REACHED, batchId, defaultBranch, START, false),
+        removedPage(AGAINST_BASE_REACHED, batchId, defaultBranch, START),
+      ])) as [SqlRow[], SqlRow[], SqlRow[], SqlRow[], SqlRow[]];
+
+    const batch = finishedBatch(batchRows, batchId);
+    if (baseRows[0] === undefined) return null;
+    const base = toBatch(baseRows[0]);
+    // Any later page names the base the first found, so a batch finished meanwhile can't change it partway.
+    return { base, comparison: await this.#againstBatch(batch, base.id, unchangedRows, firstCompared, firstRemoved, false) };
+  }
+
+  /** A comparison from its first page of each, reading any more against the finished batch named. */
+  async #againstBatch(batch: RenderBatch, baselineBatchId: string, unchangedRows: readonly SqlRow[], firstCompared: readonly SqlRow[], firstRemoved: readonly SqlRow[], includeUnchanged: boolean): Promise<Comparison> {
+    const compared = await this.#remainingPages(firstCompared, (after) => comparedPage(AGAINST_BATCH, batch.id, baselineBatchId, after, includeUnchanged));
+    const removed = await this.#remainingPages(firstRemoved, (after) => removedPage(AGAINST_BATCH, batch.id, baselineBatchId, after));
     return {
       batch,
       renders: [...compared.map(toComparedRender).sort(byStory), ...removed.map(toRemovedRender).sort(byStory)],
