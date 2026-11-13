@@ -100,7 +100,7 @@ Say first what it asks of them, then go through these in order, and stop and say
 
    200 means it does. 404 means it doesn't, since the service only hosts the public repositories written into `ui/src/worker/index.ts`, so stop here and say so.
 
-2. **Have the person install the GitHub App on this repository.** It's theirs to do, at <https://github.com/apps/selfie-hackathon/installations/new>. It only writes statuses and reads commits. Wait until they say it's done.
+2. **Have the person install the GitHub App on this repository.** It's theirs to do, at <https://github.com/apps/selfie-dev/installations/new>. It writes statuses and reads commits, and when someone signs in, reads their email address. Wait until they say it's done.
 
 3. **Set the upload token as a repository secret**, which can upload and can't approve anything. It's kept in a file, so never print it:
 

@@ -62,7 +62,7 @@ Done once, in this order.
 ### 1. GitHub
 
 1. Rename `diffplug/selfie-hackathon` to `diffplug/selfie`. GitHub then redirects the old name, and the Worker answers it too (`docs/specs/cloud.md` → Projects). Update local checkouts with `git remote set-url origin https://github.com/diffplug/selfie`, and point other repositories' workflows at `diffplug/selfie/.github/actions/selfie@main`.
-2. In the GitHub App's settings (currently **Selfie Hackathon**, `github.com/apps/selfie-hackathon`), optionally rename it to **Selfie**, then under **Identifying and authorizing users**:
+2. In the GitHub App's settings (**Selfie.dev**, `github.com/apps/selfie-dev`, App ID `5607634`; "Selfie" alone is reserved by GitHub), then under **Identifying and authorizing users**:
    - set the **Callback URL** to exactly `https://app.selfie.dev/api/auth/callback/github`
    - leave **Request user authorization (OAuth) during installation** off
    - generate a **client secret**; it and the app's **Client ID** are `GITHUB_CLIENT_SECRET` and `GITHUB_CLIENT_ID`
