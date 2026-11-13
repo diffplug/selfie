@@ -13,6 +13,7 @@ Source of truth: `ui/src/worker/index.ts`, `ui/src/worker/app.ts`, `ui/wrangler.
 - **Must answer a project's former names, listed with it**, a page or review route with a 308 to the same path under its name now, and `/api/repositories/:owner/:name` with the project, so a checkout whose `origin` still has the old name still pushes.
 - **Must give each project a D1 database of its own, through a Worker binding, named `selfie-project-<id>`**, and its blobs a prefix of its own in one R2 bucket (`docs/specs/store.md` → R2 adapter).
 - **Must set up a project's schema on its first request in a Worker's life.**
+- **Never share work still under way from one request to another**, only what's finished, such as a kept built Storybook's stories once read, or knowing a schema is set up. A Worker's I/O belongs to the request that started it, so if that request is canceled, as a browser does on navigating away, anything else waiting on it hangs until the runtime gives up with a 503.
 
 ## Origins
 
