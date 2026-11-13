@@ -104,14 +104,24 @@ export async function batchesAtHead(project: Project, environment: string): Prom
  * earlier batches were recorded at since its own work began, which a rebase may have left out of
  * that history. See `docs/specs/renders.md` -> Approvals.
  */
-export async function reachableCommits(project: Project, { gitSha, branch, environment, startedAt }: Pick<RenderBatch, "gitSha" | "branch" | "environment" | "startedAt">): Promise<readonly string[]> {
+export async function reachableCommits(project: Project, batch: Pick<RenderBatch, "gitSha" | "branch" | "environment" | "startedAt">): Promise<readonly string[]> {
+  const { gitSha, branch, environment, startedAt } = batch;
   const ancestors = await ancestorsOf(project.repo, gitSha);
-  if (branch === null) return ancestors;
-  const { defaultBranch, mergeBase } = await defaultBranchOf(project.repo, gitSha);
-  if (branch === defaultBranch) return ancestors;
-  const began = await earliestAuthoredSince(project.repo, mergeBase, gitSha);
-  if (began === null) return ancestors;
+  const began = await branchBegan(project.repo, batch);
+  if (branch === null || began === null) return ancestors;
   return [...new Set([...ancestors, ...(await project.batches.commitsOfBranch(branch, environment, began, startedAt))])];
+}
+
+/**
+ * When a batch's branch began its own work, from which its earlier batches count: the earliest author time of the
+ * commits it has and the default branch doesn't. Null if it's detached, on the default branch, or has no commits of
+ * its own. A push sends it, since the cloud has no Git to work it out. See `docs/specs/renders.md` -> Approvals.
+ */
+export async function branchBegan(repo: Repo, { gitSha, branch }: Pick<RenderBatch, "gitSha" | "branch">): Promise<number | null> {
+  if (branch === null) return null;
+  const { defaultBranch, mergeBase } = await defaultBranchOf(repo, gitSha);
+  if (branch === defaultBranch) return null;
+  return earliestAuthoredSince(repo, mergeBase, gitSha);
 }
 
 /** A batch compared with what history has approved, which is what deciding on it and looking at it both use. */

@@ -90,7 +90,7 @@ Source of truth: `compareWithApprovals` and `RenderBatches.compareFromHistory` i
 
 - **May assume a repository only ever merges with merge commits**, never a squash, or a rebase onto its default branch, so that what was approved on a pull request's commits stays in the merged commit's history (rationale).
 - **Must reach, from a batch: its commit's ancestors through every parent, up to 1,000 commits, and if it's on a branch other than the default, every commit its branch's batches were recorded at, from the earliest author time of the commits that branch has and the default doesn't, up to when this batch started** (rationale). A branch with no commits of its own reaches only its ancestors. A detached batch reaches only its ancestors. A commit this clone doesn't have reaches only itself.
-- **Must leave Git to the caller.** The store is told which commits are reachable, and runs no Git.
+- **Must leave Git to the caller.** The store is told which commits are reachable, and runs no Git. `compareReached` is told by `commit_parents` and `branch_began` instead (`docs/specs/cloud.md` → Without Git or a decoder).
 - **Must leave out approvals made on the batch being compared**, or a story would read as unchanged the moment someone approved it, and vanish from its review. Later batches see them, including later ones at the same commit (rationale).
 - **Must count an image's decision only if it's no older than the reference's approval**, so a bug that brings back an image approved long ago asks again, and a rejection of an older image doesn't stick to a newer reference (rationale).
 - **Must let a rejection leave the reference alone, unless it replaces the approval of that image at that commit**, which is how a person takes one back ([Decisions](#decisions)). Otherwise it only says what's blocked.
@@ -126,6 +126,7 @@ renders(batch_key → render_batches.key, story_key → stories.key, image_key �
 decisions(environment_key → environments.key, commit_key → commits.key, story_key → stories.key, image_key, rejected, decided_at, actor_key → actors.key, batch_id)  PK (environment_key, commit_key, story_key, image_key)  WITHOUT ROWID
   INDEX decisions_by_image(environment_key, story_key, image_key)
 commit_parents(commit_key → commits.key, parent_key → commits.key)  PK (commit_key, parent_key)  WITHOUT ROWID
+branch_began(batch_key PK → render_batches.key, began_at)
 ```
 
 - **Must leave out the CLI's local table** (`docs/specs/cli.md` → Recording only if necessary): it's in a local `store.db`, not this schema, and D1 doesn't have it.

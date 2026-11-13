@@ -21,7 +21,7 @@ To mount under `/api`. `GET /repositories/:owner/:name` finds a repository's pro
 | Route | Does | Needs |
 |---|---|---|
 | `GET /` | What the token may do here: `{ view, upload, decide }` | Any |
-| `PUT /batches/:id` | Starts holding a batch, and answers how far it got | Upload |
+| `PUT /batches/:id` | Starts holding a batch, and answers how far it got. Its facts, and `branchBegan` if it's on a branch other than the default (`docs/specs/cloud.md` → Without Git or a decoder) | Upload |
 | `POST /images/missing` | `{ hashes }`, at most 500, answers `{ missing }` | Upload |
 | `PUT /images/:hash` | Stores the image's bytes as the sender's store holds them | Upload |
 | `GET /images/:hash` | The stored bytes | View |
@@ -71,6 +71,7 @@ Source of truth: `cli/src/sync.ts`; tests in `cli/test/sync.test.ts`, between tw
 - **Must make every step safe to send again**, so a push or pull that dies is finished by running it again, with nothing to clean up. A partly received batch stays `recording`, which nothing can compare.
 - **Must send only the images the receiver lacks, and pull only those this store lacks, decoding each to check it's the image its hash names**, and stop with `corrupt-image` naming it if it isn't, leaving what's stored here as it was. A sender's check is the last that image gets, and a puller's is the only one that finds what another client sent wrongly.
 - **Must carry `reusedFromBatch`**, for `trust`. It may name a batch never pushed.
+- **Must send with a batch on a branch other than the default when that branch began, as `branchBegan`, in milliseconds**: the earliest author time of the commits it has and the default branch doesn't, which `selfie review` also goes by (`docs/specs/renders.md` → Approvals), and nothing for one that's detached, or on the default branch, or has no commits of its own. A server that doesn't know it ignores it (rationale).
 - **Must send what its commit reaches, by the same rule as a pull, that's on the batch's own images or a story being gone, each with the commit it counts from**, which are the ones that carry through a push (`docs/specs/system.md` → Approvals), since the remote may hold no other image.
 - **Must ask first what the token may do, and skip what it can't, saying so**, so that CI isn't refused after uploading everything.
 - **Must pull what a commit reaches by sending its ancestors, not by the remote's graph**, so a commit that hasn't been pushed yet can still read what its history approved.

@@ -18,7 +18,7 @@
 
 **Diffs from whoever pushed.** Decoding in a Worker needs a WebP decoder and a request's CPU for each pair, and in a browser it needs the diff's hashing rewritten. The machine that pushed has both images' decoder already, and `docs/specs/ui.md` → Future had already asked for diffs stored at review time.
 
-**Not following a branch's earlier batches.** It needs the earliest author time of a branch's own commits, which needs Git. It's only for a rebase or a force-push, which asks again rather than passing something unseen.
+**A branch's earlier batches from a time its pusher says.** Following them needs the earliest author time of a branch's own commits, which needs Git, so the push says it. The cloud finds the batches itself, since it's the only store holding them all: CI renders on a fresh machine whose store has only the batch it's pushing, so a list of commits from the pusher would be empty. It keeps one time per batch, and the walk reads the branch's batches when it's asked, just as `selfie review` does, so a batch pushed late still counts for a later one that started after it. Edges from a commit to the old commits would be shared by every batch at that commit, in every environment, and carried on through any commit whose history holds it, so the cloud would reach what a review here doesn't. The old commits' own history isn't walked either, for the same reason. Without the time, a rebase or a force-push asks again, which never passes anything unseen, so an older CLI is safe.
 
 ## Commit status
 

@@ -65,6 +65,12 @@ export const CREATE_BATCH_TABLES: readonly string[] = [
   parent_key INTEGER NOT NULL REFERENCES commits(key),
   PRIMARY KEY (commit_key, parent_key)
 ) WITHOUT ROWID`,
+  // When a batch's branch began its own work, as its pusher's Git said, for a server with no Git to ask. Only for
+  // a branch other than the default, and only ever the first one sent. See `docs/specs/renders.md` -> Approvals.
+  `CREATE TABLE IF NOT EXISTS branch_began (
+  batch_key INTEGER PRIMARY KEY REFERENCES render_batches(key),
+  began_at INTEGER NOT NULL
+)`,
 ];
 
 // Each as one bound parameter. Renders by what a request of them was measured at, and decisions of about 200 bytes.
@@ -197,18 +203,28 @@ CROSS JOIN commits c ON c.sha = j.value
 CROSS JOIN decisions d ON d.environment_key = ${environmentKey("?1")} AND d.commit_key = c.key
 ${NAMES_OF_DECISION}`;
 
-// What a batch's commit reaches, walked by key, so that a long history's SHAs never leave the database.
-const REACH_OF_BATCH = `WITH RECURSIVE reach(key) AS (
+// What a batch reaches, walked by key, so that a long history's SHAs never leave the database: its commit's history,
+// and with `branch_began` the commits of its branch's batches in its environment from then until it started, which a
+// rebase may have left out of that history. Those commits alone, not their history, as `reachableCommits` in the CLI.
+const REACH_OF_BATCH = `WITH RECURSIVE history(key) AS (
   SELECT commit_key FROM render_batches WHERE id = ?1
   UNION
-  SELECT p.parent_key FROM reach r CROSS JOIN commit_parents p ON p.commit_key = r.key
+  SELECT p.parent_key FROM history CROSS JOIN commit_parents p ON p.commit_key = history.key
   LIMIT ${MAX_REACHED_COMMITS}
+),
+reach(key) AS (
+  SELECT key FROM history
+  UNION
+  SELECT e.commit_key FROM render_batches b
+  CROSS JOIN branch_began w ON w.batch_key = b.key
+  CROSS JOIN render_batches e ON e.branch = b.branch AND e.environment_key = b.environment_key AND e.started_at BETWEEN w.began_at AND b.started_at
+  WHERE b.id = ?1
 )`;
 
 const DECISIONS_REACHED = `${REACH_OF_BATCH}
 ${PLACED_DECISION}
-FROM reach r
-CROSS JOIN decisions d ON d.environment_key = (SELECT environment_key FROM render_batches WHERE id = ?1) AND d.commit_key = r.key
+FROM reach
+CROSS JOIN decisions d ON d.environment_key = (SELECT environment_key FROM render_batches WHERE id = ?1) AND d.commit_key = reach.key
 CROSS JOIN commits c ON c.key = d.commit_key
 ${NAMES_OF_DECISION}`;
 
@@ -226,6 +242,11 @@ const rendersPage = (batchId: string, after: string): SqlStatement => ({ sql: RE
 
 const COMMITS_OF_BRANCH = `SELECT DISTINCT c.sha AS git_sha FROM render_batches r JOIN commits c ON c.key = r.commit_key
 WHERE r.branch = ?1 AND r.environment_key = ${environmentKey("?2")} AND r.started_at BETWEEN CAST(?3 AS INTEGER) AND CAST(?4 AS INTEGER)`;
+
+// Only for a batch on a branch, and the first time it's said, since a batch never changes.
+const RECORD_BRANCH_BEGAN = `INSERT INTO branch_began(batch_key, began_at)
+SELECT key, CAST(?2 AS INTEGER) FROM render_batches WHERE id = ?1 AND branch IS NOT NULL
+ON CONFLICT(batch_key) DO NOTHING`;
 
 const COUNT_RENDERS = `SELECT COUNT(*) AS total FROM renders
 WHERE batch_key = ${BATCH_KEY}`;
@@ -410,7 +431,14 @@ export interface PlacedDecision extends Decision {
 }
 
 /** A batch as another store holds it, which keeps its identity and its times here. */
-export type ReceivedBatch = Omit<RenderBatch, "status" | "finishedAt" | "failedCount" | "branch"> & { readonly branch?: string | null };
+export type ReceivedBatch = Omit<RenderBatch, "status" | "finishedAt" | "failedCount" | "branch"> & {
+  readonly branch?: string | null;
+  /**
+   * When its branch began its own work, in milliseconds, as its sender's Git said, for a store with no Git to ask
+   * which of the branch's earlier batches it reaches. Only for a branch other than the default, and kept as first sent.
+   */
+  readonly branchBegan?: number | null;
+};
 
 /** What a batch holds, as a page of a read by name. */
 export interface BatchPage {
@@ -484,15 +512,20 @@ export class RenderBatches {
    * Starts holding a batch that began in another store, under its own ID and times. If it's
    * already here, this says how far it got, so a resend can carry on: an unfinished one
    * takes its renders again, and a finished one needs nothing. Throws if that ID is here
-   * for different facts, since a batch never changes.
+   * for different facts, since a batch never changes. With `branchBegan`, its branch's earlier batches are part of
+   * what `compareReached` reaches from it.
    */
   async receiveBatch(received: ReceivedBatch): Promise<RenderBatch> {
+    const branchBegan = received.branchBegan ?? null;
+    if (branchBegan !== null && !Number.isSafeInteger(branchBegan)) throw new RangeError(`When a branch began must be whole milliseconds, got ${branchBegan}`);
     const rows = await this.#sql.batch([...insertBatchStatements(received), { sql: SELECT_BATCH, params: [received.id], idempotent: true }]);
     const batch = toBatch(rows.at(-1)![0]!);
     const { gitSha, environment, startedAt, dirty, scale, viewport } = received;
     if (batch.gitSha !== gitSha || batch.environment !== environment || batch.startedAt !== startedAt || batch.dirty !== dirty || batch.scale !== scale || batch.viewport.width !== viewport.width || batch.viewport.height !== viewport.height) {
       throw new BatchError("batch-conflict", `Batch ${received.id} is already here, and it isn't this one`);
     }
+    // Once it's known to be this batch, so another batch's sender can't say when this one's branch began.
+    if (branchBegan !== null) await this.#sql.run({ sql: RECORD_BRANCH_BEGAN, params: [received.id, branchBegan], idempotent: true });
     return batch;
   }
 
@@ -627,7 +660,10 @@ ORDER BY started_at DESC, key DESC`,
     return this.#withApprovals(batchId, batchRows, firstRenders, decisions, options);
   }
 
-  /** As `compareFromHistory`, with what the batch's commit reaches by `recordCommits`, for a store with no Git to ask. One request, for a batch shorter than a page. */
+  /**
+   * As `compareFromHistory`, with what the batch reaches by `recordCommits`, and by the `branchBegan` it was received
+   * with, for a store with no Git to ask. One request, for a batch shorter than a page.
+   */
   async compareReached(batchId: string, options?: CompareOptions): Promise<Comparison> {
     const [batchRows, decisionRows, firstRenders] = (await this.#sql.batch([
       { sql: SELECT_BATCH, params: [batchId], idempotent: true },

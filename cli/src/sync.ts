@@ -8,7 +8,7 @@ import { SelfieError } from "./errors.ts";
 import { diffToPng } from "./diff.ts";
 import { ancestorsOf, commitGraph, headSha } from "./git.ts";
 import { normalizeOrigin } from "./paths.ts";
-import { batchesAtHead, type Project } from "./project.ts";
+import { batchesAtHead, branchBegan, type Project } from "./project.ts";
 
 /** How many images go at once. Each is decoded to check it, so this bounds memory, as `Store` does. */
 const IMAGES_AT_ONCE = 4;
@@ -239,7 +239,10 @@ export async function push(project: Project, remote: Remote, { batch: given, nat
 
   // First, since this is what's refused for a dirty tree or an unpushed commit, and that should cost nothing.
   const { id: _, status: __, finishedAt, failedCount: ___, ...facts } = batch;
-  const { status } = await askJson<{ status: string }>(remote, `${route}/batches/${batchId}`, "PUT", facts satisfies SentBatch);
+  // With when its branch began, if it's on one, so the remote reaches that branch's earlier batches as a review here does.
+  const began = await branchBegan(project.repo, batch);
+  const stated: SentBatch = began === null ? facts : { ...facts, branchBegan: began };
+  const { status } = await askJson<{ status: string }>(remote, `${route}/batches/${batchId}`, "PUT", stated);
   await uploadCommits(project, remote, route, batch.gitSha);
   const storybook = await uploadStorybook(project, remote, route, batchId);
   const total = hashesIn(held).length;
