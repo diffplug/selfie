@@ -81,18 +81,18 @@ export function createCloudApp(config: CloudConfig): Hono {
       defaultBranch: project.defaultBranch,
       storybookBase: `${storybookOrigin}/${project.id}`,
     };
-    let schema: Promise<void> | null = null;
+    // Whether it's done, and never the setting up itself, since a request waiting on another's would
+    // wait forever if that one were canceled. Two first requests may both set it up, which is harmless.
+    let schemaReady = false;
     return {
       project,
       hosted,
       views: hostedViews(hosted),
-      /** Sets up its database once, or tries again next time if that failed. */
-      ready: () => {
-        schema ??= initStoreSchema(sql).catch((error: unknown) => {
-          schema = null;
-          throw error;
-        });
-        return schema;
+      /** Sets up its database until that's worked once. */
+      ready: async () => {
+        if (schemaReady) return;
+        await initStoreSchema(sql);
+        schemaReady = true;
       },
     };
   };
