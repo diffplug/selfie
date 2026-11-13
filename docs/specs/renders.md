@@ -105,7 +105,7 @@ Source of truth: `approvedSinceBase`, `RenderBatches.approvedSinceReached`, `com
 
 Once it's approved, a change is what later batches compare with, so they read it as unchanged. This is how they can still show it.
 
-- **Must take a batch's base to be the newest finished batch of the default branch, in its environment, at a commit it reaches other than its own**, by when they started (rationale). A batch that reaches none has no base, and every approval it reaches counts. With no default branch to go by, there's nothing to say.
+- **Must take a batch's base to be the newest finished batch of the default branch, in its environment, at a commit it reaches other than its own**, by when they started (rationale). A batch that reaches none has no base, and every approval it reaches counts. With no default branch to go by, there's nothing to say. `baseAmong` may be asked for a commit the store has never heard of, which has no batch to leave out, as a remote is when a pull asks for the base of a commit not yet pushed (`docs/specs/sync.md` → Pushing and pulling).
 - **Must list each story that doesn't differ now and would by the base's approvals, as those compare it**, so `goldenHash` is what it replaced, with the newest approval's `decision` and the batch it was made on as `approvedIn`. That takes in what's been added, and a removal that's been approved.
 - **Must leave out what the batch still lists**, which is for it to decide on, including what was approved on this batch, which stays there as [Approvals](#approvals) says.
 - **Must compare a batch with its base's images as `compareWithBatch` does, against the same base**, which `docs/specs/cloud.md` → Commit status uses to tell what a branch changed from what it inherited.

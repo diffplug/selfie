@@ -20,4 +20,6 @@ What's given up: wrong bytes under a hash stay, a browser won't notice, and a pu
 
 **Decisions rather than a batch.** A pull used to fetch one commit's goldens, a whole batch that CI had to make. What a review reads is decisions, so those are what it brings, which also means no walk for a commit to hold to.
 
+**The base, and not every batch.** Nobody renders the default branch on a laptop, since CI does, so a branch there had no base to be told apart from until it was pushed. A pull brings that one batch, which is what `approvedSinceOf` would look for, rather than a batch per commit. It's never the one at the commit pulled, since a batch there takes its base from further back, and since what a push sends by default is at HEAD, so a pulled base isn't sent back as if it were recorded here. The first page of renders isn't in the answer, so a second pull, finding the batch here, asks for nothing more.
+
 **Back through the second approval.** Older decisions can't change what a story reads as, since its reference is its newest approval. The second is there because an approval made on a batch isn't what that batch compares with, so that batch falls back on the one before.

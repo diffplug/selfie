@@ -372,3 +372,59 @@ describe("what a commit reaches", () => {
     expect((await reached({ environment: ENV, commits: [SHA] }, "nobody")).status).toBe(404);
   });
 });
+
+describe("a commit's base", () => {
+  const UNPUSHED = "c".repeat(40);
+  const base = (body: unknown, token = "reader") => send("POST", "/batches/base", token, body);
+  const asked = (overrides: Record<string, unknown> = {}) => ({ environment: ENV, branch: "main", gitSha: UNPUSHED, commits: [UNPUSHED, OTHER_SHA, SHA], ...overrides });
+
+  test("is the newest finished batch of the branch those commits reach, even from a commit it's never heard of", async () => {
+    await sendBatch(BATCH, RED, { branch: "main" });
+    await sendBatch(OTHER_BATCH, GREEN, { branch: "main", gitSha: OTHER_SHA, startedAt: 550 });
+    const response = await base(asked());
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ batch: await cloud.batches.getBatch(OTHER_BATCH) });
+    expect(((await (await base(asked({ commits: [UNPUSHED, SHA] }))).json()) as any).batch.id).toBe(BATCH);
+  });
+
+  test("is none at the commit itself, on another branch, in another environment, or that those commits don't reach", async () => {
+    await sendBatch(BATCH, RED, { branch: "main" });
+    for (const overrides of [{ gitSha: SHA }, { branch: "topic" }, { environment: "elsewhere" }, { commits: [UNPUSHED, OTHER_SHA] }]) {
+      expect(await (await base(asked(overrides))).json()).toEqual({ batch: null });
+    }
+  });
+
+  test("hands over a finished batch's renders a page at a time", async () => {
+    const { hash } = await putImage(RED);
+    await send("PUT", `/batches/${BATCH}`, "writer", batchFacts({ branch: "main" }));
+    const renders = Array.from({ length: SYNC_LIMITS.renders + 1 }, (_, i) => ({ story: `s${i}`, imageHash: hash }));
+    for (let i = 0; i < renders.length; i += SYNC_LIMITS.renders) await send("POST", `/batches/${BATCH}/renders`, "writer", { renders: renders.slice(i, i + SYNC_LIMITS.renders) });
+    expect((await send("GET", `/batches/${BATCH}/renders`, "reader")).status).toBe(409);
+    await send("POST", `/batches/${BATCH}/finish`, "writer", { count: renders.length, finishedAt: 600 });
+
+    const first = (await (await send("GET", `/batches/${BATCH}/renders`, "reader")).json()) as any;
+    expect(first.renders).toHaveLength(SYNC_LIMITS.renders);
+    expect(first.next).not.toBeNull();
+    const last = (await (await send("GET", `/batches/${BATCH}/renders?after=${first.next}`, "reader")).json()) as any;
+    expect(last).toEqual({ renders: [expect.objectContaining({ imageHash: hash })], next: null });
+    expect([...first.renders, ...last.renders].map(({ story }: any) => story).sort()).toEqual(renders.map(({ story }) => story).sort());
+  });
+
+  test("refuses what isn't a commit, a branch, or a page, and a batch it doesn't hold", async () => {
+    expect((await base(asked({ gitSha: "nope" }))).status).toBe(400);
+    expect((await base(asked({ branch: "" }))).status).toBe(400);
+    expect((await base(asked({ commits: Array.from({ length: SYNC_LIMITS.shas + 1 }, () => SHA) }))).status).toBe(400);
+    expect((await send("GET", `/batches/${BATCH}/renders?after=x`, "reader")).status).toBe(400);
+    expect((await send("GET", `/batches/${BATCH}/renders`, "reader")).status).toBe(404);
+  });
+
+  test("is for whoever can view, and nobody else", async () => {
+    await sendBatch(BATCH, RED, { branch: "main" });
+    expect((await base(asked(), "ci")).status).toBe(403);
+    expect((await base(asked(), "nobody")).status).toBe(404);
+    expect((await send("GET", `/batches/${BATCH}/renders`, "ci")).status).toBe(403);
+    expect((await send("GET", `/batches/${BATCH}/renders`, "nobody")).status).toBe(404);
+    const anonymous = await app.request(`/projects/42/batches/${BATCH}/renders`);
+    expect(anonymous.status).toBe(200);
+  });
+});

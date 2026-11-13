@@ -4,7 +4,7 @@
 import { Hono, type Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { assertViewport, decisionsThatCount, ImageDecodeError, isGitSha, isImageHash, isBatchId, BatchError, type PlacedDecision, type ReceivedBatch, type BuiltStorybooks, type StoredDiffs, type ReceivingStore, type RecordedRender, type RenderBatches, type StoryFilter, type Viewport } from "selfie-store";
-import { SYNC_LIMITS, type ProjectAccess } from "../shared/sync-api.ts";
+import { SYNC_LIMITS, type BaseAnswer, type ProjectAccess, type RendersPage } from "../shared/sync-api.ts";
 import { afterResponse, failure, imageResponse, INTERNAL_ERROR, noStoreByDefault } from "./http.ts";
 
 /** What a token may do in a project. */
@@ -357,6 +357,24 @@ export function createSyncApi(host: SyncHost): Hono {
     const { environment, commits } = await bodyOf(context);
     const shas = listOf(commits, SYNC_LIMITS.shas, "commits").map((sha) => readSha(sha, "A commit"));
     return context.json({ decisions: decisionsThatCount(await batches.decisionsAt(readText(environment, "environment"), shas)) });
+  });
+
+  // A commit's base, for a store that doesn't render the default branch. By the commits it's sent, as `decisions/reached` is.
+  api.post("/projects/:project/batches/base", async (context) => {
+    const { batches } = await viewable(context);
+    const { environment, branch, gitSha, commits } = await bodyOf(context);
+    const shas = listOf(commits, SYNC_LIMITS.shas, "commits").map((sha) => readSha(sha, "A commit"));
+    const batch = await batches.baseAmong(readText(branch, "branch"), { environment: readText(environment, "environment"), gitSha: readSha(gitSha, "gitSha") }, shas);
+    return context.json({ batch } satisfies BaseAnswer);
+  });
+
+  // A page of what a finished batch holds, for another store to take, as a push sends it.
+  api.get("/projects/:project/batches/:id/renders", async (context) => {
+    const { batches } = await viewable(context);
+    const after = context.req.query("after") ?? "";
+    if (!/^\d{0,19}$/.test(after)) throw badRequest("after must be where the last page ended.");
+    const { renders, next } = await batches.readBatch(readBatchId(context.req.param("id")), after, SYNC_LIMITS.renders);
+    return context.json({ renders, next } satisfies RendersPage);
   });
 
   api.all("*", (context) => context.json(failure("not-found", "No such route."), 404));

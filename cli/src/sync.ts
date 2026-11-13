@@ -1,12 +1,12 @@
 // Moving a batch, its images, and decisions between this store and another, through
 // the routes in `selfie-ui/sync`. Every step is safe to send again, so a push or pull that dies is
 // finished by running it again. See `docs/specs/sync.md`.
-import { chunks, ImageDecodeError, ImageHashMismatchError, decisionsThatCount, mapConcurrently, type PlacedDecision, type RecordedRender, type RenderBatch, type RenderBatches } from "selfie-store";
-import { SYNC_LIMITS, type DiffPair, type ProjectAccess, type SentDecision, type SentBatch, type SyncError } from "selfie-ui/sync-api";
+import { chunks, ImageDecodeError, ImageHashMismatchError, decisionsThatCount, isBatchId, mapConcurrently, type PlacedDecision, type RecordedRender, type RenderBatch, type RenderBatches } from "selfie-store";
+import { SYNC_LIMITS, type BaseAnswer, type BaseRequest, type DiffPair, type ProjectAccess, type RendersPage, type SentDecision, type SentBatch, type SyncError } from "selfie-ui/sync-api";
 import { resolveRenderSettings } from "./config.ts";
 import { SelfieError } from "./errors.ts";
 import { diffToPng } from "./diff.ts";
-import { ancestorsOf, commitGraph, headSha } from "./git.ts";
+import { ancestorsOf, commitGraph, defaultBranchOf, headSha } from "./git.ts";
 import { normalizeOrigin } from "./paths.ts";
 import { batchesAtHead, type Project } from "./project.ts";
 
@@ -261,28 +261,75 @@ export async function push(project: Project, remote: Remote, { batch: given, nat
   return { batchId, images: { sent, alreadyThere: total - sent }, decisions, storybook, diffs: await uploadDiffs(project, remote, route, batchId) };
 }
 
+/** The default branch's batch a pull took, for this store to tell a branch apart from. */
+export interface PulledBase {
+  readonly batchId: string;
+  readonly gitSha: string;
+  readonly images: { readonly received: number; readonly alreadyHere: number };
+}
+
 export interface PullResult {
   /** Whose history was asked about, or null with no commits here. */
   readonly sha: string | null;
   readonly environment: string;
   readonly images: { readonly received: number; readonly alreadyHere: number };
   readonly decisions: number;
+  /** The base of that commit, or null if the remote has none it reaches, or there's no default branch to say. */
+  readonly base: PulledBase | null;
 }
 
 /**
  * Takes the decisions a commit reaches from the remote, and the images they name, so that a review here
- * reads that commit as the remote does. Merges them, so a later decision here stands.
+ * reads that commit as the remote does. Merges them, so a later decision here stands. Then takes that
+ * commit's base, so a branch here can be told apart from the default branch that nobody renders here.
  */
 export async function pull(project: Project, remote: Remote, { commit, native }: { readonly commit: string | undefined; readonly native: boolean | undefined }): Promise<PullResult> {
   const { batches, store, repo } = project;
   const { environmentId: environment } = await resolveRenderSettings(repo, { native });
   const sha = commit ?? (await headSha(repo));
-  if (sha === null) return { sha, environment, images: { received: 0, alreadyHere: 0 }, decisions: 0 };
+  if (sha === null) return { sha, environment, images: { received: 0, alreadyHere: 0 }, decisions: 0, base: null };
   const route = await projectRoute(project, remote);
-  const { decisions } = await askJson<{ decisions: readonly PlacedDecision[] }>(remote, `${route}/decisions/reached`, "POST", { environment, commits: await ancestorsOf(repo, sha) });
+  const commits = await ancestorsOf(repo, sha);
+  const { decisions } = await askJson<{ decisions: readonly PlacedDecision[] }>(remote, `${route}/decisions/reached`, "POST", { environment, commits });
   const hashes = hashesIn(decisions);
   const missing = await store.missingImages(hashes);
   await mapConcurrently(missing, IMAGES_AT_ONCE, (hash) => fetchImage(project, remote, route, hash));
   await batches.mergeDecisions(environment, decisions);
-  return { sha, environment, images: { received: missing.length, alreadyHere: hashes.length - missing.length }, decisions: decisions.length };
+  const base = await pullBase(project, remote, route, { environment, sha, commits });
+  return { sha, environment, images: { received: missing.length, alreadyHere: hashes.length - missing.length }, decisions: decisions.length, base };
+}
+
+/**
+ * The newest batch of the default branch that a commit reaches, other than at itself, as `approvedSinceOf` would
+ * find it here, recorded under its own ID as the remote received it. Nothing is fetched if it's already here.
+ */
+async function pullBase(project: Project, remote: Remote, route: string, { environment, sha, commits }: { readonly environment: string; readonly sha: string; readonly commits: readonly string[] }): Promise<PulledBase | null> {
+  const { batches, store, repo } = project;
+  const { defaultBranch } = await defaultBranchOf(repo, sha);
+  if (defaultBranch === null) return null;
+  const { batch } = await askJson<BaseAnswer>(remote, `${route}/batches/base`, "POST", { environment, branch: defaultBranch, gitSha: sha, commits } satisfies BaseRequest);
+  if (batch === null) return null;
+  const { id, gitSha, status: _, finishedAt, failedCount: __, ...facts } = batch;
+  if (!isBatchId(id) || finishedAt === null || facts.dirty || facts.branch !== defaultBranch || facts.environment !== environment || gitSha === sha || !commits.includes(gitSha)) {
+    throw new RemoteError("remote-failed", `${remote.url} answered with a batch that isn't the base asked for.`);
+  }
+
+  const here = await batches.getBatch(id);
+  if (here !== null && here.status !== "recording") {
+    return { batchId: id, gitSha, images: { received: 0, alreadyHere: hashesIn((await allOfBatch(batches, id)).renders).length } };
+  }
+  const renders: RecordedRender[] = [];
+  for (let after: string | null = ""; after !== null; ) {
+    const page: RendersPage = await askJson<RendersPage>(remote, `${route}/batches/${id}/renders?after=${after}`);
+    renders.push(...page.renders);
+    after = page.next;
+  }
+  // Images first, so one that isn't what its hash names leaves no batch here.
+  const hashes = hashesIn(renders);
+  const missing = await store.missingImages(hashes);
+  await mapConcurrently(missing, IMAGES_AT_ONCE, (hash) => fetchImage(project, remote, route, hash));
+  await batches.receiveBatch({ id, gitSha, ...facts });
+  await batches.recordRenders(id, renders);
+  await batches.finishBatch(id, renders.length, finishedAt);
+  return { batchId: id, gitSha, images: { received: missing.length, alreadyHere: hashes.length - missing.length } };
 }

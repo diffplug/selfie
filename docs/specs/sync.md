@@ -39,6 +39,8 @@ To mount under `/api`. `GET /repositories/:owner/:name` finds a repository's pro
 | `PUT /diffs/:current/:golden` | Its `PixelDiff`, which says both are here | Upload |
 | `POST /decisions` | `{ environment, decisions }`, at most 1,000, each with its `gitSha` and `batchId`, and a null `imageHash` for a removal | Decide |
 | `POST /decisions/reached` | `{ environment, commits }`, at most 1,000, answers `{ decisions }`: what counts of those made at them, each with its `gitSha` and `batchId` | View |
+| `POST /batches/base` | `{ environment, branch, gitSha, commits }`, at most 1,000 commits, answers `{ batch }`: the newest finished batch of `branch` in `environment` at any of `commits` other than `gitSha`, which it may never have heard of, or null (`docs/specs/renders.md` → Approved since a base) | View |
+| `GET /batches/:id/renders?after=` | A finished batch's renders, `{ renders, next }`, at most 1,000 to a page, each `{ story, imageHash, failure, viewport }` as it was sent; `next` is the next page's `after`, or null after the last | View |
 
 | Status | Code | When |
 |---|---|---|
@@ -76,15 +78,17 @@ Source of truth: `cli/src/sync.ts`; tests in `cli/test/sync.test.ts`, between tw
 - **Must pull what a commit reaches by sending its ancestors, not by the remote's graph**, so a commit that hasn't been pushed yet can still read what its history approved.
 - **Must answer a pull with only what can change what a story reads as: each story's decisions, newest first, back through its second-newest approval**, and fetch only their images, so a long history doesn't mean fetching every image it ever approved (rationale).
 - **Must merge what's pulled**, so a later decision here stands (`docs/specs/renders.md` → Decisions).
+- **Must pull, after the decisions, the commit's base on the default branch, as this store names that branch (`docs/specs/cli.md` → Git), by the same ancestors, never at the commit itself**, so a branch can be told apart from a default branch nobody renders here (`docs/specs/renders.md` → Approved since a base) (rationale).
+- **Must record a pulled base under its own ID, with its facts, its renders, and the time it finished, as the remote received it, and fetch nothing of it if it's here already finished**, so it reads as any batch here does, and pulling it again is free. Its images come before it, so one that isn't what its hash names leaves no batch. Its built Storybook doesn't come ([Not yet](#not-yet)).
 
 ## Commands
 
 | Command | Prints | Exits |
 |---|---|---|
 | `selfie push [<batch>] [--remote <url>] [--native]` | `batchId`, `images: { sent, alreadyThere }`, `decisions`, null if the token can't decide, `storybook`, and `diffs` | 0 if it all went, 2 if it couldn't run |
-| `selfie pull [<commit>] [--remote <url>] [--native]` | `sha`, `environment`, `images: { received, alreadyHere }`, and `decisions` | 0 if it all came, whether or not there was anything to take, 2 if it couldn't run |
+| `selfie pull [<commit>] [--remote <url>] [--native]` | `sha`, `environment`, `images: { received, alreadyHere }`, `decisions`, and `base: { batchId, gitSha, images: { received, alreadyHere } }`, null if there's none to take | 0 if it all came, whether or not there was anything to take, 2 if it couldn't run |
 
-A push defaults to the newest finished batch from a clean tree at HEAD. A pull defaults to HEAD.
+A push defaults to the newest finished batch from a clean tree at HEAD. A pull defaults to HEAD, and the base it takes is never at the commit pulled, so a push that follows doesn't send it.
 
 - **Must find a repository's project from its GitHub origin**, by the owner and name there, and use the numeric ID the server answers (`docs/specs/access.md` → GitHub App).
 - **Must take the remote's address only from `--remote` or `SELFIE_REMOTE`, and the token only from `SELFIE_TOKEN`, never from `selfie.config.json`**, since a checkout must not be able to send someone's token to another server (`docs/specs/cli.md` → Commands). Signing in replaces the token with **Scope: github-access**.
@@ -103,5 +107,6 @@ A project's first push is the expensive one. Each new image takes one upload and
 - Replacing an image the cloud holds wrongly. Today a pull of it fails, naming it, every time, and a browser shows it as it is. A repair needs someone with write access, and a client that decodes.
 - Decisions on hunks (`docs/specs/renders.md` → Future), which add their own table, and travel the same way.
 - Notes (**Scope: remote-notes**, `docs/specs/feedback.md`).
-- Pulling a batch, for a story's reference to link to its kept built Storybook and declared size locally. A pull brings only decisions and images, so a pulled reference shows no live story here.
+- Pulling a batch's built Storybook, for a story's reference to link to it locally. A pull brings decisions, their images, and a commit's base with its declared sizes, but no built Storybook, so a pulled reference shows no live story here.
+- Pulling the decisions the base itself reaches. A pull brings each story's decisions the commit reaches back through its second-newest approval, so where a branch has approved a story twice since its base, the approval the base read it by may not come, and the base reads that story here as added.
 - Moving the routes out of `selfie-ui`, with `app.ts`, once **Scope: cloud-deploy** needs them without a build of the page.

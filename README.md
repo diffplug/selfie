@@ -65,7 +65,7 @@ From a checkout, `pnpm selfie <command>` runs these.
 | `ui` | Serves a local review page, to look at a batch's images, approve, and reject. It renders only when you ask it to on the page |
 | `selfie`, with no command | Opens every story of a built Storybook, running, to write notes on, which renders what they're on |
 | `notes`, `agent-await-feedback`, `reply` | How a person's notes on the images reach a coding agent, and how it answers |
-| `push`, `pull` | Sends a batch and its decisions to the cloud, and takes what a commit's history approved from it |
+| `push`, `pull` | Sends a batch and its decisions to the cloud, and takes what a commit's history approved, and the default branch's batch it started from, from it |
 | `flakes` | Renders a built Storybook several times, and says what wasn't the same each time. `selfie skill fix-flakes` is a guide for a coding agent to fix what it finds |
 | `skill` | Prints a guide for a coding agent: `quickstart` to set Selfie up in a repository, and `fix-flakes` to make every story render the same way |
 

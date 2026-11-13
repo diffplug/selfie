@@ -83,7 +83,9 @@ const USAGE = `Usage: selfie [--port <n>] [--native] [--no-build] [--no-open]
 
   pull [<commit>] [--remote <url>] [--native]
       Takes the decisions a commit reaches from the remote, by default HEAD's, and the images they
-      name, so a review here reads that commit as the remote does. Safe to run again.
+      name, so a review here reads that commit as the remote does. Takes that commit's base too,
+      the newest batch of the default branch it reaches that CI pushed, so a branch here can be told
+      apart from it. Safe to run again.
 
 Local data lives under ~/.config/selfie/<git-origin-slugified>/, or $SELFIE_HOME instead of
 ~/.config/selfie. A project configures Selfie in selfie.config.json at its Git top level, and

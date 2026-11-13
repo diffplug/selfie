@@ -227,6 +227,13 @@ describe("on a store", () => {
       expect(await listed(merge)).toEqual({ base: base.id, renders: [["s", "changed", hashOf(3), hashOf(1), feature.id]] });
     });
 
+    it("finds the base of a commit it has never heard of, as a remote is asked for one not yet pushed", async () => {
+      const { base } = await merged();
+      const unheardOf = "e".repeat(40);
+      expect((await batches.baseAmong("main", { environment: ENV, gitSha: unheardOf }, [unheardOf, FEATURE, BASE]))?.id).toBe(base.id);
+      expect(await batches.baseAmong("main", { environment: ENV, gitSha: BASE }, [unheardOf, FEATURE, BASE])).toBeNull();
+    });
+
     it("shows a later commit on the branch what the branch approved", async () => {
       const { base, feature } = await merged();
       await batches.recordCommits([{ sha: FOLLOWUP, parents: [FEATURE] }]);
