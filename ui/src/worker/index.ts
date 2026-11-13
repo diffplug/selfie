@@ -83,6 +83,7 @@ export default {
         auth: async (inner) => auth.fetch(inner, authEnv),
         writerGithubId: WRITER_GITHUB_ID,
         writerName: WRITER,
+        signupUrl: "https://selfie.dev/",
       }),
       writerToken: env.SELFIE_WRITER_TOKEN,
       uploadToken: env.SELFIE_UPLOAD_TOKEN,

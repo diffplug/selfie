@@ -29,7 +29,7 @@ Source of truth: `ui/src/worker/index.ts`, `ui/src/worker/app.ts`, `ui/wrangler.
 | `/` | Redirects to the first project |
 | `/sign-in` | A button that starts signing in through GitHub (`docs/specs/access.md` → Who can do what) |
 | `/api/auth/callback/github` | GitHub's return from signing in, to pgstencil's adapter |
-| `/signed-in` | Where the adapter sends a browser after GitHub: on to where it was going for the writer, signed out for anyone else |
+| `/signed-in` | Where the adapter sends a browser after GitHub: on to where it was going for the writer, and anyone else signed out and on to the mailing list (`docs/specs/access.md` → Who can do what) |
 | `/sign-out` | Ends the session |
 | `/api/…` | The sync routes (`docs/specs/sync.md` → Routes) |
 | `/:owner/:repo/api/…` | The review routes (`docs/specs/ui.md` → Routes), with `pageHeaders` and `sameOriginWrites` |

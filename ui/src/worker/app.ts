@@ -50,15 +50,14 @@ export interface CloudConfig {
   readonly now?: () => number;
 }
 
-const signInPage = (next: string, problem: "failed" | "refused" | null) => html`<!doctype html>
+const signInPage = (next: string, failed: boolean) => html`<!doctype html>
   <html lang="en">
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Sign in to Selfie</title>
     <body style="font:16px system-ui;max-width:420px;margin:15vh auto;padding:0 16px">
       <h1 style="font-size:22px">Sign in to Selfie</h1>
-      ${problem === "failed" ? html`<p role="alert" style="color:#b35900">GitHub didn't sign you in. Try again.</p>` : ""}
-      ${problem === "refused" ? html`<p role="alert" style="color:#b35900">For now, only @${WRITER} can sign in. Anyone can look around without signing in.</p>` : ""}
+      ${failed ? html`<p role="alert" style="color:#b35900">GitHub didn't sign you in. Try again.</p>` : ""}
       <form method="post">
         <input type="hidden" name="next" value="${next}" />
         <button style="font-size:16px;padding:8px 16px">Sign in with GitHub</button>
@@ -153,8 +152,8 @@ export function createCloudApp(config: CloudConfig): Hono {
     await next();
   };
   app.get("/sign-in", signInPolicy, (context) => {
-    const problem = context.req.query("refused") !== undefined ? "refused" : context.req.query("failed") !== undefined ? "failed" : null;
-    return context.html(signInPage(localPath(context.req.query("next")), problem), problem === null ? 200 : 401);
+    const failed = context.req.query("failed") !== undefined;
+    return context.html(signInPage(localPath(context.req.query("next")), failed), failed ? 401 : 200);
   });
   app.post("/sign-in", signInPolicy, sameOrigin(() => reviewOrigin), async (context) => {
     const form = await context.req.parseBody();
