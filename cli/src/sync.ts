@@ -195,9 +195,9 @@ async function uploadStorybook(project: Project, remote: Remote, route: string, 
     const pathOf = new Map(files.map(({ path, fileHash }) => [fileHash, path]));
     const missing = await askMissing(remote, `${route}/storybooks/files/missing`, [...pathOf.keys()]);
     await mapConcurrently(missing, IMAGES_AT_ONCE, async (fileHash) => {
-      const bytes = await storybooks.readFile(build, pathOf.get(fileHash)!);
-      if (bytes === null) throw new SelfieError("missing-image", `This store has lost a file of built Storybook ${build}.`);
-      await ask(remote, `${route}/storybooks/files/${fileHash}`, { method: "PUT", body: bytes as Uint8Array<ArrayBuffer> });
+      const gzipped = await storybooks.readGzippedFile(build, pathOf.get(fileHash)!);
+      if (gzipped === null) throw new SelfieError("missing-image", `This store has lost a file of built Storybook ${build}.`);
+      await ask(remote, `${route}/storybooks/files/${fileHash}`, { method: "PUT", headers: { "content-encoding": "gzip" }, body: gzipped as Uint8Array<ArrayBuffer> });
     });
     await askJson(remote, `${route}/storybooks/${build}`, "PUT", { files });
   }

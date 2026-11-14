@@ -31,7 +31,7 @@ To mount under `/api`. `GET /repositories/:owner/:name` finds a repository's pro
 | `POST /commits` | `{ commits }`, at most 1,000, each `{ sha, parents }`, so a server with no Git knows what a commit reaches | Upload |
 | `GET /storybooks/:hash` | `{ kept }` | Upload |
 | `POST /storybooks/files/missing` | `{ hashes }`, at most 500, answers `{ missing }` | Upload |
-| `PUT /storybooks/files/:hash` | A file's bytes, which must hash to that | Upload |
+| `PUT /storybooks/files/:hash` | A file's bytes, gzipped, with `Content-Encoding: gzip`, which must hash to that once decompressed | Upload |
 | `PUT /storybooks/:hash` | `{ files }`, each `{ path, fileHash }`, once all are here, or `missing-files` | Upload |
 | `POST /batches/:id/storybook` | `{ build }`, which built Storybook rendered this batch | Upload |
 | `GET /batches/:id/diffs/needed` | `{ pairs }`, each `{ current, golden }`, the changed pairs with no diff here, including those of what's been approved since its base (`docs/specs/renders.md` → Approved since a base) and of what's changed since it (`docs/specs/renders.md` → Changed since a base) | Upload |
@@ -48,7 +48,7 @@ To mount under `/api`. `GET /repositories/:owner/:name` finds a repository's pro
 | 403 | `not-allowed` | The token can do something here, but not this |
 | 404 | `not-found`, `unknown-batch`, `unknown-image` | The project can't be seen, or doesn't hold that |
 | 409 | `batch-dirty`, `commit-not-pushed`, and `BatchError`'s other codes | The request can't apply to the data as it stands |
-| 413 | `image-too-large` | It's more than the server takes |
+| 413 | `image-too-large`, `file-too-large` | It's more than the server takes |
 
 - **Must answer 404, identical to a project that doesn't exist, to anyone who can do nothing there, before reading anything else about the request, and 403 to anyone who can do something, but not this** (`docs/specs/access.md` → Who can do what).
 - **Must take who's asking only from a bearer token**, never a cookie, so another site's page can't make these requests on someone's behalf.
@@ -59,6 +59,7 @@ To mount under `/api`. `GET /repositories/:owner/:name` finds a repository's pro
 - **Must refuse a batch from a dirty tree, and a batch whose commit GitHub doesn't have, with `commit-not-pushed`, when the batch is first sent, and before any of its images**, so a forgotten `git push` costs nothing, and nothing from an unpushed commit is ever stored, since anyone can view a public repository's images (rationale). That a batch is clean is only what its client says, so this holds for honest clients.
 - **Must take an image through `ReceivingStore.receiveImage`, and never decode it**, since anyone who can upload can already approve (rationale). It answers `bad-image` for a file that isn't in a form a store keeps. A corrupt body, or one holding another picture, gets through (`docs/specs/store.md` → Image identity), and stays until [something can replace it](#not-yet).
 - **Must refuse an image larger than the server takes, before reading it**, with `image-too-large`.
+- **Must take a built Storybook's file only gzipped, and check its hash while decompressing it, never holding what it decompresses**, refusing with `file-too-large` once that passes what the server takes, so a small body can't make it do unbounded work (rationale). What was sent is kept as it came (`docs/specs/store.md` → Built Storybooks).
 - **Must take a decision only from someone who may decide, so a CI upload carries none**, and record a new one's author as whoever is pushing, as the server knows them, not what the client says (rationale). A decision the server already holds keeps its author. `docs/specs/renders.md` → Decisions says stores agree on the verdict, which the author need not match.
 - **Must not let a received decision's time, or a batch's, be later than the server's clock**, so a wrong clock can't win every later disagreement, or post-date a batch. Sending a batch again keeps the time it was first given.
 

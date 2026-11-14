@@ -8,6 +8,8 @@ It also cost a lot. A Worker can't run `sharp`, and hashing whole pixels in Wasm
 
 What's given up: wrong bytes under a hash stay, a browser won't notice, and a pull fails on them with nothing to fix them yet. A sender's check before upload catches an honest client's corruption, for about 13 ms an image at 2×.
 
+**Why a Storybook file is checked as it streams.** Unlike an image's, a file's hash is of its bytes, so checking it is cheap, and it stops one file standing in for another. But a server takes 64 MB, a Worker has 128 MB, and gzip can hold far more than it's sent as, so decompressing a file whole to hash it could run a Worker out. Web Crypto hashes only bytes held whole, so the check hashes each piece as it decompresses, by `node:crypto`, which a Worker has with `nodejs_compat`, and holds only what was sent.
+
 **Why not a batch from a dirty tree.** Its images may show work that's in no commit, which on a public repository would publish it.
 
 **Why the batch goes before its images.** Images went first in the first design, since a batch refers to them. But a batch is refused for its commit, and an image isn't, so a forgotten `git push` would have uploaded everything to be told no, and left those images where anyone holding a hash could read them. Sending the batch first costs nothing, since it refers to no image until its renders.

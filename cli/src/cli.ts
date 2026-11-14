@@ -217,7 +217,7 @@ async function serveReview(
     port: options.port,
     clientDir: context.uiClientDir,
     dir,
-    readStorybookFile: (build, file) => project.storybooks.readFile(build, file),
+    readStorybookFile: (build, file) => project.storybooks.readGzippedFile(build, file),
   });
   try {
     const url = `${servers.review.url}${options.path}`;

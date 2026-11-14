@@ -6,6 +6,7 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { assertViewport, decisionsThatCount, ImageDecodeError, isGitSha, isImageHash, isBatchId, BatchError, type PlacedDecision, type ReceivedBatch, type BuiltStorybooks, type StoredDiffs, type ReceivingStore, type RecordedRender, type RenderBatches, type StoryFilter, type Viewport } from "selfie-store";
 import { SYNC_LIMITS, type BaseAnswer, type ProjectAccess, type RendersPage } from "../shared/sync-api.ts";
 import { afterResponse, failure, imageResponse, INTERNAL_ERROR, noStoreByDefault } from "./http.ts";
+import { sha256OfGzipped, TooLargeError } from "./gzipped-hash.ts";
 
 /** What a token may do in a project. */
 export interface SyncAccess {
@@ -169,11 +170,11 @@ export function createSyncApi(host: SyncHost): Hono {
   };
 
   /** Refused before reading it where its length says so, since it can't be checked without holding it. */
+  const tooLarge = (kind: "image" | "file", as = "") => new Refusal(413, `${kind}-too-large`, `This server takes ${kind}s of at most ${maxImageBytes} bytes${as}.`);
   const readLimited = async (context: Context, kind: "image" | "file" = "file") => {
-    const tooLarge = () => new Refusal(413, `${kind}-too-large`, `This server takes ${kind}s of at most ${maxImageBytes} bytes.`);
-    if (Number(context.req.header("content-length") ?? 0) > maxImageBytes) throw tooLarge();
+    if (Number(context.req.header("content-length") ?? 0) > maxImageBytes) throw tooLarge(kind);
     const bytes = new Uint8Array(await context.req.arrayBuffer());
-    if (bytes.length > maxImageBytes) throw tooLarge();
+    if (bytes.length > maxImageBytes) throw tooLarge(kind);
     return bytes;
   };
 
@@ -293,8 +294,14 @@ export function createSyncApi(host: SyncHost): Hono {
   api.put("/projects/:project/storybooks/files/:hash", async (context) => {
     const { storybooks } = await uploadable(context);
     const hash = readHash(context.req.param("hash"));
+    if (context.req.header("content-encoding")?.trim().toLowerCase() !== "gzip") throw badRequest("A built Storybook's file is sent gzipped, with Content-Encoding: gzip.");
+    const gzipped = await readLimited(context);
+    // Sent again, it's already checked, so there's nothing to decompress.
+    if ((await storybooks.missingFiles([hash])).length === 0) return context.json({ hash });
     // Whatever a built Storybook is, a file's name is its bytes' hash, so one file can't stand in for another.
-    const kept = await storybooks.putFile(await readLimited(context));
+    const kept = await storybooks.putGzippedFile(gzipped, (sent) => sha256OfGzipped(sent, maxImageBytes)).catch((error: unknown) => {
+      throw error instanceof TooLargeError ? tooLarge("file", ", decompressed") : error;
+    });
     if (kept !== hash) throw badRequest(`Those bytes hash to ${kept}, not ${hash}.`);
     return context.json({ hash });
   });

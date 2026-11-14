@@ -152,7 +152,7 @@ export function createCloudApp(config: CloudConfig): Hono {
   // A built Storybook is the code of whatever branch was built, so it never shares an origin with what can approve.
   const storybooks = new Hono();
   storybooks.use(storybookHeaders(() => [reviewOrigin]));
-  storybooks.route("/:project", keptStorybookRoutes((build, file, context) => byId(context.req.param("project"))?.hosted.storybooks.readFile(build, file) ?? Promise.resolve(null)));
+  storybooks.route("/:project", keptStorybookRoutes((build, file, context) => byId(context.req.param("project"))?.hosted.storybooks.readGzippedFile(build, file) ?? Promise.resolve(null)));
   storybooks.all("*", (context) => context.text("Not found.", 404));
 
   const reviewHost = new URL(reviewOrigin).host;

@@ -1,5 +1,6 @@
 // The whole cloud service inside workerd, on its local D1 and R2, with stand-ins for GitHub and for
 // pgstencil's auth adapter. Nothing crosses to Node, and no account is involved. These run in order, each on what the last left.
+import { gzip } from "selfie-store";
 import { env } from "cloudflare:workers";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import type { R2BucketLike } from "selfie-store/adapters/r2";
@@ -72,10 +73,10 @@ const fakeAuth: AuthFetch = async (request) => {
   }
 };
 
-const api = (method: string, route: string, token: string | null, body?: unknown) =>
+const api = (method: string, route: string, token: string | null, body?: unknown, headers: Record<string, string> = { "content-type": "application/json" }) =>
   app.request(`${ORIGIN}/api/projects/42${route}`, {
     method,
-    headers: { ...(token === null ? {} : { authorization: `Bearer ${token}` }), "content-type": "application/json" },
+    headers: { ...(token === null ? {} : { authorization: `Bearer ${token}` }), ...headers },
     ...(body === undefined ? {} : { body: body instanceof Uint8Array ? (body as Uint8Array<ArrayBuffer>) : JSON.stringify(body) }),
   });
 
@@ -336,13 +337,20 @@ describe("the cloud service", () => {
     const build = "d".repeat(64);
     expect(((await (await api("POST", "/storybooks/files/missing", UPLOAD, { hashes: [fileHash] })).json()) as { missing: string[] }).missing).toEqual([fileHash]);
     expect((await api("PUT", `/storybooks/${build}`, UPLOAD, { files: [{ path: "index.html", fileHash }] })).status).toBe(409);
-    expect((await api("PUT", `/storybooks/files/${"e".repeat(64)}`, UPLOAD, file)).status).toBe(400);
-    expect((await api("PUT", `/storybooks/files/${fileHash}`, UPLOAD, file)).status).toBe(200);
+    const gzipped = await gzip(file);
+    const putFile = (hash: string, body: Uint8Array, headers: Record<string, string> = { "content-encoding": "gzip" }) => api("PUT", `/storybooks/files/${hash}`, UPLOAD, body, headers);
+    // Only gzipped, only gzip, and only bytes that hash to its name once decompressed.
+    expect((await putFile(fileHash, file, {})).status).toBe(400);
+    expect((await putFile(fileHash, file)).status).toBe(400);
+    expect((await putFile("e".repeat(64), gzipped)).status).toBe(400);
+    expect((await putFile(fileHash, gzipped)).status).toBe(200);
     expect((await api("PUT", `/storybooks/${build}`, UPLOAD, { files: [{ path: "index.html", fileHash }] })).status).toBe(200);
     expect((await api("POST", `/batches/${FIRST}/storybook`, UPLOAD, { build })).status).toBe(200);
 
+    // As it was sent, whatever the request accepts.
     const served = await app.request(`${STORYBOOKS}/42/built-storybooks/${build}/`);
-    expect(await served.text()).toBe("<html>story</html>");
+    expect(served.headers.get("content-encoding")).toBe("gzip");
+    expect(new Uint8Array(await served.arrayBuffer())).toEqual(gzipped);
     expect(served.headers.get("content-security-policy")).toContain(`frame-ancestors 'self' ${ORIGIN}`);
     expect((await app.request(`${STORYBOOKS}/42/api/projects/42`)).status).toBe(404);
     expect((await app.request(`${STORYBOOKS}/api/projects/42`)).status).toBe(404);

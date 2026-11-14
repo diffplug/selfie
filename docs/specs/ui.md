@@ -94,6 +94,7 @@ Source of truth: `ui/src/server/app.ts`; tests in `cli/test/ui-*.test.ts`.
 On a hosted Storybook's own origin (`docs/specs/access.md` → Local review server), `selfie-ui/storybook` serves each kept built Storybook's files at `/built-storybooks/<hash>/`, and locally the directory as it stands is at `/`.
 
 - **Must give a kept built Storybook's files `Cache-Control: private, max-age=31536000, immutable`**, since a kept built Storybook never changes, and the directory as it stands `no-store`, since a rebuild does.
+- **Must send a kept built Storybook's files gzipped, as they're kept, with `Content-Encoding: gzip`, whatever the request accepts** (`docs/specs/store.md` → Built Storybooks), since every browser takes gzip.
 - **Must refuse an image hash that isn't 64 lowercase hex digits before it reaches the store.**
 - **Must give images, diff images, and diff stats `Cache-Control: private, max-age=31536000, immutable`**, since all are addressed by content (`docs/specs/access.md` → Local review server), and every other API answer `no-store`.
 - **Must decide on exactly the images a request names, or none:** the library's `decide` refuses with `stale-decision` if any named story and hash isn't a changed or added image of that batch, or a null hash a removed story of it, and takes the names exactly, never as patterns (rationale).
