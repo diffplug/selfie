@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Blobs, initStoreSchema, BuiltStorybooks, RenderBatches, gunzip, gzip, truncateHash, type BlobStorage } from "../src/core/index.ts";
-import { fromHex } from "../src/core/image-hash.ts";
+import { fromHex, sha256, toHex } from "../src/core/image-hash.ts";
 import { createTempStore } from "./support/temp-store.ts";
 
 const BUILD = "a".repeat(64);
 const OTHER = "b".repeat(64);
 const text = (value: string) => new TextEncoder().encode(value);
-const sha256Hex = async (bytes: Uint8Array) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes as Uint8Array<ArrayBuffer>))].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+const sha256Hex = async (bytes: Uint8Array) => toHex(await sha256(bytes as Uint8Array<ArrayBuffer>));
 
 describe("BuiltStorybooks", () => {
   let temp: Awaited<ReturnType<typeof createTempStore>>;
@@ -52,7 +52,7 @@ describe("BuiltStorybooks", () => {
   it("keeps a file sent gzipped as it came", async () => {
     const sent = await gzip(text("sent"));
     const fileHash = await sha256Hex(text("sent"));
-    await builds.putGzippedFile(fileHash, sent);
+    expect(await builds.putGzippedFile(sent, async () => fileHash)).toBe(fileHash);
     expect(await builds.missingFiles([fileHash])).toEqual([]);
     await builds.putStorybook(BUILD, [{ path: "sent.js", fileHash }]);
     expect(await builds.readGzippedFile(BUILD, "sent.js")).toEqual(sent);

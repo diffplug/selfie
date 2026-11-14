@@ -57,13 +57,15 @@ export class BuiltStorybooks {
   }
 
   /**
-   * Keeps a file already gzipped, as it came, under the hash of its bytes decompressed. Only for a caller that has
-   * checked that's what they hash to, since this store can't without holding them whole: see `docs/specs/sync.md`.
+   * Keeps a file already gzipped, as it came, under the hash `hashOf` finds of what it holds, and says what that is.
+   * A caller gives the hashing, since this package runs in a browser too, and can't hash a stream there: see
+   * `docs/specs/sync.md` -> What a store takes.
    */
-  async putGzippedFile(fileHash: string, gzipped: Uint8Array): Promise<void> {
+  async putGzippedFile(gzipped: Uint8Array, hashOf: (gzipped: Uint8Array) => Promise<string>): Promise<string> {
+    const fileHash = await hashOf(gzipped);
     assertImageHash(fileHash);
-    const key = fileBlobKey(fileHash);
-    if (!(await this.#blob.has(key))) await this.#blob.put(key, gzipped);
+    await this.#blob.put(fileBlobKey(fileHash), gzipped);
+    return fileHash;
   }
 
   /** Those of these file hashes whose bytes aren't here, for a sender deciding what to upload. */

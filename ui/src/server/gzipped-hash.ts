@@ -3,34 +3,32 @@
 import { createHash } from "node:crypto";
 
 /** Bytes that would be more than a caller takes once decompressed. */
-export class TooLargeError extends Error {
-  readonly maxBytes: number;
-  constructor(maxBytes: number) {
-    super(`It's more than ${maxBytes} bytes once decompressed.`);
-    this.maxBytes = maxBytes;
-  }
-}
+export class TooLargeError extends Error {}
 
 /**
  * The hex SHA-256 of what gzip holds, refusing what isn't gzip with a `RangeError`, and stopping with `TooLargeError`
  * once it passes `maxBytes`, so a small body can't make a server do unbounded work.
  */
 export async function sha256OfGzipped(gzipped: Uint8Array, maxBytes: number): Promise<string> {
-  const reader = new Blob([gzipped as Uint8Array<ArrayBuffer>]).stream().pipeThrough(new DecompressionStream("gzip")).getReader();
+  // Enqueued as it is, since a `Blob` would copy what may be most of a Worker's memory.
+  const sent = new ReadableStream<Uint8Array<ArrayBuffer>>({
+    start(controller) {
+      controller.enqueue(gzipped as Uint8Array<ArrayBuffer>);
+      controller.close();
+    },
+  });
+  const reader = sent.pipeThrough(new DecompressionStream("gzip")).getReader();
   const hash = createHash("sha256");
   let length = 0;
   for (;;) {
-    let read: Awaited<ReturnType<typeof reader.read>>;
-    try {
-      read = await reader.read();
-    } catch (error) {
+    const read = await reader.read().catch((error: unknown) => {
       throw new RangeError("That isn't gzip.", { cause: error });
-    }
+    });
     if (read.done) return hash.digest("hex");
     length += read.value.length;
     if (length > maxBytes) {
       await reader.cancel().catch(() => undefined);
-      throw new TooLargeError(maxBytes);
+      throw new TooLargeError(`It's more than ${maxBytes} bytes once decompressed.`);
     }
     hash.update(read.value);
   }

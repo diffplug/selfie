@@ -35,11 +35,11 @@ export function keptStorybookRoutes(readStorybookFile: StorybookFileReader): Hon
     const bytes = await readStorybookFile(build, file, context);
     if (bytes === null) return context.text("That isn't a file of a kept built Storybook.", 404);
     // Whatever the request accepts, since every browser takes gzip. `encodeBody` has a Worker send the bytes as they are.
-    const init = { status: 200, encodeBody: "manual" } as ResponseInit;
     return new Response(bytes as Uint8Array<ArrayBuffer>, {
-      ...init,
+      status: 200,
+      encodeBody: "manual",
       headers: { "Content-Type": getMimeType(file) ?? "application/octet-stream", "Content-Encoding": "gzip", "Cache-Control": CONTENT_ADDRESSED },
-    });
+    } as ResponseInit);
   });
   return app;
 }

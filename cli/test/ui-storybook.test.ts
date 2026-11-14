@@ -11,6 +11,9 @@ import { localReviewSource, type RenderStories } from "../src/ui.ts";
 import { BLUE, commit, git, TEST_CONFIG, writeTestConfig } from "./support.ts";
 import { PORT, HOST, ORIGIN, h, project, clientDir, app, review, get, change } from "./ui-support.ts";
 
+/** A kept file's text, from a response read as it was sent, gzipped, with nothing on the way to decompress it. */
+const gunzippedText = async (response: Response) => new TextDecoder().decode(await gunzip(new Uint8Array(await response.arrayBuffer())));
+
 describe("the hosted Storybook", () => {
   const STORYBOOK_PORT = 51234;
   let dir: string;
@@ -111,12 +114,12 @@ describe("the hosted Storybook", () => {
       const page = await read(`/built-storybooks/${hash}/`);
       // Gzipped as it's kept, whatever the request accepts.
       expect(page.headers.get("content-encoding")).toBe("gzip");
-      expect(new TextDecoder().decode(await gunzip(new Uint8Array(await page.arrayBuffer())))).toContain("kept");
+      expect(await gunzippedText(page)).toContain("kept");
       expect(page.headers.get("content-type")).toContain("text/html");
       expect(page.headers.get("cache-control")).toContain("immutable");
       expect(page.headers.get("content-security-policy")).toBe(`frame-ancestors 'self' ${ORIGIN}`);
       const script = await read(`/built-storybooks/${hash}/assets/a%20b.js`);
-      expect(new TextDecoder().decode(await gunzip(new Uint8Array(await script.arrayBuffer())))).toBe("export {};");
+      expect(await gunzippedText(script)).toBe("export {};");
       expect(script.headers.get("content-type")).toContain("javascript");
     });
 
@@ -536,7 +539,7 @@ describe("the hosted Storybook", () => {
       await writeFile(path.join(dir, "index.html"), "<!doctype html><title>the next build</title>");
       expect(await linkOf(batchId)).toEqual(link);
       const kept = await read(new URL(link!.url).pathname);
-      expect(new TextDecoder().decode(await gunzip(new Uint8Array(await kept.arrayBuffer())))).toContain("the manager");
+      expect(await gunzippedText(kept)).toContain("the manager");
       expect(await (await read("/")).text()).toContain("the next build");
     });
 

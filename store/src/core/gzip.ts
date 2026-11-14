@@ -1,6 +1,13 @@
 // gzip, by the platform's own streams, which Node, a Worker, and a browser all have. See docs/specs/store.md -> Built Storybooks.
 
-const streamOf = (bytes: Uint8Array) => new Blob([bytes as Uint8Array<ArrayBuffer>]).stream();
+// Enqueued as they are, since a `Blob` would copy them.
+const streamOf = (bytes: Uint8Array) =>
+  new ReadableStream<Uint8Array<ArrayBuffer>>({
+    start(controller) {
+      controller.enqueue(bytes as Uint8Array<ArrayBuffer>);
+      controller.close();
+    },
+  });
 
 export async function gzip(bytes: Uint8Array): Promise<Uint8Array> {
   return new Uint8Array(await new Response(streamOf(bytes).pipeThrough(new CompressionStream("gzip"))).arrayBuffer());

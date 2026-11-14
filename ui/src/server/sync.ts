@@ -170,11 +170,11 @@ export function createSyncApi(host: SyncHost): Hono {
   };
 
   /** Refused before reading it where its length says so, since it can't be checked without holding it. */
+  const tooLarge = (kind: "image" | "file", as = "") => new Refusal(413, `${kind}-too-large`, `This server takes ${kind}s of at most ${maxImageBytes} bytes${as}.`);
   const readLimited = async (context: Context, kind: "image" | "file" = "file") => {
-    const tooLarge = () => new Refusal(413, `${kind}-too-large`, `This server takes ${kind}s of at most ${maxImageBytes} bytes.`);
-    if (Number(context.req.header("content-length") ?? 0) > maxImageBytes) throw tooLarge();
+    if (Number(context.req.header("content-length") ?? 0) > maxImageBytes) throw tooLarge(kind);
     const bytes = new Uint8Array(await context.req.arrayBuffer());
-    if (bytes.length > maxImageBytes) throw tooLarge();
+    if (bytes.length > maxImageBytes) throw tooLarge(kind);
     return bytes;
   };
 
@@ -295,17 +295,14 @@ export function createSyncApi(host: SyncHost): Hono {
     const { storybooks } = await uploadable(context);
     const hash = readHash(context.req.param("hash"));
     if (context.req.header("content-encoding")?.trim().toLowerCase() !== "gzip") throw badRequest("A built Storybook's file is sent gzipped, with Content-Encoding: gzip.");
-    // Whatever a built Storybook is, a file's name is its bytes' hash, so one file can't stand in for another.
     const gzipped = await readLimited(context);
-    let kept: string;
-    try {
-      kept = await sha256OfGzipped(gzipped, maxImageBytes);
-    } catch (error) {
-      if (error instanceof TooLargeError) throw new Refusal(413, "file-too-large", `This server takes files of at most ${maxImageBytes} bytes, decompressed.`);
-      throw error;
-    }
+    // Sent again, it's already checked, so there's nothing to decompress.
+    if ((await storybooks.missingFiles([hash])).length === 0) return context.json({ hash });
+    // Whatever a built Storybook is, a file's name is its bytes' hash, so one file can't stand in for another.
+    const kept = await storybooks.putGzippedFile(gzipped, (sent) => sha256OfGzipped(sent, maxImageBytes)).catch((error: unknown) => {
+      throw error instanceof TooLargeError ? tooLarge("file", ", decompressed") : error;
+    });
     if (kept !== hash) throw badRequest(`Those bytes hash to ${kept}, not ${hash}.`);
-    await storybooks.putGzippedFile(hash, gzipped);
     return context.json({ hash });
   });
 
