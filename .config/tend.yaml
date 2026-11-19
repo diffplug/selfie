@@ -1,0 +1,9 @@
+bot_name: selfie-bot
+
+secrets:
+  # OPERATIONS.md → Secrets and settings says what each is.
+  allowed: ["SELFIE_UPLOAD_TOKEN"]
+
+workflows:
+  ci-failures:
+    watched_workflows: ["Selfie", "Site", "App production release"]
