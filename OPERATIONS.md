@@ -12,7 +12,7 @@ Selfie has two deployments, both in Cloudflare account `0a95e814ccf2b6a95d2dc3be
 The app keeps its data in three places:
 
 - **D1:** one database per project, `selfie-project-<repository id>`, bound in `ui/wrangler.toml`. A project sets up its own schema on first use.
-- **R2:** bucket `selfie-blobs`, with every project's images and built Storybooks' files under a prefix of its own. Each project's D1 says which images it has, so its bytes must never be dropped without its rows.
+- **R2:** bucket `selfie-blobs`, one prefix per project (`docs/specs/store.md` → R2 adapter). A project's D1 lists the images it holds, so never delete their bytes without their rows (`docs/specs/store.md` → Storage).
 - **Postgres on Neon:** sign-in only, through pgstencil, reached by the Worker through an uncached Hyperdrive. Its schema is `@pgstencil/auth`'s migrations, listed in `ui/pgstencil.json`.
 
 ## Releasing
@@ -112,6 +112,4 @@ The hackathon's Worker, `selfie-hackathon`, holds `hackathon.selfie.dev` as a cu
 2. Run **App production release**. Its smoke checks cover the new origins, the redirect, and starting a sign-in.
 3. Sign in at `https://app.selfie.dev/sign-in`, and check a project page says you can approve.
 4. Push a commit, and check its `selfie` status links to `app.selfie.dev`.
-5. Delete the `selfie-hackathon` Worker. Its D1 databases are `selfie-app`'s now, so delete only the Worker.
-
-Its R2 bucket, `selfie-hackathon-images`, was copied whole into `selfie-blobs`, keys and HTTP metadata alike, and can be deleted once `selfie-app` has served from `selfie-blobs` for a while.
+5. Delete the `selfie-hackathon` Worker, but not its D1 databases, which are `selfie-app`'s now. Delete its R2 bucket, `selfie-hackathon-images`, once `selfie-app` has served from `selfie-blobs` for a while, since `selfie-blobs` began as a copy of it.
