@@ -42,7 +42,7 @@ GitHub environment `site-production`, limited to the `main` branch:
 
 | Name | Kind | What |
 |---|---|---|
-| `CLOUDFLARE_PAGES_TOKEN` | secret | Account `0a95e814…`: Cloudflare Pages Edit, and nothing else |
+| `CLOUDFLARE_PAGES_TOKEN` | secret | The Pages token, below |
 
 Repository-wide:
 
@@ -51,9 +51,9 @@ Repository-wide:
 | `CLOUDFLARE_ACCOUNT_ID` | variable | `0a95e814ccf2b6a95d2dc3bea0a4a2b4` |
 | `SELFIE_UPLOAD_TOKEN` | secret | What this repository's own CI uploads with, as on every repository the app hosts |
 
-The two Cloudflare tokens are kept nowhere else, and only in their environments, so a workflow on any other branch can't read them. To rotate one, create a token with the same permissions, set it with `pbpaste | gh secret set <NAME> --repo diffplug/selfie --env <environment>`, and delete the old one. A repository-wide secret is the exception: tend's `secrets.allowed` in `.config/tend.yaml` lists each one, and `uvx tend@latest check` flags any other.
+The two Cloudflare tokens are kept nowhere else. To rotate one, create a token with the same permissions, set it with `pbpaste | gh secret set <NAME> --env <environment>`, and delete the old one. Every repository-wide secret is listed in tend's `secrets.allowed` in `.config/tend.yaml`, and `uvx tend@latest check` flags any other.
 
-The deploy token holds exactly: Workers Scripts Edit, Account Settings Read, Hyperdrive Read, and D1 Read on the account, and Workers Routes Edit, DNS Edit, and Zone Read on `selfie.dev` and `selfieusercontent.com`. The Pages token holds Pages Edit.
+The deploy token holds exactly: Workers Scripts Edit, Account Settings Read, Hyperdrive Read, and D1 Read on the account, and Workers Routes Edit, DNS Edit, and Zone Read on `selfie.dev` and `selfieusercontent.com`. The Pages token holds Pages Edit on the account, and nothing else.
 
 Worker secrets on `selfie-app`, set with `pnpm --dir ui exec wrangler secret put <NAME>`, which `preflight` checks are all there. Cloudflare can't show them again, so keep each in the password manager:
 
