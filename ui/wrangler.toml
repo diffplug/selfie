@@ -37,10 +37,9 @@ FORMER_ORIGINS = "https://hackathon.selfie.dev"
 binding = "HYPERDRIVE"
 id = "00000000000000000000000000000000"
 
-# Named for the hackathon, and R2 can't rename a bucket.
 [[r2_buckets]]
 binding = "BLOBS"
-bucket_name = "selfie-hackathon-images"
+bucket_name = "selfie-blobs"
 
 [[d1_databases]]
 binding = "DB_1442175397"

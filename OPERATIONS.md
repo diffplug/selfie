@@ -12,7 +12,7 @@ Selfie has two deployments, both in Cloudflare account `0a95e814ccf2b6a95d2dc3be
 The app keeps its data in three places:
 
 - **D1:** one database per project, `selfie-project-<repository id>`, bound in `ui/wrangler.toml`. A project sets up its own schema on first use.
-- **R2:** bucket `selfie-hackathon-images`, named for the hackathon, since R2 can't rename a bucket.
+- **R2:** bucket `selfie-blobs`, with every project's images and built Storybooks' files under a prefix of its own. Each project's D1 says which images it has, so its bytes must never be dropped without its rows.
 - **Postgres on Neon:** sign-in only, through pgstencil, reached by the Worker through an uncached Hyperdrive. Its schema is `@pgstencil/auth`'s migrations, listed in `ui/pgstencil.json`.
 
 ## Releasing
@@ -93,15 +93,16 @@ Done once, in this order.
 ### 3. Cloudflare
 
 1. Add `selfieusercontent.com` as a zone, and point its registrar's nameservers at Cloudflare.
-2. Create the Hyperdrive as `selfie_app`, with caching off, since a sign-out must be seen at once:
+2. Create the R2 bucket, with its `r2.dev` access left off (`docs/specs/access.md` → Serving images): `pnpm --dir ui exec wrangler r2 bucket create selfie-blobs --location wnam`.
+3. Create the Hyperdrive as `selfie_app`, with caching off, since a sign-out must be seen at once:
 
    ```sh
    pnpm --dir ui exec wrangler hyperdrive create selfie-auth --caching-disabled --connection-string='postgres://selfie_app:…@<neon host>/selfie?sslmode=require'
    ```
 
    Use Neon's direct host, not its `-pooler` one, since Hyperdrive pools. Its ID is `HYPERDRIVE_ID`. `ui/wrangler.toml` keeps a placeholder, which `deploy` replaces.
-3. Set every Worker secret above on `selfie-app`. Copy `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, and `SELFIE_UPLOAD_TOKEN` from the hackathon's Worker's entries in the password manager. Generate `AUTH_SECRET` and `SELFIE_WRITER_TOKEN` fresh, with `openssl rand -hex 32`.
-4. Create the two API tokens above.
+4. Set every Worker secret above on `selfie-app`. Copy `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, and `SELFIE_UPLOAD_TOKEN` from the hackathon's Worker's entries in the password manager. Generate `AUTH_SECRET` and `SELFIE_WRITER_TOKEN` fresh, with `openssl rand -hex 32`.
+5. Create the two API tokens above.
 
 ### 4. Moving off the hackathon's Worker
 
@@ -111,4 +112,6 @@ The hackathon's Worker, `selfie-hackathon`, holds `hackathon.selfie.dev` as a cu
 2. Run **App production release**. Its smoke checks cover the new origins, the redirect, and starting a sign-in.
 3. Sign in at `https://app.selfie.dev/sign-in`, and check a project page says you can approve.
 4. Push a commit, and check its `selfie` status links to `app.selfie.dev`.
-5. Delete the `selfie-hackathon` Worker. Its D1 databases and R2 bucket are `selfie-app`'s now, so delete only the Worker.
+5. Delete the `selfie-hackathon` Worker. Its D1 databases are `selfie-app`'s now, so delete only the Worker.
+
+Its R2 bucket, `selfie-hackathon-images`, was copied whole into `selfie-blobs`, keys and HTTP metadata alike, and can be deleted once `selfie-app` has served from `selfie-blobs` for a while.
