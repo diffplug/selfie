@@ -1,0 +1,9 @@
+bot_name: selfie-bot
+
+secrets:
+  # CI's upload-only bearer token for app.selfie.dev: it can upload a batch and can't decide anything.
+  allowed: ["SELFIE_UPLOAD_TOKEN"]
+
+workflows:
+  ci-failures:
+    watched_workflows: ["Selfie", "Site", "App production release"]

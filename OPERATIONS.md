@@ -38,15 +38,20 @@ GitHub environment `app-production`, limited to the `main` branch:
 | `DATABASE_URL` | secret | The Neon migration role's direct URL (not the pooler, and not Hyperdrive) |
 | `HYPERDRIVE_ID` | variable | The Hyperdrive the Worker reaches Postgres through |
 
+GitHub environment `site-production`, limited to the `main` branch:
+
+| Name | Kind | What |
+|---|---|---|
+| `CLOUDFLARE_PAGES_TOKEN` | secret | Account `0a95e814…`: Cloudflare Pages Edit, and nothing else |
+
 Repository-wide:
 
 | Name | Kind | What |
 |---|---|---|
 | `CLOUDFLARE_ACCOUNT_ID` | variable | `0a95e814ccf2b6a95d2dc3bea0a4a2b4` |
-| `CLOUDFLARE_PAGES_TOKEN` | secret | Account `0a95e814…`: Cloudflare Pages Edit, and nothing else |
 | `SELFIE_UPLOAD_TOKEN` | secret | What this repository's own CI uploads with, as on every repository the app hosts |
 
-The two Cloudflare tokens are kept nowhere else. To rotate one, create a token with the same permissions, set it with `pbpaste | gh secret set …`, and delete the old one.
+The two Cloudflare tokens are kept nowhere else, and only in their environments, so a workflow on any other branch can't read them. To rotate one, create a token with the same permissions, set it with `pbpaste | gh secret set <NAME> --repo diffplug/selfie --env <environment>`, and delete the old one. A repository-wide secret is the exception: tend's `secrets.allowed` in `.config/tend.yaml` lists each one, and `uvx tend@latest check` flags any other.
 
 The deploy token holds exactly: Workers Scripts Edit, Account Settings Read, Hyperdrive Read, and D1 Read on the account, and Workers Routes Edit, DNS Edit, and Zone Read on `selfie.dev` and `selfieusercontent.com`. The Pages token holds Pages Edit.
 
@@ -73,7 +78,7 @@ Done once, in this order.
    - generate a **client secret**; it and the app's **Client ID** are `GITHUB_CLIENT_SECRET` and `GITHUB_CLIENT_ID`
 
    Its permissions are `statuses: write` and `contents: read` on repositories, **Email addresses: Read-only** on accounts, and no webhook. Without the email permission, GitHub refuses pgstencil's read of `/user/emails`, and every sign-in fails with a 500.
-3. Create the `app-production` environment, limited to `main`, and set the secrets and variables above.
+3. Create the `app-production` and `site-production` environments, each limited to `main`, and set the secrets and variables above.
 
 ### 2. Neon
 
