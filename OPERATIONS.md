@@ -18,7 +18,7 @@ The app keeps its data in three places:
 ## Releasing
 
 - **The site:** merge to `main`. The workflow tests the site locally, publishes `site/public/`, and tests `https://selfie.dev`.
-- **The app:** every push to `main` that touches the app runs its tests. To release, run **App production release** from the Actions tab on `main`, or `gh workflow run app-production.yml --ref main`. It checks the Hyperdrive, the Worker's secrets, and that the bucket has no public URL, applies sign-in's migrations, deploys, and then checks the live origins with `ui/scripts/production.mjs smoke`. Migrations are append-only and run before the new Worker serves, so the Worker that's live during a release must work with the new schema.
+- **The app:** every push to `main` that touches the app runs its tests. To release, run **App production release** from the Actions tab on `main`, or `gh workflow run app-production.yml --ref main`. It checks the Hyperdrive, the Worker's secrets, and that no bucket has a public URL, applies sign-in's migrations, deploys, and then checks the live origins with `ui/scripts/production.mjs smoke`. Migrations are append-only and run before the new Worker serves, so the Worker that's live during a release must work with the new schema.
 
 From a laptop, the same steps are `node ui/scripts/production.mjs preflight|deploy|smoke`, with the environment the workflow sets.
 

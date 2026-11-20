@@ -50,7 +50,7 @@ jobs:
           # A job holding deploy credentials restores no cache another job could have written.
           package-manager-cache: false
       - run: pnpm install --frozen-lockfile
-      - name: Check the Hyperdrive is uncached, every Worker secret is set, and the bucket has no public URL
+      - name: Check the Hyperdrive is uncached, every Worker secret is set, and no bucket has a public URL
         working-directory: ui
         run: node scripts/production.mjs preflight
         env:

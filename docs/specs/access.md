@@ -21,7 +21,7 @@ There's no login on this server, since anyone who can reach loopback on the mach
 
 ## Who can do what
 
-Source of truth: `ui/src/worker/auth.ts`, `ui/src/worker/login.ts`, `accessOf` in `ui/src/worker/app.ts`, `ui/src/worker/github.ts`; tests in `ui/test/workerd/cloud.workerd.test.ts`. `docs/specs/cloud.md` says what the Worker hosts.
+Source of truth: `ui/src/worker/auth.ts`, `ui/src/worker/login.ts`, `accessOf` in `ui/src/worker/app.ts`, `ui/src/worker/github.ts`, `preflight` in `ui/scripts/production.mjs`; tests in `ui/test/workerd/cloud.workerd.test.ts`. `docs/specs/cloud.md` says what the Worker hosts.
 
 Every project here is public, and one person writes (rationale).
 
@@ -41,6 +41,7 @@ Every project here is public, and one person writes (rationale).
 - **Must keep `sameOriginWrites` and `pageHeaders` on the review routes.** The sync routes answer only to a bearer token, and never read a cookie.
 - **Must use one GitHub App with only `statuses: write` and `contents: read` on repositories, `email addresses: read` on accounts, and no webhook**, to say whether a repository has a commit, to post a commit's status, and, through its OAuth client, to sign the writer in. The adapter reads a signed-in account's verified primary email, and fails a sign-in it can't read it for, so the account permission is what signing in needs. **Its private key and client secret stay in Worker secrets.**
 - **Must refuse a commit GitHub doesn't have**, as `docs/specs/sync.md` → What goes says, and treat any other answer from GitHub as an error.
+- **Never give an R2 bucket the Worker binds a public URL**, neither its `r2.dev` access nor a custom domain, so every image goes through the Worker. A release fails if one has either.
 
 ## Future
 
@@ -74,7 +75,7 @@ GitHub decides. Selfie keeps no member list of its own.
 
 ### Serving images
 
-- **Never give an image a direct R2 URL.** Every image is served by the Worker after an access check. The bucket's `r2.dev` access and custom domains stay off, and it issues no presigned URLs.
+- **Never give an image a direct R2 URL.** Every image is served by the Worker after an access check, and the bucket issues no presigned URLs. Its public URLs are already off ([Who can do what](#who-can-do-what)).
 - **Never treat an image hash as a secret**, since anyone holding an image can compute it. Access depends on who is asking and which project they ask about.
 - **Must serve images with `Cache-Control: private`, for public repositories too**, since a repository can become private and a shared cache would keep serving it.
 - **Must serve images with `X-Content-Type-Options: nosniff`, and a type read from their first bytes**, since the cloud doesn't read a file's body (`docs/specs/sync.md` → What a store takes).
