@@ -53,7 +53,7 @@ Repository-wide:
 
 The two Cloudflare tokens are kept nowhere else. To rotate one, create a token with the same permissions, set it with `pbpaste | gh secret set <NAME> --env <environment>`, and delete the old one. Every repository-wide secret is listed in tend's `secrets.allowed` in `.config/tend.yaml`, and `uvx tend@latest check` flags any other.
 
-The deploy token holds exactly: Workers Scripts Edit, Account Settings Read, Hyperdrive Read, and D1 Read on the account, and Workers Routes Edit, DNS Edit, and Zone Read on `selfie.dev` and `selfieusercontent.com`. The Pages token holds Pages Edit on the account, and nothing else.
+The deploy token holds exactly: Workers Scripts Edit, Account Settings Read, Hyperdrive Read, D1 Read, and Workers R2 Storage Read on the account, and Workers Routes Edit, DNS Edit, and Zone Read on `selfie.dev` and `selfieusercontent.com`. `wrangler deploy` uses the R2 read to look up the bucket whenever `BLOBS` names one the live Worker doesn't already bind. The Pages token holds Pages Edit on the account, and nothing else.
 
 Worker secrets on `selfie-app`, set with `pnpm --dir ui exec wrangler secret put <NAME>`, which `preflight` checks are all there. Cloudflare can't show them again, so keep each in the password manager:
 
