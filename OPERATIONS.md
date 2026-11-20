@@ -112,4 +112,4 @@ The hackathon's Worker, `selfie-hackathon`, holds `hackathon.selfie.dev` as a cu
 2. Run **App production release**. Its smoke checks cover the new origins, the redirect, and starting a sign-in.
 3. Sign in at `https://app.selfie.dev/sign-in`, and check a project page says you can approve.
 4. Push a commit, and check its `selfie` status links to `app.selfie.dev`.
-5. Delete the `selfie-hackathon` Worker, but not its D1 databases, which are `selfie-app`'s now. Delete its R2 bucket, `selfie-hackathon-images`, once `selfie-app` has served from `selfie-blobs` for a while, since `selfie-blobs` began as a copy of it.
+5. Delete the `selfie-hackathon` Worker, but not its D1 databases, which are `selfie-app`'s now.
