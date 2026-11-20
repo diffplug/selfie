@@ -1,6 +1,6 @@
 // app.selfie.dev's release steps, for .github/workflows/app-production.yml and for an operator:
 //
-//   node scripts/production.mjs preflight   the Hyperdrive is uncached, and every Worker secret is set
+//   node scripts/production.mjs preflight   the Hyperdrive is uncached, every Worker secret is set, and the bucket is reached only through the Worker
 //   node scripts/production.mjs deploy      builds, and deploys with the real Hyperdrive ID
 //   node scripts/production.mjs smoke       the live origins answer as docs/specs/cloud.md says
 //
@@ -45,6 +45,13 @@ async function cloudflare(path) {
   return body.result;
 }
 
+/** The one R2 bucket `wrangler.toml` binds. */
+function bucketName() {
+  const names = [...readFileSync("wrangler.toml", "utf8").matchAll(/^bucket_name = "([^"]+)"$/gm)].map(([, name]) => name);
+  if (names.length !== 1) throw new Error(`wrangler.toml binds ${names.length} R2 buckets, not 1.`);
+  return names[0];
+}
+
 async function preflight() {
   const hyperdrive = await cloudflare(`/hyperdrive/configs/${hyperdriveId()}`);
   // A cached read could keep a session alive after its sign-out.
@@ -52,7 +59,12 @@ async function preflight() {
   const present = new Set((await cloudflare(`/workers/scripts/${WORKER}/secrets`)).map(({ name }) => name));
   const missing = SECRETS.filter((name) => !present.has(name));
   if (missing.length > 0) throw new Error(`${WORKER} is missing secrets: ${missing.join(", ")}`);
-  console.log(`Hyperdrive ${hyperdrive.name} is uncached, and ${WORKER} has all ${SECRETS.length} secrets.`);
+  // Every image is served by the Worker after an access check (docs/specs/access.md -> Serving images).
+  const bucket = bucketName();
+  if ((await cloudflare(`/r2/buckets/${bucket}/domains/managed`)).enabled !== false) throw new Error(`R2 bucket ${bucket} has its r2.dev URL on, or Cloudflare no longer says; turn it off.`);
+  const domains = (await cloudflare(`/r2/buckets/${bucket}/domains/custom`)).domains.map(({ domain }) => domain);
+  if (domains.length > 0) throw new Error(`R2 bucket ${bucket} has custom domains: ${domains.join(", ")}`);
+  console.log(`Hyperdrive ${hyperdrive.name} is uncached, ${WORKER} has all ${SECRETS.length} secrets, and R2 bucket ${bucket} has no public URL.`);
 }
 
 function deploy() {
