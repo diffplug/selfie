@@ -1,4 +1,4 @@
-// The most statements in one request, as `docs/specs/renders.md` -> Requests says. It holds 19,600 renders, so a batch of up to that many costs one.
+// The most statements in one request, as `docs/specs/renders.md` -> Requests says. With a statement per 1,000 stories to key them, it holds about 18,600 renders, so a batch of up to that many costs one.
 export const STATEMENTS_PER_REQUEST = 400;
 
 /** Splits items into groups of at most `size`, in order. */

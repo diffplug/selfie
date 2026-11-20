@@ -270,7 +270,7 @@ describe("RenderBatches", () => {
   });
 
   describe("crashes partway", () => {
-    // 19,600 renders fill the 400 statements of one request, so this takes two.
+    // 20 statements key the stories and 380 hold 18,620 renders, filling the 400 statements of one request, so this takes two.
     const RENDERS = 20_000;
     const items: RecordedRender[] = Array.from({ length: RENDERS }, (_, i) =>
       rendered(`story-${i}`, (i % 40) + 1),
