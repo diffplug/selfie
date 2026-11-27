@@ -3,6 +3,7 @@ import type { Context, MiddlewareHandler } from "hono";
 import { imageMediaType } from "selfie-store";
 import type { ApiError } from "../shared/api.ts";
 
+/** Content-addressed, so a browser may keep it for good, and only that browser may. */
 export const CONTENT_ADDRESSED = "private, max-age=31536000, immutable";
 
 export const failure = (code: string, message: string): ApiError => ({ error: { code, message } });
