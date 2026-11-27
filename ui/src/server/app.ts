@@ -40,7 +40,6 @@ class BadRequest extends Error {
   readonly code = "bad-request";
 }
 
-
 /**
  * Another site can't frame the page to steer a click, or embed an image to learn it exists, and
  * nothing else on the page may load from anywhere else, but for frames of a hosted Storybook.
@@ -94,8 +93,6 @@ export function sameOrigin(allowedOrigin: (context: Context) => string): Middlew
   };
 }
 
-/** Content-addressed, so a browser may keep it for good, and only that browser may. */
-
 async function jsonBody(context: Context): Promise<Record<string, unknown>> {
   const body: unknown = await context.req.json().catch(() => null);
   if (body === null || typeof body !== "object" || Array.isArray(body)) {
@@ -145,10 +142,12 @@ function noteId(value: string): number {
   return id;
 }
 
-/** The routes under `/api`, which never answer with anything but JSON or an image. */
 export { failure };
 
-/** Given one source for a server's whole life, or a way to find the one a request is for. */
+/**
+ * The routes under `/api`, which never answer with anything but JSON or an image. Given one source
+ * for a server's whole life, or a way to find the one a request is for.
+ */
 export function createReviewApi(given: ReviewSource | ((context: Context) => Promise<ReviewSource>)): Hono {
   const sourceOf = typeof given === "function" ? given : async () => given;
   const api = new Hono();
