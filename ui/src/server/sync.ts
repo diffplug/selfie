@@ -100,6 +100,17 @@ function readHash(value: unknown): string {
   return value;
 }
 
+const readTexts = (value: unknown, what: string): readonly string[] => {
+  if (!Array.isArray(value) || !value.every((item) => typeof item === "string")) throw badRequest(`${what} must be a list of text.`);
+  return value;
+};
+
+/** Checked here, since a batch keeps it for good, and every page and status that reads the batch reads it. */
+function readStoryFilter(value: unknown): StoryFilter {
+  const { patterns, unmatched } = asRecord(value);
+  return { patterns: readTexts(patterns, "storyFilter.patterns"), unmatched: readTexts(unmatched, "storyFilter.unmatched") };
+}
+
 function readViewport(value: unknown): Viewport {
   const { width, height } = asRecord(value);
   const viewport = { width: width as number, height: height as number };
@@ -125,7 +136,7 @@ function receivedBatch(id: string, body: Record<string, unknown>, now: number): 
     environment: readText(environment, "environment"),
     startedAt: Math.min(readWhole(startedAt, "startedAt"), now),
     dirty,
-    storyFilter: (storyFilter ?? null) as StoryFilter | null,
+    storyFilter: orNull(storyFilter, readStoryFilter),
     reusedFromBatch: orNull(reusedFromBatch, (batch) => readText(batch, "reusedFromBatch")),
     scale,
     viewport: readViewport(viewport),
