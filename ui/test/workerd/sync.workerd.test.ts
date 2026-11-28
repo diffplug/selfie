@@ -74,6 +74,17 @@ describe("the sync routes, in a Worker", () => {
     expect(await sendJson("POST", `/batches/${FIRST}/finish`, "writer", { count: 1, finishedAt: 600 })).toEqual({ status: "complete" });
   });
 
+  it("takes a batch's story filter only as patterns and the unmatched among them", async () => {
+    const filtered = "44444444-4444-4444-8444-444444444444";
+    const storyFilter = { patterns: ["a*", "nope*"], unmatched: ["nope*"] };
+    expect(await sendJson("PUT", `/batches/${filtered}`, "writer", { ...batchFacts(SHA), storyFilter })).toEqual({ status: "recording" });
+    for (const malformed of [{}, "a*", { patterns: "a*", unmatched: [] }, { patterns: ["a*"], unmatched: [7] }, { patterns: ["a*"] }]) {
+      const response = await send("PUT", `/batches/55555555-5555-4555-8555-555555555555`, "writer", { ...batchFacts(SHA), storyFilter: malformed });
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({ error: { code: "bad-request" } });
+    }
+  });
+
   it("merges decisions by latest wins, in any order, on D1's own engine", async () => {
     const decisions = (decision: string, at: number) => ({ environment: ENV, decisions: [{ story: "a", imageHash: hash, decision, at, gitSha: SHA, batchId: FIRST }] });
     expect((await send("POST", "/decisions", "writer", decisions("rejected", 700))).status).toBe(200);
